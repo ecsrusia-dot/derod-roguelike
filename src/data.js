@@ -311,6 +311,194 @@ export const ENEMIES = {
     ],
     drop: { gold: [200, 280], gem: [4, 6] },
   },
+  
+  // === 챕터 1 (북부) 추가 ===
+  frostGiant: {
+    name: '동상 거인', hp: 130, color: '#7ba3c4',
+    desc: '동토의 거인. 한기를 발산한다',
+    tier: 'normal', chapter: 1,
+    patterns: [
+      { name: '얼어붙은 주먹', dmg: [16, 22], type: 'attack' },
+      { name: '한파', dmg: [10, 14], type: 'attack' },
+      { name: '냉기 결계', dmg: [0, 0], type: 'defend', defense: 25 },
+      { name: '눈사태', dmg: [24, 32], type: 'attack', heavy: true },
+    ],
+    drop: { gold: [40, 60] },
+  },
+  iceMage: {
+    name: '한기의 마녀', hp: 145, color: '#9ad4d4',
+    desc: '얼음을 다루는 흑마법사',
+    tier: 'elite', chapter: 1,
+    patterns: [
+      { name: '얼음 창', dmg: [18, 24], type: 'attack' },
+      { name: '눈보라', dmg: [22, 30], type: 'attack', heavy: true },
+      { name: '서리 방벽', dmg: [0, 0], type: 'defend', defense: 35 },
+      { name: '동결 저주', dmg: [12, 16], type: 'attack' },
+    ],
+    drop: { gold: [70, 100], gem: [1, 2] },
+  },
+  
+  // === 챕터 2 (숲) 추가 ===
+  shadowWolf: {
+    name: '그림자 늑대', hp: 165, color: '#3a2a4a',
+    desc: '숲의 어둠을 먹고 자란 사냥꾼',
+    tier: 'normal', chapter: 2,
+    patterns: [
+      { name: '어둠의 물어뜯기', dmg: [18, 24], type: 'attack' },
+      { name: '그림자 도약', dmg: [22, 28], type: 'attack', heavy: true },
+      { name: '잠복 자세', dmg: [0, 0], type: 'defend', defense: 25 },
+    ],
+    drop: { gold: [50, 75] },
+  },
+  corruptSpider: {
+    name: '부패한 거미', hp: 175, color: '#5c4a8c',
+    desc: '독액이 스며든 거대 거미',
+    tier: 'normal', chapter: 2,
+    patterns: [
+      { name: '독니', dmg: [16, 22], type: 'attack' },
+      { name: '거미줄 포박', dmg: [10, 14], type: 'attack' },
+      { name: '대량 독무', dmg: [22, 30], type: 'attack', heavy: true },
+      { name: '갑각 방어', dmg: [0, 0], type: 'defend', defense: 30 },
+    ],
+    drop: { gold: [55, 80] },
+  },
+  forestTyrant: {
+    name: '숲의 폭군', hp: 220, color: '#5a7a3a',
+    desc: '대삼림을 지배하는 거대 늑대왕',
+    tier: 'elite', chapter: 2,
+    patterns: [
+      { name: '왕의 송곳니', dmg: [22, 30], type: 'attack' },
+      { name: '포효', dmg: [12, 18], type: 'attack' },
+      { name: '왕의 분노', dmg: [30, 38], type: 'attack', heavy: true },
+      { name: '거대한 자세', dmg: [0, 0], type: 'defend', defense: 40 },
+    ],
+    drop: { gold: [110, 140], gem: [2, 3] },
+  },
+  
+  // === 챕터 3 (봉인된 신전) ===
+  timeKeeper: {
+    name: '시간의 수호자', hp: 195, color: '#7ba3c4',
+    desc: '신전을 지키는 시간 정령',
+    tier: 'normal', chapter: 3,
+    patterns: [
+      { name: '시간 일그러뜨리기', dmg: [20, 26], type: 'attack' },
+      { name: '연속 공격', dmg: [14, 18], type: 'attack' },
+      { name: '시간 가속', dmg: [26, 34], type: 'attack', heavy: true },
+      { name: '정지 결계', dmg: [0, 0], type: 'defend', defense: 35 },
+    ],
+    drop: { gold: [70, 100] },
+  },
+  brokenGolem: {
+    name: '깨진 골렘', hp: 240, color: '#8b8378',
+    desc: '신전의 수호 골렘. 부서져도 움직인다',
+    tier: 'normal', chapter: 3,
+    patterns: [
+      { name: '돌 주먹', dmg: [22, 28], type: 'attack' },
+      { name: '바닥 쪼개기', dmg: [16, 22], type: 'attack' },
+      { name: '거대한 일격', dmg: [32, 42], type: 'attack', heavy: true },
+      { name: '암석 자세', dmg: [0, 0], type: 'defend', defense: 50 },
+    ],
+    drop: { gold: [80, 110] },
+  },
+  sealMage: {
+    name: '봉인 마법사', hp: 200, color: '#5c4a8c',
+    desc: '엘디마이어의 봉인을 유지하는 마법사',
+    tier: 'normal', chapter: 3,
+    patterns: [
+      { name: '봉인 광선', dmg: [24, 30], type: 'attack' },
+      { name: '마력 폭발', dmg: [18, 24], type: 'attack' },
+      { name: '대봉인술', dmg: [30, 40], type: 'attack', heavy: true },
+      { name: '마법 결계', dmg: [0, 0], type: 'defend', defense: 35 },
+    ],
+    drop: { gold: [85, 115] },
+  },
+  ancientPriest: {
+    name: '옛 사제', hp: 280, color: '#d4a574',
+    desc: '데로드를 모시던 신전의 옛 사제. 광기에 빠졌다',
+    tier: 'elite', chapter: 3,
+    patterns: [
+      { name: '심판의 광선', dmg: [28, 36], type: 'attack' },
+      { name: '저주의 기도', dmg: [20, 26], type: 'attack' },
+      { name: '신성한 분노', dmg: [38, 48], type: 'attack', heavy: true },
+      { name: '신성 결계', dmg: [0, 0], type: 'defend', defense: 45 },
+    ],
+    drop: { gold: [130, 170], gem: [2, 4] },
+  },
+  oblivionSealer: {
+    name: '망각의 봉인자', hp: 460, color: '#5c4a8c',
+    desc: '엘디마이어의 마지막 수호자',
+    isBoss: true, tier: 'boss', chapter: 3,
+    patterns: [
+      { name: '망각의 일격', dmg: [28, 36], type: 'attack' },
+      { name: '시간 역행', dmg: [20, 28], type: 'attack' },
+      { name: '봉인 해제', dmg: [40, 52], type: 'attack', heavy: true },
+      { name: '절대 결계', dmg: [0, 0], type: 'defend', defense: 55 },
+    ],
+    drop: { gold: [260, 340], gem: [5, 8] },
+  },
+  
+  // === 챕터 4 (마계의 균열) ===
+  demonScout: {
+    name: '마계 정찰병', hp: 230, color: '#8b1f1f',
+    desc: '마계의 첨병',
+    tier: 'normal', chapter: 4,
+    patterns: [
+      { name: '마계의 칼', dmg: [26, 32], type: 'attack' },
+      { name: '독니 던지기', dmg: [18, 24], type: 'attack' },
+      { name: '암흑 베기', dmg: [34, 44], type: 'attack', heavy: true },
+      { name: '마계 자세', dmg: [0, 0], type: 'defend', defense: 35 },
+    ],
+    drop: { gold: [90, 120] },
+  },
+  wrathDemon: {
+    name: '분노한 악마', hp: 280, color: '#c4453d',
+    desc: '나크젤리온의 분노가 형상화된 존재',
+    tier: 'normal', chapter: 4,
+    patterns: [
+      { name: '광기의 발톱', dmg: [28, 36], type: 'attack' },
+      { name: '분노의 외침', dmg: [16, 22], type: 'attack' },
+      { name: '대광살', dmg: [38, 50], type: 'attack', heavy: true },
+      { name: '마계 결계', dmg: [0, 0], type: 'defend', defense: 40 },
+    ],
+    drop: { gold: [100, 130] },
+  },
+  riftBreach: {
+    name: '차원의 균열', hp: 260, color: '#0a0608',
+    desc: '차원이 찢어져 흘러나온 존재',
+    tier: 'normal', chapter: 4,
+    patterns: [
+      { name: '차원 베기', dmg: [30, 38], type: 'attack' },
+      { name: '공간 일그러뜨리기', dmg: [22, 28], type: 'attack' },
+      { name: '차원 폭발', dmg: [40, 54], type: 'attack', heavy: true },
+      { name: '균열 자세', dmg: [0, 0], type: 'defend', defense: 38 },
+    ],
+    drop: { gold: [105, 135] },
+  },
+  demonApostle: {
+    name: '마왕의 사도', hp: 340, color: '#5c1a1a',
+    desc: '나크젤리온의 직속 사도',
+    tier: 'elite', chapter: 4,
+    patterns: [
+      { name: '사도의 일격', dmg: [32, 40], type: 'attack' },
+      { name: '암흑 마법', dmg: [26, 34], type: 'attack' },
+      { name: '신성 모독', dmg: [44, 56], type: 'attack', heavy: true },
+      { name: '왕의 결계', dmg: [0, 0], type: 'defend', defense: 50 },
+    ],
+    drop: { gold: [160, 210], gem: [3, 5] },
+  },
+  nakzelionShadow: {
+    name: '나크젤리온의 그림자', hp: 580, color: '#0a0608',
+    desc: '마왕의 분신. 진정한 마왕은 더 깊은 곳에 있다',
+    isBoss: true, tier: 'boss', chapter: 4,
+    patterns: [
+      { name: '왕의 권능', dmg: [34, 44], type: 'attack' },
+      { name: '암흑의 격노', dmg: [26, 34], type: 'attack' },
+      { name: '절대 멸살', dmg: [50, 64], type: 'attack', heavy: true },
+      { name: '왕좌의 가호', dmg: [0, 0], type: 'defend', defense: 60 },
+      { name: '저주의 손길', dmg: [22, 30], type: 'attack' },
+    ],
+    drop: { gold: [340, 440], gem: [8, 12] },
+  },
 };
 
 // =========== 챕터 ===========
@@ -323,25 +511,25 @@ export const CHAPTERS = [
     id: 1, name: '북부 극지대', sub: 'The Northern Wastes',
     desc: '눈보라가 멈추지 않는 변경. 마족의 첩자들이 잠복한다.',
     nodeCount: 14, biome: 'ice', color: '#7ba3c4',
-    enemies: { normal: ['goblin', 'iceWolf'], elite: ['cultist'], boss: 'wraith' },
+    enemies: { normal: ['goblin', 'iceWolf', 'frostGiant'], elite: ['cultist', 'iceMage'], boss: 'wraith' },
   },
   {
     id: 2, name: '죽은 자의 숲', sub: 'Forest of the Fallen',
     desc: '엘프의 옛 영토. 망자화된 황혼의 자녀들이 떠돈다.',
     nodeCount: 16, biome: 'forest', color: '#7a9a5e',
-    enemies: { normal: ['fallenElf'], elite: ['forestSpirit'], boss: 'twilightChild' },
+    enemies: { normal: ['fallenElf', 'shadowWolf', 'corruptSpider'], elite: ['forestSpirit', 'forestTyrant'], boss: 'twilightChild' },
   },
   {
     id: 3, name: '봉인된 신전', sub: 'The Sealed Sanctum',
     desc: '엘디마이어의 파편이 깨어나는 곳. 시간이 뒤틀린다.',
     nodeCount: 18, biome: 'ruin', color: '#5c4a8c',
-    enemies: { normal: ['cultist'], elite: ['forestSpirit'], boss: 'wraith' },
+    enemies: { normal: ['timeKeeper', 'brokenGolem', 'sealMage'], elite: ['ancientPriest'], boss: 'oblivionSealer' },
   },
   {
     id: 4, name: '마계의 균열', sub: 'The Demon Rift',
     desc: '나크젤리온의 군세가 쏟아지는 차원의 틈.',
     nodeCount: 20, biome: 'demon', color: '#8b1f1f',
-    enemies: { normal: ['cultist'], elite: ['forestSpirit'], boss: 'twilightChild' },
+    enemies: { normal: ['demonScout', 'wrathDemon', 'riftBreach'], elite: ['demonApostle'], boss: 'nakzelionShadow' },
   },
 ];
 
@@ -466,6 +654,446 @@ export const EVENTS = [
         success: { text: '정령의 환영을 꿰뚫어본다.', reward: { type: 'gold', value: 100 } },
         fail: { text: '환영에 휩쓸려 길을 잃는다.', penalty: { hp: -30 } }
       },
+    ],
+  },
+  
+  // === 챕터 1 (북부) 추가 사건 ===
+  {
+    id: 'frozenCave',
+    title: '얼어붙은 동굴 입구',
+    text: '거대한 빙벽이 갈라진 틈. 안에서 차가운 바람이 불어온다.\n무언가가 안에 잠들어 있는 듯하다.',
+    chapter: [1],
+    choices: [
+      {
+        text: '안으로 들어간다 (근력 검정)',
+        stat: '근력', dc: 13,
+        success: { text: '얼음을 뚫고 들어가 잊혀진 보물을 찾는다.', reward: { type: 'random_relic' } },
+        fail: { text: '얼음이 무너져 깔린다.', penalty: { hp: -25 } }
+      },
+      { text: '우회한다', result: '안전한 길을 택한다.', reward: null },
+      {
+        text: '입구에서 살핀다 (심안 검정)',
+        stat: '지능', dc: 12,
+        success: { text: '안에 있는 보물을 발견한다.', reward: { type: 'gold', value: 70 } },
+        fail: { text: '아무것도 보이지 않는다.', penalty: null }
+      },
+    ],
+  },
+  {
+    id: 'frozenCorpse',
+    title: '얼어붙은 시신',
+    text: '눈 속에 박힌 시신. 이전 원정대의 일원이었을까. 손에는 무언가가 쥐어져 있다.',
+    chapter: [1, 2],
+    choices: [
+      { text: '시신을 뒤진다', result: '낡은 지갑을 챙긴다.', reward: { type: 'gold', value: 40 } },
+      {
+        text: '예의를 갖춰 묻어준다 (매력 검정)',
+        stat: '매력', dc: 12,
+        success: { text: '망자의 영혼이 가호를 내린다.', reward: { type: 'heal', value: 30 } },
+        fail: { text: '얼어붙은 땅이 너무 단단하다.', penalty: null }
+      },
+      { text: '지나친다', result: '추위 속에 발걸음을 옮긴다.', reward: null },
+    ],
+  },
+  {
+    id: 'auroraNight',
+    title: '극광의 밤',
+    text: '하늘이 보랏빛 빛으로 흐른다. 데블랑의 표식이 가득하다.',
+    chapter: [1],
+    choices: [
+      {
+        text: '빛에 몸을 맡긴다 (지능 검정)',
+        stat: '지능', dc: 15,
+        success: { text: '데블랑의 진리가 어렴풋이 보인다.', reward: { type: 'skill_random_lv', axis: 'utility' } },
+        fail: { text: '광기가 잠시 정신을 좀먹는다.', penalty: { hp: -20 } }
+      },
+      { text: '눈을 감고 지나친다', result: '아무것도 보지 않는다.', reward: null },
+    ],
+  },
+  {
+    id: 'oldBattlefield',
+    title: '옛 전장',
+    text: '눈 아래 묻힌 전장. 부서진 무기들이 흩어져 있다.',
+    chapter: [1, 2],
+    choices: [
+      {
+        text: '쓸 만한 무기를 찾는다 (근력 검정)',
+        stat: '근력', dc: 13,
+        success: { text: '단단한 검을 발견한다.', reward: { type: 'stat', name: '근력', value: 1 } },
+        fail: { text: '쓸 만한 게 없다.', penalty: null }
+      },
+      { text: '시신들에게 인사한다', result: '망자의 가호가 잠시 깃든다.', reward: { type: 'heal', value: 25 } },
+    ],
+  },
+  
+  // === 챕터 2 (숲) 추가 사건 ===
+  {
+    id: 'runeStone',
+    title: '고대 룬스톤',
+    text: '대지에 박힌 거대한 룬스톤. 알 수 없는 문자가 빛난다.\n손을 대면 무언가가 깃들 것 같다.',
+    chapter: [2, 3],
+    choices: [
+      {
+        text: '룬을 만진다 (지능 검정)',
+        stat: '지능', dc: 14,
+        success: { text: '고대 마법의 힘이 깃든다.', reward: { type: 'skill_random_lv', axis: 'attack' } },
+        fail: { text: '마법의 폭발이 몸을 강타한다.', penalty: { hp: -35 } }
+      },
+      {
+        text: '읽으려 한다 (마력 검정)',
+        stat: '지능', dc: 16,
+        success: { text: '룬이 가르침을 준다.', reward: { type: 'gold', value: 100 } },
+        fail: { text: '의미를 알 수 없다.', penalty: null }
+      },
+      { text: '지나친다', result: '룬이 등 뒤에서 빛난다.', reward: null },
+    ],
+  },
+  {
+    id: 'lostElf',
+    title: '길 잃은 엘프',
+    text: '나무에 기댄 어린 엘프. 무릎을 다쳤다.\n"인간이여... 도와주실 수 있나요?"',
+    chapter: [2],
+    choices: [
+      { text: '치료를 도와준다 (은화 30)', cost: { gold: 30 }, result: '엘프가 감사하며 작은 부적을 건넨다.', reward: { type: 'random_relic' } },
+      {
+        text: '함정인지 의심한다 (지능 검정)',
+        stat: '지능', dc: 13,
+        success: { text: '실제로 함정이었다. 잠복했던 적을 처치한다.', reward: { type: 'gold', value: 60 } },
+        fail: { text: '진짜였다. 도와주지 않았다.', penalty: null }
+      },
+      { text: '무시한다', result: '엘프의 울음소리가 등 뒤에서.', reward: null },
+    ],
+  },
+  {
+    id: 'huntersTrap',
+    title: '사냥꾼의 함정',
+    text: '바닥에 덫. 누군가 짐승을 잡으려 했다.\n주변에 사냥꾼은 보이지 않는다.',
+    chapter: [2],
+    choices: [
+      {
+        text: '덫을 회수한다 (민첩 검정)',
+        stat: '민첩', dc: 13,
+        success: { text: '함정을 무력화하고 부품을 챙긴다.', reward: { type: 'gold', value: 50 } },
+        fail: { text: '발이 걸린다.', penalty: { hp: -30 } }
+      },
+      { text: '우회한다', result: '함정을 피해 간다.', reward: null },
+    ],
+  },
+  {
+    id: 'sacredTree',
+    title: '신성한 나무',
+    text: '거대한 신성목. 나무 줄기에 자그마한 빛이 어른거린다.',
+    chapter: [2],
+    choices: [
+      {
+        text: '명상한다 (매력 검정)',
+        stat: '매력', dc: 14,
+        success: { text: '나무의 정령이 가호를 내린다.', reward: { type: 'heal_full' } },
+        fail: { text: '정령은 응답하지 않는다.', penalty: null }
+      },
+      { text: '나무 열매를 딴다', result: '신성한 열매를 먹는다.', reward: { type: 'heal', value: 40 } },
+      {
+        text: '나뭇가지를 꺾는다 (근력 검정)',
+        stat: '근력', dc: 14,
+        success: { text: '신성목의 가지를 얻는다.', reward: { type: 'random_relic' } },
+        fail: { text: '나무가 분노한다!', combat: 'forestSpirit', penalty: null }
+      },
+    ],
+  },
+  {
+    id: 'wolfPack',
+    title: '늑대 무리',
+    text: '어둠 속에서 빛나는 눈동자들. 늑대 무리가 길을 막고 있다.',
+    chapter: [2],
+    choices: [
+      {
+        text: '위협한다 (근력 검정)',
+        stat: '근력', dc: 14,
+        success: { text: '늑대들이 물러난다.', reward: null },
+        fail: { text: '늑대들이 달려든다!', combat: 'shadowWolf', penalty: null }
+      },
+      {
+        text: '먹이를 던진다 (은화 30)',
+        cost: { gold: 30 },
+        result: '늑대들이 먹이에 정신이 팔린 사이 지나간다.',
+        reward: null
+      },
+      { text: '강제 돌파', result: '강행돌파. 길을 뚫는다.', reward: null, penalty: { hp: -25 } },
+    ],
+  },
+  
+  // === 챕터 3 (봉인된 신전) 사건 ===
+  {
+    id: 'sealedDoor',
+    title: '봉인된 문',
+    text: '거대한 석문. 데로드의 표식이 새겨져 있다.\n안에서 무언가가 깨어나려 한다.',
+    chapter: [3],
+    choices: [
+      {
+        text: '강제로 연다 (근력 검정)',
+        stat: '근력', dc: 16,
+        success: { text: '문을 열고 봉인된 보물을 얻는다.', reward: { type: 'random_relic' } },
+        fail: { text: '문이 흔들리지 않는다. 손목이 시리다.', penalty: { hp: -30 } }
+      },
+      {
+        text: '봉인을 해독한다 (지능 검정)',
+        stat: '지능', dc: 15,
+        success: { text: '봉인을 무사히 풀고 안에 들어간다.', reward: { type: 'skill_random_lv' } },
+        fail: { text: '잘못된 주문에 마력이 폭발한다.', penalty: { hp: -25 } }
+      },
+      { text: '경고를 듣고 떠난다', result: '봉인은 그대로 둔다.', reward: null },
+    ],
+  },
+  {
+    id: 'timeRift',
+    title: '시간의 균열',
+    text: '공간이 일그러진다. 과거인지 미래인지 알 수 없는 풍경이 흘러간다.',
+    chapter: [3],
+    choices: [
+      {
+        text: '균열을 통과한다 (지능 검정)',
+        stat: '지능', dc: 15,
+        success: { text: '균열 너머의 보물을 챙긴다.', reward: { type: 'gold', value: 150 } },
+        fail: { text: '시간에 휩쓸려 부상을 입는다.', penalty: { hp: -35 } }
+      },
+      { text: '관찰만 한다', result: '시간의 비밀을 어렴풋이 깨닫는다.', reward: { type: 'stat', name: '지능', value: 1 } },
+      { text: '서둘러 지나친다', result: '균열을 피해 간다.', reward: null },
+    ],
+  },
+  {
+    id: 'oldOracle',
+    title: '낡은 신탁',
+    text: '신전 깊숙한 곳, 잠든 신탁녀. 그녀의 입에서 알 수 없는 말이 흘러나온다.',
+    chapter: [3],
+    choices: [
+      { text: '말을 듣는다', result: '신탁녀의 예언이 깃든다.', reward: { type: 'skill_random_lv', axis: 'utility' } },
+      {
+        text: '깨워서 묻는다 (매력 검정)',
+        stat: '매력', dc: 15,
+        success: { text: '신탁녀가 보물의 위치를 알려준다.', reward: { type: 'gold', value: 130 } },
+        fail: { text: '신탁녀가 분노한다!', penalty: { hp: -40 } }
+      },
+      { text: '잠든 모습 그대로 둔다', result: '예의를 갖춰 떠난다.', reward: null },
+    ],
+  },
+  {
+    id: 'shatteredAltar',
+    title: '깨진 제단',
+    text: '데로드의 제단이 박살나 있다. 누군가의 흔적이 남아있다.',
+    chapter: [3],
+    choices: [
+      {
+        text: '제단을 복원한다 (지능 검정)',
+        stat: '지능', dc: 14,
+        success: { text: '데로드의 가호가 깃든다.', reward: { type: 'heal_full' } },
+        fail: { text: '제단이 더 부서진다.', penalty: null }
+      },
+      { text: '잔해를 뒤진다', result: '낡은 보물을 챙긴다.', reward: { type: 'gold', value: 80 } },
+      {
+        text: '깨끗이 정리한다 (매력 검정)',
+        stat: '매력', dc: 13,
+        success: { text: '데로드가 작은 가호를 내린다.', reward: { type: 'skill_random_lv', axis: 'utility' } },
+        fail: { text: '응답이 없다.', penalty: null }
+      },
+    ],
+  },
+  {
+    id: 'corruptedPriest',
+    title: '타락한 사제',
+    text: '신전의 사제. 광기에 빠진 눈으로 당신을 노려본다.\n"데로드는 죽었다... 데블랑이 진실이다..."',
+    chapter: [3],
+    choices: [
+      {
+        text: '대화를 시도한다 (매력 검정)',
+        stat: '매력', dc: 16,
+        success: { text: '사제의 마음을 진정시킨다. 그의 보물을 받는다.', reward: { type: 'random_relic' } },
+        fail: { text: '사제가 폭주한다!', combat: 'ancientPriest', penalty: null }
+      },
+      { text: '즉시 공격', result: '사제와의 전투가 시작된다.', combat: 'sealMage', reward: null },
+      { text: '도망간다', result: '광기를 등 뒤로 한다.', reward: null },
+    ],
+  },
+  
+  // === 챕터 4 (마계의 균열) 사건 ===
+  {
+    id: 'demonDeal',
+    title: '악마와의 거래',
+    text: '균열 속에서 악마가 손을 내민다.\n"네 영혼의 일부를 다오. 대가는 풍족할 것이다."',
+    chapter: [4],
+    choices: [
+      { 
+        text: '거래에 응한다 (HP -40)', 
+        cost: { hp: 40 },
+        result: '악마가 약속을 지킨다.', 
+        reward: { type: 'random_relic' } 
+      },
+      { 
+        text: '큰 거래를 시도한다 (HP -60)', 
+        cost: { hp: 60 },
+        result: '악마가 강력한 힘을 건넨다.', 
+        reward: { type: 'skill_random_lv', axis: 'attack' } 
+      },
+      {
+        text: '거절한다 (지능 검정)',
+        stat: '지능', dc: 15,
+        success: { text: '악마의 함정을 꿰뚫어본다.', reward: { type: 'gold', value: 150 } },
+        fail: { text: '악마가 분노한다.', penalty: { hp: -30 } }
+      },
+    ],
+  },
+  {
+    id: 'soulPond',
+    title: '영혼의 연못',
+    text: '검은 액체로 가득 찬 연못. 안에서 영혼들이 떠올랐다 가라앉는다.',
+    chapter: [4],
+    choices: [
+      {
+        text: '액체를 마신다 (근력 검정)',
+        stat: '근력', dc: 16,
+        success: { text: '영혼의 힘을 흡수한다.', reward: { type: 'maxhp', value: 30 } },
+        fail: { text: '영혼들이 정신을 잠식한다.', penalty: { hp: -45 } }
+      },
+      {
+        text: '영혼들에게 기도한다 (매력 검정)',
+        stat: '매력', dc: 15,
+        success: { text: '영혼들이 가호를 내린다.', reward: { type: 'heal_full' } },
+        fail: { text: '응답이 없다.', penalty: null }
+      },
+      { text: '지나친다', result: '검은 연못은 그대로 둔다.', reward: null },
+    ],
+  },
+  {
+    id: 'demonWeapon',
+    title: '마계의 무기고',
+    text: '버려진 마계의 무기들. 어두운 힘이 깃들어 있다.',
+    chapter: [4],
+    choices: [
+      {
+        text: '강력한 무기를 든다 (근력 검정)',
+        stat: '근력', dc: 15,
+        success: { text: '마계의 검을 휘두른다.', reward: { type: 'random_relic' } },
+        fail: { text: '무기가 영혼을 물어뜯는다.', penalty: { hp: -40 } }
+      },
+      {
+        text: '안전한 것을 고른다 (심안 검정)',
+        stat: '지능', dc: 14,
+        success: { text: '저주받지 않은 무기를 찾는다.', reward: { type: 'stat', name: '근력', value: 2 } },
+        fail: { text: '모두 저주받았다.', penalty: null }
+      },
+      { text: '아무것도 만지지 않는다', result: '경계심을 유지한다.', reward: null },
+    ],
+  },
+  {
+    id: 'lostSoul',
+    title: '방황하는 영혼',
+    text: '한 영혼이 길을 막는다. 죽은 자의 슬픔이 가득하다.\n"제발... 나를 풀어주오..."',
+    chapter: [4],
+    choices: [
+      {
+        text: '진혼한다 (매력 검정)',
+        stat: '매력', dc: 15,
+        success: { text: '영혼이 평안을 찾는다. 작은 보물을 남긴다.', reward: { type: 'skill_random_lv', axis: 'utility' } },
+        fail: { text: '영혼이 분노로 변한다.', penalty: { hp: -35 } }
+      },
+      { text: '소금을 뿌린다 (보석 -3)', cost: { gem: 3 }, result: '영혼이 흩어진다.', reward: { type: 'gold', value: 70 } },
+      { text: '무시한다', result: '슬픈 울음을 등 뒤로.', reward: null },
+    ],
+  },
+  {
+    id: 'demonGate',
+    title: '마계의 문',
+    text: '마계로 통하는 작은 문. 심한 악취가 풍긴다.\n안에 무엇이 있을지 알 수 없다.',
+    chapter: [4],
+    choices: [
+      {
+        text: '안으로 진입한다 (근력 검정)',
+        stat: '근력', dc: 16,
+        success: { text: '마계의 보물을 약탈한다.', reward: { type: 'gold', value: 200 } },
+        fail: { text: '악마들에게 둘러싸인다!', combat: 'wrathDemon', penalty: null }
+      },
+      {
+        text: '문을 봉인한다 (지능 검정)',
+        stat: '지능', dc: 15,
+        success: { text: '마계의 침입을 막아낸다. 데로드의 가호가 깃든다.', reward: { type: 'skill_random_lv', axis: 'utility' } },
+        fail: { text: '봉인이 실패한다.', penalty: null }
+      },
+      { text: '돌아간다', result: '문을 등 뒤로 한다.', reward: null },
+    ],
+  },
+  {
+    id: 'cursedGold',
+    title: '저주받은 황금',
+    text: '거대한 금화 더미. 너무 풍요롭다. 분명 저주가 깃들어 있다.',
+    chapter: [3, 4],
+    choices: [
+      {
+        text: '모두 챙긴다 (저주 위험)',
+        result: '엄청난 부를 얻지만 저주가 깃든다.',
+        reward: { type: 'gold', value: 250 },
+        penalty: { hp: -50 }
+      },
+      {
+        text: '조금만 챙긴다 (지능 검정)',
+        stat: '지능', dc: 14,
+        success: { text: '저주받지 않은 부분만 골라낸다.', reward: { type: 'gold', value: 120 } },
+        fail: { text: '저주가 깃든다.', penalty: { hp: -30 } }
+      },
+      { text: '만지지 않는다', result: '욕망을 누른다.', reward: null },
+    ],
+  },
+  
+  // === 모든 챕터 공용 추가 사건 ===
+  {
+    id: 'mysteriousFountain',
+    title: '신비한 샘',
+    text: '맑은 물이 흐르는 작은 샘. 데로드의 표식이 살짝 보인다.',
+    chapter: [1, 2, 3, 4],
+    choices: [
+      { text: '물을 마신다', result: '몸이 한결 가벼워진다.', reward: { type: 'heal', value: 35 } },
+      {
+        text: '동전을 던진다 (은화 -20)',
+        cost: { gold: 20 },
+        result: '샘에서 빛이 솟아오른다.',
+        reward: { type: 'skill_random_lv' }
+      },
+      { text: '샘에 손을 씻는다', result: '정화된다.', reward: { type: 'heal', value: 15 } },
+    ],
+  },
+  {
+    id: 'lonelyTraveler',
+    title: '외로운 여행자',
+    text: '같은 길을 걷는 여행자. 잠시 함께 쉬어가자고 청한다.',
+    chapter: [1, 2, 3, 4],
+    choices: [
+      { text: '함께 식사한다 (은화 -30)', cost: { gold: 30 }, result: '여행자가 정보를 알려준다.', reward: { type: 'gem', value: 3 } },
+      {
+        text: '대화를 나눈다 (매력 검정)',
+        stat: '매력', dc: 13,
+        success: { text: '여행자가 작은 도움을 준다.', reward: { type: 'gold', value: 50 } },
+        fail: { text: '대화가 어색해 헤어진다.', penalty: null }
+      },
+      { text: '인사만 하고 떠난다', result: '각자의 길을 간다.', reward: null },
+    ],
+  },
+  {
+    id: 'hiddenChest',
+    title: '숨겨진 보물상자',
+    text: '풀숲 사이 보물상자. 자물쇠가 굳게 잠겨 있다.',
+    chapter: [1, 2, 3, 4],
+    choices: [
+      {
+        text: '자물쇠를 뜯는다 (근력 검정)',
+        stat: '근력', dc: 14,
+        success: { text: '자물쇠가 부러진다.', reward: { type: 'gold', value: 100 } },
+        fail: { text: '함정이 발동한다.', penalty: { hp: -25 } }
+      },
+      {
+        text: '열쇠를 따낸다 (민첩 검정)',
+        stat: '민첩', dc: 13,
+        success: { text: '자물쇠를 정밀하게 풀어낸다.', reward: { type: 'random_relic' } },
+        fail: { text: '독침이 발동한다.', penalty: { hp: -30 } }
+      },
+      { text: '의심스럽다, 떠난다', result: '함정일지도.', reward: null },
     ],
   },
   // === 추가 사건은 여기에 자유롭게 추가 ===
@@ -998,3 +1626,4 @@ export const SOUL_REWARDS = {
   rerollCost: 1,         // 제단 새로고침 비용
   altarSlots: 3,         // 제단 등장 강화 개수
 };
+
