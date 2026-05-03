@@ -214,15 +214,15 @@ export const COMBAT_SKILLS = {
   // 마족 혼혈
   광폭참격: { name: '광폭참격', cost: 0, cd: 0, type: 'physical', baseDmg: [20, 28], desc: 'HP 낮을수록 ↑', berserker: true },
   '피의 일격': { name: '피의 일격', cost: 1, cd: 2, type: 'physical', baseDmg: [25, 32], desc: '자해+출혈', selfDmg: 10, forceBleed: true },
-  광기: { name: '광기', cost: 0, cd: 4, type: 'buff', buff: 'rage', desc: '3턴 데미지+30%' },
+  광기: { name: '광기', cost: 0, cd: 4, type: 'buff', buff: 'rage', desc: '3턴 데미지+30% (광기의 분노)' },
   // 정령사
   정밀사격: { name: '정밀사격', cost: 0, cd: 0, type: 'physical', baseDmg: [16, 22], desc: '기본 활 공격' },
   연속화살: { name: '연속화살', cost: 1, cd: 2, type: 'physical', baseDmg: [12, 16], hitCount: 3, desc: '3연발' },
   바람결계: { name: '바람결계', cost: 1, cd: 0, type: 'defense', defense: 25, desc: '방어+회피', dodgeBuff: 20 },
   // 데로드의 사제
-  신성광선: { name: '신성광선', cost: 0, cd: 0, type: 'magic', baseDmg: [14, 20], desc: '신성 데미지+자가 회복 5', selfHeal: 5 },
-  축복: { name: '축복', cost: 1, cd: 3, type: 'buff', buff: 'rage', desc: '2턴 데미지+30% (분노 효과)' },
-  가호: { name: '가호', cost: 1, cd: 0, type: 'defense', defense: 35, desc: '방어 +35, HP 회복 +10', selfHeal: 10 },
+  신성광선: { name: '신성광선', cost: 0, cd: 0, type: 'magic', baseDmg: [14, 20], desc: '신성 데미지+자가 회복 10', selfHeal: 10 },
+  축복: { name: '축복', cost: 1, cd: 3, type: 'buff', buff: 'rage', desc: '3턴 데미지+30% (데로드의 축복)' },
+  가호: { name: '가호', cost: 1, cd: 0, type: 'defense', defense: 35, desc: '방어 +35, HP 회복 +15', selfHeal: 15 },
 };
 
 // =========== 적 ===========
@@ -563,14 +563,14 @@ export const CHAPTERS = [
 export const EVENTS = [
   {
     id: 'merchant',
-    title: '눈 속의 행상',
-    text: '눈보라 속에서 등이 굽은 노인이 손짓한다. 그의 마차에는 낡은 유물들이 가득하다.\n"용감한 자여, 내 물건을 보겠는가?"',
-    chapter: [1, 2, 3, 4],
+    title: '봉인된 신전 의문의 행상',
+    text: '어둠 속에서 등이 굽은 노인이 손짓한다. 그의 마차에는 낡은 유물들이 가득하다.\n"용감한 자여, 내 물건을 보겠는가?"',
+    chapter: [3],
     choices: [
       {
-        text: '거래에 응한다 (은화 50)',
-        cost: { gold: 50 },
-        result: '낡은 부적이 손에 쥐어진다.',
+        text: '거래에 응한다 (은화 300)',
+        cost: { gold: 300 },
+        result: '알 수 없는 유물 손에 쥐어진다.',
         reward: { type: 'random_relic' }
       },
       {
@@ -579,10 +579,10 @@ export const EVENTS = [
         reward: null
       },
       {
-        text: '강제로 빼앗는다 (매력 검정)',
-        stat: '매력', dc: 13,
-        success: { text: '노인의 정신을 흔든다. 짐을 챙겨 달아난다.', reward: { type: 'gold', value: 80 } },
-        fail: { text: '노인이 뼈를 드러낸다. 망자였다!', combat: 'cultist', penalty: { hp: -30 } }
+        text: '정신을 홀린 뒤 짐을 뒤진다. (매력 검정)',
+        stat: '매력', dc: 20,
+        success: { text: '노인의 정신을 뒤흔든다. 짐을 챙겨 달아난다.', reward: { type: 'gold', value: 100 } },
+        fail: { text: '노인이 뼈를 드러낸다. 망자였다!', combat: 'cultist', penalty: { hp: -50 } }
       },
     ],
   },
@@ -594,7 +594,7 @@ export const EVENTS = [
     choices: [
       {
         text: '기도를 올린다 (지능 검정)',
-        stat: '지능', dc: 14,
+        stat: '지능', dc: 19,
         success: { text: '데로드의 가호가 손에 깃든다.', reward: { type: 'skill_random_lv', axis: 'utility' } },
         fail: { text: '응답이 없다. 차가운 침묵만이.', penalty: null }
       },
@@ -619,7 +619,7 @@ export const EVENTS = [
       {
         text: '일지를 읽는다',
         result: '북부의 위험에 대한 단서를 얻는다.',
-        reward: { type: 'skill_random_lv', axis: 'utility' }
+        reward: { type: 'stat', name: '지력', value : 2 }
       },
       {
         text: '장비를 챙긴다',
@@ -628,7 +628,7 @@ export const EVENTS = [
       },
       {
         text: '경의를 표한다 (매력)',
-        stat: '매력', dc: 12,
+        stat: '매력', dc: 17,
         success: { text: '동료의 영혼이 가호를 내린다.', reward: { type: 'heal', value: 50 } },
         fail: { text: '시체는 그저 차가울 뿐.', penalty: null }
       },
@@ -1477,8 +1477,8 @@ export const META_UPGRADES = [
     desc: '시작 HP +10',
     category: 'resource',
     stackable: true,
-    maxStacks: 10,
-    cost: (stack) => 30 + stack * 20,  // 30, 50, 70, 90, 110, 130, 150, 170, 190, 210
+    maxStacks: 20,
+    cost: (stack) => 50 + stack * 50,  // 30, 50, 70, 90, 110, 130, 150, 170, 190, 210
     effect: 'startHp+10',
     color: '#9ad4a3',
   },
@@ -1488,8 +1488,8 @@ export const META_UPGRADES = [
     desc: '시작 은화 +20',
     category: 'resource',
     stackable: true,
-    maxStacks: 8,
-    cost: (stack) => 20 + stack * 15,  // 20, 35, 50, ... 125
+    maxStacks: 10,
+    cost: (stack) => 50 + stack * 50,  // 20, 35, 50, ... 125
     effect: 'startGold+20',
     color: '#d4a574',
   },
@@ -1500,7 +1500,7 @@ export const META_UPGRADES = [
     category: 'resource',
     stackable: true,
     maxStacks: 5,
-    cost: (stack) => 50 + stack * 30,  // 50, 80, 110, 140, 170
+    cost: (stack) => 50 + stack * 50,  // 50, 80, 110, 140, 170
     effect: 'startGem+3',
     color: '#7ba3c4',
   },
@@ -1524,7 +1524,7 @@ export const META_UPGRADES = [
     category: 'combat',
     stackable: true,
     maxStacks: 2,             // 5 → 2 너프
-    cost: (stack) => stack === 0 ? 500 : 1000,  // 500, 1000
+    cost: (stack) => stack === 0 ? 500 : 2000,  // 500, 2000
     effect: 'startSkill+1',
     color: '#c4453d',
   },
@@ -1535,7 +1535,7 @@ export const META_UPGRADES = [
     category: 'combat',
     stackable: true,
     maxStacks: 2,             // 5 → 2 너프
-    cost: (stack) => stack === 0 ? 500 : 1000,  // 500, 1000
+    cost: (stack) => stack === 0 ? 500 : 2000,  // 500, 2000
     effect: 'startRelic+1',
     color: '#e8b04a',
   },
@@ -1545,8 +1545,8 @@ export const META_UPGRADES = [
     desc: '주는 모든 데미지 +5%',
     category: 'combat',
     stackable: true,
-    maxStacks: 4,
-    cost: (stack) => 150 + stack * 100,  // 150, 250, 350, 450
+    maxStacks: 5,
+    cost: (stack) => 500 + stack * 500,  // 500, 1000, 1500, 2000, 2500
     effect: 'dmgDealt+5%',
     color: '#c4453d',
   },
@@ -1556,8 +1556,8 @@ export const META_UPGRADES = [
     desc: '받는 모든 데미지 -3%',
     category: 'combat',
     stackable: true,
-    maxStacks: 4,
-    cost: (stack) => 180 + stack * 140,  // 180, 320, 460, 600
+    maxStacks: 5,
+    cost: (stack) => 300 + stack * 300,  // 300, 600, 900, 1200, 1500
     effect: 'dmgTaken-3%',
     color: '#7ba3c4',
   },
@@ -1568,7 +1568,7 @@ export const META_UPGRADES = [
     category: 'combat',
     stackable: true,
     maxStacks: 5,
-    cost: (stack) => 120 + stack * 90,  // 120, 210, 300, 390, 480
+    cost: (stack) => 500 + stack * 500,  // 500, 1000, 1500, 2000, 2500
     effect: 'critRate+3%',
     color: '#d4a574',
   },
@@ -1581,7 +1581,7 @@ export const META_UPGRADES = [
     category: 'expedition',
     stackable: true,
     maxStacks: 3,
-    cost: (stack) => 250 + stack * 200,  // 250, 450, 650
+    cost: (stack) => 1000 + stack * 1000,  // 1000, 2000, 3000
     effect: 'chapterHeal+10%',
     color: '#9ad4a3',
   },
@@ -1613,7 +1613,7 @@ export const META_UPGRADES = [
     desc: '새 직업 "데로드의 사제" 사용 가능',
     category: 'unlock',
     stackable: false,
-    cost: () => 300,
+    cost: () => 10000,
     effect: 'unlock_priest',
     color: '#d4a574',
   },
@@ -1623,7 +1623,7 @@ export const META_UPGRADES = [
     desc: '2번째 원정 사용 가능 (원정 1 클리어 필요)',
     category: 'unlock',
     stackable: false,
-    cost: () => 500,
+    cost: () => 1500,
     requirePriorClear: 1,
     effect: 'unlock_expedition_2',
     color: '#5c4a8c',
@@ -1634,7 +1634,7 @@ export const META_UPGRADES = [
     desc: '3번째 원정 사용 가능 (원정 2 클리어 필요)',
     category: 'unlock',
     stackable: false,
-    cost: () => 1200,
+    cost: () => 3000,
     requirePriorClear: 2,
     effect: 'unlock_expedition_3',
     color: '#8b1f1f',
@@ -1645,7 +1645,7 @@ export const META_UPGRADES = [
     desc: '4번째 원정 사용 가능 (원정 3 클리어 필요)',
     category: 'unlock',
     stackable: false,
-    cost: () => 2500,
+    cost: () => 5000,
     requirePriorClear: 3,
     effect: 'unlock_expedition_4',
     color: '#0a0608',
