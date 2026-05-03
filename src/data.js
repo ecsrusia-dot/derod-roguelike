@@ -145,7 +145,7 @@ export const CLASSES = [
     combatSkills: ['참격', '관통', '수비'],
     color: '#c4453d',
     locked: false,
-    image: '/classes/lanthert.png',
+    image: '/classes/lanthert.jpg',
   },
   {
     id: 'sage', name: '술법사', sub: 'Sorcerer of Tour',
@@ -155,7 +155,7 @@ export const CLASSES = [
     combatSkills: ['마법탄', '정념폭발', '결계'],
     color: '#5c4a8c',
     locked: false,
-    image: '/classes/sage.png',
+    image: '/classes/sage.jpg',
   },
   {
     id: 'demonblood', name: '마족 혼혈', sub: 'Demon Heritage',
@@ -165,7 +165,7 @@ export const CLASSES = [
     combatSkills: ['광폭참격', '피의 일격', '광기'],
     color: '#8b1f1f',
     locked: false,
-    image: '/classes/demonblood.png',
+    image: '/classes/demonblood.jpg',
   },
   {
     id: 'elf', name: '숲의 정령사', sub: 'Elf of Twilight',
@@ -175,7 +175,7 @@ export const CLASSES = [
     combatSkills: ['정밀사격', '연속화살', '바람결계'],
     color: '#7a9a5e',
     locked: false,
-    image: '/classes/elf.png',
+    image: '/classes/elf.jpg',
   },
   {
     id: 'priest', name: '데로드의 사제', sub: 'Priest of Derod',
@@ -186,7 +186,7 @@ export const CLASSES = [
     color: '#d4a574',
     locked: true,  // 메타 강화로 해금
     unlockId: 'unlock_priest',  // 해금 ID
-    image: '/classes/priest.png',
+    image: '/classes/priest.jpg',
   },
 ];
 
