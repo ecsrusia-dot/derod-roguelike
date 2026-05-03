@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* PWA 풀스크린 모드 + iOS safe-area 대응 */
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background: #050304;
+  color: #e8d9c4;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  user-select: none;
+  -webkit-user-select: none;
+  overscroll-behavior: none;
+}
+
+/* iOS 노치 / Android 제스처 영역 안전 처리 */
+@supports (padding: env(safe-area-inset-top)) {
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* 텍스트 영역은 선택 가능하게 */
+.selectable, p, .selectable * {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* 버튼 클릭 즉시 반응 (300ms delay 제거) */
+button {
+  touch-action: manipulation;
+  font-family: inherit;
+}
+
+/* 스크롤바 스타일 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(255,255,255,0.02);
+}
+::-webkit-scrollbar-thumb {
+  background: #3d1f28;
+  border-radius: 3px;
+}
+
+/* 폰트 패밀리 fallback */
+body {
+  font-family: 'Noto Serif KR', 'Cinzel', serif;
+}
