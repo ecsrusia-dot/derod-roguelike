@@ -28,6 +28,7 @@ import {
   CHAPTERS,
   EVENTS,
   RELICS,
+  ULTIMATE_SKILLS,
   buildRewardPool,
   SHOP_PRICES,
   GAME_CONFIG,
@@ -36,13 +37,38 @@ import {
 // 보상 풀은 PASSIVE_SKILLS와 RELICS를 합쳐 동적으로 빌드
 const REWARD_POOL = buildRewardPool();
 
-function rollRewards(count = 3, eliteBonus = false) {
-  const totalWeight = REWARD_POOL.reduce((s, r) => s + r.weight, 0);
+// 보상 풀에서 적절한 후보를 추출.
+// - skills: 현재 보유 패시브 Lv 맵 (예: { 강타: 7 })
+// - relics: 현재 보유 유물 배열
+// - ultimates: 획득한 궁극 ID 배열 (예: ['강타_광역폭발'])
+function rollRewards(count = 3, eliteBonus = false, skills = {}, relics = [], ultimates = []) {
+  // 보상 풀 동적 필터링
+  const filteredPool = REWARD_POOL.filter(r => {
+    // 유물 중복 방지: 이미 보유한 유물은 풀에서 제외
+    if (r.type === 'relic') {
+      const owned = relics.some(rel => rel.name === r.name);
+      if (owned) return false;
+    }
+    // 궁극 3개 모두 획득한 패시브는 보상 풀에서 영구 제외
+    if (r.type === 'skill') {
+      const skillUltimates = ULTIMATE_SKILLS[r.name];
+      if (skillUltimates) {
+        const acquiredCount = skillUltimates.filter(u => ultimates.includes(u.id)).length;
+        if (acquiredCount >= 3) return false;
+      }
+    }
+    return true;
+  });
+
+  const totalWeight = filteredPool.reduce((s, r) => s + r.weight, 0);
   const picked = [];
   const usedKeys = new Set();
-  while (picked.length < count) {
+  let attempts = 0;
+  
+  while (picked.length < count && attempts < 100) {
+    attempts++;
     let r = Math.random() * totalWeight;
-    for (const reward of REWARD_POOL) {
+    for (const reward of filteredPool) {
       r -= reward.weight;
       if (r <= 0) {
         const key = `${reward.type}-${reward.name || reward.value}`;
@@ -51,6 +77,25 @@ function rollRewards(count = 3, eliteBonus = false) {
           if (eliteBonus && (final.type === 'gold' || final.type === 'gem')) {
             final.value = Math.floor(final.value * 1.5);
           }
+          
+          // Lv.7 도달한 패시브가 또 등장하면 → 궁극 진화 카드로 변환
+          if (final.type === 'skill' && skills[final.name] >= 7 && ULTIMATE_SKILLS[final.name]) {
+            const availableUltimates = ULTIMATE_SKILLS[final.name].filter(u => !ultimates.includes(u.id));
+            if (availableUltimates.length > 0) {
+              // 랜덤 궁극 1개 선택
+              const ult = availableUltimates[Math.floor(Math.random() * availableUltimates.length)];
+              final = {
+                type: 'ultimate',
+                skillName: final.name,
+                ultimate: ult,
+                weight: reward.weight,
+              };
+            } else {
+              // 이 패시브의 궁극은 다 가짐 → 다른 보상 시도
+              continue;
+            }
+          }
+          
           picked.push(final);
           usedKeys.add(key);
         }
@@ -157,6 +202,18 @@ function hasEffect(skills, effectName) {
   return false;
 }
 
+// 궁극 효과 보유 여부 확인 (ultimates 배열에서 검색)
+function hasUltimate(ultimates, effectName) {
+  if (!ultimates || ultimates.length === 0) return false;
+  for (const ultId of ultimates) {
+    for (const skillName in ULTIMATE_SKILLS) {
+      const ult = ULTIMATE_SKILLS[skillName].find(u => u.id === ultId);
+      if (ult && ult.effect === effectName) return true;
+    }
+  }
+  return false;
+}
+
 // minorEffect 누적치 계산 (Lv.1부터 효과)
 function getMinorBonus(skills, effectType) {
   let total = 0;
@@ -169,7 +226,7 @@ function getMinorBonus(skills, effectType) {
   return total;
 }
 
-function calculateDamage(skill, attacker, defender, skills, isCrit) {
+function calculateDamage(skill, attacker, defender, skills, isCrit, ultimates = []) {
   if (skill.type === 'defense' || skill.type === 'buff') return { finalDmg: 0, defenseMitigated: 0, breakdown: [], isCrit: false };
   let base = Math.floor(skill.baseDmg[0] + Math.random() * (skill.baseDmg[1] - skill.baseDmg[0]));
   let dmg = base;
@@ -211,6 +268,18 @@ function calculateDamage(skill, attacker, defender, skills, isCrit) {
     const magicBonus = Math.floor(dmg * 0.25);
     dmg += magicBonus;
     breakdown.push(`마력 Lv.3 +${magicBonus}`);
+  }
+  // 궁극 [정념 폭주] 마력_aetherStorm: 마법 데미지 ×1.5
+  if (skill.type === 'magic' && hasUltimate(ultimates, 'ult_aetherStorm')) {
+    const ultBonus = Math.floor(dmg * 0.5);
+    dmg += ultBonus;
+    breakdown.push(`★정념폭주 +${ultBonus}`);
+  }
+  // 궁극 [광기 각성] 잔혹_madness: HP 50% 이하 시 모든 데미지 +50%
+  if (hasUltimate(ultimates, 'ult_madness') && attacker.hp <= attacker.maxHp * 0.5) {
+    const ultBonus = Math.floor(dmg * 0.5);
+    dmg += ultBonus;
+    breakdown.push(`★광기각성 +${ultBonus}`);
   }
   // 강타 Lv.7: 기절(stunned)한 적에게 +50% 데미지
   if (defender.debuffs?.stunned > 0 && hasEffect(skills, 'shockExploit')) {
@@ -602,7 +671,7 @@ function MapView({ chapter, classData, mapData, hp, maxHp, gold, gem, onEnterNod
 }
 
 // =========== 전투 화면 ===========
-function CombatScreen({ classData, initialPlayer, initialSkills, enemyKey, isBoss, onVictory, onDefeat }) {
+function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimates = [], enemyKey, isBoss, onVictory, onDefeat }) {
   const [player, setPlayer] = useState(() => ({
     ...initialPlayer, defense: 0, buffs: {}, debuffs: {}, cooldowns: {},
     ether: 3, maxEther: 3, firstHitImmune: false, revivedThisCombat: false,
@@ -612,6 +681,7 @@ function CombatScreen({ classData, initialPlayer, initialSkills, enemyKey, isBos
     return { ...e, key: enemyKey, currentHp: e.hp, maxHp: e.hp, defense: 0, debuffs: {}, nextIntent: null };
   });
   const [skills] = useState(initialSkills);
+  const [ultimates] = useState(initialUltimates);
   const [turn, setTurn] = useState(1);
   const [phase, setPhase] = useState('intro');
   const [log, setLog] = useState([]);
@@ -638,6 +708,16 @@ function CombatScreen({ classData, initialPlayer, initialSkills, enemyKey, isBos
       initialLog.push({ type: 'passive', text: `◆ [신앙 누적] 모든 능력치 +${allStatsBonus}` });
     }
     
+    // 궁극 [운명의 저울] ult_destinyScale: 모든 능력치 +5
+    if (hasUltimate(ultimates, 'ult_destinyScale')) {
+      newPlayer.근력 = (newPlayer.근력 || 10) + 5;
+      newPlayer.민첩 = (newPlayer.민첩 || 10) + 5;
+      newPlayer.지능 = (newPlayer.지능 || 10) + 5;
+      newPlayer.매력 = (newPlayer.매력 || 10) + 5;
+      newPlayer.destinyScaleUses = 0;
+      initialLog.push({ type: 'passive', text: `★ [운명의 저울] 모든 능력치 +5, 치명적 회피 0/2` });
+    }
+    
     // 수비 minor: 시작 방어 +5/Lv
     const minorDef = getMinorBonus(skills, 'startDef+');
     if (minorDef > 0) {
@@ -657,13 +737,24 @@ function CombatScreen({ classData, initialPlayer, initialSkills, enemyKey, isBos
       newPlayer.firstHitImmune = true;
       initialLog.push({ type: 'passive', text: `◆ [회피 Lv.7] 첫 피격 무효 활성` });
     }
+    
+    // 신앙 Lv.7: 수신사 등극 - 전투 시작 시 적에게 신탁 발동
+    let oracleDebuffs = null;
+    if (hasEffect(skills, 'oracleUser')) {
+      oracleDebuffs = { bleed: 1, bleedTurns: 3, shockGauge: 50 };
+      initialLog.push({ type: 'passive', text: `◆ [신앙 Lv.7] 수신사의 신탁! 적에게 출혈 + 충격 게이지 50` });
+    }
+    
     setPlayer(newPlayer);
+    if (oracleDebuffs) {
+      setEnemy(e => ({ ...e, debuffs: { ...e.debuffs, ...oracleDebuffs } }));
+    }
     setLog(initialLog);
     setTimeout(() => {
       const patterns = enemy.patterns;
       setEnemy(e => ({ ...e, nextIntent: patterns[Math.floor(Math.random() * patterns.length)] }));
       setPhase('playerTurn');
-    }, 1500);
+    }, 600);
   }, []);
 
   const handlePlayerAction = (skillKey) => {
@@ -689,86 +780,112 @@ function CombatScreen({ classData, initialPlayer, initialSkills, enemyKey, isBos
     }
 
     if (skill.type === 'physical' || skill.type === 'magic') {
+      // 마력 Lv.7: 마법 공격 시 50% 확률로 재시전 (총 2회 시전)
+      // 궁극 [신탁 각성] ult_oracleAwaken: 100% 재시전
+      const echoChance = hasUltimate(ultimates, 'ult_oracleAwaken') ? 1.0 : 0.5;
+      const willEcho = skill.type === 'magic' && (hasEffect(skills, 'magicEcho') || hasUltimate(ultimates, 'ult_oracleAwaken')) && Math.random() < echoChance;
+      const echoTimes = willEcho ? 2 : 1;
+      
       const hitCount = skill.hitCount || 1;
       let totalDmg = 0;
       let usedGuaranteedCrit = false;
-      for (let i = 0; i < hitCount; i++) {
-        let isCrit = rollCrit(skills, newPlayer);
-        // 신앙 Lv.3: 다음 공격 치명타 확정 (한 번 사용)
-        if (!usedGuaranteedCrit && newPlayer.buffs?.guaranteedCrit > 0) {
-          isCrit = true;
-          usedGuaranteedCrit = true;
-          newPlayer.buffs = { ...newPlayer.buffs, guaranteedCrit: 0 };
-          newLog.push({ type: 'passive', text: `◆ [신앙 Lv.3] 치명타 확정 발동` });
+      
+      for (let echo = 0; echo < echoTimes; echo++) {
+        if (echo === 1) {
+          newLog.push({ type: 'passive', text: `◆ [마력 Lv.7] 마법 재시전!` });
         }
-        const dmgResult = calculateDamage(skill, newPlayer, newEnemy, skills, isCrit);
-        let actualDmg = dmgResult.finalDmg;
-        if (newEnemy.defense > 0 && !skill.pierce && skill.type !== 'magic') {
-          newEnemy.defense = Math.max(0, newEnemy.defense - dmgResult.defenseMitigated);
+        
+        for (let i = 0; i < hitCount; i++) {
+          let isCrit = rollCrit(skills, newPlayer);
+          // 신앙 Lv.3: 다음 공격 치명타 확정 (한 번 사용)
+          if (!usedGuaranteedCrit && newPlayer.buffs?.guaranteedCrit > 0) {
+            isCrit = true;
+            usedGuaranteedCrit = true;
+            newPlayer.buffs = { ...newPlayer.buffs, guaranteedCrit: 0 };
+            newLog.push({ type: 'passive', text: `◆ [신앙 Lv.3] 치명타 확정 발동` });
+          }
+          const dmgResult = calculateDamage(skill, newPlayer, newEnemy, skills, isCrit, ultimates);
+          let actualDmg = dmgResult.finalDmg;
+          if (newEnemy.defense > 0 && !skill.pierce && skill.type !== 'magic') {
+            newEnemy.defense = Math.max(0, newEnemy.defense - dmgResult.defenseMitigated);
+          }
+          newEnemy.currentHp = Math.max(0, newEnemy.currentHp - actualDmg);
+          totalDmg += actualDmg;
+          
+          const echoTag = (echo === 1) ? ' [재시전]' : '';
+          newLog.push({
+            type: 'damage',
+            text: `· ${enemy.name}에게 ${actualDmg} 데미지${isCrit ? ' [치명타!]' : ''}${hitCount > 1 ? ` (${i+1}/${hitCount})` : ''}${echoTag}`,
+            breakdown: dmgResult.breakdown.join(' / '),
+          });
+          
+          // 작업 5: 매 히트마다 디버프 부여 (다단히트 누적)
+          const attackPassivesPerHit = getActivePassives(skills, 'onAttack');
+          attackPassivesPerHit.forEach(p => {
+            if (p.effect === 'applyShockGauge') {
+              let gaugeAdd = GAME_CONFIG.shockGaugeBase;
+              if (hasEffect(skills, 'shockBonus')) gaugeAdd = GAME_CONFIG.shockGaugeBase + GAME_CONFIG.shockGaugeBonus;
+              // 궁극 [광역 폭발] ult_shockBlast: 게이지 +60
+              if (hasUltimate(ultimates, 'ult_shockBlast')) gaugeAdd = 60;
+              if (newEnemy.debuffs?.shockResist > 0) {
+                gaugeAdd = Math.floor(gaugeAdd * GAME_CONFIG.shockResistReduction);
+              }
+              const currentGauge = newEnemy.debuffs?.shockGauge || 0;
+              let newGauge = currentGauge + gaugeAdd;
+              if (newGauge >= 100) {
+                newLog.push({ type: 'debuff', text: `◆ [${p.skillName} Lv.${p.tierLv}] 충격 ${currentGauge}+${gaugeAdd}=100! 기절!` });
+                newEnemy.debuffs = { 
+                  ...newEnemy.debuffs, 
+                  stunned: 1, shockGauge: 0,
+                  shockResist: GAME_CONFIG.shockResistTurns,
+                  shockResistTurns: GAME_CONFIG.shockResistTurns,
+                  everStunned: true,  // 궁극 [영구 침묵] 추적용
+                };
+                if (hasEffect(skills, 'shockBonus')) {
+                  const bonusDmg = 15;
+                  newEnemy.currentHp = Math.max(0, newEnemy.currentHp - bonusDmg);
+                  newLog.push({ type: 'damage', text: `· [강타 Lv.5] 기절 추가 데미지 ${bonusDmg}` });
+                }
+                // 궁극 [광역 폭발]: 기절 발동 시 추가 30 데미지
+                if (hasUltimate(ultimates, 'ult_shockBlast')) {
+                  newEnemy.currentHp = Math.max(0, newEnemy.currentHp - 30);
+                  newLog.push({ type: 'damage', text: `★ [광역 폭발] 폭발 데미지 30` });
+                }
+                // 궁극 [즉시 처형] ult_shockExecute: 적 HP 25% 즉시 제거
+                if (hasUltimate(ultimates, 'ult_shockExecute')) {
+                  const execDmg = Math.floor(newEnemy.maxHp * 0.25);
+                  newEnemy.currentHp = Math.max(0, newEnemy.currentHp - execDmg);
+                  newLog.push({ type: 'damage', text: `★ [즉시 처형] HP 25% 제거 (${execDmg})` });
+                }
+              } else {
+                newEnemy.debuffs = { ...newEnemy.debuffs, shockGauge: newGauge };
+              }
+            }
+            if (p.effect === 'applyBleed') {
+              const stacks = (newEnemy.debuffs?.bleed || 0);
+              const newStacks = hasEffect(skills, 'bleedStack') ? Math.min(stacks + 1, 5) : 1;
+              newEnemy.debuffs = { ...newEnemy.debuffs, bleed: newStacks, bleedTurns: 3 };
+            }
+            if (p.effect === 'execute') {
+              // 궁극 [사형 선고] ult_deathSentence: HP 35% 이하, 30% 확률로 확장
+              const execThreshold = hasUltimate(ultimates, 'ult_deathSentence') ? 0.35 : 0.2;
+              const execChance = hasUltimate(ultimates, 'ult_deathSentence') ? 0.3 : 0.15;
+              if (newEnemy.currentHp > 0 && newEnemy.currentHp <= newEnemy.maxHp * execThreshold && Math.random() < execChance) {
+                newLog.push({ type: 'system', text: `◆ [잔혹 Lv.7] 즉사 발동!` });
+                newEnemy.currentHp = 0;
+              }
+            }
+          });
+          
+          if (newEnemy.currentHp <= 0) break;
         }
-        newEnemy.currentHp = Math.max(0, newEnemy.currentHp - actualDmg);
-        totalDmg += actualDmg;
-        newLog.push({
-          type: 'damage',
-          text: `· ${enemy.name}에게 ${actualDmg} 데미지${isCrit ? ' [치명타!]' : ''}${hitCount > 1 ? ` (${i+1}/${hitCount})` : ''}`,
-          breakdown: dmgResult.breakdown.join(' / '),
-        });
         if (newEnemy.currentHp <= 0) break;
       }
+      
       setAnimDmg({ player: null, enemy: totalDmg });
       setTimeout(() => setAnimDmg({ player: null, enemy: null }), 800);
 
-      const attackPassives = getActivePassives(skills, 'onAttack');
-      attackPassives.forEach(p => {
-        if (p.effect === 'applyShockGauge') {
-          // 충격 게이지 시스템: Lv.3 = 30, Lv.5 이상 = 40
-          let gaugeAdd = GAME_CONFIG.shockGaugeBase;
-          if (hasEffect(skills, 'shockBonus')) gaugeAdd = GAME_CONFIG.shockGaugeBase + GAME_CONFIG.shockGaugeBonus;
-          
-          // 충격 저항 디버프가 있으면 누적량 감소
-          if (newEnemy.debuffs?.shockResist > 0) {
-            gaugeAdd = Math.floor(gaugeAdd * GAME_CONFIG.shockResistReduction);
-          }
-          
-          const currentGauge = newEnemy.debuffs?.shockGauge || 0;
-          let newGauge = currentGauge + gaugeAdd;
-          
-          if (newGauge >= 100) {
-            // 기절 발동
-            const stunMsg = `◆ [${p.skillName} Lv.${p.tierLv}] 충격 게이지 ${currentGauge}+${gaugeAdd}=100! 기절!`;
-            newLog.push({ type: 'debuff', text: stunMsg });
-            newEnemy.debuffs = { 
-              ...newEnemy.debuffs, 
-              stunned: 1,
-              shockGauge: 0,
-              shockResist: GAME_CONFIG.shockResistTurns,
-              shockResistTurns: GAME_CONFIG.shockResistTurns,
-            };
-            
-            // 강타 Lv.5: 기절 시 추가 데미지
-            if (hasEffect(skills, 'shockBonus')) {
-              const bonusDmg = 15;
-              newEnemy.currentHp = Math.max(0, newEnemy.currentHp - bonusDmg);
-              newLog.push({ type: 'damage', text: `· [강타 Lv.5] 기절 추가 데미지 ${bonusDmg}` });
-            }
-          } else {
-            newEnemy.debuffs = { ...newEnemy.debuffs, shockGauge: newGauge };
-            newLog.push({ type: 'debuff', text: `◆ [${p.skillName} Lv.${p.tierLv}] 충격 ${currentGauge}→${newGauge}` });
-          }
-        }
-        if (p.effect === 'applyBleed') {
-          const stacks = (newEnemy.debuffs?.bleed || 0);
-          const newStacks = hasEffect(skills, 'bleedStack') ? Math.min(stacks + 1, 5) : 1;
-          newEnemy.debuffs = { ...newEnemy.debuffs, bleed: newStacks, bleedTurns: 3 };
-          newLog.push({ type: 'debuff', text: `◆ [${p.skillName} Lv.${p.tierLv}] 출혈 ${newStacks}중첩` });
-        }
-        if (p.effect === 'execute') {
-          if (newEnemy.currentHp > 0 && newEnemy.currentHp <= newEnemy.maxHp * 0.2 && Math.random() < 0.15) {
-            newLog.push({ type: 'system', text: `◆ [잔혹 Lv.7] 즉사 발동!` });
-            newEnemy.currentHp = 0;
-          }
-        }
-      });
+      // 강제 출혈 (피의 일격)
       if (skill.forceBleed) {
         newEnemy.debuffs = { ...newEnemy.debuffs, bleed: (newEnemy.debuffs?.bleed || 0) + 1, bleedTurns: 3 };
         newLog.push({ type: 'debuff', text: `· 출혈 부여` });
@@ -788,9 +905,23 @@ function CombatScreen({ classData, initialPlayer, initialSkills, enemyKey, isBos
     }
     if (skill.cd > 0) {
       // 가속 minor: 쿨다운 -1턴 (Lv.4마다 누적)
-      const cdReduce = Math.floor(getMinorBonus(skills, 'cdReduce+') / 4);
+      let cdReduce = Math.floor(getMinorBonus(skills, 'cdReduce+') / 4);
+      // 궁극 [정념 폭주] ult_aetherStorm: 마법 스킬 쿨다운 -1
+      if (skill.type === 'magic' && hasUltimate(ultimates, 'ult_aetherStorm')) cdReduce += 1;
       const finalCd = Math.max(0, skill.cd - cdReduce);
       if (finalCd > 0) newPlayer.cooldowns = { ...newPlayer.cooldowns, [skillKey]: finalCd };
+    }
+    // 궁극 [시간 역행] ult_timeRewind: 마법 공격 시 30% 확률로 쿨다운 -1 + 에테르 +1
+    if (skill.type === 'magic' && hasUltimate(ultimates, 'ult_timeRewind') && Math.random() < 0.3) {
+      newPlayer.ether = Math.min(newPlayer.maxEther || 3, newPlayer.ether + 1);
+      // 모든 쿨다운 -1
+      const reducedCd = {};
+      Object.entries(newPlayer.cooldowns || {}).forEach(([k, v]) => {
+        const newVal = Math.max(0, v - 1);
+        if (newVal > 0) reducedCd[k] = newVal;
+      });
+      newPlayer.cooldowns = reducedCd;
+      newLog.push({ type: 'passive', text: `★ [시간 역행] 모든 쿨다운 -1, 에테르 +1` });
     }
 
     setPlayer(newPlayer);
@@ -807,7 +938,7 @@ function CombatScreen({ classData, initialPlayer, initialSkills, enemyKey, isBos
     }
     // 즉시 phase 전환으로 버튼 그룹 숨김 (시각적 즉각 피드백)
     setPhase('enemyTurn');
-    setTimeout(() => { executeEnemyTurn(newPlayer, newEnemy, newLog); }, 1000);
+    setTimeout(() => { executeEnemyTurn(newPlayer, newEnemy, newLog); }, 350);
   };
 
   const executeEnemyTurn = (curPlayer, curEnemy, curLog) => {
@@ -820,12 +951,12 @@ function CombatScreen({ classData, initialPlayer, initialSkills, enemyKey, isBos
       // 기절 1턴 소모
       newEnemy.debuffs = { ...newEnemy.debuffs, stunned: 0 };
       setEnemy(newEnemy); setLog(newLog);
-      setTimeout(() => endTurn(newPlayer, newEnemy, newLog), 1200);
+      setTimeout(() => endTurn(newPlayer, newEnemy, newLog), 400);
       return;
     }
 
     const intent = curEnemy.nextIntent;
-    if (!intent) { setTimeout(() => endTurn(newPlayer, newEnemy, newLog), 800); return; }
+    if (!intent) { setTimeout(() => endTurn(newPlayer, newEnemy, newLog), 300); return; }
     newLog.push({ type: 'enemy', text: `◂ ${enemy.name}: ${intent.name}` });
 
     if (intent.type === 'attack') {
@@ -860,9 +991,26 @@ function CombatScreen({ classData, initialPlayer, initialSkills, enemyKey, isBos
             dmg -= reduced;
             if (reduced > 0) newLog.push({ type: 'passive', text: `◆ [수비 Lv.5] 데미지 -${reduced}` });
           }
+          // 궁극 [데블랑의 저주]: 받는 데미지 -25%
+          if (hasUltimate(ultimates, 'ult_deblanCurse') && dmg > 0) {
+            const reduced = Math.floor(dmg * 0.25);
+            dmg -= reduced;
+            if (reduced > 0) newLog.push({ type: 'passive', text: `★ [데블랑의 저주] 데미지 -${reduced}` });
+            // 30% 확률로 적 자해
+            if (Math.random() < 0.3) {
+              const counterDmg = Math.floor(dmg * 0.5);
+              newEnemy.currentHp = Math.max(0, newEnemy.currentHp - counterDmg);
+              newLog.push({ type: 'passive', text: `★ [데블랑의 저주] 적 자해 ${counterDmg}` });
+            }
+          }
           if (dmg > 0) {
             if (newPlayer.hp - dmg <= 0) {
-              if (hasEffect(skills, 'divineSave') && Math.random() < 0.3) {
+              // 궁극 [운명의 저울]: 치명적 피격 100% 회피 (전투당 2회)
+              if (hasUltimate(ultimates, 'ult_destinyScale') && (newPlayer.destinyScaleUses || 0) < 2) {
+                newLog.push({ type: 'passive', text: `★ [운명의 저울] 회피! (${(newPlayer.destinyScaleUses || 0) + 1}/2)` });
+                newPlayer.destinyScaleUses = (newPlayer.destinyScaleUses || 0) + 1;
+                dmg = 0;
+              } else if (hasEffect(skills, 'divineSave') && Math.random() < 0.3) {
                 newLog.push({ type: 'passive', text: `◆ [신앙 Lv.5] 신의 가호!` });
                 dmg = newPlayer.hp - 1;
               } else if (hasEffect(skills, 'revive') && !newPlayer.revivedThisCombat) {
@@ -895,7 +1043,7 @@ function CombatScreen({ classData, initialPlayer, initialSkills, enemyKey, isBos
       }, 800);
       return;
     }
-    setTimeout(() => endTurn(newPlayer, newEnemy, newLog), 1200);
+    setTimeout(() => endTurn(newPlayer, newEnemy, newLog), 400);
   };
 
   const endTurn = (curPlayer, curEnemy, curLog) => {
@@ -907,15 +1055,25 @@ function CombatScreen({ classData, initialPlayer, initialSkills, enemyKey, isBos
     if (newEnemy.debuffs?.bleed > 0 && newEnemy.debuffs?.bleedTurns > 0) {
       // 잔혹 minor: 출혈 1스택당 데미지 +1/Lv
       const bleedBonus = getMinorBonus(skills, 'bleedDmg+');
-      const bleedDmg = newEnemy.debuffs.bleed * (GAME_CONFIG.bleedDmgPerStack + bleedBonus);
+      let bleedDmg = newEnemy.debuffs.bleed * (GAME_CONFIG.bleedDmgPerStack + bleedBonus);
+      // 궁극 [피의 축제] ult_bloodFeast: 출혈 데미지 ×2
+      if (hasUltimate(ultimates, 'ult_bloodFeast')) {
+        bleedDmg *= 2;
+      }
       newEnemy.currentHp = Math.max(0, newEnemy.currentHp - bleedDmg);
       newEnemy.debuffs = {
         ...newEnemy.debuffs,
         bleedTurns: newEnemy.debuffs.bleedTurns - 1,
         bleed: newEnemy.debuffs.bleedTurns - 1 <= 0 ? 0 : newEnemy.debuffs.bleed,
       };
-      newLog.push({ type: 'debuff', text: `◆ 출혈 ${bleedDmg} 데미지` });
+      newLog.push({ type: 'debuff', text: `◆ 출혈 ${bleedDmg} 데미지${hasUltimate(ultimates, 'ult_bloodFeast') ? ' [×2 피의축제]' : ''}` });
       if (newEnemy.currentHp <= 0) {
+        // 궁극 [피의 축제]: 출혈 처치 시 HP 30 흡수
+        if (hasUltimate(ultimates, 'ult_bloodFeast')) {
+          newPlayer.hp = Math.min(newPlayer.maxHp, newPlayer.hp + 30);
+          newLog.push({ type: 'passive', text: `★ [피의 축제] HP 30 흡수` });
+          setPlayer(newPlayer);
+        }
         setEnemy(newEnemy);
         setLog([...newLog, { type: 'victory', text: `━━ ${enemy.name} 처치 (출혈 사망) ━━` }]);
         setPhase('victory');
@@ -951,8 +1109,11 @@ function CombatScreen({ classData, initialPlayer, initialSkills, enemyKey, isBos
     let guaranteedCrit = false;
     getActivePassives(skills, 'onTurnStart').forEach(p => {
       if (p.effect === 'regenPerTurn') {
-        newPlayer.hp = Math.min(newPlayer.maxHp, newPlayer.hp + 3);
-        newLog.push({ type: 'passive', text: `◆ [재생 Lv.3] HP +3` });
+        let regen = 3;
+        // 궁극 [데로드의 축복]: 회복 효과 +50%
+        if (hasUltimate(ultimates, 'ult_derodBlessing')) regen = Math.floor(regen * 1.5);
+        newPlayer.hp = Math.min(newPlayer.maxHp, newPlayer.hp + regen);
+        newLog.push({ type: 'passive', text: `◆ [재생 Lv.3] HP +${regen}` });
       }
       if (p.effect === 'extraTurn' && p.interval && newTurn % p.interval === 0) {
         if (p.interval < bestExtraTurnInterval) {
@@ -966,6 +1127,20 @@ function CombatScreen({ classData, initialPlayer, initialSkills, enemyKey, isBos
         newLog.push({ type: 'passive', text: `◆ [신앙 Lv.3] 다음 공격 치명타 확정!` });
       }
     });
+    
+    // 궁극 [데로드의 축복]: 매 턴 HP +5
+    if (hasUltimate(ultimates, 'ult_derodBlessing')) {
+      newPlayer.hp = Math.min(newPlayer.maxHp, newPlayer.hp + 5);
+      newLog.push({ type: 'passive', text: `★ [데로드의 축복] HP +5` });
+    }
+    // 궁극 [영구 침묵] 강타_ult_perpetualStun: 매 턴 25% 확률로 적 기절
+    if (hasUltimate(ultimates, 'ult_perpetualStun') && newEnemy.debuffs?.everStunned) {
+      if (Math.random() < 0.25) {
+        newEnemy.debuffs = { ...newEnemy.debuffs, stunned: 1 };
+        newLog.push({ type: 'passive', text: `★ [영구 침묵] 적 기절!` });
+      }
+    }
+    // 궁극 [운명의 저울]: 모든 능력치 +5 (전투 시작 한 번만, useEffect에서 처리)
 
     const patterns = newEnemy.patterns;
     newEnemy.nextIntent = patterns[Math.floor(Math.random() * patterns.length)];
@@ -979,12 +1154,12 @@ function CombatScreen({ classData, initialPlayer, initialSkills, enemyKey, isBos
         setLog(prev => [...prev, { type: 'passive', text: `◆ [가속] 추가 턴!` }]);
         setPhase('playerTurn');
         actionLockRef.current = false;  // 플레이어 턴 시작 → 락 해제
-      }, 1000);
+      }, 350);
     } else {
       setTimeout(() => {
         setPhase('playerTurn');
         actionLockRef.current = false;  // 플레이어 턴 시작 → 락 해제
-      }, 800);
+      }, 250);
     }
   };
 
@@ -1178,7 +1353,7 @@ function CombatScreen({ classData, initialPlayer, initialSkills, enemyKey, isBos
 }
 
 // =========== 보상 선택 ===========
-function RewardSelect({ rewards: initialRewards, gem, skills, onPick, onReroll, hasRerolled, isElite }) {
+function RewardSelect({ rewards: initialRewards, gem, skills, relics, ultimates, onPick, onReroll, hasRerolled, isElite }) {
   const [rewards, setRewards] = useState(initialRewards);
   // 운명 Lv.3: 리롤 비용 -1
   const rerollCost = hasEffect(skills, 'rerollDiscount') ? GAME_CONFIG.rerollDiscountCost : GAME_CONFIG.rerollCost;
@@ -1187,14 +1362,20 @@ function RewardSelect({ rewards: initialRewards, gem, skills, onPick, onReroll, 
     if (hasRerolled || gem < rerollCost) return;
     // 운명 Lv.5: 보상 4중1
     const count = hasEffect(skills, 'extraReward') ? 4 : 3;
-    const newRewards = rollRewards(count, isElite);
+    const newRewards = rollRewards(count, isElite, skills, relics, ultimates);
     setRewards(newRewards);
     onReroll(newRewards, rerollCost);
   };
 
   const renderReward = (r, idx) => {
     let title, desc, color, icon, currentLv, nextLv;
-    if (r.type === 'skill') {
+    if (r.type === 'ultimate') {
+      // 궁극 진화 카드 - 가장 화려하게
+      title = `★ ${r.ultimate.name}`;
+      desc = `${r.skillName} 궁극 진화\n${r.ultimate.desc}\n⚠ ${r.skillName} Lv → 0 리셋, 관련 유물 소멸`;
+      color = r.ultimate.color || PALETTE.legendary;
+      icon = '☆';
+    } else if (r.type === 'skill') {
       const sk = PASSIVE_SKILLS[r.name];
       currentLv = skills[r.name] || 0;
       nextLv = currentLv + 1;
@@ -1247,8 +1428,15 @@ function RewardSelect({ rewards: initialRewards, gem, skills, onPick, onReroll, 
                   background: `${color}30`, color, border: `1px solid ${color}80`,
                 }}>Lv.{currentLv} → Lv.{nextLv}</span>
               )}
+              {r.type === 'ultimate' && (
+                <span className="text-[10px] px-1.5 py-0.5 font-bold" style={{
+                  background: `${color}40`, color: PALETTE.legendary,
+                  border: `1px solid ${PALETTE.legendary}`,
+                  letterSpacing: '0.1em',
+                }}>★ ULTIMATE</span>
+              )}
             </div>
-            <p className="text-[11px] leading-snug" style={{ color: PALETTE.textDim }}>{desc}</p>
+            <p className="text-[11px] leading-snug whitespace-pre-line" style={{ color: PALETTE.textDim }}>{desc}</p>
           </div>
           <ChevronRight size={14} style={{ color, flexShrink: 0 }} />
         </div>
@@ -1471,13 +1659,20 @@ function RestScreen({ classData, hp, maxHp, skills, onChoice, onClose }) {
 }
 
 // =========== 상점 ===========
-function ShopScreen({ gold, onBuy, onLeave }) {
-  const [stock] = useState(() => rollRewards(4));
+function ShopScreen({ gold, skills, relics, ultimates, onBuy, onLeave }) {
+  // 상점 재고: 유물·궁극·재화는 제외하고 다양한 카테고리로
+  const [stock] = useState(() => {
+    const initial = rollRewards(8, false, skills, relics, ultimates);
+    // 유물/궁극/재화 제외, 4개만 추출
+    return initial.filter(r => 
+      r.type !== 'relic' && r.type !== 'ultimate' && 
+      r.type !== 'gold' && r.type !== 'gem'
+    ).slice(0, 4);
+  });
   const [bought, setBought] = useState(new Set());
 
   const getPrice = (r) => {
     if (r.type === 'skill') return SHOP_PRICES.skill;
-    if (r.type === 'relic') return SHOP_PRICES.relic;
     if (r.type === 'stat') return SHOP_PRICES.stat;
     if (r.type === 'heal_full') return SHOP_PRICES.heal_full;
     if (r.type === 'heal') return r.value === 50 ? SHOP_PRICES.heal_50 : SHOP_PRICES.heal_100;
@@ -1493,7 +1688,6 @@ function ShopScreen({ gold, onBuy, onLeave }) {
     else if (r.type === 'stat') { title = `${r.name} +${r.value}`; color = PALETTE.derod; }
     else if (r.type === 'heal') { title = `회복 ${r.value}`; color = PALETTE.green; }
     else if (r.type === 'heal_full') { title = '완전 회복'; color = PALETTE.legendary; }
-    else if (r.type === 'relic') { title = r.name; color = r.color; }
     else { title = `${r.type} +${r.value}`; color = PALETTE.derod; }
 
     return (
@@ -1588,7 +1782,7 @@ function ChapterClearScreen({ chapter, isLastChapter, onContinue }) {
 }
 
 // =========== 상태창 ===========
-function StatusPanel({ classData, hp, maxHp, skills, stats, relics, onClose }) {
+function StatusPanel({ classData, hp, maxHp, skills, stats, relics, ultimates = [], onClose }) {
   const skillsByAxis = { attack: [], defense: [], utility: [] };
   Object.entries(skills).forEach(([name, lv]) => {
     if (lv > 0 && PASSIVE_SKILLS[name]) {
@@ -1694,6 +1888,41 @@ function StatusPanel({ classData, hp, maxHp, skills, stats, relics, onClose }) {
             )
           ))}
         </div>
+        {ultimates.length > 0 && (
+          <div className="px-4 py-3 border-t" style={{ borderColor: PALETTE.panelBorder }}>
+            <div className="text-[11px] tracking-[0.3em] mb-3" style={{ color: PALETTE.legendary }}>★ 궁극 스킬</div>
+            <div className="space-y-1.5">
+              {ultimates.map((ultId, i) => {
+                let ultData = null;
+                let skillName = '';
+                for (const sn in ULTIMATE_SKILLS) {
+                  const found = ULTIMATE_SKILLS[sn].find(u => u.id === ultId);
+                  if (found) { ultData = found; skillName = sn; break; }
+                }
+                if (!ultData) return null;
+                return (
+                  <div key={i} className="px-3 py-2" style={{
+                    background: `${ultData.color}15`, 
+                    border: `1px solid ${ultData.color}`,
+                    boxShadow: `0 0 8px ${ultData.color}40`,
+                  }}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span style={{ color: PALETTE.legendary }}>★</span>
+                      <span className="text-[12px] font-bold" style={{ color: ultData.color }}>{ultData.name}</span>
+                      <span className="text-[9px] px-1.5 py-0.5" style={{
+                        background: `${PALETTE.legendary}30`, color: PALETTE.legendary,
+                        letterSpacing: '0.1em',
+                      }}>ULT</span>
+                    </div>
+                    <div className="text-[10px] leading-snug whitespace-pre-line" style={{ color: PALETTE.textDim }}>
+                      {skillName} · {ultData.desc}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
         {relics.length > 0 && (
           <div className="px-4 py-3 border-t" style={{ borderColor: PALETTE.panelBorder }}>
             <div className="text-[11px] tracking-[0.3em] mb-3" style={{ color: PALETTE.derod }}>◆ 보유 유물</div>
@@ -1736,6 +1965,7 @@ export default function App() {
   const [skills, setSkills] = useState({});
   const [stats, setStats] = useState({});
   const [relics, setRelics] = useState([]);
+  const [ultimates, setUltimates] = useState([]);  // 획득한 궁극 ID 배열
 
   // 보상 시스템
   const [currentRewards, setCurrentRewards] = useState([]);
@@ -1761,6 +1991,7 @@ export default function App() {
       setHp(startHp);
       setMaxHp(startHp);
       setRelics([]);
+      setUltimates([]);  // 새 런 시작 - 궁극 초기화
     } else {
       // 다음 챕터 (HP 70% 회복)
       setHp(prev => Math.min(maxHp, Math.floor(maxHp * GAME_CONFIG.chapterHealRatio)));
@@ -1874,7 +2105,7 @@ export default function App() {
     // 일반 전투/엘리트는 보상 화면으로
     // 운명 Lv.5: 보상 4중1
     const count = hasEffect(skills, 'extraReward') ? 4 : 3;
-    const rewards = rollRewards(count, isEliteReward);
+    const rewards = rollRewards(count, isEliteReward, skills, relics, ultimates);
     setCurrentRewards(rewards);
     setHasRerolled(false);
     setScreen('reward');
@@ -1898,7 +2129,26 @@ export default function App() {
   };
 
   const applyReward = (reward) => {
-    if (reward.type === 'skill') {
+    if (reward.type === 'ultimate') {
+      // 궁극 진화: 패시브 Lv → 0 리셋, 유물도 소멸, 궁극 ID 추가
+      const skillName = reward.skillName;
+      
+      // 1. 해당 패시브의 유물 모두 제거
+      setRelics(prev => prev.filter(rel => !rel.skillBonus || !rel.skillBonus[skillName]));
+      
+      // 2. 패시브 Lv을 0으로 리셋
+      setSkills(prev => ({ ...prev, [skillName]: 0 }));
+      
+      // 3. 궁극 ID 추가
+      setUltimates(prev => [...prev, reward.ultimate.id]);
+      
+      // 4. 재생이었다면 minor 보너스 HP는 잃음
+      if (skillName === '재생') {
+        const lostHp = PASSIVE_SKILLS['재생'].minorEffect.perLv * 7;
+        setMaxHp(prev => Math.max(GAME_CONFIG.startHp, prev - lostHp));
+        setHp(prev => Math.min(maxHp - lostHp, prev));
+      }
+    } else if (reward.type === 'skill') {
       // 재생 minor: 최대 HP +8/Lv (보상 획득 시도)
       if (reward.name === '재생' && (skills['재생'] || 0) < PASSIVE_SKILLS['재생'].maxLv) {
         const hpAdd = PASSIVE_SKILLS['재생'].minorEffect.perLv;
@@ -2031,35 +2281,35 @@ export default function App() {
       <div className="grid lg:grid-cols-[1fr_auto_1fr] gap-8 items-start max-w-7xl">
         {/* 좌측 안내 */}
         <div className="hidden lg:block max-w-sm" style={{ color: PALETTE.text }}>
-          <p className="text-xs tracking-[0.4em] mb-2" style={{ color: PALETTE.derod }}>DATA REFACTOR · v0.8</p>
+          <p className="text-xs tracking-[0.4em] mb-2" style={{ color: PALETTE.derod }}>ULTIMATE EVOLUTION · v0.9</p>
           <h1 className="text-3xl font-bold mb-4 leading-tight" style={{ fontFamily: '"Cinzel", serif' }}>
             데로드앤데블랑<br/>
             <span style={{ color: PALETTE.accent }}>로그라이크</span>
           </h1>
           <p className="text-sm leading-relaxed mb-6" style={{ color: PALETTE.textDim }}>
-            v0.8 — 데이터 외부화. 콘텐츠가 derod_data.js로 분리되어 코드 수정 없이 추가/변경 가능.
+            v0.9 — 궁극 스킬 시스템 도입. 7가지 피드백 반영.
           </p>
           
           <div className="space-y-3 text-xs">
             <div>
-              <div className="text-[10px] tracking-[0.3em] mb-1.5" style={{ color: PALETTE.derod }}>◆ 데이터 분리</div>
+              <div className="text-[10px] tracking-[0.3em] mb-1.5" style={{ color: PALETTE.legendary }}>★ 궁극 진화</div>
               <p style={{ color: PALETTE.textDim }}>
-                패시브, 직업, 적, 챕터, 사건, 유물, 보상, 가격, 밸런스 모두 derod_data.js에 분리. 
-                향후 .json 파일로도 그대로 변환 가능.
+                Lv.7 도달 후 같은 패시브 재획득 → 3가지 궁극 분기 中 1개 진화.
+                해당 패시브 Lv → 0 리셋, 관련 유물 소멸. 핵심 4종(강타·잔혹·마력·신앙) 12개 궁극 구현.
               </p>
             </div>
             <div>
-              <div className="text-[10px] tracking-[0.3em] mb-1.5" style={{ color: PALETTE.derod }}>◆ 콘텐츠 추가 용이</div>
+              <div className="text-[10px] tracking-[0.3em] mb-1.5" style={{ color: PALETTE.derod }}>◆ 전투 개선</div>
               <p style={{ color: PALETTE.textDim }}>
-                새 적/사건/유물은 데이터 파일 객체에 추가만 하면 자동 등장. 
-                EVENTS의 chapter 필드로 챕터별 등장 제어.
+                턴 진행 속도 60% 단축. 마력 Lv.7 재시전 / 신앙 Lv.7 수신사 신탁 구현.
+                다단히트 시 출혈/충격이 매 히트마다 누적.
               </p>
             </div>
             <div>
-              <div className="text-[10px] tracking-[0.3em] mb-1.5" style={{ color: PALETTE.derod }}>◆ 밸런스 튜닝</div>
+              <div className="text-[10px] tracking-[0.3em] mb-1.5" style={{ color: PALETTE.derod }}>◆ 보상 · 상점 밸런스</div>
               <p style={{ color: PALETTE.textDim }}>
-                GAME_CONFIG에 시작 자원·회복률·충격게이지 등 모든 수치 모음. 
-                한 곳만 고치면 전체 밸런스 조정 가능.
+                유물 중복 차단. 상점 가격 ~3배 인상, 유물 판매 금지. 
+                회복(저렴) → 능력치 → 패시브 → 완전회복(비쌈) 차등화.
               </p>
             </div>
           </div>
@@ -2097,6 +2347,7 @@ export default function App() {
               classData={classData}
               initialPlayer={{ hp, maxHp, ...stats, ...classData.stats }}
               initialSkills={skills}
+              initialUltimates={ultimates}
               enemyKey={currentEnemy}
               isBoss={isBossReward}
               onVictory={handleVictory}
@@ -2105,6 +2356,7 @@ export default function App() {
           )}
           {screen === 'reward' && (
             <RewardSelect rewards={currentRewards} gem={gem} skills={skills}
+              relics={relics} ultimates={ultimates}
               onPick={handlePickReward}
               onReroll={handleReroll}
               hasRerolled={hasRerolled}
@@ -2119,7 +2371,8 @@ export default function App() {
               onChoice={handleRestChoice} />
           )}
           {screen === 'shop' && (
-            <ShopScreen gold={gold} onBuy={handleShopBuy} onLeave={handleShopLeave} />
+            <ShopScreen gold={gold} skills={skills} relics={relics} ultimates={ultimates}
+              onBuy={handleShopBuy} onLeave={handleShopLeave} />
           )}
           {screen === 'chapterClear' && chapter && (
             <ChapterClearScreen chapter={chapter}
@@ -2129,6 +2382,7 @@ export default function App() {
           {screen === 'status' && (
             <StatusPanel classData={classData} hp={hp} maxHp={maxHp}
               skills={skills} stats={{ ...classData.stats, ...stats }} relics={relics}
+              ultimates={ultimates}
               onClose={() => setScreen('map')} />
           )}
         </PhoneFrame>
