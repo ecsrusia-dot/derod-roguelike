@@ -681,7 +681,7 @@ function ClassSelect({ meta, selected, onSelect, onNext, onBack }) {
         </div>
       </div>
 
-      {/* 2. 중앙 직업 상세 정보 영역 (이미지 삽입) */}
+      {/* 2. 중앙 직업 상세 정보 영역 */}
       <div className="flex-1 px-6 py-3 overflow-hidden">
         <div className="h-full relative overflow-hidden" style={{
           background: PALETTE.bgDeep,
@@ -693,16 +693,20 @@ function ClassSelect({ meta, selected, onSelect, onNext, onBack }) {
              <img 
                src={cls.image} 
                alt={cls.name}
-               className="w-full h-full object-cover opacity-60" 
+               className="w-full h-full object-cover" // ★ opacity 제거하여 원본 밝기 유지
                onError={(e) => { e.target.style.display = 'none'; }} 
              />
-             {/* 텍스트 가독성을 위한 어두운 그라데이션 오버레이 */}
+             {/* ★ 하단 텍스트 가독성을 위한 부분 그라데이션 수정 */}
              <div className="absolute inset-0" style={{
-               background: `linear-gradient(to bottom, transparent 0%, ${PALETTE.bgDeep}cc 60%, ${PALETTE.bgDeep} 100%)`
+               background: `linear-gradient(to bottom, 
+                 transparent 0%, 
+                 transparent 50%, 
+                 ${PALETTE.bgDeep}cc 75%, 
+                 ${PALETTE.bgDeep} 100%)`
              }} />
           </div>
 
-          {/* 정보 텍스트 영역 (최상단 z-index 10) */}
+          {/* 정보 텍스트 영역 (최상단 z-10) */}
           <div className="absolute inset-x-0 bottom-0 p-4 text-center z-10">
             <p className="text-[10px] tracking-[0.3em] mb-1" style={{ color: cls.color }}>{cls.sub}</p>
             <h2 className="text-2xl font-bold mb-2" style={{ color: cls.color, textShadow: `0 0 20px ${cls.color}80` }}>
