@@ -681,34 +681,28 @@ function ClassSelect({ meta, selected, onSelect, onNext, onBack }) {
         </div>
       </div>
 
-      {/* 2. 중앙 직업 상세 정보 영역 (구조 정리됨) */}
+      {/* 2. 중앙 직업 상세 정보 영역 (이미지 삽입) */}
       <div className="flex-1 px-6 py-3 overflow-hidden">
         <div className="h-full relative overflow-hidden" style={{
-          background: `linear-gradient(180deg, ${PALETTE.bgDeep}, ${cls.color}20 60%, ${cls.color}40)`,
+          background: PALETTE.bgDeep,
           border: `1px solid ${cls.color}60`,
         }}>
           
-          {/* ★ 이미지 배경 레이어 */}
+          {/* 캐릭터 삽화 레이어 */}
           <div className="absolute inset-0 z-0">
              <img 
                src={cls.image} 
                alt={cls.name}
-               className="w-full h-full object-cover opacity-50" 
+               className="w-full h-full object-cover opacity-60" 
                onError={(e) => { e.target.style.display = 'none'; }} 
              />
+             {/* 텍스트 가독성을 위한 어두운 그라데이션 오버레이 */}
              <div className="absolute inset-0" style={{
-               background: `linear-gradient(to bottom, transparent 0%, ${PALETTE.bgDeep} 90%)`
+               background: `linear-gradient(to bottom, transparent 0%, ${PALETTE.bgDeep}cc 60%, ${PALETTE.bgDeep} 100%)`
              }} />
           </div>
 
-          {/* 알파벳 배경 */}
-          <div className="absolute inset-0 flex items-center justify-center opacity-10 z-0">
-            <div style={{ fontSize: '180px', color: cls.color, fontFamily: 'serif' }}>
-              {cls.name[0]}
-            </div>
-          </div>
-
-          {/* 정보 텍스트 영역 */}
+          {/* 정보 텍스트 영역 (최상단 z-index 10) */}
           <div className="absolute inset-x-0 bottom-0 p-4 text-center z-10">
             <p className="text-[10px] tracking-[0.3em] mb-1" style={{ color: cls.color }}>{cls.sub}</p>
             <h2 className="text-2xl font-bold mb-2" style={{ color: cls.color, textShadow: `0 0 20px ${cls.color}80` }}>
@@ -738,7 +732,7 @@ function ClassSelect({ meta, selected, onSelect, onNext, onBack }) {
         </div>
       </div>
 
-      {/* 3. 하단 버튼 */}
+      {/* 3. 하단 버튼 영역 */}
       <div className="px-6 pb-6 pt-2 grid grid-cols-2 gap-2">
         <button onClick={onBack} className="py-3" style={{
           background: 'transparent', border: `1px solid ${PALETTE.panelBorder}`,
@@ -755,7 +749,7 @@ function ClassSelect({ meta, selected, onSelect, onNext, onBack }) {
       </div>
     </div>
   );
-} // <--- ClassSelect 함수 끝
+} // <--- 반드시 여기서 함수가 끝나는 닫는 중괄호가 있어야 합니다!
 
 function ExpeditionSelect({ meta, onSelect, onBack }) {
   return (
