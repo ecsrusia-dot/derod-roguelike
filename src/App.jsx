@@ -625,11 +625,13 @@ function TitleScreen({ meta, onStart, onAltar }) {
 }
 
 function ClassSelect({ meta, selected, onSelect, onNext, onBack }) {
-  const cls = CLASSES[selected];
-  const isClsLocked = (c) => c.locked && !isUnlocked(meta, c.unlockId);
+  const cls = CLASSES[selected]; // 현재 선택된 직업 데이터
+  const isClsLocked = (c) => c.locked && !isUnlocked(meta, c.unlockId); // 해금 여부 체크
   const clsLocked = isClsLocked(cls);
+
   return (
     <div className="absolute inset-0 flex flex-col" style={{ background: PALETTE.bgDeep }}>
+      {/* 상단 직업 아이콘 선택 바 */}
       <div className="px-4 pt-6 pb-3">
         <p className="text-center text-[11px] tracking-[0.4em] mb-3" style={{ color: PALETTE.textDim }}>
           ◆ 직업을 선택하세요 ◆
@@ -653,24 +655,47 @@ function ClassSelect({ meta, selected, onSelect, onNext, onBack }) {
           })}
         </div>
       </div>
+
+      {/* 중앙 직업 상세 정보 및 이미지 영역 */}
+      <div className="absolute inset-0 flex flex-col" style={{ background: PALETTE.bgDeep }}>
+      {/* 상단: 직업 선택 탭 생략... */}
+
       <div className="flex-1 px-6 py-3 overflow-hidden">
         <div className="h-full relative overflow-hidden" style={{
           background: `linear-gradient(180deg, ${PALETTE.bgDeep}, ${cls.color}20 60%, ${cls.color}40)`,
           border: `1px solid ${cls.color}60`,
         }}>
-          <div className="absolute inset-0 flex items-center justify-center" style={{ opacity: 0.12 }}>
-            <div style={{ fontSize: '180px', color: cls.color, fontFamily: 'serif', textShadow: `0 0 40px ${cls.color}` }}>
+          
+          {/* ★ 이미지 레이어 추가 ★ */}
+          <div className="absolute inset-0 z-0">
+             <img 
+               src={cls.image} 
+               alt={cls.name}
+               className="w-full h-full object-cover opacity-50" 
+               onError={(e) => e.target.style.display = 'none'} 
+             />
+             {/* 텍스트 가독성을 위한 그라데이션 오버레이 */}
+             <div className="absolute inset-0" style={{
+               background: `linear-gradient(to bottom, transparent 0%, ${PALETTE.bgDeep} 90%)`
+             }} />
+          </div>
+
+          {/* 기존 알파벳 배경 (이미지 뒤로 가도록 z-index 조절) */}
+          <div className="absolute inset-0 flex items-center justify-center opacity-10 z-0">
+            <div style={{ fontSize: '180px', color: cls.color, fontFamily: 'serif' }}>
               {cls.name[0]}
             </div>
           </div>
-          <div className="absolute inset-x-0 bottom-0 p-4 text-center" style={{
-            background: `linear-gradient(180deg, transparent, ${PALETTE.bgDeep}cc 40%, ${PALETTE.bgDeep})`,
-          }}>
+
+          {/* 정보 텍스트 영역 (콘텐츠가 위로 오도록 relative 설정) */}
+          <div className="absolute inset-x-0 bottom-0 p-4 text-center z-10">
             <p className="text-[10px] tracking-[0.3em] mb-1" style={{ color: cls.color }}>{cls.sub}</p>
             <h2 className="text-2xl font-bold mb-2" style={{ color: cls.color, textShadow: `0 0 20px ${cls.color}80` }}>
               {cls.name}
             </h2>
             <p className="text-xs leading-relaxed mb-3" style={{ color: PALETTE.text }}>{cls.desc}</p>
+            
+            {/* 시작 스킬 정보 */}
             <div className="text-[11px] mb-2 flex flex-wrap justify-center gap-1.5">
               {Object.entries(cls.startSkills).map(([k, v]) => (
                 <span key={k} className="px-2 py-0.5" style={{
@@ -680,6 +705,8 @@ function ClassSelect({ meta, selected, onSelect, onNext, onBack }) {
                 }}>{k} Lv.{v}</span>
               ))}
             </div>
+
+            {/* 능력치 정보 */}
             <div className="flex justify-around pt-2 border-t" style={{ borderColor: `${cls.color}30` }}>
               {Object.entries(cls.stats).map(([k, v]) => (
                 <div key={k} className="text-center">
@@ -691,6 +718,8 @@ function ClassSelect({ meta, selected, onSelect, onNext, onBack }) {
           </div>
         </div>
       </div>
+
+      {/* 하단 버튼 */}
       <div className="px-6 pb-6 pt-2 grid grid-cols-2 gap-2">
         <button onClick={onBack} className="py-3" style={{
           background: 'transparent', border: `1px solid ${PALETTE.panelBorder}`,
@@ -703,7 +732,6 @@ function ClassSelect({ meta, selected, onSelect, onNext, onBack }) {
           border: `1px solid ${clsLocked ? PALETTE.panelBorder : cls.color}`,
           color: clsLocked ? PALETTE.textDim : PALETTE.text,
           letterSpacing: '0.2em', fontSize: '13px',
-          opacity: clsLocked ? 0.5 : 1,
         }}>{clsLocked ? '🔒 잠김' : '확정 ▸'}</button>
       </div>
     </div>
