@@ -376,11 +376,12 @@ function calculateDamage(skill, attacker, defender, skills, isCrit, ultimates = 
     dmg += magicBonus;
     breakdown.push(`마력 Lv.3 +${magicBonus}`);
   }
-  // 궁극 [정념 폭주] 마력_aetherStorm: 마법 데미지 ×1.5
+  // 궁극 [정념 폭주] 마력_aetherStorm: 마법 데미지 ×2.0
   if (skill.type === 'magic' && hasUltimate(ultimates, 'ult_aetherStorm')) {
-    const ultBonus = Math.floor(dmg * 0.5);
+    // 기존 데미지만큼을 더해서 2배로 만듦
+    const ultBonus = dmg; 
     dmg += ultBonus;
-    breakdown.push(`★정념폭주 +${ultBonus}`);
+    breakdown.push(`★정념폭주 +${ultBonus} (2배)`);
   }
   // 궁극 [광기 각성] 잔혹_madness: HP 50% 이하 시 모든 데미지 +50%
   if (hasUltimate(ultimates, 'ult_madness') && attacker.hp <= attacker.maxHp * 0.5) {
@@ -1302,17 +1303,15 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
       const finalCd = Math.max(0, skill.cd - cdReduce);
       if (finalCd > 0) newPlayer.cooldowns = { ...newPlayer.cooldowns, [skillKey]: finalCd };
     }
-    // 궁극 [시간 역행] ult_timeRewind: 마법 공격 시 30% 확률로 쿨다운 -1 + 에테르 +1
-    if (skill.type === 'magic' && hasUltimate(ultimates, 'ult_timeRewind') && Math.random() < 0.3) {
+    // 궁극 [시간 역행] ult_timeRewind: 모든 마법 스킬 쿨다운 제거, 에테르 +1
+    if (skill.type === 'magic' && hasUltimate(ultimates, 'ult_timeRewind')) {
+      // 에테르 +1 (최대치 제한)
       newPlayer.ether = Math.min(newPlayer.maxEther || 3, newPlayer.ether + 1);
-      // 모든 쿨다운 -1
-      const reducedCd = {};
-      Object.entries(newPlayer.cooldowns || {}).forEach(([k, v]) => {
-        const newVal = Math.max(0, v - 1);
-        if (newVal > 0) reducedCd[k] = newVal;
-      });
-      newPlayer.cooldowns = reducedCd;
-      newLog.push({ type: 'passive', text: `★ [시간 역행] 모든 쿨다운 -1, 에테르 +1` });
+      
+      // 모든 스킬 쿨다운 즉시 제거 (빈 객체로 초기화)
+      newPlayer.cooldowns = {}; 
+      
+      newLog.push({ type: 'passive', text: `★ [시간 역행] 모든 마법 스킬 쿨다운 제거, 에테르 +1` });
     }
 
     setPlayer(newPlayer);
