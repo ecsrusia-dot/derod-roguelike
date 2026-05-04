@@ -1244,11 +1244,17 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
 
     if (skill.type === 'physical' || skill.type === 'magic') {
       // 마력 Lv.7: 마법 공격 시 50% 확률로 재시전 (총 2회 시전)
-      // 궁극 [신탁 각성] ult_oracleAwaken: 100% 재시전
-      // 1. 재시전 확률 및 횟수 설정 부분 수정
-      const echoChance = hasUltimate(ultimates, 'ult_oracleAwaken') ? 1.0 : 0.5;
-      const canEcho = skill.type === 'magic' && (hasEffect(skills, 'magicEcho', activeSkills) || hasUltimate(ultimates, 'ult_oracleAwaken'));
-      const echoTimes = (canEcho && Math.random() < echoChance) ? 3 : 1;
+      // 궁극 [신탁 각성] ult_oracleAwaken: 100% 재시전 (총 3회 시전)
+      
+      const hasOracleAwaken = hasUltimate(ultimates, 'ult_oracleAwaken');
+      const echoChance = hasOracleAwaken ? 1.0 : 0.5;
+      const canEcho = skill.type === 'magic' && (hasEffect(skills, 'magicEcho', activeSkills) || hasOracleAwaken);
+      
+      // 1. 재시전 횟수 분기 처리 (신탁 각성이면 3, 아니면 2)
+      let echoTimes = 1;
+      if (canEcho && Math.random() < echoChance) {
+        echoTimes = hasOracleAwaken ? 3 : 2;
+      }
       
       const hitCount = skill.hitCount || 1;
       let totalDmg = 0;
@@ -1256,7 +1262,9 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
       
       for (let echo = 0; echo < echoTimes; echo++) {
         if (echo > 0) {
-          newLog.push({ type: 'passive', text: `◆ [마력 Lv.7] 마법 재시전! (${echo + 1}/3)` });
+          // 2. 발동 주체에 따라 로그 텍스트 동적 변경
+          const effectName = hasOracleAwaken ? '신탁 각성' : '마력 Lv.7';
+          newLog.push({ type: 'passive', text: `◆ [${effectName}] 마법 재시전! (${echo}/${echoTimes - 1})` });
         }
         
         for (let i = 0; i < hitCount; i++) {
@@ -1276,12 +1284,16 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
           newEnemy.currentHp = Math.max(0, newEnemy.currentHp - actualDmg);
           totalDmg += actualDmg;
           
-          const echoTag = (echo === 1) ? ' [재시전]' : '';
+          // 3. 재시전 태그 동적 처리 (1번째 재시전, 2번째 재시전 모두 표시)
+          const echoTag = (echo > 0) ? ` [재시전 ${echo}]` : '';
           newLog.push({
             type: 'damage',
-            text: `· ${enemy.name}에게 ${actualDmg} 데미지${isCrit ? ' [치명타!]' : ''}${hitCount > 1 ? ` (${i+1}/${hitCount})` : ''}${echoTag}`,
+            text: `· ${newEnemy.name}에게 ${actualDmg} 데미지${isCrit ? ' [치명타!]' : ''}${hitCount > 1 ? ` (${i+1}/${hitCount})` : ''}${echoTag}`,
             breakdown: dmgResult.breakdown.join(' / '),
           });
+        }
+      }
+    }
           
           // 작업 5: 매 히트마다 디버프 부여 (다단히트 누적)
           const attackPassivesPerHit = getActivePassives(skills, 'onAttack', activeSkills);
