@@ -520,17 +520,31 @@ const NODE_TYPES = {
 };
 
 function PhoneFrame({ children }) {
-  // 모바일에서는 풀스크린, 데스크톱에서는 폰 프레임
   const [isMobile, setIsMobile] = useState(false);
+  const [scale, setScale] = useState(1);
+  const containerRef = useRef(null);
+
   useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 1024);
-    check();
-    window.addEventListener('resize', check);
-    return () => window.removeEventListener('resize', check);
+    const updateLayout = () => {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      setIsMobile(width < 1024);
+
+      if (width >= 1024) {
+        // PC 환경 배율 계산 (가로 375, 세로 780 기준)
+        // 화면 높이의 90% 정도를 차지하도록 배율 설정
+        const scaleV = (height * 0.9) / 780;
+        const scaleH = (width * 0.4) / 375; // 좌우 여백 고려
+        setScale(Math.min(scaleV, scaleH, 1.2)); // 최대 1.2배까지만 확대
+      }
+    };
+
+    updateLayout();
+    window.addEventListener('resize', updateLayout);
+    return () => window.removeEventListener('resize', updateLayout);
   }, []);
 
   if (isMobile) {
-    // 모바일: 풀스크린 (폰 자체가 폰 프레임 역할)
     return (
       <div className="fixed inset-0 overflow-hidden" style={{
         background: PALETTE.bg,
@@ -545,22 +559,32 @@ function PhoneFrame({ children }) {
     );
   }
 
-  // 데스크톱: 폰 프레임으로 미리보기
+  // 데스크톱: 배율에 맞춰 scale 적용
   return (
-    <div className="relative mx-auto" style={{
-      width: '375px', height: '780px',
-      background: PALETTE.bg,
-      borderRadius: '36px',
-      border: `8px solid ${PALETTE.bgDeep}`,
-      boxShadow: '0 30px 80px rgba(0,0,0,0.6)',
-      overflow: 'hidden',
-      fontFamily: '"Noto Serif KR", serif',
-    }}>
-      <div className="absolute inset-0 pointer-events-none opacity-25" style={{
-        backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
-        mixBlendMode: 'overlay',
-      }} />
-      {children}
+    <div className="flex items-center justify-center w-full h-full">
+      <div 
+        ref={containerRef}
+        className="relative transition-transform duration-300"
+        style={{
+          width: '375px',
+          height: '780px',
+          transform: `scale(${scale})`,
+          transformOrigin: 'center center',
+          background: PALETTE.bg,
+          borderRadius: '36px',
+          border: `8px solid ${PALETTE.bgDeep}`,
+          boxShadow: '0 30px 80px rgba(0,0,0,0.6)',
+          overflow: 'hidden',
+          fontFamily: '"Noto Serif KR", serif',
+          flexShrink: 0,
+        }}
+      >
+        <div className="absolute inset-0 pointer-events-none opacity-25" style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
+          mixBlendMode: 'overlay',
+        }} />
+        {children}
+      </div>
     </div>
   );
 }
@@ -3358,202 +3382,99 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6" style={{
+    <div className="min-h-screen w-full flex items-center justify-center p-4 lg:p-10" style={{
       background: `radial-gradient(ellipse at top, #1a0e12 0%, #050304 100%)`,
       fontFamily: '"Noto Serif KR", serif',
+      overflow: 'hidden' 
     }}>
-      <div className="grid lg:grid-cols-[1fr_auto_1fr] gap-8 items-start max-w-7xl">
-        {/* 좌측 안내 */}
-        <div className="hidden lg:block max-w-sm" style={{ color: PALETTE.text }}>
+      {/* 가로로 나열되는 컨테이너 */}
+      <div className="flex flex-row items-center justify-center gap-12 w-full max-w-[1400px]">
+        
+        {/* [좌측] 게임 안내 및 패치 노트 (PC 전용) */}
+        <div className="hidden xl:block w-80 flex-shrink-0" style={{ color: PALETTE.text }}>
           <p className="text-xs tracking-[0.4em] mb-2" style={{ color: PALETTE.deblan }}>RELIC REFORM · v1.4</p>
           <h1 className="text-3xl font-bold mb-4 leading-tight" style={{ fontFamily: '"Cinzel", serif' }}>
             데로드앤데블랑<br/>
             <span style={{ color: PALETTE.accent }}>로그라이크</span>
           </h1>
           <p className="text-sm leading-relaxed mb-6" style={{ color: PALETTE.textDim }}>
-            v1.4 — 유물 시스템 재편 + 영혼의 제단 너프.
+            v1.4 — 유물 시스템 재편 + 영혼의 제단 밸런스 조정.
           </p>
           
-          <div className="space-y-3 text-xs">
+          <div className="space-y-4 text-xs">
             <div>
               <div className="text-[10px] tracking-[0.3em] mb-1.5" style={{ color: PALETTE.legendary }}>★ 유물 스탯형 전환</div>
-              <p style={{ color: PALETTE.textDim }}>
-                패시브 Lv 강화 → 직접 스탯 보너스로 전환. 12종 유물.
-                데미지 % / 치명타율 / 회피율 / 최대 HP / 흡혈 / 반사 등.
-              </p>
+              <p style={{ color: PALETTE.textDim }}>패시브 Lv 강화 대신 직접적인 스탯 보너스를 부여합니다.</p>
             </div>
             <div>
-              <div className="text-[10px] tracking-[0.3em] mb-1.5" style={{ color: PALETTE.deblan }}>✦ 영혼 제단 너프</div>
-              <p style={{ color: PALETTE.textDim }}>
-                전체 비용 3~5배 증가. 신탁의 유물 / 단련된 영혼 최대 2단계 (500/1000).
-                리롤 비용 1 → 20 영혼.
-              </p>
-            </div>
-            <div>
-              <div className="text-[10px] tracking-[0.3em] mb-1.5" style={{ color: PALETTE.derod }}>◆ 유물 중복 방지</div>
-              <p style={{ color: PALETTE.textDim }}>
-                이미 보유한 유물은 보상·사건·상점 풀에서 모두 제외.
-              </p>
+              <div className="text-[10px] tracking-[0.3em] mb-1.5" style={{ color: PALETTE.deblan }}>✦ 영혼 제단 조정</div>
+              <p style={{ color: PALETTE.textDim }}>강화 비용이 현실적으로 조정되었습니다.</p>
             </div>
           </div>
 
-          <div className="mt-6 pt-5 border-t text-[11px] leading-relaxed" style={{ color: PALETTE.textDim, borderColor: PALETTE.panelBorder }}>
-            ◇ 유물은 봉인되면 효과 0<br/>
-            ◇ 모든 진행은 IndexedDB에 자동 저장
+          <div className="mt-8 pt-5 border-t text-[11px] leading-relaxed" style={{ color: PALETTE.textDim, borderColor: PALETTE.panelBorder }}>
+            ◇ 모든 진행은 브라우저에 자동 저장됩니다.
           </div>
         </div>
 
-        {/* 폰 (게임 화면) */}
-        <PhoneFrame>
-          {screen === 'title' && <TitleScreen meta={meta} 
-            onStart={() => setScreen('classSelect')}
-            onAltar={enterAltar} />}
-          {screen === 'classSelect' && (
-            <ClassSelect meta={meta} selected={selectedClass} onSelect={setSelectedClass}
-              onNext={() => setScreen('expeditionSelect')}
-              onBack={() => setScreen('title')} />
-          )}
-          {screen === 'expeditionSelect' && (
-            <ExpeditionSelect meta={meta}
-              onSelect={startExpedition}
-              onBack={() => setScreen('classSelect')} />
-          )}
-          {screen === 'altar' && (
-            <SoulAltar meta={meta} slots={altarSlots}
-              onPurchase={purchaseUpgrade}
-              onReroll={rerollAltar}
-              onBack={() => setScreen('title')} />
-          )}
-          {screen === 'map' && chapter && mapData && (
-            <MapView chapter={chapter} classData={classData} mapData={mapData}
-              hp={hp} maxHp={maxHp} gold={gold} gem={gem}
-              expedition={currentExpedition} curses={currentCurses} chapterIdx={chapterIdx}
-              onEnterNode={handleEnterNode}
-              onOpenStatus={() => setScreen('status')}
-              onBack={() => setScreen('title')} />
-          )}
-          {screen === 'combat' && currentEnemy && (
-            <CombatScreen
-              key={`${activeNodeId}-${currentEnemy}`}
-              classData={classData}
-              initialPlayer={{ hp, maxHp, ...stats, ...classData.stats }}
-              initialSkills={skills}
-              initialUltimates={ultimates}
-              initialRelics={relics}
-              activeSkills={activeSkills}
-              activeRelicNames={activeRelicNames}
-              enemyKey={currentEnemy}
-              isBoss={isBossReward}
-              expedition={currentExpedition}
-              curses={currentCurses}
-              meta={meta}
-              onVictory={handleVictory}
-              onDefeat={handleDefeat}
-            />
-          )}
-          {screen === 'reward' && (
-            <RewardSelect rewards={currentRewards} gem={gem} skills={skills}
-              relics={relics} ultimates={ultimates}
-              onPick={handlePickReward}
-              onReroll={handleReroll}
-              hasRerolled={hasRerolled}
-              isElite={isEliteReward} />
-          )}
-          {screen === 'event' && currentEvent && (
-            <EventScreen event={currentEvent} classData={classData} stats={{ ...classData.stats, ...stats }}
-              onResolve={handleEventResolve} />
-          )}
-          {screen === 'rest' && (
-            <RestScreen classData={classData} hp={hp} maxHp={maxHp} skills={skills}
-              relics={relics} expedition={currentExpedition}
-              onChoice={handleRestChoice} />
-          )}
-          {screen === 'prep' && (
-            <PrepScreen skills={skills} relics={relics} ultimates={ultimates}
-              expedition={currentExpedition}
-              mode="full"
-              onConfirm={handlePrepConfirm} />
-          )}
-          {screen === 'reselect' && (
-            <PrepScreen skills={skills} relics={relics} ultimates={ultimates}
-              expedition={currentExpedition}
-              mode={reselectMode}
-              currentActiveSkills={activeSkills}
-              currentActiveRelicNames={activeRelicNames}
-              onConfirm={handleReselectConfirm} />
-          )}
-          {screen === 'shop' && (
-            <ShopScreen gold={gold} skills={skills} relics={relics} ultimates={ultimates}
-              onBuy={handleShopBuy} onLeave={handleShopLeave} />
-          )}
-          {screen === 'chapterClear' && chapter && (
-            <ChapterClearScreen chapter={chapter}
-              isLastChapter={false}
-              onContinue={handleChapterContinue} />
-          )}
-          {screen === 'expeditionClear' && currentExpedition && (
-            <ExpeditionClearScreen expedition={currentExpedition}
-              soulsGained={runSouls}
-              onContinue={handleExpeditionClearContinue} />
-          )}
-          {screen === 'defeat' && (
-            <DefeatScreen chapter={chapter}
-              soulsGained={runSouls}
-              onContinue={handleDefeatContinue} />
-          )}
-          {screen === 'status' && (
-            <StatusPanel classData={classData} hp={hp} maxHp={maxHp}
-              skills={skills} stats={{ ...classData.stats, ...stats }} relics={relics}
-              ultimates={ultimates}
-              activeSkills={activeSkills}
-              activeRelicNames={activeRelicNames}
-              onClose={() => setScreen('map')} />
-          )}
-        </PhoneFrame>
+        {/* [중앙] 실제 게임 화면 (PhoneFrame) */}
+        <div className="flex-shrink-0">
+          <PhoneFrame>
+            {screen === 'title' && <TitleScreen meta={meta} onStart={() => setScreen('classSelect')} onAltar={enterAltar} />}
+            {screen === 'classSelect' && <ClassSelect meta={meta} selected={selectedClass} onSelect={setSelectedClass} onNext={() => setScreen('expeditionSelect')} onBack={() => setScreen('title')} />}
+            {screen === 'expeditionSelect' && <ExpeditionSelect meta={meta} onSelect={startExpedition} onBack={() => setScreen('classSelect')} />}
+            {screen === 'altar' && <SoulAltar meta={meta} slots={altarSlots} onPurchase={purchaseUpgrade} onReroll={rerollAltar} onBack={() => setScreen('title')} />}
+            {screen === 'map' && chapter && mapData && <MapView chapter={chapter} classData={classData} mapData={mapData} hp={hp} maxHp={maxHp} gold={gold} gem={gem} expedition={currentExpedition} curses={currentCurses} chapterIdx={chapterIdx} onEnterNode={handleEnterNode} onOpenStatus={() => setScreen('status')} onBack={() => setScreen('title')} />}
+            {screen === 'combat' && currentEnemy && <CombatScreen key={`${activeNodeId}-${currentEnemy}`} classData={classData} initialPlayer={{ hp, maxHp, ...stats, ...classData.stats }} initialSkills={skills} initialUltimates={ultimates} initialRelics={relics} activeSkills={activeSkills} activeRelicNames={activeRelicNames} enemyKey={currentEnemy} isBoss={isBossReward} expedition={currentExpedition} curses={currentCurses} meta={meta} onVictory={handleVictory} onDefeat={handleDefeat} />}
+            {screen === 'reward' && <RewardSelect rewards={currentRewards} gem={gem} skills={skills} relics={relics} ultimates={ultimates} onPick={handlePickReward} onReroll={handleReroll} hasRerolled={hasRerolled} isElite={isEliteReward} />}
+            {screen === 'event' && currentEvent && <EventScreen event={currentEvent} classData={classData} stats={{ ...classData.stats, ...stats }} onResolve={handleEventResolve} />}
+            {screen === 'rest' && <RestScreen classData={classData} hp={hp} maxHp={maxHp} skills={skills} relics={relics} expedition={currentExpedition} onChoice={handleRestChoice} />}
+            {screen === 'prep' && <PrepScreen skills={skills} relics={relics} ultimates={ultimates} expedition={currentExpedition} mode="full" onConfirm={handlePrepConfirm} />}
+            {screen === 'reselect' && <PrepScreen skills={skills} relics={relics} ultimates={ultimates} expedition={currentExpedition} mode={reselectMode} currentActiveSkills={activeSkills} currentActiveRelicNames={activeRelicNames} onConfirm={handleReselectConfirm} />}
+            {screen === 'shop' && <ShopScreen gold={gold} skills={skills} relics={relics} ultimates={ultimates} onBuy={handleShopBuy} onLeave={handleShopLeave} />}
+            {screen === 'chapterClear' && chapter && <ChapterClearScreen chapter={chapter} isLastChapter={false} onContinue={handleChapterContinue} />}
+            {screen === 'expeditionClear' && currentExpedition && <ExpeditionClearScreen expedition={currentExpedition} soulsGained={runSouls} onContinue={handleExpeditionClearContinue} />}
+            {screen === 'defeat' && <DefeatScreen chapter={chapter} soulsGained={runSouls} onContinue={handleDefeatContinue} />}
+            {screen === 'status' && <StatusPanel classData={classData} hp={hp} maxHp={maxHp} skills={skills} stats={{ ...classData.stats, ...stats }} relics={relics} ultimates={ultimates} activeSkills={activeSkills} activeRelicNames={activeRelicNames} onClose={() => setScreen('map')} />}
+          </PhoneFrame>
+        </div>
 
-        {/* 우측 디버그 */}
-        <div className="hidden lg:block max-w-sm">
-          <p className="text-xs tracking-[0.4em] mb-3" style={{ color: PALETTE.derod }}>현재 상태</p>
+        {/* [우측] 실시간 디버그 정보 (PC 전용) */}
+        <div className="hidden lg:block w-80 flex-shrink-0 overflow-y-auto max-h-[85vh] pr-2 custom-scrollbar">
+          <p className="text-xs tracking-[0.4em] mb-3" style={{ color: PALETTE.derod }}>실시간 상태</p>
           
-          <div className="px-3 py-2.5 mb-3" style={{ background: `${PALETTE.accent}10`, border: `1px solid ${PALETTE.panelBorder}` }}>
-            <div className="text-[10px] mb-1" style={{ color: PALETTE.textDim }}>현재 화면</div>
-            <div className="text-xs font-bold" style={{ color: PALETTE.text }}>{screen}</div>
+          <div className="px-3 py-2 mb-4" style={{ background: `${PALETTE.accent}10`, border: `1px solid ${PALETTE.panelBorder}` }}>
+            <div className="text-[10px] mb-1" style={{ color: PALETTE.textDim }}>현재 페이즈</div>
+            <div className="text-xs font-bold" style={{ color: PALETTE.text }}>{screen.toUpperCase()}</div>
           </div>
 
-          <div className="space-y-1 text-[11px] mb-4">
-            <div className="flex justify-between"><span style={{ color: PALETTE.textDim }}>HP</span><span style={{ color: PALETTE.text }}>{hp}/{maxHp}</span></div>
-            <div className="flex justify-between"><span style={{ color: PALETTE.textDim }}>은화</span><span style={{ color: PALETTE.text }}>{gold}</span></div>
-            <div className="flex justify-between"><span style={{ color: PALETTE.textDim }}>보석</span><span style={{ color: PALETTE.text }}>{gem}</span></div>
-            <div className="flex justify-between"><span style={{ color: PALETTE.textDim }}>유물</span><span style={{ color: PALETTE.text }}>{relics.length}개</span></div>
-            {chapter && <div className="flex justify-between"><span style={{ color: PALETTE.textDim }}>챕터</span><span style={{ color: PALETTE.text }}>{chapter.name}</span></div>}
+          <div className="space-y-2 text-[11px] mb-6">
+            <div className="flex justify-between border-b border-white/5 pb-1"><span style={{ color: PALETTE.textDim }}>체력</span><span style={{ color: PALETTE.text }}>{hp}/{maxHp}</span></div>
+            <div className="flex justify-between border-b border-white/5 pb-1"><span style={{ color: PALETTE.textDim }}>보유 은화</span><span style={{ color: PALETTE.text }}>{gold}</span></div>
+            <div className="flex justify-between border-b border-white/5 pb-1"><span style={{ color: PALETTE.textDim }}>보유 보석</span><span style={{ color: PALETTE.text }}>{gem}</span></div>
+            <div className="flex justify-between border-b border-white/5 pb-1"><span style={{ color: PALETTE.textDim }}>획득 유물</span><span style={{ color: PALETTE.text }}>{relics.length}개</span></div>
           </div>
 
           {Object.keys(skills).length > 0 && (
-            <div className="mb-4">
-              <div className="text-[10px] mb-1" style={{ color: PALETTE.derod }}>패시브 스킬</div>
-              <div className="flex flex-wrap gap-1">
+            <div className="mb-6">
+              <div className="text-[10px] mb-2" style={{ color: PALETTE.derod }}>습득 패시브</div>
+              <div className="flex flex-wrap gap-1.5">
                 {Object.entries(skills).filter(([_, lv]) => lv > 0).map(([k, lv]) => (
-                  <span key={k} className="text-[10px] px-1.5 py-0.5" style={{
-                    background: `${PASSIVE_SKILLS[k].color}30`,
+                  <span key={k} className="text-[10px] px-2 py-0.5" style={{
+                    background: `${PASSIVE_SKILLS[k].color}20`,
                     color: PASSIVE_SKILLS[k].color,
-                    border: `1px solid ${PASSIVE_SKILLS[k].color}60`,
-                  }}>{k} {lv}</span>
+                    border: `1px solid ${PASSIVE_SKILLS[k].color}40`,
+                  }}>{k} Lv.{lv}</span>
                 ))}
               </div>
             </div>
           )}
 
-          <div className="pt-4 border-t text-[10px] leading-relaxed" style={{ color: PALETTE.textDim, borderColor: PALETTE.panelBorder }}>
-            <p className="mb-2">◇ <strong style={{ color: PALETTE.text }}>플레이 순서:</strong></p>
-            <p>1. 직업 선택 → 챕터 선택</p>
-            <p>2. 발광 노드 탭 → 해당 컨텐츠 진행</p>
-            <p>3. 전투 승리 → 보상 3중1 선택</p>
-            <p>4. 보스 처치 → 다음 챕터로 자동 이동</p>
-            <p className="mt-2">◇ 보석 3개로 보상 1회 리롤</p>
-            <p>◇ 우측 상단 캐릭터 아이콘으로 상태창</p>
+          <div className="pt-4 border-t text-[10px] style={{ color: PALETTE.textDim, borderColor: PALETTE.panelBorder }}">
+             <p className="opacity-50">배율 조정 모드 활성화됨</p>
           </div>
         </div>
+
       </div>
     </div>
   );
-}
