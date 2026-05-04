@@ -1154,17 +1154,18 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
     if (skill.type === 'physical' || skill.type === 'magic') {
       // 마력 Lv.7: 마법 공격 시 50% 확률로 재시전 (총 2회 시전)
       // 궁극 [신탁 각성] ult_oracleAwaken: 100% 재시전
+      // 1. 재시전 확률 및 횟수 설정 부분 수정
       const echoChance = hasUltimate(ultimates, 'ult_oracleAwaken') ? 1.0 : 0.5;
-      const willEcho = skill.type === 'magic' && (hasEffect(skills, 'magicEcho', activeSkills) || hasUltimate(ultimates, 'ult_oracleAwaken')) && Math.random() < echoChance;
-      const echoTimes = willEcho ? 2 : 1;
+      const canEcho = skill.type === 'magic' && (hasEffect(skills, 'magicEcho', activeSkills) || hasUltimate(ultimates, 'ult_oracleAwaken'));
+      const echoTimes = (canEcho && Math.random() < echoChance) ? 3 : 1;
       
       const hitCount = skill.hitCount || 1;
       let totalDmg = 0;
       let usedGuaranteedCrit = false;
       
       for (let echo = 0; echo < echoTimes; echo++) {
-        if (echo === 1) {
-          newLog.push({ type: 'passive', text: `◆ [마력 Lv.7] 마법 재시전!` });
+        if (echo > 0) {
+          newLog.push({ type: 'passive', text: `◆ [마력 Lv.7] 마법 재시전! (${echo + 1}/3)` });
         }
         
         for (let i = 0; i < hitCount; i++) {
