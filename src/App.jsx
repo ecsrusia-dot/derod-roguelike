@@ -1812,7 +1812,7 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
           {/* 내 캐릭터 모습 (요청하신 파일명 그대로 적용) */}
           <div className="flex-1 relative overflow-hidden bg-[#050304]">
             <img 
-              src="image_a75fbe.png" 
+              src={classData.image}
               alt="Player Avatar" 
               className="absolute inset-0 w-full h-full object-cover object-top opacity-80"
             />
