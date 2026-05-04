@@ -1807,64 +1807,76 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
         </div>
 
         {/* 3. 하단 1/3 : 캐릭터 모습, 내 정보창 및 행동 스킬 */}
-        <div className="flex-1 flex flex-col min-h-0 border-t" style={{ borderColor: PALETTE.panelBorder }}>
+        <div className="flex-1 relative flex flex-col min-h-0 border-t" style={{ borderColor: PALETTE.panelBorder }}>
           
-          {/* 내 캐릭터 모습 (요청하신 파일명 그대로 적용) */}
-          <div className="flex-1 relative overflow-hidden bg-[#050304]">
+          {/* 배경 일러스트 (전체 영역 차지) */}
+          <div className="absolute inset-0 z-0">
             <img 
-              src={classData.image}
+              src={classData.image} 
               alt="Player Avatar" 
-              className="absolute inset-0 w-full h-full object-cover object-top opacity-80"
+              className="w-full h-full object-cover"
+              style={{ objectPosition: 'center 15%' }} // 얼굴이 화면에 더 잘 들어오도록 위치 조정
+              onError={(e) => { e.target.src = '/classes/lanthert.jpg'; }} 
             />
-            {/* 아래 정보창과 자연스럽게 이어지도록 밑에서 위로 어두워지는 그라데이션 */}
-            <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#1a0e12] to-transparent z-10" />
+            {/* 글씨 가독성을 위해 전체적으로 옅은 어둠을 깔고, 하단 스킬창 쪽은 더 어둡게 그라데이션 */}
+            <div className="absolute inset-0 bg-black/10" />
+            <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-[#050304] via-[#050304]/70 to-transparent" />
           </div>
 
-          {/* 내 정보창 */}
-          <div className="shrink-0 px-3 py-2 relative z-20" style={{ background: `${classData.color}10` }}>
+          {/* 일러스트의 상단이 오롯이 보이도록 띄워주는 투명한 빈 공간 */}
+          <div className="flex-1 min-h-0 relative z-10" />
+
+          {/* 내 정보창 (투명도 및 블러 적용) */}
+          <div className="shrink-0 px-3 py-2 relative z-10" style={{ 
+            background: `linear-gradient(90deg, ${classData.color}30, rgba(0,0,0,0.4))`,
+            borderTop: `1px solid ${classData.color}50`,
+            backdropFilter: 'blur(2px)' // 뒤쪽 일러스트를 살짝 흐리게 해 글씨 가독성 향상
+          }}>
             <div className="flex justify-between items-center mb-1">
-              <span className="text-xs font-bold" style={{ color: classData.color }}>{classData.name}</span>
-              <span className="text-[11px] tabular-nums" style={{ color: PALETTE.text }}>
+              <span className="text-xs font-bold drop-shadow-md" style={{ color: classData.color }}>{classData.name}</span>
+              <span className="text-[11px] tabular-nums font-bold drop-shadow-md" style={{ color: PALETTE.text }}>
                 {animDmg.player && <span className="mr-1 animate-pulse" style={{ color: PALETTE.accent }}>-{animDmg.player}</span>}
                 {player.hp}/{player.maxHp}
               </span>
             </div>
-            <div className="h-1.5 relative mb-1.5" style={{ background: PALETTE.bgDeep }}>
+            <div className="h-1.5 relative mb-1.5" style={{ background: 'rgba(0,0,0,0.6)' }}>
               <div className="absolute inset-y-0 left-0 transition-all" style={{
                 width: `${(player.hp/player.maxHp)*100}%`,
                 background: `linear-gradient(90deg, ${PALETTE.blood}, ${PALETTE.green})`,
               }} />
             </div>
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-[9px] px-1.5 py-0.5" style={{ background: `${PALETTE.deblan}30`, color: PALETTE.deblan, border: `1px solid ${PALETTE.deblan}60` }}>
+              <span className="text-[9px] px-1.5 py-0.5 backdrop-blur-sm" style={{ background: `${PALETTE.deblan}40`, color: '#fff', border: `1px solid ${PALETTE.deblan}80` }}>
                 ✦ 에테르 {player.ether}/{player.maxEther}
               </span>
               {player.defense > 0 && (
-                <span className="text-[9px] px-1.5 py-0.5" style={{ background: `${PALETTE.defense}30`, color: PALETTE.defense, border: `1px solid ${PALETTE.defense}60` }}>
+                <span className="text-[9px] px-1.5 py-0.5 backdrop-blur-sm" style={{ background: `${PALETTE.defense}40`, color: '#fff', border: `1px solid ${PALETTE.defense}80` }}>
                   ◈ 방어 {player.defense}
                 </span>
               )}
               {player.buffs?.rage > 0 && (
-                <span className="text-[9px] px-1.5 py-0.5" style={{ background: `${PALETTE.accent}30`, color: PALETTE.accent, border: `1px solid ${PALETTE.accent}60` }}>
+                <span className="text-[9px] px-1.5 py-0.5 backdrop-blur-sm" style={{ background: `${PALETTE.accent}40`, color: '#fff', border: `1px solid ${PALETTE.accent}80` }}>
                   ☩ 분노 ({player.buffs.rage}T)
                 </span>
               )}
               {player.firstHitImmune && (
-                <span className="text-[9px] px-1.5 py-0.5" style={{ background: `${PALETTE.legendary}30`, color: PALETTE.legendary, border: `1px solid ${PALETTE.legendary}60` }}>
+                <span className="text-[9px] px-1.5 py-0.5 backdrop-blur-sm" style={{ background: `${PALETTE.legendary}40`, color: '#fff', border: `1px solid ${PALETTE.legendary}80` }}>
                   ✦ 무적 1회
                 </span>
               )}
             </div>
           </div>
 
-          {/* 스킬 행동 UI */}
-          <div className="shrink-0 border-t p-2.5 relative z-20" style={{
-            borderColor: PALETTE.panelBorder, background: `linear-gradient(180deg, ${PALETTE.panel}, ${PALETTE.bgDeep})`,
+          {/* 스킬 행동 UI (높이 고정 h-[88px] 및 반투명 배경으로 창 크기 고정) */}
+          <div className="shrink-0 border-t px-2.5 py-0 relative z-10 flex flex-col justify-center h-[88px]" style={{
+            borderColor: PALETTE.panelBorder, 
+            background: 'rgba(5, 3, 4, 0.55)', // 일러스트가 비치는 반투명 검정
+            backdropFilter: 'blur(4px)', // 일러스트가 너무 선명해 버튼 글씨를 해치지 않도록 블러
           }}>
-            {phase === 'intro' && <div className="text-center text-[11px] py-2" style={{ color: PALETTE.textDim }}>전투 준비 중...</div>}
-            {phase === 'enemyTurn' && <div className="text-center text-[11px] py-2" style={{ color: PALETTE.accent }}>◂ 적의 턴 ◂</div>}
+            {phase === 'intro' && <div className="text-center text-[11px] font-bold w-full drop-shadow-md" style={{ color: PALETTE.textDim }}>전투 준비 중...</div>}
+            {phase === 'enemyTurn' && <div className="text-center text-[11px] font-bold w-full drop-shadow-md" style={{ color: PALETTE.accent }}>◂ 적의 턴 ◂</div>}
             {phase === 'playerTurn' && (
-              <div className="grid grid-cols-3 gap-1.5">
+              <div className="grid grid-cols-3 gap-1.5 w-full">
                 {classData.combatSkills.map(skillKey => {
                   const skill = COMBAT_SKILLS[skillKey];
                   if (!skill) return null;
@@ -1875,23 +1887,23 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
                   const disabled = onCd || noEther;
                   return (
                     <button key={skillKey} onClick={() => handlePlayerAction(skillKey)} disabled={disabled}
-                      className="py-2 transition-all flex flex-col items-center gap-0.5"
+                      className="py-2 transition-all flex flex-col items-center gap-0.5 backdrop-blur-sm"
                       style={{
-                        background: disabled ? PALETTE.bgDeep
-                          : skill.type === 'physical' ? `${PALETTE.accent}20`
-                          : skill.type === 'magic' ? `${PALETTE.deblan}20`
-                          : skill.type === 'defense' ? `${PALETTE.ice}20`
-                          : `${PALETTE.derod}20`,
+                        background: disabled ? 'rgba(0,0,0,0.5)'
+                          : skill.type === 'physical' ? `${PALETTE.accent}30`
+                          : skill.type === 'magic' ? `${PALETTE.deblan}30`
+                          : skill.type === 'defense' ? `${PALETTE.ice}30`
+                          : `${PALETTE.derod}30`,
                         border: `1px solid ${disabled ? PALETTE.panelBorder : skill.type === 'physical' ? PALETTE.accent : skill.type === 'magic' ? PALETTE.deblan : skill.type === 'defense' ? PALETTE.ice : PALETTE.derod}`,
-                        color: disabled ? PALETTE.textDim : PALETTE.text,
+                        color: disabled ? PALETTE.textDim : '#fff',
                         opacity: disabled ? 0.5 : 1,
                       }}>
-                      <span className="text-[11px] font-bold">{skill.name}</span>
-                      <span className="text-[9px]" style={{ color: PALETTE.textDim }}>
+                      <span className="text-[11px] font-bold drop-shadow-md">{skill.name}</span>
+                      <span className="text-[9px] drop-shadow-md" style={{ color: disabled ? PALETTE.textDim : '#ddd' }}>
                         {skill.type === 'defense' ? `+${skill.defense}` : skill.type === 'buff' ? '버프' : `${skill.baseDmg[0]}-${skill.baseDmg[1]}`}
                         {cost > 0 && ` ✦${cost}`}
                       </span>
-                      {onCd && <span className="text-[9px]" style={{ color: PALETTE.accent }}>CD {player.cooldowns[skillKey]}</span>}
+                      {onCd && <span className="text-[9px] font-bold" style={{ color: PALETTE.accent }}>CD {player.cooldowns[skillKey]}</span>}
                     </button>
                   );
                 })}
@@ -1899,15 +1911,15 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
             )}
             {phase === 'victory' && (
               <button onClick={() => onVictory(player.hp, enemy.drop)}
-                className="w-full py-2.5 text-xs tracking-[0.3em]" style={{
-                  background: `linear-gradient(180deg, ${PALETTE.legendary}40, ${PALETTE.legendary}20)`,
-                  border: `1px solid ${PALETTE.legendary}`, color: PALETTE.text,
+                className="w-full py-2.5 text-xs tracking-[0.3em] font-bold backdrop-blur-sm drop-shadow-md" style={{
+                  background: `linear-gradient(180deg, ${PALETTE.legendary}60, ${PALETTE.legendary}30)`,
+                  border: `1px solid ${PALETTE.legendary}`, color: '#fff',
                 }}>▸ 보상 획득</button>
             )}
             {phase === 'defeat' && (
-              <button onClick={() => onDefeat()} className="w-full py-2.5 text-xs tracking-[0.3em]" style={{
-                background: `linear-gradient(180deg, ${PALETTE.accent}40, ${PALETTE.accent}20)`,
-                border: `1px solid ${PALETTE.accent}`, color: PALETTE.text,
+              <button onClick={() => onDefeat()} className="w-full py-2.5 text-xs tracking-[0.3em] font-bold backdrop-blur-sm drop-shadow-md" style={{
+                background: `linear-gradient(180deg, ${PALETTE.accent}60, ${PALETTE.accent}30)`,
+                border: `1px solid ${PALETTE.accent}`, color: '#fff',
               }}>▸ 메인 메뉴로</button>
             )}
           </div>
