@@ -1323,7 +1323,7 @@ export const ULTIMATE_SKILLS = {
     {
       id: '신앙_운명의저울',
       name: '운명의 저울',
-      desc: '치명적 피격 시 100% 회피 (전투당 2회). 모든 능력치 +5.',
+      desc: '치명적 피격 시 100% 회피 (전투당 2회). 모든 능력치 +10.',
       effect: 'ult_destinyScale',
       color: '#d4a574',
     },
