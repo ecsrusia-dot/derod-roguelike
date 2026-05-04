@@ -1083,26 +1083,23 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
       ...initialPlayer, defense: 0, buffs: {}, debuffs: {}, cooldowns: {},
       ether: 3, maxEther: 3, firstHitImmune: false, revivedThisCombat: false,
     };
-    // 메타 강화: 최대 에테르 +1
     if (meta) {
       const etherBonus = getMetaBonus(meta, 'maxEther+1');
       p.maxEther += etherBonus;
       p.ether += etherBonus;
     }
-    // 저주: 에테르 -1
     if (hasCurse(curses, 'curse_ether-1')) {
       p.maxEther = Math.max(1, p.maxEther - 1);
       p.ether = Math.max(1, p.ether - 1);
     }
     return p;
   });
+
   const [enemy, setEnemy] = useState(() => {
     const e = ENEMIES[enemyKey];
-    // 원정 능력치 배율
     const hpMult = expedition?.enemyHpMult || 1.0;
     const dmgMult = expedition?.enemyDmgMult || 1.0;
     const adjustedHp = Math.floor(e.hp * hpMult);
-    // 패턴의 데미지에도 배율 적용
     const adjustedPatterns = (e.patterns || []).map(pat => ({
       ...pat,
       dmg: pat.dmg ? [Math.floor(pat.dmg[0] * dmgMult), Math.floor(pat.dmg[1] * dmgMult)] : pat.dmg,
@@ -1114,53 +1111,36 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
       defense: 0, debuffs: {}, nextIntent: null 
     };
   });
-  // 전투 준비 봉인 시스템 (이제 패스스루 — 유물이 패시브에 영향 없음)
-  const skills = useMemo(() => 
-    getEffectiveSkills(initialSkills, initialRelics, activeRelicNames),
-    [initialSkills, initialRelics, activeRelicNames]
-  );
-  // 활성 유물의 모든 스탯 보너스를 단일 객체로 집계 (성능 최적화)
+
+  const skills = useMemo(() => getEffectiveSkills(initialSkills, initialRelics, activeRelicNames), [initialSkills, initialRelics, activeRelicNames]);
   const relicStat = useMemo(() => {
     const stats = {};
-    const keys = ['dmgDealt', 'dmgTaken', 'critRate', 'critDmg', 'dodge', 'maxHp', 
-                  'startGold', 'startGem', 'heal', 'reflect', 'lifesteal', 'shieldOnStart'];
+    const keys = ['dmgDealt', 'dmgTaken', 'critRate', 'critDmg', 'dodge', 'maxHp', 'startGold', 'startGem', 'heal', 'reflect', 'lifesteal', 'shieldOnStart'];
     keys.forEach(k => stats[k] = getActiveRelicStat(initialRelics, activeRelicNames, k));
     return stats;
   }, [initialRelics, activeRelicNames]);
+
   const [ultimates] = useState(initialUltimates);
   const [turn, setTurn] = useState(1);
   const [phase, setPhase] = useState('intro');
   const [log, setLog] = useState([]);
   const [animDmg, setAnimDmg] = useState({ player: null, enemy: null });
   const logEndRef = useRef(null);
-  // 동기적 액션 락: setPhase는 비동기라 빠른 연타 시 race condition 발생.
-  // 이 ref로 클릭 즉시 잠그고, 적 턴 종료 후 해제한다.
   const actionLockRef = useRef(false);
 
   useEffect(() => { logEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [log]);
 
   useEffect(() => {
-    const initialLog = [{ type: 'narrative', text: `━━ ${enemy.name}이(가) 나타났다 ━━` },
-      { type: 'narrative', text: `「${enemy.desc}」` }];
-    
-    // 저주 표시
+    const initialLog = [{ type: 'narrative', text: `━━ ${enemy.name}이(가) 나타났다 ━━` }, { type: 'narrative', text: `「${enemy.desc}」` }];
     if (curses && curses.length > 0) {
-      curses.forEach(c => {
-        initialLog.push({ type: 'debuff', text: `✦ [저주 · ${c.name}] ${c.desc}` });
-      });
+      curses.forEach(c => initialLog.push({ type: 'debuff', text: `✦ [저주 · ${c.name}] ${c.desc}` }));
     }
     
     let newPlayer = { ...player };
-    
-    // 암검술 Lv.5: 첫 턴 확정 치명타 버프 부여
     if (hasEffect(skills, 'firstTurnGuaranteedCrit', activeSkills)) {
       newPlayer.buffs = { ...newPlayer.buffs, guaranteedCrit: 1 };
       initialLog.push({ type: 'passive', text: `◆ [암검술 Lv.5] 심안의 개안: 첫 공격 치명타 확정` });
     }
-  
-    setPlayer(newPlayer);
-    
-    // 신앙 minor: 모든 능력치 +1/Lv (전투 동안만)
     const allStatsBonus = getMinorBonus(skills, 'allStats+', activeSkills);
     if (allStatsBonus > 0) {
       newPlayer.근력 = (newPlayer.근력 || 10) + allStatsBonus;
@@ -1169,654 +1149,175 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
       newPlayer.매력 = (newPlayer.매력 || 10) + allStatsBonus;
       initialLog.push({ type: 'passive', text: `◆ [신앙 누적] 모든 능력치 +${allStatsBonus}` });
     }
-    
-    // 궁극 [운명의 저울] ult_destinyScale: 모든 능력치 +10
     if (hasUltimate(ultimates, 'ult_destinyScale')) {
-      newPlayer.근력 = (newPlayer.근력 || 10) + 10;
-      newPlayer.민첩 = (newPlayer.민첩 || 10) + 10;
-      newPlayer.지능 = (newPlayer.지능 || 10) + 10;
-      newPlayer.매력 = (newPlayer.매력 || 10) + 10;
+      newPlayer.근력 += 10; newPlayer.민첩 += 10; newPlayer.지능 += 10; newPlayer.매력 += 10;
       newPlayer.destinyScaleUses = 0;
       initialLog.push({ type: 'passive', text: `★ [운명의 저울] 모든 능력치 +10, 치명적 회피 0/2` });
     }
-    
-    // 수비 minor: 시작 방어 +5/Lv
     const minorDef = getMinorBonus(skills, 'startDef+', activeSkills);
-    if (minorDef > 0) {
-      newPlayer.defense += minorDef;
-      initialLog.push({ type: 'passive', text: `◆ [수비 누적] 시작 방어 +${minorDef}` });
-    }
-    if (hasEffect(skills, 'startDefense+20', activeSkills)) {
-      newPlayer.defense += 20;
-      initialLog.push({ type: 'passive', text: `◆ [수비 Lv.3] 시작 방어 +20` });
-    }
-    // 유물: 전투 시작 시 방어 +
-    if (relicStat.shieldOnStart > 0) {
-      newPlayer.defense += relicStat.shieldOnStart;
-      initialLog.push({ type: 'passive', text: `◆ [수호의 방패] 시작 방어 +${relicStat.shieldOnStart}` });
-    }
+    if (minorDef > 0) newPlayer.defense += minorDef;
+    if (hasEffect(skills, 'startDefense+20', activeSkills)) newPlayer.defense += 20;
+    if (relicStat.shieldOnStart > 0) newPlayer.defense += relicStat.shieldOnStart;
     if (hasEffect(skills, 'heal20%', activeSkills)) {
       const heal = Math.floor(newPlayer.maxHp * 0.2);
       newPlayer.hp = Math.min(newPlayer.maxHp, newPlayer.hp + heal);
-      initialLog.push({ type: 'passive', text: `◆ [재생 Lv.5] HP ${heal} 회복` });
     }
-    if (hasEffect(skills, 'firstHitImmune', activeSkills)) {
-      newPlayer.firstHitImmune = true;
-      initialLog.push({ type: 'passive', text: `◆ [회피 Lv.7] 첫 피격 무효 활성` });
-    }
-    
-    // 저주: 시작 방어 0
-    if (hasCurse(curses, 'curse_noDefense')) {
-      newPlayer.defense = 0;
-    }
-    
-    // 신앙 Lv.7: 수신사 등극 - 전투 시작 시 적에게 신탁 발동
+    if (hasEffect(skills, 'firstHitImmune', activeSkills)) newPlayer.firstHitImmune = true;
+    if (hasCurse(curses, 'curse_noDefense')) newPlayer.defense = 0;
+
     let oracleDebuffs = null;
     if (hasEffect(skills, 'oracleUser', activeSkills)) {
       oracleDebuffs = { bleed: 2, bleedTurns: 3, shockGauge: 100 };
-      initialLog.push({ type: 'passive', text: `◆ [신앙 Lv.7] 수신사의 신탁! 적에게 출혈 3턴 + 기절 1턴` });
+      initialLog.push({ type: 'passive', text: `◆ [신앙 Lv.7] 수신사의 신탁! 적에게 출혈 + 기절` });
     }
     
     setPlayer(newPlayer);
-    if (oracleDebuffs) {
-      setEnemy(e => ({ ...e, debuffs: { ...e.debuffs, ...oracleDebuffs } }));
-    }
+    if (oracleDebuffs) setEnemy(e => ({ ...e, debuffs: { ...e.debuffs, ...oracleDebuffs } }));
     setLog(initialLog);
     setTimeout(() => {
-      const patterns = enemy.patterns;
-      setEnemy(e => ({ ...e, nextIntent: patterns[Math.floor(Math.random() * patterns.length)] }));
+      setEnemy(e => ({ ...e, nextIntent: e.patterns[Math.floor(Math.random() * e.patterns.length)] }));
       setPhase('playerTurn');
     }, 600);
   }, []);
 
   const handlePlayerAction = (skillKey) => {
-  if (phase !== 'playerTurn') return;
-  if (actionLockRef.current) return; // 동기 락 체크 - 처리 중이면 무시
-  const skill = COMBAT_SKILLS[skillKey];
-  if (!skill) return;
-  if (player.cooldowns[skillKey] > 0) return;
+    if (phase !== 'playerTurn' || actionLockRef.current) return;
+    const skill = COMBAT_SKILLS[skillKey];
+    if (!skill || player.cooldowns[skillKey] > 0) return;
 
-  let etherCost = skill.cost || 0;
-  if (etherCost > 0 && hasEffect(skills, 'etherCost-20', activeSkills)) etherCost = Math.max(0, etherCost - 1);
+    let etherCost = skill.cost || 0;
+    if (etherCost > 0 && hasEffect(skills, 'etherCost-20', activeSkills)) etherCost = Math.max(0, etherCost - 1);
+    if (skill.type === 'magic' && hasEffect(skills, 'etherSave', activeSkills) && Math.random() < 0.5) etherCost = 0;
+    if (etherCost > player.ether) return;
 
-  // --- [추가] 정념술 Lv.3: 에테르 미소모 체크 ---
-  if (skill.type === 'magic' && hasEffect(skills, 'etherSave', activeSkills) && Math.random() < 0.5) {
-    etherCost = 0;
-    // 로그는 루프 밖에서 한 번만 출력되도록 처리 (아래에서 수행)
-  }
-
-  if (etherCost > player.ether) return;
-
-  // 모든 검증 통과 → 락 획득
-  actionLockRef.current = true;
-
-  const newLog = [...log, { type: 'player', text: `▸ ${skill.name}` }];
-  // 정념술 효과로 etherCost가 0이 되었다면 여기서 반영됨
-  if (skill.type === 'magic' && etherCost === 0 && (skill.cost || 0) > 0) {
-    newLog.push({ type: 'passive', text: `◆ [정념술 Lv.3] 에테르 공명: 비용 소모 없음` });
-  }
-
-  let newPlayer = { ...player, ether: player.ether - etherCost };
-  let newEnemy = { ...enemy };
-  let extraTurnFromCrit = false;
-
-  // --- [필수 수정] 변수 선언 및 기본값 설정 (에러 방지) ---
-  let echoTimes = 1; // 기본 1회 시전
-  const hitCount = skill.hitCount || 1; // 기본 1타
-
-  // 술법사(정념술) 또는 특정 궁극기 효과로 인한 재시전 판정
-  if (skill.type === 'magic') {
-    const canEcho = hasEffect(skills, 'magicEcho', activeSkills) || hasUltimate(ultimates, 'ult_oracleAwaken');
-    if (canEcho) {
-      const echoChance = hasUltimate(ultimates, 'ult_oracleAwaken') ? 1.0 : 0.5;
-      if (Math.random() < echoChance) echoTimes = 3; 
-    }
-  }
-
-  // --- 공격 루프 시작 ---
-  for (let echo = 0; echo < echoTimes; echo++) {
-    if (echo > 0) {
-      newLog.push({ type: 'passive', text: `◆ [재시전] 효과 발동! (${echo + 1}/${echoTimes})` });
+    actionLockRef.current = true;
+    const newLog = [...log, { type: 'player', text: `▸ ${skill.name}` }];
+    if (skill.type === 'magic' && etherCost === 0 && (skill.cost || 0) > 0) {
+      newLog.push({ type: 'passive', text: `◆ [정념술 Lv.3] 에테르 공명: 비용 소모 없음` });
     }
 
-    for (let i = 0; i < hitCount; i++) {
-      // 치명타 판정
-      let isCrit = rollCrit(skills, newPlayer, meta, activeSkills, relicStat);
-      if (newPlayer.buffs?.guaranteedCrit > 0) {
-        isCrit = true;
-      }
+    let newPlayer = { ...player, ether: player.ether - etherCost };
+    let newEnemy = { ...enemy };
+    let extraTurnFromCrit = false;
+    let echoTimes = 1;
+    const hitCount = skill.hitCount || 1;
 
-      // 데미지 계산 및 적용
-      const dmgResult = calculateDamage(skill, newPlayer, newEnemy, skills, isCrit, ultimates, meta, curses, activeSkills, relicStat);
-      newEnemy.currentHp = Math.max(0, newEnemy.currentHp - dmgResult.finalDmg);
-
-      // --- 암검술 효과 처리 ---
-      // 1. 암검술 Lv.3: 치명타 시 추가 행동 플래그
-      if (isCrit && hasEffect(skills, 'critExtraTurn', activeSkills)) {
-        extraTurnFromCrit = true;
-      }
-
-      // 2. 암검술 Lv.7: 침묵 게이지 누적 (타당 35씩 누적, 3타 시 침묵)
-      if (hasEffect(skills, 'applySilenceGauge', activeSkills)) {
-        const currentSilence = newEnemy.debuffs?.silenceGauge || 0;
-        let nextSilence = currentSilence + 35;
-
-        if (nextSilence >= 100) {
-          newLog.push({ type: 'debuff', text: `◆ [암검술 Lv.7] 침묵의 일격! 적의 기술을 봉인함` });
-          newEnemy.debuffs = { ...newEnemy.debuffs, silenced: 1, silenceGauge: 0 };
-        } else {
-          newEnemy.debuffs = { ...newEnemy.debuffs, silenceGauge: nextSilence };
-        }
-      }
-    }
-  }
-
-  // --- 공격 종료 후 후처리 ---
-  // 첫 턴 확정 치명타 버프 소모
-  if (newPlayer.buffs?.guaranteedCrit > 0) {
-    newPlayer.buffs = { ...newPlayer.buffs, guaranteedCrit: 0 };
-  }
-
-  // 암검술 Lv.3 추가 행동 로그 출력
-  if (extraTurnFromCrit) {
-    newLog.push({ type: 'passive', text: `◆ [암검술 Lv.3] 신속한 연격: 추가 행동 획득!` });
-    // 기존의 추가 턴 시스템(extraTurn)과 연동하기 위해 플래그를 버프에 저장하거나 
-    // 로직에 따라 즉시 턴을 초기화하는 처리가 필요할 수 있습니다.
-  }
-
-  // 상태 업데이트 및 화면 전환
-  setPlayer(newPlayer);
-  setEnemy(newEnemy);
-  setLog(newLog);
-
-  if (newEnemy.currentHp <= 0) {
-    // 승리 처리 로직 (생략)
-    setTimeout(() => {
-      setLog(prev => [...prev, { type: 'victory', text: `━━ ${enemy.name} 처치 ━━` }]);
-      setPhase('victory');
-      actionLockRef.current = false;
-    }, 800);
-    return;
-  }
-
-  setPhase('enemyTurn');
-  setTimeout(() => { executeEnemyTurn(newPlayer, newEnemy, newLog); }, 350);
-};
-
-    // 버프 소모 및 상태 업데이트
-    if (newPlayer.buffs?.guaranteedCrit > 0) newPlayer.buffs.guaranteedCrit = 0;
-    setIsFirstTurn(false);
-  
-    // 추가 행동 발생 시 처리
-    if (extraTurnFromCrit) {
-      newLog.push({ type: 'passive', text: `◆ [암검술 Lv.3] 신속한 연격: 추가 행동 획득!` });
-      // 여기서 바로 플레이어 턴으로 다시 세팅하거나, 턴 종료 로직에서 phase를 조절합니다.
-      // 기존 가속(extraTurn) 시스템과 통합하여 처리하는 것을 권장합니다.
+    if (skill.type === 'magic') {
+      const canEcho = hasEffect(skills, 'magicEcho', activeSkills) || hasUltimate(ultimates, 'ult_oracleAwaken');
+      if (canEcho && Math.random() < (hasUltimate(ultimates, 'ult_oracleAwaken') ? 1.0 : 0.5)) echoTimes = 3;
     }
 
-    if (skill.selfDmg) {
-      newPlayer.hp = Math.max(1, newPlayer.hp - skill.selfDmg);
-      newLog.push({ type: 'system', text: `· 자신 HP -${skill.selfDmg}` });
-    }
+    for (let echo = 0; echo < echoTimes; echo++) {
+      if (echo > 0) newLog.push({ type: 'passive', text: `◆ [재시전] (${echo + 1}/${echoTimes})` });
+      for (let i = 0; i < hitCount; i++) {
+        let isCrit = rollCrit(skills, newPlayer, meta, activeSkills, relicStat);
+        if (newPlayer.buffs?.guaranteedCrit > 0) isCrit = true;
 
-    if (skill.type === 'physical' || skill.type === 'magic') {
-      // 마력 Lv.7: 마법 공격 시 50% 확률로 재시전 (총 2회 시전)
-      // 궁극 [신탁 각성] ult_oracleAwaken: 100% 재시전
-      // 1. 재시전 확률 및 횟수 설정 부분 수정
-      const echoChance = hasUltimate(ultimates, 'ult_oracleAwaken') ? 1.0 : 0.5;
-      const canEcho = skill.type === 'magic' && (hasEffect(skills, 'magicEcho', activeSkills) || hasUltimate(ultimates, 'ult_oracleAwaken'));
-      const echoTimes = (canEcho && Math.random() < echoChance) ? 3 : 1;
-      
-      const hitCount = skill.hitCount || 1;
-      let totalDmg = 0;
-      let usedGuaranteedCrit = false;
-      
-      for (let echo = 0; echo < echoTimes; echo++) {
-        if (echo > 0) {
-          newLog.push({ type: 'passive', text: `◆ [마력 Lv.7] 마법 재시전! (${echo + 1}/3)` });
+        const dmgResult = calculateDamage(skill, newPlayer, newEnemy, skills, isCrit, ultimates, meta, curses, activeSkills, relicStat);
+        newEnemy.defense = Math.max(0, newEnemy.defense - dmgResult.defenseMitigated);
+        newEnemy.currentHp = Math.max(0, newEnemy.currentHp - dmgResult.finalDmg);
+
+        newLog.push({
+          type: 'damage',
+          text: `· ${enemy.name}에게 ${dmgResult.finalDmg} 데미지${isCrit ? ' [치명타!]' : ''}`,
+          breakdown: dmgResult.breakdown.join(' / '),
+        });
+
+        if (isCrit && hasEffect(skills, 'critExtraTurn', activeSkills)) extraTurnFromCrit = true;
+        if (hasEffect(skills, 'applySilenceGauge', activeSkills)) {
+          const curS = newEnemy.debuffs?.silenceGauge || 0;
+          if (curS + 35 >= 100) {
+            newLog.push({ type: 'debuff', text: `◆ [암검술 Lv.7] 침묵!` });
+            newEnemy.debuffs = { ...newEnemy.debuffs, silenced: 1, silenceGauge: 0 };
+          } else {
+            newEnemy.debuffs = { ...newEnemy.debuffs, silenceGauge: curS + 35 };
+          }
         }
         
-        for (let i = 0; i < hitCount; i++) {
-          let isCrit = rollCrit(skills, newPlayer, meta, activeSkills, relicStat);
-          // 신앙 Lv.3: 다음 공격 치명타 확정 (한 번 사용)
-          if (!usedGuaranteedCrit && newPlayer.buffs?.guaranteedCrit > 0) {
-            isCrit = true;
-            usedGuaranteedCrit = true;
-            newPlayer.buffs = { ...newPlayer.buffs, guaranteedCrit: 0 };
-            newLog.push({ type: 'passive', text: `◆ [신앙 Lv.3] 치명타 확정 발동` });
+        const attackPassives = getActivePassives(skills, 'onAttack', activeSkills);
+        attackPassives.forEach(p => {
+          if (p.effect === 'applyShockGauge') {
+             let g = GAME_CONFIG.shockGaugeBase + (hasEffect(skills, 'shockBonus', activeSkills) ? GAME_CONFIG.shockGaugeBonus : 0);
+             let curG = newEnemy.debuffs?.shockGauge || 0;
+             if (curG + g >= 100) {
+               newEnemy.debuffs = { ...newEnemy.debuffs, stunned: 1, shockGauge: 0, everStunned: true };
+               newLog.push({ type: 'debuff', text: `◆ 기절!` });
+             } else {
+               newEnemy.debuffs = { ...newEnemy.debuffs, shockGauge: curG + g };
+             }
           }
-          const dmgResult = calculateDamage(skill, newPlayer, newEnemy, skills, isCrit, ultimates, meta, curses, activeSkills, relicStat);
-          let actualDmg = dmgResult.finalDmg;
-          if (newEnemy.defense > 0 && !skill.pierce && skill.type !== 'magic') {
-            newEnemy.defense = Math.max(0, newEnemy.defense - dmgResult.defenseMitigated);
-          }
-          newEnemy.currentHp = Math.max(0, newEnemy.currentHp - actualDmg);
-          totalDmg += actualDmg;
-          
-          const echoTag = (echo === 1) ? ' [재시전]' : '';
-          newLog.push({
-            type: 'damage',
-            text: `· ${enemy.name}에게 ${actualDmg} 데미지${isCrit ? ' [치명타!]' : ''}${hitCount > 1 ? ` (${i+1}/${hitCount})` : ''}${echoTag}`,
-            breakdown: dmgResult.breakdown.join(' / '),
-          });
-          
-          // 작업 5: 매 히트마다 디버프 부여 (다단히트 누적)
-          const attackPassivesPerHit = getActivePassives(skills, 'onAttack', activeSkills);
-          attackPassivesPerHit.forEach(p => {
-            if (p.effect === 'applyShockGauge') {
-              let gaugeAdd = GAME_CONFIG.shockGaugeBase;
-              if (hasEffect(skills, 'shockBonus', activeSkills)) gaugeAdd = GAME_CONFIG.shockGaugeBase + GAME_CONFIG.shockGaugeBonus;
-              // 궁극 [광역 폭발] ult_shockBlast: 게이지 +60
-              if (hasUltimate(ultimates, 'ult_shockBlast')) gaugeAdd = 60;
-              if (newEnemy.debuffs?.shockResist > 0) {
-                gaugeAdd = Math.floor(gaugeAdd * GAME_CONFIG.shockResistReduction);
-              }
-              const currentGauge = newEnemy.debuffs?.shockGauge || 0;
-              let newGauge = currentGauge + gaugeAdd;
-              if (newGauge >= 100) {
-                newLog.push({ type: 'debuff', text: `◆ [${p.skillName} Lv.${p.tierLv}] 충격 ${currentGauge}+${gaugeAdd}=100! 기절!` });
-                newEnemy.debuffs = { 
-                  ...newEnemy.debuffs, 
-                  stunned: 1, shockGauge: 0,
-                  shockResist: GAME_CONFIG.shockResistTurns,
-                  shockResistTurns: GAME_CONFIG.shockResistTurns,
-                  everStunned: true,  // 궁극 [영구 침묵] 추적용
-                };
-                if (hasEffect(skills, 'shockBonus', activeSkills)) {
-                  const bonusDmg = 15;
-                  newEnemy.currentHp = Math.max(0, newEnemy.currentHp - bonusDmg);
-                  newLog.push({ type: 'damage', text: `· [강타 Lv.5] 기절 추가 데미지 ${bonusDmg}` });
-                }
-                // 궁극 [광역 폭발]: 기절 발동 시 추가 30 데미지
-                if (hasUltimate(ultimates, 'ult_shockBlast')) {
-                  newEnemy.currentHp = Math.max(0, newEnemy.currentHp - 30);
-                  newLog.push({ type: 'damage', text: `★ [광역 폭발] 폭발 데미지 30` });
-                }
-                // 궁극 [즉시 처형] ult_shockExecute: 적 HP 25% 즉시 제거
-                if (hasUltimate(ultimates, 'ult_shockExecute')) {
-                  const execDmg = Math.floor(newEnemy.maxHp * 0.25);
-                  newEnemy.currentHp = Math.max(0, newEnemy.currentHp - execDmg);
-                  newLog.push({ type: 'damage', text: `★ [즉시 처형] HP 25% 제거 (${execDmg})` });
-                }
-              } else {
-                newEnemy.debuffs = { ...newEnemy.debuffs, shockGauge: newGauge };
-              }
-            }
-            if (p.effect === 'applyBleed') {
-              const stacks = (newEnemy.debuffs?.bleed || 0);
-              const newStacks = hasEffect(skills, 'bleedStack', activeSkills) ? Math.min(stacks + 1, 5) : 1;
-              newEnemy.debuffs = { ...newEnemy.debuffs, bleed: newStacks, bleedTurns: 3 };
-            }
-            if (p.effect === 'execute') {
-              // 궁극 [사형 선고] ult_deathSentence: HP 35% 이하, 30% 확률로 확장
-              const execThreshold = hasUltimate(ultimates, 'ult_deathSentence') ? 0.35 : 0.2;
-              const execChance = hasUltimate(ultimates, 'ult_deathSentence') ? 0.3 : 0.15;
-              if (newEnemy.currentHp > 0 && newEnemy.currentHp <= newEnemy.maxHp * execThreshold && Math.random() < execChance) {
-                newLog.push({ type: 'system', text: `◆ [잔혹 Lv.7] 즉사 발동!` });
-                newEnemy.currentHp = 0;
-              }
-            }
-          });
-          
-          if (newEnemy.currentHp <= 0) break;
-        }
+        });
         if (newEnemy.currentHp <= 0) break;
       }
-      
-      setAnimDmg({ player: null, enemy: totalDmg });
-      setTimeout(() => setAnimDmg({ player: null, enemy: null }), 800);
-
-      // 강제 출혈 (피의 일격)
-      if (skill.forceBleed) {
-        newEnemy.debuffs = { ...newEnemy.debuffs, bleed: (newEnemy.debuffs?.bleed || 0) + 1, bleedTurns: 3 };
-        newLog.push({ type: 'debuff', text: `· 출혈 부여` });
-      }
-      // 자가 회복 (사제 - 신성광선)
-      if (skill.selfHeal) {
-        let heal = skill.selfHeal;
-        // 유물 heal % 보너스
-        if (relicStat.heal > 0) heal = Math.floor(heal * (1 + relicStat.heal / 100));
-        if (hasCurse(curses, 'curse_heal-50')) heal = Math.floor(heal * 0.5);
-        newPlayer.hp = Math.min(newPlayer.maxHp, newPlayer.hp + heal);
-        newLog.push({ type: 'passive', text: `◇ HP +${heal}` });
-      }
+      if (newEnemy.currentHp <= 0) break;
     }
 
-    if (skill.type === 'defense') {
-      newPlayer.defense += skill.defense;
-      newLog.push({ type: 'system', text: `· 방어 +${skill.defense}` });
-      if (skill.dodgeBuff) {
-        newPlayer.buffs = { ...newPlayer.buffs, dodgeBuff: skill.dodgeBuff, dodgeBuffTurns: 1 };
-      }
-      // 자가 회복 (사제 - 가호)
-      if (skill.selfHeal) {
-        let heal = skill.selfHeal;
-        // 유물 heal % 보너스
-        if (relicStat.heal > 0) heal = Math.floor(heal * (1 + relicStat.heal / 100));
-        if (hasCurse(curses, 'curse_heal-50')) heal = Math.floor(heal * 0.5);
-        newPlayer.hp = Math.min(newPlayer.maxHp, newPlayer.hp + heal);
-        newLog.push({ type: 'passive', text: `◇ HP +${heal}` });
-      }
+    if (newPlayer.buffs?.guaranteedCrit > 0) newPlayer.buffs.guaranteedCrit = 0;
+    setIsFirstTurn(false);
+    if (skill.selfDmg) newPlayer.hp = Math.max(1, newPlayer.hp - skill.selfDmg);
+    if (skill.selfHeal) {
+      let h = skill.selfHeal;
+      if (relicStat.heal > 0) h = Math.floor(h * (1 + relicStat.heal/100));
+      newPlayer.hp = Math.min(newPlayer.maxHp, newPlayer.hp + h);
     }
-    if (skill.type === 'buff' && skill.buff === 'rage') {
-      newPlayer.buffs = { ...newPlayer.buffs, rage: 3 };
-      newLog.push({ type: 'system', text: `· 분노 발동! 3턴간 데미지 +30%` });
-    }
-    if (skill.cd > 0) {
-      // 가속 minor: 쿨다운 -1턴 (Lv.4마다 누적)
-      let cdReduce = Math.floor(getMinorBonus(skills, 'cdReduce+', activeSkills) / 4);
-      // 궁극 [정념 폭주] ult_aetherStorm: 마법 스킬 쿨다운 -1
-      if (skill.type === 'magic' && hasUltimate(ultimates, 'ult_aetherStorm')) cdReduce += 1;
-      const finalCd = Math.max(0, skill.cd - cdReduce);
-      if (finalCd > 0) newPlayer.cooldowns = { ...newPlayer.cooldowns, [skillKey]: finalCd };
-    }
-    // 궁극 [시간 역행] ult_timeRewind: 모든 마법 스킬 쿨다운 제거, 에테르 +1
-    if (skill.type === 'magic' && hasUltimate(ultimates, 'ult_timeRewind')) {
-      // 에테르 +1 (최대치 제한)
-      newPlayer.ether = Math.min(newPlayer.maxEther || 3, newPlayer.ether + 1);
-      
-      // 모든 스킬 쿨다운 즉시 제거 (빈 객체로 초기화)
-      newPlayer.cooldowns = {}; 
-      
-      newLog.push({ type: 'passive', text: `★ [시간 역행] 모든 마법 스킬 쿨다운 제거, 에테르 +1` });
-    }
+    if (skill.type === 'defense') newPlayer.defense += skill.defense;
+    if (skill.cd > 0) newPlayer.cooldowns[skillKey] = skill.cd;
 
-    setPlayer(newPlayer);
-    setEnemy(newEnemy);
-    setLog(newLog);
+    setPlayer(newPlayer); setEnemy(newEnemy); setLog(newLog);
+    setAnimDmg({ player: null, enemy: 1 }); setTimeout(() => setAnimDmg({ player: null, enemy: null }), 500);
 
     if (newEnemy.currentHp <= 0) {
-      // 유물 lifesteal: 적 처치 시 HP 회복
-      if (relicStat.lifesteal > 0) {
-        const heal = relicStat.lifesteal;
-        newPlayer.hp = Math.min(newPlayer.maxHp, newPlayer.hp + heal);
-        newLog.push({ type: 'passive', text: `◆ [유물] 흡혈 +${heal}` });
-        setPlayer(newPlayer);
-      }
-      setTimeout(() => {
-        setLog(prev => [...prev, { type: 'victory', text: `━━ ${enemy.name} 처치 ━━` }]);
-        setPhase('victory');
-        actionLockRef.current = false;
-      }, 800);
+      setTimeout(() => { setPhase('victory'); actionLockRef.current = false; }, 600);
       return;
     }
-    // 즉시 phase 전환으로 버튼 그룹 숨김 (시각적 즉각 피드백)
-    setPhase('enemyTurn');
-    setTimeout(() => { executeEnemyTurn(newPlayer, newEnemy, newLog); }, 350);
+
+    if (extraTurnFromCrit) {
+      newLog.push({ type: 'passive', text: `◆ [암검술 Lv.3] 추가 행동!` });
+      actionLockRef.current = false;
+    } else {
+      setPhase('enemyTurn');
+      setTimeout(() => executeEnemyTurn(newPlayer, newEnemy, newLog), 400);
+    }
   };
 
-  const executeEnemyTurn = (curPlayer, curEnemy, curLog) => {
-    const newLog = [...curLog];
-    let newPlayer = { ...curPlayer };
-    let newEnemy = { ...curEnemy };
-
-    // 침묵 체크
-    if (curEnemy.debuffs?.silenced > 0) {
-      curLog.push({ type: 'debuff', text: `◇ 침묵 상태: ${enemy.name}의 기술이 불발됨` });
-      
-      // 로직 선택: 아예 행동 불능으로 만들거나(기절과 동일), 공격력을 급감시킴
-      // 제안: 기술 봉인이므로 해당 턴 데미지를 0으로 처리 (완전 방어)
-      curEnemy.debuffs.silenced = 0; // 1턴 후 해제
-      setEnemy(curEnemy);
-      setTimeout(() => endTurn(curPlayer, curEnemy, curLog), 400);
-      return;
-    }
-    
-    if (newEnemy.debuffs?.stunned > 0) {
-      newLog.push({ type: 'debuff', text: `◆ ${enemy.name}이(가) 기절 상태로 행동 못 함` });
-      // 기절 1턴 소모
-      newEnemy.debuffs = { ...newEnemy.debuffs, stunned: 0 };
+  const executeEnemyTurn = (p, e, l) => {
+    let newPlayer = { ...p }; let newEnemy = { ...e }; let newLog = [...l];
+    if (newEnemy.debuffs?.silenced > 0) {
+      newLog.push({ type: 'debuff', text: `◇ 침묵: 기술 불발` });
+      newEnemy.debuffs.silenced = 0;
       setEnemy(newEnemy); setLog(newLog);
       setTimeout(() => endTurn(newPlayer, newEnemy, newLog), 400);
       return;
     }
-
-    const intent = curEnemy.nextIntent;
-    if (!intent) { setTimeout(() => endTurn(newPlayer, newEnemy, newLog), 300); return; }
-    newLog.push({ type: 'enemy', text: `◂ ${enemy.name}: ${intent.name}` });
-
-    if (intent.type === 'attack') {
-      const dodged = rollDodge(skills, newPlayer, activeSkills, relicStat);
-      if (dodged) {
-        newLog.push({ type: 'system', text: `· 회피 성공!` });
-        if (hasEffect(skills, 'counterAttack', activeSkills) && Math.random() < 0.5) {
-          const counterDmg = Math.floor(15 + Math.random() * 10);
-          newEnemy.currentHp = Math.max(0, newEnemy.currentHp - counterDmg);
-          newLog.push({ type: 'damage', text: `◆ [회피 Lv.5] 반격 ${counterDmg} 데미지` });
-        }
-      } else {
-        if (newPlayer.firstHitImmune) {
-          newLog.push({ type: 'passive', text: `◆ [회피 Lv.7] 첫 피격 무효!` });
-          newPlayer.firstHitImmune = false;
-        } else {
-          let dmg = Math.floor(intent.dmg[0] + Math.random() * (intent.dmg[1] - intent.dmg[0]));
-          // 수비 Lv.7: 방어 게이지가 최대 HP의 50% 이상이면 받는 데미지 50% 차단
-          if (hasEffect(skills, 'fortify', activeSkills) && newPlayer.defense >= newPlayer.maxHp * 0.5) {
-            const blocked = Math.floor(dmg * 0.5);
-            dmg -= blocked;
-            if (blocked > 0) newLog.push({ type: 'passive', text: `◆ [수비 Lv.7] 요새화! 데미지 -${blocked}` });
-          }
-          if (newPlayer.defense > 0) {
-            const absorbed = Math.min(newPlayer.defense, dmg);
-            newPlayer.defense -= absorbed;
-            dmg -= absorbed;
-            if (absorbed > 0) newLog.push({ type: 'system', text: `· 방어 ${absorbed} 흡수` });
-          }
-          if (hasEffect(skills, 'dmgTaken-15', activeSkills) && dmg > 0) {
-            const reduced = Math.floor(dmg * 0.15);
-            dmg -= reduced;
-            if (reduced > 0) newLog.push({ type: 'passive', text: `◆ [수비 Lv.5] 데미지 -${reduced}` });
-          }
-          // 메타 강화: 받는 데미지 -3%/단계
-          const metaReduction = getMetaBonus(meta, 'dmgTaken-3%') * 0.03;
-          if (metaReduction > 0 && dmg > 0) {
-            const reduced = Math.floor(dmg * metaReduction);
-            dmg -= reduced;
-            if (reduced > 0) newLog.push({ type: 'passive', text: `◇ [강철의 의지] -${reduced}` });
-          }
-          // 유물: dmgTaken % (음수면 감소, 양수면 증가)
-          if (relicStat.dmgTaken && dmg > 0) {
-            const change = Math.floor(dmg * relicStat.dmgTaken / 100);
-            dmg += change;
-            if (change < 0) newLog.push({ type: 'passive', text: `◇ [유물] -${-change}` });
-            else if (change > 0) newLog.push({ type: 'debuff', text: `· [유물 부작용] +${change}` });
-          }
-          // 유물: reflect % (받은 데미지의 일정 % 적에게 반사)
-          if (relicStat.reflect > 0 && dmg > 0) {
-            const reflectDmg = Math.floor(dmg * relicStat.reflect / 100);
-            if (reflectDmg > 0) {
-              newEnemy.currentHp = Math.max(0, newEnemy.currentHp - reflectDmg);
-              newLog.push({ type: 'damage', text: `◆ [가시 갑옷] 반사 ${reflectDmg}` });
-            }
-          }
-          // 저주: 받는 데미지 +15%
-          if (hasCurse(curses, 'curse_dmgTaken+15') && dmg > 0) {
-            const inc = Math.floor(dmg * 0.15);
-            dmg += inc;
-            newLog.push({ type: 'debuff', text: `✦ [저주] 데미지 +${inc}` });
-          }
-          // 궁극 [데블랑의 저주]: 받는 데미지 -25%
-          if (hasUltimate(ultimates, 'ult_deblanCurse') && dmg > 0) {
-            const reduced = Math.floor(dmg * 0.25);
-            dmg -= reduced;
-            if (reduced > 0) newLog.push({ type: 'passive', text: `★ [데블랑의 저주] 데미지 -${reduced}` });
-            // 30% 확률로 적 자해
-            if (Math.random() < 0.3) {
-              const counterDmg = Math.floor(dmg * 0.5);
-              newEnemy.currentHp = Math.max(0, newEnemy.currentHp - counterDmg);
-              newLog.push({ type: 'passive', text: `★ [데블랑의 저주] 적 자해 ${counterDmg}` });
-            }
-          }
-          if (dmg > 0) {
-            // [체크] 이번 공격을 맞으면 죽는가?
-            const isFatalDamage = newPlayer.hp - dmg <= 0;
-          
-            if (isFatalDamage) {
-              // 1순위: [운명의 저울] - 치명타 상황에서만 횟수 차감 후 100% 회피
-              if (hasUltimate(ultimates, 'ult_destinyScale') && (newPlayer.destinyScaleUses || 0) < 2) {
-                newPlayer.destinyScaleUses = (newPlayer.destinyScaleUses || 0) + 1;
-                newLog.push({ 
-                  type: 'passive', 
-                  text: `★ [운명의 저울] 치명적 피격 회피! (${newPlayer.destinyScaleUses}/2)` 
-                });
-                dmg = 0; // 데미지 무효화
-              } 
-              // 2순위: [신의 가호] - 30% 확률로 생존
-              else if (hasEffect(skills, 'divineSave', activeSkills) && Math.random() < 0.3) {
-                newLog.push({ type: 'passive', text: `◆ [신앙 Lv.5] 신의 가호!` });
-                dmg = newPlayer.hp - 1; // 체력을 1로 만듦
-              } 
-              // 3순위: [부활] - 전투당 1회 체력 50% 회복
-              else if (hasEffect(skills, 'revive', activeSkills) && !newPlayer.revivedThisCombat) {
-                newPlayer.hp = Math.floor(newPlayer.maxHp * 0.5);
-                newPlayer.revivedThisCombat = true;
-                newLog.push({ type: 'passive', text: `◆ [재생 Lv.7] 부활!` });
-                dmg = 0; // 데미지 무효화
-              }
-            }
-          
-            // 최종 데미지 적용 (위의 조건들에서 dmg가 0이 되었다면 실행되지 않음)
-            if (dmg > 0) {
-              newPlayer.hp = Math.max(0, newPlayer.hp - dmg);
-              newLog.push({ type: 'damageTaken', text: `· ${dmg} 데미지` });
-              setAnimDmg({ player: dmg, enemy: null });
-              setTimeout(() => setAnimDmg({ player: null, enemy: null }), 800);
-            }
-          }
-        }
-      }
-    } else if (intent.type === 'defend') {
-      newEnemy.defense += intent.defense;
-      newLog.push({ type: 'system', text: `· 방어 자세 (+${intent.defense})` });
-    }
-
-    setPlayer(newPlayer); setEnemy(newEnemy); setLog(newLog);
-    if (newPlayer.hp <= 0) {
-      setTimeout(() => { 
-        setLog(prev => [...prev, { type: 'defeat', text: `━━ 패배 ━━` }]); 
-        setPhase('defeat'); 
-        actionLockRef.current = false;  // 전투 종료 - 락 해제
-      }, 800);
+    if (newEnemy.debuffs?.stunned > 0) {
+      newLog.push({ type: 'debuff', text: `◆ 기절 중` });
+      newEnemy.debuffs.stunned = 0;
+      setEnemy(newEnemy); setLog(newLog);
+      setTimeout(() => endTurn(newPlayer, newEnemy, newLog), 400);
       return;
     }
+    const intent = newEnemy.nextIntent;
+    if (intent?.type === 'attack') {
+      if (rollDodge(skills, newPlayer, activeSkills, relicStat)) {
+        newLog.push({ type: 'system', text: `· 회피 성공!` });
+      } else {
+        let d = Math.floor(intent.dmg[0] + Math.random() * (intent.dmg[1] - intent.dmg[0]));
+        newPlayer.hp = Math.max(0, newPlayer.hp - d);
+        newLog.push({ type: 'damageTaken', text: `· ${d} 데미지` });
+      }
+    }
+    setPlayer(newPlayer); setLog(newLog);
+    if (newPlayer.hp <= 0) { setPhase('defeat'); return; }
     setTimeout(() => endTurn(newPlayer, newEnemy, newLog), 400);
   };
 
-  const endTurn = (curPlayer, curEnemy, curLog) => {
-    const newLog = [...curLog];
-    let newPlayer = { ...curPlayer };
-    let newEnemy = { ...curEnemy };
-    const newTurn = turn + 1;
-
-    if (newEnemy.debuffs?.bleed > 0 && newEnemy.debuffs?.bleedTurns > 0) {
-      // 잔혹 minor: 출혈 1스택당 데미지 +1/Lv
-      const bleedBonus = getMinorBonus(skills, 'bleedDmg+', activeSkills);
-      let bleedDmg = newEnemy.debuffs.bleed * (GAME_CONFIG.bleedDmgPerStack + bleedBonus);
-      // 궁극 [피의 축제] ult_bloodFeast: 출혈 데미지 ×2
-      if (hasUltimate(ultimates, 'ult_bloodFeast')) {
-        bleedDmg *= 2;
-      }
-      newEnemy.currentHp = Math.max(0, newEnemy.currentHp - bleedDmg);
-      newEnemy.debuffs = {
-        ...newEnemy.debuffs,
-        bleedTurns: newEnemy.debuffs.bleedTurns - 1,
-        bleed: newEnemy.debuffs.bleedTurns - 1 <= 0 ? 0 : newEnemy.debuffs.bleed,
-      };
-      newLog.push({ type: 'debuff', text: `◆ 출혈 ${bleedDmg} 데미지${hasUltimate(ultimates, 'ult_bloodFeast') ? ' [×2 피의축제]' : ''}` });
-      if (newEnemy.currentHp <= 0) {
-        // 궁극 [피의 축제]: 출혈 처치 시 HP 30 흡수
-        if (hasUltimate(ultimates, 'ult_bloodFeast')) {
-          newPlayer.hp = Math.min(newPlayer.maxHp, newPlayer.hp + 30);
-          newLog.push({ type: 'passive', text: `★ [피의 축제] HP 30 흡수` });
-          setPlayer(newPlayer);
-        }
-        setEnemy(newEnemy);
-        setLog([...newLog, { type: 'victory', text: `━━ ${enemy.name} 처치 (출혈 사망) ━━` }]);
-        setPhase('victory');
-        actionLockRef.current = false;  // 전투 종료 - 락 해제
-        return;
-      }
-    }
-    
-    // 충격 저항 디버프 턴 감소
-    if (newEnemy.debuffs?.shockResistTurns > 0) {
-      newEnemy.debuffs = {
-        ...newEnemy.debuffs,
-        shockResistTurns: newEnemy.debuffs.shockResistTurns - 1,
-        shockResist: newEnemy.debuffs.shockResistTurns - 1 <= 0 ? 0 : newEnemy.debuffs.shockResist,
-      };
-    }
-
-    Object.keys(newPlayer.cooldowns).forEach(k => {
-      if (newPlayer.cooldowns[k] > 0) newPlayer.cooldowns[k]--;
-    });
-    if (newPlayer.buffs?.rage > 0) {
-      newPlayer.buffs.rage--;
-      if (newPlayer.buffs.rage === 0) newLog.push({ type: 'system', text: `· 분노 종료` });
-    }
-    if (newPlayer.buffs?.dodgeBuffTurns > 0) {
-      newPlayer.buffs.dodgeBuffTurns--;
-      if (newPlayer.buffs.dodgeBuffTurns === 0) newPlayer.buffs.dodgeBuff = 0;
-    }
-    newPlayer.ether = Math.min(newPlayer.maxEther, newPlayer.ether + 1);
-
-    let extraTurnTriggered = false;
-    let bestExtraTurnInterval = Infinity;
-    let guaranteedCrit = false;
-    getActivePassives(skills, 'onTurnStart', activeSkills).forEach(p => {
-      if (p.effect === 'regenPerTurn') {
-        let regen = 3;
-        // 궁극 [데로드의 축복]: 회복 효과 +50%
-        if (hasUltimate(ultimates, 'ult_derodBlessing')) regen = Math.floor(regen * 1.5);
-        newPlayer.hp = Math.min(newPlayer.maxHp, newPlayer.hp + regen);
-        newLog.push({ type: 'passive', text: `◆ [재생 Lv.3] HP +${regen}` });
-      }
-      if (p.effect === 'extraTurn' && p.interval && newTurn % p.interval === 0) {
-        if (p.interval < bestExtraTurnInterval) {
-          bestExtraTurnInterval = p.interval;
-          extraTurnTriggered = true;
-        }
-      }
-      if (p.effect === 'guaranteeCrit' && p.interval && newTurn % p.interval === 0) {
-        guaranteedCrit = true;
-        newPlayer.buffs = { ...newPlayer.buffs, guaranteedCrit: 1 };
-        newLog.push({ type: 'passive', text: `◆ [신앙 Lv.3] 다음 공격 치명타 확정!` });
-      }
-    });
-    
-    // 궁극 [데로드의 축복]: 매 턴 HP +5
-    if (hasUltimate(ultimates, 'ult_derodBlessing')) {
-      newPlayer.hp = Math.min(newPlayer.maxHp, newPlayer.hp + 5);
-      newLog.push({ type: 'passive', text: `★ [데로드의 축복] HP +5` });
-    }
-    // 궁극 [영구 침묵] 강타_ult_perpetualStun: 매 턴 25% 확률로 적 기절
-    if (hasUltimate(ultimates, 'ult_perpetualStun') && newEnemy.debuffs?.everStunned) {
-      if (Math.random() < 0.25) {
-        newEnemy.debuffs = { ...newEnemy.debuffs, stunned: 1 };
-        newLog.push({ type: 'passive', text: `★ [영구 침묵] 적 기절!` });
-      }
-    }
-    // 궁극 [운명의 저울]: 모든 능력치 +5 (전투 시작 한 번만, useEffect에서 처리)
-
-    const patterns = newEnemy.patterns;
-    newEnemy.nextIntent = patterns[Math.floor(Math.random() * patterns.length)];
-    newPlayer.defense = Math.floor(newPlayer.defense * 0.5);
-    newEnemy.defense = Math.floor(newEnemy.defense * 0.5);
-
-    setPlayer(newPlayer); setEnemy(newEnemy); setLog(newLog); setTurn(newTurn);
-
-    if (extraTurnTriggered) {
-      setTimeout(() => {
-        setLog(prev => [...prev, { type: 'passive', text: `◆ [가속] 추가 턴!` }]);
-        setPhase('playerTurn');
-        actionLockRef.current = false;  // 플레이어 턴 시작 → 락 해제
-      }, 350);
-    } else {
-      setTimeout(() => {
-        setPhase('playerTurn');
-        actionLockRef.current = false;  // 플레이어 턴 시작 → 락 해제
-      }, 250);
-    }
+  const endTurn = (p, e, l) => {
+    let nP = { ...p }; let nE = { ...e }; let nL = [...l];
+    nP.ether = Math.min(nP.maxEther, nP.ether + 1);
+    Object.keys(nP.cooldowns).forEach(k => { if(nP.cooldowns[k] > 0) nP.cooldowns[k]--; });
+    nE.nextIntent = nE.patterns[Math.floor(Math.random() * nE.patterns.length)];
+    setPlayer(nP); setEnemy(nE); setLog(nL); setTurn(t => t + 1);
+    setPhase('playerTurn'); actionLockRef.current = false;
   };
 
   return (
@@ -1825,148 +1326,35 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
         <span className="text-[10px] tracking-[0.3em]" style={{ color: PALETTE.accent }}>━━ 전투 ━━</span>
         <span className="text-[10px] tabular-nums" style={{ color: PALETTE.derod }}>TURN {turn}</span>
       </div>
-      <div className="px-3 py-2.5" style={{
-        background: `linear-gradient(180deg, ${enemy.color}25, transparent)`,
-        borderBottom: `1px solid ${enemy.color}40`,
-      }}>
+      <div className="px-3 py-2.5" style={{ background: `linear-gradient(180deg, ${enemy.color}25, transparent)`, borderBottom: `1px solid ${enemy.color}40` }}>
         <div className="flex justify-between items-center mb-1">
-          <div>
-            <span className="text-xs font-bold" style={{ color: enemy.color }}>{enemy.name}</span>
-            {enemy.isBoss && <span className="ml-1 text-[9px] px-1" style={{ background: PALETTE.legendary, color: PALETTE.bgDeep }}>BOSS</span>}
-          </div>
-          <span className="text-[11px] tabular-nums" style={{ color: PALETTE.text }}>
-            {enemy.currentHp}/{enemy.maxHp}
-            {animDmg.enemy && <span className="ml-1 animate-pulse" style={{ color: PALETTE.accent }}>-{animDmg.enemy}</span>}
-          </span>
+          <span className="text-xs font-bold" style={{ color: enemy.color }}>{enemy.name}</span>
+          <span className="text-[11px] tabular-nums" style={{ color: PALETTE.text }}>{enemy.currentHp}/{enemy.maxHp}</span>
         </div>
         <div className="h-1.5 relative mb-1.5" style={{ background: PALETTE.bgDeep }}>
-          <div className="absolute inset-y-0 left-0 transition-all" style={{
-            width: `${(enemy.currentHp/enemy.maxHp)*100}%`,
-            background: `linear-gradient(90deg, ${PALETTE.blood}, ${enemy.color})`,
-          }} />
+          <div className="absolute inset-y-0 left-0 transition-all" style={{ width: `${(enemy.currentHp/enemy.maxHp)*100}%`, background: `linear-gradient(90deg, ${PALETTE.blood}, ${enemy.color})` }} />
         </div>
         <div className="flex items-center gap-1.5 flex-wrap">
-          {enemy.defense > 0 && (
-            <span className="text-[9px] px-1.5 py-0.5" style={{ background: `${PALETTE.defense}30`, color: PALETTE.defense, border: `1px solid ${PALETTE.defense}60` }}>
-              ◈ 방어 {enemy.defense}
-            </span>
-          )}
-          {enemy.debuffs?.bleed > 0 && (
-            <span className="text-[9px] px-1.5 py-0.5" style={{ background: `${PALETTE.bleed}30`, color: PALETTE.bleed, border: `1px solid ${PALETTE.bleed}60` }}>
-              ◆ 출혈 {enemy.debuffs.bleed} ({enemy.debuffs.bleedTurns}T)
-            </span>
-          )}
-          {enemy.debuffs?.shockGauge > 0 && (
-            <span className="text-[9px] px-1.5 py-0.5" style={{ background: `${PALETTE.shock}30`, color: PALETTE.shock, border: `1px solid ${PALETTE.shock}60` }}>
-              ⚡ 충격 {enemy.debuffs.shockGauge}/100
-            </span>
-          )}
-          {enemy.debuffs?.stunned > 0 && (
-            <span className="text-[9px] px-1.5 py-0.5" style={{ background: `${PALETTE.legendary}40`, color: PALETTE.legendary, border: `1px solid ${PALETTE.legendary}` }}>
-              ✦ 기절 1T
-            </span>
-          )}
-          {enemy.debuffs?.shockResist > 0 && (
-            <span className="text-[9px] px-1.5 py-0.5" style={{ background: `${PALETTE.textDim}30`, color: PALETTE.textDim, border: `1px solid ${PALETTE.textDim}60` }}>
-              ◇ 충격 저항 ({enemy.debuffs.shockResistTurns}T)
-            </span>
-          )}
+          {enemy.debuffs?.silenceGauge > 0 && <span className="text-[9px] px-1.5 py-0.5" style={{ background: '#5c4a8c30', color: '#a594cf' }}>Silence {enemy.debuffs.silenceGauge}/100</span>}
         </div>
-        {/* 심안 3단계 이상일 때만 박스 자체가 나타남 */}
-        {phase === 'playerTurn' && enemy.nextIntent && getSkillLevel(skills, '심안') >= 3 && (
-          <div className="mt-1.5 px-2 py-1 flex items-center gap-2" style={{
-            background: PALETTE.bgDeep, border: `1px dashed ${enemy.color}80`,
-          }}>
-            <AlertTriangle size={10} style={{ color: enemy.color }} />
-            <span className="text-[10px]" style={{ color: PALETTE.textDim }}>[심안] 의도:</span>
-        
-            {/* 3단계(predictIntent): 행동 이름 공개 */}
-            <span className="text-[10px] font-bold" style={{ color: PALETTE.text }}>
-              {enemy.nextIntent.name}
-            </span>
-        
-            {/* 5단계(detailIntent): 구체적인 수치(데미지/방어) 공개 */}
-            {getSkillLevel(skills, '심안') >= 5 && (
-              <div className="flex ml-auto gap-2">
-                {enemy.nextIntent.dmg[1] > 0 && (
-                  <span className="text-[10px] tabular-nums" style={{ color: enemy.nextIntent.heavy ? PALETTE.accent : PALETTE.textDim }}>
-                    {enemy.nextIntent.dmg[0]}-{enemy.nextIntent.dmg[1]}
-                  </span>
-                )}
-                {enemy.nextIntent.type === 'defend' && (
-                  <span className="text-[10px]" style={{ color: PALETTE.defense }}>방어</span>
-                )}
-              </div>
-            )}
-          </div>
-        )}
       </div>
-      <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1.5" style={{
-        background: `linear-gradient(180deg, ${PALETTE.bgDeep}, #060306)`,
-      }}>
-        {log.map((entry, i) => (
-          <div key={i} className="text-[11px] leading-relaxed" style={{
-            color: entry.type === 'narrative' ? PALETTE.text
-              : entry.type === 'player' ? PALETTE.green
-              : entry.type === 'enemy' ? PALETTE.accent
-              : entry.type === 'damageTaken' ? PALETTE.accent
-              : entry.type === 'system' ? PALETTE.textDim
-              : entry.type === 'passive' ? PALETTE.derod
-              : entry.type === 'debuff' ? PALETTE.bleed
-              : entry.type === 'victory' ? PALETTE.legendary
-              : entry.type === 'defeat' ? PALETTE.accent
-              : PALETTE.text,
-            fontStyle: entry.type === 'narrative' ? 'italic' : 'normal',
-            paddingLeft: ['damage', 'damageTaken', 'system', 'passive', 'debuff'].includes(entry.type) ? '12px' : '0',
-          }}>
-            {entry.text}
-            {entry.breakdown && (
-              <span className="block text-[9px] opacity-60" style={{ paddingLeft: '12px' }}>({entry.breakdown})</span>
-            )}
-          </div>
-        ))}
+      <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1.5">
+        {log.map((entry, i) => <div key={i} className="text-[11px] leading-relaxed" style={{ color: entry.type === 'player' ? PALETTE.green : entry.type === 'enemy' ? PALETTE.accent : entry.type === 'damage' ? '#e8d9c4' : PALETTE.text }}>{entry.text}</div>)}
         <div ref={logEndRef} />
       </div>
-      <div className="px-3 py-2 border-t" style={{ borderColor: PALETTE.panelBorder, background: `${classData.color}10` }}>
+      <div className="px-3 py-2 border-t" style={{ background: `${classData.color}10` }}>
         <div className="flex justify-between items-center mb-1">
           <span className="text-xs font-bold" style={{ color: classData.color }}>{classData.name}</span>
-          <span className="text-[11px] tabular-nums" style={{ color: PALETTE.text }}>
-            {animDmg.player && <span className="mr-1 animate-pulse" style={{ color: PALETTE.accent }}>-{animDmg.player}</span>}
-            {player.hp}/{player.maxHp}
-          </span>
+          <span className="text-[11px] tabular-nums" style={{ color: PALETTE.text }}>{player.hp}/{player.maxHp}</span>
         </div>
         <div className="h-1.5 relative mb-1.5" style={{ background: PALETTE.bgDeep }}>
-          <div className="absolute inset-y-0 left-0 transition-all" style={{
-            width: `${(player.hp/player.maxHp)*100}%`,
-            background: `linear-gradient(90deg, ${PALETTE.blood}, ${PALETTE.green})`,
-          }} />
+          <div className="absolute inset-y-0 left-0 transition-all" style={{ width: `${(player.hp/player.maxHp)*100}%`, background: `linear-gradient(90deg, ${PALETTE.blood}, ${PALETTE.green})` }} />
         </div>
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-[9px] px-1.5 py-0.5" style={{ background: `${PALETTE.deblan}30`, color: PALETTE.deblan, border: `1px solid ${PALETTE.deblan}60` }}>
-            ✦ 에테르 {player.ether}/{player.maxEther}
-          </span>
-          {player.defense > 0 && (
-            <span className="text-[9px] px-1.5 py-0.5" style={{ background: `${PALETTE.defense}30`, color: PALETTE.defense, border: `1px solid ${PALETTE.defense}60` }}>
-              ◈ 방어 {player.defense}
-            </span>
-          )}
-          {player.buffs?.rage > 0 && (
-            <span className="text-[9px] px-1.5 py-0.5" style={{ background: `${PALETTE.accent}30`, color: PALETTE.accent, border: `1px solid ${PALETTE.accent}60` }}>
-              ☩ 분노 ({player.buffs.rage}T)
-            </span>
-          )}
-          {player.firstHitImmune && (
-            <span className="text-[9px] px-1.5 py-0.5" style={{ background: `${PALETTE.legendary}30`, color: PALETTE.legendary, border: `1px solid ${PALETTE.legendary}60` }}>
-              ✦ 무적 1회
-            </span>
-          )}
+          <span className="text-[9px] px-1.5 py-0.5" style={{ background: `${PALETTE.deblan}30`, color: PALETTE.deblan }}>✦ 에테르 {player.ether}/{player.maxEther}</span>
         </div>
       </div>
-      <div className="border-t p-2.5" style={{
-        borderColor: PALETTE.panelBorder, background: `linear-gradient(180deg, ${PALETTE.panel}, ${PALETTE.bgDeep})`,
-      }}>
-        {phase === 'intro' && <div className="text-center text-[11px] py-2" style={{ color: PALETTE.textDim }}>전투 준비 중...</div>}
-        {phase === 'enemyTurn' && <div className="text-center text-[11px] py-2" style={{ color: PALETTE.accent }}>◂ 적의 턴 ◂</div>}
+      <div className="border-t p-2.5" style={{ background: PALETTE.panel }}>
         {phase === 'playerTurn' && (
           <div className="grid grid-cols-3 gap-1.5">
             {classData.combatSkills.map(skillKey => {
@@ -1975,45 +1363,18 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
               const onCd = (player.cooldowns[skillKey] || 0) > 0;
               let cost = skill.cost || 0;
               if (cost > 0 && hasEffect(skills, 'etherCost-20', activeSkills)) cost = Math.max(0, cost - 1);
-              const noEther = cost > player.ether;
-              const disabled = onCd || noEther;
+              const disabled = onCd || cost > player.ether;
               return (
-                <button key={skillKey} onClick={() => handlePlayerAction(skillKey)} disabled={disabled}
-                  className="py-2 transition-all flex flex-col items-center gap-0.5"
-                  style={{
-                    background: disabled ? PALETTE.bgDeep
-                      : skill.type === 'physical' ? `${PALETTE.accent}20`
-                      : skill.type === 'magic' ? `${PALETTE.deblan}20`
-                      : skill.type === 'defense' ? `${PALETTE.ice}20`
-                      : `${PALETTE.derod}20`,
-                    border: `1px solid ${disabled ? PALETTE.panelBorder : skill.type === 'physical' ? PALETTE.accent : skill.type === 'magic' ? PALETTE.deblan : skill.type === 'defense' ? PALETTE.ice : PALETTE.derod}`,
-                    color: disabled ? PALETTE.textDim : PALETTE.text,
-                    opacity: disabled ? 0.5 : 1,
-                  }}>
+                <button key={skillKey} onClick={() => handlePlayerAction(skillKey)} disabled={disabled} className="py-2 flex flex-col items-center" style={{ background: disabled ? '#222' : skill.type === 'physical' ? '#4a1515' : '#15154a', border: `1px solid ${disabled ? '#444' : PALETTE.accent}`, opacity: disabled ? 0.5 : 1 }}>
                   <span className="text-[11px] font-bold">{skill.name}</span>
-                  <span className="text-[9px]" style={{ color: PALETTE.textDim }}>
-                    {skill.type === 'defense' ? `+${skill.defense}` : skill.type === 'buff' ? '버프' : `${skill.baseDmg[0]}-${skill.baseDmg[1]}`}
-                    {cost > 0 && ` ✦${cost}`}
-                  </span>
-                  {onCd && <span className="text-[9px]" style={{ color: PALETTE.accent }}>CD {player.cooldowns[skillKey]}</span>}
+                  <span className="text-[9px]">{cost > 0 ? `✦${cost}` : '무료'}</span>
                 </button>
               );
             })}
           </div>
         )}
-        {phase === 'victory' && (
-          <button onClick={() => onVictory(player.hp, enemy.drop)}
-            className="w-full py-2.5 text-xs tracking-[0.3em]" style={{
-              background: `linear-gradient(180deg, ${PALETTE.legendary}40, ${PALETTE.legendary}20)`,
-              border: `1px solid ${PALETTE.legendary}`, color: PALETTE.text,
-            }}>▸ 보상 획득</button>
-        )}
-        {phase === 'defeat' && (
-          <button onClick={() => onDefeat()} className="w-full py-2.5 text-xs tracking-[0.3em]" style={{
-            background: `linear-gradient(180deg, ${PALETTE.accent}40, ${PALETTE.accent}20)`,
-            border: `1px solid ${PALETTE.accent}`, color: PALETTE.text,
-          }}>▸ 메인 메뉴로</button>
-        )}
+        {phase === 'victory' && <button onClick={() => onVictory(player.hp, enemy.drop)} className="w-full py-2.5" style={{ background: PALETTE.legendary }}>보상 획득</button>}
+        {phase === 'defeat' && <button onClick={() => onDefeat()} className="w-full py-2.5" style={{ background: PALETTE.accent }}>메인 메뉴</button>}
       </div>
     </div>
   );
