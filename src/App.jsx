@@ -2055,7 +2055,7 @@ function EventScreen({ event, classData, stats, onResolve }) {
       <div className="px-4 py-3 border-b flex items-center justify-between" style={{
         borderColor: PALETTE.panelBorder, background: PALETTE.panel,
       }}>
-        <span className="text-[10px] tracking-[0.3em]" style={{ color: PALETTE.ice }}>◆ 사건 ◆</span>
+        <span className="text-[10px] tracking-[0.3em] style={{ color: PALETTE.ice }}">◆ 사건 ◆</span>
         <span className="text-xs font-bold" style={{ color: PALETTE.text }}>{event.title}</span>
       </div>
       <div className="flex-1 overflow-y-auto px-4 py-4" style={{
@@ -2077,18 +2077,10 @@ function EventScreen({ event, classData, stats, onResolve }) {
               <div className="mt-4 p-3" style={{ border: `1px solid ${PALETTE.derod}60`, background: `${PALETTE.derod}10` }}>
                 <div className="text-[10px] tracking-[0.3em] mb-1" style={{ color: PALETTE.derod }}>◆ 보상</div>
                 <div className="text-xs" style={{ color: PALETTE.text }}>
-                  {/* 기존 gold, heal 로직에 아래 항목들을 추가하세요 */}
                   {resultData.reward.type === 'gold' && `은화 +${resultData.reward.value}`}
                   {resultData.reward.type === 'heal' && `체력 ${resultData.reward.value} 회복`}
-                  
-                  {/* ★ 추가: 랜덤 유물 및 스킬 보상 텍스트 대응 */}
-                  {resultData.reward.type === 'random_relic' && (
-                    <span style={{ color: PALETTE.legendary }}>무작위 유물 1개 획득</span>
-                  )}
-                  {resultData.reward.type === 'skill_random_lv' && (
-                    <span style={{ color: PALETTE.ice }}>무작위 패시브 숙련도 +1Lv</span>
-                  )}
-                  {/* 기타 보상 타입이 있다면 여기에 추가 */}
+                  {resultData.reward.type === 'random_relic' && <span style={{ color: PALETTE.legendary }}>무작위 유물 1개 획득</span>}
+                  {resultData.reward.type === 'skill_random_lv' && <span style={{ color: PALETTE.ice }}>무작위 패시브 숙련도 +1Lv</span>}
                 </div>
               </div>
             )}
@@ -2096,22 +2088,21 @@ function EventScreen({ event, classData, stats, onResolve }) {
               <div className="mt-4 p-3" style={{ border: `1px solid ${PALETTE.accent}60`, background: `${PALETTE.accent}10` }}>
                 <div className="text-[10px] tracking-[0.3em] mb-1" style={{ color: PALETTE.accent }}>◆ 페널티</div>
                 <div className="text-xs" style={{ color: PALETTE.text }}>
-                  {/* HP 감소 (기존) */}
                   {resultData.penalty.hp && `체력 ${resultData.penalty.hp}`}
-                  
-                  {/* 은화/보석 상실 (추가 가능성 대비) */}
                   {resultData.penalty.gold && `은화 ${resultData.penalty.gold}`}
                   {resultData.penalty.gem && `보석 ${resultData.penalty.gem}`}
                 </div>
               </div>
             )}
+            {/* ★ 이 부분이 문제였을 확률이 높습니다: 괄호 닫기 확인 */}
             {resultData.combat && (
               <div className="mt-4 p-3" style={{ border: `1px solid ${PALETTE.accent}`, background: `${PALETTE.accent}20` }}>
                 <div className="text-[10px] tracking-[0.3em] mb-1" style={{ color: PALETTE.accent }}>◆ 전투 발생</div>
                 <div className="text-xs" style={{ color: PALETTE.text }}>
-                  {/* 에러 방지를 위해 옵셔널 체이닝(?.) 추가 권장 */}
                   {ENEMIES[resultData.combat]?.name || '적'}이(가) 나타난다!
                 </div>
+              </div>
+            )} 
           </div>
         )}
       </div>
