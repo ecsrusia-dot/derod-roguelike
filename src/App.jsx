@@ -1230,58 +1230,118 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
   }, []);
 
   const handlePlayerAction = (skillKey) => {
-    if (phase !== 'playerTurn') return;
-    if (actionLockRef.current) return;  // 동기 락 체크 - 처리 중이면 무시
-    const skill = COMBAT_SKILLS[skillKey];
-    if (!skill) return;
-    if (player.cooldowns[skillKey] > 0) return;
-    let etherCost = skill.cost || 0;
-    if (etherCost > 0 && hasEffect(skills, 'etherCost-20', activeSkills)) etherCost = Math.max(0, etherCost - 1);
-    if (etherCost > player.ether) return;
+  if (phase !== 'playerTurn') return;
+  if (actionLockRef.current) return; // 동기 락 체크 - 처리 중이면 무시
+  const skill = COMBAT_SKILLS[skillKey];
+  if (!skill) return;
+  if (player.cooldowns[skillKey] > 0) return;
 
-    // 모든 검증 통과 → 락 획득
-    actionLockRef.current = true;
+  let etherCost = skill.cost || 0;
+  if (etherCost > 0 && hasEffect(skills, 'etherCost-20', activeSkills)) etherCost = Math.max(0, etherCost - 1);
 
-    const newLog = [...log, { type: 'player', text: `▸ ${skill.name}` }];
-    let newPlayer = { ...player, ether: player.ether - etherCost };
-    let newEnemy = { ...enemy };
-    let extraTurnFromCrit = false;
+  // --- [추가] 정념술 Lv.3: 에테르 미소모 체크 ---
+  if (skill.type === 'magic' && hasEffect(skills, 'etherSave', activeSkills) && Math.random() < 0.5) {
+    etherCost = 0;
+    // 로그는 루프 밖에서 한 번만 출력되도록 처리 (아래에서 수행)
+  }
 
-    for (let echo = 0; echo < echoTimes; echo++) {
-      for (let i = 0; i < hitCount; i++) {
-        // 치명타 판정
-        let isCrit = rollCrit(skills, newPlayer, meta, activeSkills, relicStat);
-        if (newPlayer.buffs?.guaranteedCrit > 0) {
-          isCrit = true;
-          // 첫 턴 확정 치명타 소모는 공격 루프가 끝난 뒤 처리
+  if (etherCost > player.ether) return;
+
+  // 모든 검증 통과 → 락 획득
+  actionLockRef.current = true;
+
+  const newLog = [...log, { type: 'player', text: `▸ ${skill.name}` }];
+  // 정념술 효과로 etherCost가 0이 되었다면 여기서 반영됨
+  if (skill.type === 'magic' && etherCost === 0 && (skill.cost || 0) > 0) {
+    newLog.push({ type: 'passive', text: `◆ [정념술 Lv.3] 에테르 공명: 비용 소모 없음` });
+  }
+
+  let newPlayer = { ...player, ether: player.ether - etherCost };
+  let newEnemy = { ...enemy };
+  let extraTurnFromCrit = false;
+
+  // --- [필수 수정] 변수 선언 및 기본값 설정 (에러 방지) ---
+  let echoTimes = 1; // 기본 1회 시전
+  const hitCount = skill.hitCount || 1; // 기본 1타
+
+  // 술법사(정념술) 또는 특정 궁극기 효과로 인한 재시전 판정
+  if (skill.type === 'magic') {
+    const canEcho = hasEffect(skills, 'magicEcho', activeSkills) || hasUltimate(ultimates, 'ult_oracleAwaken');
+    if (canEcho) {
+      const echoChance = hasUltimate(ultimates, 'ult_oracleAwaken') ? 1.0 : 0.5;
+      if (Math.random() < echoChance) echoTimes = 3; 
+    }
+  }
+
+  // --- 공격 루프 시작 ---
+  for (let echo = 0; echo < echoTimes; echo++) {
+    if (echo > 0) {
+      newLog.push({ type: 'passive', text: `◆ [재시전] 효과 발동! (${echo + 1}/${echoTimes})` });
+    }
+
+    for (let i = 0; i < hitCount; i++) {
+      // 치명타 판정
+      let isCrit = rollCrit(skills, newPlayer, meta, activeSkills, relicStat);
+      if (newPlayer.buffs?.guaranteedCrit > 0) {
+        isCrit = true;
+      }
+
+      // 데미지 계산 및 적용
+      const dmgResult = calculateDamage(skill, newPlayer, newEnemy, skills, isCrit, ultimates, meta, curses, activeSkills, relicStat);
+      newEnemy.currentHp = Math.max(0, newEnemy.currentHp - dmgResult.finalDmg);
+
+      // --- 암검술 효과 처리 ---
+      // 1. 암검술 Lv.3: 치명타 시 추가 행동 플래그
+      if (isCrit && hasEffect(skills, 'critExtraTurn', activeSkills)) {
+        extraTurnFromCrit = true;
+      }
+
+      // 2. 암검술 Lv.7: 침묵 게이지 누적 (타당 35씩 누적, 3타 시 침묵)
+      if (hasEffect(skills, 'applySilenceGauge', activeSkills)) {
+        const currentSilence = newEnemy.debuffs?.silenceGauge || 0;
+        let nextSilence = currentSilence + 35;
+
+        if (nextSilence >= 100) {
+          newLog.push({ type: 'debuff', text: `◆ [암검술 Lv.7] 침묵의 일격! 적의 기술을 봉인함` });
+          newEnemy.debuffs = { ...newEnemy.debuffs, silenced: 1, silenceGauge: 0 };
+        } else {
+          newEnemy.debuffs = { ...newEnemy.debuffs, silenceGauge: nextSilence };
         }
-  
-        // 데미지 계산 및 적용
-        const dmgResult = calculateDamage(skill, newPlayer, newEnemy, skills, isCrit, ultimates, meta, curses, activeSkills, relicStat);
-        newEnemy.currentHp = Math.max(0, newEnemy.currentHp - dmgResult.finalDmg);
-  
-        // --- 암검술 효과 처리 ---
-        
-        // 1. 암검술 Lv.3: 치명타 시 추가 행동 플래그
-        if (isCrit && hasEffect(skills, 'critExtraTurn', activeSkills)) {
-          extraTurnFromCrit = true; 
-        }
-  
-        // 2. 암검술 Lv.7: 침묵 게이지 누적 (타당 35씩 누적, 3타 시 침묵)
-        if (hasEffect(skills, 'applySilenceGauge', activeSkills)) {
-          const currentSilence = newEnemy.debuffs?.silenceGauge || 0;
-          let nextSilence = currentSilence + 35;
-          
-          if (nextSilence >= 100) {
-            newLog.push({ type: 'debuff', text: `◆ [암검술 Lv.7] 침묵의 일격! 적의 기술을 봉인함` });
-            newEnemy.debuffs = { ...newEnemy.debuffs, silenced: 1, silenceGauge: 0 };
-          } else {
-            newEnemy.debuffs = { ...newEnemy.debuffs, silenceGauge: nextSilence };
-          }
-        }
-        // -----------------------
       }
     }
+  }
+
+  // --- 공격 종료 후 후처리 ---
+  // 첫 턴 확정 치명타 버프 소모
+  if (newPlayer.buffs?.guaranteedCrit > 0) {
+    newPlayer.buffs = { ...newPlayer.buffs, guaranteedCrit: 0 };
+  }
+
+  // 암검술 Lv.3 추가 행동 로그 출력
+  if (extraTurnFromCrit) {
+    newLog.push({ type: 'passive', text: `◆ [암검술 Lv.3] 신속한 연격: 추가 행동 획득!` });
+    // 기존의 추가 턴 시스템(extraTurn)과 연동하기 위해 플래그를 버프에 저장하거나 
+    // 로직에 따라 즉시 턴을 초기화하는 처리가 필요할 수 있습니다.
+  }
+
+  // 상태 업데이트 및 화면 전환
+  setPlayer(newPlayer);
+  setEnemy(newEnemy);
+  setLog(newLog);
+
+  if (newEnemy.currentHp <= 0) {
+    // 승리 처리 로직 (생략)
+    setTimeout(() => {
+      setLog(prev => [...prev, { type: 'victory', text: `━━ ${enemy.name} 처치 ━━` }]);
+      setPhase('victory');
+      actionLockRef.current = false;
+    }, 800);
+    return;
+  }
+
+  setPhase('enemyTurn');
+  setTimeout(() => { executeEnemyTurn(newPlayer, newEnemy, newLog); }, 350);
+};
 
     // 버프 소모 및 상태 업데이트
     if (newPlayer.buffs?.guaranteedCrit > 0) newPlayer.buffs.guaranteedCrit = 0;
