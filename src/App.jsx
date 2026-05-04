@@ -6,6 +6,10 @@ import { Sword, Shield, Heart, Zap, Skull, Sparkles, Eye, Flame, Crown, BookOpen
 // 전체 게임 루프: 챕터 → 맵 → 노드 → 전투/사건 → 보상 → 다음 노드 → 보스 → 다음 챕터
 // ============================================
 
+function getSkillLevel(skills, skillName) {
+  return skills[skillName] || 0; 
+}
+
 const PALETTE = {
   bg: '#0a0608', bgDeep: '#050304',
   panel: '#1a0e12', panelLight: '#241419', panelBorder: '#3d1f28',
