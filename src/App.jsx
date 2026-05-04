@@ -1070,14 +1070,14 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
       initialLog.push({ type: 'passive', text: `◆ [신앙 누적] 모든 능력치 +${allStatsBonus}` });
     }
     
-    // 궁극 [운명의 저울] ult_destinyScale: 모든 능력치 +5
+    // 궁극 [운명의 저울] ult_destinyScale: 모든 능력치 +10
     if (hasUltimate(ultimates, 'ult_destinyScale')) {
-      newPlayer.근력 = (newPlayer.근력 || 10) + 5;
-      newPlayer.민첩 = (newPlayer.민첩 || 10) + 5;
-      newPlayer.지능 = (newPlayer.지능 || 10) + 5;
-      newPlayer.매력 = (newPlayer.매력 || 10) + 5;
+      newPlayer.근력 = (newPlayer.근력 || 10) + 10;
+      newPlayer.민첩 = (newPlayer.민첩 || 10) + 10;
+      newPlayer.지능 = (newPlayer.지능 || 10) + 10;
+      newPlayer.매력 = (newPlayer.매력 || 10) + 10;
       newPlayer.destinyScaleUses = 0;
-      initialLog.push({ type: 'passive', text: `★ [운명의 저울] 모든 능력치 +5, 치명적 회피 0/2` });
+      initialLog.push({ type: 'passive', text: `★ [운명의 저울] 모든 능력치 +10, 치명적 회피 0/2` });
     }
     
     // 수비 minor: 시작 방어 +5/Lv
@@ -1429,22 +1429,34 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
             }
           }
           if (dmg > 0) {
-            if (newPlayer.hp - dmg <= 0) {
-              // 궁극 [운명의 저울]: 치명적 피격 100% 회피 (전투당 2회)
+            // [체크] 이번 공격을 맞으면 죽는가?
+            const isFatalDamage = newPlayer.hp - dmg <= 0;
+          
+            if (isFatalDamage) {
+              // 1순위: [운명의 저울] - 치명타 상황에서만 횟수 차감 후 100% 회피
               if (hasUltimate(ultimates, 'ult_destinyScale') && (newPlayer.destinyScaleUses || 0) < 2) {
-                newLog.push({ type: 'passive', text: `★ [운명의 저울] 회피! (${(newPlayer.destinyScaleUses || 0) + 1}/2)` });
                 newPlayer.destinyScaleUses = (newPlayer.destinyScaleUses || 0) + 1;
-                dmg = 0;
-              } else if (hasEffect(skills, 'divineSave', activeSkills) && Math.random() < 0.3) {
+                newLog.push({ 
+                  type: 'passive', 
+                  text: `★ [운명의 저울] 치명적 피격 회피! (${newPlayer.destinyScaleUses}/2)` 
+                });
+                dmg = 0; // 데미지 무효화
+              } 
+              // 2순위: [신의 가호] - 30% 확률로 생존
+              else if (hasEffect(skills, 'divineSave', activeSkills) && Math.random() < 0.3) {
                 newLog.push({ type: 'passive', text: `◆ [신앙 Lv.5] 신의 가호!` });
-                dmg = newPlayer.hp - 1;
-              } else if (hasEffect(skills, 'revive', activeSkills) && !newPlayer.revivedThisCombat) {
+                dmg = newPlayer.hp - 1; // 체력을 1로 만듦
+              } 
+              // 3순위: [부활] - 전투당 1회 체력 50% 회복
+              else if (hasEffect(skills, 'revive', activeSkills) && !newPlayer.revivedThisCombat) {
                 newPlayer.hp = Math.floor(newPlayer.maxHp * 0.5);
                 newPlayer.revivedThisCombat = true;
                 newLog.push({ type: 'passive', text: `◆ [재생 Lv.7] 부활!` });
-                dmg = 0;
+                dmg = 0; // 데미지 무효화
               }
             }
+          
+            // 최종 데미지 적용 (위의 조건들에서 dmg가 0이 되었다면 실행되지 않음)
             if (dmg > 0) {
               newPlayer.hp = Math.max(0, newPlayer.hp - dmg);
               newLog.push({ type: 'damageTaken', text: `· ${dmg} 데미지` });
