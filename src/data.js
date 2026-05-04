@@ -132,6 +132,19 @@ export const PASSIVE_SKILLS = {
       7: { text: '운명 카드 1회 재선택', trigger: 'passive', effect: 'fateReroll' }
     }
   },
+  암검술: {
+    axis: 'special',
+    maxLv: 7,
+    color: '#c4453d',
+    desc: '어둠 속에서도 검을 뻗는 방랑검사의 비술',
+    minorEffect: { type: 'dmgDealt+', perLv: 5, desc: '모든 데미지 +5%/Lv' },
+    tiers: {
+      3: { text: '치명타 발생 시 다음 턴에 추가 행동을 획득한다.', trigger: 'onAttack', effect: 'critExtraTurn' },
+      5: { text: '전투 첫 턴에 반드시 치명타가 발생한다.', trigger: 'onCombatStart', effect: 'firstTurnGuaranteedCrit' },
+      7: { text: '공격 시 침묵 게이지 누적, 100 도달 시 침묵(1턴간 스킬 봉인)', trigger: 'onAttack', effect: 'applySilenceGauge' }
+    }
+  },
+};
 };
 
 // =========== 직업 ===========
