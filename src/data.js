@@ -103,15 +103,15 @@ export const PASSIVE_SKILLS = {
     }
   },
   심안: {
-    axis: 'utility', maxLv: 7, color: '#7ba3c4',
-    desc: '시야와 인지',
-    minorEffect: { type: 'accuracy+', perLv: 2, desc: '명중률 +2%/Lv' },
-    tiers: {
-      3: { text: '회피 불가 적에게도 50% 회피 가능', trigger: 'passive', effect: 'pierceDodge' },
-      5: { text: '함정 탐지율 +100%', trigger: 'passive', effect: 'trapDetect' },
-      7: { text: '미지 노드 정보 사전 공개', trigger: 'passive', effect: 'revealNodes' }
-    }
-  },
+  axis: 'utility', maxLv: 7, color: '#7ba3c4',
+  desc: '시야와 인지',
+  minorEffect: { type: 'accuracy+', perLv: 2, desc: '명중률 +2%/Lv' },
+  tiers: {
+    3: { text: '적의 행동을 미리 파악할 수 있다.', trigger: 'passive', effect: 'predictIntent' },
+    5: { text: '다음 행동의 정확한 수치 파악, 회피율 +10%', trigger: 'passive', effect: 'detailIntent' },
+    7: { text: '적의 약점을 파악한다. 치명타 +10%, 치명타 데미지 +50%', trigger: 'passive', effect: 'weaknessPoint' }
+  }
+},
   신앙: {
     axis: 'utility', maxLv: 7, color: '#d4a574',
     desc: '신의 가호',
