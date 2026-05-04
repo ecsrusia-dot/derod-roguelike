@@ -1653,20 +1653,31 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
             </span>
           )}
         </div>
-        {phase === 'playerTurn' && enemy.nextIntent && (
+        {/* 심안 3단계 이상일 때만 박스 자체가 나타남 */}
+        {phase === 'playerTurn' && enemy.nextIntent && getSkillLevel(skills, '심안') >= 3 && (
           <div className="mt-1.5 px-2 py-1 flex items-center gap-2" style={{
             background: PALETTE.bgDeep, border: `1px dashed ${enemy.color}80`,
           }}>
             <AlertTriangle size={10} style={{ color: enemy.color }} />
-            <span className="text-[10px]" style={{ color: PALETTE.textDim }}>다음 행동:</span>
-            <span className="text-[10px] font-bold" style={{ color: PALETTE.text }}>{enemy.nextIntent.name}</span>
-            {enemy.nextIntent.dmg[1] > 0 && (
-              <span className="text-[10px] tabular-nums ml-auto" style={{ color: enemy.nextIntent.heavy ? PALETTE.accent : PALETTE.textDim }}>
-                {enemy.nextIntent.dmg[0]}-{enemy.nextIntent.dmg[1]}
-              </span>
-            )}
-            {enemy.nextIntent.type === 'defend' && (
-              <span className="text-[10px] ml-auto" style={{ color: PALETTE.defense }}>방어</span>
+            <span className="text-[10px]" style={{ color: PALETTE.textDim }}>[심안] 의도:</span>
+        
+            {/* 3단계(predictIntent): 행동 이름 공개 */}
+            <span className="text-[10px] font-bold" style={{ color: PALETTE.text }}>
+              {enemy.nextIntent.name}
+            </span>
+        
+            {/* 5단계(detailIntent): 구체적인 수치(데미지/방어) 공개 */}
+            {getSkillLevel(skills, '심안') >= 5 && (
+              <div className="flex ml-auto gap-2">
+                {enemy.nextIntent.dmg[1] > 0 && (
+                  <span className="text-[10px] tabular-nums" style={{ color: enemy.nextIntent.heavy ? PALETTE.accent : PALETTE.textDim }}>
+                    {enemy.nextIntent.dmg[0]}-{enemy.nextIntent.dmg[1]}
+                  </span>
+                )}
+                {enemy.nextIntent.type === 'defend' && (
+                  <span className="text-[10px]" style={{ color: PALETTE.defense }}>방어</span>
+                )}
+              </div>
             )}
           </div>
         )}
