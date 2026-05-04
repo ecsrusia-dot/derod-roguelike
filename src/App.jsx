@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Sword, Shield, Heart, Zap, Skull, Sparkles, Eye, Flame, Crown, BookOpen, Compass, ChevronRight, X, RefreshCw, Lock, Check, AlertTriangle } from 'lucide-react';
 
 // ============================================
-// 데로드앤데블랑 로그라이크 v0.4 - INTEGRATED
+// 데로드앤데블랑 로그라이크 v1.4 - INTEGRATED
 // 전체 게임 루프: 챕터 → 맵 → 노드 → 전투/사건 → 보상 → 다음 노드 → 보스 → 다음 챕터
 // ============================================
 
