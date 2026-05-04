@@ -1077,6 +1077,7 @@ function MapView({ chapter, classData, mapData, hp, maxHp, gold, gem, expedition
 
 // =========== 전투 화면 ===========
 function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimates = [], initialRelics = [], activeSkills = null, activeRelicNames = null, enemyKey, isBoss, expedition, curses = [], meta, onVictory, onDefeat }) {
+  const [isFirstTurn, setIsFirstTurn] = useState(true);
   const [player, setPlayer] = useState(() => {
     let p = {
       ...initialPlayer, defense: 0, buffs: {}, debuffs: {}, cooldowns: {},
@@ -1150,6 +1151,14 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
     }
     
     let newPlayer = { ...player };
+    
+    // 암검술 Lv.5: 첫 턴 확정 치명타 버프 부여
+    if (hasEffect(skills, 'firstTurnGuaranteedCrit', activeSkills)) {
+      newPlayer.buffs = { ...newPlayer.buffs, guaranteedCrit: 1 };
+      initialLog.push({ type: 'passive', text: `◆ [암검술 Lv.5] 심안의 개안: 첫 공격 치명타 확정` });
+    }
+  
+    setPlayer(newPlayer);
     
     // 신앙 minor: 모든 능력치 +1/Lv (전투 동안만)
     const allStatsBonus = getMinorBonus(skills, 'allStats+', activeSkills);
@@ -1236,6 +1245,54 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
     const newLog = [...log, { type: 'player', text: `▸ ${skill.name}` }];
     let newPlayer = { ...player, ether: player.ether - etherCost };
     let newEnemy = { ...enemy };
+    let extraTurnFromCrit = false;
+
+    for (let echo = 0; echo < echoTimes; echo++) {
+      for (let i = 0; i < hitCount; i++) {
+        // 치명타 판정
+        let isCrit = rollCrit(skills, newPlayer, meta, activeSkills, relicStat);
+        if (newPlayer.buffs?.guaranteedCrit > 0) {
+          isCrit = true;
+          // 첫 턴 확정 치명타 소모는 공격 루프가 끝난 뒤 처리
+        }
+  
+        // 데미지 계산 및 적용
+        const dmgResult = calculateDamage(skill, newPlayer, newEnemy, skills, isCrit, ultimates, meta, curses, activeSkills, relicStat);
+        newEnemy.currentHp = Math.max(0, newEnemy.currentHp - dmgResult.finalDmg);
+  
+        // --- 암검술 효과 처리 ---
+        
+        // 1. 암검술 Lv.3: 치명타 시 추가 행동 플래그
+        if (isCrit && hasEffect(skills, 'critExtraTurn', activeSkills)) {
+          extraTurnFromCrit = true; 
+        }
+  
+        // 2. 암검술 Lv.7: 침묵 게이지 누적 (타당 35씩 누적, 3타 시 침묵)
+        if (hasEffect(skills, 'applySilenceGauge', activeSkills)) {
+          const currentSilence = newEnemy.debuffs?.silenceGauge || 0;
+          let nextSilence = currentSilence + 35;
+          
+          if (nextSilence >= 100) {
+            newLog.push({ type: 'debuff', text: `◆ [암검술 Lv.7] 침묵의 일격! 적의 기술을 봉인함` });
+            newEnemy.debuffs = { ...newEnemy.debuffs, silenced: 1, silenceGauge: 0 };
+          } else {
+            newEnemy.debuffs = { ...newEnemy.debuffs, silenceGauge: nextSilence };
+          }
+        }
+        // -----------------------
+      }
+    }
+
+    // 버프 소모 및 상태 업데이트
+    if (newPlayer.buffs?.guaranteedCrit > 0) newPlayer.buffs.guaranteedCrit = 0;
+    setIsFirstTurn(false);
+  
+    // 추가 행동 발생 시 처리
+    if (extraTurnFromCrit) {
+      newLog.push({ type: 'passive', text: `◆ [암검술 Lv.3] 신속한 연격: 추가 행동 획득!` });
+      // 여기서 바로 플레이어 턴으로 다시 세팅하거나, 턴 종료 로직에서 phase를 조절합니다.
+      // 기존 가속(extraTurn) 시스템과 통합하여 처리하는 것을 권장합니다.
+    }
 
     if (skill.selfDmg) {
       newPlayer.hp = Math.max(1, newPlayer.hp - skill.selfDmg);
@@ -1433,6 +1490,18 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
     let newPlayer = { ...curPlayer };
     let newEnemy = { ...curEnemy };
 
+    // 침묵 체크
+    if (curEnemy.debuffs?.silenced > 0) {
+      curLog.push({ type: 'debuff', text: `◇ 침묵 상태: ${enemy.name}의 기술이 불발됨` });
+      
+      // 로직 선택: 아예 행동 불능으로 만들거나(기절과 동일), 공격력을 급감시킴
+      // 제안: 기술 봉인이므로 해당 턴 데미지를 0으로 처리 (완전 방어)
+      curEnemy.debuffs.silenced = 0; // 1턴 후 해제
+      setEnemy(curEnemy);
+      setTimeout(() => endTurn(curPlayer, curEnemy, curLog), 400);
+      return;
+    }
+    
     if (newEnemy.debuffs?.stunned > 0) {
       newLog.push({ type: 'debuff', text: `◆ ${enemy.name}이(가) 기절 상태로 행동 못 함` });
       // 기절 1턴 소모
