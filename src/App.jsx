@@ -395,13 +395,25 @@ function calculateDamage(skill, attacker, defender, skills, isCrit, ultimates = 
     dmg += stunBonus;
     breakdown.push(`강타 Lv.7 +${stunBonus}`);
   }
-  if (isCrit) {
-    let critMult = hasEffect(skills, 'critDmg+30', activeSkills) ? 1.8 : 1.5;
-    // 유물 critDmg %
-    critMult += (relicStat.critDmg || 0) / 100;
-    dmg = Math.floor(dmg * critMult);
-    breakdown.push(`치명타 ×${critMult}`);
+if (isCrit) {
+  // 1. 기본 치명타 배율 설정 (1.5배)
+  let critMult = 1.5;
+  // 2. 기존 [치명타 데미지 +30%] 패시브 체크 (+0.3)
+  if (hasEffect(skills, 'critDmg+30', activeSkills)) {
+    critMult += 0.3;
   }
+  // 3. ★ [심안] 7단계 (weaknessPoint) 효과 체크 (+0.5)
+  if (hasEffect(skills, 'weaknessPoint', activeSkills)) {
+    critMult += 0.5;
+  }
+  // 4. 유물 보너스 합산
+  critMult += (relicStat.critDmg || 0) / 100;
+  // 5. 최종 데미지 계산 (소수점 버림)
+  dmg = Math.floor(dmg * critMult);
+  // 6. 로그 기록 (소수점 1자리까지 표시하여 가독성 확보)
+  const critLabel = hasEffect(skills, 'weaknessPoint', activeSkills) ? '약점 간파' : '치명타';
+  breakdown.push(`${critLabel} ×${critMult.toFixed(1)}`);
+}
   // 메타 강화: 주는 데미지 +5%/단계
   const metaDmgBonus = getMetaBonus(meta, 'dmgDealt+5%') * 0.05;
   if (metaDmgBonus > 0) {
@@ -440,24 +452,53 @@ function calculateDamage(skill, attacker, defender, skills, isCrit, ultimates = 
 }
 
 function rollCrit(skills, attacker, meta = null, activeSkills = null, relicStat = {}) {
+  // 1. 기본 확률 + 민첩 보너스
   let critRate = 5 + Math.max(0, (attacker.민첩 - 10) * 0.5);
-  // 정밀 minor: 치명타율 +3%/Lv (Lv.1부터 적용)
+  
+  // 2. 정밀 minor: 치명타율 +3%/Lv
   critRate += getMinorBonus(skills, 'critRate+', activeSkills);
-  // 메타 강화: 치명타율 +3%/단계
+  
+  // 3. 메타 강화 및 유물 보너스
   critRate += getMetaBonus(meta, 'critRate+3%') * 3;
-  // 유물 critRate %
   critRate += relicStat.critRate || 0;
+
+  // 4. ★ [심안] 7단계 효과 적용
+  // getSkillLevel 대신 기존에 정의된 hasEffect를 사용합니다.
+  if (hasEffect(skills, 'weaknessPoint', activeSkills)) {
+    critRate += 10;
+  }
+
+  // 5. 최종 확률 판정
   return Math.random() * 100 < critRate;
 }
 
 function rollDodge(skills, defender, activeSkills = null, relicStat = {}) {
+  // 1. 민첩 보너스 (기본)
   let dodgeRate = Math.max(0, (defender.민첩 - 10) * 0.3);
-  // 회피 minor: 회피율 +3%/Lv
+  
+  // 2. 회피 minor 스킬 보너스 (+3%/Lv)
   dodgeRate += getMinorBonus(skills, 'dodge+', activeSkills);
-  // 유물 dodge %
+  
+  // 3. 유물 보너스
   dodgeRate += relicStat.dodge || 0;
-  if (hasEffect(skills, 'dodge+15', activeSkills)) dodgeRate += 15;
-  if (defender.buffs?.dodgeBuff > 0) dodgeRate += defender.buffs.dodgeBuff;
+  
+  // 4. 기존 특정 스킬 효과 (회피+15)
+  if (hasEffect(skills, 'dodge+15', activeSkills)) {
+    dodgeRate += 15;
+  }
+
+  // 5. ★ [심안] 5단계 (detailIntent) 효과 적용
+  // getSkillLevel 대신 hasEffect를 사용하여 일관성 유지
+  if (hasEffect(skills, 'detailIntent', activeSkills)) {
+    dodgeRate += 10;
+  }
+
+  // 6. 인게임 버프 (예: 회피 물약, 스킬 버프 등)
+  if (defender.buffs?.dodgeBuff > 0) {
+    dodgeRate += defender.buffs.dodgeBuff;
+  }
+
+  // 7. 최종 확률 판정
   return Math.random() * 100 < dodgeRate;
 }
 
