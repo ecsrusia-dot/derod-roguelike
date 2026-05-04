@@ -1243,14 +1243,11 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
     }
 
     if (skill.type === 'physical' || skill.type === 'magic') {
-      // 마력 Lv.7: 마법 공격 시 50% 확률로 재시전 (총 2회 시전)
-      // 궁극 [신탁 각성] ult_oracleAwaken: 100% 재시전 (총 3회 시전)
-      
+      // 마력 Lv.7 및 신탁 각성 재시전 횟수 분기 처리
       const hasOracleAwaken = hasUltimate(ultimates, 'ult_oracleAwaken');
       const echoChance = hasOracleAwaken ? 1.0 : 0.5;
       const canEcho = skill.type === 'magic' && (hasEffect(skills, 'magicEcho', activeSkills) || hasOracleAwaken);
       
-      // 1. 재시전 횟수 분기 처리 (신탁 각성이면 3, 아니면 2)
       let echoTimes = 1;
       if (canEcho && Math.random() < echoChance) {
         echoTimes = hasOracleAwaken ? 3 : 2;
@@ -1262,7 +1259,6 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
       
       for (let echo = 0; echo < echoTimes; echo++) {
         if (echo > 0) {
-          // 2. 발동 주체에 따라 로그 텍스트 동적 변경
           const effectName = hasOracleAwaken ? '신탁 각성' : '마력 Lv.7';
           newLog.push({ type: 'passive', text: `◆ [${effectName}] 마법 재시전! (${echo}/${echoTimes - 1})` });
         }
@@ -1284,24 +1280,19 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
           newEnemy.currentHp = Math.max(0, newEnemy.currentHp - actualDmg);
           totalDmg += actualDmg;
           
-          // 3. 재시전 태그 동적 처리 (1번째 재시전, 2번째 재시전 모두 표시)
           const echoTag = (echo > 0) ? ` [재시전 ${echo}]` : '';
           newLog.push({
             type: 'damage',
-            text: `· ${newEnemy.name}에게 ${actualDmg} 데미지${isCrit ? ' [치명타!]' : ''}${hitCount > 1 ? ` (${i+1}/${hitCount})` : ''}${echoTag}`,
+            text: `· ${enemy.name}에게 ${actualDmg} 데미지${isCrit ? ' [치명타!]' : ''}${hitCount > 1 ? ` (${i+1}/${hitCount})` : ''}${echoTag}`,
             breakdown: dmgResult.breakdown.join(' / '),
           });
-        }
-      }
-    }
           
-          // 작업 5: 매 히트마다 디버프 부여 (다단히트 누적)
+          // 매 히트마다 디버프 부여 (다단히트 누적)
           const attackPassivesPerHit = getActivePassives(skills, 'onAttack', activeSkills);
           attackPassivesPerHit.forEach(p => {
             if (p.effect === 'applyShockGauge') {
               let gaugeAdd = GAME_CONFIG.shockGaugeBase;
               if (hasEffect(skills, 'shockBonus', activeSkills)) gaugeAdd = GAME_CONFIG.shockGaugeBase + GAME_CONFIG.shockGaugeBonus;
-              // 궁극 [광역 폭발] ult_shockBlast: 게이지 +60
               if (hasUltimate(ultimates, 'ult_shockBlast')) gaugeAdd = 60;
               if (newEnemy.debuffs?.shockResist > 0) {
                 gaugeAdd = Math.floor(gaugeAdd * GAME_CONFIG.shockResistReduction);
@@ -1315,19 +1306,17 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
                   stunned: 1, shockGauge: 0,
                   shockResist: GAME_CONFIG.shockResistTurns,
                   shockResistTurns: GAME_CONFIG.shockResistTurns,
-                  everStunned: true,  // 궁극 [영구 침묵] 추적용
+                  everStunned: true,  
                 };
                 if (hasEffect(skills, 'shockBonus', activeSkills)) {
                   const bonusDmg = 15;
                   newEnemy.currentHp = Math.max(0, newEnemy.currentHp - bonusDmg);
                   newLog.push({ type: 'damage', text: `· [강타 Lv.5] 기절 추가 데미지 ${bonusDmg}` });
                 }
-                // 궁극 [광역 폭발]: 기절 발동 시 추가 30 데미지
                 if (hasUltimate(ultimates, 'ult_shockBlast')) {
                   newEnemy.currentHp = Math.max(0, newEnemy.currentHp - 30);
                   newLog.push({ type: 'damage', text: `★ [광역 폭발] 폭발 데미지 30` });
                 }
-                // 궁극 [즉시 처형] ult_shockExecute: 적 HP 25% 즉시 제거
                 if (hasUltimate(ultimates, 'ult_shockExecute')) {
                   const execDmg = Math.floor(newEnemy.maxHp * 0.25);
                   newEnemy.currentHp = Math.max(0, newEnemy.currentHp - execDmg);
@@ -1343,7 +1332,6 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
               newEnemy.debuffs = { ...newEnemy.debuffs, bleed: newStacks, bleedTurns: 3 };
             }
             if (p.effect === 'execute') {
-              // 궁극 [사형 선고] ult_deathSentence: HP 35% 이하, 30% 확률로 확장
               const execThreshold = hasUltimate(ultimates, 'ult_deathSentence') ? 0.35 : 0.2;
               const execChance = hasUltimate(ultimates, 'ult_deathSentence') ? 0.3 : 0.15;
               if (newEnemy.currentHp > 0 && newEnemy.currentHp <= newEnemy.maxHp * execThreshold && Math.random() < execChance) {
@@ -1369,7 +1357,6 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
       // 자가 회복 (사제 - 신성광선)
       if (skill.selfHeal) {
         let heal = skill.selfHeal;
-        // 유물 heal % 보너스
         if (relicStat.heal > 0) heal = Math.floor(heal * (1 + relicStat.heal / 100));
         if (hasCurse(curses, 'curse_heal-50')) heal = Math.floor(heal * 0.5);
         newPlayer.hp = Math.min(newPlayer.maxHp, newPlayer.hp + heal);
@@ -1386,7 +1373,6 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
       // 자가 회복 (사제 - 가호)
       if (skill.selfHeal) {
         let heal = skill.selfHeal;
-        // 유물 heal % 보너스
         if (relicStat.heal > 0) heal = Math.floor(heal * (1 + relicStat.heal / 100));
         if (hasCurse(curses, 'curse_heal-50')) heal = Math.floor(heal * 0.5);
         newPlayer.hp = Math.min(newPlayer.maxHp, newPlayer.hp + heal);
@@ -1407,12 +1393,8 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
     }
     // 궁극 [시간 역행] ult_timeRewind: 모든 마법 스킬 쿨다운 제거, 에테르 +1
     if (skill.type === 'magic' && hasUltimate(ultimates, 'ult_timeRewind')) {
-      // 에테르 +1 (최대치 제한)
       newPlayer.ether = Math.min(newPlayer.maxEther || 3, newPlayer.ether + 1);
-      
-      // 모든 스킬 쿨다운 즉시 제거 (빈 객체로 초기화)
       newPlayer.cooldowns = {}; 
-      
       newLog.push({ type: 'passive', text: `★ [시간 역행] 모든 마법 스킬 쿨다운 제거, 에테르 +1` });
     }
 
@@ -1421,7 +1403,6 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
     setLog(newLog);
 
     if (newEnemy.currentHp <= 0) {
-      // 유물 lifesteal: 적 처치 시 HP 회복
       if (relicStat.lifesteal > 0) {
         const heal = relicStat.lifesteal;
         newPlayer.hp = Math.min(newPlayer.maxHp, newPlayer.hp + heal);
@@ -1435,7 +1416,7 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
       }, 800);
       return;
     }
-    // 즉시 phase 전환으로 버튼 그룹 숨김 (시각적 즉각 피드백)
+    
     setPhase('enemyTurn');
     setTimeout(() => { executeEnemyTurn(newPlayer, newEnemy, newLog); }, 350);
   };
