@@ -3455,11 +3455,12 @@ export default function App() {
             </div>
           )}
 
-          <div className="pt-4 border-t text-[10px] style={{ color: PALETTE.textDim, borderColor: PALETTE.panelBorder }}">
+          <div className="pt-4 border-t text-[10px]" style={{ color: PALETTE.textDim, borderColor: PALETTE.panelBorder }}>
              <p className="opacity-50">배율 조정 모드 활성화됨</p>
           </div>
         </div>
 
       </div>
     </div>
-  );
+  ); // <--- return 문을 닫는 소괄호와 세미콜론
+} // <--- App 함수를 닫는 마지막 중괄호 (이게 누락되었을 가능성이 큽니다!)
