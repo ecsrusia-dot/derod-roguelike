@@ -3119,6 +3119,38 @@ export default function App() {
         ...prev,
         [reward.name]: Math.min((prev[reward.name] || 0) + 1, PASSIVE_SKILLS[reward.name].maxLv)
       }));
+      // ★ 추가: 활성화 슬롯이 남았다면(5개 미만) 획득 즉시 활성화 목록에 추가
+      setActiveSkills(prev => {
+        const currentActive = prev || [];
+        if (currentActive.length < PREP_CONFIG.maxSkillSelect && !currentActive.includes(reward.name)) {
+          return [...currentActive, reward.name];
+        }
+        return currentActive;
+      });
+    } else if (reward.type === 'relic') {
+      // 1. 유물 보유 목록 추가
+      setRelics(prev => [...prev, reward]);
+      
+      // 2. 유물 즉시 효과(HP/골드/보석) 적용
+      const stat = reward.statBonus || {};
+      if (stat.maxHp) {
+        const bonus = Math.floor(maxHp * stat.maxHp / 100);
+        setMaxHp(prev => prev + bonus);
+        setHp(prev => prev + bonus);
+      }
+      if (stat.startGold) setGold(prev => prev + stat.startGold);
+      if (stat.startGem) setGem(prev => prev + stat.startGem);
+  
+      // ★ 추가: 유물 슬롯이 남았다면 즉시 활성화 목록에 추가
+      setActiveRelicNames(prev => {
+        const currentActive = prev || [];
+        const maxRelicSelect = currentExpedition?.maxRelicSelect || 1;
+        if (currentActive.length < maxRelicSelect && !currentActive.includes(reward.name)) {
+          return [...currentActive, reward.name];
+        }
+        return currentActive;
+      });
+      
     } else if (reward.type === 'stat') {
       setStats(prev => ({ ...prev, [reward.name]: (prev[reward.name] || 10) + reward.value }));
       if (reward.name === '최대 체력') {
