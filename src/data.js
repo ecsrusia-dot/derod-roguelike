@@ -145,7 +145,7 @@ export const PASSIVE_SKILLS = {
     }
   },
 };
-};
+
 
 // =========== 직업 ===========
 // locked: true인 직업은 메타 강화로 해금
@@ -153,7 +153,7 @@ export const CLASSES = [
   {
     id: 'lanthert', name: '방랑검사', sub: 'Lanthert Path',
     desc: '시력을 잃었던 검사. 어둠 속에서도 검을 뻗는다.',
-    startSkills: { 강타: 3, 심안: 2 },
+    startSkills: { 암검술: 3, 심안: 2 },
     stats: { 근력: 16, 민첩: 15, 지능: 14, 매력: 11 },
     combatSkills: ['참격', '관통', '수비'],
     color: '#c4453d',
