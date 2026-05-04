@@ -25,7 +25,7 @@ export const PASSIVE_SKILLS = {
   강타: {
     axis: 'attack', maxLv: 7, color: '#c4453d',
     desc: '공격 시 충격 게이지 누적, 100 도달 시 기절',
-    minorEffect: { type: 'physDmg+', perLv: 2, desc: '물리 데미지 +2/Lv' },
+    minorEffect: { type: 'physDmg+', perLv: 3, desc: '물리 데미지 +3/Lv' },
     tiers: {
       3: { text: '공격 시 충격 게이지 +30 (100 시 기절 1턴)', trigger: 'onAttack', effect: 'applyShockGauge' },
       5: { text: '충격 게이지 누적량 +10, 기절 시 추가 데미지', trigger: 'passive', effect: 'shockBonus' },
@@ -55,9 +55,9 @@ export const PASSIVE_SKILLS = {
   마력: {
     axis: 'attack', maxLv: 7, color: '#5c4a8c',
     desc: '마법 데미지 강화',
-    minorEffect: { type: 'magicDmg+', perLv: 4, desc: '마법 데미지 +4%/Lv' },
+    minorEffect: { type: 'magicDmg+', perLv: 5, desc: '마법 데미지 +5%/Lv' },
     tiers: {
-      3: { text: '마법 데미지 추가 +25%', trigger: 'passive', effect: 'magicDmg+25' },
+      3: { text: '마법 데미지 추가 +30%', trigger: 'passive', effect: 'magicDmg+30' },
       5: { text: '에테르 비용 -1 (최소 0)', trigger: 'passive', effect: 'etherCost-20' },
       7: { text: '마법 공격 시 50% 확률로 재시전', trigger: 'passive', effect: 'magicEcho' }
     }
@@ -65,10 +65,10 @@ export const PASSIVE_SKILLS = {
   회피: {
     axis: 'defense', maxLv: 7, color: '#7a9a5e',
     desc: '회피율 증가',
-    minorEffect: { type: 'dodge+', perLv: 3, desc: '회피율 +3%/Lv' },
+    minorEffect: { type: 'dodge+', perLv: 4, desc: '회피율 +4%/Lv' },
     tiers: {
       3: { text: '회피 추가 +15%', trigger: 'passive', effect: 'dodge+15' },
-      5: { text: '회피 시 50% 확률로 반격', trigger: 'onDodge', effect: 'counterAttack' },
+      5: { text: '회피 시 70% 확률로 반격', trigger: 'onDodge', effect: 'counterAttack' },
       7: { text: '첫 피격 무효 (전투당 1회)', trigger: 'onCombatStart', effect: 'firstHitImmune' }
     }
   },
@@ -77,18 +77,18 @@ export const PASSIVE_SKILLS = {
     desc: '방어 게이지 강화',
     minorEffect: { type: 'startDef+', perLv: 5, desc: '시작 방어 +5/Lv' },
     tiers: {
-      3: { text: '시작 방어 추가 +20', trigger: 'onCombatStart', effect: 'startDefense+20' },
-      5: { text: '받는 모든 데미지 -15% (마법 포함)', trigger: 'passive', effect: 'dmgTaken-15' },
+      3: { text: '시작 방어 추가 +30', trigger: 'onCombatStart', effect: 'startDefense+30' },
+      5: { text: '받는 모든 데미지 -20% (마법 포함)', trigger: 'passive', effect: 'dmgTaken-20' },
       7: { text: '방어 50% 이상일 때 받는 데미지 50% 차단', trigger: 'passive', effect: 'fortify' }
     }
   },
   재생: {
     axis: 'defense', maxLv: 7, color: '#9ad4a3',
     desc: '체력 회복',
-    minorEffect: { type: 'maxHp+', perLv: 8, desc: '최대 체력 +8/Lv (영구)' },
+    minorEffect: { type: 'maxHp+', perLv: 10, desc: '최대 체력 +10/Lv (영구)' },
     tiers: {
       3: { text: '매 턴 종료 시 HP +3', trigger: 'onTurnStart', effect: 'regenPerTurn' },
-      5: { text: '전투 시작 시 HP 20% 회복', trigger: 'onCombatStart', effect: 'heal20%' },
+      5: { text: '전투 시작 시 HP 30% 회복', trigger: 'onCombatStart', effect: 'heal30%' },
       7: { text: 'HP 30% 이하 시 전투당 1회 부활', trigger: 'onLethal', effect: 'revive' }
     }
   },
@@ -97,9 +97,9 @@ export const PASSIVE_SKILLS = {
     desc: '추가 행동',
     minorEffect: { type: 'cdReduce+', perLv: 1, desc: '쿨다운 -1턴 (Lv.4마다 누적)' },
     tiers: {
-      3: { text: '5턴마다 추가 턴 획득', trigger: 'onTurnStart', effect: 'extraTurn', interval: 5 },
-      5: { text: '4턴마다 추가 턴', trigger: 'onTurnStart', effect: 'extraTurn', interval: 4 },
-      7: { text: '3턴마다 추가 턴', trigger: 'onTurnStart', effect: 'extraTurn', interval: 3 }
+      3: { text: '4턴마다 추가 턴 획득', trigger: 'onTurnStart', effect: 'extraTurn', interval: 4 },
+      5: { text: '3턴마다 추가 턴', trigger: 'onTurnStart', effect: 'extraTurn', interval: 3 },
+      7: { text: '2턴마다 추가 턴', trigger: 'onTurnStart', effect: 'extraTurn', interval: 2 }
     }
   },
   심안: {
@@ -115,7 +115,7 @@ export const PASSIVE_SKILLS = {
   신앙: {
     axis: 'utility', maxLv: 7, color: '#d4a574',
     desc: '신의 가호',
-    minorEffect: { type: 'allStats+', perLv: 1, desc: '모든 능력치 +1/Lv' },
+    minorEffect: { type: 'allStats+', perLv: 2, desc: '모든 능력치 +2/Lv' },
     tiers: {
       3: { text: '5턴마다 다음 공격 치명타 확정', trigger: 'onTurnStart', effect: 'guaranteeCrit', interval: 5 },
       5: { text: '치명적 피격 30% 회피', trigger: 'onLethal', effect: 'divineSave' },
@@ -141,7 +141,7 @@ export const CLASSES = [
     id: 'lanthert', name: '방랑검사', sub: 'Lanthert Path',
     desc: '시력을 잃었던 검사. 어둠 속에서도 검을 뻗는다.',
     startSkills: { 강타: 3, 심안: 2 },
-    stats: { 근력: 16, 민첩: 15, 지능: 14, 매력: 11 },
+    stats: { 근력: 18, 민첩: 15, 지능: 14, 매력: 11 },
     combatSkills: ['참격', '관통', '수비'],
     color: '#c4453d',
     locked: false,
@@ -151,7 +151,7 @@ export const CLASSES = [
     id: 'sage', name: '술법사', sub: 'Sorcerer of Tour',
     desc: '정념계 마법을 익힌 자. 신과 정령의 힘을 빌린다.',
     startSkills: { 마력: 3, 신앙: 2 },
-    stats: { 근력: 8, 민첩: 11, 지능: 18, 매력: 14 },
+    stats: { 근력: 8, 민첩: 11, 지능: 20, 매력: 14 },
     combatSkills: ['마법탄', '정념폭발', '결계'],
     color: '#5c4a8c',
     locked: false,
@@ -161,7 +161,7 @@ export const CLASSES = [
     id: 'demonblood', name: '마족 혼혈', sub: 'Demon Heritage',
     desc: '나크젤리온의 피가 흐르는 자. 분노가 곧 힘이 된다.',
     startSkills: { 잔혹: 3, 강타: 1 },
-    stats: { 근력: 17, 민첩: 13, 지능: 13, 매력: 9 },
+    stats: { 근력: 19, 민첩: 13, 지능: 13, 매력: 9 },
     combatSkills: ['광폭참격', '피의 일격', '광기'],
     color: '#8b1f1f',
     locked: false,
@@ -171,7 +171,7 @@ export const CLASSES = [
     id: 'elf', name: '숲의 정령사', sub: 'Elf of Twilight',
     desc: '엘프 종족. 숲의 정령과 교감하며 활을 다룬다.',
     startSkills: { 회피: 3, 정밀: 2 },
-    stats: { 근력: 11, 민첩: 18, 지능: 14, 매력: 15 },
+    stats: { 근력: 11, 민첩: 20, 지능: 14, 매력: 15 },
     combatSkills: ['정밀사격', '연속화살', '바람결계'],
     color: '#7a9a5e',
     locked: false,
@@ -181,7 +181,7 @@ export const CLASSES = [
     id: 'priest', name: '데로드의 사제', sub: 'Priest of Derod',
     desc: '데로드의 가호를 받은 자. 회복과 가호로 동료를 살린다.',
     startSkills: { 신앙: 3, 재생: 2 },
-    stats: { 근력: 9, 민첩: 11, 지능: 15, 매력: 17 },
+    stats: { 근력: 9, 민첩: 11, 지능: 15, 매력: 19 },
     combatSkills: ['신성광선', '축복', '가호'],
     color: '#d4a574',
     locked: true,  // 메타 강화로 해금
@@ -204,25 +204,25 @@ export const CLASSES = [
 // buff: 'rage' 등 버프 키
 export const COMBAT_SKILLS = {
   // 방랑검사
-  참격: { name: '참격', cost: 0, cd: 0, type: 'physical', baseDmg: [18, 24], desc: '기본 검 공격' },
-  관통: { name: '관통', cost: 1, cd: 2, type: 'physical', baseDmg: [30, 38], desc: '방어 무시', pierce: true },
-  수비: { name: '수비', cost: 0, cd: 0, type: 'defense', defense: 30, desc: '방어 +30' },
+  참격: { name: '참격', cost: 0, cd: 0, type: 'physical', baseDmg: [20, 26], desc: '기본 검 공격' },
+  관통: { name: '관통', cost: 1, cd: 2, type: 'physical', baseDmg: [32, 40], desc: '방어 무시', pierce: true },
+  수비: { name: '수비', cost: 0, cd: 0, type: 'defense', defense: 40, desc: '방어 +40' },
   // 술법사
-  마법탄: { name: '마법탄', cost: 0, cd: 0, type: 'magic', baseDmg: [16, 22], desc: '기본 마법' },
-  정념폭발: { name: '정념폭발', cost: 2, cd: 3, type: 'magic', baseDmg: [40, 50], desc: '강력한 마법' },
-  결계: { name: '결계', cost: 1, cd: 0, type: 'defense', defense: 40, desc: '방어 +40' },
+  마법탄: { name: '마법탄', cost: 0, cd: 0, type: 'magic', baseDmg: [18, 24], desc: '기본 마법' },
+  정념폭발: { name: '정념폭발', cost: 2, cd: 3, type: 'magic', baseDmg: [42, 52], desc: '강력한 마법' },
+  결계: { name: '결계', cost: 1, cd: 0, type: 'defense', defense: 50, desc: '방어 +50' },
   // 마족 혼혈
-  광폭참격: { name: '광폭참격', cost: 0, cd: 0, type: 'physical', baseDmg: [20, 28], desc: 'HP 낮을수록 ↑', berserker: true },
-  '피의 일격': { name: '피의 일격', cost: 1, cd: 2, type: 'physical', baseDmg: [25, 32], desc: '자해+출혈', selfDmg: 10, forceBleed: true },
+  광폭참격: { name: '광폭참격', cost: 0, cd: 0, type: 'physical', baseDmg: [22, 30], desc: 'HP 낮을수록 ↑', berserker: true },
+  '피의 일격': { name: '피의 일격', cost: 1, cd: 2, type: 'physical', baseDmg: [27, 35], desc: '자해+출혈', selfDmg: 10, forceBleed: true },
   광기: { name: '광기', cost: 0, cd: 4, type: 'buff', buff: 'rage', desc: '3턴 데미지+30% (광기의 분노)' },
   // 정령사
-  정밀사격: { name: '정밀사격', cost: 0, cd: 0, type: 'physical', baseDmg: [16, 22], desc: '기본 활 공격' },
-  연속화살: { name: '연속화살', cost: 1, cd: 2, type: 'physical', baseDmg: [12, 16], hitCount: 3, desc: '3연발' },
-  바람결계: { name: '바람결계', cost: 1, cd: 0, type: 'defense', defense: 25, desc: '방어+회피', dodgeBuff: 20 },
+  정밀사격: { name: '정밀사격', cost: 0, cd: 0, type: 'physical', baseDmg: [18, 24], desc: '기본 활 공격' },
+  연속화살: { name: '연속화살', cost: 1, cd: 2, type: 'physical', baseDmg: [15, 19], hitCount: 3, desc: '3연발' },
+  바람결계: { name: '바람결계', cost: 1, cd: 0, type: 'defense', defense: 30, desc: '방어+회피', dodgeBuff: 30 },
   // 데로드의 사제
-  신성광선: { name: '신성광선', cost: 0, cd: 0, type: 'magic', baseDmg: [14, 20], desc: '신성 데미지+자가 회복 10', selfHeal: 10 },
+  신성광선: { name: '신성광선', cost: 0, cd: 0, type: 'magic', baseDmg: [17, 25], desc: '신성 데미지+자가 회복 10', selfHeal: 10 },
   축복: { name: '축복', cost: 1, cd: 3, type: 'buff', buff: 'rage', desc: '3턴 데미지+30% (데로드의 축복)' },
-  가호: { name: '가호', cost: 1, cd: 0, type: 'defense', defense: 35, desc: '방어 +35, HP 회복 +15', selfHeal: 15 },
+  가호: { name: '가호', cost: 1, cd: 0, type: 'defense', defense: 50, desc: '방어 +50, HP 회복 +15', selfHeal: 15 },
 };
 
 // =========== 적 ===========
