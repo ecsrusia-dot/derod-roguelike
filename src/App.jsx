@@ -7,7 +7,8 @@ import { Sword, Shield, Heart, Zap, Skull, Sparkles, Eye, Flame, Crown, BookOpen
 // ============================================
 
 function getSkillLevel(skills, skillName) {
-  return skills[skillName] || 0; 
+  if (!skills || !skills[skillName]) return 0;
+  return typeof skills[skillName] === 'object' ? (skills[skillName].lv || 0) : (skills[skillName] || 0);
 }
 
 const PALETTE = {
