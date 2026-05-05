@@ -515,25 +515,25 @@ export const CHAPTERS = [
   {
     id: 1, name: '북부 극지대', sub: 'The Northern Wastes',
     desc: '눈보라가 멈추지 않는 변경. 마족의 첩자들이 잠복한다.',
-    nodeCount: 18, biome: 'ice', color: '#7ba3c4',
+    nodeCount: 20, biome: 'ice', color: '#7ba3c4',
     enemies: { normal: ['goblin', 'iceWolf', 'frostGiant'], elite: ['cultist', 'iceMage'], boss: 'wraith' },
   },
   {
     id: 2, name: '죽은 자의 숲', sub: 'Forest of the Fallen',
     desc: '엘프의 옛 영토. 망자화된 황혼의 자녀들이 떠돈다.',
-    nodeCount: 20, biome: 'forest', color: '#7a9a5e',
+    nodeCount: 24, biome: 'forest', color: '#7a9a5e',
     enemies: { normal: ['fallenElf', 'shadowWolf', 'corruptSpider'], elite: ['forestSpirit', 'forestTyrant'], boss: 'twilightChild' },
   },
   {
     id: 3, name: '봉인된 신전', sub: 'The Sealed Sanctum',
     desc: '엘디마이어의 파편이 깨어나는 곳. 시간이 뒤틀린다.',
-    nodeCount: 22, biome: 'ruin', color: '#5c4a8c',
+    nodeCount: 28, biome: 'ruin', color: '#5c4a8c',
     enemies: { normal: ['timeKeeper', 'brokenGolem', 'sealMage'], elite: ['ancientPriest'], boss: 'oblivionSealer' },
   },
   {
     id: 4, name: '마계의 균열', sub: 'The Demon Rift',
     desc: '나크젤리온의 군세가 쏟아지는 차원의 틈.',
-    nodeCount: 24, biome: 'demon', color: '#8b1f1f',
+    nodeCount: 32, biome: 'demon', color: '#8b1f1f',
     enemies: { normal: ['demonScout', 'wrathDemon', 'riftBreach'], elite: ['demonApostle'], boss: 'nakzelionShadow' },
   },
 ];
