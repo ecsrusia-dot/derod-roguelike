@@ -1204,7 +1204,7 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
     // 신앙 Lv.7: 수신사 등극 - 전투 시작 시 적에게 신탁 발동
     let oracleDebuffs = null;
     if (hasEffect(skills, 'oracleUser', activeSkills)) {
-      oracleDebuffs = { bleed: 2, bleedTurns: 3, shockGauge: 100 };
+      oracleDebuffs = { bleed: 2, bleedTurns: 3, shockGauge: 101 };
       initialLog.push({ type: 'passive', text: `◆ [신앙 Lv.7] 수신사의 신탁! 적에게 출혈 3턴 + 기절 1턴` });
     }
     
