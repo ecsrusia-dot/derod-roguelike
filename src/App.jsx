@@ -2093,13 +2093,29 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
           </div>
         </div>
         
-        {/* 4. 캐릭터 일러스트 — 고정 높이 h-48 (더 크게) */}
+        {/* 4. 캐릭터 일러스트 — 70% 배율 + 흐릿한 배경으로 양엣지 자연스럽게 채움 */}
         <div className="shrink-0 h-48 relative overflow-hidden border-t" style={{ borderColor: PALETTE.panelBorder }}>
+          {/* 배경: 같은 이미지를 흐릿하게 + 확대 (양 엣지 채움) */}
+          <img 
+            src={classData.image}
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover"
+            style={{ 
+              objectPosition: 'center 15%',
+              filter: 'blur(20px) brightness(0.7)',
+              transform: 'scale(1.15)',
+            }}
+            onError={(e) => { e.target.src = '/classes/lanthert.jpg'; }} 
+          />
+          {/* 전경: 70% 배율로 축소된 선명한 이미지 (가운데 정렬) */}
           <img 
             src={classData.image} 
             alt="Player Avatar" 
-            className="w-full h-full object-cover"
-            style={{ objectPosition: 'center 15%' }}
+            className="absolute inset-0 w-full h-full object-contain"
+            style={{ 
+              objectPosition: 'center 15%',
+              transform: 'scale(0.7)',
+            }}
             onError={(e) => { e.target.src = '/classes/lanthert.jpg'; }} 
           />
           {/* 하단 가독성용 살짝 어두움 */}
