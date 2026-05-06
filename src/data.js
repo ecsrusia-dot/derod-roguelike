@@ -132,6 +132,20 @@ export const PASSIVE_SKILLS = {
       7: { text: '운명 카드 1회 재선택', trigger: 'passive', effect: 'fateReroll' }
     }
   },
+  
+  // === 직업 전용 패시브 ===
+  // classOnly: 해당 직업만 시작 시 보유. 보상 풀에서 등장하지 않음.
+  심안류: {
+    axis: 'utility', maxLv: 7, color: '#c4453d',
+    desc: '맹인 검사의 감각 극대화. 공격을 흘리고 반격한다',
+    classOnly: 'lanthert',
+    minorEffect: { type: 'counterDmg+', perLv: 5, desc: '반격 데미지 +5%/Lv (기본 반격율 20%)' },
+    tiers: {
+      3: { text: '반격 확률 +10% (총 30%)', trigger: 'passive', effect: 'counterRate+10' },
+      5: { text: '반격 데미지 +15%', trigger: 'passive', effect: 'counterDmg+15' },
+      7: { text: '반격 발생 시 다음 턴 반드시 치명타', trigger: 'passive', effect: 'counterCrit' }
+    }
+  },
 };
 
 // =========== 직업 ===========
@@ -140,7 +154,7 @@ export const CLASSES = [
   {
     id: 'lanthert', name: '방랑검사', sub: 'Lanthert Path',
     desc: '시력을 잃었던 검사. 어둠 속에서도 검을 뻗는다.',
-    startSkills: { 강타: 3, 심안: 2 },
+    startSkills: { 심안류: 3, 심안: 2 },
     stats: { 근력: 18, 민첩: 15, 지능: 14, 매력: 11 },
     combatSkills: ['참격', '관통', '수비'],
     color: '#c4453d',
@@ -1170,8 +1184,10 @@ export const RELICS = [
 // 이 함수는 PASSIVE_SKILLS와 RELICS를 합쳐 동적으로 풀을 생성합니다.
 export function buildRewardPool() {
   return [
-    // 패시브 스킬 (모든 종)
-    ...Object.keys(PASSIVE_SKILLS).map(name => ({ type: 'skill', name, weight: 28 })),
+    // 패시브 스킬 (직업 전용 제외)
+    ...Object.entries(PASSIVE_SKILLS)
+      .filter(([_, sk]) => !sk.classOnly)
+      .map(([name]) => ({ type: 'skill', name, weight: 28 })),
     // 능력치
     { type: 'stat', name: '근력', value: 2, weight: 10 },
     { type: 'stat', name: '민첩', value: 2, weight: 10 },
@@ -1346,6 +1362,31 @@ export const ULTIMATE_SKILLS = {
   // === 다른 패시브의 궁극은 향후 콘텐츠 확장에서 추가 ===
   // (정밀, 회피, 수비, 재생, 가속, 심안, 운명)
   // 위 4개 패시브는 핵심 빌드 축이라 우선 구현. 나머지는 일반 Lv.7 효과로 충분.
+  
+  // === 직업 전용 궁극 (방랑검사) ===
+  심안류: [
+    {
+      id: '심안류_명경지수',
+      name: '명경지수',
+      desc: '반격 확률 +50%, 반격 데미지 +50%.\n반격 발생 시 다음 턴 회피율 +30%.\n적 공격 회피 시 다음 턴 반격 데미지 +50%.',
+      effect: 'ult_counterMirror',
+      color: '#7ba3c4',
+    },
+    {
+      id: '심안류_검로일여',
+      name: '검로일여',
+      desc: '반격 확률 +40%, 반격 데미지 +50%.\n반격 발생 시 충격 게이지 +30 (100시 기절).\n기절한 적 공격 시 치명타 발생.',
+      effect: 'ult_counterShock',
+      color: '#e8b04a',
+    },
+    {
+      id: '심안류_무영검',
+      name: '무영검',
+      desc: '반격 확률 +40%, 반격 데미지 +50%.\n반격 발생 시 다음 턴 치명타 확률 +30%.\n반격 실패 시 반격 데미지 증가량 +50% 누적 (제한 없음).\n반격 발동 시 누적 초기화.',
+      effect: 'ult_counterShadow',
+      color: '#5c4a8c',
+    },
+  ],
 };
 
 // =========== 원정 (Expedition) ===========
