@@ -153,6 +153,7 @@ export const PASSIVE_SKILLS = {
 export const CLASSES = [
   {
     id: 'lanthert', name: '방랑검사', sub: 'Lanthert Path',
+    quote: '다녀오겠습니다...',
     desc: '시력을 잃었던 검사. 어둠 속에서도 검을 뻗는다.',
     startSkills: { 심안류: 3, 심안: 2 },
     stats: { 근력: 18, 민첩: 15, 지능: 14, 매력: 11 },
@@ -166,6 +167,7 @@ export const CLASSES = [
   },
   {
     id: 'sage', name: '술법사', sub: 'Sorcerer of Tour',
+    quote: '다녀올께~ 보고싶어도 참아?',
     desc: '정념계 마법을 익힌 자. 신과 정령의 힘을 빌린다.',
     startSkills: { 마력: 3, 신앙: 2 },
     stats: { 근력: 8, 민첩: 11, 지능: 20, 매력: 14 },
@@ -179,6 +181,7 @@ export const CLASSES = [
   },
   {
     id: 'demonblood', name: '마족 혼혈', sub: 'Demon Heritage',
+    quote: '걱정마, 밤이되기전에 돌아올께!',
     desc: '나크젤리온의 피가 흐르는 자. 분노가 곧 힘이 된다.',
     startSkills: { 잔혹: 3, 강타: 1 },
     stats: { 근력: 19, 민첩: 13, 지능: 13, 매력: 9 },
@@ -192,6 +195,7 @@ export const CLASSES = [
   },
   {
     id: 'elf', name: '숲의 정령사', sub: 'Elf of Twilight',
+    quote: '바람이 부르는 길로... 다녀올게요',
     desc: '엘프 종족. 숲의 정령과 교감하며 활을 다룬다.',
     startSkills: { 회피: 3, 정밀: 2 },
     stats: { 근력: 11, 민첩: 20, 지능: 14, 매력: 15 },
@@ -205,6 +209,7 @@ export const CLASSES = [
   },
   {
     id: 'priest', name: '데로드의 사제', sub: 'Priest of Derod',
+    quote: '데로드의 가호 아래... 반드시 돌아오겠습니다.',
     desc: '데로드의 가호를 받은 자. 회복과 가호로 동료를 살린다.',
     startSkills: { 신앙: 3, 재생: 2 },
     stats: { 근력: 9, 민첩: 11, 지능: 15, 매력: 19 },
