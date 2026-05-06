@@ -1251,7 +1251,15 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
     setLog(initialLog);
     setTimeout(() => {
       const patterns = enemy.patterns;
-      setEnemy(e => ({ ...e, nextIntent: patterns[Math.floor(Math.random() * patterns.length)] }));
+      const firstIntent = patterns[Math.floor(Math.random() * patterns.length)];
+      setEnemy(e => {
+        const updated = { ...e, nextIntent: firstIntent };
+        // 첫 의도가 defend면 즉시 방어 적용 (그 턴만 유지)
+        if (firstIntent?.type === 'defend' && firstIntent.defense) {
+          updated.defense = firstIntent.defense;
+        }
+        return updated;
+      });
       setPhase('playerTurn');
     }, 600);
   }, []);
@@ -1714,8 +1722,7 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
         }
       }
     } else if (intent.type === 'defend') {
-      newEnemy.defense += intent.defense;
-      newLog.push({ type: 'system', text: `· 방어 자세 (+${intent.defense})` });
+      // 방어는 이미 endTurn에서 적용됨 — 적 턴엔 추가 처리 없음 (중복 방지)
     }
 
     setPlayer(newPlayer); setEnemy(newEnemy); setLog(newLog);
@@ -1811,6 +1818,10 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
     if (newPlayer.buffs?.shadowCritNext > 0) {
       newPlayer.buffs = { ...newPlayer.buffs, shadowCritNext: 0 };
     }
+    // 방어 리셋 — 내 방어 스킬은 사용한 턴만 유지, 다음 턴 시작 시 0으로
+    if (newPlayer.defense > 0) {
+      newPlayer.defense = 0;
+    }
     newPlayer.ether = Math.min(newPlayer.maxEther, newPlayer.ether + 1);
 
     let extraTurnTriggered = false;
@@ -1853,8 +1864,14 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
 
     const patterns = newEnemy.patterns;
     newEnemy.nextIntent = patterns[Math.floor(Math.random() * patterns.length)];
-    newPlayer.defense = Math.floor(newPlayer.defense * 0.5);
-    newEnemy.defense = Math.floor(newEnemy.defense * 0.5);
+    // 방어 리셋 — 내 방어와 적 방어 모두 그 턴만 유지 (다음 턴 시작 시 0으로)
+    // 내 defense는 위에서 이미 0으로 리셋됨
+    newEnemy.defense = 0;
+    // 적 의도가 defend면 즉시 방어 적용 (내 공격 받기 전에 막음)
+    if (newEnemy.nextIntent?.type === 'defend' && newEnemy.nextIntent.defense) {
+      newEnemy.defense = newEnemy.nextIntent.defense;
+      newLog.push({ type: 'system', text: `· ${newEnemy.name}이(가) 방어 자세를 취했다 (+${newEnemy.nextIntent.defense})` });
+    }
 
     setPlayer(newPlayer); setEnemy(newEnemy); setLog(newLog); setTurn(newTurn);
 
@@ -1916,7 +1933,8 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
             </div>
             {/* 디버프 영역 — 항상 고정 높이로 일러 흔들림 방지 */}
             <div className="flex items-center gap-1.5 flex-wrap min-h-[18px]">
-              {enemy.defense > 0 && (
+              {/* 적 방어는 심안 Lv.1+ 부터 보임 (심안 없으면 완전 숨김) */}
+              {enemy.defense > 0 && getSkillLevel(skills, '심안') >= 1 && (
                 <span className="text-[9px] px-1.5 py-0.5" style={{ background: `${PALETTE.defense}30`, color: PALETTE.defense, border: `1px solid ${PALETTE.defense}60` }}>
                   ◈ 방어 {enemy.defense}
                 </span>
@@ -1944,29 +1962,55 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
             </div>
             {/* 심안 의도 영역 — 항상 고정 높이 (없을 땐 빈 칸) */}
             <div className="mt-1.5 min-h-[26px]">
-              {phase === 'playerTurn' && enemy.nextIntent && getSkillLevel(skills, '심안') >= 3 && (
-                <div className="px-2 py-1 flex items-center gap-2" style={{
-                  background: PALETTE.bgDeep, border: `1px dashed ${enemy.color}80`,
-                }}>
-                  <AlertTriangle size={10} style={{ color: enemy.color }} />
-                  <span className="text-[10px]" style={{ color: PALETTE.textDim }}>[심안] 의도:</span>
-                  <span className="text-[10px] font-bold" style={{ color: PALETTE.text }}>
-                    {enemy.nextIntent.name}
-                  </span>
-                  {getSkillLevel(skills, '심안') >= 5 && (
-                    <div className="flex ml-auto gap-2">
-                      {enemy.nextIntent.dmg[1] > 0 && (
-                        <span className="text-[10px] tabular-nums" style={{ color: enemy.nextIntent.heavy ? PALETTE.accent : PALETTE.textDim }}>
-                          {enemy.nextIntent.dmg[0]}-{enemy.nextIntent.dmg[1]}
-                        </span>
-                      )}
-                      {enemy.nextIntent.type === 'defend' && (
-                        <span className="text-[10px]" style={{ color: PALETTE.defense }}>방어</span>
-                      )}
+              {phase === 'playerTurn' && enemy.nextIntent && getSkillLevel(skills, '심안') >= 3 && (() => {
+                const lv = getSkillLevel(skills, '심안');
+                const isAttack = enemy.nextIntent.type === 'attack';
+                // Lv.3: 두루뭉술
+                if (lv < 5) {
+                  return (
+                    <div className="px-2 py-1 flex items-center gap-2" style={{
+                      background: PALETTE.bgDeep, border: `1px dashed ${enemy.color}80`,
+                    }}>
+                      <AlertTriangle size={10} style={{ color: enemy.color }} />
+                      <span className="text-[10px]" style={{ color: PALETTE.textDim }}>[심안]</span>
+                      <span className="text-[10px] italic" style={{ color: PALETTE.text }}>
+                        {isAttack ? '공격할 것 같다...' : '방어할 거 같다...'}
+                      </span>
                     </div>
-                  )}
-                </div>
-              )}
+                  );
+                }
+                // Lv.5+: 스킬명 + 공격/방어 마크
+                return (
+                  <div className="px-2 py-1 flex items-center gap-2" style={{
+                    background: PALETTE.bgDeep, border: `1px dashed ${enemy.color}80`,
+                  }}>
+                    <AlertTriangle size={10} style={{ color: enemy.color }} />
+                    <span className="text-[9px] px-1" style={{ 
+                      background: isAttack ? `${PALETTE.accent}30` : `${PALETTE.defense}30`,
+                      color: isAttack ? PALETTE.accent : PALETTE.defense,
+                      border: `1px solid ${isAttack ? PALETTE.accent : PALETTE.defense}60`,
+                    }}>
+                      {isAttack ? '공격' : '방어'}
+                    </span>
+                    <span className="text-[10px] font-bold" style={{ color: PALETTE.text }}>
+                      {enemy.nextIntent.name}
+                    </span>
+                    {/* Lv.7: 수치 */}
+                    {lv >= 7 && (
+                      <div className="flex ml-auto gap-2">
+                        {enemy.nextIntent.dmg && enemy.nextIntent.dmg[1] > 0 && (
+                          <span className="text-[10px] tabular-nums" style={{ color: enemy.nextIntent.heavy ? PALETTE.accent : PALETTE.textDim }}>
+                            {enemy.nextIntent.dmg[0]}-{enemy.nextIntent.dmg[1]}
+                          </span>
+                        )}
+                        {enemy.nextIntent.type === 'defend' && enemy.nextIntent.defense && (
+                          <span className="text-[10px]" style={{ color: PALETTE.defense }}>+{enemy.nextIntent.defense}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -2046,7 +2090,7 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
             src={classData.image} 
             alt="Player Avatar" 
             className="w-full h-full object-cover"
-            style={{ objectPosition: 'center 25%' }}
+            style={{ objectPosition: 'center top' }}
             onError={(e) => { e.target.src = '/classes/lanthert.jpg'; }} 
           />
           {/* 하단 가독성용 살짝 어두움 */}
