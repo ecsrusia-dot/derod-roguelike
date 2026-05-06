@@ -107,9 +107,9 @@ export const PASSIVE_SKILLS = {
   desc: '시야와 인지',
   minorEffect: { type: 'accuracy+', perLv: 2, desc: '명중률 +2%/Lv' },
   tiers: {
-    3: { text: '적의 행동을 미리 파악할 수 있다.', trigger: 'passive', effect: 'predictIntent' },
-    5: { text: '다음 행동의 정확한 수치 파악, 회피율 +10%', trigger: 'passive', effect: 'detailIntent' },
-    7: { text: '적의 약점을 파악한다. 치명타 +10%, 치명타 데미지 +50%', trigger: 'passive', effect: 'weaknessPoint' }
+    3: { text: '적의 행동을 어렴풋이 감지한다 (공격/방어 구분)', trigger: 'passive', effect: 'predictIntent' },
+    5: { text: '적의 다음 스킬명을 파악한다. 회피율 +10%', trigger: 'passive', effect: 'detailIntent' },
+    7: { text: '적의 약점을 파악한다 (수치 확인). 치명타 +10%, 치명타 데미지 +50%', trigger: 'passive', effect: 'weaknessPoint' }
   }
 },
   신앙: {
