@@ -503,6 +503,10 @@ function rollDodge(skills, defender, activeSkills = null, relicStat = {}) {
   if (defender.buffs?.dodgeBuff > 0) {
     dodgeRate += defender.buffs.dodgeBuff;
   }
+  // 명경지수 궁극: 반격 후 다음 턴 회피율 +30%
+  if (defender.buffs?.mirrorDodgeNext > 0) {
+    dodgeRate += defender.buffs.mirrorDodgeNext;
+  }
 
   // 7. 최종 확률 판정
   return Math.random() * 100 < dodgeRate;
@@ -1304,6 +1308,24 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
             newPlayer.buffs = { ...newPlayer.buffs, guaranteedCrit: 0 };
             newLog.push({ type: 'passive', text: `◆ [신앙 Lv.3] 치명타 확정 발동` });
           }
+          // 심안류 Lv.7: 반격 후 다음 턴 반드시 치명타 (1회)
+          if (!usedGuaranteedCrit && newPlayer.buffs?.guaranteedCritNext) {
+            isCrit = true;
+            usedGuaranteedCrit = true;
+            newPlayer.buffs = { ...newPlayer.buffs, guaranteedCritNext: false };
+            newLog.push({ type: 'passive', text: `◆ [심안류 Lv.7] 반격 후 치명타 확정!` });
+          }
+          // 검로일여: 기절한(또는 기절 경험한) 적 공격 시 치명타
+          if (!isCrit && hasUltimate(ultimates, 'ult_counterShock') 
+              && (newEnemy.debuffs?.stunned > 0 || newEnemy.debuffs?.everStunned)) {
+            isCrit = true;
+            newLog.push({ type: 'passive', text: `★ [검로일여] 기절 적 공격 → 치명타!` });
+          }
+          // 무영검: 다음 턴 치명타 확률 +30% 버프 적용
+          if (!isCrit && newPlayer.buffs?.shadowCritNext > 0 && Math.random() * 100 < newPlayer.buffs.shadowCritNext) {
+            isCrit = true;
+            newLog.push({ type: 'passive', text: `★ [무영검] 치명타 +30% 발동!` });
+          }
           const dmgResult = calculateDamage(skill, newPlayer, newEnemy, skills, isCrit, ultimates, meta, curses, activeSkills, relicStat);
           let actualDmg = dmgResult.finalDmg;
           if (newEnemy.defense > 0 && !skill.pierce && skill.type !== 'magic') {
@@ -1581,12 +1603,140 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
           }
         }
       }
+      
+      // ============ 심안류 반격 시스템 ============
+      // 회피와 독립 — 회피 성공/실패와 무관하게 반격 확률 체크
+      // 적의 attack 1턴 = 1회 반격 판정
+      const simanLv = skills['심안류'] || 0;
+      const hasMirror = hasUltimate(ultimates, 'ult_counterMirror');
+      const hasShock = hasUltimate(ultimates, 'ult_counterShock');
+      const hasShadow = hasUltimate(ultimates, 'ult_counterShadow');
+      const hasAnyCounterUlt = hasMirror || hasShock || hasShadow;
+      
+      if (simanLv > 0 || hasAnyCounterUlt) {
+        // 반격 확률 계산
+        let counterRate = 20;  // 기본
+        if (simanLv >= 3) counterRate += 10;  // Lv.3: +10%
+        if (hasMirror) counterRate += 50;
+        else if (hasShock) counterRate += 40;
+        else if (hasShadow) counterRate += 40;
+        
+        // 회피했고 명경지수면: 다음 턴 반격 데미지 +50% 효과 표시
+        if (dodged && hasMirror) {
+          newPlayer.buffs = { ...newPlayer.buffs, mirrorCounterDmgNext: true };
+          newLog.push({ type: 'passive', text: `★ [명경지수] 회피! 다음 턴 반격 데미지 +50%` });
+        }
+        
+        // 반격 판정
+        if (Math.random() * 100 < counterRate) {
+          // 반격 데미지 = 근력 × 1.5 (기본)
+          let counterDmg = Math.floor(newPlayer.근력 * 1.5);
+          
+          // minor: +5%/Lv
+          if (simanLv > 0) counterDmg = Math.floor(counterDmg * (1 + simanLv * 0.05));
+          // Lv.5: +15%
+          if (simanLv >= 5) counterDmg = Math.floor(counterDmg * 1.15);
+          // 궁극 공통: +50%
+          if (hasAnyCounterUlt) counterDmg = Math.floor(counterDmg * 1.5);
+          // 명경지수: 회피→다음턴 반격 데미지 +50% 버프 소비
+          if (newPlayer.buffs?.mirrorCounterDmgPending) {
+            counterDmg = Math.floor(counterDmg * 1.5);
+            newPlayer.buffs = { ...newPlayer.buffs, mirrorCounterDmgPending: false };
+            newLog.push({ type: 'passive', text: `★ [명경지수] 회피→반격 데미지 +50% 적용!` });
+          }
+          // 무영검: 누적된 미스 보너스 적용
+          if (hasShadow && newPlayer.buffs?.shadowCounterStack > 0) {
+            const stack = newPlayer.buffs.shadowCounterStack;
+            counterDmg = Math.floor(counterDmg * (1 + stack * 0.5));
+            newLog.push({ type: 'passive', text: `★ [무영검] 누적 ×${stack} 데미지 폭발!` });
+            newPlayer.buffs = { ...newPlayer.buffs, shadowCounterStack: 0 };
+          }
+          
+          // 적 방어 적용
+          let actualDmg = counterDmg;
+          if (newEnemy.defense > 0) {
+            const absorbed = Math.min(newEnemy.defense, actualDmg);
+            newEnemy.defense -= absorbed;
+            actualDmg -= absorbed;
+          }
+          newEnemy.currentHp = Math.max(0, newEnemy.currentHp - actualDmg);
+          newLog.push({ type: 'damage', text: `◆ [심안류] 반격! ${actualDmg} 데미지` });
+          
+          // Lv.7: 반격 발생 시 다음 턴 반드시 치명타
+          if (simanLv >= 7) {
+            newPlayer.buffs = { ...newPlayer.buffs, guaranteedCritNext: true };
+            newLog.push({ type: 'passive', text: `◆ [심안류 Lv.7] 다음 턴 반드시 치명타!` });
+          }
+          
+          // 명경지수: 반격 후 다음 턴 회피율 +30%
+          if (hasMirror) {
+            newPlayer.buffs = { ...newPlayer.buffs, mirrorDodgeNext: 30 };
+            newLog.push({ type: 'passive', text: `★ [명경지수] 다음 턴 회피율 +30%` });
+          }
+          
+          // 검로일여: 반격 시 충격 게이지 +30
+          if (hasShock) {
+            const currentGauge = newEnemy.debuffs?.shockGauge || 0;
+            const newGauge = currentGauge + 30;
+            if (newGauge >= 100) {
+              newEnemy.debuffs = { 
+                ...newEnemy.debuffs, 
+                stunned: 1, shockGauge: 0, everStunned: true,
+              };
+              newLog.push({ type: 'debuff', text: `★ [검로일여] 충격 100! 기절!` });
+            } else {
+              newEnemy.debuffs = { ...newEnemy.debuffs, shockGauge: newGauge };
+              newLog.push({ type: 'debuff', text: `★ [검로일여] 충격 +30 (${newGauge}/100)` });
+            }
+          }
+          
+          // 무영검: 반격 시 다음 턴 치명타 확률 +30%
+          if (hasShadow) {
+            newPlayer.buffs = { ...newPlayer.buffs, shadowCritNext: 30 };
+            newLog.push({ type: 'passive', text: `★ [무영검] 다음 턴 치명타 +30%` });
+          }
+          
+          // 명경지수: 회피→다음턴 반격 데미지 +50% 버프를 다음 턴으로 넘김
+          if (newPlayer.buffs?.mirrorCounterDmgNext) {
+            newPlayer.buffs = { 
+              ...newPlayer.buffs, 
+              mirrorCounterDmgPending: true,
+              mirrorCounterDmgNext: false,
+            };
+          }
+        } else {
+          // 반격 실패 — 무영검: 누적 +50%
+          if (hasShadow) {
+            const stack = (newPlayer.buffs?.shadowCounterStack || 0) + 1;
+            newPlayer.buffs = { ...newPlayer.buffs, shadowCounterStack: stack };
+            newLog.push({ type: 'passive', text: `★ [무영검] 반격 실패. 누적 ×${stack} (다음 발동 시 폭발)` });
+          }
+        }
+      }
     } else if (intent.type === 'defend') {
       newEnemy.defense += intent.defense;
       newLog.push({ type: 'system', text: `· 방어 자세 (+${intent.defense})` });
     }
 
     setPlayer(newPlayer); setEnemy(newEnemy); setLog(newLog);
+    
+    // 반격으로 적 사망 처리
+    if (newEnemy.currentHp <= 0) {
+      // 흡혈 (유물)
+      if (relicStat.lifesteal > 0) {
+        const heal = relicStat.lifesteal;
+        newPlayer.hp = Math.min(newPlayer.maxHp, newPlayer.hp + heal);
+        newLog.push({ type: 'passive', text: `◆ [유물] 흡혈 +${heal}` });
+        setPlayer(newPlayer);
+      }
+      setTimeout(() => {
+        setLog(prev => [...prev, { type: 'victory', text: `━━ ${enemy.name} 처치 (반격) ━━` }]);
+        setPhase('victory');
+        actionLockRef.current = false;
+      }, 800);
+      return;
+    }
+    
     if (newPlayer.hp <= 0) {
       setTimeout(() => { 
         setLog(prev => [...prev, { type: 'defeat', text: `━━ 패배 ━━` }]); 
@@ -1653,6 +1803,13 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
     if (newPlayer.buffs?.dodgeBuffTurns > 0) {
       newPlayer.buffs.dodgeBuffTurns--;
       if (newPlayer.buffs.dodgeBuffTurns === 0) newPlayer.buffs.dodgeBuff = 0;
+    }
+    // 심안류 궁극 1턴 버프 정리
+    if (newPlayer.buffs?.mirrorDodgeNext > 0) {
+      newPlayer.buffs = { ...newPlayer.buffs, mirrorDodgeNext: 0 };
+    }
+    if (newPlayer.buffs?.shadowCritNext > 0) {
+      newPlayer.buffs = { ...newPlayer.buffs, shadowCritNext: 0 };
     }
     newPlayer.ether = Math.min(newPlayer.maxEther, newPlayer.ether + 1);
 
