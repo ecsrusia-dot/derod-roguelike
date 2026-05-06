@@ -44,7 +44,7 @@ import {
   GAME_CONFIG,
   ACHIEVEMENTS,
 } from './data.js';
-import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState } from './storage.js';
+import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement } from './storage.js';
 
 // 보상 풀은 PASSIVE_SKILLS와 RELICS를 합쳐 동적으로 빌드
 // REWARD_POOL은 동적으로 빌드 (직업별 전용 패시브 포함 위해)
@@ -3041,10 +3041,21 @@ function StartScreen({ classData, onContinue }) {
             {classData.name} · <span className="text-[10px]" style={{ color: PALETTE.textDim }}>{classData.sub}</span>
           </div>
         )}
+        {/* 직업 대사 */}
+        {classData?.quote && (
+          <div className="text-base italic mt-4 px-4" style={{
+            color: '#fff',
+            animation: 'startSubFade 1.4s ease-out 1.3s both',
+            textShadow: `0 0 8px ${classColor}, 0 2px 6px rgba(0,0,0,0.95)`,
+            letterSpacing: '0.05em',
+          }}>
+            「 {classData.quote} 」
+          </div>
+        )}
         <div className="text-[10px] tracking-[0.4em] mt-4" style={{
           color: PALETTE.textDim,
           animation: 'startTapHint 2s ease-in-out 1.8s infinite',
-        }}>▸ 화면을 탭하여 원정 선택</div>
+        }}>▸ 화면을 탭하여 출정</div>
       </div>
     </div>
   );
@@ -3643,6 +3654,8 @@ function StatusPanel({ classData, hp, maxHp, skills, stats, relics, ultimates = 
 export default function App() {
   const [screen, setScreen] = useState('title');
   const [selectedClass, setSelectedClass] = useState(0);
+  // 원정 선택 후 출정 화면에서 사용 — start 화면 탭 시 실제 startExpedition 호출
+  const [selectedExpedition, setSelectedExpedition] = useState(null);
   const [chapter, setChapter] = useState(null);
   const [chapterIdx, setChapterIdx] = useState(0);
   const [mapData, setMapData] = useState(null);
@@ -3738,6 +3751,20 @@ export default function App() {
     // 구매한 항목 제거 (자동 갱신 X — 시간이 안 지났으면 같은 슬롯 유지)
     const updatedSlotIds = (newMeta.altarSlots || []).filter(id => id !== upgrade.id);
     newMeta = { ...newMeta, altarSlots: updatedSlotIds };
+    
+    // === 업적 트래킹: 영혼 수호자 (모든 강화 최대 단계) ===
+    // 모든 stackable 강화가 maxStacks 도달 + 모든 unlock이 unlocks에 포함
+    const allMaxed = META_UPGRADES.every(u => {
+      if (u.stackable) {
+        return (newMeta.upgrades[u.id] || 0) >= (u.maxStacks || 999);
+      } else {
+        return newMeta.unlocks.includes(u.id);
+      }
+    });
+    if (allMaxed) {
+      newMeta = completeAchievement(newMeta, 'special_max_meta', 1);
+    }
+    
     setMeta(newMeta);
     const slots = updatedSlotIds.map(id => META_UPGRADES.find(u => u.id === id)).filter(Boolean);
     setAltarSlots(slots);
@@ -3772,6 +3799,12 @@ export default function App() {
     const curses = rollCurses(expedition.curseCount);
     setCurrentCurses(curses);
     setRunSouls(0);
+    
+    // === 업적 트래킹: 원정 시도 ===
+    let trackedMeta = { ...meta, totalRuns: (meta.totalRuns || 0) + 1 };
+    trackedMeta = setAchievementProgress(trackedMeta, 'meta_runs_10', trackedMeta.totalRuns, 10);
+    trackedMeta = setAchievementProgress(trackedMeta, 'meta_runs_100', trackedMeta.totalRuns, 100);
+    setMeta(trackedMeta);
     
     // 활성 패시브/유물 초기화 (prep 노드에서 결정될 때까지 null = 모두 비활성)
     setActiveSkills(null);
@@ -3951,6 +3984,15 @@ export default function App() {
   // 전투 승리
   const handleVictory = (remainingHp, drop) => {
     setHp(remainingHp);
+    
+    // === 업적 트래킹: 적 처치 ===
+    let trackedMeta = { ...meta, totalKills: (meta.totalKills || 0) + 1 };
+    // 첫걸음 (첫 처치)
+    trackedMeta = completeAchievement(trackedMeta, 'special_first_kill', 1);
+    // 누적 처치 카운터
+    trackedMeta = setAchievementProgress(trackedMeta, 'meta_kill_100', trackedMeta.totalKills, 100);
+    trackedMeta = setAchievementProgress(trackedMeta, 'meta_kill_1000', trackedMeta.totalKills, 1000);
+    setMeta(trackedMeta);
     
     // 드랍 적용 (저주: 획득 은화 -50%)
     if (drop?.gold) {
@@ -4228,6 +4270,31 @@ export default function App() {
       let newMeta = { ...meta };
       newMeta = addSouls(newMeta, totalSouls);
       newMeta = recordExpeditionClear(newMeta, currentExpedition.id);
+      
+      // === 업적 트래킹: 원정 클리어 (직업 × 원정) ===
+      const classId = classData?.id;
+      const expId = currentExpedition.id;  // 1=북부, 2=심연, 3=광기, 4=망각
+      if (classId && expId) {
+        // 첫 클리어
+        newMeta = completeAchievement(newMeta, `clear_${classId}_${expId}`, 1);
+        // 10회 숙달 — 카운터 +1
+        newMeta = incrementAchievement(newMeta, `master10_${classId}_${expId}`, 1, 10);
+        // 망각 원정(4)이면 전문가 50회 / 마스터 100회 추가
+        if (expId === 4) {
+          newMeta = incrementAchievement(newMeta, `expert_${classId}`, 1, 50);
+          newMeta = incrementAchievement(newMeta, `master_${classId}`, 1, 100);
+        }
+        // 미답의 도전자 (모든 직업으로 망각 클리어 = 5)
+        if (expId === 4) {
+          // 각 직업의 망각 첫 클리어 카운트 = 미답의 도전자 진행도
+          const cleared4 = ['lanthert', 'sage', 'demonblood', 'elf', 'priest']
+            .filter(c => newMeta.achievements?.[`clear_${c}_4`]?.completed).length;
+          newMeta = setAchievementProgress(newMeta, 'special_all_class_e4', cleared4, 5);
+        }
+      }
+      // 영혼 부자 (5000 누적 보유) — 영혼 추가 후 체크
+      newMeta = setAchievementProgress(newMeta, 'special_souls_5000', newMeta.souls, 5000);
+      
       setMeta(newMeta);
       
       setRunSouls(totalSouls);  // 화면에 표시용
@@ -4296,9 +4363,9 @@ export default function App() {
         <div className="flex-shrink-0">
           <PhoneFrame>
             {screen === 'title' && <TitleScreen meta={meta} onStart={() => setScreen('classSelect')} onAltar={enterAltar} onAchievements={() => { setPrevAchievementsBack('title'); setScreen('achievements'); }} />}
-            {screen === 'classSelect' && <ClassSelect meta={meta} selected={selectedClass} onSelect={setSelectedClass} onNext={() => setScreen('start')} onBack={() => setScreen('title')} />}
-            {screen === 'start' && <StartScreen classData={classData} onContinue={() => setScreen('expeditionSelect')} />}
-            {screen === 'expeditionSelect' && <ExpeditionSelect meta={meta} onSelect={startExpedition} onBack={() => setScreen('classSelect')} />}
+            {screen === 'classSelect' && <ClassSelect meta={meta} selected={selectedClass} onSelect={setSelectedClass} onNext={() => setScreen('expeditionSelect')} onBack={() => setScreen('title')} />}
+            {screen === 'expeditionSelect' && <ExpeditionSelect meta={meta} onSelect={(exp) => { setSelectedExpedition(exp); setScreen('start'); }} onBack={() => setScreen('classSelect')} />}
+            {screen === 'start' && <StartScreen classData={classData} onContinue={() => { if (selectedExpedition) startExpedition(selectedExpedition); }} />}
             {screen === 'altar' && <SoulAltar meta={meta} slots={altarSlots} onPurchase={purchaseUpgrade} onReroll={rerollAltar} onBack={() => setScreen('title')} />}
             {screen === 'achievements' && <AchievementScreen meta={meta} onClaim={handleClaimAchievement} onClose={() => setScreen(prevAchievementsBack)} />}
             {screen === 'map' && chapter && mapData && <MapView chapter={chapter} classData={classData} mapData={mapData} hp={hp} maxHp={maxHp} gold={gold} gem={gem} expedition={currentExpedition} curses={currentCurses} chapterIdx={chapterIdx} onEnterNode={handleEnterNode} onOpenStatus={() => setScreen('status')} onOpenAchievements={() => { setPrevAchievementsBack('map'); setScreen('achievements'); }} onBack={() => setScreen('title')} />}
