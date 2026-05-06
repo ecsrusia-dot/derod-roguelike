@@ -2099,7 +2099,7 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
             src={classData.image} 
             alt="Player Avatar" 
             className="w-full h-full object-cover"
-            style={{ objectPosition: 'center 40%' }}
+            style={{ objectPosition: 'center 15%' }}
             onError={(e) => { e.target.src = '/classes/lanthert.jpg'; }} 
           />
           {/* 하단 가독성용 살짝 어두움 */}
