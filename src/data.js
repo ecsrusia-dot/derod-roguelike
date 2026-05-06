@@ -234,8 +234,8 @@ export const CLASSES = [
 export const COMBAT_SKILLS = {
   // 방랑검사
   참격: { name: '참격', cost: 0, cd: 0, type: 'physical', baseDmg: [20, 26], desc: '기본 검 공격' },
-  관통: { name: '관통', cost: 1, cd: 2, type: 'physical', baseDmg: [32, 40], desc: '방어 무시', pierce: true },
-  수비: { name: '수비', cost: 0, cd: 0, type: 'defense', defense: 40, desc: '방어 +40' },
+  관통: { name: '관통', cost: 2, cd: 2, type: 'physical', baseDmg: [32, 40], desc: '방어 무시', pierce: true },
+  수비: { name: '수비', cost: 1, cd: 0, type: 'defense', defense: 40, desc: '방어 +40' },
   // 술법사
   마법탄: { name: '마법탄', cost: 0, cd: 0, type: 'magic', baseDmg: [18, 24], desc: '기본 마법' },
   정념폭발: { name: '정념폭발', cost: 2, cd: 3, type: 'magic', baseDmg: [42, 52], desc: '강력한 마법' },
