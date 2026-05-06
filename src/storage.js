@@ -228,3 +228,76 @@ export function claimAchievement(meta, achievement) {
 export function getAchievementState(meta, id) {
   return meta.achievements?.[id] || { progress: 0, completed: false, claimed: false };
 }
+
+// =============================================
+// 업적 추적 (런 종료 / 메타 변동 시 호출)
+// =============================================
+
+// 진행도 증가 (target 도달 시 자동 completed 처리)
+// 이미 completed면 progress만 그대로 유지
+export function incrementAchievement(meta, achievementId, amount = 1, target = null) {
+  const cur = meta.achievements?.[achievementId] || { progress: 0, completed: false, claimed: false };
+  // 이미 완료되었으면 진행도만 그대로 유지
+  if (cur.completed) {
+    return {
+      ...meta,
+      achievements: {
+        ...(meta.achievements || {}),
+        [achievementId]: { ...cur, progress: Math.max(cur.progress, amount + cur.progress) },
+      },
+    };
+  }
+  const newProgress = cur.progress + amount;
+  const completed = target !== null && newProgress >= target;
+  return {
+    ...meta,
+    achievements: {
+      ...(meta.achievements || {}),
+      [achievementId]: {
+        progress: completed ? target : newProgress,
+        completed,
+        claimed: false,
+      },
+    },
+  };
+}
+
+// 진행도 직접 설정 (예: 영혼 보유량 같은 절대값)
+export function setAchievementProgress(meta, achievementId, value, target) {
+  const cur = meta.achievements?.[achievementId] || { progress: 0, completed: false, claimed: false };
+  const completed = value >= target;
+  // 이미 completed인 업적의 claimed는 유지
+  if (cur.completed) {
+    return {
+      ...meta,
+      achievements: {
+        ...(meta.achievements || {}),
+        [achievementId]: { ...cur, progress: Math.max(cur.progress, value) },
+      },
+    };
+  }
+  return {
+    ...meta,
+    achievements: {
+      ...(meta.achievements || {}),
+      [achievementId]: {
+        progress: completed ? target : value,
+        completed,
+        claimed: false,
+      },
+    },
+  };
+}
+
+// 업적 완료 마킹 (one-shot 업적용 — 첫걸음 등)
+export function completeAchievement(meta, achievementId, target = 1) {
+  const cur = meta.achievements?.[achievementId] || { progress: 0, completed: false, claimed: false };
+  if (cur.completed) return meta;
+  return {
+    ...meta,
+    achievements: {
+      ...(meta.achievements || {}),
+      [achievementId]: { progress: target, completed: true, claimed: false },
+    },
+  };
+}
