@@ -1971,8 +1971,8 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
           </div>
         </div>
 
-        {/* 2. 중단 : 전투 로그 (높이 축소 - 일러스트 영역 확대) */}
-        <div className="shrink-0 h-32 overflow-y-auto px-3 py-2 space-y-1.5" style={{
+        {/* 2. 중단 : 전투 로그 (남은 공간 차지) */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-3 py-2 space-y-1.5" style={{
           background: `linear-gradient(180deg, ${PALETTE.bgDeep}, #060306)`,
         }}>
           {log.map((entry, i) => (
@@ -2040,13 +2040,13 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
           </div>
         </div>
         
-        {/* 4. 캐릭터 일러스트 — 고정 높이 h-32 (스킬 버튼 포함 약 1/3) */}
-        <div className="shrink-0 h-32 relative overflow-hidden border-t" style={{ borderColor: PALETTE.panelBorder }}>
+        {/* 4. 캐릭터 일러스트 — 고정 높이 h-48 (더 크게) */}
+        <div className="shrink-0 h-48 relative overflow-hidden border-t" style={{ borderColor: PALETTE.panelBorder }}>
           <img 
             src={classData.image} 
             alt="Player Avatar" 
             className="w-full h-full object-cover"
-            style={{ objectPosition: 'center 20%' }}
+            style={{ objectPosition: 'center 25%' }}
             onError={(e) => { e.target.src = '/classes/lanthert.jpg'; }} 
           />
           {/* 하단 가독성용 살짝 어두움 */}
