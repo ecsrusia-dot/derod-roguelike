@@ -139,9 +139,9 @@ export const PASSIVE_SKILLS = {
     axis: 'utility', maxLv: 7, color: '#c4453d',
     desc: '맹인 검사의 감각 극대화. 공격을 흘리고 반격한다',
     classOnly: 'lanthert',
-    minorEffect: { type: 'counterDmg+', perLv: 5, desc: '반격 데미지 +5%/Lv (기본 반격율 20%)' },
+    minorEffect: { type: 'counterStat+', perLv: 5, desc: '반격율 +5%/Lv, 반격 데미지 +5%/Lv' },
     tiers: {
-      3: { text: '반격 확률 +10% (총 30%)', trigger: 'passive', effect: 'counterRate+10' },
+      3: { text: '반격 확률 +10%', trigger: 'passive', effect: 'counterRate+10' },
       5: { text: '반격 데미지 +15%', trigger: 'passive', effect: 'counterDmg+15' },
       7: { text: '반격 발생 시 다음 턴 반드시 치명타', trigger: 'passive', effect: 'counterCrit' }
     }
@@ -157,7 +157,7 @@ export const CLASSES = [
     desc: '시력을 잃었던 검사. 어둠 속에서도 검을 뻗는다.',
     startSkills: { 심안류: 3, 심안: 2 },
     stats: { 근력: 18, 민첩: 15, 지능: 14, 매력: 11 },
-    combatSkills: ['참격', '관통', '수비'],
+    combatSkills: ['참격', '관통', '방검'],
     color: '#c4453d',
     locked: false,
     image: './classes/lanthert.jpg',
@@ -240,7 +240,7 @@ export const COMBAT_SKILLS = {
   // 방랑검사
   참격: { name: '참격', cost: 0, cd: 0, type: 'physical', baseDmg: [20, 26], desc: '기본 검 공격' },
   관통: { name: '관통', cost: 2, cd: 2, type: 'physical', baseDmg: [32, 40], desc: '방어 무시', pierce: true },
-  수비: { name: '수비', cost: 1, cd: 1, type: 'defense', defense: 40, desc: '방어 +40' },
+  방검: { name: '방검', cost: 1, cd: 2, type: 'defense', defense: 30, desc: '방어 +30' },
   // 술법사
   마법탄: { name: '마법탄', cost: 0, cd: 0, type: 'magic', baseDmg: [18, 24], desc: '기본 마법' },
   정념폭발: { name: '정념폭발', cost: 2, cd: 3, type: 'magic', baseDmg: [42, 52], desc: '강력한 마법' },
