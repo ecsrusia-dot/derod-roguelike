@@ -1870,7 +1870,16 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
     // 적 의도가 defend면 즉시 방어 적용 (내 공격 받기 전에 막음)
     if (newEnemy.nextIntent?.type === 'defend' && newEnemy.nextIntent.defense) {
       newEnemy.defense = newEnemy.nextIntent.defense;
-      newLog.push({ type: 'system', text: `· ${newEnemy.name}이(가) 방어 자세를 취했다 (+${newEnemy.nextIntent.defense})` });
+      // 심안 등급별로 메시지 노출 (심안 없으면 알 수 없음)
+      const simanLvForLog = getSkillLevel(skills, '심안');
+      if (simanLvForLog >= 7) {
+        newLog.push({ type: 'system', text: `· ${newEnemy.name}이(가) ${newEnemy.nextIntent.name} 자세 (+${newEnemy.nextIntent.defense})` });
+      } else if (simanLvForLog >= 5) {
+        newLog.push({ type: 'system', text: `· ${newEnemy.name}이(가) ${newEnemy.nextIntent.name} 자세를 취했다` });
+      } else if (simanLvForLog >= 3) {
+        newLog.push({ type: 'system', text: `· ${newEnemy.name}이(가) 방어 자세를 취한 것 같다` });
+      }
+      // Lv.0~2: 로그 표시 안 함
     }
 
     setPlayer(newPlayer); setEnemy(newEnemy); setLog(newLog); setTurn(newTurn);
@@ -1933,8 +1942,8 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
             </div>
             {/* 디버프 영역 — 항상 고정 높이로 일러 흔들림 방지 */}
             <div className="flex items-center gap-1.5 flex-wrap min-h-[18px]">
-              {/* 적 방어는 심안 Lv.1+ 부터 보임 (심안 없으면 완전 숨김) */}
-              {enemy.defense > 0 && getSkillLevel(skills, '심안') >= 1 && (
+              {/* 적 방어 수치는 심안 Lv.7+ 부터 (수치 파악 단계) */}
+              {enemy.defense > 0 && getSkillLevel(skills, '심안') >= 7 && (
                 <span className="text-[9px] px-1.5 py-0.5" style={{ background: `${PALETTE.defense}30`, color: PALETTE.defense, border: `1px solid ${PALETTE.defense}60` }}>
                   ◈ 방어 {enemy.defense}
                 </span>
@@ -2090,7 +2099,7 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
             src={classData.image} 
             alt="Player Avatar" 
             className="w-full h-full object-cover"
-            style={{ objectPosition: 'center top' }}
+            style={{ objectPosition: 'center 40%' }}
             onError={(e) => { e.target.src = '/classes/lanthert.jpg'; }} 
           />
           {/* 하단 가독성용 살짝 어두움 */}
