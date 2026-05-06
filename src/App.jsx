@@ -1259,9 +1259,9 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
       newPlayer.defense += minorDef;
       initialLog.push({ type: 'passive', text: `◆ [수비 누적] 시작 방어 +${minorDef}` });
     }
-    if (hasEffect(skills, 'startDefense+20', activeSkills)) {
-      newPlayer.defense += 20;
-      initialLog.push({ type: 'passive', text: `◆ [수비 Lv.3] 시작 방어 +20` });
+    if (hasEffect(skills, 'startDefense+30', activeSkills)) {
+      newPlayer.defense += 30;
+      initialLog.push({ type: 'passive', text: `◆ [수비 Lv.3] 시작 방어 +30` });
     }
     // 유물: 전투 시작 시 방어 +
     if (relicStat.shieldOnStart > 0) {
@@ -3923,10 +3923,11 @@ export default function App() {
         setHp(prev => prev + bonus);
       }
     } else {
-      // 다음 챕터 - HP 회복
+      // 다음 챕터 - HP 회복 (70%까지 회복 보장, 이미 더 높으면 유지)
       let healRatio = GAME_CONFIG.chapterHealRatio + getMetaBonus(meta, 'chapterHeal+10%') * 0.1;
       if (hasCurse(curses, 'curse_heal-50')) healRatio *= 0.5;
-      setHp(prev => Math.min(maxHp, Math.floor(maxHp * healRatio)));
+      const targetHp = Math.floor(maxHp * healRatio);
+      setHp(prev => Math.min(maxHp, Math.max(prev, targetHp)));
     }
     setHasRerolled(false);
     const map = generateChapterMap(chapterData, idx);
