@@ -1211,6 +1211,8 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
   const [animDmg, setAnimDmg] = useState({ player: null, enemy: null });
   // 패시브/유물 툴팁 (클릭 시 정보 표시)
   const [tooltip, setTooltip] = useState(null); // { type: 'skill'|'relic', name, content }
+  // 스테이터스 전체 모달 (직업명 옆 ≡ 버튼 클릭)
+  const [statusModalOpen, setStatusModalOpen] = useState(false);
   const logEndRef = useRef(null);
   // 동기적 액션 락: setPhase는 비동기라 빠른 연타 시 race condition 발생.
   // 이 ref로 클릭 즉시 잠그고, 적 턴 종료 후 해제한다.
@@ -1950,214 +1952,101 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
         <span className="text-[10px] tabular-nums" style={{ color: PALETTE.derod }}>TURN {turn}</span>
       </div>
 
-      {/* 메인 컨테이너: 위 영역 + 스킬 버튼 세로 배치 */}
+      {/* 메인 컨테이너: 3분할 + 스킬 버튼 세로 배치 */}
       <div className="flex-1 flex flex-col min-h-0">
-        {/* 상단 영역: 좌우 2열 (좌측 = 적/내 캐릭터, 우측 = 로그/스테이터스) */}
-        <div className="flex-1 flex min-h-0">
-          {/* === 좌측 (50%) === */}
-          <div className="w-1/2 flex flex-col min-h-0 border-r" style={{ borderColor: PALETTE.panelBorder }}>
-            {/* 좌상: 적 영역 (1/2) */}
-            <div className="flex-1 min-h-0 flex flex-col border-b" style={{ borderColor: PALETTE.panelBorder, background: `linear-gradient(180deg, ${enemy.color}15, ${PALETTE.bgDeep})` }}>
-              {/* 적 정보 BAR */}
-              <div className="shrink-0 px-2 pt-2 pb-1.5">
-                <div className="flex justify-between items-center mb-0.5">
-                  <span className="text-[10px] font-bold" style={{ color: enemy.color }}>{enemy.name}</span>
-                  <span className="text-[9px] tabular-nums" style={{ color: PALETTE.text }}>{animDmg.enemy && <span className="mr-1 animate-pulse" style={{ color: PALETTE.accent }}>-{animDmg.enemy}</span>}{enemy.currentHp}/{enemy.hp}</span>
-                </div>
-                <div className="h-1 relative mb-1" style={{ background: 'rgba(0,0,0,0.6)' }}><div className="absolute inset-y-0 left-0 transition-all" style={{ width: `${(enemy.currentHp/enemy.hp)*100}%`, background: `linear-gradient(90deg, ${PALETTE.blood}, ${enemy.color})` }} /></div>
-                {/* 디버프 영역 (고정 높이) */}
-                <div className="flex items-center gap-1 flex-wrap min-h-[14px] mb-0.5">
-                  {enemy.defense > 0 && getSkillLevel(skills, '심안') >= 7 && (<span className="text-[8px] px-1" style={{ background: `${PALETTE.defense}30`, color: PALETTE.defense, border: `1px solid ${PALETTE.defense}60` }}>◈{enemy.defense}</span>)}
-                  {enemy.debuffs?.bleed > 0 && (<span className="text-[8px] px-1" style={{ background: `${PALETTE.bleed}30`, color: PALETTE.bleed }}>◆출혈{enemy.debuffs.bleed}({enemy.debuffs.bleedTurns}T)</span>)}
-                  {enemy.debuffs?.shockGauge > 0 && (<span className="text-[8px] px-1" style={{ background: `${PALETTE.shock}30`, color: PALETTE.shock }}>⚡{enemy.debuffs.shockGauge}/100</span>)}
-                  {enemy.debuffs?.stunned > 0 && (<span className="text-[8px] px-1" style={{ background: `${PALETTE.legendary}40`, color: PALETTE.legendary }}>✦기절</span>)}
-                  {enemy.debuffs?.shockResist > 0 && (<span className="text-[8px] px-1" style={{ background: `${PALETTE.textDim}30`, color: PALETTE.textDim }}>◇저항({enemy.debuffs.shockResistTurns}T)</span>)}
-                </div>
-                {/* 심안 의도 (고정 높이) */}
-                <div className="min-h-[16px]">
-                  {phase === 'playerTurn' && enemy.nextIntent && getSkillLevel(skills, '심안') >= 3 && (() => {
-                    const lv = getSkillLevel(skills, '심안');
-                    const isAttack = enemy.nextIntent.type === 'attack';
-                    if (lv < 5) {
-                      return (<div className="px-1.5 py-0.5 flex items-center gap-1" style={{ background: PALETTE.bgDeep, border: `1px dashed ${enemy.color}80` }}><AlertTriangle size={8} style={{ color: enemy.color }} /><span className="text-[9px] italic" style={{ color: PALETTE.text }}>{isAttack ? '공격할 것 같다' : '방어할 거 같다'}</span></div>);
-                    }
-                    return (<div className="px-1.5 py-0.5 flex items-center gap-1" style={{ background: PALETTE.bgDeep, border: `1px dashed ${enemy.color}80` }}><AlertTriangle size={8} style={{ color: enemy.color }} /><span className="text-[8px] px-0.5" style={{ color: isAttack ? PALETTE.accent : PALETTE.defense }}>{isAttack ? '공' : '방'}</span><span className="text-[9px] font-bold" style={{ color: PALETTE.text }}>{enemy.nextIntent.name}</span>{lv >= 7 && (<div className="flex ml-auto gap-1">{enemy.nextIntent.dmg && enemy.nextIntent.dmg[1] > 0 && (<span className="text-[9px] tabular-nums" style={{ color: enemy.nextIntent.heavy ? PALETTE.accent : PALETTE.textDim }}>{enemy.nextIntent.dmg[0]}-{enemy.nextIntent.dmg[1]}</span>)}{enemy.nextIntent.type === 'defend' && enemy.nextIntent.defense && (<span className="text-[9px]" style={{ color: PALETTE.defense }}>+{enemy.nextIntent.defense}</span>)}</div>)}</div>);
-                  })()}
-                </div>
+        {/* === 1/3: 적 영역 (일러스트 + 정보 BAR 오버레이) === */}
+        <div className="flex-1 min-h-0 relative overflow-hidden border-b" style={{ borderColor: PALETTE.panelBorder }}>
+          {/* 적 일러스트 미구현 — 어두운 배경 + 패턴 */}
+          <div className="absolute inset-0 bg-[#0a0608] flex items-center justify-center">
+            <div className="absolute inset-0 opacity-20" style={{ background: `repeating-linear-gradient(45deg, transparent 0px, transparent 8px, ${enemy.color}15 8px, ${enemy.color}15 9px)` }} />
+            <div className="text-[12px] tracking-[0.3em] relative grayscale" style={{ color: PALETTE.textDim }}>[ 적 모습 미구현 ]</div>
+          </div>
+          {/* 정보 BAR 오버레이 (하단 + 그라디언트) */}
+          <div className="absolute inset-x-0 bottom-0">
+            <div className="absolute inset-0" style={{ background: `linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.7) 60%, rgba(0,0,0,0.9) 100%)`, pointerEvents: 'none' }} />
+            <div className="relative px-3 py-2">
+              {/* 1줄: 이름 + HP */}
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-[12px] font-bold drop-shadow-md" style={{ color: enemy.color }}>{enemy.name}</span>
+                <span className="text-[11px] tabular-nums drop-shadow-md" style={{ color: PALETTE.text }}>{animDmg.enemy && <span className="mr-1 animate-pulse" style={{ color: PALETTE.accent }}>-{animDmg.enemy}</span>}{enemy.currentHp}/{enemy.hp}</span>
               </div>
-              {/* 적 일러 (미구현) */}
-              <div className="flex-1 min-h-0 relative overflow-hidden bg-[#0a0608] flex items-center justify-center grayscale">
-                <div className="absolute inset-0 opacity-20" style={{ background: `repeating-linear-gradient(45deg, transparent 0px, transparent 8px, ${enemy.color}15 8px, ${enemy.color}15 9px)` }} />
-                <div className="text-[10px] tracking-[0.3em] relative" style={{ color: PALETTE.textDim }}>[ 적 모습 미구현 ]</div>
+              <div className="h-1.5 relative mb-1.5" style={{ background: 'rgba(0,0,0,0.7)' }}><div className="absolute inset-y-0 left-0 transition-all" style={{ width: `${(enemy.currentHp/enemy.hp)*100}%`, background: `linear-gradient(90deg, ${PALETTE.blood}, ${enemy.color})` }} /></div>
+              {/* 2줄: 디버프 카드 (고정 높이) */}
+              <div className="flex items-center gap-1.5 flex-wrap min-h-[18px] mb-1">
+                {enemy.defense > 0 && getSkillLevel(skills, '심안') >= 7 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.defense}40`, color: PALETTE.defense, border: `1px solid ${PALETTE.defense}80` }}>◈ 방어 {enemy.defense}</span>)}
+                {enemy.debuffs?.bleed > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.bleed}40`, color: PALETTE.bleed, border: `1px solid ${PALETTE.bleed}80` }}>◆ 출혈 {enemy.debuffs.bleed} ({enemy.debuffs.bleedTurns}T)</span>)}
+                {enemy.debuffs?.shockGauge > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.shock}40`, color: PALETTE.shock, border: `1px solid ${PALETTE.shock}80` }}>⚡ 충격 {enemy.debuffs.shockGauge}/100</span>)}
+                {enemy.debuffs?.stunned > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.legendary}40`, color: PALETTE.legendary, border: `1px solid ${PALETTE.legendary}` }}>✦ 기절</span>)}
+                {enemy.debuffs?.shockResist > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.textDim}40`, color: PALETTE.textDim, border: `1px solid ${PALETTE.textDim}80` }}>◇ 저항 ({enemy.debuffs.shockResistTurns}T)</span>)}
               </div>
-            </div>
-            {/* 좌하: 내 영역 (1/2) */}
-            <div className="flex-1 min-h-0 flex flex-col" style={{ background: `linear-gradient(180deg, ${classData.color}15, ${PALETTE.bgDeep})` }}>
-              {/* 내 정보 BAR */}
-              <div className="shrink-0 px-2 pt-2 pb-1.5">
-                <div className="flex justify-between items-center mb-0.5">
-                  <span className="text-[10px] font-bold" style={{ color: classData.color }}>{classData.name}</span>
-                  <span className="text-[9px] tabular-nums font-bold" style={{ color: PALETTE.text }}>{animDmg.player && <span className="mr-1 animate-pulse" style={{ color: PALETTE.accent }}>-{animDmg.player}</span>}{player.hp}/{player.maxHp}</span>
-                </div>
-                <div className="h-1 relative mb-1" style={{ background: 'rgba(0,0,0,0.6)' }}><div className="absolute inset-y-0 left-0 transition-all" style={{ width: `${(player.hp/player.maxHp)*100}%`, background: `linear-gradient(90deg, ${PALETTE.blood}, ${PALETTE.green})` }} /></div>
-                <div className="flex items-center gap-1 flex-wrap min-h-[14px]">
-                  <span className="text-[8px] px-1" style={{ background: `${PALETTE.deblan}40`, color: '#fff', border: `1px solid ${PALETTE.deblan}80` }}>✦{player.ether}/{player.maxEther}</span>
-                  {player.defense > 0 && (<span className="text-[8px] px-1" style={{ background: `${PALETTE.defense}40`, color: '#fff', border: `1px solid ${PALETTE.defense}80` }}>◈{player.defense}</span>)}
-                  {player.buffs?.rage > 0 && (<span className="text-[8px] px-1" style={{ background: `${PALETTE.accent}40`, color: '#fff' }}>☩{player.buffs.rage}T</span>)}
-                  {player.firstHitImmune && (<span className="text-[8px] px-1" style={{ background: `${PALETTE.legendary}40`, color: '#fff' }}>무적</span>)}
-                </div>
-              </div>
-              {/* 내 일러 (남은 공간) */}
-              <div className="flex-1 min-h-0 relative overflow-hidden">
-                <img src={classData.image} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ objectPosition: 'center center', filter: 'blur(15px) brightness(0.6)', transform: 'scale(1.2)' }} onError={(e) => { e.target.src = '/classes/lanthert.jpg'; }} />
-                <img src={classData.image} alt="Player Avatar" className="absolute inset-0 w-full h-full object-cover" style={{ objectPosition: 'center top' }} onError={(e) => { e.target.src = '/classes/lanthert.jpg'; }} />
+              {/* 3줄: 심안 의도 카드 (고정 높이) */}
+              <div className="min-h-[22px]">
+                {phase === 'playerTurn' && enemy.nextIntent && getSkillLevel(skills, '심안') >= 3 && (() => {
+                  const lv = getSkillLevel(skills, '심안');
+                  const isAttack = enemy.nextIntent.type === 'attack';
+                  if (lv < 5) {
+                    return (
+                      <div className="px-2 py-1 flex items-center gap-1.5" style={{ background: 'rgba(0,0,0,0.7)', border: `1px dashed ${enemy.color}80` }}>
+                        <AlertTriangle size={11} style={{ color: enemy.color }} />
+                        <span className="text-[10px] italic" style={{ color: PALETTE.text }}>{isAttack ? '공격할 것 같다' : '방어할 거 같다'}</span>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="px-2 py-1 flex items-center gap-1.5" style={{ background: 'rgba(0,0,0,0.7)', border: `1px dashed ${enemy.color}80` }}>
+                      <AlertTriangle size={11} style={{ color: enemy.color }} />
+                      <span className="text-[10px] px-1" style={{ background: isAttack ? `${PALETTE.accent}30` : `${PALETTE.defense}30`, color: isAttack ? PALETTE.accent : PALETTE.defense, border: `1px solid ${isAttack ? PALETTE.accent : PALETTE.defense}60` }}>{isAttack ? '공격' : '방어'}</span>
+                      <span className="text-[11px] font-bold" style={{ color: PALETTE.text }}>{enemy.nextIntent.name}</span>
+                      {lv >= 7 && (
+                        <div className="flex ml-auto gap-2">
+                          {enemy.nextIntent.dmg && enemy.nextIntent.dmg[1] > 0 && (
+                            <span className="text-[10px] tabular-nums" style={{ color: enemy.nextIntent.heavy ? PALETTE.accent : PALETTE.textDim }}>{enemy.nextIntent.dmg[0]}-{enemy.nextIntent.dmg[1]}</span>
+                          )}
+                          {enemy.nextIntent.type === 'defend' && enemy.nextIntent.defense && (
+                            <span className="text-[10px]" style={{ color: PALETTE.defense }}>+{enemy.nextIntent.defense}</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           </div>
-          {/* === 우측 (50%) === */}
-          <div className="w-1/2 flex flex-col min-h-0">
-            {/* 우상: 전투 로그 (1/2) */}
-            <div className="flex-1 min-h-0 overflow-y-auto px-2 py-1.5 space-y-1 border-b" style={{ borderColor: PALETTE.panelBorder, background: `linear-gradient(180deg, ${PALETTE.bgDeep}, #060306)` }}>
-              {log.map((l, i) => (
-                <div key={i} className="text-[10px] leading-snug" style={{ color: l.type === 'damage' ? PALETTE.accent : l.type === 'damageTaken' ? PALETTE.bleed : l.type === 'crit' ? PALETTE.legendary : l.type === 'passive' ? PALETTE.derod : l.type === 'debuff' ? PALETTE.shock : l.type === 'heal' ? PALETTE.green : l.type === 'enemy_action' ? PALETTE.accent : l.type === 'victory' ? PALETTE.legendary : l.type === 'defeat' ? PALETTE.accent : PALETTE.text, opacity: l.type === 'system' ? 0.7 : 1 }}>{l.text}</div>
-              ))}
-              <div ref={logEndRef} />
-            </div>
-            {/* 우하: 스테이터스 (스크롤) */}
-            <div className="flex-1 min-h-0 overflow-y-auto px-2 py-1.5" style={{ background: `linear-gradient(180deg, ${classData.color}10, ${PALETTE.bgDeep})` }}>
-              <div className="text-[10px] tracking-[0.2em] mb-1.5 text-center" style={{ color: classData.color }}>━ 스테이터스 ━</div>
-              {/* 그룹 1: 기본 능력 */}
-              <div className="grid grid-cols-2 gap-x-2 gap-y-0 text-[9px] mb-1">
-                <div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>근력</span><span className="font-bold tabular-nums" style={{ color: PALETTE.text }}>{player.근력 || 0}</span></div>
-                <div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>민첩</span><span className="font-bold tabular-nums" style={{ color: PALETTE.text }}>{player.민첩 || 0}</span></div>
-                <div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>지능</span><span className="font-bold tabular-nums" style={{ color: PALETTE.text }}>{player.지능 || 0}</span></div>
-                <div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>매력</span><span className="font-bold tabular-nums" style={{ color: PALETTE.text }}>{player.매력 || 0}</span></div>
+        </div>
+
+        {/* === 2/3: 전투 로그 (5줄 분량 = 약 110px 고정) === */}
+        <div className="shrink-0 h-[110px] overflow-y-auto px-3 py-2 space-y-1 border-b" style={{ borderColor: PALETTE.panelBorder, background: `linear-gradient(180deg, ${PALETTE.bgDeep}, #060306)` }}>
+          {log.map((l, i) => (
+            <div key={i} className="text-[11px] leading-snug" style={{ color: l.type === 'damage' ? PALETTE.accent : l.type === 'damageTaken' ? PALETTE.bleed : l.type === 'crit' ? PALETTE.legendary : l.type === 'passive' ? PALETTE.derod : l.type === 'debuff' ? PALETTE.shock : l.type === 'heal' ? PALETTE.green : l.type === 'enemy_action' ? PALETTE.accent : l.type === 'victory' ? PALETTE.legendary : l.type === 'defeat' ? PALETTE.accent : PALETTE.text, opacity: l.type === 'system' ? 0.7 : 1 }}>{l.text}</div>
+          ))}
+          <div ref={logEndRef} />
+        </div>
+
+        {/* === 3/3: 내 영역 (일러스트 + 정보 BAR 오버레이) === */}
+        <div className="flex-1 min-h-0 relative overflow-hidden">
+          {/* 내 일러스트 — 가득 채움, center 15% */}
+          <img src={classData.image} alt="Player Avatar" className="absolute inset-0 w-full h-full object-cover" style={{ objectPosition: 'center 15%' }} onError={(e) => { e.target.src = '/classes/lanthert.jpg'; }} />
+          {/* 정보 BAR 오버레이 (하단 + 그라디언트) */}
+          <div className="absolute inset-x-0 bottom-0">
+            <div className="absolute inset-0" style={{ background: `linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.7) 60%, rgba(0,0,0,0.9) 100%)`, pointerEvents: 'none' }} />
+            <div className="relative px-3 py-2">
+              {/* 1줄: 이름 + 스테이터스 모달 버튼 + HP */}
+              <div className="flex justify-between items-center mb-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[12px] font-bold drop-shadow-md" style={{ color: classData.color }}>{classData.name}</span>
+                  <button onClick={() => setStatusModalOpen(true)} className="text-[10px] px-1.5 py-0.5 leading-none" style={{ background: `${classData.color}30`, border: `1px solid ${classData.color}80`, color: '#fff' }} title="스테이터스 보기">≡</button>
+                </div>
+                <span className="text-[11px] tabular-nums font-bold drop-shadow-md" style={{ color: PALETTE.text }}>{animDmg.player && <span className="mr-1 animate-pulse" style={{ color: PALETTE.accent }}>-{animDmg.player}</span>}{player.hp}/{player.maxHp}</span>
               </div>
-              {/* 그룹 2: 전투 수치 */}
-              {(() => {
-                const playerDex = player.민첩 || 10;
-                let critRate = 5 + Math.max(0, (playerDex - 10) * 0.5);
-                critRate += getMinorBonus(skills, 'critRate+', activeSkills);
-                critRate += getMetaBonus(meta, 'critRate+3%') * 3;
-                critRate += relicStat.critRate || 0;
-                if (hasEffect(skills, 'weaknessPoint', activeSkills)) critRate += 10;
-                let critDmg = hasEffect(skills, 'critDmg+30', activeSkills) ? 80 : 50;
-                critDmg += relicStat.critDmg || 0;
-                if (hasEffect(skills, 'weaknessPoint', activeSkills)) critDmg += 50;
-                let dodgeRate = Math.max(0, (playerDex - 10) * 0.3);
-                dodgeRate += getMinorBonus(skills, 'dodge+', activeSkills);
-                dodgeRate += relicStat.dodge || 0;
-                if (hasEffect(skills, 'dodge+15', activeSkills)) dodgeRate += 15;
-                if (hasEffect(skills, 'detailIntent', activeSkills)) dodgeRate += 10;
-                const simanLv = skills['심안류'] || 0;
-                const hasMirror = hasUltimate(ultimates, 'ult_counterMirror');
-                const hasShock = hasUltimate(ultimates, 'ult_counterShock');
-                const hasShadow = hasUltimate(ultimates, 'ult_counterShadow');
-                let counterRate = 0;
-                if (simanLv > 0 || hasMirror || hasShock || hasShadow) {
-                  counterRate = 20;
-                  if (simanLv >= 3) counterRate += 10;
-                  if (hasMirror) counterRate += 50;
-                  else if (hasShock || hasShadow) counterRate += 40;
-                }
-                let accuracy = 100 + getMinorBonus(skills, 'accuracy+', activeSkills);
-                return (
-                  <div className="grid grid-cols-2 gap-x-2 gap-y-0 text-[9px] mb-1">
-                    <div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>치명</span><span className="font-bold tabular-nums" style={{ color: PALETTE.legendary }}>{Math.round(critRate)}%</span></div>
-                    <div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>치피</span><span className="font-bold tabular-nums" style={{ color: PALETTE.legendary }}>+{Math.round(critDmg)}%</span></div>
-                    <div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>회피</span><span className="font-bold tabular-nums" style={{ color: PALETTE.green }}>{Math.round(dodgeRate)}%</span></div>
-                    {counterRate > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>반격</span><span className="font-bold tabular-nums" style={{ color: PALETTE.accent }}>{counterRate}%</span></div>)}
-                    <div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>명중</span><span className="font-bold tabular-nums" style={{ color: PALETTE.text }}>{Math.round(accuracy)}%</span></div>
-                  </div>
-                );
-              })()}
-              {/* 그룹 3: 데미지 보정 */}
-              {(() => {
-                const physBonus = getMinorBonus(skills, 'physDmg+', activeSkills);
-                const magicBonus = getMinorBonus(skills, 'magicDmg+', activeSkills);
-                const bleedBonus = getMinorBonus(skills, 'bleedDmg+', activeSkills);
-                const counterBonus = getMinorBonus(skills, 'counterDmg+', activeSkills);
-                const metaDmgBonus = getMetaBonus(meta, 'dmgDealt+5%') * 5;
-                const relicDmgBonus = relicStat.dmgDealt || 0;
-                const allDmgBonus = metaDmgBonus + relicDmgBonus;
-                const dmgTakenMeta = getMetaBonus(meta, 'dmgTaken-3%') * 3;
-                const dmgTakenRelic = relicStat.dmgTaken || 0;
-                const dmgTakenLv5 = hasEffect(skills, 'dmgTaken-20', activeSkills) ? 20 : 0;
-                const dmgTakenReduce = dmgTakenMeta + dmgTakenRelic + dmgTakenLv5;
-                const dmgDealtCurse = hasCurse(curses, 'curse_dmgDealt-15') ? 15 : 0;
-                const dmgTakenCurse = hasCurse(curses, 'curse_dmgTaken+15') ? 15 : 0;
-                const hasAny = physBonus || magicBonus || bleedBonus || counterBonus || allDmgBonus || dmgTakenReduce || dmgDealtCurse || dmgTakenCurse || (player.buffs?.rage > 0);
-                if (!hasAny) return null;
-                return (
-                  <>
-                    <div className="h-px my-1" style={{ background: PALETTE.panelBorder, opacity: 0.5 }} />
-                    <div className="grid grid-cols-2 gap-x-2 gap-y-0 text-[9px] mb-1">
-                      {physBonus > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>물공</span><span className="font-bold tabular-nums" style={{ color: PALETTE.accent }}>+{physBonus}</span></div>)}
-                      {magicBonus > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>마공</span><span className="font-bold tabular-nums" style={{ color: PALETTE.deblan }}>+{magicBonus}%</span></div>)}
-                      {bleedBonus > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>출혈</span><span className="font-bold tabular-nums" style={{ color: PALETTE.bleed }}>+{bleedBonus}%</span></div>)}
-                      {counterBonus > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>반격딜</span><span className="font-bold tabular-nums" style={{ color: PALETTE.accent }}>+{counterBonus}%</span></div>)}
-                      {allDmgBonus > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>모든딜</span><span className="font-bold tabular-nums" style={{ color: PALETTE.legendary }}>+{allDmgBonus}%</span></div>)}
-                      {player.buffs?.rage > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>분노</span><span className="font-bold tabular-nums" style={{ color: PALETTE.accent }}>+30%</span></div>)}
-                      {dmgTakenReduce > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>받는딜</span><span className="font-bold tabular-nums" style={{ color: PALETTE.green }}>-{dmgTakenReduce}%</span></div>)}
-                      {dmgDealtCurse > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>저주딜</span><span className="font-bold tabular-nums" style={{ color: PALETTE.deblan }}>-{dmgDealtCurse}%</span></div>)}
-                      {dmgTakenCurse > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>저주피</span><span className="font-bold tabular-nums" style={{ color: PALETTE.deblan }}>+{dmgTakenCurse}%</span></div>)}
-                    </div>
-                  </>
-                );
-              })()}
-              {/* 그룹 4: 기타 효과 */}
-              {(() => {
-                const regenLv = skills['재생'] || 0;
-                const lifesteal = relicStat.lifesteal || 0;
-                const reflect = relicStat.reflect || 0;
-                const heal = relicStat.heal || 0;
-                const cdReduce = getMinorBonus(skills, 'cdReduce+', activeSkills);
-                const etherReduce = hasEffect(skills, 'etherCost-20', activeSkills);
-                const hasAny = regenLv || lifesteal || reflect || heal || cdReduce || etherReduce;
-                if (!hasAny) return null;
-                return (
-                  <>
-                    <div className="h-px my-1" style={{ background: PALETTE.panelBorder, opacity: 0.5 }} />
-                    <div className="grid grid-cols-2 gap-x-2 gap-y-0 text-[9px] mb-1">
-                      {regenLv > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>HP재생</span><span className="font-bold tabular-nums" style={{ color: PALETTE.green }}>+{regenLv}/T</span></div>)}
-                      {lifesteal > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>흡혈</span><span className="font-bold tabular-nums" style={{ color: PALETTE.accent }}>+{lifesteal}</span></div>)}
-                      {reflect > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>반사</span><span className="font-bold tabular-nums" style={{ color: PALETTE.accent }}>{reflect}%</span></div>)}
-                      {heal > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>회복</span><span className="font-bold tabular-nums" style={{ color: PALETTE.green }}>+{heal}%</span></div>)}
-                      {cdReduce > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>쿨감</span><span className="font-bold tabular-nums" style={{ color: PALETTE.deblan }}>-{cdReduce}T</span></div>)}
-                      {etherReduce && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>에테르</span><span className="font-bold tabular-nums" style={{ color: PALETTE.deblan }}>-1</span></div>)}
-                    </div>
-                  </>
-                );
-              })()}
-              {/* 패시브 */}
-              <div className="h-px my-1" style={{ background: PALETTE.panelBorder }} />
-              <div className="text-[8px] mb-1" style={{ color: PALETTE.textDim }}>패시브</div>
-              <div className="flex flex-wrap gap-0.5 mb-1.5">
-                {Object.entries(skills).filter(([n, l]) => l > 0 && (!activeSkills || activeSkills.includes(n))).map(([name, lv]) => {
-                  const sk = PASSIVE_SKILLS[name];
-                  if (!sk) return null;
-                  return (<button key={name} onClick={() => setTooltip({ type: 'skill', name, lv })} className="text-[8px] px-1 py-0.5" style={{ background: `${sk.color}25`, border: `1px solid ${sk.color}80`, color: '#fff' }}>{name}<span style={{ color: sk.color, marginLeft: '2px' }}>Lv.{lv}</span></button>);
-                })}
-                {(ultimates || []).map(uid => {
-                  let ultData = null;
-                  Object.entries(ULTIMATE_SKILLS).forEach(([sk, ults]) => {
-                    ults.forEach(u => { if (u.id === uid || u.effect === uid) ultData = u; });
-                  });
-                  if (!ultData) return null;
-                  return (<button key={uid} onClick={() => setTooltip({ type: 'ultimate', name: ultData.name, ult: ultData })} className="text-[8px] px-1 py-0.5" style={{ background: `${ultData.color}40`, border: `1px solid ${ultData.color}`, color: '#fff' }}>★{ultData.name}</button>);
-                })}
+              <div className="h-1.5 relative mb-1.5" style={{ background: 'rgba(0,0,0,0.7)' }}><div className="absolute inset-y-0 left-0 transition-all" style={{ width: `${(player.hp/player.maxHp)*100}%`, background: `linear-gradient(90deg, ${PALETTE.blood}, ${PALETTE.green})` }} /></div>
+              {/* 2줄: 버프/상태 카드 (고정 높이) */}
+              <div className="flex items-center gap-1.5 flex-wrap min-h-[18px]">
+                <span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.deblan}50`, color: '#fff', border: `1px solid ${PALETTE.deblan}` }}>✦ 에테르 {player.ether}/{player.maxEther}</span>
+                {player.defense > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.defense}50`, color: '#fff', border: `1px solid ${PALETTE.defense}` }}>◈ 방어 {player.defense}</span>)}
+                {player.buffs?.rage > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.accent}50`, color: '#fff', border: `1px solid ${PALETTE.accent}` }}>☩ 분노 ({player.buffs.rage}T)</span>)}
+                {player.firstHitImmune && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.legendary}50`, color: '#fff', border: `1px solid ${PALETTE.legendary}` }}>✦ 무적 1회</span>)}
               </div>
-              {/* 유물 */}
-              {initialRelics && initialRelics.length > 0 && (
-                <>
-                  <div className="text-[8px] mb-1" style={{ color: PALETTE.textDim }}>유물</div>
-                  <div className="flex flex-wrap gap-0.5">
-                    {initialRelics.filter(r => !activeRelicNames || activeRelicNames.includes(r.name)).map((rel, i) => (
-                      <button key={i} onClick={() => setTooltip({ type: 'relic', name: rel.name, relic: rel })} className="text-[8px] px-1 py-0.5" style={{ background: `${rel.color || PALETTE.derod}25`, border: `1px solid ${rel.color || PALETTE.derod}80`, color: '#fff' }}>{rel.name}</button>
-                    ))}
-                  </div>
-                </>
-              )}
             </div>
           </div>
         </div>
@@ -2225,6 +2114,194 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
         </div>
 
       </div>
+      
+      {/* 스테이터스 전체 모달 (직업명 옆 ≡ 클릭 시) */}
+      {statusModalOpen && (
+        <div onClick={() => setStatusModalOpen(false)} className="absolute inset-0 flex items-center justify-center z-40 px-4" style={{ background: 'rgba(0,0,0,0.8)' }}>
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm max-h-[85%] overflow-y-auto px-4 py-4" style={{ background: PALETTE.bgDeep, border: `1px solid ${classData.color}` }}>
+            <div className="flex justify-between items-center mb-3">
+              <span className="text-[12px] tracking-[0.3em] font-bold" style={{ color: classData.color }}>━ {classData.name} 스테이터스 ━</span>
+              <button onClick={() => setStatusModalOpen(false)} className="text-[14px] px-2" style={{ color: PALETTE.textDim }}>✕</button>
+            </div>
+            
+            {/* HP / 에테르 / 방어 */}
+            <div className="grid grid-cols-3 gap-2 text-[11px] mb-3">
+              <div className="px-2 py-1.5" style={{ background: `${PALETTE.blood}20`, border: `1px solid ${PALETTE.blood}60` }}>
+                <div className="text-[9px]" style={{ color: PALETTE.textDim }}>체력</div>
+                <div className="font-bold tabular-nums" style={{ color: PALETTE.text }}>{player.hp}/{player.maxHp}</div>
+              </div>
+              <div className="px-2 py-1.5" style={{ background: `${PALETTE.deblan}20`, border: `1px solid ${PALETTE.deblan}60` }}>
+                <div className="text-[9px]" style={{ color: PALETTE.textDim }}>에테르</div>
+                <div className="font-bold tabular-nums" style={{ color: PALETTE.text }}>{player.ether}/{player.maxEther}</div>
+              </div>
+              <div className="px-2 py-1.5" style={{ background: `${PALETTE.defense}20`, border: `1px solid ${PALETTE.defense}60` }}>
+                <div className="text-[9px]" style={{ color: PALETTE.textDim }}>방어</div>
+                <div className="font-bold tabular-nums" style={{ color: PALETTE.text }}>{player.defense || 0}</div>
+              </div>
+            </div>
+            
+            {/* 그룹 1: 기본 능력 */}
+            <div className="text-[10px] mb-1.5" style={{ color: PALETTE.textDim }}>━ 기본 능력 ━</div>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] mb-3">
+              <div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>근력</span><span className="font-bold tabular-nums" style={{ color: PALETTE.text }}>{player.근력 || 0}</span></div>
+              <div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>민첩</span><span className="font-bold tabular-nums" style={{ color: PALETTE.text }}>{player.민첩 || 0}</span></div>
+              <div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>지능</span><span className="font-bold tabular-nums" style={{ color: PALETTE.text }}>{player.지능 || 0}</span></div>
+              <div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>매력</span><span className="font-bold tabular-nums" style={{ color: PALETTE.text }}>{player.매력 || 0}</span></div>
+            </div>
+            
+            {/* 그룹 2: 전투 수치 */}
+            {(() => {
+              const playerDex = player.민첩 || 10;
+              let critRate = 5 + Math.max(0, (playerDex - 10) * 0.5);
+              critRate += getMinorBonus(skills, 'critRate+', activeSkills);
+              critRate += getMetaBonus(meta, 'critRate+3%') * 3;
+              critRate += relicStat.critRate || 0;
+              if (hasEffect(skills, 'weaknessPoint', activeSkills)) critRate += 10;
+              let critDmg = hasEffect(skills, 'critDmg+30', activeSkills) ? 80 : 50;
+              critDmg += relicStat.critDmg || 0;
+              if (hasEffect(skills, 'weaknessPoint', activeSkills)) critDmg += 50;
+              let dodgeRate = Math.max(0, (playerDex - 10) * 0.3);
+              dodgeRate += getMinorBonus(skills, 'dodge+', activeSkills);
+              dodgeRate += relicStat.dodge || 0;
+              if (hasEffect(skills, 'dodge+15', activeSkills)) dodgeRate += 15;
+              if (hasEffect(skills, 'detailIntent', activeSkills)) dodgeRate += 10;
+              const simanLv = skills['심안류'] || 0;
+              const hasMirror = hasUltimate(ultimates, 'ult_counterMirror');
+              const hasShock = hasUltimate(ultimates, 'ult_counterShock');
+              const hasShadow = hasUltimate(ultimates, 'ult_counterShadow');
+              let counterRate = 0;
+              if (simanLv > 0 || hasMirror || hasShock || hasShadow) {
+                counterRate = 20;
+                if (simanLv >= 3) counterRate += 10;
+                if (hasMirror) counterRate += 50;
+                else if (hasShock || hasShadow) counterRate += 40;
+              }
+              let accuracy = 100 + getMinorBonus(skills, 'accuracy+', activeSkills);
+              return (
+                <>
+                  <div className="text-[10px] mb-1.5" style={{ color: PALETTE.textDim }}>━ 전투 수치 ━</div>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] mb-3">
+                    <div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>치명타율</span><span className="font-bold tabular-nums" style={{ color: PALETTE.legendary }}>{Math.round(critRate)}%</span></div>
+                    <div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>치명타데미지</span><span className="font-bold tabular-nums" style={{ color: PALETTE.legendary }}>+{Math.round(critDmg)}%</span></div>
+                    <div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>회피율</span><span className="font-bold tabular-nums" style={{ color: PALETTE.green }}>{Math.round(dodgeRate)}%</span></div>
+                    {counterRate > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>반격률</span><span className="font-bold tabular-nums" style={{ color: PALETTE.accent }}>{counterRate}%</span></div>)}
+                    <div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>명중률</span><span className="font-bold tabular-nums" style={{ color: PALETTE.text }}>{Math.round(accuracy)}%</span></div>
+                  </div>
+                </>
+              );
+            })()}
+            
+            {/* 그룹 3: 데미지 보정 */}
+            {(() => {
+              const physBonus = getMinorBonus(skills, 'physDmg+', activeSkills);
+              const magicBonus = getMinorBonus(skills, 'magicDmg+', activeSkills);
+              const bleedBonus = getMinorBonus(skills, 'bleedDmg+', activeSkills);
+              // 반격 데미지: minor + Lv.5 +15% + 궁극 +50%
+              const simanLv = skills['심안류'] || 0;
+              const hasMirror = hasUltimate(ultimates, 'ult_counterMirror');
+              const hasShock = hasUltimate(ultimates, 'ult_counterShock');
+              const hasShadow = hasUltimate(ultimates, 'ult_counterShadow');
+              let counterDmgBonus = simanLv * 5;
+              if (simanLv >= 5) counterDmgBonus += 15;
+              if (hasMirror || hasShock || hasShadow) counterDmgBonus += 50;
+              const metaDmgBonus = getMetaBonus(meta, 'dmgDealt+5%') * 5;
+              const relicDmgBonus = relicStat.dmgDealt || 0;
+              const allDmgBonus = metaDmgBonus + relicDmgBonus;
+              const dmgTakenMeta = getMetaBonus(meta, 'dmgTaken-3%') * 3;
+              const dmgTakenRelic = relicStat.dmgTaken || 0;
+              const dmgTakenLv5 = hasEffect(skills, 'dmgTaken-20', activeSkills) ? 20 : 0;
+              const dmgTakenReduce = dmgTakenMeta + dmgTakenRelic + dmgTakenLv5;
+              const dmgDealtCurse = hasCurse(curses, 'curse_dmgDealt-15') ? 15 : 0;
+              const dmgTakenCurse = hasCurse(curses, 'curse_dmgTaken+15') ? 15 : 0;
+              const hasAny = physBonus || magicBonus || bleedBonus || counterDmgBonus || allDmgBonus || dmgTakenReduce || dmgDealtCurse || dmgTakenCurse || (player.buffs?.rage > 0);
+              if (!hasAny) return null;
+              return (
+                <>
+                  <div className="text-[10px] mb-1.5" style={{ color: PALETTE.textDim }}>━ 데미지 보정 ━</div>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] mb-3">
+                    {physBonus > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>물리데미지</span><span className="font-bold tabular-nums" style={{ color: PALETTE.accent }}>+{physBonus}</span></div>)}
+                    {magicBonus > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>마법데미지</span><span className="font-bold tabular-nums" style={{ color: PALETTE.deblan }}>+{magicBonus}%</span></div>)}
+                    {bleedBonus > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>출혈데미지</span><span className="font-bold tabular-nums" style={{ color: PALETTE.bleed }}>+{bleedBonus}%</span></div>)}
+                    {counterDmgBonus > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>반격데미지</span><span className="font-bold tabular-nums" style={{ color: PALETTE.accent }}>+{counterDmgBonus}%</span></div>)}
+                    {allDmgBonus > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>모든데미지</span><span className="font-bold tabular-nums" style={{ color: PALETTE.legendary }}>+{allDmgBonus}%</span></div>)}
+                    {player.buffs?.rage > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>분노버프</span><span className="font-bold tabular-nums" style={{ color: PALETTE.accent }}>+30%</span></div>)}
+                    {dmgTakenReduce > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>받는데미지</span><span className="font-bold tabular-nums" style={{ color: PALETTE.green }}>-{dmgTakenReduce}%</span></div>)}
+                    {dmgDealtCurse > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>저주(딜)</span><span className="font-bold tabular-nums" style={{ color: PALETTE.deblan }}>-{dmgDealtCurse}%</span></div>)}
+                    {dmgTakenCurse > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>저주(피)</span><span className="font-bold tabular-nums" style={{ color: PALETTE.deblan }}>+{dmgTakenCurse}%</span></div>)}
+                  </div>
+                </>
+              );
+            })()}
+            
+            {/* 그룹 4: 기타 효과 */}
+            {(() => {
+              const regenLv = skills['재생'] || 0;
+              const lifesteal = relicStat.lifesteal || 0;
+              const reflect = relicStat.reflect || 0;
+              const heal = relicStat.heal || 0;
+              const cdReduce = getMinorBonus(skills, 'cdReduce+', activeSkills);
+              const etherReduce = hasEffect(skills, 'etherCost-20', activeSkills);
+              const hasAny = regenLv || lifesteal || reflect || heal || cdReduce || etherReduce;
+              if (!hasAny) return null;
+              return (
+                <>
+                  <div className="text-[10px] mb-1.5" style={{ color: PALETTE.textDim }}>━ 기타 효과 ━</div>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] mb-3">
+                    {regenLv > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>HP재생</span><span className="font-bold tabular-nums" style={{ color: PALETTE.green }}>+{regenLv}/턴</span></div>)}
+                    {lifesteal > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>흡혈</span><span className="font-bold tabular-nums" style={{ color: PALETTE.accent }}>+{lifesteal}</span></div>)}
+                    {reflect > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>반사</span><span className="font-bold tabular-nums" style={{ color: PALETTE.accent }}>{reflect}%</span></div>)}
+                    {heal > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>회복효과</span><span className="font-bold tabular-nums" style={{ color: PALETTE.green }}>+{heal}%</span></div>)}
+                    {cdReduce > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>쿨다운감소</span><span className="font-bold tabular-nums" style={{ color: PALETTE.deblan }}>-{cdReduce}턴</span></div>)}
+                    {etherReduce && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>에테르비용</span><span className="font-bold tabular-nums" style={{ color: PALETTE.deblan }}>-1</span></div>)}
+                  </div>
+                </>
+              );
+            })()}
+            
+            {/* 패시브 */}
+            <div className="text-[10px] mb-1.5" style={{ color: PALETTE.textDim }}>━ 패시브 ━</div>
+            <div className="flex flex-wrap gap-1 mb-3">
+              {Object.entries(skills).filter(([n, l]) => l > 0 && (!activeSkills || activeSkills.includes(n))).map(([name, lv]) => {
+                const sk = PASSIVE_SKILLS[name];
+                if (!sk) return null;
+                return (
+                  <button key={name} onClick={() => { setStatusModalOpen(false); setTooltip({ type: 'skill', name, lv }); }} className="text-[10px] px-2 py-1" style={{ background: `${sk.color}25`, border: `1px solid ${sk.color}80`, color: '#fff' }}>
+                    {name}<span style={{ color: sk.color, marginLeft: '3px' }}>Lv.{lv}</span>
+                  </button>
+                );
+              })}
+              {(ultimates || []).map(uid => {
+                let ultData = null;
+                Object.entries(ULTIMATE_SKILLS).forEach(([sk, ults]) => {
+                  ults.forEach(u => { if (u.id === uid || u.effect === uid) ultData = u; });
+                });
+                if (!ultData) return null;
+                return (
+                  <button key={uid} onClick={() => { setStatusModalOpen(false); setTooltip({ type: 'ultimate', name: ultData.name, ult: ultData }); }} className="text-[10px] px-2 py-1" style={{ background: `${ultData.color}40`, border: `1px solid ${ultData.color}`, color: '#fff' }}>
+                    ★{ultData.name}
+                  </button>
+                );
+              })}
+            </div>
+            
+            {/* 유물 */}
+            {initialRelics && initialRelics.length > 0 && (
+              <>
+                <div className="text-[10px] mb-1.5" style={{ color: PALETTE.textDim }}>━ 유물 ━</div>
+                <div className="flex flex-wrap gap-1 mb-3">
+                  {initialRelics.filter(r => !activeRelicNames || activeRelicNames.includes(r.name)).map((rel, i) => (
+                    <button key={i} onClick={() => { setStatusModalOpen(false); setTooltip({ type: 'relic', name: rel.name, relic: rel }); }} className="text-[10px] px-2 py-1" style={{ background: `${rel.color || PALETTE.derod}25`, border: `1px solid ${rel.color || PALETTE.derod}80`, color: '#fff' }}>
+                      {rel.name}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+            
+            <button onClick={() => setStatusModalOpen(false)} className="w-full mt-2 py-2 text-[11px] tracking-[0.2em]" style={{ background: 'transparent', border: `1px solid ${PALETTE.panelBorder}`, color: PALETTE.textDim }}>닫기</button>
+          </div>
+        </div>
+      )}
       
       {/* 패시브/유물/궁극 정보 툴팁 모달 */}
       {tooltip && (
