@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Sword, Shield, Heart, Zap, Skull, Sparkles, Eye, Flame, Crown, BookOpen, Compass, ChevronRight, X, RefreshCw, Lock, Check, AlertTriangle } from 'lucide-react';
 
 // ============================================
-// 데로드앤데블랑 로그라이크 v0.4 - INTEGRATED.
+// 데로드앤데블랑 로그라이크 v0.4 - INTEGRATED
 // 전체 게임 루프: 챕터 → 맵 → 노드 → 전투/사건 → 보상 → 다음 노드 → 보스 → 다음 챕터
 // ============================================
 
@@ -1668,12 +1668,14 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
       const hasAnyCounterUlt = hasMirror || hasShock || hasShadow;
       
       if (simanLv > 0 || hasAnyCounterUlt) {
-        // 반격 확률 계산
-        let counterRate = 20;  // 기본
-        if (simanLv >= 3) counterRate += 10;  // Lv.3: +10%
+        // 반격 확률 계산 (기본 0% — 심안류 레벨/궁극으로만 획득)
+        let counterRate = simanLv * 5;  // Lv당 +5%
+        if (simanLv >= 3) counterRate += 10;  // Lv.3 추가 +10%
         if (hasMirror) counterRate += 50;
         else if (hasShock) counterRate += 40;
         else if (hasShadow) counterRate += 40;
+        // 반격률 상한 75%
+        if (counterRate > 75) counterRate = 75;
         
         // 회피했고 명경지수면: 다음 턴 반격 데미지 +50% 효과 표시
         if (dodged && hasMirror) {
@@ -2171,10 +2173,11 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
               const hasShadow = hasUltimate(ultimates, 'ult_counterShadow');
               let counterRate = 0;
               if (simanLv > 0 || hasMirror || hasShock || hasShadow) {
-                counterRate = 20;
+                counterRate = simanLv * 5;
                 if (simanLv >= 3) counterRate += 10;
                 if (hasMirror) counterRate += 50;
                 else if (hasShock || hasShadow) counterRate += 40;
+                if (counterRate > 75) counterRate = 75;  // 상한
               }
               let accuracy = 100 + getMinorBonus(skills, 'accuracy+', activeSkills);
               return (
@@ -3062,7 +3065,7 @@ function StartScreen({ classData, onContinue }) {
 }
 
 // =========== 전투 승리 화면 ===========
-function VictoryScreen({ classData, enemy, onContinue }) {
+function VictoryScreen({ classData, enemy, gains = { gold: 0, gem: 0, souls: 0 }, onContinue }) {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
   
@@ -3122,6 +3125,43 @@ function VictoryScreen({ classData, enemy, onContinue }) {
         }}>
           {enemy?.name ? `「${enemy.name}」을(를) 처치` : '적을 처치'}
         </p>
+        {/* 획득 재화 */}
+        {(gains.gold > 0 || gains.gem > 0 || gains.souls > 0) && (
+          <div className="flex justify-center items-center gap-3 mt-4 flex-wrap" style={{
+            animation: 'victorySubFade 1.4s ease-out 1.2s both',
+          }}>
+            {gains.gold > 0 && (
+              <span className="text-sm font-bold tabular-nums px-2 py-1" style={{ 
+                color: '#fff',
+                background: 'rgba(0,0,0,0.5)',
+                border: `1px solid ${PALETTE.derod}80`,
+                textShadow: `0 0 6px ${PALETTE.derod}, 0 1px 4px rgba(0,0,0,0.9)`,
+              }}>
+                <span style={{ color: PALETTE.derod }}>● </span>+{gains.gold} 은화
+              </span>
+            )}
+            {gains.gem > 0 && (
+              <span className="text-sm font-bold tabular-nums px-2 py-1" style={{ 
+                color: '#fff',
+                background: 'rgba(0,0,0,0.5)',
+                border: `1px solid ${PALETTE.deblan}80`,
+                textShadow: `0 0 6px ${PALETTE.deblan}, 0 1px 4px rgba(0,0,0,0.9)`,
+              }}>
+                <span style={{ color: PALETTE.deblan }}>◆ </span>+{gains.gem} 보석
+              </span>
+            )}
+            {gains.souls > 0 && (
+              <span className="text-sm font-bold tabular-nums px-2 py-1" style={{ 
+                color: '#fff',
+                background: 'rgba(0,0,0,0.5)',
+                border: `1px solid ${PALETTE.legendary}80`,
+                textShadow: `0 0 6px ${PALETTE.legendary}, 0 1px 4px rgba(0,0,0,0.9)`,
+              }}>
+                <span style={{ color: PALETTE.legendary }}>✦ </span>+{gains.souls} 영혼
+              </span>
+            )}
+          </div>
+        )}
         <div className="text-[10px] tracking-[0.4em] mt-4" style={{
           color: PALETTE.textDim,
           animation: 'victoryTapHint 2s ease-in-out 1.8s infinite',
@@ -3686,6 +3726,8 @@ export default function App() {
   const [reselectMode, setReselectMode] = useState(null);
   // 승리 화면 후 이동할 다음 화면
   const [victoryNextScreen, setVictoryNextScreen] = useState(null);
+  // 승리 화면에 표시할 획득 재화 (gold/gem/souls)
+  const [victoryGains, setVictoryGains] = useState({ gold: 0, gem: 0, souls: 0 });
   // 업적 화면에서 뒤로갈 때 어디로 갈지 기억 (title 또는 map)
   const [prevAchievementsBack, setPrevAchievementsBack] = useState('title');
 
@@ -3994,14 +4036,18 @@ export default function App() {
     trackedMeta = setAchievementProgress(trackedMeta, 'meta_kill_1000', trackedMeta.totalKills, 1000);
     setMeta(trackedMeta);
     
-    // 드랍 적용 (저주: 획득 은화 -50%)
+    // 드랍 적용 (저주: 획득 은화 -50%) + 획득량 추적
+    let goldGained = 0;
+    let gemGained = 0;
     if (drop?.gold) {
       let g = Math.floor(drop.gold[0] + Math.random() * (drop.gold[1] - drop.gold[0]));
       if (hasCurse(currentCurses, 'curse_gold-50')) g = Math.floor(g * 0.5);
+      goldGained = g;
       setGold(prev => prev + g);
     }
     if (drop?.gem) {
       const gm = Math.floor(drop.gem[0] + Math.random() * (drop.gem[1] - drop.gem[0]));
+      gemGained = gm;
       setGem(prev => prev + gm);
     }
     
@@ -4015,10 +4061,21 @@ export default function App() {
     }
     setRunSouls(prev => prev + soulGain);
 
-    // 보스라면 victory 화면 → 챕터 클리어
+    // 보스라면 챕터 보너스도 추가
+    let chapterBonusSouls = 0;
     if (isBossReward) {
-      const chapterBonus = SOUL_REWARDS.chapterClear[chapterIdx] || 5;
-      setRunSouls(prev => prev + chapterBonus);
+      chapterBonusSouls = SOUL_REWARDS.chapterClear[chapterIdx] || 5;
+      setRunSouls(prev => prev + chapterBonusSouls);
+    }
+    
+    // 승리 화면용 획득량 저장
+    setVictoryGains({ 
+      gold: goldGained, 
+      gem: gemGained, 
+      souls: soulGain + chapterBonusSouls 
+    });
+
+    if (isBossReward) {
       setVictoryNextScreen('chapterClear');
       setScreen('victory');
       return;
@@ -4371,7 +4428,7 @@ export default function App() {
             {screen === 'map' && chapter && mapData && <MapView chapter={chapter} classData={classData} mapData={mapData} hp={hp} maxHp={maxHp} gold={gold} gem={gem} expedition={currentExpedition} curses={currentCurses} chapterIdx={chapterIdx} onEnterNode={handleEnterNode} onOpenStatus={() => setScreen('status')} onOpenAchievements={() => { setPrevAchievementsBack('map'); setScreen('achievements'); }} onBack={() => setScreen('title')} />}
             {screen === 'combat' && currentEnemy && <CombatScreen key={`${activeNodeId}-${currentEnemy}`} classData={classData} initialPlayer={{ hp, maxHp, ...stats, ...classData.stats }} initialSkills={skills} initialUltimates={ultimates} initialRelics={relics} activeSkills={activeSkills} activeRelicNames={activeRelicNames} enemyKey={currentEnemy} isBoss={isBossReward} expedition={currentExpedition} curses={currentCurses} meta={meta} onVictory={handleVictory} onDefeat={handleDefeat} />}
             {screen === 'reward' && <RewardSelect rewards={currentRewards} gem={gem} skills={skills} relics={relics} ultimates={ultimates} onPick={handlePickReward} onReroll={handleReroll} hasRerolled={hasRerolled} isElite={isEliteReward} classId={classData?.id} />}
-            {screen === 'victory' && <VictoryScreen classData={classData} enemy={currentEnemy ? ENEMIES[currentEnemy] : null} onContinue={handleVictoryContinue} />}
+            {screen === 'victory' && <VictoryScreen classData={classData} enemy={currentEnemy ? ENEMIES[currentEnemy] : null} gains={victoryGains} onContinue={handleVictoryContinue} />}
             {screen === 'event' && currentEvent && <EventScreen event={currentEvent} classData={classData} stats={{ ...classData.stats, ...stats }} onResolve={handleEventResolve} />}
             {screen === 'rest' && <RestScreen classData={classData} hp={hp} maxHp={maxHp} skills={skills} relics={relics} expedition={currentExpedition} onChoice={handleRestChoice} />}
             {screen === 'prep' && <PrepScreen skills={skills} relics={relics} ultimates={ultimates} expedition={currentExpedition} mode="full" onConfirm={handlePrepConfirm} />}
