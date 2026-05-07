@@ -175,6 +175,7 @@ export const CLASSES = [
     winImage: './classes/lanthertwin.jpg',
     lossImage: './classes/lanthertloss.jpg',
     startImage: './classes/lanthertstart.jpg',
+    combatImage: './classes/combat/lanthert_combat.jpg',
   },
   {
     id: 'sage', name: '술법사', sub: 'Sorcerer of Tour',
@@ -189,6 +190,7 @@ export const CLASSES = [
     winImage: './classes/sagewin.jpg',
     lossImage: './classes/sageloss.jpg',
     startImage: './classes/sagestart.jpg',
+    combatImage: './classes/combat/sage_combat.jpg',
   },
   {
     id: 'demonblood', name: '마족 혼혈', sub: 'Demon Heritage',
@@ -203,6 +205,7 @@ export const CLASSES = [
     winImage: './classes/demonbloodwin.jpg',
     lossImage: './classes/demonbloodloss.jpg',
     startImage: './classes/demonbloodstart.jpg',
+    combatImage: './classes/combat/demonblood_combat.jpg',
   },
   {
     id: 'elf', name: '숲의 정령사', sub: 'Elf of Twilight',
@@ -217,6 +220,7 @@ export const CLASSES = [
     winImage: './classes/elfwin.jpg',
     lossImage: './classes/elfloss.jpg',
     startImage: './classes/elfstart.jpg',
+    combatImage: './classes/combat/elf_combat.jpg',
   },
   {
     id: 'priest', name: '데로드의 사제', sub: 'Priest of Derod',
@@ -232,6 +236,7 @@ export const CLASSES = [
     winImage: './classes/priestwin.jpg',
     lossImage: './classes/priestloss.jpg',
     startImage: './classes/prieststart.jpg',
+    combatImage: './classes/combat/priest_combat.jpg',
   },
 ];
 
