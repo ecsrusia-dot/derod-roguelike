@@ -2266,8 +2266,21 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
 
         {/* === 3/3: 내 영역 (일러스트 + 정보 BAR 오버레이) === */}
         <div className="flex-1 min-h-0 relative overflow-hidden">
-          {/* 내 일러스트 — 가로 잘림 없이, center 18% 세로 */}
-          <img src={classData.image} alt="Player Avatar" className="absolute inset-0 w-full h-full object-contain" style={{ objectPosition: 'center 18%' }} onError={(e) => { e.target.src = '/classes/lanthert.jpg'; }} />
+          {/* 내 전투 일러스트 — 가로형, 가득 채움 */}
+          <img 
+            src={classData.combatImage || classData.image} 
+            alt="Player Avatar" 
+            className="absolute inset-0 w-full h-full object-cover" 
+            style={{ objectPosition: 'center center' }} 
+            onError={(e) => { 
+              // 전투 일러 없으면 기본 일러로 폴백
+              if (e.target.src.includes('combat/')) {
+                e.target.src = classData.image; 
+              } else {
+                e.target.src = '/classes/lanthert.jpg'; 
+              }
+            }} 
+          />
           {/* 정보 BAR 오버레이 (하단 + 그라디언트) */}
           <div className="absolute inset-x-0 bottom-0">
             <div className="absolute inset-0" style={{ background: `linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.7) 60%, rgba(0,0,0,0.9) 100%)`, pointerEvents: 'none' }} />
