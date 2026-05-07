@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Sword, Shield, Heart, Zap, Skull, Sparkles, Eye, Flame, Crown, BookOpen, Compass, ChevronRight, X, RefreshCw, Lock, Check, AlertTriangle } from 'lucide-react';
+import { Sword, Shield, Heart, Zap, Skull, Sparkles, Eye, Flame, Crown, BookOpen, Compass, ChevronRight, X, RefreshCw, Lock, Check, AlertTriangle, Hammer, Coins } from 'lucide-react';
 
 // ============================================
 // 데로드앤데블랑 로그라이크 v0.4 - INTEGRATED
@@ -43,6 +43,8 @@ import {
   SHOP_PRICES,
   GAME_CONFIG,
   ACHIEVEMENTS,
+  FORGE_RECIPES,
+  findRecipe,
 } from './data.js';
 import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement } from './storage.js';
 
@@ -224,9 +226,9 @@ function generateChapterMap(chapter, chapterIdx = 0) {
   // Layer 0: 모든 챕터 첫 노드 = 'prep' (전투 준비)
   nodes.push({ id: id++, type: 'prep', layer: 0, x: 50, y: 95, completed: false, current: true, locked: false });
 
-  // 중간 레이어 노드 타입 (rest 완전 제거)
-  const types = ['battle', 'event', 'shop', 'unknown', 'elite'];
-  const weights = [50, 24, 9, 14, 9];
+  // 중간 레이어 노드 타입 (rest 완전 제거, shop은 강제 배치로 별도 처리)
+  const types = ['battle', 'event', 'unknown', 'elite'];
+  const weights = [55, 26, 14, 9];
 
   // 중간 레이어 (1 ~ layers-3) — 보스 직전 layer는 별도 처리
   for (let l = 1; l < layers - 2; l++) {
@@ -243,6 +245,36 @@ function generateChapterMap(chapter, chapterIdx = 0) {
         if (rt <= 0) { type = types[t]; break; }
       }
       nodes.push({ id: id++, type, layer: l, x: xPos, y: yPos, completed: false, current: false, locked: false });
+    }
+  }
+
+  // === 상점/대장간 강제 배치 ===
+  // 상점: 모든 챕터 1개, layer 3 ~ layers-3 (정비/보스 제외) 중 랜덤
+  // 대장간: 챕터 3 이상 (chapterIdx >= 2)에서 1개, layer 1 ~ layers-3 중 랜덤
+  
+  // 강제 배치 가능 layer 풀 (일반 노드 중에서 변환)
+  const pickRandomNode = (minLayer, maxLayer, excludeIds = []) => {
+    const candidates = nodes.filter(n => 
+      n.layer >= minLayer && 
+      n.layer <= maxLayer && 
+      n.type !== 'prep' && n.type !== 'boss' && n.type !== 'rest' &&
+      !excludeIds.includes(n.id)
+    );
+    if (candidates.length === 0) return null;
+    return candidates[Math.floor(Math.random() * candidates.length)];
+  };
+  
+  // 상점 강제 배치 (layer 3 ~ layers-3)
+  const shopNode = pickRandomNode(3, layers - 3);
+  if (shopNode) {
+    shopNode.type = 'shop';
+  }
+  
+  // 대장간 강제 배치 (chapterIdx >= 2 = 챕터 3+, layer 1 ~ layers-3)
+  if (chapterIdx >= 2) {
+    const forgeNode = pickRandomNode(1, layers - 3, shopNode ? [shopNode.id] : []);
+    if (forgeNode) {
+      forgeNode.type = 'forge';
     }
   }
 
@@ -385,6 +417,12 @@ function calculateDamage(skill, attacker, defender, skills, isCrit, ultimates = 
     const magicBonus = Math.floor(dmg * 0.25);
     dmg += magicBonus;
     breakdown.push(`마력 Lv.3 +${magicBonus}`);
+  }
+  // 현자의 서 (유물): 마법 데미지 +N%
+  if (skill.type === 'magic' && relicStat.magicDmg > 0) {
+    const bookBonus = Math.floor(dmg * (relicStat.magicDmg / 100));
+    dmg += bookBonus;
+    if (bookBonus > 0) breakdown.push(`현자의 서 +${bookBonus}`);
   }
   // 연옥지화: 화염 각인 보유 적 공격 시 마법 데미지 +20% (각인 부여 턴 미적용)
   // calculateDamage는 데미지 계산 후 부여이므로, defender.debuffs.igniteDmg > 0 = 이전 턴 부여된 각인
@@ -586,7 +624,8 @@ const NODE_TYPES = {
   battle: { icon: Skull, color: '#c4453d', label: '전투' },
   elite: { icon: Crown, color: '#e8b04a', label: '강적' },
   event: { icon: BookOpen, color: '#7ba3c4', label: '사건' },
-  shop: { icon: Sparkles, color: '#5c4a8c', label: '상점' },
+  shop: { icon: Coins, color: '#d4a574', label: '상점' },
+  forge: { icon: Hammer, color: '#c46535', label: '대장간' },
   rest: { icon: Flame, color: '#d4a574', label: '정비' },
   prep: { icon: Sword, color: '#9ad4a3', label: '준비' },
   unknown: { icon: Compass, color: '#9b8975', label: '미지' },
@@ -1043,7 +1082,11 @@ function SoulAltar({ meta, onPurchase, onReroll, slots, onBack }) {
   );
 }
 
-function MapView({ chapter, classData, mapData, hp, maxHp, gold, gem, expedition, curses = [], chapterIdx, onEnterNode, onOpenStatus, onOpenAchievements, onBack }) {
+function MapView({ chapter, classData, mapData, hp, maxHp, gold, gem, relics = [], activeRelicNames = null, expedition, curses = [], chapterIdx, onEnterNode, onOpenStatus, onOpenAchievements, onBack }) {
+  // 천리안 유물 보유 (활성 상태) 시 모든 노드 공개
+  const hasMapReveal = relics && relics.some(r => 
+    r.statBonus?.mapReveal > 0 && (!activeRelicNames || activeRelicNames.includes(r.name))
+  );
   return (
     <div className="absolute inset-0 flex flex-col" style={{ background: PALETTE.bgDeep }}>
       <div className="flex items-center gap-2 px-3 py-2.5" style={{
@@ -1142,6 +1185,10 @@ function MapView({ chapter, classData, mapData, hp, maxHp, gold, gem, expedition
               {isCurrent && (
                 <div className="absolute inset-0 rounded-full animate-ping" style={{ background: cfg.color, opacity: 0.4 }} />
               )}
+              {/* 상점/대장간 노드는 항상 미세 펄스로 강조 (방문 전) */}
+              {(n.type === 'shop' || n.type === 'forge') && !isCompleted && !isCurrent && (
+                <div className="absolute inset-0 rounded-full animate-pulse" style={{ background: cfg.color, opacity: 0.3 }} />
+              )}
               <div className="relative w-full h-full rounded-full flex items-center justify-center" style={{
                 background: isCompleted
                   ? `radial-gradient(circle, ${PALETTE.derod}30, ${PALETTE.bgDeep})`
@@ -1161,9 +1208,11 @@ function MapView({ chapter, classData, mapData, hp, maxHp, gold, gem, expedition
               }}>
                 {isLocked
                   ? <X size={isBoss ? 18 : 14} style={{ color: '#5a3030' }} />
-                  : !isCurrent && !isCompleted && !isBoss
-                    ? <span className="text-base" style={{ color: PALETTE.textDim }}>?</span>
-                    : <Icon size={isBoss ? 22 : isCurrent ? 18 : 14} style={{ color: isCompleted ? PALETTE.derod : cfg.color }} />}
+                  : (n.type === 'shop' || n.type === 'forge' || hasMapReveal)
+                    ? <Icon size={isBoss ? 22 : isCurrent ? 18 : 14} style={{ color: isCompleted ? PALETTE.derod : cfg.color }} />
+                    : !isCurrent && !isCompleted && !isBoss
+                      ? <span className="text-base" style={{ color: PALETTE.textDim }}>?</span>
+                      : <Icon size={isBoss ? 22 : isCurrent ? 18 : 14} style={{ color: isCompleted ? PALETTE.derod : cfg.color }} />}
               </div>
             </button>
           );
@@ -1240,7 +1289,8 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
   const relicStat = useMemo(() => {
     const stats = {};
     const keys = ['dmgDealt', 'dmgTaken', 'critRate', 'critDmg', 'dodge', 'maxHp', 
-                  'startGold', 'startGem', 'heal', 'reflect', 'lifesteal', 'shieldOnStart'];
+                  'startGold', 'startGem', 'heal', 'reflect', 'lifesteal', 'shieldOnStart',
+                  'magicDmg', 'cdReduceChance', 'mapReveal'];
     keys.forEach(k => stats[k] = getActiveRelicStat(initialRelics, activeRelicNames, k));
     return stats;
   }, [initialRelics, activeRelicNames]);
@@ -2015,6 +2065,18 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
     Object.keys(newPlayer.cooldowns).forEach(k => {
       if (newPlayer.cooldowns[k] > 0) newPlayer.cooldowns[k]--;
     });
+    // 황혼의 모래시계: 매 턴 20% 확률로 모든 스킬 쿨다운 -1 (이미 -1된 거 추가)
+    const hourglassChance = (relicStat.cdReduceChance || 0);
+    if (hourglassChance > 0 && Math.random() * 100 < hourglassChance) {
+      let reduced = false;
+      Object.keys(newPlayer.cooldowns).forEach(k => {
+        if (newPlayer.cooldowns[k] > 0) {
+          newPlayer.cooldowns[k]--;
+          reduced = true;
+        }
+      });
+      if (reduced) newLog.push({ type: 'passive', text: `◇ [황혼의 모래시계] 쿨다운 -1` });
+    }
     if (newPlayer.buffs?.rage > 0) {
       newPlayer.buffs.rage--;
       if (newPlayer.buffs.rage === 0) newLog.push({ type: 'system', text: `· 분노 종료` });
@@ -2954,6 +3016,124 @@ function ShopScreen({ gold, skills, relics, ultimates, onBuy, onLeave, classId =
         <button onClick={onLeave} className="w-full py-2.5 text-xs tracking-[0.3em]" style={{
           background: 'transparent', border: `1px solid ${PALETTE.panelBorder}`, color: PALETTE.textDim,
         }}>▸ 떠난다</button>
+      </div>
+    </div>
+  );
+}
+
+// =========== 황혼의 대장간 ===========
+// 유물 2개 희생 → 정해진 패시브 +1Lv (또는 영혼 +50)
+// 직업 전용 패시브 (심안류, 이프리트) 제외
+function ForgeScreen({ relics, skills, activeRelicNames, onCombine, onLeave }) {
+  const [selected, setSelected] = useState([]);
+  const [resultMsg, setResultMsg] = useState(null);
+  
+  const availableRelics = relics; // 봉인 무관 — 모든 보유 유물 희생 가능
+  
+  const toggleSelect = (idx) => {
+    if (resultMsg) return;
+    if (selected.includes(idx)) {
+      setSelected(selected.filter(i => i !== idx));
+    } else if (selected.length < 2) {
+      setSelected([...selected, idx]);
+    }
+  };
+  
+  const handleCombine = () => {
+    if (selected.length !== 2) return;
+    const r1 = availableRelics[selected[0]];
+    const r2 = availableRelics[selected[1]];
+    const recipe = findRecipe(r1.name, r2.name);
+    
+    let result;
+    if (recipe) {
+      const curLv = skills[recipe.result] || 0;
+      if (curLv >= 7) {
+        // 이미 Lv.7 → 영혼 보상
+        result = { type: 'souls', value: 50, msg: `[${recipe.result}] 이미 Lv.7\n영혼 +50` };
+      } else {
+        // 패시브 +1
+        result = { type: 'skill', skillName: recipe.result, msg: `★ [${recipe.result}] Lv.${curLv} → Lv.${curLv + 1}` };
+      }
+    } else {
+      // 정의 안 된 조합 → 영혼 보상
+      result = { type: 'souls', value: 50, msg: `정의되지 않은 조합\n영혼 +50` };
+    }
+    
+    setResultMsg(result.msg);
+    onCombine(selected, result);
+  };
+  
+  return (
+    <div className="absolute inset-0 flex flex-col" style={{ background: PALETTE.bgDeep }}>
+      <div className="px-4 py-3 border-b text-center" style={{ borderColor: PALETTE.panelBorder }}>
+        <div className="text-[10px] tracking-[0.4em]" style={{ color: '#c46535' }}>━━ T W I L I G H T   F O R G E ━━</div>
+        <div className="text-base font-bold tracking-[0.2em] mt-1" style={{ color: PALETTE.text }}>황혼의 대장간</div>
+        <div className="text-[10px] mt-1" style={{ color: PALETTE.textDim }}>유물 2개를 희생하여 패시브를 단련한다</div>
+      </div>
+      
+      <div className="flex-1 overflow-y-auto px-3 py-3">
+        {resultMsg ? (
+          // 결과 화면
+          <div className="flex flex-col items-center justify-center h-full">
+            <div className="text-center px-4 py-8" style={{ background: `${PALETTE.bgDeep}`, border: `2px solid #c46535` }}>
+              <div className="text-2xl mb-3" style={{ color: '#c46535' }}>🔨</div>
+              <div className="text-sm leading-relaxed whitespace-pre-line" style={{ color: PALETTE.text, textShadow: '0 0 8px #c4653580' }}>
+                {resultMsg}
+              </div>
+            </div>
+            <button onClick={onLeave} className="mt-6 w-full max-w-xs py-2.5 text-xs tracking-[0.3em]" style={{
+              background: `linear-gradient(180deg, #c4653540, #c4653520)`,
+              border: `1px solid #c46535`, color: '#fff',
+            }}>▸ 대장간을 떠난다</button>
+          </div>
+        ) : (
+          <>
+            {/* 보유 유물 목록 */}
+            {availableRelics.length === 0 ? (
+              <div className="text-center py-12" style={{ color: PALETTE.textDim }}>
+                <div className="text-sm">희생할 유물이 없다</div>
+              </div>
+            ) : (
+              <>
+                <div className="text-[10px] mb-2" style={{ color: PALETTE.textDim }}>
+                  희생할 유물 2개를 선택하라 ({selected.length}/2)
+                </div>
+                <div className="space-y-1.5 mb-4">
+                  {availableRelics.map((rel, i) => {
+                    const isSelected = selected.includes(i);
+                    return (
+                      <button key={i} onClick={() => toggleSelect(i)}
+                        className="w-full px-3 py-2 text-left flex items-center justify-between"
+                        style={{
+                          background: isSelected ? `${rel.color || PALETTE.derod}40` : `${rel.color || PALETTE.derod}15`,
+                          border: `1px solid ${isSelected ? '#c46535' : rel.color || PALETTE.derod}`,
+                          opacity: 1,
+                        }}>
+                        <div>
+                          <div className="text-[11px] font-bold" style={{ color: '#fff' }}>{rel.name}</div>
+                          <div className="text-[9px] mt-0.5" style={{ color: PALETTE.textDim }}>{rel.desc}</div>
+                        </div>
+                        {isSelected && <span className="text-sm" style={{ color: '#c46535' }}>✓</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+                <button onClick={handleCombine} disabled={selected.length !== 2}
+                  className="w-full py-2.5 text-xs tracking-[0.3em] font-bold" style={{
+                    background: selected.length === 2 ? `linear-gradient(180deg, #c4653560, #c4653530)` : 'transparent',
+                    border: `1px solid ${selected.length === 2 ? '#c46535' : PALETTE.panelBorder}`,
+                    color: selected.length === 2 ? '#fff' : PALETTE.textDim,
+                  }}>🔨 단련 실행</button>
+                <button onClick={onLeave} className="w-full mt-2 py-2 text-[11px] tracking-[0.2em]" style={{
+                  background: 'transparent',
+                  border: `1px solid ${PALETTE.panelBorder}`,
+                  color: PALETTE.textDim,
+                }}>떠난다 (희생 X)</button>
+              </>
+            )}
+          </>
+        )}
       </div>
     </div>
   );
@@ -4163,6 +4343,8 @@ export default function App() {
       setScreen('event');
     } else if (nodeType === 'shop') {
       setScreen('shop');
+    } else if (nodeType === 'forge') {
+      setScreen('forge');
     } else if (nodeType === 'rest') {
       setScreen('rest');
     } else if (nodeType === 'prep') {
@@ -4493,6 +4675,31 @@ export default function App() {
     completeCurrentNode();
     setScreen('map');
   };
+  
+  // 황혼의 대장간: 유물 2개 희생 → 패시브 +1 또는 영혼 +50
+  const handleForgeCombine = (selectedIndices, result) => {
+    // 선택된 유물 2개 제거
+    const removeIndices = new Set(selectedIndices);
+    setRelics(prev => prev.filter((_, i) => !removeIndices.has(i)));
+    // 활성 유물 목록에서도 제거 (해당 이름)
+    if (activeRelicNames) {
+      const removed = selectedIndices.map(i => relics[i]?.name).filter(Boolean);
+      setActiveRelicNames(prev => prev ? prev.filter(n => !removed.includes(n)) : null);
+    }
+    
+    if (result.type === 'skill') {
+      // 패시브 +1
+      setSkills(prev => ({ ...prev, [result.skillName]: (prev[result.skillName] || 0) + 1 }));
+    } else if (result.type === 'souls') {
+      // 영혼 +50 (해당 런 누적, 원정 클리어/사망 시 메타에 반영)
+      setRunSouls(prev => prev + result.value);
+    }
+  };
+  
+  const handleForgeLeave = () => {
+    completeCurrentNode();
+    setScreen('map');
+  };
 
   // 챕터 클리어 → 다음 챕터 / 원정 클리어
   const handleChapterContinue = () => {
@@ -4610,7 +4817,7 @@ export default function App() {
             {screen === 'start' && <StartScreen classData={classData} onContinue={() => { if (selectedExpedition) startExpedition(selectedExpedition); }} />}
             {screen === 'altar' && <SoulAltar meta={meta} slots={altarSlots} onPurchase={purchaseUpgrade} onReroll={rerollAltar} onBack={() => setScreen('title')} />}
             {screen === 'achievements' && <AchievementScreen meta={meta} onClaim={handleClaimAchievement} onClose={() => setScreen(prevAchievementsBack)} />}
-            {screen === 'map' && chapter && mapData && <MapView chapter={chapter} classData={classData} mapData={mapData} hp={hp} maxHp={maxHp} gold={gold} gem={gem} expedition={currentExpedition} curses={currentCurses} chapterIdx={chapterIdx} onEnterNode={handleEnterNode} onOpenStatus={() => setScreen('status')} onOpenAchievements={() => { setPrevAchievementsBack('map'); setScreen('achievements'); }} onBack={() => setScreen('title')} />}
+            {screen === 'map' && chapter && mapData && <MapView chapter={chapter} classData={classData} mapData={mapData} hp={hp} maxHp={maxHp} gold={gold} gem={gem} relics={relics} activeRelicNames={activeRelicNames} expedition={currentExpedition} curses={currentCurses} chapterIdx={chapterIdx} onEnterNode={handleEnterNode} onOpenStatus={() => setScreen('status')} onOpenAchievements={() => { setPrevAchievementsBack('map'); setScreen('achievements'); }} onBack={() => setScreen('title')} />}
             {screen === 'combat' && currentEnemy && <CombatScreen key={`${activeNodeId}-${currentEnemy}`} classData={classData} initialPlayer={{ hp, maxHp, ...stats, ...classData.stats }} initialSkills={skills} initialUltimates={ultimates} initialRelics={relics} activeSkills={activeSkills} activeRelicNames={activeRelicNames} enemyKey={currentEnemy} isBoss={isBossReward} expedition={currentExpedition} curses={currentCurses} meta={meta} onVictory={handleVictory} onDefeat={handleDefeat} />}
             {screen === 'reward' && <RewardSelect rewards={currentRewards} gem={gem} skills={skills} relics={relics} ultimates={ultimates} onPick={handlePickReward} onReroll={handleReroll} hasRerolled={hasRerolled} isElite={isEliteReward} classId={classData?.id} />}
             {screen === 'victory' && <VictoryScreen classData={classData} enemy={currentEnemy ? ENEMIES[currentEnemy] : null} gains={victoryGains} onContinue={handleVictoryContinue} />}
@@ -4619,6 +4826,7 @@ export default function App() {
             {screen === 'prep' && <PrepScreen skills={skills} relics={relics} ultimates={ultimates} expedition={currentExpedition} mode="full" onConfirm={handlePrepConfirm} />}
             {screen === 'reselect' && <PrepScreen skills={skills} relics={relics} ultimates={ultimates} expedition={currentExpedition} mode={reselectMode} currentActiveSkills={activeSkills} currentActiveRelicNames={activeRelicNames} onConfirm={handleReselectConfirm} />}
             {screen === 'shop' && <ShopScreen gold={gold} skills={skills} relics={relics} ultimates={ultimates} onBuy={handleShopBuy} onLeave={handleShopLeave} classId={classData?.id} />}
+            {screen === 'forge' && <ForgeScreen relics={relics} skills={skills} activeRelicNames={activeRelicNames} onCombine={handleForgeCombine} onLeave={handleForgeLeave} />}
             {screen === 'chapterClear' && chapter && <ChapterClearScreen chapter={chapter} isLastChapter={false} onContinue={handleChapterContinue} />}
             {screen === 'expeditionClear' && currentExpedition && <ExpeditionClearScreen expedition={currentExpedition} soulsGained={runSouls} onContinue={handleExpeditionClearContinue} />}
             {screen === 'defeat' && <DefeatScreen classData={classData} chapter={chapter} soulsGained={runSouls} onContinue={handleDefeatContinue} />}
