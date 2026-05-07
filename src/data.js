@@ -1897,4 +1897,17 @@ export const ACHIEVEMENTS = [
   { id: 'meta_kill_1000', cat: 'meta', kind: 'cumulative', target: 1000, reward: 300, name: '천 인의 처단자', desc: '누적 1000마리 처치' },
   { id: 'meta_runs_10', cat: 'meta', kind: 'cumulative', target: 10, reward: 100, name: '도전자', desc: '누적 10회 원정 시도' },
   { id: 'meta_runs_100', cat: 'meta', kind: 'cumulative', target: 100, reward: 500, name: '불굴의 의지', desc: '누적 100회 원정 시도' },
+  
+  // === 황혼의 대장간 업적 ===
+  { id: 'forge_first', cat: 'forge', kind: 'event', target: 1, reward: 30, name: '첫 단련', desc: '황혼의 대장간에서 첫 조합 시도' },
+  { id: 'forge_recipe_3', cat: 'forge', kind: 'cumulative', target: 3, reward: 150, name: '초보 대장장이', desc: '레시피 3종 발견' },
+  { id: 'forge_recipe_6', cat: 'forge', kind: 'cumulative', target: 6, reward: 250, name: '숙련 대장장이', desc: '레시피 6종 발견' },
+  { id: 'forge_recipe_all', cat: 'forge', kind: 'cumulative', target: 12, reward: 500, name: '황혼의 대장장이', desc: '모든 레시피 12종 발견' },
+  { id: 'forge_count_10', cat: 'forge', kind: 'cumulative', target: 10, reward: 100, name: '단련의 길', desc: '대장간 누적 조합 10회' },
+  { id: 'forge_count_50', cat: 'forge', kind: 'cumulative', target: 50, reward: 500, name: '무한 단련', desc: '대장간 누적 조합 50회' },
+  { id: 'forge_count_100', cat: 'forge', kind: 'cumulative', target: 100, reward: 1000, name: '단련 100회', desc: '대장간 누적 조합 100회' },
+  { id: 'forge_count_200', cat: 'forge', kind: 'cumulative', target: 200, reward: 1000, name: '단련 200회', desc: '대장간 누적 조합 200회' },
+  { id: 'forge_count_300', cat: 'forge', kind: 'cumulative', target: 300, reward: 1000, name: '단련 300회', desc: '대장간 누적 조합 300회' },
+  { id: 'forge_count_400', cat: 'forge', kind: 'cumulative', target: 400, reward: 1000, name: '단련 400회', desc: '대장간 누적 조합 400회' },
+  { id: 'forge_count_500', cat: 'forge', kind: 'cumulative', target: 500, reward: 1000, name: '단련 500회', desc: '대장간 누적 조합 500회' },
 ];
