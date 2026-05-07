@@ -1082,7 +1082,7 @@ function SoulAltar({ meta, onPurchase, onReroll, slots, onBack }) {
   );
 }
 
-function MapView({ chapter, classData, mapData, hp, maxHp, gold, gem, relics = [], activeRelicNames = null, expedition, curses = [], chapterIdx, onEnterNode, onOpenStatus, onOpenAchievements, onBack }) {
+function MapView({ chapter, classData, mapData, hp, maxHp, gold, gem, relics = [], activeRelicNames = null, expedition, curses = [], chapterIdx, onEnterNode, onOpenStatus, onOpenAchievements, onOpenCodex, onBack }) {
   // 천리안 유물 보유 (활성 상태) 시 모든 노드 공개
   const hasMapReveal = relics && relics.some(r => 
     r.statBonus?.mapReveal > 0 && (!activeRelicNames || activeRelicNames.includes(r.name))
@@ -1220,7 +1220,7 @@ function MapView({ chapter, classData, mapData, hp, maxHp, gold, gem, relics = [
       </div>
       <div className="grid grid-cols-5 border-t" style={{ borderColor: PALETTE.panelBorder, background: PALETTE.bgDeep }}>
         <button onClick={onBack} className="py-2.5 text-[10px]" style={{ color: PALETTE.textDim }}>나가기</button>
-        <button className="py-2.5 text-[10px]" style={{ color: PALETTE.textDim }}>기록</button>
+        <button onClick={onOpenCodex} className="py-2.5 text-[10px]" style={{ color: '#c46535' }}>도감</button>
         <button onClick={onOpenStatus} className="py-2.5 text-[10px]" style={{ color: PALETTE.derod }}>스킬</button>
         <button onClick={onOpenAchievements} className="py-2.5 text-[10px]" style={{ color: PALETTE.legendary }}>업적</button>
         <button className="py-2.5 text-[10px]" style={{ color: PALETTE.textDim }}>설정</button>
@@ -2266,8 +2266,8 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
 
         {/* === 3/3: 내 영역 (일러스트 + 정보 BAR 오버레이) === */}
         <div className="flex-1 min-h-0 relative overflow-hidden">
-          {/* 내 일러스트 — 가득 채움, center 15% */}
-          <img src={classData.image} alt="Player Avatar" className="absolute inset-0 w-full h-full object-cover" style={{ objectPosition: 'center 15%' }} onError={(e) => { e.target.src = '/classes/lanthert.jpg'; }} />
+          {/* 내 일러스트 — 가로 잘림 없이, center 18% 세로 */}
+          <img src={classData.image} alt="Player Avatar" className="absolute inset-0 w-full h-full object-contain" style={{ objectPosition: 'center 18%' }} onError={(e) => { e.target.src = '/classes/lanthert.jpg'; }} />
           {/* 정보 BAR 오버레이 (하단 + 그라디언트) */}
           <div className="absolute inset-x-0 bottom-0">
             <div className="absolute inset-0" style={{ background: `linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.7) 60%, rgba(0,0,0,0.9) 100%)`, pointerEvents: 'none' }} />
@@ -3139,6 +3139,85 @@ function ForgeScreen({ relics, skills, activeRelicNames, onCombine, onLeave }) {
   );
 }
 
+// =========== 도감 (대장간 조합식) ===========
+// 발견된 레시피만 공개, 미발견은 ??? + ??? = ??? 형식
+function CodexScreen({ meta, onBack }) {
+  const discovered = meta.discoveredRecipes || [];
+  const totalRecipes = FORGE_RECIPES.length;
+  
+  // 발견된 것 먼저, 미발견 나중
+  const sortedRecipes = [...FORGE_RECIPES].sort((a, b) => {
+    const aDis = discovered.includes(a.result);
+    const bDis = discovered.includes(b.result);
+    if (aDis && !bDis) return -1;
+    if (!aDis && bDis) return 1;
+    return 0;
+  });
+  
+  return (
+    <div className="absolute inset-0 flex flex-col" style={{ background: PALETTE.bgDeep }}>
+      <div className="px-4 py-3 border-b flex items-center gap-3" style={{ borderColor: PALETTE.panelBorder }}>
+        <button onClick={onBack} className="text-base font-bold" style={{ color: PALETTE.textDim }}>◂</button>
+        <div className="flex-1 text-center">
+          <div className="text-[10px] tracking-[0.3em]" style={{ color: '#c46535' }}>━━ C O D E X ━━</div>
+          <div className="text-sm font-bold tracking-[0.2em] mt-0.5" style={{ color: PALETTE.text }}>황혼의 대장간 도감</div>
+        </div>
+        <div style={{ width: '20px' }} />
+      </div>
+      
+      <div className="px-4 py-2 flex justify-between items-center" style={{ background: `${PALETTE.bgDeep}`, borderBottom: `1px solid ${PALETTE.panelBorder}` }}>
+        <span className="text-[10px]" style={{ color: PALETTE.textDim }}>발견된 레시피</span>
+        <span className="text-[12px] font-bold tabular-nums" style={{ color: '#c46535' }}>
+          {discovered.length} / {totalRecipes}
+        </span>
+      </div>
+      
+      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2">
+        {sortedRecipes.map((recipe, idx) => {
+          const isDiscovered = discovered.includes(recipe.result);
+          return (
+            <div key={idx} className="px-3 py-2.5" style={{
+              background: isDiscovered ? `${PALETTE.bgDeep}` : '#0a0608',
+              border: `1px solid ${isDiscovered ? '#c46535' : PALETTE.panelBorder}`,
+              opacity: isDiscovered ? 1 : 0.6,
+            }}>
+              <div className="flex items-center gap-2 mb-1.5">
+                <Hammer size={14} style={{ color: isDiscovered ? '#c46535' : PALETTE.textDim }} />
+                <div className="text-[12px] font-bold" style={{ color: isDiscovered ? PALETTE.text : PALETTE.textDim }}>
+                  {isDiscovered ? recipe.result : '???'}
+                </div>
+              </div>
+              <div className="text-[10px] flex items-center gap-1.5 flex-wrap" style={{ color: PALETTE.textDim }}>
+                {isDiscovered ? (
+                  <>
+                    <span>{recipe.ingredients[0]}</span>
+                    <span style={{ color: '#c46535' }}>+</span>
+                    <span>{recipe.ingredients[1]}</span>
+                    <span style={{ color: '#c46535' }}>=</span>
+                    <span style={{ color: PALETTE.legendary }}>{recipe.result} +1Lv</span>
+                  </>
+                ) : (
+                  <>
+                    <span>???</span>
+                    <span>+</span>
+                    <span>???</span>
+                    <span>=</span>
+                    <span>???</span>
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })}
+        
+        <div className="text-[9px] text-center mt-4 mb-2" style={{ color: PALETTE.textDim, opacity: 0.6 }}>
+          유물 2개를 희생하면 정해진 패시브를 획득한다
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // =========== 전투 준비 노드 ===========
 // 보유 패시브 中 5개, 보유 유물 中 N개 (원정별) 선택 → 나머지 봉인
 // =========== 전투 준비 / 재선택 노드 ===========
@@ -3718,6 +3797,7 @@ function AchievementScreen({ meta, onClaim, onClose }) {
     clear: ACHIEVEMENTS.filter(a => a.cat === 'clear'),
     special: ACHIEVEMENTS.filter(a => a.cat === 'special'),
     meta: ACHIEVEMENTS.filter(a => a.cat === 'meta'),
+    forge: ACHIEVEMENTS.filter(a => a.cat === 'forge'),
   };
   
   // 진행률 계산
@@ -3760,12 +3840,13 @@ function AchievementScreen({ meta, onClaim, onClose }) {
       </div>
       
       {/* 카테고리 필터 */}
-      <div className="grid grid-cols-4 border-b" style={{ borderColor: PALETTE.panelBorder }}>
+      <div className="grid grid-cols-5 border-b" style={{ borderColor: PALETTE.panelBorder }}>
         {[
           { id: 'all', label: '전체' },
-          { id: 'clear', label: `클리어 (${byCategory.clear.length})` },
-          { id: 'special', label: `특수 (${byCategory.special.length})` },
-          { id: 'meta', label: `누적 (${byCategory.meta.length})` },
+          { id: 'clear', label: `클리어` },
+          { id: 'special', label: `특수` },
+          { id: 'meta', label: `누적` },
+          { id: 'forge', label: `대장간` },
         ].map(f => (
           <button key={f.id} onClick={() => setFilter(f.id)} 
             className="py-2 text-[10px] tracking-[0.1em]" style={{
@@ -4694,6 +4775,40 @@ export default function App() {
       // 영혼 +50 (해당 런 누적, 원정 클리어/사망 시 메타에 반영)
       setRunSouls(prev => prev + result.value);
     }
+    
+    // === 업적 트래킹 ===
+    let trackedMeta = { 
+      ...meta, 
+      forgeCount: (meta.forgeCount || 0) + 1,
+      discoveredRecipes: meta.discoveredRecipes || [],
+    };
+    
+    // 첫 단련
+    trackedMeta = completeAchievement(trackedMeta, 'forge_first', 1);
+    
+    // 누적 조합 횟수
+    const newCount = trackedMeta.forgeCount;
+    trackedMeta = setAchievementProgress(trackedMeta, 'forge_count_10', newCount, 10);
+    trackedMeta = setAchievementProgress(trackedMeta, 'forge_count_50', newCount, 50);
+    trackedMeta = setAchievementProgress(trackedMeta, 'forge_count_100', newCount, 100);
+    trackedMeta = setAchievementProgress(trackedMeta, 'forge_count_200', newCount, 200);
+    trackedMeta = setAchievementProgress(trackedMeta, 'forge_count_300', newCount, 300);
+    trackedMeta = setAchievementProgress(trackedMeta, 'forge_count_400', newCount, 400);
+    trackedMeta = setAchievementProgress(trackedMeta, 'forge_count_500', newCount, 500);
+    
+    // 레시피 발견 (skill 결과 + 처음 발견 시만)
+    if (result.type === 'skill' && result.skillName) {
+      const discovered = trackedMeta.discoveredRecipes || [];
+      if (!discovered.includes(result.skillName)) {
+        trackedMeta.discoveredRecipes = [...discovered, result.skillName];
+        const count = trackedMeta.discoveredRecipes.length;
+        trackedMeta = setAchievementProgress(trackedMeta, 'forge_recipe_3', count, 3);
+        trackedMeta = setAchievementProgress(trackedMeta, 'forge_recipe_6', count, 6);
+        trackedMeta = setAchievementProgress(trackedMeta, 'forge_recipe_all', count, 12);
+      }
+    }
+    
+    setMeta(trackedMeta);
   };
   
   const handleForgeLeave = () => {
@@ -4817,7 +4932,8 @@ export default function App() {
             {screen === 'start' && <StartScreen classData={classData} onContinue={() => { if (selectedExpedition) startExpedition(selectedExpedition); }} />}
             {screen === 'altar' && <SoulAltar meta={meta} slots={altarSlots} onPurchase={purchaseUpgrade} onReroll={rerollAltar} onBack={() => setScreen('title')} />}
             {screen === 'achievements' && <AchievementScreen meta={meta} onClaim={handleClaimAchievement} onClose={() => setScreen(prevAchievementsBack)} />}
-            {screen === 'map' && chapter && mapData && <MapView chapter={chapter} classData={classData} mapData={mapData} hp={hp} maxHp={maxHp} gold={gold} gem={gem} relics={relics} activeRelicNames={activeRelicNames} expedition={currentExpedition} curses={currentCurses} chapterIdx={chapterIdx} onEnterNode={handleEnterNode} onOpenStatus={() => setScreen('status')} onOpenAchievements={() => { setPrevAchievementsBack('map'); setScreen('achievements'); }} onBack={() => setScreen('title')} />}
+            {screen === 'map' && chapter && mapData && <MapView chapter={chapter} classData={classData} mapData={mapData} hp={hp} maxHp={maxHp} gold={gold} gem={gem} relics={relics} activeRelicNames={activeRelicNames} expedition={currentExpedition} curses={currentCurses} chapterIdx={chapterIdx} onEnterNode={handleEnterNode} onOpenStatus={() => setScreen('status')} onOpenAchievements={() => { setPrevAchievementsBack('map'); setScreen('achievements'); }} onOpenCodex={() => setScreen('codex')} onBack={() => setScreen('title')} />}
+            {screen === 'codex' && <CodexScreen meta={meta} onBack={() => setScreen('map')} />}
             {screen === 'combat' && currentEnemy && <CombatScreen key={`${activeNodeId}-${currentEnemy}`} classData={classData} initialPlayer={{ hp, maxHp, ...stats, ...classData.stats }} initialSkills={skills} initialUltimates={ultimates} initialRelics={relics} activeSkills={activeSkills} activeRelicNames={activeRelicNames} enemyKey={currentEnemy} isBoss={isBossReward} expedition={currentExpedition} curses={currentCurses} meta={meta} onVictory={handleVictory} onDefeat={handleDefeat} />}
             {screen === 'reward' && <RewardSelect rewards={currentRewards} gem={gem} skills={skills} relics={relics} ultimates={ultimates} onPick={handlePickReward} onReroll={handleReroll} hasRerolled={hasRerolled} isElite={isEliteReward} classId={classData?.id} />}
             {screen === 'victory' && <VictoryScreen classData={classData} enemy={currentEnemy ? ENEMIES[currentEnemy] : null} gains={victoryGains} onContinue={handleVictoryContinue} />}
