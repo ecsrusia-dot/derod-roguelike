@@ -124,7 +124,7 @@ export const PASSIVE_SKILLS = {
   },
   운명: {
     axis: 'utility', maxLv: 7, color: '#5c4a8c',
-    desc: '데로드/데블랑 게이지',
+    desc: '여명/황혼 게이지',
     minorEffect: { type: 'rewardChoice+', perLv: 1, desc: '보상 시 추가 보석 +1/Lv' },
     tiers: {
       3: { text: '보석 리롤 비용 -1', trigger: 'passive', effect: 'rerollDiscount' },
@@ -193,7 +193,7 @@ export const CLASSES = [
     combatImage: './classes/combat/sage_combat.jpg',
   },
   {
-    id: 'demonblood', name: '마족 혼혈', sub: 'Demon Heritage',
+    id: 'demonblood', name: '혼혈 마족', sub: 'Demon Heritage',
     quote: '걱정마, 밤이되기전에 돌아올께!',
     desc: '나크젤리온의 피가 흐르는 자. 분노가 곧 힘이 된다.',
     startSkills: { 잔혹: 3, 강타: 1 },
@@ -223,9 +223,9 @@ export const CLASSES = [
     combatImage: './classes/combat/elf_combat.jpg',
   },
   {
-    id: 'priest', name: '데로드의 사제', sub: 'Priest of Derod',
-    quote: '데로드의 가호 아래... 반드시 돌아오겠습니다.',
-    desc: '데로드의 가호를 받은 자. 회복과 가호로 동료를 살린다.',
+    id: 'priest', name: '여명의 사제', sub: 'Priest of Dawn',
+    quote: '여명의 가호 아래... 반드시 돌아오겠습니다.',
+    desc: '여명의 가호를 받은 자. 회복과 가호로 동료를 살린다.',
     startSkills: { 신앙: 3, 재생: 2 },
     stats: { 근력: 9, 민첩: 11, 지능: 15, 매력: 19 },
     combatSkills: ['신성광선', '축복', '가호'],
@@ -261,7 +261,7 @@ export const COMBAT_SKILLS = {
   마법탄: { name: '마법탄', cost: 0, cd: 0, type: 'magic', baseDmg: [18, 24], desc: '기본 마법' },
   정념폭발: { name: '정념폭발', cost: 2, cd: 3, type: 'magic', baseDmg: [42, 52], desc: '강력한 마법' },
   결계: { name: '결계', cost: 1, cd: 1, type: 'defense', defense: 50, desc: '방어 +50' },
-  // 마족 혼혈
+  // 혼혈 마족
   광폭참격: { name: '광폭참격', cost: 0, cd: 0, type: 'physical', baseDmg: [22, 30], desc: 'HP 낮을수록 ↑', berserker: true },
   '피의 일격': { name: '피의 일격', cost: 1, cd: 2, type: 'physical', baseDmg: [27, 35], desc: '자해+출혈', selfDmg: 10, forceBleed: true },
   광기: { name: '광기', cost: 2, cd: 3, type: 'buff', buff: 'rage', desc: '3턴 데미지+30% (광기의 분노)' },
@@ -269,9 +269,9 @@ export const COMBAT_SKILLS = {
   정밀사격: { name: '정밀사격', cost: 0, cd: 0, type: 'physical', baseDmg: [18, 24], desc: '기본 활 공격' },
   연속화살: { name: '연속화살', cost: 2, cd: 3, type: 'physical', baseDmg: [15, 19], hitCount: 3, desc: '3연발' },
   바람결계: { name: '바람결계', cost: 1, cd: 1, type: 'defense', defense: 30, desc: '방어+회피', dodgeBuff: 30 },
-  // 데로드의 사제
+  // 여명의 사제
   신성광선: { name: '신성광선', cost: 0, cd: 0, type: 'magic', baseDmg: [17, 25], desc: '신성 데미지+자가 회복 10', selfHeal: 10 },
-  축복: { name: '축복', cost: 1, cd: 3, type: 'buff', buff: 'rage', desc: '3턴 데미지+30% (데로드의 축복)' },
+  축복: { name: '축복', cost: 1, cd: 3, type: 'buff', buff: 'rage', desc: '3턴 데미지+30% (여명의 축복)' },
   가호: { name: '가호', cost: 2, cd: 2, type: 'defense', defense: 50, desc: '방어 +50, HP 회복 +15', selfHeal: 15 },
 };
 
@@ -469,7 +469,7 @@ export const ENEMIES = {
   },
   ancientPriest: {
     name: '옛 사제', hp: 280, color: '#d4a574',
-    desc: '데로드를 모시던 신전의 옛 사제. 광기에 빠졌다',
+    desc: '여명을 모시던 신전의 옛 사제. 광기에 빠졌다',
     tier: 'elite', chapter: 3,
     patterns: [
       { name: '심판의 광선', dmg: [28, 36], type: 'attack' },
@@ -639,13 +639,13 @@ export const EVENTS = [
   {
     id: 'shrine',
     title: '버려진 신전',
-    text: '얼어붙은 돌계단 위에 작은 신전. 데로드의 표식이 새겨져 있다.\n무언가가 당신을 부르는 듯하다.',
+    text: '얼어붙은 돌계단 위에 작은 신전. 여명의 표식이 새겨져 있다.\n무언가가 당신을 부르는 듯하다.',
     chapter: [1, 2, 3],
     choices: [
       {
         text: '기도를 올린다 (지능 검정)',
         stat: '지능', dc: 19,
-        success: { text: '데로드의 가호가 손에 깃든다.', reward: { type: 'skill_random_lv', axis: 'utility' } },
+        success: { text: '여명의 가호가 손에 깃든다.', reward: { type: 'skill_random_lv', axis: 'utility' } },
         fail: { text: '응답이 없다. 차가운 침묵만이.', penalty: null }
       },
       {
@@ -753,13 +753,13 @@ export const EVENTS = [
   {
     id: 'auroraNight',
     title: '극광의 밤',
-    text: '하늘이 보랏빛 빛으로 흐른다. 데블랑의 표식이 가득하다.',
+    text: '하늘이 보랏빛 빛으로 흐른다. 황혼의 표식이 가득하다.',
     chapter: [1],
     choices: [
       {
         text: '빛에 몸을 맡긴다 (지능 검정)',
         stat: '지능', dc: 15,
-        success: { text: '데블랑의 진리가 어렴풋이 보인다.', reward: { type: 'skill_random_lv', axis: 'utility' } },
+        success: { text: '황혼의 진리가 어렴풋이 보인다.', reward: { type: 'skill_random_lv', axis: 'utility' } },
         fail: { text: '광기가 잠시 정신을 좀먹는다.', penalty: { hp: -20 } }
       },
       { text: '눈을 감고 지나친다', result: '아무것도 보지 않는다.', reward: null },
@@ -881,7 +881,7 @@ export const EVENTS = [
   {
     id: 'sealedDoor',
     title: '봉인된 문',
-    text: '거대한 석문. 데로드의 표식이 새겨져 있다.\n안에서 무언가가 깨어나려 한다.',
+    text: '거대한 석문. 여명의 표식이 새겨져 있다.\n안에서 무언가가 깨어나려 한다.',
     chapter: [3],
     choices: [
       {
@@ -934,20 +934,20 @@ export const EVENTS = [
   {
     id: 'shatteredAltar',
     title: '깨진 제단',
-    text: '데로드의 제단이 박살나 있다. 누군가의 흔적이 남아있다.',
+    text: '여명의 제단이 박살나 있다. 누군가의 흔적이 남아있다.',
     chapter: [3],
     choices: [
       {
         text: '제단을 복원한다 (지능 검정)',
         stat: '지능', dc: 14,
-        success: { text: '데로드의 가호가 깃든다.', reward: { type: 'heal_full' } },
+        success: { text: '여명의 가호가 깃든다.', reward: { type: 'heal_full' } },
         fail: { text: '제단이 더 부서진다.', penalty: null }
       },
       { text: '잔해를 뒤진다', result: '낡은 보물을 챙긴다.', reward: { type: 'gold', value: 80 } },
       {
         text: '깨끗이 정리한다 (매력 검정)',
         stat: '매력', dc: 13,
-        success: { text: '데로드가 작은 가호를 내린다.', reward: { type: 'skill_random_lv', axis: 'utility' } },
+        success: { text: '여명이 작은 가호를 내린다.', reward: { type: 'skill_random_lv', axis: 'utility' } },
         fail: { text: '응답이 없다.', penalty: null }
       },
     ],
@@ -955,7 +955,7 @@ export const EVENTS = [
   {
     id: 'corruptedPriest',
     title: '타락한 사제',
-    text: '신전의 사제. 광기에 빠진 눈으로 당신을 노려본다.\n"데로드는 죽었다... 데블랑이 진실이다..."',
+    text: '신전의 사제. 광기에 빠진 눈으로 당신을 노려본다.\n"여명은 죽었다... 황혼이 진실이다..."',
     chapter: [3],
     choices: [
       {
@@ -1069,7 +1069,7 @@ export const EVENTS = [
       {
         text: '문을 봉인한다 (지능 검정)',
         stat: '지능', dc: 15,
-        success: { text: '마계의 침입을 막아낸다. 데로드의 가호가 깃든다.', reward: { type: 'skill_random_lv', axis: 'utility' } },
+        success: { text: '마계의 침입을 막아낸다. 여명의 가호가 깃든다.', reward: { type: 'skill_random_lv', axis: 'utility' } },
         fail: { text: '봉인이 실패한다.', penalty: null }
       },
       { text: '돌아간다', result: '문을 등 뒤로 한다.', reward: null },
@@ -1101,7 +1101,7 @@ export const EVENTS = [
   {
     id: 'mysteriousFountain',
     title: '신비한 샘',
-    text: '맑은 물이 흐르는 작은 샘. 데로드의 표식이 살짝 보인다.',
+    text: '맑은 물이 흐르는 작은 샘. 여명의 표식이 살짝 보인다.',
     chapter: [1, 2, 3, 4],
     choices: [
       { text: '물을 마신다', result: '몸이 한결 가벼워진다.', reward: { type: 'heal', value: 35 } },
@@ -1391,15 +1391,15 @@ export const ULTIMATE_SKILLS = {
   ],
   신앙: [
     {
-      id: '신앙_데로드의축복',
-      name: '데로드의 축복',
+      id: '신앙_여명의축복',
+      name: '여명의 축복',
       desc: '매 턴 HP +5, 모든 회복 효과 +50%.',
       effect: 'ult_derodBlessing',
       color: '#d4a574',
     },
     {
-      id: '신앙_데블랑의저주',
-      name: '데블랑의 저주',
+      id: '신앙_황혼의저주',
+      name: '황혼의 저주',
       desc: '받는 데미지 -25%. 적 공격 시 30% 확률로 적이 자해.',
       effect: 'ult_deblanCurse',
       color: '#5c4a8c',
@@ -1742,8 +1742,8 @@ export const META_UPGRADES = [
   // === 해금 ===
   {
     id: 'unlock_priest',
-    name: '데로드의 사제 해금',
-    desc: '새 직업 "데로드의 사제" 사용 가능',
+    name: '여명의 사제 해금',
+    desc: '새 직업 "여명의 사제" 사용 가능',
     category: 'unlock',
     stackable: false,
     cost: () => 10000,
@@ -1824,20 +1824,20 @@ export const ACHIEVEMENTS = [
   { id: 'clear_sage_3', cat: 'clear', class: 'sage', expedition: 3, kind: 'first', target: 1, reward: 300, name: '광기 정복 (술법사)', desc: '술법사로 광기의 원정 클리어' },
   { id: 'clear_sage_4', cat: 'clear', class: 'sage', expedition: 4, kind: 'first', target: 1, reward: 500, name: '망각 정복 (술법사)', desc: '술법사로 망각의 원정 클리어' },
   
-  { id: 'clear_demonblood_1', cat: 'clear', class: 'demonblood', expedition: 1, kind: 'first', target: 1, reward: 100, name: '북부 정복 (마족 혼혈)', desc: '마족 혼혈로 북부의 원정 클리어' },
-  { id: 'clear_demonblood_2', cat: 'clear', class: 'demonblood', expedition: 2, kind: 'first', target: 1, reward: 200, name: '심연 정복 (마족 혼혈)', desc: '마족 혼혈로 심연의 원정 클리어' },
-  { id: 'clear_demonblood_3', cat: 'clear', class: 'demonblood', expedition: 3, kind: 'first', target: 1, reward: 300, name: '광기 정복 (마족 혼혈)', desc: '마족 혼혈로 광기의 원정 클리어' },
-  { id: 'clear_demonblood_4', cat: 'clear', class: 'demonblood', expedition: 4, kind: 'first', target: 1, reward: 500, name: '망각 정복 (마족 혼혈)', desc: '마족 혼혈로 망각의 원정 클리어' },
+  { id: 'clear_demonblood_1', cat: 'clear', class: 'demonblood', expedition: 1, kind: 'first', target: 1, reward: 100, name: '북부 정복 (혼혈 마족)', desc: '혼혈 마족로 북부의 원정 클리어' },
+  { id: 'clear_demonblood_2', cat: 'clear', class: 'demonblood', expedition: 2, kind: 'first', target: 1, reward: 200, name: '심연 정복 (혼혈 마족)', desc: '혼혈 마족로 심연의 원정 클리어' },
+  { id: 'clear_demonblood_3', cat: 'clear', class: 'demonblood', expedition: 3, kind: 'first', target: 1, reward: 300, name: '광기 정복 (혼혈 마족)', desc: '혼혈 마족로 광기의 원정 클리어' },
+  { id: 'clear_demonblood_4', cat: 'clear', class: 'demonblood', expedition: 4, kind: 'first', target: 1, reward: 500, name: '망각 정복 (혼혈 마족)', desc: '혼혈 마족로 망각의 원정 클리어' },
   
   { id: 'clear_elf_1', cat: 'clear', class: 'elf', expedition: 1, kind: 'first', target: 1, reward: 100, name: '북부 정복 (정령사)', desc: '숲의 정령사로 북부의 원정 클리어' },
   { id: 'clear_elf_2', cat: 'clear', class: 'elf', expedition: 2, kind: 'first', target: 1, reward: 200, name: '심연 정복 (정령사)', desc: '숲의 정령사로 심연의 원정 클리어' },
   { id: 'clear_elf_3', cat: 'clear', class: 'elf', expedition: 3, kind: 'first', target: 1, reward: 300, name: '광기 정복 (정령사)', desc: '숲의 정령사로 광기의 원정 클리어' },
   { id: 'clear_elf_4', cat: 'clear', class: 'elf', expedition: 4, kind: 'first', target: 1, reward: 500, name: '망각 정복 (정령사)', desc: '숲의 정령사로 망각의 원정 클리어' },
   
-  { id: 'clear_priest_1', cat: 'clear', class: 'priest', expedition: 1, kind: 'first', target: 1, reward: 100, name: '북부 정복 (사제)', desc: '데로드의 사제로 북부의 원정 클리어' },
-  { id: 'clear_priest_2', cat: 'clear', class: 'priest', expedition: 2, kind: 'first', target: 1, reward: 200, name: '심연 정복 (사제)', desc: '데로드의 사제로 심연의 원정 클리어' },
-  { id: 'clear_priest_3', cat: 'clear', class: 'priest', expedition: 3, kind: 'first', target: 1, reward: 300, name: '광기 정복 (사제)', desc: '데로드의 사제로 광기의 원정 클리어' },
-  { id: 'clear_priest_4', cat: 'clear', class: 'priest', expedition: 4, kind: 'first', target: 1, reward: 500, name: '망각 정복 (사제)', desc: '데로드의 사제로 망각의 원정 클리어' },
+  { id: 'clear_priest_1', cat: 'clear', class: 'priest', expedition: 1, kind: 'first', target: 1, reward: 100, name: '북부 정복 (사제)', desc: '여명의 사제로 북부의 원정 클리어' },
+  { id: 'clear_priest_2', cat: 'clear', class: 'priest', expedition: 2, kind: 'first', target: 1, reward: 200, name: '심연 정복 (사제)', desc: '여명의 사제로 심연의 원정 클리어' },
+  { id: 'clear_priest_3', cat: 'clear', class: 'priest', expedition: 3, kind: 'first', target: 1, reward: 300, name: '광기 정복 (사제)', desc: '여명의 사제로 광기의 원정 클리어' },
+  { id: 'clear_priest_4', cat: 'clear', class: 'priest', expedition: 4, kind: 'first', target: 1, reward: 500, name: '망각 정복 (사제)', desc: '여명의 사제로 망각의 원정 클리어' },
   
   // === 숙달 업적: 직업 × 원정 10회 클리어 (5 × 4 = 20개) ===
   // 보상: 원정 1=200, 2=400, 3=600, 4=1000
@@ -1851,34 +1851,34 @@ export const ACHIEVEMENTS = [
   { id: 'master10_sage_3', cat: 'clear', class: 'sage', expedition: 3, kind: 'count', target: 10, reward: 600, name: '광기의 숙달자 (술법사)', desc: '술법사로 광기의 원정 10회 클리어' },
   { id: 'master10_sage_4', cat: 'clear', class: 'sage', expedition: 4, kind: 'count', target: 10, reward: 1000, name: '망각의 숙달자 (술법사)', desc: '술법사로 망각의 원정 10회 클리어' },
   
-  { id: 'master10_demonblood_1', cat: 'clear', class: 'demonblood', expedition: 1, kind: 'count', target: 10, reward: 200, name: '북부의 숙달자 (마족 혼혈)', desc: '마족 혼혈로 북부의 원정 10회 클리어' },
-  { id: 'master10_demonblood_2', cat: 'clear', class: 'demonblood', expedition: 2, kind: 'count', target: 10, reward: 400, name: '심연의 숙달자 (마족 혼혈)', desc: '마족 혼혈로 심연의 원정 10회 클리어' },
-  { id: 'master10_demonblood_3', cat: 'clear', class: 'demonblood', expedition: 3, kind: 'count', target: 10, reward: 600, name: '광기의 숙달자 (마족 혼혈)', desc: '마족 혼혈로 광기의 원정 10회 클리어' },
-  { id: 'master10_demonblood_4', cat: 'clear', class: 'demonblood', expedition: 4, kind: 'count', target: 10, reward: 1000, name: '망각의 숙달자 (마족 혼혈)', desc: '마족 혼혈로 망각의 원정 10회 클리어' },
+  { id: 'master10_demonblood_1', cat: 'clear', class: 'demonblood', expedition: 1, kind: 'count', target: 10, reward: 200, name: '북부의 숙달자 (혼혈 마족)', desc: '혼혈 마족로 북부의 원정 10회 클리어' },
+  { id: 'master10_demonblood_2', cat: 'clear', class: 'demonblood', expedition: 2, kind: 'count', target: 10, reward: 400, name: '심연의 숙달자 (혼혈 마족)', desc: '혼혈 마족로 심연의 원정 10회 클리어' },
+  { id: 'master10_demonblood_3', cat: 'clear', class: 'demonblood', expedition: 3, kind: 'count', target: 10, reward: 600, name: '광기의 숙달자 (혼혈 마족)', desc: '혼혈 마족로 광기의 원정 10회 클리어' },
+  { id: 'master10_demonblood_4', cat: 'clear', class: 'demonblood', expedition: 4, kind: 'count', target: 10, reward: 1000, name: '망각의 숙달자 (혼혈 마족)', desc: '혼혈 마족로 망각의 원정 10회 클리어' },
   
   { id: 'master10_elf_1', cat: 'clear', class: 'elf', expedition: 1, kind: 'count', target: 10, reward: 200, name: '북부의 숙달자 (정령사)', desc: '숲의 정령사로 북부의 원정 10회 클리어' },
   { id: 'master10_elf_2', cat: 'clear', class: 'elf', expedition: 2, kind: 'count', target: 10, reward: 400, name: '심연의 숙달자 (정령사)', desc: '숲의 정령사로 심연의 원정 10회 클리어' },
   { id: 'master10_elf_3', cat: 'clear', class: 'elf', expedition: 3, kind: 'count', target: 10, reward: 600, name: '광기의 숙달자 (정령사)', desc: '숲의 정령사로 광기의 원정 10회 클리어' },
   { id: 'master10_elf_4', cat: 'clear', class: 'elf', expedition: 4, kind: 'count', target: 10, reward: 1000, name: '망각의 숙달자 (정령사)', desc: '숲의 정령사로 망각의 원정 10회 클리어' },
   
-  { id: 'master10_priest_1', cat: 'clear', class: 'priest', expedition: 1, kind: 'count', target: 10, reward: 200, name: '북부의 숙달자 (사제)', desc: '데로드의 사제로 북부의 원정 10회 클리어' },
-  { id: 'master10_priest_2', cat: 'clear', class: 'priest', expedition: 2, kind: 'count', target: 10, reward: 400, name: '심연의 숙달자 (사제)', desc: '데로드의 사제로 심연의 원정 10회 클리어' },
-  { id: 'master10_priest_3', cat: 'clear', class: 'priest', expedition: 3, kind: 'count', target: 10, reward: 600, name: '광기의 숙달자 (사제)', desc: '데로드의 사제로 광기의 원정 10회 클리어' },
-  { id: 'master10_priest_4', cat: 'clear', class: 'priest', expedition: 4, kind: 'count', target: 10, reward: 1000, name: '망각의 숙달자 (사제)', desc: '데로드의 사제로 망각의 원정 10회 클리어' },
+  { id: 'master10_priest_1', cat: 'clear', class: 'priest', expedition: 1, kind: 'count', target: 10, reward: 200, name: '북부의 숙달자 (사제)', desc: '여명의 사제로 북부의 원정 10회 클리어' },
+  { id: 'master10_priest_2', cat: 'clear', class: 'priest', expedition: 2, kind: 'count', target: 10, reward: 400, name: '심연의 숙달자 (사제)', desc: '여명의 사제로 심연의 원정 10회 클리어' },
+  { id: 'master10_priest_3', cat: 'clear', class: 'priest', expedition: 3, kind: 'count', target: 10, reward: 600, name: '광기의 숙달자 (사제)', desc: '여명의 사제로 광기의 원정 10회 클리어' },
+  { id: 'master10_priest_4', cat: 'clear', class: 'priest', expedition: 4, kind: 'count', target: 10, reward: 1000, name: '망각의 숙달자 (사제)', desc: '여명의 사제로 망각의 원정 10회 클리어' },
   
   // === 전문가 (50회) - 직업당 1개 (가장 어려운 원정 4 기준) ===
   { id: 'expert_lanthert', cat: 'clear', class: 'lanthert', expedition: 4, kind: 'count', target: 50, reward: 2000, name: '검의 전문가', desc: '방랑검사로 망각의 원정 50회 클리어' },
   { id: 'expert_sage', cat: 'clear', class: 'sage', expedition: 4, kind: 'count', target: 50, reward: 2000, name: '술법의 전문가', desc: '술법사로 망각의 원정 50회 클리어' },
-  { id: 'expert_demonblood', cat: 'clear', class: 'demonblood', expedition: 4, kind: 'count', target: 50, reward: 2000, name: '마혈의 전문가', desc: '마족 혼혈로 망각의 원정 50회 클리어' },
+  { id: 'expert_demonblood', cat: 'clear', class: 'demonblood', expedition: 4, kind: 'count', target: 50, reward: 2000, name: '마혈의 전문가', desc: '혼혈 마족로 망각의 원정 50회 클리어' },
   { id: 'expert_elf', cat: 'clear', class: 'elf', expedition: 4, kind: 'count', target: 50, reward: 2000, name: '숲의 전문가', desc: '숲의 정령사로 망각의 원정 50회 클리어' },
-  { id: 'expert_priest', cat: 'clear', class: 'priest', expedition: 4, kind: 'count', target: 50, reward: 2000, name: '신앙의 전문가', desc: '데로드의 사제로 망각의 원정 50회 클리어' },
+  { id: 'expert_priest', cat: 'clear', class: 'priest', expedition: 4, kind: 'count', target: 50, reward: 2000, name: '신앙의 전문가', desc: '여명의 사제로 망각의 원정 50회 클리어' },
   
   // === 마스터 (100회) - 직업당 1개 ===
   { id: 'master_lanthert', cat: 'clear', class: 'lanthert', expedition: 4, kind: 'count', target: 100, reward: 5000, name: '검의 마스터', desc: '방랑검사로 망각의 원정 100회 클리어' },
   { id: 'master_sage', cat: 'clear', class: 'sage', expedition: 4, kind: 'count', target: 100, reward: 5000, name: '술법의 마스터', desc: '술법사로 망각의 원정 100회 클리어' },
-  { id: 'master_demonblood', cat: 'clear', class: 'demonblood', expedition: 4, kind: 'count', target: 100, reward: 5000, name: '마혈의 마스터', desc: '마족 혼혈로 망각의 원정 100회 클리어' },
+  { id: 'master_demonblood', cat: 'clear', class: 'demonblood', expedition: 4, kind: 'count', target: 100, reward: 5000, name: '마혈의 마스터', desc: '혼혈 마족로 망각의 원정 100회 클리어' },
   { id: 'master_elf', cat: 'clear', class: 'elf', expedition: 4, kind: 'count', target: 100, reward: 5000, name: '숲의 마스터', desc: '숲의 정령사로 망각의 원정 100회 클리어' },
-  { id: 'master_priest', cat: 'clear', class: 'priest', expedition: 4, kind: 'count', target: 100, reward: 5000, name: '신앙의 마스터', desc: '데로드의 사제로 망각의 원정 100회 클리어' },
+  { id: 'master_priest', cat: 'clear', class: 'priest', expedition: 4, kind: 'count', target: 100, reward: 5000, name: '신앙의 마스터', desc: '여명의 사제로 망각의 원정 100회 클리어' },
   
   // === 기발한 업적 (Achievement Hunter) ===
   { id: 'special_first_kill', cat: 'special', kind: 'event', target: 1, reward: 20, name: '첫걸음', desc: '처음으로 적을 처치' },
@@ -1890,8 +1890,8 @@ export const ACHIEVEMENTS = [
   { id: 'special_no_death', cat: 'special', kind: 'event', target: 1, reward: 250, name: '신중한 자', desc: '단 한번도 사망하지 않고 원정 클리어' },
   { id: 'special_kill_50', cat: 'special', kind: 'event', target: 50, reward: 150, name: '몰살자', desc: '한 챕터에서 적 50마리 처치' },
   { id: 'special_speed_clear', cat: 'special', kind: 'event', target: 1, reward: 200, name: '광속 클리어', desc: '챕터를 5분 안에 클리어' },
-  { id: 'special_all_lv7', cat: 'special', kind: 'event', target: 1, reward: 350, name: '데로드의 의지', desc: '한 런에서 패시브 5종 모두 Lv.7 보유' },
-  { id: 'special_three_curses', cat: 'special', kind: 'event', target: 1, reward: 500, name: '데블랑의 손길', desc: '저주 3개 모두 받은 채 원정 클리어' },
+  { id: 'special_all_lv7', cat: 'special', kind: 'event', target: 1, reward: 350, name: '여명의 의지', desc: '한 런에서 패시브 5종 모두 Lv.7 보유' },
+  { id: 'special_three_curses', cat: 'special', kind: 'event', target: 1, reward: 500, name: '황혼의 손길', desc: '저주 3개 모두 받은 채 원정 클리어' },
   { id: 'special_event_perfect', cat: 'special', kind: 'event', target: 1, reward: 200, name: '운명의 심판자', desc: '한 런에서 모든 사건 성공' },
   { id: 'special_lanthert_3ult', cat: 'special', kind: 'event', target: 1, reward: 600, name: '검의 길', desc: '방랑검사 궁극 3종 모두 1런에 진화' },
   { id: 'special_all_class_e4', cat: 'meta', kind: 'event', target: 5, reward: 3000, name: '미답의 도전자', desc: '모든 직업으로 망각 원정 클리어' },
