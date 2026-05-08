@@ -1185,9 +1185,17 @@ function MapView({ chapter, classData, mapData, hp, maxHp, gold, gem, relics = [
               {isCurrent && (
                 <div className="absolute inset-0 rounded-full animate-ping" style={{ background: cfg.color, opacity: 0.4 }} />
               )}
-              {/* 상점/대장간 노드는 항상 미세 펄스로 강조 (방문 전) */}
+              {/* 상점/대장간 노드는 항상 강조 (방문 전) — 펄스 + 외곽 링 */}
               {(n.type === 'shop' || n.type === 'forge') && !isCompleted && !isCurrent && (
-                <div className="absolute inset-0 rounded-full animate-pulse" style={{ background: cfg.color, opacity: 0.3 }} />
+                <>
+                  <div className="absolute rounded-full animate-ping" style={{ 
+                    inset: '-4px', background: cfg.color, opacity: 0.5,
+                  }} />
+                  <div className="absolute rounded-full animate-pulse" style={{ 
+                    inset: '-2px', background: cfg.color, opacity: 0.6,
+                    border: `2px solid ${cfg.color}`,
+                  }} />
+                </>
               )}
               <div className="relative w-full h-full rounded-full flex items-center justify-center" style={{
                 background: isCompleted
@@ -2764,7 +2772,7 @@ function RewardSelect({ rewards: initialRewards, gem, skills, relics, ultimates,
 }
 
 // =========== 사건 화면 ===========
-function EventScreen({ event, classData, stats, onResolve }) {
+function EventScreen({ event, classData, stats, skills = {}, onResolve }) {
   const [stage, setStage] = useState('intro'); // intro | result
   const [resultData, setResultData] = useState(null);
 
@@ -2793,6 +2801,16 @@ function EventScreen({ event, classData, stats, onResolve }) {
       result.text = choice.result || choice.text;
       result.reward = choice.reward;
     }
+    
+    // === skill_random_lv: 어느 패시브가 오를지 미리 결정 (표시용) ===
+    if (result.reward?.type === 'skill_random_lv') {
+      const ownedSkills = Object.entries(skills).filter(([_, lv]) => lv > 0 && lv < 7);
+      if (ownedSkills.length > 0) {
+        const [name, curLv] = ownedSkills[Math.floor(Math.random() * ownedSkills.length)];
+        result.reward = { ...result.reward, _resolvedSkill: name, _resolvedFrom: curLv, _resolvedTo: curLv + 1 };
+      }
+    }
+    
     setResultData(result);
     setStage('result');
   };
@@ -2827,7 +2845,15 @@ function EventScreen({ event, classData, stats, onResolve }) {
                   {resultData.reward.type === 'gold' && `은화 +${resultData.reward.value}`}
                   {resultData.reward.type === 'heal' && `체력 ${resultData.reward.value} 회복`}
                   {resultData.reward.type === 'random_relic' && <span style={{ color: PALETTE.legendary }}>무작위 유물 1개 획득</span>}
-                  {resultData.reward.type === 'skill_random_lv' && <span style={{ color: PALETTE.ice }}>무작위 패시브 숙련도 +1Lv</span>}
+                  {resultData.reward.type === 'skill_random_lv' && (
+                    resultData.reward._resolvedSkill ? (
+                      <span style={{ color: PALETTE.ice }}>
+                        ★ [{resultData.reward._resolvedSkill}] Lv.{resultData.reward._resolvedFrom} → Lv.{resultData.reward._resolvedTo}
+                      </span>
+                    ) : (
+                      <span style={{ color: PALETTE.textDim }}>강화 가능한 패시브 없음</span>
+                    )
+                  )}
                 </div>
               </div>
             )}
@@ -2986,19 +3012,32 @@ function ShopScreen({ gold, skills, relics, ultimates, onBuy, onLeave, classId =
     else if (r.type === 'heal_full') { title = '완전 회복'; color = PALETTE.legendary; }
     else { title = `${r.type} +${r.value}`; color = PALETTE.derod; }
 
+    // 패시브 Lv 변화 계산
+    const currentLv = r.type === 'skill' ? (skills[r.name] || 0) : 0;
+    const nextLv = currentLv + 1;
+    const maxLv = r.type === 'skill' ? (PASSIVE_SKILLS[r.name]?.maxLv || 7) : 0;
+    const isMaxed = r.type === 'skill' && currentLv >= maxLv;
+
     return (
-      <button key={idx} disabled={!canAfford || isBought}
+      <button key={idx} disabled={!canAfford || isBought || isMaxed}
         onClick={() => { onBuy(r, price); setBought(prev => new Set([...prev, idx])); }}
         className="w-full text-left px-3 py-2.5 transition-all"
         style={{
           background: isBought ? PALETTE.bgDeep : `${color}15`,
           border: `1px solid ${isBought ? PALETTE.panelBorder : color}`,
-          opacity: isBought ? 0.4 : (canAfford ? 1 : 0.6),
+          opacity: isBought ? 0.4 : (canAfford && !isMaxed ? 1 : 0.6),
         }}>
         <div className="flex items-center justify-between">
-          <div>
-            <div className="text-xs font-bold" style={{ color: PALETTE.text }}>{title}</div>
-            <div className="text-[10px] mt-0.5" style={{ color: PALETTE.textDim }}>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xs font-bold" style={{ color: PALETTE.text }}>{title}</span>
+              {r.type === 'skill' && (
+                <span className="text-[10px] px-1.5 py-0.5" style={{
+                  background: `${color}30`, color, border: `1px solid ${color}80`,
+                }}>{isMaxed ? 'MAX' : `Lv.${currentLv} → Lv.${nextLv}`}</span>
+              )}
+            </div>
+            <div className="text-[10px]" style={{ color: PALETTE.textDim }}>
               {isBought ? '구매 완료' : r.type === 'skill' ? PASSIVE_SKILLS[r.name].desc : ''}
             </div>
           </div>
@@ -4400,9 +4439,9 @@ export default function App() {
     setActiveNodeId(node.id);
     let nodeType = node.type;
     
-    // 미지 노드는 진입 시 랜덤 결정 (rest 제거)
+    // 미지 노드는 진입 시 랜덤 결정 (shop은 강제 배치 외에는 등장 X)
     if (nodeType === 'unknown') {
-      const types = ['battle', 'event', 'shop'];
+      const types = ['battle', 'event'];
       nodeType = types[Math.floor(Math.random() * types.length)];
     }
     setActiveNodeType(nodeType);
@@ -4537,7 +4576,9 @@ export default function App() {
     });
 
     if (isBossReward) {
-      setVictoryNextScreen('chapterClear');
+      // 마지막 챕터 보스 처치 → 원정 클리어 화면, 그 외 → 챕터 클리어
+      const isLastChapter = currentExpedition && chapterIdx >= currentExpedition.chapters.length - 1;
+      setVictoryNextScreen(isLastChapter ? 'expeditionClear' : 'chapterClear');
       setScreen('victory');
       return;
     }
@@ -4552,11 +4593,15 @@ export default function App() {
     setScreen('victory');
   };
   
-  // 승리 화면 → 다음 화면 (보상 또는 챕터 클리어)
+  // 승리 화면 → 다음 화면 (보상 / 챕터 클리어 / 원정 클리어)
   const handleVictoryContinue = () => {
     if (victoryNextScreen === 'chapterClear') {
       completeCurrentNode();
       setScreen('chapterClear');
+    } else if (victoryNextScreen === 'expeditionClear') {
+      completeCurrentNode();
+      // 원정 클리어 처리 (영혼 보너스 합산 등은 handleChapterContinue에서 처리)
+      handleChapterContinue();
     } else {
       setScreen('reward');
     }
@@ -4707,10 +4752,17 @@ export default function App() {
           setGold(prev => prev + 80);
         }
       } else if (resultData.reward.type === 'skill_random_lv') {
-        const ownedSkills = Object.entries(skills).filter(([_, lv]) => lv > 0 && lv < 7);
-        if (ownedSkills.length > 0) {
-          const [name] = ownedSkills[Math.floor(Math.random() * ownedSkills.length)];
-          setSkills(prev => ({ ...prev, [name]: Math.min(prev[name] + 1, 7) }));
+        // EventScreen에서 미리 결정된 스킬 사용 (없으면 다시 굴림)
+        const targetName = resultData.reward._resolvedSkill;
+        if (targetName && skills[targetName] != null && skills[targetName] < 7) {
+          setSkills(prev => ({ ...prev, [targetName]: Math.min(prev[targetName] + 1, 7) }));
+        } else {
+          // 폴백 (혹시 미리 결정 안 됐을 때)
+          const ownedSkills = Object.entries(skills).filter(([_, lv]) => lv > 0 && lv < 7);
+          if (ownedSkills.length > 0) {
+            const [name] = ownedSkills[Math.floor(Math.random() * ownedSkills.length)];
+            setSkills(prev => ({ ...prev, [name]: Math.min(prev[name] + 1, 7) }));
+          }
         }
       }
     }
@@ -4950,7 +5002,7 @@ export default function App() {
             {screen === 'combat' && currentEnemy && <CombatScreen key={`${activeNodeId}-${currentEnemy}`} classData={classData} initialPlayer={{ hp, maxHp, ...stats, ...classData.stats }} initialSkills={skills} initialUltimates={ultimates} initialRelics={relics} activeSkills={activeSkills} activeRelicNames={activeRelicNames} enemyKey={currentEnemy} isBoss={isBossReward} expedition={currentExpedition} curses={currentCurses} meta={meta} onVictory={handleVictory} onDefeat={handleDefeat} />}
             {screen === 'reward' && <RewardSelect rewards={currentRewards} gem={gem} skills={skills} relics={relics} ultimates={ultimates} onPick={handlePickReward} onReroll={handleReroll} hasRerolled={hasRerolled} isElite={isEliteReward} classId={classData?.id} />}
             {screen === 'victory' && <VictoryScreen classData={classData} enemy={currentEnemy ? ENEMIES[currentEnemy] : null} gains={victoryGains} onContinue={handleVictoryContinue} />}
-            {screen === 'event' && currentEvent && <EventScreen event={currentEvent} classData={classData} stats={{ ...classData.stats, ...stats }} onResolve={handleEventResolve} />}
+            {screen === 'event' && currentEvent && <EventScreen event={currentEvent} classData={classData} stats={{ ...classData.stats, ...stats }} skills={skills} onResolve={handleEventResolve} />}
             {screen === 'rest' && <RestScreen classData={classData} hp={hp} maxHp={maxHp} skills={skills} relics={relics} expedition={currentExpedition} onChoice={handleRestChoice} />}
             {screen === 'prep' && <PrepScreen skills={skills} relics={relics} ultimates={ultimates} expedition={currentExpedition} mode="full" onConfirm={handlePrepConfirm} />}
             {screen === 'reselect' && <PrepScreen skills={skills} relics={relics} ultimates={ultimates} expedition={currentExpedition} mode={reselectMode} currentActiveSkills={activeSkills} currentActiveRelicNames={activeRelicNames} onConfirm={handleReselectConfirm} />}
