@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Sword, Shield, Heart, Zap, Skull, Sparkles, Eye, Flame, Crown, BookOpen, Compass, ChevronRight, X, RefreshCw, Lock, Check, AlertTriangle, Hammer, Coins } from 'lucide-react';
 
 // ============================================
-// 데로드앤데블랑 로그라이크 v0.4 - INTEGRATED
+// 여명앤황혼 로그라이크 v0.4 - INTEGRATED
 // 전체 게임 루프: 챕터 → 맵 → 노드 → 전투/사건 → 보상 → 다음 노드 → 보스 → 다음 챕터
 // ============================================
 
@@ -15,7 +15,7 @@ const PALETTE = {
   bg: '#0a0608', bgDeep: '#050304',
   panel: '#1a0e12', panelLight: '#241419', panelBorder: '#3d1f28',
   accent: '#c4453d', accentDim: '#7a2820',
-  derod: '#d4a574', deblan: '#5c4a8c',
+  dawn: '#d4a574', twilight: '#5c4a8c',
   text: '#e8d9c4', textDim: '#9b8975',
   ice: '#7ba3c4', blood: '#8b1f1f',
   green: '#7a9a5e', legendary: '#e8b04a',
@@ -710,8 +710,8 @@ function TitleScreen({ meta, onStart, onAltar, onAchievements }) {
       background: `radial-gradient(ellipse at center, ${PALETTE.panel} 0%, ${PALETTE.bgDeep} 70%)`,
     }}>
       <div className="text-center mt-8">
-        <div className="text-xs tracking-[0.4em] mb-4" style={{ color: PALETTE.derod, opacity: 0.7 }}>
-          DEROD &amp; DEBLAN
+        <div className="text-xs tracking-[0.4em] mb-4" style={{ color: PALETTE.dawn, opacity: 0.7 }}>
+          DAWN &amp; TWILIGHT
         </div>
         <h1 className="text-4xl font-bold leading-tight mb-3" style={{
           color: PALETTE.text,
@@ -719,7 +719,7 @@ function TitleScreen({ meta, onStart, onAltar, onAchievements }) {
           letterSpacing: '0.05em',
           textShadow: `0 0 30px ${PALETTE.accent}40`,
         }}>
-          행복과<br/>불행 사이
+          던앤<br/>트와일라잇
         </h1>
         <div className="text-xs tracking-widest mt-4" style={{ color: PALETTE.textDim }}>
           ━━━ 텍스트 로그라이크 ━━━
@@ -728,10 +728,10 @@ function TitleScreen({ meta, onStart, onAltar, onAchievements }) {
       
       {/* 영혼 카운터 */}
       <div className="px-6 py-2 flex items-center gap-2" style={{
-        background: `${PALETTE.deblan}20`,
-        border: `1px solid ${PALETTE.deblan}80`,
+        background: `${PALETTE.twilight}20`,
+        border: `1px solid ${PALETTE.twilight}80`,
       }}>
-        <span style={{ color: PALETTE.deblan, fontSize: '20px' }}>✦</span>
+        <span style={{ color: PALETTE.twilight, fontSize: '20px' }}>✦</span>
         <span className="text-base font-bold tracking-wider" style={{ color: PALETTE.text, fontFamily: '"Cinzel", serif' }}>
           {meta?.souls || 0}
         </span>
@@ -742,7 +742,7 @@ function TitleScreen({ meta, onStart, onAltar, onAchievements }) {
         <button onClick={onStart} className="w-full py-3 transition-all hover:scale-[1.02]" style={{
           background: `linear-gradient(180deg, ${PALETTE.accent}, ${PALETTE.accentDim})`,
           color: PALETTE.text,
-          border: `1px solid ${PALETTE.derod}40`,
+          border: `1px solid ${PALETTE.dawn}40`,
           fontFamily: '"Cinzel", serif',
           letterSpacing: '0.3em',
           fontSize: '14px',
@@ -750,9 +750,9 @@ function TitleScreen({ meta, onStart, onAltar, onAchievements }) {
         }}>여정 시작</button>
         
         <button onClick={onAltar} className="w-full py-2.5 transition-all hover:scale-[1.02]" style={{
-          background: `linear-gradient(180deg, ${PALETTE.deblan}40, ${PALETTE.deblan}20)`,
+          background: `linear-gradient(180deg, ${PALETTE.twilight}40, ${PALETTE.twilight}20)`,
           color: PALETTE.text,
-          border: `1px solid ${PALETTE.deblan}`,
+          border: `1px solid ${PALETTE.twilight}`,
           fontFamily: '"Cinzel", serif',
           letterSpacing: '0.25em',
           fontSize: '12px',
@@ -884,7 +884,7 @@ function ExpeditionSelect({ meta, onSelect, onBack }) {
         <p className="text-center text-[11px] tracking-[0.4em]" style={{ color: PALETTE.textDim }}>
           ◆ 원정을 선택하세요 ◆
         </p>
-        <p className="text-center text-xs mt-1" style={{ color: PALETTE.derod }}>각 원정은 4개 챕터로 구성됩니다</p>
+        <p className="text-center text-xs mt-1" style={{ color: PALETTE.dawn }}>각 원정은 4개 챕터로 구성됩니다</p>
       </div>
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
         {EXPEDITIONS.map((exp) => {
@@ -933,18 +933,18 @@ function ExpeditionSelect({ meta, onSelect, onBack }) {
                   )}
                   {exp.curseCount > 0 && (
                     <span className="text-[9px] px-1.5 py-0.5" style={{
-                      background: `${PALETTE.deblan}30`, color: PALETTE.deblan,
+                      background: `${PALETTE.twilight}30`, color: PALETTE.twilight,
                     }}>저주 {exp.curseCount}개</span>
                   )}
                 </div>
                 
                 <div className="flex items-center justify-between text-[10px]">
                   <div style={{ color: PALETTE.textDim }}>
-                    클리어 보상 <span style={{ color: PALETTE.deblan }}>✦ {exp.soulReward}</span>
+                    클리어 보상 <span style={{ color: PALETTE.twilight }}>✦ {exp.soulReward}</span>
                   </div>
                   {locked && exp.unlockCost && (
                     <div style={{ color: PALETTE.textDim }}>
-                      해금 <span style={{ color: PALETTE.deblan }}>✦ {exp.unlockCost}</span>
+                      해금 <span style={{ color: PALETTE.twilight }}>✦ {exp.unlockCost}</span>
                     </div>
                   )}
                 </div>
@@ -981,11 +981,11 @@ function SoulAltar({ meta, onPurchase, onReroll, slots, onBack }) {
   return (
     <div className="absolute inset-0 flex flex-col" style={{ background: PALETTE.bgDeep }}>
       <div className="px-4 pt-6 pb-3 border-b" style={{ borderColor: PALETTE.panelBorder }}>
-        <p className="text-center text-[11px] tracking-[0.4em]" style={{ color: PALETTE.deblan }}>
+        <p className="text-center text-[11px] tracking-[0.4em]" style={{ color: PALETTE.twilight }}>
           ★ 영혼의 제단 ★
         </p>
         <div className="flex justify-center items-center gap-2 mt-2">
-          <span style={{ color: PALETTE.deblan, fontSize: '16px' }}>✦</span>
+          <span style={{ color: PALETTE.twilight, fontSize: '16px' }}>✦</span>
           <span className="text-base font-bold" style={{ color: PALETTE.text, fontFamily: '"Cinzel", serif' }}>
             {meta.souls}
           </span>
@@ -1039,7 +1039,7 @@ function SoulAltar({ meta, onPurchase, onReroll, slots, onBack }) {
                       </div>
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0">
-                      <span style={{ color: PALETTE.deblan, fontSize: '12px' }}>✦</span>
+                      <span style={{ color: PALETTE.twilight, fontSize: '12px' }}>✦</span>
                       <span className="text-sm font-bold" style={{
                         color: canAfford ? PALETTE.text : PALETTE.accent,
                       }}>{cost}</span>
@@ -1062,8 +1062,8 @@ function SoulAltar({ meta, onPurchase, onReroll, slots, onBack }) {
       <div className="p-3 border-t flex gap-2" style={{ borderColor: PALETTE.panelBorder }}>
         <button onClick={onReroll} disabled={!canReroll}
           className="flex-1 py-2.5 text-[11px] tracking-[0.2em] flex flex-col items-center justify-center gap-0.5" style={{
-            background: canReroll ? `${PALETTE.deblan}20` : 'transparent',
-            border: `1px solid ${canReroll ? PALETTE.deblan : PALETTE.panelBorder}`,
+            background: canReroll ? `${PALETTE.twilight}20` : 'transparent',
+            border: `1px solid ${canReroll ? PALETTE.twilight : PALETTE.panelBorder}`,
             color: canReroll ? PALETTE.text : PALETTE.textDim,
             opacity: canReroll ? 1 : 0.5,
           }}>
@@ -1094,7 +1094,7 @@ function MapView({ chapter, classData, mapData, hp, maxHp, gold, gem, relics = [
         borderBottom: `1px solid ${PALETTE.panelBorder}`,
       }}>
         <button onClick={onOpenStatus} className="w-9 h-9 flex items-center justify-center text-base font-bold" style={{
-          background: classData.color, color: PALETTE.bgDeep, border: `1px solid ${PALETTE.derod}`,
+          background: classData.color, color: PALETTE.bgDeep, border: `1px solid ${PALETTE.dawn}`,
         }}>{classData.name[0]}</button>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1 mb-0.5">
@@ -1114,7 +1114,7 @@ function MapView({ chapter, classData, mapData, hp, maxHp, gold, gem, relics = [
         </div>
         <div className="flex flex-col items-end text-[10px] gap-0.5">
           <div className="flex items-center gap-1"><span style={{ color: PALETTE.ice }}>◆</span><span className="tabular-nums" style={{ color: PALETTE.text }}>{gem}</span></div>
-          <div className="flex items-center gap-1"><span style={{ color: PALETTE.derod }}>◉</span><span className="tabular-nums" style={{ color: PALETTE.text }}>{gold}</span></div>
+          <div className="flex items-center gap-1"><span style={{ color: PALETTE.dawn }}>◉</span><span className="tabular-nums" style={{ color: PALETTE.text }}>{gold}</span></div>
         </div>
       </div>
       <div className="text-center py-2 border-b" style={{ borderColor: PALETTE.panelBorder }}>
@@ -1160,7 +1160,7 @@ function MapView({ chapter, classData, mapData, hp, maxHp, gold, gem, relics = [
               <line key={i} x1={na.x} y1={na.y} x2={nb.x} y2={nb.y}
                 stroke={
                   eitherLocked ? '#2a1515'
-                  : na.completed && nb.completed ? PALETTE.derod 
+                  : na.completed && nb.completed ? PALETTE.dawn 
                   : reachable ? chapter.color 
                   : PALETTE.panelBorder
                 }
@@ -1199,14 +1199,14 @@ function MapView({ chapter, classData, mapData, hp, maxHp, gold, gem, relics = [
               )}
               <div className="relative w-full h-full rounded-full flex items-center justify-center" style={{
                 background: isCompleted
-                  ? `radial-gradient(circle, ${PALETTE.derod}30, ${PALETTE.bgDeep})`
+                  ? `radial-gradient(circle, ${PALETTE.dawn}30, ${PALETTE.bgDeep})`
                   : isCurrent
                     ? `radial-gradient(circle, ${cfg.color}40, ${PALETTE.bgDeep})`
                     : isLocked
                       ? `radial-gradient(circle, ${PALETTE.bgDeep}, #1a0a0a)`
                       : `radial-gradient(circle, ${PALETTE.panel}, ${PALETTE.bgDeep})`,
                 border: `${isBoss ? 2 : 1.5}px solid ${
-                  isCompleted ? PALETTE.derod 
+                  isCompleted ? PALETTE.dawn 
                   : isCurrent ? cfg.color 
                   : isLocked ? '#3a1f1f' 
                   : PALETTE.panelBorder
@@ -1217,10 +1217,10 @@ function MapView({ chapter, classData, mapData, hp, maxHp, gold, gem, relics = [
                 {isLocked
                   ? <X size={isBoss ? 18 : 14} style={{ color: '#5a3030' }} />
                   : (n.type === 'shop' || n.type === 'forge' || hasMapReveal)
-                    ? <Icon size={isBoss ? 22 : isCurrent ? 18 : 14} style={{ color: isCompleted ? PALETTE.derod : cfg.color }} />
+                    ? <Icon size={isBoss ? 22 : isCurrent ? 18 : 14} style={{ color: isCompleted ? PALETTE.dawn : cfg.color }} />
                     : !isCurrent && !isCompleted && !isBoss
                       ? <span className="text-base" style={{ color: PALETTE.textDim }}>?</span>
-                      : <Icon size={isBoss ? 22 : isCurrent ? 18 : 14} style={{ color: isCompleted ? PALETTE.derod : cfg.color }} />}
+                      : <Icon size={isBoss ? 22 : isCurrent ? 18 : 14} style={{ color: isCompleted ? PALETTE.dawn : cfg.color }} />}
               </div>
             </button>
           );
@@ -1229,7 +1229,7 @@ function MapView({ chapter, classData, mapData, hp, maxHp, gold, gem, relics = [
       <div className="grid grid-cols-5 border-t" style={{ borderColor: PALETTE.panelBorder, background: PALETTE.bgDeep }}>
         <button onClick={onBack} className="py-2.5 text-[10px]" style={{ color: PALETTE.textDim }}>나가기</button>
         <button onClick={onOpenCodex} className="py-2.5 text-[10px]" style={{ color: '#c46535' }}>도감</button>
-        <button onClick={onOpenStatus} className="py-2.5 text-[10px]" style={{ color: PALETTE.derod }}>스킬</button>
+        <button onClick={onOpenStatus} className="py-2.5 text-[10px]" style={{ color: PALETTE.dawn }}>스킬</button>
         <button onClick={onOpenAchievements} className="py-2.5 text-[10px]" style={{ color: PALETTE.legendary }}>업적</button>
         <button className="py-2.5 text-[10px]" style={{ color: PALETTE.textDim }}>설정</button>
       </div>
@@ -1431,9 +1431,9 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
     }
 
     if (skill.type === 'physical' || skill.type === 'magic') {
-      // 마력 Lv.7 및 신탁 각성 재시전 횟수 분기 처리
+      // 마력 Lv.7 (50% × 2회) / 신탁 각성 (50% × 3회)
       const hasOracleAwaken = hasUltimate(ultimates, 'ult_oracleAwaken');
-      const echoChance = hasOracleAwaken ? 1.0 : 0.5;
+      const echoChance = 0.5;  // 둘 다 50% 확률
       const canEcho = skill.type === 'magic' && (hasEffect(skills, 'magicEcho', activeSkills) || hasOracleAwaken);
       
       let echoTimes = 1;
@@ -1798,16 +1798,16 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
             dmg += inc;
             takenBreakdown.push(`저주 +${inc}`);
           }
-          // 궁극 [데블랑의 저주]: 받는 데미지 -25%
+          // 궁극 [황혼의 저주]: 받는 데미지 -25%
           if (hasUltimate(ultimates, 'ult_deblanCurse') && dmg > 0) {
             const reduced = Math.floor(dmg * 0.25);
             dmg -= reduced;
-            if (reduced > 0) takenBreakdown.push(`데블랑의 저주 -${reduced}`);
+            if (reduced > 0) takenBreakdown.push(`황혼의 저주 -${reduced}`);
             // 30% 확률로 적 자해
             if (Math.random() < 0.3) {
               const counterDmg = Math.floor(dmg * 0.5);
               newEnemy.currentHp = Math.max(0, newEnemy.currentHp - counterDmg);
-              newLog.push({ type: 'passive', text: `★ [데블랑의 저주] 적 자해 ${counterDmg}` });
+              newLog.push({ type: 'passive', text: `★ [황혼의 저주] 적 자해 ${counterDmg}` });
             }
           }
           if (dmg > 0) {
@@ -2121,7 +2121,7 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
     getActivePassives(skills, 'onTurnStart', activeSkills).forEach(p => {
       if (p.effect === 'regenPerTurn') {
         let regen = 3;
-        // 궁극 [데로드의 축복]: 회복 효과 +50%
+        // 궁극 [여명의 축복]: 회복 효과 +50%
         if (hasUltimate(ultimates, 'ult_derodBlessing')) regen = Math.floor(regen * 1.5);
         newPlayer.hp = Math.min(newPlayer.maxHp, newPlayer.hp + regen);
         newLog.push({ type: 'passive', text: `◆ [재생 Lv.3] HP +${regen}` });
@@ -2139,10 +2139,10 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
       }
     });
     
-    // 궁극 [데로드의 축복]: 매 턴 HP +5
+    // 궁극 [여명의 축복]: 매 턴 HP +5
     if (hasUltimate(ultimates, 'ult_derodBlessing')) {
       newPlayer.hp = Math.min(newPlayer.maxHp, newPlayer.hp + 5);
-      newLog.push({ type: 'passive', text: `★ [데로드의 축복] HP +5` });
+      newLog.push({ type: 'passive', text: `★ [여명의 축복] HP +5` });
     }
     // 궁극 [영구 침묵] 강타_ult_perpetualStun: 매 턴 25% 확률로 적 기절
     if (hasUltimate(ultimates, 'ult_perpetualStun') && newEnemy.debuffs?.everStunned) {
@@ -2194,7 +2194,7 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
       {/* 최상단 턴 정보 (높이 고정) */}
       <div className="px-4 py-2 border-b flex items-center justify-between shrink-0" style={{ borderColor: PALETTE.panelBorder, background: PALETTE.panel }}>
         <span className="text-[10px] tracking-[0.3em]" style={{ color: PALETTE.accent }}>━━ 전투 ━━</span>
-        <span className="text-[10px] tabular-nums" style={{ color: PALETTE.derod }}>TURN {turn}</span>
+        <span className="text-[10px] tabular-nums" style={{ color: PALETTE.dawn }}>TURN {turn}</span>
       </div>
 
       {/* 메인 컨테이너: 3분할 + 스킬 버튼 세로 배치 */}
@@ -2265,7 +2265,7 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
         <div className="shrink-0 h-[110px] overflow-y-auto px-3 py-2 space-y-1 border-b" style={{ borderColor: PALETTE.panelBorder, background: `linear-gradient(180deg, ${PALETTE.bgDeep}, #060306)` }}>
           {log.map((l, i) => (
             <div key={i}>
-              <div className="text-[11px] leading-snug" style={{ color: l.type === 'damage' ? PALETTE.accent : l.type === 'damageTaken' ? PALETTE.bleed : l.type === 'crit' ? PALETTE.legendary : l.type === 'passive' ? PALETTE.derod : l.type === 'debuff' ? PALETTE.shock : l.type === 'heal' ? PALETTE.green : l.type === 'enemy_action' ? PALETTE.accent : l.type === 'victory' ? PALETTE.legendary : l.type === 'defeat' ? PALETTE.accent : PALETTE.text, opacity: l.type === 'system' ? 0.7 : 1 }}>{l.text}</div>
+              <div className="text-[11px] leading-snug" style={{ color: l.type === 'damage' ? PALETTE.accent : l.type === 'damageTaken' ? PALETTE.bleed : l.type === 'crit' ? PALETTE.legendary : l.type === 'passive' ? PALETTE.dawn : l.type === 'debuff' ? PALETTE.shock : l.type === 'heal' ? PALETTE.green : l.type === 'enemy_action' ? PALETTE.accent : l.type === 'victory' ? PALETTE.legendary : l.type === 'defeat' ? PALETTE.accent : PALETTE.text, opacity: l.type === 'system' ? 0.7 : 1 }}>{l.text}</div>
               {l.breakdown && (<div className="text-[9px] leading-snug pl-3" style={{ color: PALETTE.textDim, opacity: 0.7 }}>({l.breakdown})</div>)}
             </div>
           ))}
@@ -2304,7 +2304,7 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
               <div className="h-1.5 relative mb-1.5" style={{ background: 'rgba(0,0,0,0.7)' }}><div className="absolute inset-y-0 left-0 transition-all" style={{ width: `${(player.hp/player.maxHp)*100}%`, background: `linear-gradient(90deg, ${PALETTE.blood}, ${PALETTE.green})` }} /></div>
               {/* 2줄: 버프/상태 카드 (고정 높이) */}
               <div className="flex items-center gap-1.5 flex-wrap min-h-[18px]">
-                <span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.deblan}50`, color: '#fff', border: `1px solid ${PALETTE.deblan}` }}>✦ 에테르 {player.ether}/{player.maxEther}</span>
+                <span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.twilight}50`, color: '#fff', border: `1px solid ${PALETTE.twilight}` }}>✦ 에테르 {player.ether}/{player.maxEther}</span>
                 {player.defense > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.defense}50`, color: '#fff', border: `1px solid ${PALETTE.defense}` }}>◈ 방어 {player.defense}</span>)}
                 {player.buffs?.rage > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.accent}50`, color: '#fff', border: `1px solid ${PALETTE.accent}` }}>☩ 분노 ({player.buffs.rage}T)</span>)}
                 {player.firstHitImmune && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.legendary}50`, color: '#fff', border: `1px solid ${PALETTE.legendary}` }}>✦ 무적 1회</span>)}
@@ -2336,10 +2336,10 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
                     style={{
                       background: disabled ? 'rgba(0,0,0,0.5)'
                         : skill.type === 'physical' ? `${PALETTE.accent}30`
-                        : skill.type === 'magic' ? `${PALETTE.deblan}30`
+                        : skill.type === 'magic' ? `${PALETTE.twilight}30`
                         : skill.type === 'defense' ? `${PALETTE.ice}30`
-                        : `${PALETTE.derod}30`,
-                      border: `1px solid ${disabled ? PALETTE.panelBorder : skill.type === 'physical' ? PALETTE.accent : skill.type === 'magic' ? PALETTE.deblan : skill.type === 'defense' ? PALETTE.ice : PALETTE.derod}`,
+                        : `${PALETTE.dawn}30`,
+                      border: `1px solid ${disabled ? PALETTE.panelBorder : skill.type === 'physical' ? PALETTE.accent : skill.type === 'magic' ? PALETTE.twilight : skill.type === 'defense' ? PALETTE.ice : PALETTE.dawn}`,
                       color: disabled ? PALETTE.textDim : '#fff',
                       opacity: disabled ? 0.5 : 1,
                     }}>
@@ -2399,7 +2399,7 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
                 <div className="text-[9px]" style={{ color: PALETTE.textDim }}>체력</div>
                 <div className="font-bold tabular-nums" style={{ color: PALETTE.text }}>{player.hp}/{player.maxHp}</div>
               </div>
-              <div className="px-2 py-1.5" style={{ background: `${PALETTE.deblan}20`, border: `1px solid ${PALETTE.deblan}60` }}>
+              <div className="px-2 py-1.5" style={{ background: `${PALETTE.twilight}20`, border: `1px solid ${PALETTE.twilight}60` }}>
                 <div className="text-[9px]" style={{ color: PALETTE.textDim }}>에테르</div>
                 <div className="font-bold tabular-nums" style={{ color: PALETTE.text }}>{player.ether}/{player.maxEther}</div>
               </div>
@@ -2490,14 +2490,14 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
                   <div className="text-[10px] mb-1.5" style={{ color: PALETTE.textDim }}>━ 데미지 보정 ━</div>
                   <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] mb-3">
                     {physBonus > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>물리데미지</span><span className="font-bold tabular-nums" style={{ color: PALETTE.accent }}>+{physBonus}</span></div>)}
-                    {magicBonus > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>마법데미지</span><span className="font-bold tabular-nums" style={{ color: PALETTE.deblan }}>+{magicBonus}%</span></div>)}
+                    {magicBonus > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>마법데미지</span><span className="font-bold tabular-nums" style={{ color: PALETTE.twilight }}>+{magicBonus}%</span></div>)}
                     {bleedBonus > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>출혈데미지</span><span className="font-bold tabular-nums" style={{ color: PALETTE.bleed }}>+{bleedBonus}%</span></div>)}
                     {counterDmgBonus > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>반격데미지</span><span className="font-bold tabular-nums" style={{ color: PALETTE.accent }}>+{counterDmgBonus}%</span></div>)}
                     {allDmgBonus > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>모든데미지</span><span className="font-bold tabular-nums" style={{ color: PALETTE.legendary }}>+{allDmgBonus}%</span></div>)}
                     {player.buffs?.rage > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>분노버프</span><span className="font-bold tabular-nums" style={{ color: PALETTE.accent }}>+30%</span></div>)}
                     {dmgTakenReduce > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>받는데미지</span><span className="font-bold tabular-nums" style={{ color: PALETTE.green }}>-{dmgTakenReduce}%</span></div>)}
-                    {dmgDealtCurse > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>저주(딜)</span><span className="font-bold tabular-nums" style={{ color: PALETTE.deblan }}>-{dmgDealtCurse}%</span></div>)}
-                    {dmgTakenCurse > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>저주(피)</span><span className="font-bold tabular-nums" style={{ color: PALETTE.deblan }}>+{dmgTakenCurse}%</span></div>)}
+                    {dmgDealtCurse > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>저주(딜)</span><span className="font-bold tabular-nums" style={{ color: PALETTE.twilight }}>-{dmgDealtCurse}%</span></div>)}
+                    {dmgTakenCurse > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>저주(피)</span><span className="font-bold tabular-nums" style={{ color: PALETTE.twilight }}>+{dmgTakenCurse}%</span></div>)}
                   </div>
                 </>
               );
@@ -2521,8 +2521,8 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
                     {lifesteal > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>흡혈</span><span className="font-bold tabular-nums" style={{ color: PALETTE.accent }}>+{lifesteal}</span></div>)}
                     {reflect > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>반사</span><span className="font-bold tabular-nums" style={{ color: PALETTE.accent }}>{reflect}%</span></div>)}
                     {heal > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>회복효과</span><span className="font-bold tabular-nums" style={{ color: PALETTE.green }}>+{heal}%</span></div>)}
-                    {cdReduce > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>쿨다운감소</span><span className="font-bold tabular-nums" style={{ color: PALETTE.deblan }}>-{cdReduce}턴</span></div>)}
-                    {etherReduce && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>에테르비용</span><span className="font-bold tabular-nums" style={{ color: PALETTE.deblan }}>-1</span></div>)}
+                    {cdReduce > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>쿨다운감소</span><span className="font-bold tabular-nums" style={{ color: PALETTE.twilight }}>-{cdReduce}턴</span></div>)}
+                    {etherReduce && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>에테르비용</span><span className="font-bold tabular-nums" style={{ color: PALETTE.twilight }}>-1</span></div>)}
                   </div>
                 </>
               );
@@ -2560,7 +2560,7 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
                 <div className="text-[10px] mb-1.5" style={{ color: PALETTE.textDim }}>━ 유물 ━</div>
                 <div className="flex flex-wrap gap-1 mb-3">
                   {initialRelics.filter(r => !activeRelicNames || activeRelicNames.includes(r.name)).map((rel, i) => (
-                    <button key={i} onClick={() => { setStatusModalOpen(false); setTooltip({ type: 'relic', name: rel.name, relic: rel }); }} className="text-[10px] px-2 py-1" style={{ background: `${rel.color || PALETTE.derod}25`, border: `1px solid ${rel.color || PALETTE.derod}80`, color: '#fff' }}>
+                    <button key={i} onClick={() => { setStatusModalOpen(false); setTooltip({ type: 'relic', name: rel.name, relic: rel }); }} className="text-[10px] px-2 py-1" style={{ background: `${rel.color || PALETTE.dawn}25`, border: `1px solid ${rel.color || PALETTE.dawn}80`, color: '#fff' }}>
                       {rel.name}
                     </button>
                   ))}
@@ -2581,7 +2581,7 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
           <div onClick={(e) => e.stopPropagation()}
             className="w-full max-w-xs px-4 py-4" style={{
               background: PALETTE.bgDeep,
-              border: `1px solid ${tooltip.type === 'relic' ? (tooltip.relic?.color || PALETTE.derod) : tooltip.type === 'ultimate' ? (tooltip.ult?.color || PALETTE.legendary) : PALETTE.derod}`,
+              border: `1px solid ${tooltip.type === 'relic' ? (tooltip.relic?.color || PALETTE.dawn) : tooltip.type === 'ultimate' ? (tooltip.ult?.color || PALETTE.legendary) : PALETTE.dawn}`,
               boxShadow: '0 0 30px rgba(0,0,0,0.8)',
             }}>
             {tooltip.type === 'skill' && (() => {
@@ -2614,7 +2614,7 @@ function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimate
             })()}
             {tooltip.type === 'relic' && tooltip.relic && (
               <>
-                <div className="text-[10px] tracking-[0.3em] mb-1" style={{ color: tooltip.relic.color || PALETTE.derod }}>유물</div>
+                <div className="text-[10px] tracking-[0.3em] mb-1" style={{ color: tooltip.relic.color || PALETTE.dawn }}>유물</div>
                 <div className="text-base font-bold mb-2" style={{ color: PALETTE.text }}>{tooltip.relic.name}</div>
                 <p className="text-[11px]" style={{ color: PALETTE.textDim }}>
                   {tooltip.relic.desc || (tooltip.relic.statBonus 
@@ -2681,7 +2681,7 @@ function RewardSelect({ rewards: initialRewards, gem, skills, relics, ultimates,
       }
       color = sk.color; icon = '◈';
     } else if (r.type === 'stat') {
-      title = `${r.name} +${r.value}`; desc = '영구 능력치 상승'; color = PALETTE.derod; icon = '↑';
+      title = `${r.name} +${r.value}`; desc = '영구 능력치 상승'; color = PALETTE.dawn; icon = '↑';
     } else if (r.type === 'heal') {
       title = `회복 ${r.value}`; desc = '즉시 체력 회복'; color = PALETTE.green; icon = '+';
     } else if (r.type === 'heal_full') {
@@ -2691,7 +2691,7 @@ function RewardSelect({ rewards: initialRewards, gem, skills, relics, ultimates,
       desc = r.desc || `유물 · 스탯 효과`;
       color = r.color; icon = '◆';
     } else if (r.type === 'gold') {
-      title = `은화 +${r.value}`; desc = '상점에서 사용'; color = PALETTE.derod; icon = '◉';
+      title = `은화 +${r.value}`; desc = '상점에서 사용'; color = PALETTE.dawn; icon = '◉';
     } else if (r.type === 'gem') {
       title = `보석 +${r.value}`; desc = '리롤·부활에 사용'; color = PALETTE.ice; icon = '◆';
     }
@@ -2738,7 +2738,7 @@ function RewardSelect({ rewards: initialRewards, gem, skills, relics, ultimates,
       background: `radial-gradient(ellipse at center, ${PALETTE.panel}, ${PALETTE.bgDeep} 80%)`,
     }}>
       <div className="px-4 py-4 border-b" style={{ borderColor: PALETTE.panelBorder }}>
-        <p className="text-center text-[10px] tracking-[0.4em] mb-1" style={{ color: PALETTE.derod }}>◆ 운명의 갈림길 ◆</p>
+        <p className="text-center text-[10px] tracking-[0.4em] mb-1" style={{ color: PALETTE.dawn }}>◆ 운명의 갈림길 ◆</p>
         <p className="text-center text-base font-bold" style={{ color: PALETTE.text }}>하나의 길을 선택하라</p>
         <p className="text-center text-[11px] mt-1" style={{ color: PALETTE.textDim }}>
           {isElite ? '◆ 강적 보상 ◆' : '세 갈래 중 단 하나만 가질 수 있다'}
@@ -2839,8 +2839,8 @@ function EventScreen({ event, classData, stats, skills = {}, onResolve }) {
               {resultData.text.split('\n').map((line, i) => <span key={i}>{line}<br/></span>)}
             </p>
             {resultData.reward && (
-              <div className="mt-4 p-3" style={{ border: `1px solid ${PALETTE.derod}60`, background: `${PALETTE.derod}10` }}>
-                <div className="text-[10px] tracking-[0.3em] mb-1" style={{ color: PALETTE.derod }}>◆ 보상</div>
+              <div className="mt-4 p-3" style={{ border: `1px solid ${PALETTE.dawn}60`, background: `${PALETTE.dawn}10` }}>
+                <div className="text-[10px] tracking-[0.3em] mb-1" style={{ color: PALETTE.dawn }}>◆ 보상</div>
                 <div className="text-xs" style={{ color: PALETTE.text }}>
                   {resultData.reward.type === 'gold' && `은화 +${resultData.reward.value}`}
                   {resultData.reward.type === 'heal' && `체력 ${resultData.reward.value} 회복`}
@@ -2888,8 +2888,8 @@ function EventScreen({ event, classData, stats, skills = {}, onResolve }) {
               <button key={i} onClick={() => handleChoice(c)}
                 className="w-full text-left px-3 py-2 text-xs transition-all hover:translate-x-1"
                 style={{
-                  background: c.stat ? `${PALETTE.ice}10` : c.cost ? `${PALETTE.derod}10` : 'transparent',
-                  border: `1px solid ${c.stat ? PALETTE.ice : c.cost ? PALETTE.derod : PALETTE.panelBorder}40`,
+                  background: c.stat ? `${PALETTE.ice}10` : c.cost ? `${PALETTE.dawn}10` : 'transparent',
+                  border: `1px solid ${c.stat ? PALETTE.ice : c.cost ? PALETTE.dawn : PALETTE.panelBorder}40`,
                   color: PALETTE.text,
                 }}>
                 <div className="flex items-center justify-between">
@@ -2902,8 +2902,8 @@ function EventScreen({ event, classData, stats, skills = {}, onResolve }) {
         )}
         {stage === 'result' && (
           <button onClick={() => onResolve(resultData)} className="w-full py-2.5 text-xs tracking-[0.3em]" style={{
-            background: `linear-gradient(180deg, ${PALETTE.derod}40, ${PALETTE.derod}20)`,
-            border: `1px solid ${PALETTE.derod}`, color: PALETTE.text,
+            background: `linear-gradient(180deg, ${PALETTE.dawn}40, ${PALETTE.dawn}20)`,
+            border: `1px solid ${PALETTE.dawn}`, color: PALETTE.text,
           }}>▸ 여정을 계속한다</button>
         )}
       </div>
@@ -2924,11 +2924,11 @@ function RestScreen({ classData, hp, maxHp, skills, relics, expedition, onChoice
   return (
     <div className="absolute inset-0 flex flex-col" style={{ background: PALETTE.bgDeep }}>
       <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: PALETTE.panelBorder, background: PALETTE.panel }}>
-        <span className="text-[10px] tracking-[0.3em]" style={{ color: PALETTE.derod }}>◆ 정비 ◆</span>
+        <span className="text-[10px] tracking-[0.3em]" style={{ color: PALETTE.dawn }}>◆ 정비 ◆</span>
         <span className="text-xs font-bold" style={{ color: PALETTE.text }}>보스 직전</span>
       </div>
       <div className="flex-1 px-5 py-5 space-y-3 overflow-y-auto" style={{
-        background: `radial-gradient(ellipse at center top, ${PALETTE.derod}15, ${PALETTE.bgDeep} 70%)`,
+        background: `radial-gradient(ellipse at center top, ${PALETTE.dawn}15, ${PALETTE.bgDeep} 70%)`,
       }}>
         <p className="text-xs leading-relaxed italic mb-4" style={{ color: PALETTE.textDim }}>
           앞에 있을 적은 강력하다. 마지막 정비를 해야 할 시간.<br/>
@@ -2948,11 +2948,11 @@ function RestScreen({ classData, hp, maxHp, skills, relics, expedition, onChoice
           disabled={!canReselectSkills}
           className="w-full text-left px-4 py-3 transition-all hover:translate-x-1"
           style={{
-            background: canReselectSkills ? `${PALETTE.derod}20` : 'transparent',
-            border: `1px solid ${canReselectSkills ? PALETTE.derod : PALETTE.panelBorder}`,
+            background: canReselectSkills ? `${PALETTE.dawn}20` : 'transparent',
+            border: `1px solid ${canReselectSkills ? PALETTE.dawn : PALETTE.panelBorder}`,
             opacity: canReselectSkills ? 1 : 0.5,
           }}>
-          <div className="text-sm font-bold mb-0.5" style={{ color: PALETTE.derod }}>◇ 패시브 재선택</div>
+          <div className="text-sm font-bold mb-0.5" style={{ color: PALETTE.dawn }}>◇ 패시브 재선택</div>
           <div className="text-[11px]" style={{ color: PALETTE.textDim }}>
             {canReselectSkills 
               ? `보유 패시브 ${ownedSkills.length}개 中 ${maxSkillSelect}개 다시 선택`
@@ -3007,10 +3007,10 @@ function ShopScreen({ gold, skills, relics, ultimates, onBuy, onLeave, classId =
     const isBought = bought.has(idx);
     let title, color;
     if (r.type === 'skill') { title = `${r.name} +1Lv`; color = PASSIVE_SKILLS[r.name].color; }
-    else if (r.type === 'stat') { title = `${r.name} +${r.value}`; color = PALETTE.derod; }
+    else if (r.type === 'stat') { title = `${r.name} +${r.value}`; color = PALETTE.dawn; }
     else if (r.type === 'heal') { title = `회복 ${r.value}`; color = PALETTE.green; }
     else if (r.type === 'heal_full') { title = '완전 회복'; color = PALETTE.legendary; }
-    else { title = `${r.type} +${r.value}`; color = PALETTE.derod; }
+    else { title = `${r.type} +${r.value}`; color = PALETTE.dawn; }
 
     // 패시브 Lv 변화 계산
     const currentLv = r.type === 'skill' ? (skills[r.name] || 0) : 0;
@@ -3041,7 +3041,7 @@ function ShopScreen({ gold, skills, relics, ultimates, onBuy, onLeave, classId =
               {isBought ? '구매 완료' : r.type === 'skill' ? PASSIVE_SKILLS[r.name].desc : ''}
             </div>
           </div>
-          <div className="text-[11px] tabular-nums" style={{ color: canAfford ? PALETTE.derod : PALETTE.accent }}>
+          <div className="text-[11px] tabular-nums" style={{ color: canAfford ? PALETTE.dawn : PALETTE.accent }}>
             {isBought ? '✓' : `◉ ${price}`}
           </div>
         </div>
@@ -3052,13 +3052,13 @@ function ShopScreen({ gold, skills, relics, ultimates, onBuy, onLeave, classId =
   return (
     <div className="absolute inset-0 flex flex-col" style={{ background: PALETTE.bgDeep }}>
       <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: PALETTE.panelBorder, background: PALETTE.panel }}>
-        <span className="text-[10px] tracking-[0.3em]" style={{ color: PALETTE.deblan }}>◆ 상점 ◆</span>
+        <span className="text-[10px] tracking-[0.3em]" style={{ color: PALETTE.twilight }}>◆ 상점 ◆</span>
         <span className="text-xs font-bold" style={{ color: PALETTE.text }}>떠돌이 행상</span>
       </div>
-      <div className="px-4 py-3 border-b" style={{ borderColor: PALETTE.panelBorder, background: `${PALETTE.deblan}10` }}>
+      <div className="px-4 py-3 border-b" style={{ borderColor: PALETTE.panelBorder, background: `${PALETTE.twilight}10` }}>
         <div className="flex items-center justify-between">
           <p className="text-[11px] italic" style={{ color: PALETTE.textDim }}>"운 좋은 날이군. 좋은 물건들이 있다네."</p>
-          <span className="text-xs tabular-nums" style={{ color: PALETTE.derod }}>◉ {gold}</span>
+          <span className="text-xs tabular-nums" style={{ color: PALETTE.dawn }}>◉ {gold}</span>
         </div>
       </div>
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
@@ -3158,8 +3158,8 @@ function ForgeScreen({ relics, skills, activeRelicNames, onCombine, onLeave }) {
                       <button key={i} onClick={() => toggleSelect(i)}
                         className="w-full px-3 py-2 text-left flex items-center justify-between"
                         style={{
-                          background: isSelected ? `${rel.color || PALETTE.derod}40` : `${rel.color || PALETTE.derod}15`,
-                          border: `1px solid ${isSelected ? '#c46535' : rel.color || PALETTE.derod}`,
+                          background: isSelected ? `${rel.color || PALETTE.dawn}40` : `${rel.color || PALETTE.dawn}15`,
+                          border: `1px solid ${isSelected ? '#c46535' : rel.color || PALETTE.dawn}`,
                           opacity: 1,
                         }}>
                         <div>
@@ -3336,7 +3336,7 @@ function PrepScreen({ skills, relics, ultimates, expedition, mode = 'full', curr
   return (
     <div className="absolute inset-0 flex flex-col" style={{ background: PALETTE.bgDeep }}>
       <div className="px-4 pt-5 pb-2 border-b" style={{ borderColor: PALETTE.panelBorder }}>
-        <p className="text-center text-[11px] tracking-[0.4em]" style={{ color: PALETTE.derod }}>
+        <p className="text-center text-[11px] tracking-[0.4em]" style={{ color: PALETTE.dawn }}>
           ◆ {titleText} ◆
         </p>
         <p className="text-center text-[10px] mt-1" style={{ color: PALETTE.textDim }}>
@@ -3348,7 +3348,7 @@ function PrepScreen({ skills, relics, ultimates, expedition, mode = 'full', curr
         {showSkills && (
         <div>
           <div className="flex items-center justify-between mb-2 px-1">
-            <div className="text-[11px] tracking-[0.3em]" style={{ color: PALETTE.derod }}>
+            <div className="text-[11px] tracking-[0.3em]" style={{ color: PALETTE.dawn }}>
               ◇ 활성 패시브
             </div>
             <div className="text-[10px]" style={{ 
@@ -3457,9 +3457,9 @@ function PrepScreen({ skills, relics, ultimates, expedition, mode = 'full', curr
           disabled={!canConfirm}
           className="w-full py-3 text-[12px] tracking-[0.3em]" style={{
             background: canConfirm 
-              ? `linear-gradient(180deg, ${PALETTE.derod}40, ${PALETTE.derod}20)`
+              ? `linear-gradient(180deg, ${PALETTE.dawn}40, ${PALETTE.dawn}20)`
               : 'transparent',
-            border: `1px solid ${canConfirm ? PALETTE.derod : PALETTE.panelBorder}`,
+            border: `1px solid ${canConfirm ? PALETTE.dawn : PALETTE.panelBorder}`,
             color: canConfirm ? PALETTE.text : PALETTE.textDim,
             opacity: canConfirm ? 1 : 0.5,
           }}>
@@ -3477,7 +3477,7 @@ function PrepScreen({ skills, relics, ultimates, expedition, mode = 'full', curr
 function StartScreen({ classData, onContinue }) {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
-  const classColor = classData?.color || PALETTE.derod;
+  const classColor = classData?.color || PALETTE.dawn;
   
   return (
     <div className="absolute inset-0 overflow-hidden" 
@@ -3629,20 +3629,20 @@ function VictoryScreen({ classData, enemy, gains = { gold: 0, gem: 0, souls: 0 }
               <span className="text-sm font-bold tabular-nums px-2 py-1" style={{ 
                 color: '#fff',
                 background: 'rgba(0,0,0,0.5)',
-                border: `1px solid ${PALETTE.derod}80`,
-                textShadow: `0 0 6px ${PALETTE.derod}, 0 1px 4px rgba(0,0,0,0.9)`,
+                border: `1px solid ${PALETTE.dawn}80`,
+                textShadow: `0 0 6px ${PALETTE.dawn}, 0 1px 4px rgba(0,0,0,0.9)`,
               }}>
-                <span style={{ color: PALETTE.derod }}>● </span>+{gains.gold} 은화
+                <span style={{ color: PALETTE.dawn }}>● </span>+{gains.gold} 은화
               </span>
             )}
             {gains.gem > 0 && (
               <span className="text-sm font-bold tabular-nums px-2 py-1" style={{ 
                 color: '#fff',
                 background: 'rgba(0,0,0,0.5)',
-                border: `1px solid ${PALETTE.deblan}80`,
-                textShadow: `0 0 6px ${PALETTE.deblan}, 0 1px 4px rgba(0,0,0,0.9)`,
+                border: `1px solid ${PALETTE.twilight}80`,
+                textShadow: `0 0 6px ${PALETTE.twilight}, 0 1px 4px rgba(0,0,0,0.9)`,
               }}>
-                <span style={{ color: PALETTE.deblan }}>◆ </span>+{gains.gem} 보석
+                <span style={{ color: PALETTE.twilight }}>◆ </span>+{gains.gem} 보석
               </span>
             )}
             {gains.souls > 0 && (
@@ -3684,7 +3684,7 @@ function ChapterClearScreen({ chapter, isLastChapter, onContinue }) {
         "한 챕터의 어둠이 걷힌다.<br/>
         여정은 아직 끝나지 않았다."
       </p>
-      <div className="text-[11px] mb-8" style={{ color: PALETTE.derod }}>◇ 체력 회복 ◇</div>
+      <div className="text-[11px] mb-8" style={{ color: PALETTE.dawn }}>◇ 체력 회복 ◇</div>
       <button onClick={onContinue} className="px-12 py-3" style={{
         background: `linear-gradient(180deg, ${chapter.color}40, ${chapter.color}20)`,
         border: `1px solid ${chapter.color}`,
@@ -3715,17 +3715,17 @@ function ExpeditionClearScreen({ expedition, soulsGained, onContinue }) {
       
       {/* 영혼 획득 카운터 */}
       <div className="mb-8 px-8 py-4 flex flex-col items-center" style={{
-        background: `${PALETTE.deblan}30`,
-        border: `1px solid ${PALETTE.deblan}`,
-        boxShadow: `0 0 30px ${PALETTE.deblan}40`,
+        background: `${PALETTE.twilight}30`,
+        border: `1px solid ${PALETTE.twilight}`,
+        boxShadow: `0 0 30px ${PALETTE.twilight}40`,
       }}>
-        <div className="text-[10px] tracking-[0.3em] mb-2" style={{ color: PALETTE.deblan }}>SOULS GAINED</div>
+        <div className="text-[10px] tracking-[0.3em] mb-2" style={{ color: PALETTE.twilight }}>SOULS GAINED</div>
         <div className="flex items-center gap-3">
-          <span style={{ color: PALETTE.deblan, fontSize: '32px' }}>✦</span>
+          <span style={{ color: PALETTE.twilight, fontSize: '32px' }}>✦</span>
           <span className="text-4xl font-bold" style={{ 
             color: PALETTE.text, 
             fontFamily: '"Cinzel", serif',
-            textShadow: `0 0 20px ${PALETTE.deblan}`,
+            textShadow: `0 0 20px ${PALETTE.twilight}`,
           }}>+{soulsGained}</span>
         </div>
       </div>
@@ -3813,15 +3813,15 @@ function DefeatScreen({ classData, chapter, soulsGained, onContinue }) {
           {chapter ? `${chapter.name}에서 쓰러지다` : '여정의 끝'}
         </p>
         <div className="mt-4 mx-auto px-6 py-2 inline-flex flex-col items-center" style={{
-          background: `${PALETTE.deblan}30`,
-          border: `1px solid ${PALETTE.deblan}80`,
+          background: `${PALETTE.twilight}30`,
+          border: `1px solid ${PALETTE.twilight}80`,
           animation: 'defeatSubFade 1.5s ease-out 1.4s both',
         }}>
-          <div className="text-[9px] tracking-[0.3em] mb-1" style={{ color: PALETTE.deblan }}>
+          <div className="text-[9px] tracking-[0.3em] mb-1" style={{ color: PALETTE.twilight }}>
             SOULS RECOVERED · {Math.round(SOUL_REWARDS.deathPenalty * 100)}%
           </div>
           <div className="flex items-center gap-2">
-            <span style={{ color: PALETTE.deblan, fontSize: '20px' }}>✦</span>
+            <span style={{ color: PALETTE.twilight, fontSize: '20px' }}>✦</span>
             <span className="text-2xl font-bold" style={{ 
               color: PALETTE.text, fontFamily: '"Cinzel", serif',
             }}>+{soulsGained}</span>
@@ -3932,7 +3932,7 @@ function AchievementScreen({ meta, onClaim, onClose }) {
               <div className="flex items-start justify-between gap-2 mb-1">
                 <div className="flex-1 min-w-0">
                   <div className="text-[10px] tracking-[0.2em]" style={{ 
-                    color: ach.cat === 'clear' ? PALETTE.derod : ach.cat === 'special' ? PALETTE.accent : PALETTE.deblan,
+                    color: ach.cat === 'clear' ? PALETTE.dawn : ach.cat === 'special' ? PALETTE.accent : PALETTE.twilight,
                     opacity: 0.7,
                   }}>
                     {ach.cat === 'clear' ? '클리어' : ach.cat === 'special' ? '특수' : '누적'}
@@ -3945,7 +3945,7 @@ function AchievementScreen({ meta, onClaim, onClose }) {
                   </p>
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
-                  <span style={{ color: PALETTE.deblan, fontSize: '11px' }}>✦</span>
+                  <span style={{ color: PALETTE.twilight, fontSize: '11px' }}>✦</span>
                   <span className="text-sm font-bold" style={{ color: PALETTE.text }}>{ach.reward}</span>
                 </div>
               </div>
@@ -3957,7 +3957,7 @@ function AchievementScreen({ meta, onClaim, onClose }) {
                     width: `${progressPct}%`,
                     background: claimed ? PALETTE.textDim 
                       : claimable ? PALETTE.legendary
-                      : PALETTE.derod,
+                      : PALETTE.dawn,
                   }} />
                 </div>
                 <span className="text-[9px] tabular-nums" style={{ color: PALETTE.textDim }}>
@@ -4023,7 +4023,7 @@ function StatusPanel({ classData, hp, maxHp, skills, stats, relics, ultimates = 
         }}>
           <div className="flex items-start gap-3">
             <div className="w-14 h-14 flex items-center justify-center text-2xl font-bold" style={{
-              background: classData.color, color: PALETTE.bgDeep, border: `1px solid ${PALETTE.derod}`,
+              background: classData.color, color: PALETTE.bgDeep, border: `1px solid ${PALETTE.dawn}`,
             }}>{classData.name[0]}</div>
             <div className="flex-1">
               <div className="text-[10px] tracking-[0.2em]" style={{ color: classData.color }}>{classData.sub}</div>
@@ -4044,7 +4044,7 @@ function StatusPanel({ classData, hp, maxHp, skills, stats, relics, ultimates = 
           </div>
         </div>
         <div className="px-4 py-3">
-          <div className="text-[11px] tracking-[0.3em] mb-3" style={{ color: PALETTE.derod }}>◆ 패시브 스킬</div>
+          <div className="text-[11px] tracking-[0.3em] mb-3" style={{ color: PALETTE.dawn }}>◆ 패시브 스킬</div>
           {Object.entries(skillsByAxis).map(([axis, list]) => (
             list.length > 0 && (
               <div key={axis} className="mb-3">
@@ -4068,7 +4068,7 @@ function StatusPanel({ classData, hp, maxHp, skills, stats, relics, ultimates = 
                             }}>Lv.{sk.lv} / {sk.maxLv}</span>
                             {isSealed && (
                               <span className="text-[9px] px-1.5 py-0.5" style={{
-                                background: `${PALETTE.deblan}30`, color: PALETTE.deblan,
+                                background: `${PALETTE.twilight}30`, color: PALETTE.twilight,
                                 letterSpacing: '0.1em',
                               }}>봉인</span>
                             )}
@@ -4152,7 +4152,7 @@ function StatusPanel({ classData, hp, maxHp, skills, stats, relics, ultimates = 
         )}
         {relics.length > 0 && (
           <div className="px-4 py-3 border-t" style={{ borderColor: PALETTE.panelBorder }}>
-            <div className="text-[11px] tracking-[0.3em] mb-3" style={{ color: PALETTE.derod }}>◆ 보유 유물</div>
+            <div className="text-[11px] tracking-[0.3em] mb-3" style={{ color: PALETTE.dawn }}>◆ 보유 유물</div>
             <div className="space-y-1.5">
               {relics.map((r, i) => {
                 const isSealed = activeRelicNames && !activeRelicNames.includes(r.name);
@@ -4167,7 +4167,7 @@ function StatusPanel({ classData, hp, maxHp, skills, stats, relics, ultimates = 
                         {r.name}
                         {isSealed && (
                           <span className="text-[9px] px-1.5 py-0.5" style={{
-                            background: `${PALETTE.deblan}30`, color: PALETTE.deblan,
+                            background: `${PALETTE.twilight}30`, color: PALETTE.twilight,
                             letterSpacing: '0.1em',
                           }}>봉인</span>
                         )}
@@ -4963,9 +4963,9 @@ export default function App() {
         
         {/* [좌측] 게임 안내 및 패치 노트 (PC 전용) */}
         <div className="hidden xl:block w-80 flex-shrink-0" style={{ color: PALETTE.text }}>
-          <p className="text-xs tracking-[0.4em] mb-2" style={{ color: PALETTE.deblan }}>RELIC REFORM · v1.4</p>
+          <p className="text-xs tracking-[0.4em] mb-2" style={{ color: PALETTE.twilight }}>RELIC REFORM · v1.4</p>
           <h1 className="text-3xl font-bold mb-4 leading-tight" style={{ fontFamily: '"Cinzel", serif' }}>
-            데로드앤데블랑<br/>
+            여명앤황혼<br/>
             <span style={{ color: PALETTE.accent }}>로그라이크</span>
           </h1>
           <p className="text-sm leading-relaxed mb-6" style={{ color: PALETTE.textDim }}>
@@ -4978,7 +4978,7 @@ export default function App() {
               <p style={{ color: PALETTE.textDim }}>패시브 Lv 강화 대신 직접적인 스탯 보너스를 부여합니다.</p>
             </div>
             <div>
-              <div className="text-[10px] tracking-[0.3em] mb-1.5" style={{ color: PALETTE.deblan }}>✦ 영혼 제단 조정</div>
+              <div className="text-[10px] tracking-[0.3em] mb-1.5" style={{ color: PALETTE.twilight }}>✦ 영혼 제단 조정</div>
               <p style={{ color: PALETTE.textDim }}>강화 비용이 현실적으로 조정되었습니다.</p>
             </div>
           </div>
@@ -5017,7 +5017,7 @@ export default function App() {
 
         {/* [우측] 실시간 디버그 정보 (PC 전용) */}
         <div className="hidden lg:block w-80 flex-shrink-0 overflow-y-auto max-h-[85vh] pr-2 custom-scrollbar">
-          <p className="text-xs tracking-[0.4em] mb-3" style={{ color: PALETTE.derod }}>실시간 상태</p>
+          <p className="text-xs tracking-[0.4em] mb-3" style={{ color: PALETTE.dawn }}>실시간 상태</p>
           
           <div className="px-3 py-2 mb-4" style={{ background: `${PALETTE.accent}10`, border: `1px solid ${PALETTE.panelBorder}` }}>
             <div className="text-[10px] mb-1" style={{ color: PALETTE.textDim }}>현재 페이즈</div>
@@ -5033,7 +5033,7 @@ export default function App() {
 
           {Object.keys(skills).length > 0 && (
             <div className="mb-6">
-              <div className="text-[10px] mb-2" style={{ color: PALETTE.derod }}>습득 패시브</div>
+              <div className="text-[10px] mb-2" style={{ color: PALETTE.dawn }}>습득 패시브</div>
               <div className="flex flex-wrap gap-1.5">
                 {Object.entries(skills).filter(([_, lv]) => lv > 0).map(([k, lv]) => (
                   <span key={k} className="text-[10px] px-2 py-0.5" style={{
