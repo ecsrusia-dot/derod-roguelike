@@ -15,8 +15,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'icon-192.png', 'icon-512.png'],
       manifest: {
-        name: '데로드앤데블랑 로그라이크',
-        short_name: '데로드',
+        name: 'Dawn and Twilight',
+        short_name: 'D&T',
         description: '행복과 불행 사이 - 텍스트 기반 다크 판타지 로그라이크',
         theme_color: '#0a0608',
         background_color: '#050304',
