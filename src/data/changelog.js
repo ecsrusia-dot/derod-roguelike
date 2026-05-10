@@ -7,6 +7,14 @@
 
 export const CHANGELOG = [
   {
+    version: '1.0.7',
+    date: '2026-05-11',
+    label: '패배 화면 블랙스크린 수정',
+    changes: [
+      { type: 'fix', text: '전투 패배 시 블랙스크린 버그 수정 (useEffect import 누락)' },
+    ],
+  },
+  {
     version: '1.0.6',
     date: '2026-05-11',
     label: 'Firebase 통합 (1단계)',
