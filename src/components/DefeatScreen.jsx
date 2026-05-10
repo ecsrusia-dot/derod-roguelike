@@ -1,7 +1,7 @@
 // ============================================
 // components/DefeatScreen.jsx — 패배 화면
 // ============================================
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PALETTE } from '../utils/helpers.js';
 import { SOUL_REWARDS } from '../data.js';
 
