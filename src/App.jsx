@@ -523,9 +523,14 @@ export default function App() {
     setActiveSkills(null);
     setActiveRelicNames(null);
     
-    // 첫 챕터 시작
-    const firstChapterIdx = expedition.chapters[0] - 1;
-    initializeRun(CHAPTERS[firstChapterIdx], 0, expedition, curses);
+    // 첫 챕터 시작 (ID로 검색 — 튜토리얼은 string ID, 수련/일반은 number ID)
+    const firstChapterId = expedition.chapters[0];
+    const firstChapter = CHAPTERS.find(c => c.id === firstChapterId);
+    if (!firstChapter) {
+      console.error('챕터 데이터 없음:', firstChapterId);
+      return;
+    }
+    initializeRun(firstChapter, 0, expedition, curses);
   };
   
   // 챔피언십 원정 시작 (5원정 × 4난이도)
@@ -1323,8 +1328,13 @@ export default function App() {
         const nextChapterData = CHAMPIONSHIP_CHAPTERS[nextChapterId];
         initializeRun(nextChapterData, nextChapterIdx);
       } else {
-        const nextChIdx = currentExpedition.chapters[nextChapterIdx] - 1;
-        initializeRun(CHAPTERS[nextChIdx], nextChapterIdx);
+        const nextChapterId = currentExpedition.chapters[nextChapterIdx];
+        const nextChapter = CHAPTERS.find(c => c.id === nextChapterId);
+        if (!nextChapter) {
+          console.error('다음 챕터 데이터 없음:', nextChapterId);
+          return;
+        }
+        initializeRun(nextChapter, nextChapterIdx);
       }
     }
   };
