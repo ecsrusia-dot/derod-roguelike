@@ -1,15 +1,26 @@
 // ============================================
-// components/ExpeditionSelect.jsx — 원정 선택 (클래식 + 챔피언십)
+// components/ExpeditionSelect.jsx — 원정 선택
+// ============================================
+// 두 탭:
+// - 클래식: 튜토리얼 (2) + 수련의 길 (5직업)
+// - 챔피언십: 5컨셉 × 4난이도 (직업 잠금 기반)
 // ============================================
 
 import React, { useState } from 'react';
 import { ChevronRight, Lock } from 'lucide-react';
 import { PALETTE, isUnlocked } from '../utils/helpers.js';
-import { EXPEDITIONS, CHAMPIONSHIPS, CHAMPIONSHIP_DIFFICULTIES } from '../data.js';
-import { isChampionshipDifficultyUnlocked } from '../storage.js';
+import { EXPEDITIONS, CHAMPIONSHIPS, CHAMPIONSHIP_DIFFICULTIES, CLASSES } from '../data.js';
+import { isChampionshipDifficultyUnlocked, getUnlockedChampionshipClasses } from '../storage.js';
 
 export default function ExpeditionSelect({ meta, onSelect, onSelectChampionship, onBack }) {
-  const [tab, setTab] = useState('classic'); // 'classic' | 'championship'
+  const [tab, setTab] = useState('classic');
+  
+  const tutorials = EXPEDITIONS.filter(e => e.category === 'tutorial')
+    .sort((a, b) => (a.tutorialOrder || 0) - (b.tutorialOrder || 0));
+  const trainings = EXPEDITIONS.filter(e => e.category === 'training');
+  
+  const unlockedClasses = getUnlockedChampionshipClasses(meta);
+  const championshipUnlocked = unlockedClasses.length > 0;
   
   return (
     <div className="absolute inset-0 flex flex-col" style={{ background: PALETTE.bgDeep }}>
@@ -19,13 +30,12 @@ export default function ExpeditionSelect({ meta, onSelect, onSelectChampionship,
         </p>
       </div>
       
-      {/* 탭 */}
       <div className="grid grid-cols-2 border-b" style={{ borderColor: PALETTE.panelBorder }}>
         <button onClick={() => setTab('classic')} className="py-3 text-[11px] tracking-[0.2em]" style={{
           background: tab === 'classic' ? PALETTE.bgDeep : 'transparent',
           color: tab === 'classic' ? PALETTE.dawn : PALETTE.textDim,
           borderBottom: tab === 'classic' ? `2px solid ${PALETTE.dawn}` : 'none',
-        }}>클래식 원정</button>
+        }}>클래식</button>
         <button onClick={() => setTab('championship')} className="py-3 text-[11px] tracking-[0.2em]" style={{
           background: tab === 'championship' ? PALETTE.bgDeep : 'transparent',
           color: tab === 'championship' ? PALETTE.legendary : PALETTE.textDim,
@@ -34,95 +44,171 @@ export default function ExpeditionSelect({ meta, onSelect, onSelectChampionship,
       </div>
       
       {tab === 'classic' && (
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
-        <p className="text-center text-[10px] mb-2" style={{ color: PALETTE.dawn, opacity: 0.7 }}>난이도 상승형 — 4개 챕터 묶음</p>
-        {EXPEDITIONS.map((exp) => {
-          const locked = exp.unlockId && !isUnlocked(meta, exp.unlockId);
-          const cleared = meta.clearedExpeditions?.includes(exp.id);
-          return (
-            <button key={exp.id} onClick={() => !locked && onSelect(exp)} disabled={locked}
-              className="w-full text-left relative overflow-hidden transition-all"
-              style={{
-                background: locked
-                  ? `linear-gradient(135deg, ${PALETTE.panel}, ${PALETTE.bgDeep})`
-                  : `linear-gradient(135deg, ${exp.color}25, ${PALETTE.bgDeep})`,
-                border: `1px solid ${locked ? PALETTE.panelBorder : exp.color}`,
-                opacity: locked ? 0.4 : 1,
-              }}>
-              <div className="px-4 py-3.5">
-                <div className="flex items-start justify-between mb-2">
-                  <div>
-                    <div className="text-[10px] tracking-[0.2em] mb-0.5" style={{ color: exp.color, opacity: 0.7 }}>
-                      EXPEDITION {exp.id} · {exp.sub}
+      <div className="flex-1 overflow-y-auto px-4 py-3">
+        {/* 튜토리얼 */}
+        <div className="mb-4">
+          <p className="text-center text-[10px] mb-2 tracking-[0.3em]" style={{ color: PALETTE.dawn, opacity: 0.7 }}>
+            ━━ 튜토리얼 ━━
+          </p>
+          <p className="text-center text-[9px] mb-3" style={{ color: PALETTE.textDim, opacity: 0.6 }}>
+            방랑검사로 게임 시스템을 익히세요
+          </p>
+          <div className="space-y-2">
+            {tutorials.map((exp) => {
+              const locked = exp.unlockId && !isUnlocked(meta, exp.unlockId);
+              const cleared = meta.clearedExpeditions?.includes(exp.id);
+              return (
+                <button key={exp.id} onClick={() => !locked && onSelect(exp)} disabled={locked}
+                  className="w-full text-left relative overflow-hidden transition-all"
+                  style={{
+                    background: locked
+                      ? `linear-gradient(135deg, ${PALETTE.panel}, ${PALETTE.bgDeep})`
+                      : `linear-gradient(135deg, ${exp.color}25, ${PALETTE.bgDeep})`,
+                    border: `1px solid ${locked ? PALETTE.panelBorder : exp.color}`,
+                    opacity: locked ? 0.4 : 1,
+                  }}>
+                  <div className="px-3 py-2.5">
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <div className="flex-1">
+                        <div className="text-[9px] tracking-[0.2em]" style={{ color: exp.color, opacity: 0.7 }}>
+                          TUTORIAL {exp.tutorialOrder}
+                        </div>
+                        <div className="text-sm font-bold flex items-center gap-2 mt-0.5" style={{ color: PALETTE.text }}>
+                          {exp.name}
+                          {cleared && <span className="text-[9px] px-1.5 py-0.5" style={{
+                            background: `${PALETTE.legendary}20`, color: PALETTE.legendary,
+                            border: `1px solid ${PALETTE.legendary}80`,
+                          }}>완료</span>}
+                        </div>
+                      </div>
+                      {locked
+                        ? <Lock size={14} style={{ color: PALETTE.textDim }} />
+                        : <ChevronRight size={14} style={{ color: exp.color }} />}
                     </div>
-                    <div className="text-base font-bold flex items-center gap-2" style={{ color: PALETTE.text }}>
-                      {exp.name}
-                      {cleared && <span className="text-[10px] px-1.5 py-0.5" style={{
-                        background: `${PALETTE.legendary}20`, color: PALETTE.legendary,
-                        border: `1px solid ${PALETTE.legendary}80`,
-                      }}>CLEAR</span>}
+                    <p className="text-[10px] leading-relaxed" style={{ color: PALETTE.textDim }}>{exp.desc}</p>
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      <span className="text-[9px] px-1.5 py-0.5" style={{ 
+                        background: `${PALETTE.twilight}20`, color: PALETTE.twilight 
+                      }}>영혼 +{exp.soulReward}</span>
+                      {locked && (
+                        <span className="text-[9px] px-1.5 py-0.5" style={{ 
+                          background: `${PALETTE.accent}20`, color: PALETTE.accent 
+                        }}>이전 단계 클리어 필요</span>
+                      )}
                     </div>
                   </div>
-                  {locked ? <Lock size={14} style={{ color: PALETTE.textDim }} />
-                    : <ChevronRight size={16} style={{ color: exp.color }} />}
-                </div>
-                <p className="text-[11px] mb-2 leading-relaxed" style={{ color: PALETTE.textDim }}>{exp.desc}</p>
-                
-                {/* 난이도 정보 */}
-                <div className="flex flex-wrap gap-1.5 mb-2">
-                  {exp.enemyHpMult > 1 && (
-                    <span className="text-[9px] px-1.5 py-0.5" style={{
-                      background: `${PALETTE.accent}20`, color: PALETTE.accent,
-                    }}>적 HP ×{exp.enemyHpMult}</span>
-                  )}
-                  {exp.enemyDmgMult > 1 && (
-                    <span className="text-[9px] px-1.5 py-0.5" style={{
-                      background: `${PALETTE.accent}20`, color: PALETTE.accent,
-                    }}>적 데미지 ×{exp.enemyDmgMult}</span>
-                  )}
-                  {exp.curseCount > 0 && (
-                    <span className="text-[9px] px-1.5 py-0.5" style={{
-                      background: `${PALETTE.twilight}30`, color: PALETTE.twilight,
-                    }}>저주 {exp.curseCount}개</span>
-                  )}
-                </div>
-                
-                <div className="flex items-center justify-between text-[10px]">
-                  <div style={{ color: PALETTE.textDim }}>
-                    클리어 보상 <span style={{ color: PALETTE.twilight }}>✦ {exp.soulReward}</span>
-                  </div>
-                  {locked && exp.unlockCost && (
-                    <div style={{ color: PALETTE.textDim }}>
-                      해금 <span style={{ color: PALETTE.twilight }}>✦ {exp.unlockCost}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        
+        {/* 수련의 길 */}
+        <div className="mt-5">
+          <p className="text-center text-[10px] mb-2 tracking-[0.3em]" style={{ color: PALETTE.accent, opacity: 0.7 }}>
+            ━━ 수련의 길 ━━
+          </p>
+          <p className="text-center text-[9px] mb-3" style={{ color: PALETTE.textDim, opacity: 0.6 }}>
+            각 직업 수련을 클리어하면 챔피언십에서 사용 가능
+          </p>
+          <div className="space-y-2">
+            {trainings.map((exp) => {
+              const locked = exp.unlockId && !isUnlocked(meta, exp.unlockId);
+              const cleared = meta.clearedExpeditions?.includes(exp.id);
+              const classData = CLASSES[exp.forcedClassId];
+              return (
+                <button key={exp.id} onClick={() => !locked && onSelect(exp)} disabled={locked}
+                  className="w-full text-left relative overflow-hidden transition-all"
+                  style={{
+                    background: locked
+                      ? `linear-gradient(135deg, ${PALETTE.panel}, ${PALETTE.bgDeep})`
+                      : `linear-gradient(135deg, ${exp.color}25, ${PALETTE.bgDeep})`,
+                    border: `1px solid ${locked ? PALETTE.panelBorder : exp.color}`,
+                    opacity: locked ? 0.4 : 1,
+                  }}>
+                  <div className="px-3 py-2.5">
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <div className="flex-1">
+                        <div className="text-[9px] tracking-[0.2em]" style={{ color: exp.color, opacity: 0.7 }}>
+                          TRAINING · {classData?.name || ''}
+                        </div>
+                        <div className="text-sm font-bold flex items-center gap-2 mt-0.5" style={{ color: PALETTE.text }}>
+                          {exp.name}
+                          {cleared && <span className="text-[9px] px-1.5 py-0.5" style={{
+                            background: `${PALETTE.legendary}20`, color: PALETTE.legendary,
+                            border: `1px solid ${PALETTE.legendary}80`,
+                          }}>완료</span>}
+                        </div>
+                      </div>
+                      {locked
+                        ? <Lock size={14} style={{ color: PALETTE.textDim }} />
+                        : <ChevronRight size={14} style={{ color: exp.color }} />}
                     </div>
-                  )}
-                </div>
-              </div>
-            </button>
-          );
-        })}
+                    <p className="text-[10px] leading-relaxed" style={{ color: PALETTE.textDim }}>{exp.desc}</p>
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      <span className="text-[9px] px-1.5 py-0.5" style={{ 
+                        background: `${PALETTE.twilight}20`, color: PALETTE.twilight 
+                      }}>영혼 +{exp.soulReward}</span>
+                      <span className="text-[9px] px-1.5 py-0.5" style={{ 
+                        background: `${PALETTE.legendary}20`, color: PALETTE.legendary 
+                      }}>4챕터</span>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
       )}
       
       {tab === 'championship' && (
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
-        <p className="text-center text-[10px] mb-2" style={{ color: PALETTE.legendary, opacity: 0.7 }}>
+        <p className="text-center text-[10px] mb-1" style={{ color: PALETTE.legendary, opacity: 0.7 }}>
           전술형 — 컨셉별 5개 원정 × 4난이도
         </p>
-        <p className="text-center text-[9px] mb-3" style={{ color: PALETTE.textDim, opacity: 0.6 }}>
+        <p className="text-center text-[9px] mb-2" style={{ color: PALETTE.textDim, opacity: 0.6 }}>
           각 원정은 고유한 적 패턴과 전술이 적용됩니다
         </p>
+        
+        {!championshipUnlocked ? (
+          <div className="px-3 py-3 mb-3" style={{
+            background: `${PALETTE.accent}10`,
+            border: `1px solid ${PALETTE.accent}60`,
+          }}>
+            <p className="text-[11px] text-center" style={{ color: PALETTE.accent }}>
+              <Lock size={12} className="inline mr-1" />
+              아직 사용 가능한 직업이 없습니다
+            </p>
+            <p className="text-[10px] text-center mt-1" style={{ color: PALETTE.textDim }}>
+              클래식 탭의 수련의 길을 클리어하세요
+            </p>
+          </div>
+        ) : (
+          <div className="px-3 py-2 mb-3" style={{
+            background: `${PALETTE.legendary}10`,
+            border: `1px solid ${PALETTE.legendary}60`,
+          }}>
+            <p className="text-[10px] text-center" style={{ color: PALETTE.legendary }}>
+              사용 가능 직업: {unlockedClasses.map(i => CLASSES[i]?.name).filter(Boolean).join(', ')}
+            </p>
+          </div>
+        )}
+        
         {CHAMPIONSHIPS.map((champ) => {
           const clears = meta.championshipClears?.[champ.id] || {};
           const clearCount = Object.values(clears).filter(Boolean).length;
           const allCleared = clearCount === 4;
+          const canEnter = championshipUnlocked;
           return (
             <button key={champ.id} 
-              onClick={() => onSelectChampionship(champ)}
+              onClick={() => canEnter && onSelectChampionship(champ)}
+              disabled={!canEnter}
               className="w-full text-left relative overflow-hidden transition-all"
               style={{
                 background: `linear-gradient(135deg, ${champ.color}25, ${PALETTE.bgDeep})`,
                 border: `1px solid ${champ.color}`,
+                opacity: canEnter ? 1 : 0.4,
               }}>
               <div className="px-4 py-3.5">
                 <div className="flex items-start justify-between mb-2">
@@ -138,7 +224,9 @@ export default function ExpeditionSelect({ meta, onSelect, onSelectChampionship,
                       }}>마스터</span>}
                     </div>
                   </div>
-                  <ChevronRight size={16} style={{ color: champ.color }} />
+                  {canEnter
+                    ? <ChevronRight size={16} style={{ color: champ.color }} />
+                    : <Lock size={16} style={{ color: PALETTE.textDim }} />}
                 </div>
                 <p className="text-[11px] mb-2 leading-relaxed" style={{ color: PALETTE.textDim }}>{champ.desc}</p>
                 <div className="text-[10px] mb-2 px-2 py-1" style={{ 
@@ -147,7 +235,6 @@ export default function ExpeditionSelect({ meta, onSelect, onSelectChampionship,
                 }}>
                   ◆ {champ.concept}
                 </div>
-                {/* 난이도 진행도 */}
                 <div className="flex gap-1 mt-2">
                   {CHAMPIONSHIP_DIFFICULTIES.map((d) => {
                     const cleared = !!clears[d.id];
@@ -179,5 +266,3 @@ export default function ExpeditionSelect({ meta, onSelect, onSelectChampionship,
     </div>
   );
 }
-
-// =========== 영혼의 제단 ===========

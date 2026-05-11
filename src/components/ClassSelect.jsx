@@ -5,12 +5,22 @@
 import React, { useState } from 'react';
 import { PALETTE, isUnlocked } from '../utils/helpers.js';
 import { CLASSES, PASSIVE_SKILLS } from '../data.js';
+import { isChampionshipClassUnlocked } from '../storage.js';
 
-export default function ClassSelect({ meta, selected, onSelect, onNext, onBack }) {
+export default function ClassSelect({ meta, selected, onSelect, onNext, onBack, isChampionship = false }) {
   const cls = CLASSES[selected]; 
-  const isClsLocked = (c) => c.locked && !isUnlocked(meta, c.unlockId); 
-  const clsLocked = isClsLocked(cls);
-  const [skillModal, setSkillModal] = useState(null); // 클릭한 스킬 정보 모달
+  // 잠금 기준:
+  // - 챔피언십: isChampionshipClassUnlocked 사용
+  // - 일반: 직업 자체의 locked + unlockId
+  const isClsLocked = (c, i) => {
+    if (isChampionship) {
+      // 챔피언십은 수련의 길 클리어 여부로 판단
+      return !isChampionshipClassUnlocked(meta, i);
+    }
+    return c.locked && !isUnlocked(meta, c.unlockId);
+  };
+  const clsLocked = isClsLocked(cls, selected);
+  const [skillModal, setSkillModal] = useState(null);
 
   return (
     <div className="absolute inset-0 flex flex-col" style={{ background: PALETTE.bgDeep }}>
@@ -21,7 +31,7 @@ export default function ClassSelect({ meta, selected, onSelect, onNext, onBack }
         </p>
         <div className="flex gap-1.5">
           {CLASSES.map((c, i) => {
-            const lk = isClsLocked(c);
+            const lk = isClsLocked(c, i);
             return (
               <button key={c.id} onClick={() => onSelect(i)}
                 className="flex-1 aspect-square flex items-center justify-center transition-all"
