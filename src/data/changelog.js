@@ -7,6 +7,27 @@
 
 export const CHANGELOG = [
   {
+    version: '1.0.10',
+    date: '2026-05-11',
+    label: '리팩토링 완료',
+    changes: [
+      { type: 'system', text: 'CombatScreen 분리 (1647줄 → 별도 파일)' },
+      { type: 'system', text: 'App.jsx 1464줄로 슬림화 (총 76% 감소)' },
+      { type: 'system', text: '전체 15개 컴포넌트 + 4개 유틸 모듈로 재구성' },
+      { type: 'system', text: '미사용 lucide 아이콘 import 정리' },
+    ],
+  },
+  {
+    version: '1.0.9',
+    date: '2026-05-11',
+    label: '리팩토링 3단계',
+    changes: [
+      { type: 'system', text: '화면 컴포넌트 14종 추가 분리 (ClassSelect, MapView, CombatScreen 외 12종)' },
+      { type: 'system', text: 'App.jsx 약 37% 감소 (4966 → 3111줄)' },
+      { type: 'system', text: '전체 누적 49% 감소 (6117 → 3111줄)' },
+    ],
+  },
+  {
     version: '1.0.8',
     date: '2026-05-11',
     label: '계정 관리 + 모드 분리 수정',
