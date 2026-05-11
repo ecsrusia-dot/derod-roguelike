@@ -7,6 +7,15 @@
 
 export const CHANGELOG = [
   {
+    version: '1.0.14',
+    date: '2026-05-11',
+    label: '추가 import 누락 수정',
+    changes: [
+      { type: 'fix', text: '챔피언십 진입 시 블랙스크린 (CHAMPIONSHIP_DIFFICULTIES, isChampionshipDifficultyUnlocked import 누락)' },
+      { type: 'fix', text: '첫 노드 클릭 시 블랙스크린 (EventScreen ENEMIES/GAME_CONFIG, RestScreen PASSIVE_SKILLS import 누락)' },
+    ],
+  },
+  {
     version: '1.0.13',
     date: '2026-05-11',
     label: '블랙스크린 + UI 위치 수정',

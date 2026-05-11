@@ -5,7 +5,8 @@
 import React, { useState } from 'react';
 import { ChevronRight, Lock } from 'lucide-react';
 import { PALETTE, isUnlocked } from '../utils/helpers.js';
-import { EXPEDITIONS, CHAMPIONSHIPS } from '../data.js';
+import { EXPEDITIONS, CHAMPIONSHIPS, CHAMPIONSHIP_DIFFICULTIES } from '../data.js';
+import { isChampionshipDifficultyUnlocked } from '../storage.js';
 
 export default function ExpeditionSelect({ meta, onSelect, onSelectChampionship, onBack }) {
   const [tab, setTab] = useState('classic'); // 'classic' | 'championship'

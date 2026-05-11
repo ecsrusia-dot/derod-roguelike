@@ -4,6 +4,7 @@
 
 import React, { useState } from 'react';
 import { PALETTE } from '../utils/helpers.js';
+import { ENEMIES, GAME_CONFIG } from '../data.js';
 
 export default function EventScreen({ event, classData, stats, skills = {}, onResolve }) {
   const [stage, setStage] = useState('intro'); // intro | result
