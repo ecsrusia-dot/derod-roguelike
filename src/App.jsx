@@ -37,8 +37,9 @@ import { generateChapterMap } from './utils/mapGen.js';
 import TitleScreen from './components/TitleScreen.jsx';
 import ChangelogModal from './components/ChangelogModal.jsx';
 import LoginScreen from './components/LoginScreen.jsx';
+import AccountScreen from './components/AccountScreen.jsx';
 import { LATEST_VERSION } from './data/changelog.js';
-import { signInGuest, signInGoogle, signOut, watchAuthState, getUserInfo } from './cloud/auth.js';
+import { signInGuest, signInGoogle, signOut, watchAuthState, getUserInfo, linkGuestToGoogle } from './cloud/auth.js';
 import { saveCloudMeta, loadCloudMeta, pickLatest } from './cloud/sync.js';
 import StartScreen from './components/StartScreen.jsx';
 import VictoryScreen from './components/VictoryScreen.jsx';
@@ -76,7 +77,7 @@ import {
   VERSION_DATE,
   VERSION_LABEL,
 } from './data.js';
-import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta } from './storage.js';
+import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta } from './storage.js';
 
 
 
@@ -4072,14 +4073,21 @@ export default function App() {
     if (user) {
       setAuthMode('guest');
       setAuthModeState('guest');
-      // 클라우드 + 로컬 중 최신 사용
+      // 클라우드에 기존 데이터가 있는지 확인 (재로그인 케이스)
       const cloud = await loadCloudMeta(user.uid);
-      const local = await loadMeta();
-      const merged = pickLatest(local, cloud) || local;
-      const safe = { ...getDefaultMeta(), ...merged };
+      let safe;
+      if (cloud) {
+        // 같은 UID로 재로그인 — 클라우드 데이터 사용
+        safe = { ...getDefaultMeta(), ...cloud };
+      } else {
+        // 새 게스트 — 로컬 데이터 무시하고 기본값 시작
+        // (이전 모드의 데이터가 들어가는 것 방지)
+        safe = getDefaultMeta();
+        // 로컬도 초기화
+        await clearLocalMeta();
+      }
       setMeta(safe);
       setMetaLoaded(true);
-      // 첫 게스트 진입 시 클라우드에 저장 (없으면 생성)
       if (!cloud) {
         await saveCloudMeta(user.uid, safe);
       }
@@ -4094,10 +4102,17 @@ export default function App() {
     if (user) {
       setAuthMode('google');
       setAuthModeState('google');
+      // 클라우드에 기존 데이터가 있는지 확인
       const cloud = await loadCloudMeta(user.uid);
-      const local = await loadMeta();
-      const merged = pickLatest(local, cloud) || local;
-      const safe = { ...getDefaultMeta(), ...merged };
+      let safe;
+      if (cloud) {
+        // 기존 구글 계정 재로그인 — 클라우드 데이터 사용
+        safe = { ...getDefaultMeta(), ...cloud };
+      } else {
+        // 새 구글 계정 — 로컬 데이터 무시하고 기본값 시작
+        safe = getDefaultMeta();
+        await clearLocalMeta();
+      }
       setMeta(safe);
       setMetaLoaded(true);
       if (!cloud) {
@@ -4106,6 +4121,43 @@ export default function App() {
       if (safe.lastSeenVersion !== LATEST_VERSION) {
         setShowChangelog({ firstSeen: true });
       }
+    }
+  };
+  
+  // 로그아웃 — Firebase signOut + 로컬 클리어 + 모드 리셋
+  const handleLogout = async () => {
+    try {
+      if (authMode !== 'local' && firebaseUser) {
+        await signOut();
+      }
+      // 로컬 IndexedDB 클리어 — 다음 모드 선택 시 옛 데이터 안 보이도록
+      await clearLocalMeta();
+      // 모드 리셋
+      setAuthMode(null);
+      setAuthModeState(null);
+      setFirebaseUser(null);
+      setMetaLoaded(false);
+      setMeta({ souls: 0, upgrades: {}, unlocks: [], clearedExpeditions: [] });
+      setScreen('title');  // LoginScreen이 표시될 것
+    } catch (err) {
+      console.error('[Logout] Failed:', err);
+      throw err;
+    }
+  };
+  
+  // 게스트 → 구글 연동 (데이터 유지)
+  const handleLinkGoogle = async () => {
+    try {
+      const user = await linkGuestToGoogle();
+      if (user) {
+        setAuthMode('google');
+        setAuthModeState('google');
+        // user는 같음, UID 유지 — 클라우드 데이터 그대로
+        setFirebaseUser(user);
+      }
+    } catch (err) {
+      console.error('[Link] Failed:', err);
+      throw err;
     }
   };
 
@@ -5137,7 +5189,15 @@ export default function App() {
               onSelectGuest={handleSelectGuest} 
               onSelectGoogle={handleSelectGoogle} 
             />}
-            {screen === 'title' && authMode && <TitleScreen meta={meta} onStart={() => setScreen('classSelect')} onAltar={enterAltar} onAchievements={() => { setPrevAchievementsBack('title'); setScreen('achievements'); }} onChangelog={() => setShowChangelog({ firstSeen: false })} />}
+            {screen === 'title' && authMode && <TitleScreen meta={meta} onStart={() => setScreen('classSelect')} onAltar={enterAltar} onAchievements={() => { setPrevAchievementsBack('title'); setScreen('achievements'); }} onChangelog={() => setShowChangelog({ firstSeen: false })} onAccount={() => setScreen('account')} />}
+            {screen === 'account' && <AccountScreen 
+              authMode={authMode} 
+              firebaseUser={firebaseUser} 
+              meta={meta} 
+              onLogout={handleLogout} 
+              onLinkGoogle={handleLinkGoogle} 
+              onClose={() => setScreen('title')} 
+            />}
             {screen === 'classSelect' && <ClassSelect meta={meta} selected={selectedClass} onSelect={setSelectedClass} onNext={() => setScreen('expeditionSelect')} onBack={() => setScreen('title')} />}
             {screen === 'expeditionSelect' && <ExpeditionSelect meta={meta} 
               onSelect={(exp) => { setSelectedExpedition(exp); setScreen('start'); }} 
