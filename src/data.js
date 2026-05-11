@@ -22,9 +22,9 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.0.16';
+export const GAME_VERSION = '1.0.17';
 export const VERSION_DATE = '2026-05-11';
-export const VERSION_LABEL = 'useRef + rollRewards import 수정';
+export const VERSION_LABEL = '클래식 → 튜토리얼+수련의길 개편';
 
 // =========== 패시브 스킬 ===========
 // effect 필드는 문자열 키. 실제 동작은 메인 코드의 trigger handler에서 처리.
@@ -169,7 +169,8 @@ export const PASSIVE_SKILLS = {
 };
 
 // =========== 직업 ===========
-// locked: true인 직업은 메타 강화로 해금
+// locked: true인 직업은 이전 직업의 수련의 길 클리어로 해금
+// 해금 순서: 방랑검사 → 술법사 → 마족 → 엘프 → 사제
 export const CLASSES = [
   {
     id: 'lanthert', name: '방랑검사', sub: 'Lanthert Path',
@@ -179,7 +180,7 @@ export const CLASSES = [
     stats: { 근력: 18, 민첩: 15, 지능: 14, 매력: 11 },
     combatSkills: ['참격', '관통', '방검'],
     color: '#c4453d',
-    locked: false,
+    locked: false,        // 항상 사용 가능 (시작 직업)
     image: './classes/lanthert.jpg',
     winImage: './classes/lanthertwin.jpg',
     lossImage: './classes/lanthertloss.jpg',
@@ -194,7 +195,8 @@ export const CLASSES = [
     stats: { 근력: 8, 민첩: 11, 지능: 20, 매력: 14 },
     combatSkills: ['마법탄', '정념폭발', '결계'],
     color: '#5c4a8c',
-    locked: false,
+    locked: true,
+    unlockId: 'training_lanthert_clear',     // 방랑검사 수련 클리어 시 해금
     image: './classes/sage.jpg',
     winImage: './classes/sagewin.jpg',
     lossImage: './classes/sageloss.jpg',
@@ -209,7 +211,8 @@ export const CLASSES = [
     stats: { 근력: 19, 민첩: 13, 지능: 13, 매력: 9 },
     combatSkills: ['광폭참격', '피의 일격', '광기'],
     color: '#8b1f1f',
-    locked: false,
+    locked: true,
+    unlockId: 'training_sage_clear',         // 술법사 수련 클리어 시 해금
     image: './classes/demonblood.jpg',
     winImage: './classes/demonbloodwin.jpg',
     lossImage: './classes/demonbloodloss.jpg',
@@ -224,7 +227,8 @@ export const CLASSES = [
     stats: { 근력: 11, 민첩: 20, 지능: 14, 매력: 15 },
     combatSkills: ['정밀사격', '연속화살', '바람결계'],
     color: '#7a9a5e',
-    locked: false,
+    locked: true,
+    unlockId: 'training_demonblood_clear',   // 마족 수련 클리어 시 해금
     image: './classes/elf.jpg',
     winImage: './classes/elfwin.jpg',
     lossImage: './classes/elfloss.jpg',
@@ -239,8 +243,8 @@ export const CLASSES = [
     stats: { 근력: 9, 민첩: 11, 지능: 15, 매력: 19 },
     combatSkills: ['신성광선', '축복', '가호'],
     color: '#d4a574',
-    locked: true,  // 메타 강화로 해금
-    unlockId: 'unlock_priest',  // 해금 ID
+    locked: true,
+    unlockId: 'training_elf_clear',          // 엘프 수련 클리어 시 해금
     image: './classes/priest.jpg',
     winImage: './classes/priestwin.jpg',
     lossImage: './classes/priestloss.jpg',
@@ -1580,6 +1584,50 @@ export const ENEMIES = {
 //   - elite: 강적 노드에서 등장
 //   - boss: 보스 노드에서 등장 (1마리)
 export const CHAPTERS = [
+  // === 튜토리얼 챕터 ===
+  {
+    id: 'tutorial_basic',
+    name: '여명의 시작',
+    sub: 'Where the Dawn Begins',
+    desc: '여명의 검사가 마주하는 첫 시련. 모든 종류의 노드를 경험하라.',
+    nodeCount: 12,
+    biome: 'tutorial',
+    color: '#d4a574',
+    isTutorial: true,
+    // 노드 구성: 전투, 사건, 미지, 강적, 정비, 보스 (상점/대장간 제외)
+    nodeWeights: {
+      battle: 0.40,
+      event: 0.25,
+      unknown: 0.20,
+      elite: 0.10,
+      // shop/forge 제외
+    },
+    enemies: { normal: ['goblin', 'iceWolf'], elite: ['cultist'], boss: 'wraith' },
+  },
+  {
+    id: 'tutorial_market',
+    name: '대장간 길목',
+    sub: 'The Path of Trade',
+    desc: '상인과 대장장이의 영역. 은화를 모으고 유물을 단련하라.',
+    nodeCount: 16,
+    biome: 'tutorial',
+    color: '#c46535',
+    isTutorial: true,
+    // 노드 구성: 전투 위주(은화/유물 확보) + 상점/대장간 보장
+    nodeWeights: {
+      battle: 0.50,
+      event: 0.10,
+      shop: 0.15,      // 1~2개 등장 보장
+      forge: 0.15,     // 1~2개 등장 보장
+      unknown: 0.10,
+    },
+    guaranteedNodes: ['shop', 'forge'],  // 최소 1개씩 보장
+    preShopBattles: 3,  // 상점 등장 전 최소 전투 수
+    preForgeBattles: 4, // 대장간 등장 전 최소 전투 수
+    enemies: { normal: ['goblin', 'iceWolf', 'frostGiant'], elite: ['cultist'], boss: 'iceMage' },
+  },
+  
+  // === 기존 클래식 챕터 (수련의 길에서 사용) ===
   {
     id: 1, name: '북부 극지대', sub: 'The Northern Wastes',
     desc: '눈보라가 멈추지 않는 변경. 마족의 첩자들이 잠복한다.',
@@ -2511,66 +2559,142 @@ export const ULTIMATE_SKILLS = {
 // 원정 = 4챕터 묶음 (한 던전). 클리어 시 다음 원정 해금.
 // 새 원정은 능력치 배율 + 저주 시스템으로 난이도 상승.
 // maxRelicSelect: 첫 노드(전투 준비)에서 활성화 가능한 유물 개수
+// ============================================
+// 클래식 모드 = 튜토리얼 + 수련의 길
+// ============================================
+// 1. 튜토리얼 (방랑검사 고정): 노드 입문 + 대장간 길목
+// 2. 수련의 길 (5직업 각각): 클리어 시 해당 직업으로 챔피언십 해금
+// ============================================
 export const EXPEDITIONS = [
+  // === 튜토리얼 1: 노드 입문 ===
   {
-    id: 1,
-    name: '북부 원정',
-    sub: 'The Northern Expedition',
-    desc: '얼어붙은 변경에서 마계의 균열까지. 첫 시련.',
+    id: 'tutorial_basic',
+    name: '여명의 시작',
+    sub: 'Where the Dawn Begins',
+    desc: '방랑검사의 첫 발걸음. 노드의 종류를 익혀라.',
+    color: '#d4a574',
+    chapters: ['tutorial_basic'],
+    enemyHpMult: 0.8,        // 살짝 쉽게
+    enemyDmgMult: 0.8,
+    curseCount: 0,
+    maxRelicSelect: 1,
+    soulReward: 20,
+    unlockId: null,
+    isTutorial: true,
+    forcedClassId: 0,        // 방랑검사 고정 (CLASSES 배열 인덱스)
+    category: 'tutorial',
+    tutorialOrder: 1,
+  },
+  // === 튜토리얼 2: 대장간 길목 ===
+  {
+    id: 'tutorial_market',
+    name: '대장간 길목',
+    sub: 'The Path of Trade',
+    desc: '은화를 모으고 유물을 단련하라. 상점과 대장간을 익혀라.',
+    color: '#c46535',
+    chapters: ['tutorial_market'],
+    enemyHpMult: 0.9,
+    enemyDmgMult: 0.9,
+    curseCount: 0,
+    maxRelicSelect: 1,
+    soulReward: 30,
+    unlockId: 'tutorial_basic_clear',     // 튜토리얼 1 클리어 후 해금
+    isTutorial: true,
+    forcedClassId: 0,
+    category: 'tutorial',
+    tutorialOrder: 2,
+  },
+  
+  // === 수련의 길 (5직업) — 챔피언십 해금 트리거 ===
+  {
+    id: 'training_lanthert',
+    name: '방랑검사의 수련',
+    sub: 'Path of the Lanthert',
+    desc: '검을 마스터한다. 클리어 시 챔피언십에서 방랑검사 사용 가능 + 술법사 해금.',
+    color: '#c4453d',
+    chapters: [1, 2, 3, 4],
+    enemyHpMult: 1.0,
+    enemyDmgMult: 1.0,
+    curseCount: 0,
+    maxRelicSelect: 1,
+    soulReward: 80,
+    unlockId: 'tutorial_market_clear',    // 튜토리얼 2 클리어 후 해금
+    category: 'training',
+    forcedClassId: 0,
+    unlocksChampionshipFor: 0,            // 클리어 시 챔피언십(방랑검사) 해금
+    unlocksClass: 1,                       // 클리어 시 술법사 직업 해금
+  },
+  {
+    id: 'training_sage',
+    name: '술법사의 수련',
+    sub: 'Path of the Sage',
+    desc: '주문을 연마한다. 클리어 시 챔피언십에서 술법사 사용 가능 + 마족 해금.',
     color: '#7ba3c4',
     chapters: [1, 2, 3, 4],
     enemyHpMult: 1.0,
     enemyDmgMult: 1.0,
     curseCount: 0,
-    maxRelicSelect: 1,    // 활성 유물 1개
-    soulReward: 30,
-    unlockId: null,
+    maxRelicSelect: 1,
+    soulReward: 80,
+    unlockId: 'training_lanthert_clear',
+    category: 'training',
+    forcedClassId: 1,
+    unlocksChampionshipFor: 1,
+    unlocksClass: 2,
   },
   {
-    id: 2,
-    name: '심연의 원정',
-    sub: 'Expedition of the Abyss',
-    desc: '같은 길, 더 깊은 어둠. 적은 강해지고 저주가 깃든다.',
-    color: '#5c4a8c',
-    chapters: [1, 2, 3, 4],
-    enemyHpMult: 1.3,
-    enemyDmgMult: 1.2,
-    curseCount: 1,
-    maxRelicSelect: 2,    // 활성 유물 2개
-    soulReward: 60,
-    unlockId: 'unlock_expedition_2',
-    unlockCost: 200,
-  },
-  {
-    id: 3,
-    name: '광기의 원정',
-    sub: 'Expedition of Madness',
-    desc: '정신이 무너지기 시작한다. 적은 더 강하고 저주는 두 겹이다.',
+    id: 'training_demonblood',
+    name: '혼혈 마족의 수련',
+    sub: 'Path of the Demonblood',
+    desc: '마성을 다스린다. 클리어 시 챔피언십에서 마족 사용 가능 + 엘프 해금.',
     color: '#8b1f1f',
     chapters: [1, 2, 3, 4],
-    enemyHpMult: 1.6,
-    enemyDmgMult: 1.4,
-    curseCount: 2,
-    maxRelicSelect: 3,    // 활성 유물 3개
-    soulReward: 120,
-    unlockId: 'unlock_expedition_3',
-    unlockCost: 500,
+    enemyHpMult: 1.0,
+    enemyDmgMult: 1.0,
+    curseCount: 0,
+    maxRelicSelect: 1,
+    soulReward: 80,
+    unlockId: 'training_sage_clear',
+    category: 'training',
+    forcedClassId: 2,
+    unlocksChampionshipFor: 2,
+    unlocksClass: 3,
   },
   {
-    id: 4,
-    name: '망각의 원정',
-    sub: 'Expedition of Oblivion',
-    desc: '존재의 끝. 모든 적이 강적이고, 저주는 세 겹이다.',
-    color: '#0a0608',
+    id: 'training_elf',
+    name: '엘프의 수련',
+    sub: 'Path of the Elf',
+    desc: '자연을 부린다. 클리어 시 챔피언십에서 엘프 사용 가능 + 사제 해금.',
+    color: '#7a9a5e',
     chapters: [1, 2, 3, 4],
-    enemyHpMult: 2.0,
-    enemyDmgMult: 1.6,
-    curseCount: 3,
-    maxRelicSelect: 4,    // 활성 유물 4개
-    eliteRatio: 0.5,
-    soulReward: 250,
-    unlockId: 'unlock_expedition_4',
-    unlockCost: 1000,
+    enemyHpMult: 1.0,
+    enemyDmgMult: 1.0,
+    curseCount: 0,
+    maxRelicSelect: 1,
+    soulReward: 80,
+    unlockId: 'training_demonblood_clear',
+    category: 'training',
+    forcedClassId: 3,
+    unlocksChampionshipFor: 3,
+    unlocksClass: 4,
+  },
+  {
+    id: 'training_priest',
+    name: '사제의 수련',
+    sub: 'Path of the Priest',
+    desc: '신앙을 굳힌다. 클리어 시 챔피언십에서 사제 사용 가능.',
+    color: '#d4a574',
+    chapters: [1, 2, 3, 4],
+    enemyHpMult: 1.0,
+    enemyDmgMult: 1.0,
+    curseCount: 0,
+    maxRelicSelect: 1,
+    soulReward: 80,
+    unlockId: 'training_elf_clear',
+    category: 'training',
+    forcedClassId: 4,
+    unlocksChampionshipFor: 4,
+    // 마지막 수련 — 다음 직업 해금 없음
   },
 ];
 
@@ -3004,49 +3128,8 @@ export const META_UPGRADES = [
   },
   
   // === 해금 ===
-  {
-    id: 'unlock_priest',
-    name: '여명의 사제 해금',
-    desc: '새 직업 "여명의 사제" 사용 가능',
-    category: 'unlock',
-    stackable: false,
-    cost: () => 10000,
-    effect: 'unlock_priest',
-    color: '#d4a574',
-  },
-  {
-    id: 'unlock_expedition_2',
-    name: '심연의 원정 해금',
-    desc: '2번째 원정 사용 가능 (원정 1 클리어 필요)',
-    category: 'unlock',
-    stackable: false,
-    cost: () => 1500,
-    requirePriorClear: 1,
-    effect: 'unlock_expedition_2',
-    color: '#5c4a8c',
-  },
-  {
-    id: 'unlock_expedition_3',
-    name: '광기의 원정 해금',
-    desc: '3번째 원정 사용 가능 (원정 2 클리어 필요)',
-    category: 'unlock',
-    stackable: false,
-    cost: () => 3000,
-    requirePriorClear: 2,
-    effect: 'unlock_expedition_3',
-    color: '#8b1f1f',
-  },
-  {
-    id: 'unlock_expedition_4',
-    name: '망각의 원정 해금',
-    desc: '4번째 원정 사용 가능 (원정 3 클리어 필요)',
-    category: 'unlock',
-    stackable: false,
-    cost: () => 5000,
-    requirePriorClear: 3,
-    effect: 'unlock_expedition_4',
-    color: '#0a0608',
-  },
+  // 직업 해금은 수련의 길 클리어로 자동 해금 (영혼 구매 불필요)
+  // 원정 해금도 진행 기반 (튜토리얼 → 수련 → 챔피언십)으로 변경
   
   // === 챔피언십 메타 강화 (도전자 보상) ===
   {
@@ -3100,59 +3183,36 @@ export const SOUL_REWARDS = {
 //   - first_kill: 첫 처치
 //   - 등 (구현은 추적 시스템에서)
 export const ACHIEVEMENTS = [
-  // === 진행 업적: 직업 × 원정 첫 클리어 (5직업 × 4원정 = 20개) ===
-  // 보상: 원정 1=100, 2=200, 3=300, 4=500
-  { id: 'clear_lanthert_1', cat: 'clear', class: 'lanthert', expedition: 1, kind: 'first', target: 1, reward: 100, name: '북부 정복 (방랑검사)', desc: '방랑검사로 북부의 원정 클리어' },
-  { id: 'clear_lanthert_2', cat: 'clear', class: 'lanthert', expedition: 2, kind: 'first', target: 1, reward: 200, name: '심연 정복 (방랑검사)', desc: '방랑검사로 심연의 원정 클리어' },
-  { id: 'clear_lanthert_3', cat: 'clear', class: 'lanthert', expedition: 3, kind: 'first', target: 1, reward: 300, name: '광기 정복 (방랑검사)', desc: '방랑검사로 광기의 원정 클리어' },
-  { id: 'clear_lanthert_4', cat: 'clear', class: 'lanthert', expedition: 4, kind: 'first', target: 1, reward: 500, name: '망각 정복 (방랑검사)', desc: '방랑검사로 망각의 원정 클리어' },
+  // === 튜토리얼 진행 업적 ===
+  { id: 'clear_tutorial_basic', cat: 'tutorial', kind: 'first', target: 1, reward: 50, 
+    name: '여명의 첫 발걸음', desc: '튜토리얼 - 노드 입문 클리어' },
+  { id: 'clear_tutorial_market', cat: 'tutorial', kind: 'first', target: 1, reward: 80, 
+    name: '상인과 대장장이', desc: '튜토리얼 - 대장간 길목 클리어' },
   
-  { id: 'clear_sage_1', cat: 'clear', class: 'sage', expedition: 1, kind: 'first', target: 1, reward: 100, name: '북부 정복 (술법사)', desc: '술법사로 북부의 원정 클리어' },
-  { id: 'clear_sage_2', cat: 'clear', class: 'sage', expedition: 2, kind: 'first', target: 1, reward: 200, name: '심연 정복 (술법사)', desc: '술법사로 심연의 원정 클리어' },
-  { id: 'clear_sage_3', cat: 'clear', class: 'sage', expedition: 3, kind: 'first', target: 1, reward: 300, name: '광기 정복 (술법사)', desc: '술법사로 광기의 원정 클리어' },
-  { id: 'clear_sage_4', cat: 'clear', class: 'sage', expedition: 4, kind: 'first', target: 1, reward: 500, name: '망각 정복 (술법사)', desc: '술법사로 망각의 원정 클리어' },
+  // === 수련의 길 클리어 업적 (5직업) ===
+  // 보상: 직업 순서대로 100/150/200/250/300
+  { id: 'clear_training_lanthert', cat: 'training', class: 'lanthert', kind: 'first', target: 1, reward: 100, 
+    name: '검의 수련자', desc: '방랑검사의 수련 클리어 — 술법사 해금' },
+  { id: 'clear_training_sage', cat: 'training', class: 'sage', kind: 'first', target: 1, reward: 150, 
+    name: '주문의 수련자', desc: '술법사의 수련 클리어 — 마족 해금' },
+  { id: 'clear_training_demonblood', cat: 'training', class: 'demonblood', kind: 'first', target: 1, reward: 200, 
+    name: '마성의 수련자', desc: '혼혈 마족의 수련 클리어 — 엘프 해금' },
+  { id: 'clear_training_elf', cat: 'training', class: 'elf', kind: 'first', target: 1, reward: 250, 
+    name: '자연의 수련자', desc: '엘프의 수련 클리어 — 사제 해금' },
+  { id: 'clear_training_priest', cat: 'training', class: 'priest', kind: 'first', target: 1, reward: 300, 
+    name: '신앙의 수련자', desc: '사제의 수련 클리어 — 모든 직업 마스터' },
   
-  { id: 'clear_demonblood_1', cat: 'clear', class: 'demonblood', expedition: 1, kind: 'first', target: 1, reward: 100, name: '북부 정복 (혼혈 마족)', desc: '혼혈 마족로 북부의 원정 클리어' },
-  { id: 'clear_demonblood_2', cat: 'clear', class: 'demonblood', expedition: 2, kind: 'first', target: 1, reward: 200, name: '심연 정복 (혼혈 마족)', desc: '혼혈 마족로 심연의 원정 클리어' },
-  { id: 'clear_demonblood_3', cat: 'clear', class: 'demonblood', expedition: 3, kind: 'first', target: 1, reward: 300, name: '광기 정복 (혼혈 마족)', desc: '혼혈 마족로 광기의 원정 클리어' },
-  { id: 'clear_demonblood_4', cat: 'clear', class: 'demonblood', expedition: 4, kind: 'first', target: 1, reward: 500, name: '망각 정복 (혼혈 마족)', desc: '혼혈 마족로 망각의 원정 클리어' },
-  
-  { id: 'clear_elf_1', cat: 'clear', class: 'elf', expedition: 1, kind: 'first', target: 1, reward: 100, name: '북부 정복 (정령사)', desc: '숲의 정령사로 북부의 원정 클리어' },
-  { id: 'clear_elf_2', cat: 'clear', class: 'elf', expedition: 2, kind: 'first', target: 1, reward: 200, name: '심연 정복 (정령사)', desc: '숲의 정령사로 심연의 원정 클리어' },
-  { id: 'clear_elf_3', cat: 'clear', class: 'elf', expedition: 3, kind: 'first', target: 1, reward: 300, name: '광기 정복 (정령사)', desc: '숲의 정령사로 광기의 원정 클리어' },
-  { id: 'clear_elf_4', cat: 'clear', class: 'elf', expedition: 4, kind: 'first', target: 1, reward: 500, name: '망각 정복 (정령사)', desc: '숲의 정령사로 망각의 원정 클리어' },
-  
-  { id: 'clear_priest_1', cat: 'clear', class: 'priest', expedition: 1, kind: 'first', target: 1, reward: 100, name: '북부 정복 (사제)', desc: '여명의 사제로 북부의 원정 클리어' },
-  { id: 'clear_priest_2', cat: 'clear', class: 'priest', expedition: 2, kind: 'first', target: 1, reward: 200, name: '심연 정복 (사제)', desc: '여명의 사제로 심연의 원정 클리어' },
-  { id: 'clear_priest_3', cat: 'clear', class: 'priest', expedition: 3, kind: 'first', target: 1, reward: 300, name: '광기 정복 (사제)', desc: '여명의 사제로 광기의 원정 클리어' },
-  { id: 'clear_priest_4', cat: 'clear', class: 'priest', expedition: 4, kind: 'first', target: 1, reward: 500, name: '망각 정복 (사제)', desc: '여명의 사제로 망각의 원정 클리어' },
-  
-  // === 숙달 업적: 직업 × 원정 10회 클리어 (5 × 4 = 20개) ===
-  // 보상: 원정 1=200, 2=400, 3=600, 4=1000
-  { id: 'master10_lanthert_1', cat: 'clear', class: 'lanthert', expedition: 1, kind: 'count', target: 10, reward: 200, name: '북부의 숙달자 (방랑검사)', desc: '방랑검사로 북부의 원정 10회 클리어' },
-  { id: 'master10_lanthert_2', cat: 'clear', class: 'lanthert', expedition: 2, kind: 'count', target: 10, reward: 400, name: '심연의 숙달자 (방랑검사)', desc: '방랑검사로 심연의 원정 10회 클리어' },
-  { id: 'master10_lanthert_3', cat: 'clear', class: 'lanthert', expedition: 3, kind: 'count', target: 10, reward: 600, name: '광기의 숙달자 (방랑검사)', desc: '방랑검사로 광기의 원정 10회 클리어' },
-  { id: 'master10_lanthert_4', cat: 'clear', class: 'lanthert', expedition: 4, kind: 'count', target: 10, reward: 1000, name: '망각의 숙달자 (방랑검사)', desc: '방랑검사로 망각의 원정 10회 클리어' },
-  
-  { id: 'master10_sage_1', cat: 'clear', class: 'sage', expedition: 1, kind: 'count', target: 10, reward: 200, name: '북부의 숙달자 (술법사)', desc: '술법사로 북부의 원정 10회 클리어' },
-  { id: 'master10_sage_2', cat: 'clear', class: 'sage', expedition: 2, kind: 'count', target: 10, reward: 400, name: '심연의 숙달자 (술법사)', desc: '술법사로 심연의 원정 10회 클리어' },
-  { id: 'master10_sage_3', cat: 'clear', class: 'sage', expedition: 3, kind: 'count', target: 10, reward: 600, name: '광기의 숙달자 (술법사)', desc: '술법사로 광기의 원정 10회 클리어' },
-  { id: 'master10_sage_4', cat: 'clear', class: 'sage', expedition: 4, kind: 'count', target: 10, reward: 1000, name: '망각의 숙달자 (술법사)', desc: '술법사로 망각의 원정 10회 클리어' },
-  
-  { id: 'master10_demonblood_1', cat: 'clear', class: 'demonblood', expedition: 1, kind: 'count', target: 10, reward: 200, name: '북부의 숙달자 (혼혈 마족)', desc: '혼혈 마족로 북부의 원정 10회 클리어' },
-  { id: 'master10_demonblood_2', cat: 'clear', class: 'demonblood', expedition: 2, kind: 'count', target: 10, reward: 400, name: '심연의 숙달자 (혼혈 마족)', desc: '혼혈 마족로 심연의 원정 10회 클리어' },
-  { id: 'master10_demonblood_3', cat: 'clear', class: 'demonblood', expedition: 3, kind: 'count', target: 10, reward: 600, name: '광기의 숙달자 (혼혈 마족)', desc: '혼혈 마족로 광기의 원정 10회 클리어' },
-  { id: 'master10_demonblood_4', cat: 'clear', class: 'demonblood', expedition: 4, kind: 'count', target: 10, reward: 1000, name: '망각의 숙달자 (혼혈 마족)', desc: '혼혈 마족로 망각의 원정 10회 클리어' },
-  
-  { id: 'master10_elf_1', cat: 'clear', class: 'elf', expedition: 1, kind: 'count', target: 10, reward: 200, name: '북부의 숙달자 (정령사)', desc: '숲의 정령사로 북부의 원정 10회 클리어' },
-  { id: 'master10_elf_2', cat: 'clear', class: 'elf', expedition: 2, kind: 'count', target: 10, reward: 400, name: '심연의 숙달자 (정령사)', desc: '숲의 정령사로 심연의 원정 10회 클리어' },
-  { id: 'master10_elf_3', cat: 'clear', class: 'elf', expedition: 3, kind: 'count', target: 10, reward: 600, name: '광기의 숙달자 (정령사)', desc: '숲의 정령사로 광기의 원정 10회 클리어' },
-  { id: 'master10_elf_4', cat: 'clear', class: 'elf', expedition: 4, kind: 'count', target: 10, reward: 1000, name: '망각의 숙달자 (정령사)', desc: '숲의 정령사로 망각의 원정 10회 클리어' },
-  
-  { id: 'master10_priest_1', cat: 'clear', class: 'priest', expedition: 1, kind: 'count', target: 10, reward: 200, name: '북부의 숙달자 (사제)', desc: '여명의 사제로 북부의 원정 10회 클리어' },
-  { id: 'master10_priest_2', cat: 'clear', class: 'priest', expedition: 2, kind: 'count', target: 10, reward: 400, name: '심연의 숙달자 (사제)', desc: '여명의 사제로 심연의 원정 10회 클리어' },
-  { id: 'master10_priest_3', cat: 'clear', class: 'priest', expedition: 3, kind: 'count', target: 10, reward: 600, name: '광기의 숙달자 (사제)', desc: '여명의 사제로 광기의 원정 10회 클리어' },
-  { id: 'master10_priest_4', cat: 'clear', class: 'priest', expedition: 4, kind: 'count', target: 10, reward: 1000, name: '망각의 숙달자 (사제)', desc: '여명의 사제로 망각의 원정 10회 클리어' },
+  // === 수련의 길 숙달 업적 (5직업 × 10회) ===
+  { id: 'master10_training_lanthert', cat: 'training', class: 'lanthert', kind: 'count', target: 10, reward: 300, 
+    name: '방랑검사의 숙달자', desc: '방랑검사의 수련 10회 클리어' },
+  { id: 'master10_training_sage', cat: 'training', class: 'sage', kind: 'count', target: 10, reward: 300, 
+    name: '술법사의 숙달자', desc: '술법사의 수련 10회 클리어' },
+  { id: 'master10_training_demonblood', cat: 'training', class: 'demonblood', kind: 'count', target: 10, reward: 300, 
+    name: '혼혈 마족의 숙달자', desc: '혼혈 마족의 수련 10회 클리어' },
+  { id: 'master10_training_elf', cat: 'training', class: 'elf', kind: 'count', target: 10, reward: 300, 
+    name: '엘프의 숙달자', desc: '엘프의 수련 10회 클리어' },
+  { id: 'master10_training_priest', cat: 'training', class: 'priest', kind: 'count', target: 10, reward: 300, 
+    name: '사제의 숙달자', desc: '사제의 수련 10회 클리어' },
   
   // === 전문가 (50회) - 직업당 1개 (가장 어려운 원정 4 기준) ===
   { id: 'expert_lanthert', cat: 'clear', class: 'lanthert', expedition: 4, kind: 'count', target: 50, reward: 2000, name: '검의 전문가', desc: '방랑검사로 망각의 원정 50회 클리어' },

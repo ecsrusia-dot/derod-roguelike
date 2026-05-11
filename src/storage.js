@@ -176,6 +176,28 @@ export function recordExpeditionClear(meta, expeditionId) {
   };
 }
 
+// 챔피언십에서 사용 가능한 직업인지 확인
+// (해당 직업의 수련의 길 클리어 시 해금)
+export function isChampionshipClassUnlocked(meta, classId) {
+  if (!meta || !meta.clearedExpeditions) return false;
+  // training_{classId} 패턴의 expedition을 클리어했는지
+  const classKeys = ['lanthert', 'sage', 'demonblood', 'elf', 'priest'];
+  const key = classKeys[classId];
+  if (!key) return false;
+  return meta.clearedExpeditions.includes(`training_${key}`);
+}
+
+// 챔피언십에서 사용 가능한 직업 ID 배열 반환
+export function getUnlockedChampionshipClasses(meta) {
+  const result = [];
+  for (let i = 0; i < 5; i++) {
+    if (isChampionshipClassUnlocked(meta, i)) {
+      result.push(i);
+    }
+  }
+  return result;
+}
+
 // =============================================
 // 영혼 제단 갱신 시스템 (KST 0시 / 12시)
 // =============================================

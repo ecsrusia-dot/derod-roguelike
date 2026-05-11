@@ -1278,29 +1278,32 @@ export default function App() {
         newMeta = setAchievementProgress(newMeta, 'champ_all_hell',    hellCleared,    5);
         newMeta = setAchievementProgress(newMeta, 'champ_all_madness', madnessCleared, 5);
       } else {
-        // 클래식 원정
+        // 클래식 원정 (튜토리얼 또는 수련의 길)
         newMeta = recordExpeditionClear(newMeta, currentExpedition.id);
         
-        // === 업적 트래킹: 원정 클리어 (직업 × 원정) ===
-        const classId = classData?.id;
-        const expId = currentExpedition.id;  // 1=북부, 2=심연, 3=광기, 4=망각
-        if (classId && expId) {
-          // 첫 클리어
-          newMeta = completeAchievement(newMeta, `clear_${classId}_${expId}`, 1);
-          // 10회 숙달 — 카운터 +1
-          newMeta = incrementAchievement(newMeta, `master10_${classId}_${expId}`, 1, 10);
-          // 망각 원정(4)이면 전문가 50회 / 마스터 100회 추가
-          if (expId === 4) {
-            newMeta = incrementAchievement(newMeta, `expert_${classId}`, 1, 50);
-            newMeta = incrementAchievement(newMeta, `master_${classId}`, 1, 100);
+        const expId = currentExpedition.id;
+        
+        // 1. 튜토리얼 클리어 업적
+        if (expId === 'tutorial_basic' || expId === 'tutorial_market') {
+          newMeta = completeAchievement(newMeta, `clear_${expId}`, 1);
+        }
+        
+        // 2. 수련의 길 클리어 처리
+        if (currentExpedition.category === 'training') {
+          // 첫 클리어 업적
+          newMeta = completeAchievement(newMeta, `clear_${expId}`, 1);
+          // 10회 숙달
+          newMeta = incrementAchievement(newMeta, `master10_${expId}`, 1, 10);
+          
+          // 다음 직업 자동 해금 (unlocksClass)
+          if (typeof currentExpedition.unlocksClass === 'number') {
+            const classKeys = ['lanthert', 'sage', 'demonblood', 'elf', 'priest'];
+            const unlockClassId = classKeys[currentExpedition.unlocksClass];
+            if (unlockClassId && !newMeta.unlocks.includes(`unlock_${unlockClassId}`)) {
+              newMeta = applyUnlock(newMeta, `unlock_${unlockClassId}`);
+            }
           }
-          // 미답의 도전자 (모든 직업으로 망각 클리어 = 5)
-          if (expId === 4) {
-            // 각 직업의 망각 첫 클리어 카운트 = 미답의 도전자 진행도
-            const cleared4 = ['lanthert', 'sage', 'demonblood', 'elf', 'priest']
-              .filter(c => newMeta.achievements?.[`clear_${c}_4`]?.completed).length;
-            newMeta = setAchievementProgress(newMeta, 'special_all_class_e4', cleared4, 5);
-          }
+          // 챔피언십 직업 사용 가능 (자동으로 isChampionshipClassUnlocked가 처리)
         }
       }
       
@@ -1371,7 +1374,7 @@ export default function App() {
               onSelectGuest={handleSelectGuest} 
               onSelectGoogle={handleSelectGoogle} 
             />}
-            {screen === 'title' && authMode && <TitleScreen meta={meta} onStart={() => setScreen('classSelect')} onAltar={enterAltar} onAchievements={() => { setPrevAchievementsBack('title'); setScreen('achievements'); }} onChangelog={() => setShowChangelog({ firstSeen: false })} onAccount={() => setScreen('account')} />}
+            {screen === 'title' && authMode && <TitleScreen meta={meta} onStart={() => setScreen('expeditionSelect')} onAltar={enterAltar} onAchievements={() => { setPrevAchievementsBack('title'); setScreen('achievements'); }} onChangelog={() => setShowChangelog({ firstSeen: false })} onAccount={() => setScreen('account')} />}
             {screen === 'account' && <AccountScreen 
               authMode={authMode} 
               firebaseUser={firebaseUser} 
@@ -1380,14 +1383,32 @@ export default function App() {
               onLinkGoogle={handleLinkGoogle} 
               onClose={() => setScreen('title')} 
             />}
-            {screen === 'classSelect' && <ClassSelect meta={meta} selected={selectedClass} onSelect={setSelectedClass} onNext={() => setScreen('expeditionSelect')} onBack={() => setScreen('title')} />}
+            {screen === 'classSelect' && <ClassSelect meta={meta} selected={selectedClass} onSelect={setSelectedClass} onNext={() => setScreen('start')} onBack={() => { 
+              // 챔피언십 흐름이면 difficulty로, 일반은 expedition으로
+              if (selectedChampionship) setScreen('championshipDifficulty');
+              else setScreen('expeditionSelect'); 
+            }} isChampionship={!!selectedChampionship} />}
             {screen === 'expeditionSelect' && <ExpeditionSelect meta={meta} 
-              onSelect={(exp) => { setSelectedExpedition(exp); setScreen('start'); }} 
+              onSelect={(exp) => { 
+                setSelectedExpedition(exp); 
+                // 튜토리얼/수련: 직업 강제. 직업 선택 화면 건너뛰고 바로 시작
+                if (typeof exp.forcedClassId === 'number') {
+                  setSelectedClass(exp.forcedClassId);
+                  setScreen('start');
+                } else {
+                  // 일반 원정: 직업 선택 (현재는 없음, 미래 대비)
+                  setScreen('classSelect');
+                }
+              }} 
               onSelectChampionship={(champ) => { setSelectedChampionship(champ); setScreen('championshipDifficulty'); }}
-              onBack={() => setScreen('classSelect')} />}
+              onBack={() => setScreen('title')} />}
             {screen === 'championshipDifficulty' && selectedChampionship && <ChampionshipDifficultySelect 
               championship={selectedChampionship} meta={meta}
-              onSelect={(diff) => { setSelectedDifficulty(diff); setScreen('start'); }}
+              onSelect={(diff) => { 
+                setSelectedDifficulty(diff); 
+                // 챔피언십은 직업 선택 필요 (해금된 직업만)
+                setScreen('classSelect');
+              }}
               onBack={() => { setSelectedChampionship(null); setScreen('expeditionSelect'); }} />}
             {screen === 'start' && <StartScreen classData={classData} onContinue={() => { 
               if (selectedChampionship && selectedDifficulty) startChampionship(selectedChampionship, selectedDifficulty);
