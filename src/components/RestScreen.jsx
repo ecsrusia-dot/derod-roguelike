@@ -4,7 +4,7 @@
 
 import React from 'react';
 import { PALETTE } from '../utils/helpers.js';
-import { PASSIVE_SKILLS } from '../data.js';
+import { PASSIVE_SKILLS, PREP_CONFIG } from '../data.js';
 
 export default function RestScreen({ classData, hp, maxHp, skills, relics, expedition, onChoice, onClose }) {
   const ownedSkills = Object.entries(skills)

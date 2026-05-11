@@ -4,7 +4,7 @@
 
 import React, { useState } from 'react';
 import { PALETTE } from '../utils/helpers.js';
-import { PASSIVE_SKILLS } from '../data.js';
+import { PASSIVE_SKILLS, PREP_CONFIG } from '../data.js';
 
 export default function PrepScreen({ skills, relics, ultimates, expedition, mode = 'full', currentActiveSkills = null, currentActiveRelicNames = null, onConfirm }) {
   // Lv > 0 인 보유 패시브 목록

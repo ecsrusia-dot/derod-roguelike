@@ -7,6 +7,15 @@
 
 export const CHANGELOG = [
   {
+    version: '1.0.15',
+    date: '2026-05-11',
+    label: 'PREP_CONFIG import 누락 수정',
+    changes: [
+      { type: 'fix', text: '첫 노드(전투 준비) 진입 시 블랙스크린 수정 (PrepScreen/RestScreen에 PREP_CONFIG import 누락)' },
+      { type: 'system', text: '모든 컴포넌트 import 종합 점검 완료 (data.js, helpers, storage)' },
+    ],
+  },
+  {
     version: '1.0.14',
     date: '2026-05-11',
     label: '추가 import 누락 수정',
