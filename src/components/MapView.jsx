@@ -3,10 +3,7 @@
 // ============================================
 
 import React from 'react';
-import { 
-  Sword, Skull, Crown, BookOpen, Coins, Hammer, Flame, HelpCircle, 
-  ChevronRight 
-} from 'lucide-react';
+import { BookOpen, ChevronRight, Coins, Crown, Flame, Hammer, HelpCircle, Skull, Sword, X } from 'lucide-react';
 import { PALETTE } from '../utils/helpers.js';
 
 // 노드 종류별 아이콘/색상/라벨

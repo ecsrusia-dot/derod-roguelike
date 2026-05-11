@@ -3,6 +3,7 @@
 // ============================================
 
 import React, { useState } from 'react';
+import { ChevronRight, Lock } from 'lucide-react';
 import { PALETTE, isUnlocked } from '../utils/helpers.js';
 import { EXPEDITIONS, CHAMPIONSHIPS } from '../data.js';
 

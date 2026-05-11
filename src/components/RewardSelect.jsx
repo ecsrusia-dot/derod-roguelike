@@ -3,6 +3,7 @@
 // ============================================
 
 import React, { useState } from 'react';
+import { ChevronRight, RefreshCw } from 'lucide-react';
 import { PALETTE, hasEffect } from '../utils/helpers.js';
 import { PASSIVE_SKILLS, GAME_CONFIG } from '../data.js';
 import { rollRewards } from '../utils/rewards.js';

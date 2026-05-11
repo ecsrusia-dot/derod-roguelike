@@ -4,6 +4,7 @@
 // 발견된 레시피만 공개, 미발견은 ??? + ??? = ??? 형식
 
 import React from 'react';
+import { Hammer } from 'lucide-react';
 import { PALETTE } from '../utils/helpers.js';
 import { FORGE_RECIPES } from '../data.js';
 

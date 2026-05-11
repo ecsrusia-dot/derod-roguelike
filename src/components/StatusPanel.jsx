@@ -3,6 +3,7 @@
 // ============================================
 
 import React, { useState } from 'react';
+import { Heart, X, Lock, Check } from 'lucide-react';
 import { PALETTE } from '../utils/helpers.js';
 import { PASSIVE_SKILLS, ULTIMATE_SKILLS } from '../data.js';
 

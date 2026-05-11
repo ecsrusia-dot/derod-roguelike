@@ -3,6 +3,7 @@
 // ============================================
 
 import React, { useState } from 'react';
+import { RefreshCw } from 'lucide-react';
 import { PALETTE, getUpgradeCost } from '../utils/helpers.js';
 import { META_UPGRADES, SOUL_REWARDS } from '../data.js';
 import { getNextRefreshTime } from '../storage.js';

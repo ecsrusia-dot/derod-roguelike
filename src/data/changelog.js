@@ -7,6 +7,16 @@
 
 export const CHANGELOG = [
   {
+    version: '1.0.13',
+    date: '2026-05-11',
+    label: '블랙스크린 + UI 위치 수정',
+    changes: [
+      { type: 'fix', text: '직업 선택 후 블랙스크린 버그 수정 (ChevronRight 등 아이콘 import 누락)' },
+      { type: 'fix', text: '7개 컴포넌트 lucide-react 아이콘 import 일괄 추가' },
+      { type: 'fix', text: '메인 화면 버전 텍스트가 타이틀과 겹치던 버그 수정 (PhoneFrame 크기 0 문제)' },
+    ],
+  },
+  {
     version: '1.0.12',
     date: '2026-05-11',
     label: 'PC 사이드바 (실시간 상태)',

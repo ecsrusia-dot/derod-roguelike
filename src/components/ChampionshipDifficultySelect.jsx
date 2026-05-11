@@ -3,6 +3,7 @@
 // ============================================
 
 import React from 'react';
+import { Lock } from 'lucide-react';
 import { PALETTE } from '../utils/helpers.js';
 import { CHAMPIONSHIP_DIFFICULTIES } from '../data.js';
 import { isChampionshipDifficultyUnlocked, hasChampionshipClear } from '../storage.js';
