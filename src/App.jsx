@@ -101,7 +101,7 @@ import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpediti
 
 function PhoneFrame({ children }) {
   return (
-    <div className="relative" style={{ pointerEvents: 'auto' }}>
+    <div className="absolute inset-0" style={{ pointerEvents: 'auto' }}>
       {children}
     </div>
   );
