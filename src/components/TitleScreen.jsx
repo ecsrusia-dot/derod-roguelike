@@ -5,7 +5,7 @@ import React from 'react';
 import { PALETTE } from '../utils/helpers.js';
 import { GAME_VERSION, VERSION_DATE, VERSION_LABEL } from '../data.js';
 
-export default function TitleScreen({ meta, onStart, onAltar, onAchievements, onChangelog }) {
+export default function TitleScreen({ meta, onStart, onAltar, onAchievements, onChangelog, onAccount }) {
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-between py-12 px-8" style={{
       background: `radial-gradient(ellipse at center, ${PALETTE.panel} 0%, ${PALETTE.bgDeep} 70%)`,
@@ -67,6 +67,17 @@ export default function TitleScreen({ meta, onStart, onAltar, onAchievements, on
           letterSpacing: '0.25em',
           fontSize: '12px',
         }}>✦ 업적</button>
+        
+        {onAccount && (
+          <button onClick={onAccount} className="w-full py-2 transition-all" style={{
+            background: 'transparent',
+            color: PALETTE.textDim,
+            border: `1px solid ${PALETTE.panelBorder}`,
+            letterSpacing: '0.2em',
+            fontSize: '10px',
+            marginTop: '4px',
+          }}>◆ 계정 관리</button>
+        )}
       </div>
       
       {/* 버전 정보 (하단 작은 텍스트, 클릭 시 업데이트 로그) */}
