@@ -7,6 +7,17 @@
 
 export const CHANGELOG = [
   {
+    version: '1.0.12',
+    date: '2026-05-11',
+    label: 'PC 사이드바 (실시간 상태)',
+    changes: [
+      { type: 'feature', text: 'PC 우측 사이드바 추가 — 현재 화면, HP, 영혼, 유물 수, 패시브 수 상시 표시' },
+      { type: 'feature', text: '사이드바 항목 클릭 시 상세 모달 (유물 목록, 패시브 + 궁극기, 활성 저주)' },
+      { type: 'fix', text: '옛 v1.4 좌측/우측 패널 제거 ("유물 스탯형 전환" 등)' },
+      { type: 'system', text: 'ResponsiveLayout 컴포넌트 분리 (모바일/PC 분기)' },
+    ],
+  },
+  {
     version: '1.0.11',
     date: '2026-05-11',
     label: 'PC 환경 UI 개선',
