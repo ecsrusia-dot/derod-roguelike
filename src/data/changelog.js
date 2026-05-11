@@ -7,6 +7,18 @@
 
 export const CHANGELOG = [
   {
+    version: '1.0.8',
+    date: '2026-05-11',
+    label: '계정 관리 + 모드 분리 수정',
+    changes: [
+      { type: 'feature', text: '계정 관리 화면 추가 — 메인 화면 "◆ 계정 관리" 버튼' },
+      { type: 'feature', text: '로그아웃 기능 추가 (모드 변경 가능)' },
+      { type: 'feature', text: '게스트 → Google 계정 연동 기능 (데이터 유지)' },
+      { type: 'fix', text: '모드 전환 시 이전 데이터가 새 모드로 복사되던 버그 수정' },
+      { type: 'system', text: '로그아웃 시 로컬 IndexedDB 자동 클리어' },
+    ],
+  },
+  {
     version: '1.0.7',
     date: '2026-05-11',
     label: '패배 화면 블랙스크린 수정',
