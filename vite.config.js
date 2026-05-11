@@ -45,6 +45,9 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,png,svg,woff2}'],
+        skipWaiting: true,        // 새 SW 즉시 활성화
+        clientsClaim: true,        // 페이지가 즉시 새 SW 사용
+        cleanupOutdatedCaches: true,  // 옛 캐시 자동 삭제
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/,
