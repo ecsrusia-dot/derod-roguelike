@@ -7,6 +7,17 @@
 
 export const CHANGELOG = [
   {
+    version: '1.0.18',
+    date: '2026-05-11',
+    label: '튜토리얼/수련 출정 먹통 수정',
+    changes: [
+      { type: 'fix', text: '튜토리얼 1·2 출정 화면 탭 시 진입 안 되던 문제 (chapter ID가 string인데 array index로 처리되어 NaN)' },
+      { type: 'fix', text: '수련의 길 1챕터에서 튜토리얼 챕터가 잘못 로드되던 문제 (CHAPTERS 배열 인덱스 밀림)' },
+      { type: 'fix', text: '챕터 진행(다음 챕터) 시에도 동일한 인덱스 버그 수정' },
+      { type: 'system', text: '챕터 데이터 조회를 array index 대신 ID 기반 검색으로 변경' },
+    ],
+  },
+  {
     version: '1.0.17',
     date: '2026-05-11',
     label: '클래식 → 튜토리얼+수련의길 개편',
