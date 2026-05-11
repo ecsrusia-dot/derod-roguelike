@@ -5,7 +5,7 @@
 import React, { useState } from 'react';
 import { PALETTE } from '../utils/helpers.js';
 import { SHOP_PRICES, PASSIVE_SKILLS } from '../data.js';
-import { getRewardPool } from '../utils/rewards.js';
+import { getRewardPool, rollRewards } from '../utils/rewards.js';
 
 export default function ShopScreen({ gold, skills, relics, ultimates, onBuy, onLeave, classId = null }) {
   // 상점 재고: 유물·궁극·재화는 제외하고 다양한 카테고리로

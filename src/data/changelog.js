@@ -7,6 +7,16 @@
 
 export const CHANGELOG = [
   {
+    version: '1.0.16',
+    date: '2026-05-11',
+    label: 'useRef + rollRewards import 수정',
+    changes: [
+      { type: 'fix', text: '2번째 전투 노드 진입 시 블랙스크린 (CombatScreen useRef import 누락)' },
+      { type: 'fix', text: '상점 진입 시 잠재적 블랙스크린 (ShopScreen rollRewards import 누락)' },
+      { type: 'system', text: '6개 모듈 (react, lucide, helpers, data, storage, combat, utils, cloud) × 25개 컴포넌트 전수 점검 완료' },
+    ],
+  },
+  {
     version: '1.0.15',
     date: '2026-05-11',
     label: 'PREP_CONFIG import 누락 수정',

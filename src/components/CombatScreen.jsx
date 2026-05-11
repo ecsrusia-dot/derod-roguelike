@@ -4,7 +4,7 @@
 // 가장 큰 컴포넌트 — 플레이어 턴, 적 턴, 데미지 적용,
 // 디버프 (출혈/충격/봉인/동상), 회피/반격 처리 모두 포함
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
 import { 
   PALETTE, 
