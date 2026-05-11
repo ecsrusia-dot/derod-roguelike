@@ -52,6 +52,7 @@ import StatusPanel from './components/StatusPanel.jsx';
 import SoulAltar from './components/SoulAltar.jsx';
 import MapView from './components/MapView.jsx';
 import CombatScreen from './components/CombatScreen.jsx';
+import PCSidebar from './components/PCSidebar.jsx';
 import { LATEST_VERSION } from './data/changelog.js';
 import { signInGuest, signInGoogle, signOut, watchAuthState, getUserInfo, linkGuestToGoogle } from './cloud/auth.js';
 import { saveCloudMeta, loadCloudMeta, pickLatest } from './cloud/sync.js';
@@ -99,14 +100,21 @@ import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpediti
 
 
 function PhoneFrame({ children }) {
+  return (
+    <div className="relative" style={{ pointerEvents: 'auto' }}>
+      {children}
+    </div>
+  );
+}
+
+// PhoneFrame을 감싸는 컨테이너 — 모바일/PC 분기
+function ResponsiveLayout({ children, sidebar }) {
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
     const updateLayout = () => {
-      const width = window.innerWidth;
-      setIsMobile(width < 1024);
+      setIsMobile(window.innerWidth < 1024);
     };
-
     updateLayout();
     window.addEventListener('resize', updateLayout);
     return () => window.removeEventListener('resize', updateLayout);
@@ -122,28 +130,27 @@ function PhoneFrame({ children }) {
           backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
           mixBlendMode: 'overlay',
         }} />
-        {children}
+        <div className="absolute inset-0">{children}</div>
       </div>
     );
   }
 
-  // 데스크톱: 화면 중앙에 적응형 폰 프레임 (transform scale 제거 — 모달 클릭 문제 해결)
-  // 폰 크기: 가로 420px, 세로 화면의 92%까지 (max 920px)
+  // PC: 중앙 폰 프레임 + 우측 사이드바
   return (
     <div 
       className="fixed inset-0 flex items-center justify-center overflow-hidden"
       style={{
         background: `radial-gradient(ellipse at center, ${PALETTE.bg} 0%, ${PALETTE.bgDeep} 100%)`,
+        fontFamily: '"Noto Serif KR", serif',
       }}
     >
-      {/* 배경 분위기 */}
       <div className="absolute inset-0 pointer-events-none opacity-15" style={{
         backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
-          mixBlendMode: 'overlay',
+        mixBlendMode: 'overlay',
       }} />
       
-      {/* PC 전용 게임 타이틀 (좌측 상단) */}
-      <div className="absolute top-6 left-8 pointer-events-none" style={{ color: PALETTE.textDim, opacity: 0.7 }}>
+      {/* 좌측 — 게임 타이틀 (간단) */}
+      <div className="absolute top-8 left-10 pointer-events-none" style={{ color: PALETTE.textDim, opacity: 0.6 }}>
         <div className="text-[10px] tracking-[0.4em]" style={{ color: PALETTE.dawn }}>
           DAWN & TWILIGHT
         </div>
@@ -152,7 +159,7 @@ function PhoneFrame({ children }) {
         </div>
       </div>
       
-      {/* 폰 프레임 — 실제 컨테이너 */}
+      {/* 중앙 — 폰 프레임 */}
       <div 
         className="relative"
         style={{
@@ -163,7 +170,6 @@ function PhoneFrame({ children }) {
           border: `8px solid ${PALETTE.bgDeep}`,
           boxShadow: `0 30px 80px rgba(0,0,0,0.7), 0 0 60px ${PALETTE.dawn}15`,
           overflow: 'hidden',
-          fontFamily: '"Noto Serif KR", serif',
           flexShrink: 0,
         }}
       >
@@ -174,15 +180,8 @@ function PhoneFrame({ children }) {
         {children}
       </div>
       
-      {/* PC 전용 안내 (우측 하단) */}
-      <div className="absolute bottom-6 right-8 pointer-events-none text-right" style={{ color: PALETTE.textDim, opacity: 0.5 }}>
-        <div className="text-[10px] tracking-[0.2em]">
-          모바일 PWA 게임
-        </div>
-        <div className="text-[9px] mt-1">
-          최적 경험: 모바일 또는 좁은 창
-        </div>
-      </div>
+      {/* 우측 사이드바 */}
+      {sidebar}
     </div>
   );
 }
@@ -1348,44 +1347,25 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center p-4 lg:p-10" style={{
-      background: `radial-gradient(ellipse at top, #1a0e12 0%, #050304 100%)`,
-      fontFamily: '"Noto Serif KR", serif',
-      overflow: 'hidden' 
-    }}>
-      {/* 가로로 나열되는 컨테이너 */}
-      <div className="flex flex-row items-center justify-center gap-12 w-full max-w-[1400px]">
-        
-        {/* [좌측] 게임 안내 및 패치 노트 (PC 전용) */}
-        <div className="hidden xl:block w-80 flex-shrink-0" style={{ color: PALETTE.text }}>
-          <p className="text-xs tracking-[0.4em] mb-2" style={{ color: PALETTE.twilight }}>RELIC REFORM · v1.4</p>
-          <h1 className="text-3xl font-bold mb-4 leading-tight" style={{ fontFamily: '"Cinzel", serif' }}>
-            여명앤황혼<br/>
-            <span style={{ color: PALETTE.accent }}>로그라이크</span>
-          </h1>
-          <p className="text-sm leading-relaxed mb-6" style={{ color: PALETTE.textDim }}>
-            v1.4 — 유물 시스템 재편 + 영혼의 제단 밸런스 조정.
-          </p>
-          
-          <div className="space-y-4 text-xs">
-            <div>
-              <div className="text-[10px] tracking-[0.3em] mb-1.5" style={{ color: PALETTE.legendary }}>★ 유물 스탯형 전환</div>
-              <p style={{ color: PALETTE.textDim }}>패시브 Lv 강화 대신 직접적인 스탯 보너스를 부여합니다.</p>
-            </div>
-            <div>
-              <div className="text-[10px] tracking-[0.3em] mb-1.5" style={{ color: PALETTE.twilight }}>✦ 영혼 제단 조정</div>
-              <p style={{ color: PALETTE.textDim }}>강화 비용이 현실적으로 조정되었습니다.</p>
-            </div>
-          </div>
-
-          <div className="mt-8 pt-5 border-t text-[11px] leading-relaxed" style={{ color: PALETTE.textDim, borderColor: PALETTE.panelBorder }}>
-            ◇ 모든 진행은 브라우저에 자동 저장됩니다.
-          </div>
-        </div>
-
-        {/* [중앙] 실제 게임 화면 (PhoneFrame) */}
-        <div className="flex-shrink-0">
-          <PhoneFrame>
+    <ResponsiveLayout sidebar={
+      <PCSidebar 
+        screen={screen}
+        meta={meta}
+        hp={hp}
+        maxHp={maxHp}
+        gold={gold}
+        gem={gem}
+        relics={relics}
+        skills={skills}
+        ultimates={ultimates}
+        chapter={chapter}
+        chapterIdx={chapterIdx}
+        expedition={currentExpedition}
+        classData={classData}
+        curses={currentCurses}
+      />
+    }>
+      <PhoneFrame>
             {screen === 'title' && !authMode && <LoginScreen 
               onSelectLocal={handleSelectLocal} 
               onSelectGuest={handleSelectGuest} 
@@ -1439,45 +1419,6 @@ export default function App() {
               setShowChangelog(null);
             }} />}
           </PhoneFrame>
-        </div>
-
-        {/* [우측] 실시간 디버그 정보 (PC 전용) */}
-        <div className="hidden lg:block w-80 flex-shrink-0 overflow-y-auto max-h-[85vh] pr-2 custom-scrollbar">
-          <p className="text-xs tracking-[0.4em] mb-3" style={{ color: PALETTE.dawn }}>실시간 상태</p>
-          
-          <div className="px-3 py-2 mb-4" style={{ background: `${PALETTE.accent}10`, border: `1px solid ${PALETTE.panelBorder}` }}>
-            <div className="text-[10px] mb-1" style={{ color: PALETTE.textDim }}>현재 페이즈</div>
-            <div className="text-xs font-bold" style={{ color: PALETTE.text }}>{screen.toUpperCase()}</div>
-          </div>
-
-          <div className="space-y-2 text-[11px] mb-6">
-            <div className="flex justify-between border-b border-white/5 pb-1"><span style={{ color: PALETTE.textDim }}>체력</span><span style={{ color: PALETTE.text }}>{hp}/{maxHp}</span></div>
-            <div className="flex justify-between border-b border-white/5 pb-1"><span style={{ color: PALETTE.textDim }}>보유 은화</span><span style={{ color: PALETTE.text }}>{gold}</span></div>
-            <div className="flex justify-between border-b border-white/5 pb-1"><span style={{ color: PALETTE.textDim }}>보유 보석</span><span style={{ color: PALETTE.text }}>{gem}</span></div>
-            <div className="flex justify-between border-b border-white/5 pb-1"><span style={{ color: PALETTE.textDim }}>획득 유물</span><span style={{ color: PALETTE.text }}>{relics.length}개</span></div>
-          </div>
-
-          {Object.keys(skills).length > 0 && (
-            <div className="mb-6">
-              <div className="text-[10px] mb-2" style={{ color: PALETTE.dawn }}>습득 패시브</div>
-              <div className="flex flex-wrap gap-1.5">
-                {Object.entries(skills).filter(([_, lv]) => lv > 0).map(([k, lv]) => (
-                  <span key={k} className="text-[10px] px-2 py-0.5" style={{
-                    background: `${PASSIVE_SKILLS[k].color}20`,
-                    color: PASSIVE_SKILLS[k].color,
-                    border: `1px solid ${PASSIVE_SKILLS[k].color}40`,
-                  }}>{k} Lv.{lv}</span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="pt-4 border-t text-[10px]" style={{ color: PALETTE.textDim, borderColor: PALETTE.panelBorder }}>
-             <p className="opacity-50">배율 조정 모드 활성화됨</p>
-          </div>
-        </div>
-
-      </div>
-    </div>
-  ); // <--- return 문을 닫는 소괄호와 세미콜론
-} // <--- App 함수를 닫는 마지막 중괄호 (이게 누락되었을 가능성이 큽니다!)
+    </ResponsiveLayout>
+  );
+}
