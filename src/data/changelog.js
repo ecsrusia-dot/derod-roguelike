@@ -7,6 +7,17 @@
 
 export const CHANGELOG = [
   {
+    version: '1.0.11',
+    date: '2026-05-11',
+    label: 'PC 환경 UI 개선',
+    changes: [
+      { type: 'fix', text: 'PC에서 모달 X 버튼 클릭 안 되던 버그 수정 (transform scale 제거)' },
+      { type: 'feature', text: 'PC 화면 적응형 레이아웃 — 더 큰 폰 프레임 (420×920)' },
+      { type: 'feature', text: 'PC 전용 배경 디자인 — 좌측 게임 타이틀 + 그라데이션' },
+      { type: 'system', text: 'PhoneFrame 재설계 (transform 제거, fixed 사용)' },
+    ],
+  },
+  {
     version: '1.0.10',
     date: '2026-05-11',
     label: '리팩토링 완료',
