@@ -121,6 +121,22 @@ export function getDefaultMeta() {
   return { ...DEFAULT_META };
 }
 
+// 로컬 IndexedDB 메타 데이터 초기화 (로그아웃 시 호출)
+export async function clearLocalMeta() {
+  try {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      const request = store.delete(META_KEY);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  } catch (e) {
+    console.error('Meta clear failed:', e);
+  }
+}
+
 // 메타 데이터 초기화 (디버그용)
 export async function resetMeta() {
   await saveMeta({ ...DEFAULT_META });
