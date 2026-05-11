@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 
 // ============================================
 // 여명앤황혼 로그라이크 v0.4 - INTEGRATED
@@ -100,22 +100,11 @@ import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpediti
 
 function PhoneFrame({ children }) {
   const [isMobile, setIsMobile] = useState(false);
-  const [scale, setScale] = useState(1);
-  const containerRef = useRef(null);
 
   useEffect(() => {
     const updateLayout = () => {
       const width = window.innerWidth;
-      const height = window.innerHeight;
       setIsMobile(width < 1024);
-
-      if (width >= 1024) {
-        // PC 환경 배율 계산 (가로 375, 세로 780 기준)
-        // 화면 높이의 90% 정도를 차지하도록 배율 설정
-        const scaleV = (height * 0.9) / 780;
-        const scaleH = (width * 0.4) / 375; // 좌우 여백 고려
-        setScale(Math.min(scaleV, scaleH, 1.2)); // 최대 1.2배까지만 확대
-      }
     };
 
     updateLayout();
@@ -138,21 +127,41 @@ function PhoneFrame({ children }) {
     );
   }
 
-  // 데스크톱: 배율에 맞춰 scale 적용
+  // 데스크톱: 화면 중앙에 적응형 폰 프레임 (transform scale 제거 — 모달 클릭 문제 해결)
+  // 폰 크기: 가로 420px, 세로 화면의 92%까지 (max 920px)
   return (
-    <div className="flex items-center justify-center w-full h-full">
+    <div 
+      className="fixed inset-0 flex items-center justify-center overflow-hidden"
+      style={{
+        background: `radial-gradient(ellipse at center, ${PALETTE.bg} 0%, ${PALETTE.bgDeep} 100%)`,
+      }}
+    >
+      {/* 배경 분위기 */}
+      <div className="absolute inset-0 pointer-events-none opacity-15" style={{
+        backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
+          mixBlendMode: 'overlay',
+      }} />
+      
+      {/* PC 전용 게임 타이틀 (좌측 상단) */}
+      <div className="absolute top-6 left-8 pointer-events-none" style={{ color: PALETTE.textDim, opacity: 0.7 }}>
+        <div className="text-[10px] tracking-[0.4em]" style={{ color: PALETTE.dawn }}>
+          DAWN & TWILIGHT
+        </div>
+        <div className="text-xs tracking-[0.3em] mt-1" style={{ fontFamily: '"Cinzel", serif' }}>
+          던앤 트와일라잇
+        </div>
+      </div>
+      
+      {/* 폰 프레임 — 실제 컨테이너 */}
       <div 
-        ref={containerRef}
-        className="relative transition-transform duration-300"
+        className="relative"
         style={{
-          width: '375px',
-          height: '780px',
-          transform: `scale(${scale})`,
-          transformOrigin: 'center center',
+          width: '420px',
+          height: 'min(92vh, 920px)',
           background: PALETTE.bg,
-          borderRadius: '36px',
+          borderRadius: '40px',
           border: `8px solid ${PALETTE.bgDeep}`,
-          boxShadow: '0 30px 80px rgba(0,0,0,0.6)',
+          boxShadow: `0 30px 80px rgba(0,0,0,0.7), 0 0 60px ${PALETTE.dawn}15`,
           overflow: 'hidden',
           fontFamily: '"Noto Serif KR", serif',
           flexShrink: 0,
@@ -163,6 +172,16 @@ function PhoneFrame({ children }) {
           mixBlendMode: 'overlay',
         }} />
         {children}
+      </div>
+      
+      {/* PC 전용 안내 (우측 하단) */}
+      <div className="absolute bottom-6 right-8 pointer-events-none text-right" style={{ color: PALETTE.textDim, opacity: 0.5 }}>
+        <div className="text-[10px] tracking-[0.2em]">
+          모바일 PWA 게임
+        </div>
+        <div className="text-[9px] mt-1">
+          최적 경험: 모바일 또는 좁은 창
+        </div>
       </div>
     </div>
   );
