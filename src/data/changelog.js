@@ -7,6 +7,22 @@
 
 export const CHANGELOG = [
   {
+    version: '1.0.17',
+    date: '2026-05-11',
+    label: '클래식 → 튜토리얼+수련의길 개편',
+    changes: [
+      { type: 'feature', text: '클래식 모드 = 튜토리얼 + 수련의 길로 개편' },
+      { type: 'feature', text: '튜토리얼 1: 노드 입문 (방랑검사, 사건/미지/전투 위주)' },
+      { type: 'feature', text: '튜토리얼 2: 대장간 길목 (상점+대장간 강제 배치)' },
+      { type: 'feature', text: '수련의 길 5종: 직업별 4챕터, 클리어 시 다음 직업 + 챔피언십 직업 해금' },
+      { type: 'feature', text: '챔피언십 탭: 수련 클리어한 직업만 사용 가능' },
+      { type: 'system', text: '직업 해금 순서: 방랑검사 → 술법사 → 마족 → 엘프 → 사제' },
+      { type: 'system', text: '시작 화면 → 원정 선택 → (강제 직업 또는 직업 선택) → 시작' },
+      { type: 'fix', text: '옛 클래식 원정 4종, 옛 직업 해금 메타 강화 삭제' },
+      { type: 'fix', text: '옛 클래식 업적 40개 → 튜토리얼/수련 업적 12개로 교체' },
+    ],
+  },
+  {
     version: '1.0.16',
     date: '2026-05-11',
     label: 'useRef + rollRewards import 수정',
