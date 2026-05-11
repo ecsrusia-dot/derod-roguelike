@@ -167,9 +167,23 @@ export function getChampionshipMetaRelicBonus(meta) {
 }
 
 // 해금 여부
+// unlockId 형식:
+//   - "unlock_xxx" : meta.unlocks 배열 확인
+//   - "tutorial_basic_clear" / "tutorial_market_clear" : 해당 expedition 클리어 여부 확인
+//   - "training_xxx" : 클리어 여부 확인 (수련의 길)
+//   - null : 항상 해금
 export function isUnlocked(meta, unlockId) {
-  if (!meta || !meta.unlocks) return false;
-  return meta.unlocks.includes(unlockId);
+  if (!unlockId) return true;  // null이면 항상 해금
+  if (!meta) return false;
+  
+  // expedition 클리어 확인 (tutorial_basic_clear 같은 형식)
+  if (unlockId.endsWith('_clear')) {
+    const expId = unlockId.replace('_clear', '');
+    return (meta.clearedExpeditions || []).includes(expId);
+  }
+  
+  // 일반 unlock (영혼 제단 등에서 해금)
+  return (meta.unlocks || []).includes(unlockId);
 }
 
 // 강화 비용 계산

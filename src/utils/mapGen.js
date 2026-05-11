@@ -11,28 +11,44 @@
 import { GAME_CONFIG } from '../data.js';
 
 export function generateChapterMap(chapter, chapterIdx = 0) {
-  // 더 큰 노드 수에 맞춰 layers 확대
-  // 시작(1) + 중간(여러 layer) + 보스직전(1) + 보스(1)
   const layers = Math.max(5, Math.ceil(chapter.nodeCount / 2.8));
   const nodes = [];
   let id = 0;
+  
+  // 튜토리얼 챕터 처리
+  const isTutorial = chapter.isTutorial === true;
 
   // Layer 0: 모든 챕터 첫 노드 = 'prep' (전투 준비)
   nodes.push({ id: id++, type: 'prep', layer: 0, x: 50, y: 95, completed: false, current: true, locked: false });
 
   // 중간 레이어 노드 타입 (rest 완전 제거, shop은 강제 배치로 별도 처리)
-  const types = ['battle', 'event', 'unknown', 'elite'];
-  const weights = [55, 26, 14, 9];
+  let types, weights;
+  if (isTutorial && chapter.nodeWeights) {
+    // 튜토리얼: 명시된 비율 사용 (shop, forge 제외 — 강제 배치로 처리)
+    types = ['battle', 'event', 'unknown', 'elite'];
+    weights = [
+      (chapter.nodeWeights.battle || 0) * 100,
+      (chapter.nodeWeights.event || 0) * 100,
+      (chapter.nodeWeights.unknown || 0) * 100,
+      (chapter.nodeWeights.elite || 0) * 100,
+    ];
+    // 합이 0이면 기본 배율
+    if (weights.reduce((a, b) => a + b, 0) === 0) {
+      weights = [55, 26, 14, 9];
+    }
+  } else {
+    types = ['battle', 'event', 'unknown', 'elite'];
+    weights = [55, 26, 14, 9];
+  }
 
-  // 중간 레이어 (1 ~ layers-3) — 보스 직전 layer는 별도 처리
+  // 중간 레이어
   for (let l = 1; l < layers - 2; l++) {
     const yPos = 95 - (l / (layers - 1)) * 85;
-    // layer당 2~4개 노드 (기존 2~3 → 2~4)
     const r = Math.random();
     const nodeCount = r < 0.3 ? 2 : r < 0.75 ? 3 : 4;
     for (let i = 0; i < nodeCount; i++) {
       const xPos = (i + 1) * (100 / (nodeCount + 1)) + (Math.random() - 0.5) * 5;
-      let rt = Math.random() * 100;
+      let rt = Math.random() * weights.reduce((a, b) => a + b, 0);
       let type = 'battle';
       for (let t = 0; t < types.length; t++) {
         rt -= weights[t];
@@ -43,10 +59,10 @@ export function generateChapterMap(chapter, chapterIdx = 0) {
   }
 
   // === 상점/대장간 강제 배치 ===
-  // 상점: 모든 챕터 1개, layer 3 ~ layers-3 (정비/보스 제외) 중 랜덤
-  // 대장간: 챕터 3 이상 (chapterIdx >= 2)에서 1개, layer 1 ~ layers-3 중 랜덤
+  // 일반 챕터: 상점 1개 (chapter 3+ 대장간 1개)
+  // 튜토리얼 basic: 상점/대장간 둘 다 X
+  // 튜토리얼 market: 상점 + 대장간 보장
   
-  // 강제 배치 가능 layer 풀 (일반 노드 중에서 변환)
   const pickRandomNode = (minLayer, maxLayer, excludeIds = []) => {
     const candidates = nodes.filter(n => 
       n.layer >= minLayer && 
@@ -58,17 +74,32 @@ export function generateChapterMap(chapter, chapterIdx = 0) {
     return candidates[Math.floor(Math.random() * candidates.length)];
   };
   
-  // 상점 강제 배치 (layer 3 ~ layers-3)
-  const shopNode = pickRandomNode(3, layers - 3);
-  if (shopNode) {
-    shopNode.type = 'shop';
-  }
-  
-  // 대장간 강제 배치 (chapterIdx >= 2 = 챕터 3+, layer 1 ~ layers-3)
-  if (chapterIdx >= 2) {
-    const forgeNode = pickRandomNode(1, layers - 3, shopNode ? [shopNode.id] : []);
-    if (forgeNode) {
-      forgeNode.type = 'forge';
+  if (isTutorial && chapter.id === 'tutorial_basic') {
+    // 튜토리얼 1: 상점/대장간 없음 (skip)
+  } else if (isTutorial && chapter.id === 'tutorial_market') {
+    // 튜토리얼 2: 상점 + 대장간 강제 (사전 전투 보장)
+    // 상점은 layer 3 이후 (앞쪽 전투에서 골드 확보)
+    const minShopLayer = Math.max(3, Math.ceil(layers / 3));
+    const shopNode = pickRandomNode(minShopLayer, layers - 3);
+    if (shopNode) shopNode.type = 'shop';
+    
+    // 대장간은 layer 2 이후 (전투 2~3회로 유물 확보)
+    const minForgeLayer = 2;
+    const forgeNode = pickRandomNode(minForgeLayer, layers - 3, shopNode ? [shopNode.id] : []);
+    if (forgeNode) forgeNode.type = 'forge';
+  } else {
+    // 일반 챕터: 기존 로직
+    const shopNode = pickRandomNode(3, layers - 3);
+    if (shopNode) {
+      shopNode.type = 'shop';
+    }
+    
+    // 대장간 강제 배치 (chapterIdx >= 2 = 챕터 3+, layer 1 ~ layers-3)
+    if (chapterIdx >= 2) {
+      const forgeNode = pickRandomNode(1, layers - 3, shopNode ? [shopNode.id] : []);
+      if (forgeNode) {
+        forgeNode.type = 'forge';
+      }
     }
   }
 
