@@ -1590,18 +1590,13 @@ export const CHAPTERS = [
     name: '여명의 시작',
     sub: 'Where the Dawn Begins',
     desc: '여명의 검사가 마주하는 첫 시련. 모든 종류의 노드를 경험하라.',
-    nodeCount: 12,
+    nodeCount: 7,
     biome: 'tutorial',
     color: '#d4a574',
     isTutorial: true,
-    // 노드 구성: 전투, 사건, 미지, 강적, 정비, 보스 (상점/대장간 제외)
-    nodeWeights: {
-      battle: 0.40,
-      event: 0.25,
-      unknown: 0.20,
-      elite: 0.10,
-      // shop/forge 제외
-    },
+    // 일직선 7노드 시퀀스: 준비 → 일반몹 → 강적 → 미지 → 사건 → 정비 → 보스
+    // 각 노드 진입 시 NodeInfoModal로 설명 팝업
+    linearSequence: ['prep', 'battle', 'elite', 'unknown', 'event', 'rest', 'boss'],
     enemies: { normal: ['goblin', 'iceWolf'], elite: ['cultist'], boss: 'wraith' },
   },
   {
