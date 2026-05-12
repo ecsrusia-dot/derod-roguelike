@@ -11,12 +11,36 @@
 import { GAME_CONFIG } from '../data.js';
 
 export function generateChapterMap(chapter, chapterIdx = 0) {
+  // 튜토리얼 챕터 처리
+  const isTutorial = chapter.isTutorial === true;
+
+  // === 일직선 시퀀스 챕터 (tutorial_basic) ===
+  // chapter.linearSequence가 노드 타입 배열이면 그 순서대로 1열 배치
+  if (Array.isArray(chapter.linearSequence) && chapter.linearSequence.length > 0) {
+    const seq = chapter.linearSequence;
+    const linearNodes = [];
+    const linearEdges = [];
+    const count = seq.length;
+    for (let i = 0; i < count; i++) {
+      const yPos = count === 1 ? 50 : 95 - (i / (count - 1)) * 87;
+      linearNodes.push({
+        id: i,
+        type: seq[i],
+        layer: i,
+        x: 50,
+        y: yPos,
+        completed: false,
+        current: i === 0,
+        locked: false,
+      });
+      if (i > 0) linearEdges.push([i - 1, i]);
+    }
+    return { nodes: linearNodes, edges: linearEdges };
+  }
+
   const layers = Math.max(5, Math.ceil(chapter.nodeCount / 2.8));
   const nodes = [];
   let id = 0;
-  
-  // 튜토리얼 챕터 처리
-  const isTutorial = chapter.isTutorial === true;
 
   // Layer 0: 모든 챕터 첫 노드 = 'prep' (전투 준비)
   nodes.push({ id: id++, type: 'prep', layer: 0, x: 50, y: 95, completed: false, current: true, locked: false });

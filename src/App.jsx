@@ -52,6 +52,7 @@ import StatusPanel from './components/StatusPanel.jsx';
 import SoulAltar from './components/SoulAltar.jsx';
 import MapView from './components/MapView.jsx';
 import CombatScreen from './components/CombatScreen.jsx';
+import NodeInfoModal from './components/NodeInfoModal.jsx';
 import PCSidebar from './components/PCSidebar.jsx';
 import { LATEST_VERSION } from './data/changelog.js';
 import { signInGuest, signInGoogle, signOut, watchAuthState, getUserInfo, linkGuestToGoogle } from './cloud/auth.js';
@@ -240,6 +241,8 @@ export default function App() {
   const [prevAchievementsBack, setPrevAchievementsBack] = useState('title');
   // 업데이트 로그 모달 (firstSeen=true: 자동 표시 / false: 수동 클릭)
   const [showChangelog, setShowChangelog] = useState(null);  // null | { firstSeen: bool }
+  // 노드 진입 설명 모달 (튜토리얼 챕터에서만 표시)
+  const [pendingNode, setPendingNode] = useState(null);  // null | { node, resolvedType }
   
   // === 인증/저장 모드 (Phase 1) ===
   // null = 미선택 (LoginScreen 표시), 'local' | 'guest' | 'google'
@@ -700,9 +703,8 @@ export default function App() {
 
   // 노드 진입 분기
   const handleEnterNode = (node) => {
-    setActiveNodeId(node.id);
     let nodeType = node.type;
-    
+
     // 미지 노드는 진입 시 랜덤 결정
     // 사건 50% / 회복의 샘 15% / 전투 30% / 강적 5%
     if (nodeType === 'unknown') {
@@ -712,6 +714,21 @@ export default function App() {
       else if (r < 95) nodeType = 'battle';
       else nodeType = 'elite';
     }
+
+    // 튜토리얼 챕터: 진입 전 설명 모달 표시 (모달 확인 후 proceedEnterNode 호출)
+    // 미지 노드는 맵에 표시되는 '미지' 그대로 안내 (랜덤 해석 결과는 모달 닫은 뒤 적용)
+    if (chapter && chapter.isTutorial) {
+      const modalType = node.type === 'unknown' ? 'unknown' : nodeType;
+      setPendingNode({ node, resolvedType: nodeType, modalType });
+      return;
+    }
+
+    proceedEnterNode(node, nodeType);
+  };
+
+  // 모달 확인 후(혹은 튜토리얼이 아닐 때 바로) 실제 노드 진입 처리
+  const proceedEnterNode = (node, nodeType) => {
+    setActiveNodeId(node.id);
     setActiveNodeType(nodeType);
 
     if (nodeType === 'battle') {
@@ -1441,6 +1458,17 @@ export default function App() {
             {screen === 'expeditionClear' && currentExpedition && <ExpeditionClearScreen expedition={currentExpedition} soulsGained={runSouls} firstClear={runFirstChampClear} onContinue={handleExpeditionClearContinue} />}
             {screen === 'defeat' && <DefeatScreen classData={classData} chapter={chapter} soulsGained={runSouls} onContinue={handleDefeatContinue} />}
             {screen === 'status' && <StatusPanel classData={classData} hp={hp} maxHp={maxHp} skills={skills} stats={{ ...classData.stats, ...stats }} relics={relics} ultimates={ultimates} activeSkills={activeSkills} activeRelicNames={activeRelicNames} onClose={() => setScreen('map')} />}
+            {/* 노드 진입 설명 모달 (튜토리얼 챕터에서만) */}
+            {pendingNode && (
+              <NodeInfoModal
+                nodeType={pendingNode.modalType}
+                onConfirm={() => {
+                  const { node, resolvedType } = pendingNode;
+                  setPendingNode(null);
+                  proceedEnterNode(node, resolvedType);
+                }}
+              />
+            )}
             {/* 업데이트 로그 모달 (전역) */}
             {showChangelog && <ChangelogModal firstSeen={showChangelog.firstSeen} onClose={() => {
               // 첫 표시 시 마지막 본 버전 기록
