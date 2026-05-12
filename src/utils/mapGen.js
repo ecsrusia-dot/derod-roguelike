@@ -14,18 +14,21 @@ export function generateChapterMap(chapter, chapterIdx = 0) {
   // 튜토리얼 챕터 처리
   const isTutorial = chapter.isTutorial === true;
 
-  // === 일직선 시퀀스 챕터 (tutorial_basic) ===
-  // chapter.linearSequence가 노드 타입 배열이면 그 순서대로 1열 배치
+  // === 일직선 시퀀스 챕터 (tutorial_basic, tutorial_market) ===
+  // chapter.linearSequence가 배열이면 그 순서대로 1열 배치
+  // 항목은 문자열('battle') 또는 객체({ type: 'event', forceEventId: '...' }) 가능
   if (Array.isArray(chapter.linearSequence) && chapter.linearSequence.length > 0) {
     const seq = chapter.linearSequence;
     const linearNodes = [];
     const linearEdges = [];
     const count = seq.length;
     for (let i = 0; i < count; i++) {
+      const item = seq[i];
+      const type = typeof item === 'string' ? item : item.type;
       const yPos = count === 1 ? 50 : 95 - (i / (count - 1)) * 87;
       linearNodes.push({
         id: i,
-        type: seq[i],
+        type,
         layer: i,
         x: 50,
         y: yPos,

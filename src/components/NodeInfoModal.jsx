@@ -82,12 +82,14 @@ const NODE_INFO = {
   },
 };
 
-export default function NodeInfoModal({ nodeType, onConfirm }) {
-  const info = NODE_INFO[nodeType];
-  if (!info) {
+export default function NodeInfoModal({ nodeType, override = null, onConfirm }) {
+  const base = NODE_INFO[nodeType];
+  if (!base) {
     // 정의되지 않은 타입은 그냥 통과
     return null;
   }
+  // linearSequence의 modalOverride로 desc/detail/label 등을 노드별로 덮어쓸 수 있음
+  const info = override ? { ...base, ...override } : base;
   const Icon = info.icon;
 
   return (

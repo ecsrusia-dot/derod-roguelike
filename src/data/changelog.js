@@ -7,6 +7,20 @@
 
 export const CHANGELOG = [
   {
+    version: '1.2.0',
+    date: '2026-05-12',
+    label: '튜토리얼 2 황혼의 시장 (상점·대장간 학습)',
+    changes: [
+      { type: 'feature', text: '튜토리얼 2 제목 변경: 대장간 길목 → 황혼의 시장 (상점·대장간 둘 다 다루는 챕터에 맞춰 개편)' },
+      { type: 'feature', text: '튜토리얼 2를 7노드 일직선으로 재구성: 준비 → 사건 → 상점 → 사건 → 대장간 → 정비 → 보스' },
+      { type: 'feature', text: '상점 직전 사건: 길 잃은 행상에게서 은화 250 확정 지급 (상점 이용 자금 보장)' },
+      { type: 'feature', text: '대장간 직전 사건: 버려진 유물 발견으로 랜덤 유물 1개 확정 지급' },
+      { type: 'feature', text: '대장간 노드 진입 시 추가 랜덤 유물 1개 자동 지급 — 조합용 두 번째 유물 보장' },
+      { type: 'feature', text: '대장간 노드 모달에 조합 성공/실패 결과 설명 추가 (성공 시 패시브 Lv +1, 실패 시 영혼 +50)' },
+      { type: 'system', text: 'linearSequence가 객체 형태 항목 지원 — forceEventId/tutorialForge/modalOverride로 노드별 맞춤 동작 지정 가능' },
+    ],
+  },
+  {
     version: '1.1.0',
     date: '2026-05-12',
     label: '튜토리얼 1 일직선 + 노드 설명 모달',
