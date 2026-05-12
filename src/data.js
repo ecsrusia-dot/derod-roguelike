@@ -22,9 +22,9 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.1.0';
+export const GAME_VERSION = '1.2.0';
 export const VERSION_DATE = '2026-05-12';
-export const VERSION_LABEL = '튜토리얼 1 일직선 + 노드 설명 모달';
+export const VERSION_LABEL = '튜토리얼 2 황혼의 시장 (상점·대장간 학습)';
 
 // =========== 패시브 스킬 ===========
 // effect 필드는 문자열 키. 실제 동작은 메인 코드의 trigger handler에서 처리.
@@ -1601,24 +1601,31 @@ export const CHAPTERS = [
   },
   {
     id: 'tutorial_market',
-    name: '대장간 길목',
-    sub: 'The Path of Trade',
-    desc: '상인과 대장장이의 영역. 은화를 모으고 유물을 단련하라.',
-    nodeCount: 16,
+    name: '황혼의 시장',
+    sub: 'The Twilight Market',
+    desc: '상인과 대장장이가 모인 거리. 은화로 거래하고 유물을 단련하라.',
+    nodeCount: 7,
     biome: 'tutorial',
     color: '#c46535',
     isTutorial: true,
-    // 노드 구성: 전투 위주(은화/유물 확보) + 상점/대장간 보장
-    nodeWeights: {
-      battle: 0.50,
-      event: 0.10,
-      shop: 0.15,      // 1~2개 등장 보장
-      forge: 0.15,     // 1~2개 등장 보장
-      unknown: 0.10,
-    },
-    guaranteedNodes: ['shop', 'forge'],  // 최소 1개씩 보장
-    preShopBattles: 3,  // 상점 등장 전 최소 전투 수
-    preForgeBattles: 4, // 대장간 등장 전 최소 전투 수
+    // 일직선 7노드 시퀀스: 준비 → 사건(은화 250) → 상점 → 사건(랜덤 유물) → 대장간 → 정비 → 보스
+    // 사건/대장간 노드는 객체 형태로 추가 옵션 지정
+    linearSequence: [
+      { type: 'prep' },
+      { type: 'event', forceEventId: 'tutorial_silver_grant' },
+      { type: 'shop' },
+      { type: 'event', forceEventId: 'tutorial_relic_grant' },
+      {
+        type: 'forge',
+        tutorialForge: true,  // 진입 시 랜덤 유물 +1 (조합용 두 번째 유물)
+        modalOverride: {
+          desc: '보유한 유물 두 개를 희생해 더 강한 패시브로 단련한다.',
+          detail: '대장간 진입 시 유물을 하나 더 받게 됩니다. 두 유물의 조합이 정해진 레시피와 일치하면 패시브 스킬 Lv +1, 일치하지 않으면 영혼 +50의 위로 보상이 주어집니다. 운에 맡기되, 도감에서 레시피를 모아 나가세요.',
+        },
+      },
+      { type: 'rest' },
+      { type: 'boss' },
+    ],
     enemies: { normal: ['goblin', 'iceWolf', 'frostGiant'], elite: ['cultist'], boss: 'iceMage' },
   },
   
@@ -1672,6 +1679,33 @@ export const CHAPTERS = [
 //   - 'skill_specific' (특정 패시브 +1Lv) — name 필요
 //   - 'stat' (능력치 +X) — name, value 필요
 export const EVENTS = [
+  // === 튜토리얼 2 (황혼의 시장) 전용 사건 ===
+  {
+    id: 'tutorial_silver_grant',
+    title: '길 잃은 행상',
+    text: '저잣거리 어귀에서 한 행상이 손짓한다.\n"여행자여, 무거운 짐을 좀 들어줄 수 있겠나? 사례는 두둑이 하지."\n그가 건넨 가죽 주머니에는 은화가 가득 들어 있다.',
+    chapter: ['tutorial_market'],
+    choices: [
+      {
+        text: '은화 주머니를 받는다 (+250 은화)',
+        result: '주머니의 은화 250냥이 손에 쥐어진다.\n곧 시장의 상점이 보일 것이다.',
+        reward: { type: 'gold', value: 250 },
+      },
+    ],
+  },
+  {
+    id: 'tutorial_relic_grant',
+    title: '버려진 유물',
+    text: '길섶에 누군가 떨어뜨린 듯한 작은 꾸러미가 놓여 있다.\n조심스레 열어보자, 옅은 빛을 내뿜는 유물 하나가 모습을 드러낸다.\n"……이건, 길 잃은 자의 행운인가."',
+    chapter: ['tutorial_market'],
+    choices: [
+      {
+        text: '유물을 거둔다 (랜덤 유물 +1)',
+        result: '유물이 짐 속으로 들어간다.\n앞쪽 대장간에서 무언가에 쓸 수 있을지도 모른다.',
+        reward: { type: 'random_relic' },
+      },
+    ],
+  },
   {
     id: 'merchant',
     title: '봉인된 신전 의문의 행상',

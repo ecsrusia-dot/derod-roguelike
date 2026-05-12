@@ -701,6 +701,14 @@ export default function App() {
     setScreen('map');
   };
 
+  // linearSequence에서 해당 노드의 메타(객체 형태)를 가져옴 — 문자열 항목이면 null
+  const getNodeMeta = (node) => {
+    const seq = chapter?.linearSequence;
+    if (!Array.isArray(seq)) return null;
+    const item = seq[node.layer];
+    return item && typeof item === 'object' ? item : null;
+  };
+
   // 노드 진입 분기
   const handleEnterNode = (node) => {
     let nodeType = node.type;
@@ -719,7 +727,8 @@ export default function App() {
     // 미지 노드는 맵에 표시되는 '미지' 그대로 안내 (랜덤 해석 결과는 모달 닫은 뒤 적용)
     if (chapter && chapter.isTutorial) {
       const modalType = node.type === 'unknown' ? 'unknown' : nodeType;
-      setPendingNode({ node, resolvedType: nodeType, modalType });
+      const meta = getNodeMeta(node);
+      setPendingNode({ node, resolvedType: nodeType, modalType, modalOverride: meta?.modalOverride || null });
       return;
     }
 
@@ -751,12 +760,20 @@ export default function App() {
       setIsEliteReward(false);
       setScreen('combat');
     } else if (nodeType === 'event') {
-      // 현재 챕터에 적용 가능한 사건만 필터링
-      const chapterId = chapter.id;
-      const validEvents = EVENTS.filter(e => !e.chapter || e.chapter.includes(chapterId));
-      const ev = validEvents.length > 0
-        ? validEvents[Math.floor(Math.random() * validEvents.length)]
-        : EVENTS[Math.floor(Math.random() * EVENTS.length)]; // 폴백
+      // linearSequence에서 forceEventId가 지정되어 있으면 그 이벤트 사용
+      const meta = getNodeMeta(node);
+      let ev = null;
+      if (meta?.forceEventId) {
+        ev = EVENTS.find(e => e.id === meta.forceEventId);
+      }
+      if (!ev) {
+        // 현재 챕터에 적용 가능한 사건만 필터링
+        const chapterId = chapter.id;
+        const validEvents = EVENTS.filter(e => !e.chapter || e.chapter.includes(chapterId));
+        ev = validEvents.length > 0
+          ? validEvents[Math.floor(Math.random() * validEvents.length)]
+          : EVENTS[Math.floor(Math.random() * EVENTS.length)]; // 폴백
+      }
       setCurrentEvent(ev);
       setScreen('event');
     } else if (nodeType === 'fountain') {
@@ -780,6 +797,29 @@ export default function App() {
     } else if (nodeType === 'shop') {
       setScreen('shop');
     } else if (nodeType === 'forge') {
+      // tutorialForge: 진입 시 보유 유물 외에 랜덤 유물 1개 추가 지급
+      // (튜토리얼에서 조합에 사용할 두 번째 유물 확보)
+      const meta = getNodeMeta(node);
+      if (meta?.tutorialForge) {
+        const ownedNames = relics.map(r => r.name);
+        const pool = getRewardPool(classData?.id)
+          .filter(r => r.type === 'relic' && !ownedNames.includes(r.name));
+        if (pool.length > 0) {
+          const totalWeight = pool.reduce((s, r) => s + (r.weight || 1), 0);
+          let roll = Math.random() * totalWeight;
+          let picked = pool[0];
+          for (const r of pool) {
+            roll -= (r.weight || 1);
+            if (roll <= 0) { picked = r; break; }
+          }
+          // 유물 추가 (statBonus 키 정규화는 다른 곳과 동일하게 처리되어 있음)
+          setRelics(prev => [...prev, picked]);
+          // 활성 유물 목록에도 자동 포함
+          if (activeRelicNames) {
+            setActiveRelicNames(prev => prev ? [...prev, picked.name] : null);
+          }
+        }
+      }
       setScreen('forge');
     } else if (nodeType === 'rest') {
       setScreen('rest');
@@ -1462,6 +1502,7 @@ export default function App() {
             {pendingNode && (
               <NodeInfoModal
                 nodeType={pendingNode.modalType}
+                override={pendingNode.modalOverride}
                 onConfirm={() => {
                   const { node, resolvedType } = pendingNode;
                   setPendingNode(null);
