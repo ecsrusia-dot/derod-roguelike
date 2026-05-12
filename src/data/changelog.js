@@ -7,6 +7,17 @@
 
 export const CHANGELOG = [
   {
+    version: '1.1.0',
+    date: '2026-05-12',
+    label: '튜토리얼 1 일직선 + 노드 설명 모달',
+    changes: [
+      { type: 'feature', text: '튜토리얼 1(여명의 시작)을 7노드 일직선으로 재구성: 준비 → 일반 적 → 강적 → 미지 → 사건 → 정비 → 보스' },
+      { type: 'feature', text: '튜토리얼 챕터에서 노드 진입 시 해당 노드 타입을 설명하는 모달 표시 (튜토리얼 1·2 모두 적용)' },
+      { type: 'system', text: 'mapGen에 linearSequence 옵션 추가 — 챕터 데이터에서 노드 순서를 직접 지정 가능' },
+      { type: 'system', text: '빈 placeholder 파일(dummy.txt / a.txt) 8개 저장소에서 정리' },
+    ],
+  },
+  {
     version: '1.0.18',
     date: '2026-05-11',
     label: '튜토리얼/수련 출정 먹통 수정',

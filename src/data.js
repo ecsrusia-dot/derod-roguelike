@@ -22,9 +22,9 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.0.18';
-export const VERSION_DATE = '2026-05-11';
-export const VERSION_LABEL = '튜토리얼/수련 출정 먹통 수정';
+export const GAME_VERSION = '1.1.0';
+export const VERSION_DATE = '2026-05-12';
+export const VERSION_LABEL = '튜토리얼 1 일직선 + 노드 설명 모달';
 
 // =========== 패시브 스킬 ===========
 // effect 필드는 문자열 키. 실제 동작은 메인 코드의 trigger handler에서 처리.
