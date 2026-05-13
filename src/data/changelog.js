@@ -7,6 +7,14 @@
 
 export const CHANGELOG = [
   {
+    version: '1.10.1',
+    date: '2026-05-13',
+    label: '협업 인수인계 문서(CLAUDE.md) 추가',
+    changes: [
+      { type: 'system', text: 'CLAUDE.md 추가 — 새 협업 세션에서도 동일한 워크플로(버전·changelog 룰, PR 패턴, PM 커뮤니케이션 스타일)가 유지되도록 인수인계 문서 작성' },
+    ],
+  },
+  {
     version: '1.10.0',
     date: '2026-05-13',
     label: '전투 시각 이팩트 Phase 1 — 박진감 업그레이드',
