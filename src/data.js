@@ -22,9 +22,9 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.4.1';
+export const GAME_VERSION = '1.5.0';
 export const VERSION_DATE = '2026-05-13';
-export const VERSION_LABEL = '튜토리얼 적 강도 상향 (특히 4번 저주의 시련)';
+export const VERSION_LABEL = '콘텐츠 확장: 사건 30 / 유물 8 / 레시피 13 / 저주 4';
 
 // =========== 패시브 스킬 ===========
 // effect 필드는 문자열 키. 실제 동작은 메인 코드의 trigger handler에서 처리.
@@ -2358,6 +2358,418 @@ export const EVENTS = [
     ],
   },
   // === 추가 사건은 여기에 자유롭게 추가 ===
+
+  // ============================================================
+  // === 챕터 1 (북부 극지대) 추가 사건 — 얼음·망령·고대 원정대 ===
+  // ============================================================
+  {
+    id: 'frozenSoldier',
+    title: '얼음에 갇힌 병사',
+    text: '거대한 얼음 기둥 속에 갑옷을 입은 병사가 봉인되어 있다.\n눈동자가 천천히 깜빡인다 — 아직 살아 있는 것 같다.',
+    chapter: [1],
+    choices: [
+      { text: '검으로 얼음을 부순다 (근력 검정)', stat: '근력', dc: 14,
+        success: { text: '병사가 깨어나 사례한다.', reward: { type: 'gold', value: 80 } },
+        fail: { text: '얼음과 함께 검이 미끄러진다.', penalty: { hp: -20 } } },
+      { text: '주문으로 녹인다 (지능 검정)', stat: '지능', dc: 13,
+        success: { text: '병사가 옛 유물을 건넨다.', reward: { type: 'random_relic' } },
+        fail: { text: '주문이 어긋난다.', penalty: { gem: -2 } } },
+      { text: '내버려둔다', result: '얼음은 그대로다.', reward: null },
+    ],
+  },
+  {
+    id: 'auroraShrine',
+    title: '오로라의 제단',
+    text: '눈 덮인 평원에 광채를 흘리는 작은 제단이 서 있다.\n공물을 바치라는 글귀가 새겨져 있다.',
+    chapter: [1],
+    choices: [
+      { text: '은화를 바친다 (-40)', cost: { gold: 40 }, result: '오로라가 몸을 휘감는다.', reward: { type: 'heal', value: 50 } },
+      { text: '보석을 바친다 (-2)', cost: { gem: 2 }, result: '제단이 푸르게 빛난다.', reward: { type: 'skill_random_lv' } },
+      { text: '제단을 지나친다', result: '오로라는 사라진다.', reward: null },
+    ],
+  },
+  {
+    id: 'frostHunter',
+    title: '서리의 사냥꾼',
+    text: '두꺼운 모피를 두른 사냥꾼이 따뜻한 불 앞에서 손짓한다.\n"이방인, 거래 한 번 어떤가."',
+    chapter: [1],
+    choices: [
+      { text: '모피를 산다 (은화 -60)', cost: { gold: 60 }, result: '추위가 한결 덜하다.', reward: { type: 'maxhp', value: 25 } },
+      { text: '사냥 동행 (민첩 검정)', stat: '민첩', dc: 13,
+        success: { text: '큰 짐승을 잡았다.', reward: { type: 'gold', value: 110 } },
+        fail: { text: '짐승을 놓치고 다친다.', penalty: { hp: -25 } } },
+      { text: '거절한다', result: '사냥꾼이 어깨를 으쓱한다.', reward: null },
+    ],
+  },
+  {
+    id: 'lostExpedition',
+    title: '잃어버린 원정대',
+    text: '눈 속에 반쯤 묻힌 원정대 야영지. 깃발이 매섭게 펄럭인다.\n흔적을 보니 도망친 듯하다.',
+    chapter: [1],
+    choices: [
+      { text: '천막을 뒤진다', result: '식량과 잡동사니를 챙긴다.', reward: { type: 'gold', value: 60 } },
+      { text: '깃발의 룬을 해석한다 (지능 검정)', stat: '지능', dc: 14,
+        success: { text: '원정대의 비밀 유물을 발견한다.', reward: { type: 'random_relic' } },
+        fail: { text: '룬이 폭주한다.', penalty: { hp: -20 } } },
+      { text: '죽은 자에게 묵념한다', result: '마음이 가벼워진다.', reward: { type: 'heal', value: 20 } },
+    ],
+  },
+  {
+    id: 'icyChasm',
+    title: '얼음의 균열',
+    text: '발 밑이 갈라진다. 깊은 균열 사이로 푸른 빛이 새어 나온다.',
+    chapter: [1],
+    choices: [
+      { text: '밧줄을 타고 내려간다 (민첩 검정)', stat: '민첩', dc: 14,
+        success: { text: '얼음 속 보물을 회수한다.', reward: { type: 'gem', value: 4 } },
+        fail: { text: '벽에 부딪힌다.', penalty: { hp: -25 } } },
+      { text: '균열 너머로 뛴다 (근력 검정)', stat: '근력', dc: 13,
+        success: { text: '지름길로 시간을 번다.', reward: { type: 'gold', value: 70 } },
+        fail: { text: '얼음 가시에 베인다.', penalty: { hp: -20 } } },
+      { text: '돌아간다', result: '안전한 길을 찾는다.', reward: null },
+    ],
+  },
+  {
+    id: 'whisperingIce',
+    title: '속삭이는 얼음',
+    text: '머리를 짓누르는 듯한 속삭임이 얼음 벽에서 새어 나온다.\n뭔가가 너의 이름을 부른다.',
+    chapter: [1],
+    choices: [
+      { text: '귀를 기울인다 (지능 검정)', stat: '지능', dc: 14,
+        success: { text: '속삭임이 비밀을 알려준다.', reward: { type: 'skill_random_lv' } },
+        fail: { text: '정신이 흔들린다.', penalty: { hp: -15, gem: -1 } } },
+      { text: '못 들은 척한다', result: '속삭임이 사라진다.', reward: null },
+      { text: '얼음을 부순다', result: '소음과 함께 잔해를 발견한다.', reward: { type: 'gold', value: 40 } },
+    ],
+  },
+  {
+    id: 'crystalDeer',
+    title: '수정 사슴',
+    text: '얼음으로 된 듯한 사슴이 너를 응시한다.\n뿔에서 푸른 보석이 자란다.',
+    chapter: [1],
+    choices: [
+      { text: '사냥한다 (민첩 검정)', stat: '민첩', dc: 14,
+        success: { text: '뿔의 결정을 거둔다.', reward: { type: 'gem', value: 5 } },
+        fail: { text: '사슴이 너를 들이받는다.', penalty: { hp: -30 } } },
+      { text: '먹이를 준다 (은화 -25)', cost: { gold: 25 }, result: '사슴이 보석 한 조각을 떨군다.', reward: { type: 'gem', value: 2 } },
+      { text: '지나친다', result: '사슴은 안개 속으로 사라진다.', reward: null },
+    ],
+  },
+  {
+    id: 'frostMerchant',
+    title: '극지의 행상',
+    text: '두꺼운 외투를 두른 행상이 보따리를 풀어 보인다.\n낯선 모양의 부적이 줄지어 있다.',
+    chapter: [1],
+    choices: [
+      { text: '부적을 산다 (은화 -120)', cost: { gold: 120 }, result: '부적이 가슴에 새겨진다.', reward: { type: 'random_relic' } },
+      { text: '간이 회복약을 산다 (은화 -50)', cost: { gold: 50 }, result: '체력을 회복한다.', reward: { type: 'heal', value: 40 } },
+      { text: '구경만 한다', result: '행상이 다음을 기약한다.', reward: null },
+    ],
+  },
+
+  // ============================================================
+  // === 챕터 2 (죽은 자의 숲) 추가 사건 — 망령 엘프·정령 ===
+  // ============================================================
+  {
+    id: 'ancientTree',
+    title: '오래된 나무',
+    text: '뿌리부터 빛을 흘리는 거대한 나무. 가지에 무언가 매달려 있다.',
+    chapter: [2],
+    choices: [
+      { text: '나무에 손을 댄다', result: '따스한 기운이 흘러든다.', reward: { type: 'heal', value: 45 } },
+      { text: '가지를 흔든다 (근력 검정)', stat: '근력', dc: 13,
+        success: { text: '낡은 부적이 떨어진다.', reward: { type: 'random_relic' } },
+        fail: { text: '가지가 부러져 떨어진다.', penalty: { hp: -20 } } },
+      { text: '명상한다 (지능 검정)', stat: '지능', dc: 14,
+        success: { text: '나무가 비밀을 속삭인다.', reward: { type: 'skill_random_lv' } },
+        fail: { text: '집중을 잃는다.', penalty: null } },
+    ],
+  },
+  {
+    id: 'twilightChild',
+    title: '황혼의 아이',
+    text: '안개 속에서 어린아이가 손을 흔든다.\n눈동자가 텅 비어 있다 — 산 자가 아니다.',
+    chapter: [2],
+    choices: [
+      { text: '함께 놀아준다 (매력 검정)', stat: '매력', dc: 14,
+        success: { text: '아이가 작은 보석을 손에 쥐어준다.', reward: { type: 'gem', value: 4 } },
+        fail: { text: '아이가 슬프게 사라진다.', penalty: { hp: -15 } } },
+      { text: '도망친다', result: '뒤에서 울음소리가 들린다.', reward: null },
+      { text: '안식의 노래를 부른다', result: '아이가 빛으로 흩어진다.', reward: { type: 'heal', value: 30 } },
+    ],
+  },
+  {
+    id: 'fallenElfShrine',
+    title: '타락한 엘프의 사당',
+    text: '뒤틀린 룬이 새겨진 작은 사당. 검은 기운이 새어 나온다.',
+    chapter: [2],
+    choices: [
+      { text: '사당을 부순다 (근력 검정)', stat: '근력', dc: 14,
+        success: { text: '저주가 풀리고 보물이 드러난다.', reward: { type: 'gold', value: 100 } },
+        fail: { text: '저주가 반사된다.', penalty: { hp: -25 } } },
+      { text: '봉납한다 (은화 -50)', cost: { gold: 50 }, result: '사당의 기운이 잠잠해진다.', reward: { type: 'skill_random_lv' } },
+      { text: '지나친다', result: '사당은 그대로다.', reward: null },
+    ],
+  },
+  {
+    id: 'spiritWind',
+    title: '정령의 바람',
+    text: '나뭇잎이 의지를 가진 듯 너를 둘러싼다.\n바람이 길을 가리킨다.',
+    chapter: [2],
+    choices: [
+      { text: '바람을 따라간다 (민첩 검정)', stat: '민첩', dc: 13,
+        success: { text: '숨겨진 샛길이 나타난다.', reward: { type: 'gold', value: 70 } },
+        fail: { text: '길을 잃고 헤맨다.', penalty: { hp: -15 } } },
+      { text: '바람과 이야기한다 (지능 검정)', stat: '지능', dc: 14,
+        success: { text: '정령의 축복을 받는다.', reward: { type: 'maxhp', value: 20 } },
+        fail: { text: '바람이 흩어진다.', penalty: null } },
+      { text: '발걸음을 옮긴다', result: '바람은 사라진다.', reward: null },
+    ],
+  },
+  {
+    id: 'fungalGrove',
+    title: '독버섯의 숲',
+    text: '거대한 버섯이 빽빽이 자란 음습한 구역.\n포자가 떠다닌다.',
+    chapter: [2],
+    choices: [
+      { text: '독버섯을 채집한다 (민첩 검정)', stat: '민첩', dc: 13,
+        success: { text: '값나가는 표본을 챙긴다.', reward: { type: 'gold', value: 80 } },
+        fail: { text: '포자에 중독된다.', penalty: { hp: -30 } } },
+      { text: '버섯을 먹어본다', result: '환영을 본다 — 단서를 얻는다.', reward: { type: 'gem', value: 2 } },
+      { text: '돌아간다', result: '포자가 머리카락에 묻는다.', reward: null },
+    ],
+  },
+  {
+    id: 'mossyAltar',
+    title: '이끼의 제단',
+    text: '잎과 이끼로 뒤덮인 낮은 제단.\n흙 사이로 보석이 자라난다.',
+    chapter: [2],
+    choices: [
+      { text: '이끼를 걷어낸다', result: '돌 밑에 작은 보석이 있다.', reward: { type: 'gem', value: 3 } },
+      { text: '나뭇가지를 바친다 (은화 -30)', cost: { gold: 30 }, result: '대지가 화답한다.', reward: { type: 'heal', value: 50 } },
+      { text: '지나간다', result: '이끼는 그대로 자란다.', reward: null },
+    ],
+  },
+  {
+    id: 'twilightHunter',
+    title: '황혼의 사냥꾼',
+    text: '엘프의 외투를 두른 자가 활시위를 당긴다.\n표적은 너인지, 너의 등 뒤인지 알 수 없다.',
+    chapter: [2],
+    choices: [
+      { text: '대화를 시도한다 (매력 검정)', stat: '매력', dc: 14,
+        success: { text: '사냥꾼이 길을 안내한다.', reward: { type: 'gold', value: 90 } },
+        fail: { text: '화살이 옆을 스친다.', penalty: { hp: -20 } } },
+      { text: '먼저 공격한다 (민첩 검정)', stat: '민첩', dc: 15,
+        success: { text: '사냥꾼을 제압하고 짐을 챙긴다.', reward: { type: 'random_relic' } },
+        fail: { text: '반격에 당한다.', penalty: { hp: -35 } } },
+      { text: '몰래 우회한다', result: '발자국 소리를 죽인다.', reward: null },
+    ],
+  },
+  {
+    id: 'forestPond',
+    title: '숲의 연못',
+    text: '맑은 물이 거울처럼 비치는 연못.\n수면 아래 무언가가 움직인다.',
+    chapter: [2],
+    choices: [
+      { text: '물에 들어간다', result: '몸이 가벼워진다.', reward: { type: 'heal', value: 35 } },
+      { text: '수면 아래로 잠수한다 (근력 검정)', stat: '근력', dc: 14,
+        success: { text: '잠겨 있던 보물을 끌어올린다.', reward: { type: 'gold', value: 100 } },
+        fail: { text: '무언가에 발목이 잡힌다.', penalty: { hp: -25 } } },
+      { text: '동전을 던진다 (-20)', cost: { gold: 20 }, result: '소원이 이루어진다.', reward: { type: 'skill_random_lv' } },
+    ],
+  },
+
+  // ============================================================
+  // === 챕터 3 (봉인된 신전) 추가 사건 — 봉인·시간·고대 사제 ===
+  // ============================================================
+  {
+    id: 'sealedDoor',
+    title: '봉인된 문',
+    text: '룬으로 뒤덮인 거대한 문. 안에서 무언가가 깨어나려 한다.',
+    chapter: [3],
+    choices: [
+      { text: '봉인을 강제로 푼다 (근력 검정)', stat: '근력', dc: 15,
+        success: { text: '안에는 보물이 가득하다.', reward: { type: 'random_relic' } },
+        fail: { text: '봉인이 반발한다.', penalty: { hp: -40 } } },
+      { text: '룬을 해독한다 (지능 검정)', stat: '지능', dc: 14,
+        success: { text: '문이 부드럽게 열린다.', reward: { type: 'gold', value: 120 } },
+        fail: { text: '룬이 폭주한다.', penalty: { hp: -25 } } },
+      { text: '문을 지나친다', result: '문은 잠긴 채 남는다.', reward: null },
+    ],
+  },
+  {
+    id: 'timeFracture',
+    title: '시간의 균열',
+    text: '공기가 일그러진다. 시간의 흐름이 어긋난다.',
+    chapter: [3],
+    choices: [
+      { text: '균열에 손을 댄다 (지능 검정)', stat: '지능', dc: 15,
+        success: { text: '잃었던 기력이 돌아온다.', reward: { type: 'heal', value: 80 } },
+        fail: { text: '늙어버린 듯한 피로감.', penalty: { hp: -30 } } },
+      { text: '돌을 던져 본다', result: '돌이 다시 손에 돌아온다.', reward: { type: 'gem', value: 2 } },
+      { text: '거리를 둔다', result: '균열이 흔들리며 사라진다.', reward: null },
+    ],
+  },
+  {
+    id: 'ancientPriest',
+    title: '잊혀진 사제',
+    text: '먼지 쌓인 제의를 입은 사제가 무릎 꿇고 있다.\n수백 년 전에 죽은 듯하다.',
+    chapter: [3],
+    choices: [
+      { text: '기도해 준다', result: '사제의 영혼이 감사를 표한다.', reward: { type: 'skill_random_lv' } },
+      { text: '제의를 뒤진다', result: '낡은 부적을 얻는다.', reward: { type: 'random_relic' } },
+      { text: '경의를 표하고 떠난다', result: '마음이 평온해진다.', reward: { type: 'heal', value: 25 } },
+    ],
+  },
+  {
+    id: 'librarianGhost',
+    title: '도서관의 망령',
+    text: '책장 사이로 투명한 노인이 책을 정리하고 있다.\n읽혀지지 않는 글자가 떠다닌다.',
+    chapter: [3],
+    choices: [
+      { text: '책에 대해 묻는다 (지능 검정)', stat: '지능', dc: 14,
+        success: { text: '망령이 비밀을 가르쳐 준다.', reward: { type: 'skill_random_lv' } },
+        fail: { text: '책장이 무너진다.', penalty: { hp: -20 } } },
+      { text: '책을 한 권 가져간다', result: '망령이 한숨을 쉰다.', reward: { type: 'gold', value: 60 } },
+      { text: '조용히 떠난다', result: '망령이 다시 책장을 본다.', reward: null },
+    ],
+  },
+  {
+    id: 'puzzleAltar',
+    title: '풀리지 않는 제단',
+    text: '맞물려 돌아가는 톱니바퀴들. 한 부분이 어긋나 있다.',
+    chapter: [3],
+    choices: [
+      { text: '톱니를 맞춘다 (민첩 검정)', stat: '민첩', dc: 14,
+        success: { text: '제단이 보상을 토해낸다.', reward: { type: 'gem', value: 5 } },
+        fail: { text: '톱니에 손이 끼인다.', penalty: { hp: -20 } } },
+      { text: '강제로 부순다 (근력 검정)', stat: '근력', dc: 15,
+        success: { text: '잔해 속에 유물이 있다.', reward: { type: 'random_relic' } },
+        fail: { text: '톱니 파편에 베인다.', penalty: { hp: -30 } } },
+      { text: '돌아간다', result: '톱니는 멈춰 있다.', reward: null },
+    ],
+  },
+  {
+    id: 'mirrorOfRegret',
+    title: '회한의 거울',
+    text: '거울 속의 너는 너를 닮지 않았다.\n다른 길을 걸어온 너 자신이다.',
+    chapter: [3],
+    choices: [
+      { text: '거울에 손을 뻗는다', result: '잠시 다른 너의 기억이 흘러든다.', reward: { type: 'skill_random_lv' } },
+      { text: '거울을 깬다 (근력 검정)', stat: '근력', dc: 14,
+        success: { text: '파편 속에서 보석을 발견한다.', reward: { type: 'gem', value: 4 } },
+        fail: { text: '파편이 너에게 박힌다.', penalty: { hp: -25 } } },
+      { text: '눈을 돌린다', result: '거울이 흐릿해진다.', reward: null },
+    ],
+  },
+  {
+    id: 'forgottenSarcophagus',
+    title: '잊혀진 석관',
+    text: '먼지 쌓인 석관이 한가운데에 놓여 있다.\n뚜껑에 보석이 박혀 있다.',
+    chapter: [3],
+    choices: [
+      { text: '뚜껑을 연다 (근력 검정)', stat: '근력', dc: 15,
+        success: { text: '안에는 부장품이 가득하다.', reward: { type: 'gold', value: 150 } },
+        fail: { text: '먼지 폭발이 일어난다.', penalty: { hp: -30 } } },
+      { text: '보석만 뽑는다 (민첩 검정)', stat: '민첩', dc: 13,
+        success: { text: '깔끔하게 보석을 챙긴다.', reward: { type: 'gem', value: 4 } },
+        fail: { text: '석관이 무너진다.', penalty: { hp: -20 } } },
+      { text: '경의를 표하고 떠난다', result: '석관은 다시 잠든다.', reward: null },
+    ],
+  },
+  {
+    id: 'echoChamber',
+    title: '메아리의 방',
+    text: '발걸음이 끝없이 메아리친다.\n수없이 겹친 목소리가 너를 부른다.',
+    chapter: [3],
+    choices: [
+      { text: '소리에 응답한다 (매력 검정)', stat: '매력', dc: 14,
+        success: { text: '메아리들이 너를 축복한다.', reward: { type: 'maxhp', value: 25 } },
+        fail: { text: '메아리에 짓눌린다.', penalty: { hp: -25 } } },
+      { text: '귀를 막는다', result: '소리가 멀어진다.', reward: null },
+      { text: '큰 소리로 외친다', result: '메아리가 보석을 떨군다.', reward: { type: 'gem', value: 3 } },
+    ],
+  },
+
+  // ============================================================
+  // === 챕터 4 (마계의 균열) 추가 사건 — 마족·계약·균열 ===
+  // ============================================================
+  {
+    id: 'demonContract',
+    title: '마족의 계약서',
+    text: '핏빛으로 적힌 계약서가 허공에 떠 있다.\n서명만 하면 즉시 효력이 발생한다고 한다.',
+    chapter: [4],
+    choices: [
+      { text: '서명한다 (HP -40)', penalty: { hp: -40 }, result: '몸에서 어둠이 솟구친다.', reward: { type: 'random_relic' } },
+      { text: '계약 조항을 따진다 (지능 검정)', stat: '지능', dc: 15,
+        success: { text: '안전 조항을 발견한다.', reward: { type: 'gold', value: 150 } },
+        fail: { text: '책장 사이의 함정이 발동한다.', penalty: { hp: -30 } } },
+      { text: '계약서를 찢는다', result: '계약서가 비명을 지르며 사라진다.', reward: { type: 'heal', value: 20 } },
+    ],
+  },
+  {
+    id: 'voidRift',
+    title: '공허의 균열',
+    text: '발 밑이 사라진 듯한 검은 균열이 입을 벌린다.\n안에서 형용할 수 없는 무언가가 너를 응시한다.',
+    chapter: [4],
+    choices: [
+      { text: '균열을 응시한다 (지능 검정)', stat: '지능', dc: 16,
+        success: { text: '공허가 비밀을 속삭인다.', reward: { type: 'skill_random_lv' } },
+        fail: { text: '정신이 잠식된다.', penalty: { hp: -35 } } },
+      { text: '돌을 던진다', result: '돌이 사라진다 — 그게 전부다.', reward: null },
+      { text: '거리를 둔다', result: '균열은 천천히 닫힌다.', reward: { type: 'gem', value: 2 } },
+    ],
+  },
+  {
+    id: 'fallenAngel',
+    title: '추락한 천사',
+    text: '검은 깃털이 흩어진 골짜기.\n부서진 날개의 천사가 흙바닥에 누워 있다.',
+    chapter: [4],
+    choices: [
+      { text: '치료해 준다 (은화 -100)', cost: { gold: 100 }, result: '천사가 빛을 너에게 옮긴다.', reward: { type: 'maxhp', value: 35 } },
+      { text: '깃털을 뽑는다', result: '깃털에 검은 빛이 깃들어 있다.', reward: { type: 'random_relic' } },
+      { text: '안식을 빈다', result: '천사가 마지막 미소를 짓고 사라진다.', reward: { type: 'skill_random_lv' } },
+    ],
+  },
+  {
+    id: 'soulMerchant',
+    title: '영혼의 상인',
+    text: '검은 망토를 두른 상인이 차가운 미소를 짓는다.\n"네 영혼의 한 조각, 좋은 값에 사지."',
+    chapter: [4],
+    choices: [
+      { text: '영혼을 판다 (HP -50)', penalty: { hp: -50 }, result: '몸이 가벼워진다 — 무언가 비어 있다.', reward: { type: 'gem', value: 8 } },
+      { text: '거꾸로 산다 (은화 -150)', cost: { gold: 150 }, result: '상인이 작은 결정을 건넨다.', reward: { type: 'random_relic' } },
+      { text: '거래를 거절한다', result: '상인이 사라진다.', reward: null },
+    ],
+  },
+  {
+    id: 'corruptedRune',
+    title: '오염된 룬',
+    text: '벽에 새겨진 룬이 검게 물들어 있다.\n만지면 무언가 흘러들 것 같다.',
+    chapter: [4],
+    choices: [
+      { text: '룬을 정화한다 (지능 검정)', stat: '지능', dc: 15,
+        success: { text: '깨끗해진 룬이 보상을 토해낸다.', reward: { type: 'gold', value: 130 } },
+        fail: { text: '오염이 손끝으로 번진다.', penalty: { hp: -30 } } },
+      { text: '룬을 받아들인다', result: '어둠이 너의 일부가 된다.', reward: { type: 'skill_random_lv' } },
+      { text: '벽을 부순다 (근력 검정)', stat: '근력', dc: 14,
+        success: { text: '룬이 깨어지며 보석을 토한다.', reward: { type: 'gem', value: 4 } },
+        fail: { text: '벽이 무너지며 깔린다.', penalty: { hp: -25 } } },
+    ],
+  },
+  {
+    id: 'demonForge',
+    title: '마계의 화로',
+    text: '검은 불꽃이 끝없이 타오르는 화로.\n근처에 망치와 모루가 놓여 있다.',
+    chapter: [4],
+    choices: [
+      { text: '무기를 단련한다 (근력 검정)', stat: '근력', dc: 15,
+        success: { text: '무기에 검은 기운이 깃든다.', reward: { type: 'random_relic' } },
+        fail: { text: '불꽃에 화상을 입는다.', penalty: { hp: -30 } } },
+      { text: '제물로 은화를 바친다 (-200)', cost: { gold: 200 }, result: '화로가 응답한다.', reward: { type: 'gem', value: 8 } },
+      { text: '발걸음을 돌린다', result: '화로는 계속 타오른다.', reward: null },
+    ],
+  },
 ];
 
 // =========== 유물 ===========
@@ -2410,7 +2822,28 @@ export const RELICS = [
     desc: '매 턴 20% 확률로 모든 스킬 쿨다운 -1턴' },
   { name: '천리안', statBonus: { mapReveal: 1 }, weight: 4, color: '#7ba3c4',
     desc: '맵의 모든 노드 공개 (사전 루트 파악)' },
-  
+
+  // === 신규 일반 유물 ===
+  // 공격축
+  { name: '사냥꾼의 활시위', statBonus: { critRate: 8, dmgDealt: 5 }, weight: 4, color: '#7a9a5e',
+    desc: '치명타율 +8%, 주는 데미지 +5%' },
+  { name: '뱀파이어의 인장', statBonus: { lifesteal: 12 }, weight: 3, color: '#5c1a1a',
+    desc: '적 처치 시 HP +12' },
+  { name: '폭풍의 인장', statBonus: { critDmg: 20, dmgDealt: 5 }, weight: 3, color: '#5c4a8c',
+    desc: '치명타 데미지 +20%, 주는 데미지 +5%' },
+  // 방어축
+  { name: '강철의 맹세', statBonus: { dmgTaken: -8, maxHp: 10 }, weight: 4, color: '#8b8378',
+    desc: '받는 데미지 -8%, 최대 HP +10%' },
+  { name: '거룩한 부적', statBonus: { dodge: 8, shieldOnStart: 15 }, weight: 4, color: '#d4d4a0',
+    desc: '회피율 +8%, 전투 시작 시 방어 +15' },
+  // 유틸·회복·자원축
+  { name: '여명의 깃털', statBonus: { heal: 30, startGem: 3 }, weight: 4, color: '#d4a574',
+    desc: '회복 효과 +30%, 시작 보석 +3' },
+  { name: '상인의 저울', statBonus: { startGold: 120 }, weight: 4, color: '#e8b04a',
+    desc: '시작 은화 +120' },
+  { name: '시간의 모래', statBonus: { cdReduceChance: 15, mapReveal: 1 }, weight: 3, color: '#7ba3c4',
+    desc: '매 턴 15% 확률 쿨다운 -1, 맵 노드 공개' },
+
   // === 챔피언십 전용 유물 (해당 원정 클리어 시 해금) ===
   // championshipUnlock: 어느 챔피언십에서 해금되는지
   // 일반 풀 weight = 0 (랜덤 미등장), 해금 후 프렙 단계에서 선택 가능
@@ -2448,6 +2881,24 @@ export const FORGE_RECIPES = [
   { ingredients: ['왕의 보고', '네잎 클로버'], result: '운명' },
   { ingredients: ['광기의 가면', '나크젤리온의 송곳니'], result: '광폭' },
   { ingredients: ['천리안', '마족의 발톱'], result: '심안' },
+  // === 신규 레시피 (새 유물 ↔ 기존 유물 조합) ===
+  // 공격축
+  { ingredients: ['사냥꾼의 활시위', '명검 로비아의 파편'], result: '정밀' },
+  { ingredients: ['뱀파이어의 인장', '레카르도의 검편'], result: '잔혹' },
+  { ingredients: ['폭풍의 인장', '광기의 가면'], result: '강타' },
+  { ingredients: ['뱀파이어의 인장', '나크젤리온의 송곳니'], result: '광폭' },
+  // 방어축
+  { ingredients: ['강철의 맹세', '수호의 방패'], result: '수비' },
+  { ingredients: ['거룩한 부적', '네잎 클로버'], result: '회피' },
+  { ingredients: ['강철의 맹세', '에테르의 결정'], result: '재생' },
+  // 유틸·회복·자원
+  { ingredients: ['여명의 깃털', '대지의 심장'], result: '신앙' },
+  { ingredients: ['상인의 저울', '왕의 보고'], result: '운명' },
+  { ingredients: ['시간의 모래', '황혼의 모래시계'], result: '가속' },
+  { ingredients: ['시간의 모래', '현자의 서'], result: '마력' },
+  // 신규 ↔ 신규 (희귀 조합)
+  { ingredients: ['사냥꾼의 활시위', '거룩한 부적'], result: '심안' },
+  { ingredients: ['폭풍의 인장', '강철의 맹세'], result: '광폭' },
 ];
 
 // 조합 도우미: 두 유물 이름으로 조합식 검색 (순서 무관)
@@ -3162,6 +3613,35 @@ export const CURSES = [
     desc: '시작 방어 0',
     effect: 'curse_noDefense',
     color: '#7ba3c4',
+  },
+  // === 신규 저주 (1.5.0) ===
+  {
+    id: 'curse_doom',
+    name: '심연의 저주',
+    desc: '받는 모든 데미지 +30%',
+    effect: 'curse_dmgTaken+30',
+    color: '#3a0f1f',
+  },
+  {
+    id: 'curse_drought',
+    name: '가뭄의 저주',
+    desc: '획득 은화 -25%',
+    effect: 'curse_gold-25',
+    color: '#a0522d',
+  },
+  {
+    id: 'curse_greed',
+    name: '탐욕의 저주',
+    desc: '상점 가격 +50%',
+    effect: 'curse_shopPrice+50',
+    color: '#c46535',
+  },
+  {
+    id: 'curse_envy',
+    name: '시기의 저주',
+    desc: '전투 보석 보상 -1 (최소 0)',
+    effect: 'curse_rewardGem-1',
+    color: '#5c4a8c',
   },
 ];
 

@@ -629,11 +629,16 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
               newLog.push({ type: 'damage', text: `◆ [가시 갑옷] 반사 ${reflectDmg}` });
             }
           }
-          // 저주: 받는 데미지 +15%
+          // 저주: 받는 데미지 +15% / +30% (심연의 저주는 +15와 누적)
           if (hasCurse(curses, 'curse_dmgTaken+15') && dmg > 0) {
             const inc = Math.floor(dmg * 0.15);
             dmg += inc;
             takenBreakdown.push(`저주 +${inc}`);
+          }
+          if (hasCurse(curses, 'curse_dmgTaken+30') && dmg > 0) {
+            const inc = Math.floor(dmg * 0.30);
+            dmg += inc;
+            takenBreakdown.push(`심연 +${inc}`);
           }
           // 궁극 [황혼의 저주]: 받는 데미지 -25%
           if (hasUltimate(ultimates, 'ult_deblanCurse') && dmg > 0) {
@@ -1517,7 +1522,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
               const dmgTakenLv5 = hasEffect(skills, 'dmgTaken-20', activeSkills) ? 20 : 0;
               const dmgTakenReduce = dmgTakenMeta + dmgTakenRelic + dmgTakenLv5;
               const dmgDealtCurse = hasCurse(curses, 'curse_dmgDealt-15') ? 15 : 0;
-              const dmgTakenCurse = hasCurse(curses, 'curse_dmgTaken+15') ? 15 : 0;
+              const dmgTakenCurse = (hasCurse(curses, 'curse_dmgTaken+15') ? 15 : 0)
+                + (hasCurse(curses, 'curse_dmgTaken+30') ? 30 : 0);
               const hasAny = physBonus || magicBonus || bleedBonus || counterDmgBonus || allDmgBonus || dmgTakenReduce || dmgDealtCurse || dmgTakenCurse || (player.buffs?.rage > 0);
               if (!hasAny) return null;
               return (

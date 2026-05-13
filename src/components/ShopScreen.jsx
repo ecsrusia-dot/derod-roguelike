@@ -3,11 +3,12 @@
 // ============================================
 
 import React, { useState } from 'react';
-import { PALETTE } from '../utils/helpers.js';
+import { PALETTE, hasCurse } from '../utils/helpers.js';
 import { SHOP_PRICES, PASSIVE_SKILLS } from '../data.js';
 import { getRewardPool, rollRewards } from '../utils/rewards.js';
 
-export default function ShopScreen({ gold, skills, relics, ultimates, onBuy, onLeave, classId = null }) {
+export default function ShopScreen({ gold, skills, relics, ultimates, curses = [], onBuy, onLeave, classId = null }) {
+  const priceMultiplier = hasCurse(curses, 'curse_shopPrice+50') ? 1.5 : 1.0;
   // 상점 재고: 유물·궁극·재화는 제외하고 다양한 카테고리로
   const [stock] = useState(() => {
     const initial = rollRewards(8, false, skills, relics, ultimates, classId);
@@ -20,11 +21,13 @@ export default function ShopScreen({ gold, skills, relics, ultimates, onBuy, onL
   const [bought, setBought] = useState(new Set());
 
   const getPrice = (r) => {
-    if (r.type === 'skill') return SHOP_PRICES.skill;
-    if (r.type === 'stat') return SHOP_PRICES.stat;
-    if (r.type === 'heal_full') return SHOP_PRICES.heal_full;
-    if (r.type === 'heal') return r.value === 50 ? SHOP_PRICES.heal_50 : SHOP_PRICES.heal_100;
-    return SHOP_PRICES.default;
+    let base;
+    if (r.type === 'skill') base = SHOP_PRICES.skill;
+    else if (r.type === 'stat') base = SHOP_PRICES.stat;
+    else if (r.type === 'heal_full') base = SHOP_PRICES.heal_full;
+    else if (r.type === 'heal') base = r.value === 50 ? SHOP_PRICES.heal_50 : SHOP_PRICES.heal_100;
+    else base = SHOP_PRICES.default;
+    return Math.ceil(base * priceMultiplier);
   };
 
   const renderItem = (r, idx) => {
