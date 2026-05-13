@@ -7,6 +7,15 @@
 
 export const CHANGELOG = [
   {
+    version: '1.8.1',
+    date: '2026-05-13',
+    label: '원정 선택 3탭 재구성 (클래식·챌린지·챔피언십)',
+    changes: [
+      { type: 'feature', text: '원정 선택을 3탭 구조로 재정비 — 클래식(튜토리얼+수련의 길) / 챌린지(일일+무한) / 챔피언십' },
+      { type: 'feature', text: '신규 챌린지 탭에 일일 챌린지·무한모드 카드를 모아 한 곳에서 도전 콘텐츠 확인' },
+    ],
+  },
+  {
     version: '1.8.0',
     date: '2026-05-13',
     label: '무한모드 황혼의 끝 (Tier 2B)',
