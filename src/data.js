@@ -22,9 +22,9 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.4.0';
+export const GAME_VERSION = '1.4.1';
 export const VERSION_DATE = '2026-05-13';
-export const VERSION_LABEL = '튜토리얼 4 저주의 시련 (저주 누적 체험)';
+export const VERSION_LABEL = '튜토리얼 적 강도 상향 (특히 4번 저주의 시련)';
 
 // =========== 패시브 스킬 ===========
 // effect 필드는 문자열 키. 실제 동작은 메인 코드의 trigger handler에서 처리.
@@ -2714,8 +2714,8 @@ export const EXPEDITIONS = [
     desc: '방랑검사의 첫 발걸음. 노드의 종류를 익혀라.',
     color: '#d4a574',
     chapters: ['tutorial_basic'],
-    enemyHpMult: 0.8,        // 살짝 쉽게
-    enemyDmgMult: 0.8,
+    enemyHpMult: 0.9,        // 입문 — 한 두 턴 더 끌리도록 살짝 상향
+    enemyDmgMult: 0.9,
     curseCount: 0,
     maxRelicSelect: 1,
     soulReward: 20,
@@ -2733,8 +2733,8 @@ export const EXPEDITIONS = [
     desc: '은화를 모으고 유물을 단련하라. 상점과 대장간을 익혀라.',
     color: '#c46535',
     chapters: ['tutorial_market'],
-    enemyHpMult: 0.9,
-    enemyDmgMult: 0.9,
+    enemyHpMult: 1.0,        // 상점·대장간 운영 가르치는 단계 — 기준값
+    enemyDmgMult: 1.0,
     curseCount: 0,
     maxRelicSelect: 1,
     soulReward: 30,
@@ -2752,7 +2752,7 @@ export const EXPEDITIONS = [
     desc: '세 갈래 길이 갈라진다. 어디로 향하느냐에 따라 얻는 것이 달라진다.',
     color: '#b48ad4',
     chapters: ['tutorial_branching'],
-    enemyHpMult: 1.0,
+    enemyHpMult: 1.1,        // 분기 선택의 무게가 느껴지도록 약간 상향
     enemyDmgMult: 1.0,
     curseCount: 0,
     maxRelicSelect: 1,
@@ -2771,8 +2771,8 @@ export const EXPEDITIONS = [
     desc: '강적과 거듭 맞붙으며 저주가 한 단계씩 늘어난다. 난이도 곡선을 체감하라.',
     color: '#8b1f1f',
     chapters: ['tutorial_curse'],
-    enemyHpMult: 1.0,
-    enemyDmgMult: 1.0,
+    enemyHpMult: 1.6,        // 강적이 빨리 죽으면 저주 누적 체감 불가 — 큰 폭으로 상향
+    enemyDmgMult: 1.2,       // 저주 1단계(받는 +15%)가 실제 위협이 되도록 기본 화력도 상향
     curseCount: 0,  // 시작 시 저주 없음. 노드 진입마다 누적됨.
     maxRelicSelect: 1,
     soulReward: 50,
