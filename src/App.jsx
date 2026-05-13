@@ -909,11 +909,13 @@ export default function App() {
     if (drop?.gold) {
       let g = Math.floor(drop.gold[0] + Math.random() * (drop.gold[1] - drop.gold[0]));
       if (hasCurse(currentCurses, 'curse_gold-50')) g = Math.floor(g * 0.5);
+      else if (hasCurse(currentCurses, 'curse_gold-25')) g = Math.floor(g * 0.75);
       goldGained = g;
       setGold(prev => prev + g);
     }
     if (drop?.gem) {
-      const gm = Math.floor(drop.gem[0] + Math.random() * (drop.gem[1] - drop.gem[0]));
+      let gm = Math.floor(drop.gem[0] + Math.random() * (drop.gem[1] - drop.gem[0]));
+      if (hasCurse(currentCurses, 'curse_rewardGem-1')) gm = Math.max(0, gm - 1);
       gemGained = gm;
       setGem(prev => prev + gm);
     }
@@ -1526,7 +1528,7 @@ export default function App() {
             {screen === 'rest' && <RestScreen classData={classData} hp={hp} maxHp={maxHp} skills={skills} relics={relics} expedition={currentExpedition} onChoice={handleRestChoice} />}
             {screen === 'prep' && <PrepScreen classData={classData} skills={skills} relics={relics} ultimates={ultimates} expedition={currentExpedition} mode="full" onConfirm={handlePrepConfirm} />}
             {screen === 'reselect' && <PrepScreen classData={classData} skills={skills} relics={relics} ultimates={ultimates} expedition={currentExpedition} mode={reselectMode} currentActiveSkills={activeSkills} currentActiveRelicNames={activeRelicNames} onConfirm={handleReselectConfirm} />}
-            {screen === 'shop' && <ShopScreen gold={gold} skills={skills} relics={relics} ultimates={ultimates} onBuy={handleShopBuy} onLeave={handleShopLeave} classId={classData?.id} />}
+            {screen === 'shop' && <ShopScreen gold={gold} skills={skills} relics={relics} ultimates={ultimates} curses={currentCurses} onBuy={handleShopBuy} onLeave={handleShopLeave} classId={classData?.id} />}
             {screen === 'forge' && <ForgeScreen relics={relics} skills={skills} activeRelicNames={activeRelicNames} meta={meta} onCombine={handleForgeCombine} onLeave={handleForgeLeave} />}
             {screen === 'chapterClear' && chapter && <ChapterClearScreen chapter={chapter} isLastChapter={false} hp={hp} maxHp={maxHp} meta={meta} curses={currentCurses} onContinue={handleChapterContinue} />}
             {screen === 'expeditionClear' && currentExpedition && <ExpeditionClearScreen expedition={currentExpedition} soulsGained={runSouls} firstClear={runFirstChampClear} onContinue={handleExpeditionClearContinue} />}
