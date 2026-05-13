@@ -41,6 +41,75 @@ export function generateChapterMap(chapter, chapterIdx = 0) {
     return { nodes: linearNodes, edges: linearEdges };
   }
 
+  // === 분기 시퀀스 챕터 (tutorial_branching) ===
+  // chapter.branchSequence는 레이어 배열. 각 레이어는 단일 항목(객체/문자열)이거나
+  // 배열(여러 컬럼). 배열일 경우 그 길이만큼 가로로 분기.
+  // - 단일 → 단일: 1:1 연결
+  // - 단일 → N열: 단일이 N열 전부와 연결 (분기 시작)
+  // - N열 → N열: 같은 인덱스(컬럼)끼리만 연결 (경로 분리)
+  // - N열 → 단일: N열 전부가 단일로 합류 (보스 직전 정비 등)
+  if (Array.isArray(chapter.branchSequence) && chapter.branchSequence.length > 0) {
+    const layers = chapter.branchSequence;
+    const branchNodes = [];
+    const branchEdges = [];
+    let nextId = 0;
+    // 각 레이어의 노드 id 배열을 모아둠 (엣지 계산용)
+    const layerIds = [];
+
+    const layerCount = layers.length;
+    layers.forEach((layer, l) => {
+      const yPos = layerCount === 1 ? 50 : 95 - (l / (layerCount - 1)) * 87;
+      const cols = Array.isArray(layer) ? layer : [layer];
+      const colCount = cols.length;
+      const ids = [];
+      cols.forEach((item, c) => {
+        const type = typeof item === 'string' ? item : item.type;
+        // 1열: x=50 / 2열 이상: 양 끝 20~80 사이 균등 배치
+        const xPos = colCount === 1
+          ? 50
+          : 20 + (c / (colCount - 1)) * 60;
+        branchNodes.push({
+          id: nextId,
+          type,
+          layer: l,
+          x: xPos,
+          y: yPos,
+          completed: false,
+          current: l === 0,
+          locked: false,
+        });
+        ids.push(nextId);
+        nextId++;
+      });
+      layerIds.push(ids);
+    });
+
+    // 엣지: 인접 레이어 간 연결
+    for (let l = 0; l < layerIds.length - 1; l++) {
+      const cur = layerIds[l];
+      const next = layerIds[l + 1];
+      if (cur.length === 1 && next.length === 1) {
+        branchEdges.push([cur[0], next[0]]);
+      } else if (cur.length === 1 && next.length > 1) {
+        // 단일 → N열 분기: 모두 연결
+        next.forEach(nid => branchEdges.push([cur[0], nid]));
+      } else if (cur.length > 1 && next.length === 1) {
+        // N열 → 단일 합류: 모두 연결
+        cur.forEach(cid => branchEdges.push([cid, next[0]]));
+      } else if (cur.length === next.length) {
+        // 같은 컬럼 수: 같은 인덱스끼리 1:1 (컬럼 잠금)
+        for (let i = 0; i < cur.length; i++) {
+          branchEdges.push([cur[i], next[i]]);
+        }
+      } else {
+        // 컬럼 수가 다른데 둘 다 다열인 경우 — 모든 조합 연결 (안전한 폴백)
+        cur.forEach(cid => next.forEach(nid => branchEdges.push([cid, nid])));
+      }
+    }
+
+    return { nodes: branchNodes, edges: branchEdges };
+  }
+
   const layers = Math.max(5, Math.ceil(chapter.nodeCount / 2.8));
   const nodes = [];
   let id = 0;
