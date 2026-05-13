@@ -135,13 +135,13 @@ export default function NodeInfoModal({ nodeType, override = null, onConfirm }) 
           </div>
         </div>
 
-        {/* 본문 — 설명 */}
+        {/* 본문 — 설명 (\n으로 단락 분리 가능) */}
         <div className="px-4 py-4 space-y-3">
-          <div className="text-[12px] leading-relaxed" style={{ color: PALETTE.text }}>
+          <div className="text-[12px] leading-relaxed whitespace-pre-line" style={{ color: PALETTE.text }}>
             {info.desc}
           </div>
           <div
-            className="text-[11px] leading-relaxed px-3 py-2"
+            className="text-[11px] leading-relaxed whitespace-pre-line px-3 py-2"
             style={{
               color: PALETTE.textDim,
               background: `${info.color}10`,

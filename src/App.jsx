@@ -1500,8 +1500,8 @@ export default function App() {
             {screen === 'victory' && <VictoryScreen classData={classData} enemy={currentEnemy ? ENEMIES[currentEnemy] : null} gains={victoryGains} onContinue={handleVictoryContinue} />}
             {screen === 'event' && currentEvent && <EventScreen event={currentEvent} classData={classData} stats={{ ...classData.stats, ...stats }} skills={skills} onResolve={handleEventResolve} />}
             {screen === 'rest' && <RestScreen classData={classData} hp={hp} maxHp={maxHp} skills={skills} relics={relics} expedition={currentExpedition} onChoice={handleRestChoice} />}
-            {screen === 'prep' && <PrepScreen skills={skills} relics={relics} ultimates={ultimates} expedition={currentExpedition} mode="full" onConfirm={handlePrepConfirm} />}
-            {screen === 'reselect' && <PrepScreen skills={skills} relics={relics} ultimates={ultimates} expedition={currentExpedition} mode={reselectMode} currentActiveSkills={activeSkills} currentActiveRelicNames={activeRelicNames} onConfirm={handleReselectConfirm} />}
+            {screen === 'prep' && <PrepScreen classData={classData} skills={skills} relics={relics} ultimates={ultimates} expedition={currentExpedition} mode="full" onConfirm={handlePrepConfirm} />}
+            {screen === 'reselect' && <PrepScreen classData={classData} skills={skills} relics={relics} ultimates={ultimates} expedition={currentExpedition} mode={reselectMode} currentActiveSkills={activeSkills} currentActiveRelicNames={activeRelicNames} onConfirm={handleReselectConfirm} />}
             {screen === 'shop' && <ShopScreen gold={gold} skills={skills} relics={relics} ultimates={ultimates} onBuy={handleShopBuy} onLeave={handleShopLeave} classId={classData?.id} />}
             {screen === 'forge' && <ForgeScreen relics={relics} skills={skills} activeRelicNames={activeRelicNames} meta={meta} onCombine={handleForgeCombine} onLeave={handleForgeLeave} />}
             {screen === 'chapterClear' && chapter && <ChapterClearScreen chapter={chapter} isLastChapter={false} hp={hp} maxHp={maxHp} meta={meta} curses={currentCurses} onContinue={handleChapterContinue} />}
