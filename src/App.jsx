@@ -224,6 +224,8 @@ export default function App() {
   const [currentExpedition, setCurrentExpedition] = useState(null);
   const [currentCurses, setCurrentCurses] = useState([]);
   const [runSouls, setRunSouls] = useState(0);  // 이번 런에서 획득한 영혼 (사망 시 70%만 적용)
+  // 무한모드(endless): 현재 깊이(0-indexed). 챕터 클리어할 때마다 +1.
+  const [endlessDepth, setEndlessDepth] = useState(0);
   // 챔피언십 첫 클리어 정보 (ExpeditionClearScreen에서 사용)
   const [runFirstChampClear, setRunFirstChampClear] = useState(null);
   
@@ -511,6 +513,7 @@ export default function App() {
   // 새로운 런 시작 (원정 선택 시)
   const startExpedition = (expedition) => {
     setCurrentExpedition(expedition);
+    setEndlessDepth(0);  // 무한모드 깊이 초기화
     // 저주 부여 — fixedCurses(일일 챌린지)는 시드 픽 그대로 사용
     const curses = Array.isArray(expedition.fixedCurses) && expedition.fixedCurses.length > 0
       ? [...expedition.fixedCurses]
@@ -994,8 +997,15 @@ export default function App() {
 
   // 전투 패배
   const handleDefeat = () => {
-    // 사망 페널티: 누적 영혼의 70%만 획득
-    const recoveredSouls = Math.floor(runSouls * SOUL_REWARDS.deathPenalty);
+    // 무한모드: 깊이 기반 보너스 (페널티 없음 — 죽음 = 도전의 끝)
+    // 일반: 누적 영혼의 70%만 획득
+    let recoveredSouls;
+    if (currentExpedition?.endless) {
+      const depthBonus = endlessDepth * 15;
+      recoveredSouls = runSouls + depthBonus;
+    } else {
+      recoveredSouls = Math.floor(runSouls * SOUL_REWARDS.deathPenalty);
+    }
     if (recoveredSouls > 0) {
       const newMeta = addSouls(meta, recoveredSouls);
       setMeta(newMeta);
@@ -1329,9 +1339,10 @@ export default function App() {
       setScreen('title');
       return;
     }
-    
-    const isLastChapter = chapterIdx >= currentExpedition.chapters.length - 1;
-    
+
+    // 무한모드는 마지막 챕터 개념이 없음 — 항상 다음 사이클로
+    const isLastChapter = !currentExpedition.endless && chapterIdx >= currentExpedition.chapters.length - 1;
+
     if (isLastChapter) {
       // 원정 클리어
       const expSoulReward = currentExpedition.soulReward;
@@ -1443,12 +1454,36 @@ export default function App() {
     } else {
       // 다음 챕터
       const nextChapterIdx = chapterIdx + 1;
-      // 챔피언십이면 ID로, 클래식이면 인덱스로
-      if (currentExpedition.isChampionship) {
+      // 무한모드: 챕터 사이클 + 깊이 기반 스케일링
+      if (currentExpedition.endless) {
+        const baseChapters = currentExpedition.chapters;
+        const nextChapterId = baseChapters[nextChapterIdx % baseChapters.length];
+        const nextChapter = CHAPTERS.find(c => c.id === nextChapterId);
+        if (!nextChapter) {
+          console.error('무한모드 챕터 데이터 없음:', nextChapterId);
+          return;
+        }
+        // 원본 multipliers 보존 + 깊이 기반 스케일
+        const baseExp = currentExpedition._baseExp || currentExpedition;
+        const newDepth = nextChapterIdx;
+        const hpScale = 1 + newDepth * 0.15;
+        const dmgScale = 1 + newDepth * 0.12;
+        const scaledExp = {
+          ...baseExp,
+          enemyHpMult: (baseExp.enemyHpMult || 1.0) * hpScale,
+          enemyDmgMult: (baseExp.enemyDmgMult || 1.0) * dmgScale,
+          _baseExp: baseExp,
+        };
+        setCurrentExpedition(scaledExp);
+        setEndlessDepth(newDepth);
+        initializeRun(nextChapter, nextChapterIdx, scaledExp);
+      } else if (currentExpedition.isChampionship) {
+        // 챔피언십이면 ID로
         const nextChapterId = currentExpedition.chapters[nextChapterIdx];
         const nextChapterData = CHAMPIONSHIP_CHAPTERS[nextChapterId];
         initializeRun(nextChapterData, nextChapterIdx);
       } else {
+        // 클래식
         const nextChapterId = currentExpedition.chapters[nextChapterIdx];
         const nextChapter = CHAPTERS.find(c => c.id === nextChapterId);
         if (!nextChapter) {

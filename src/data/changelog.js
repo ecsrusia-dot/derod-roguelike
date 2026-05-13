@@ -7,6 +7,19 @@
 
 export const CHANGELOG = [
   {
+    version: '1.8.0',
+    date: '2026-05-13',
+    label: '무한모드 황혼의 끝 (Tier 2B)',
+    changes: [
+      { type: 'feature', text: '무한모드 "황혼의 끝" 추가 — 보스 클리어해도 끝나지 않고 다음 챕터로 진행. 챕터는 1→2→3→4→1→2... 무한 순환' },
+      { type: 'feature', text: '깊이가 깊어질수록 적 강화: HP ×(1 + 깊이×0.15), 데미지 ×(1 + 깊이×0.12). 챕터 진행할수록 가파른 도전' },
+      { type: 'feature', text: '죽음 시 영혼 보상 = 누적 영혼 + (깊이 × 15). 일반 원정의 70% 페널티 대신 깊이 자체가 보상' },
+      { type: 'feature', text: '맵 헤더에 챕터 표기가 "Depth N"으로 전환됨 (무한모드 전용)' },
+      { type: 'feature', text: '해금 조건: 모든 튜토리얼(1~4) 클리어. 직업은 자유 선택' },
+      { type: 'system', text: 'linearSequence/branchSequence 기반 챕터 모두 사이클 가능. 챕터 데이터에 추가 작업 불필요' },
+    ],
+  },
+  {
     version: '1.7.0',
     date: '2026-05-13',
     label: '일일 챌린지 (Tier 2A)',

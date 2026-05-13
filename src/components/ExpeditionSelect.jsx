@@ -19,6 +19,7 @@ export default function ExpeditionSelect({ meta, onSelect, onSelectChampionship,
   const tutorials = EXPEDITIONS.filter(e => e.category === 'tutorial')
     .sort((a, b) => (a.tutorialOrder || 0) - (b.tutorialOrder || 0));
   const trainings = EXPEDITIONS.filter(e => e.category === 'training');
+  const endlessExps = EXPEDITIONS.filter(e => e.category === 'endless');
 
   // 일일 챌린지 — 화면 진입 시점의 KST 날짜로 빌드
   const daily = useMemo(() => buildDailyExpedition(CURSES), []);
@@ -102,6 +103,64 @@ export default function ExpeditionSelect({ meta, onSelect, onSelectChampionship,
             </div>
           </button>
         </div>
+
+        {/* === 무한모드 === */}
+        {endlessExps.length > 0 && (
+        <div className="mb-4">
+          <p className="text-center text-[10px] mb-2 tracking-[0.3em]" style={{ color: '#5c1a1a', opacity: 0.9 }}>
+            ━━ 무한모드 ━━
+          </p>
+          <p className="text-center text-[9px] mb-3" style={{ color: PALETTE.textDim, opacity: 0.6 }}>
+            쓰러질 때까지 이어지는 도전 · 깊이 = 영혼
+          </p>
+          <div className="space-y-2">
+            {endlessExps.map((exp) => {
+              const locked = exp.unlockId && !isUnlocked(meta, exp.unlockId);
+              return (
+                <button key={exp.id} onClick={() => !locked && onSelect(exp)} disabled={locked}
+                  className="w-full text-left relative overflow-hidden transition-all"
+                  style={{
+                    background: locked
+                      ? `linear-gradient(135deg, ${PALETTE.panel}, ${PALETTE.bgDeep})`
+                      : `linear-gradient(135deg, ${exp.color}30, ${PALETTE.bgDeep})`,
+                    border: `1.5px solid ${locked ? PALETTE.panelBorder : exp.color}`,
+                    opacity: locked ? 0.4 : 1,
+                  }}>
+                  <div className="px-3 py-2.5">
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <div className="flex-1">
+                        <div className="text-[9px] tracking-[0.2em]" style={{ color: exp.color, opacity: 0.8 }}>
+                          ENDLESS
+                        </div>
+                        <div className="text-sm font-bold mt-0.5" style={{ color: PALETTE.text }}>
+                          {exp.name}
+                        </div>
+                      </div>
+                      {locked
+                        ? <Lock size={14} style={{ color: PALETTE.textDim }} />
+                        : <ChevronRight size={14} style={{ color: exp.color }} />}
+                    </div>
+                    <p className="text-[10px] leading-relaxed" style={{ color: PALETTE.textDim }}>{exp.desc}</p>
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      <span className="text-[9px] px-1.5 py-0.5" style={{
+                        background: `${exp.color}25`, color: exp.color,
+                      }}>깊이당 적 강화</span>
+                      <span className="text-[9px] px-1.5 py-0.5" style={{
+                        background: `${PALETTE.twilight}20`, color: PALETTE.twilight,
+                      }}>깊이 × 15 영혼</span>
+                      {locked && (
+                        <span className="text-[9px] px-1.5 py-0.5" style={{
+                          background: `${PALETTE.accent}20`, color: PALETTE.accent,
+                        }}>모든 튜토리얼 클리어 필요</span>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        )}
 
         {/* 튜토리얼 */}
         <div className="mb-4">
