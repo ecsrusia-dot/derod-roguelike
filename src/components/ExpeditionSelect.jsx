@@ -37,12 +37,17 @@ export default function ExpeditionSelect({ meta, onSelect, onSelectChampionship,
         </p>
       </div>
       
-      <div className="grid grid-cols-2 border-b" style={{ borderColor: PALETTE.panelBorder }}>
+      <div className="grid grid-cols-3 border-b" style={{ borderColor: PALETTE.panelBorder }}>
         <button onClick={() => setTab('classic')} className="py-3 text-[11px] tracking-[0.2em]" style={{
           background: tab === 'classic' ? PALETTE.bgDeep : 'transparent',
           color: tab === 'classic' ? PALETTE.dawn : PALETTE.textDim,
           borderBottom: tab === 'classic' ? `2px solid ${PALETTE.dawn}` : 'none',
         }}>클래식</button>
+        <button onClick={() => setTab('challenge')} className="py-3 text-[11px] tracking-[0.2em]" style={{
+          background: tab === 'challenge' ? PALETTE.bgDeep : 'transparent',
+          color: tab === 'challenge' ? '#d4d4a0' : PALETTE.textDim,
+          borderBottom: tab === 'challenge' ? `2px solid #d4d4a0` : 'none',
+        }}>챌린지</button>
         <button onClick={() => setTab('championship')} className="py-3 text-[11px] tracking-[0.2em]" style={{
           background: tab === 'championship' ? PALETTE.bgDeep : 'transparent',
           color: tab === 'championship' ? PALETTE.legendary : PALETTE.textDim,
@@ -50,7 +55,8 @@ export default function ExpeditionSelect({ meta, onSelect, onSelectChampionship,
         }}>챔피언십</button>
       </div>
       
-      {tab === 'classic' && (
+      {/* ====== 챌린지 탭 ====== */}
+      {tab === 'challenge' && (
       <div className="flex-1 overflow-y-auto px-4 py-3">
         {/* === 일일 챌린지 === */}
         <div className="mb-4">
@@ -161,7 +167,12 @@ export default function ExpeditionSelect({ meta, onSelect, onSelectChampionship,
           </div>
         </div>
         )}
+      </div>
+      )}
 
+      {/* ====== 클래식 탭 ====== */}
+      {tab === 'classic' && (
+      <div className="flex-1 overflow-y-auto px-4 py-3">
         {/* 튜토리얼 */}
         <div className="mb-4">
           <p className="text-center text-[10px] mb-2 tracking-[0.3em]" style={{ color: PALETTE.dawn, opacity: 0.7 }}>
