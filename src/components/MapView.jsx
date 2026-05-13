@@ -64,7 +64,9 @@ export default function MapView({ chapter, classData, mapData, hp, maxHp, gold, 
             }}>{expedition.name}</span>
           )}
           <div className="text-[9px] tracking-[0.4em]" style={{ color: chapter.color }}>
-            {expedition ? `Ch.${(chapterIdx || 0) + 1}/${expedition.chapters.length}` : chapter.sub}
+            {expedition?.endless
+              ? `Depth ${(chapterIdx || 0) + 1}`
+              : (expedition ? `Ch.${(chapterIdx || 0) + 1}/${expedition.chapters.length}` : chapter.sub)}
           </div>
         </div>
         <div className="text-sm font-bold tracking-[0.2em] mt-0.5" style={{

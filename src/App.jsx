@@ -93,7 +93,7 @@ import {
   VERSION_DATE,
   VERSION_LABEL,
 } from './data.js';
-import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta } from './storage.js';
+import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared } from './storage.js';
 
 
 
@@ -224,6 +224,8 @@ export default function App() {
   const [currentExpedition, setCurrentExpedition] = useState(null);
   const [currentCurses, setCurrentCurses] = useState([]);
   const [runSouls, setRunSouls] = useState(0);  // 이번 런에서 획득한 영혼 (사망 시 70%만 적용)
+  // 무한모드(endless): 현재 깊이(0-indexed). 챕터 클리어할 때마다 +1.
+  const [endlessDepth, setEndlessDepth] = useState(0);
   // 챔피언십 첫 클리어 정보 (ExpeditionClearScreen에서 사용)
   const [runFirstChampClear, setRunFirstChampClear] = useState(null);
   
@@ -511,8 +513,11 @@ export default function App() {
   // 새로운 런 시작 (원정 선택 시)
   const startExpedition = (expedition) => {
     setCurrentExpedition(expedition);
-    // 저주 부여
-    const curses = rollCurses(expedition.curseCount);
+    setEndlessDepth(0);  // 무한모드 깊이 초기화
+    // 저주 부여 — fixedCurses(일일 챌린지)는 시드 픽 그대로 사용
+    const curses = Array.isArray(expedition.fixedCurses) && expedition.fixedCurses.length > 0
+      ? [...expedition.fixedCurses]
+      : rollCurses(expedition.curseCount);
     setCurrentCurses(curses);
     setRunSouls(0);
     
@@ -767,6 +772,7 @@ export default function App() {
       const pool = chapter.enemies.normal;
       const enemyKey = pool[Math.floor(Math.random() * pool.length)];
       setCurrentEnemy(enemyKey);
+      setMeta(prev => recordCodex(prev, 'enemies', enemyKey));
       setIsEliteReward(false);
       setIsBossReward(false);
       setScreen('combat');
@@ -774,11 +780,14 @@ export default function App() {
       const pool = chapter.enemies.elite;
       const enemyKey = pool[Math.floor(Math.random() * pool.length)];
       setCurrentEnemy(enemyKey);
+      setMeta(prev => recordCodex(prev, 'enemies', enemyKey));
       setIsEliteReward(true);
       setIsBossReward(false);
       setScreen('combat');
     } else if (nodeType === 'boss') {
-      setCurrentEnemy(chapter.enemies.boss);
+      const enemyKey = chapter.enemies.boss;
+      setCurrentEnemy(enemyKey);
+      setMeta(prev => recordCodex(prev, 'enemies', enemyKey));
       setIsBossReward(true);
       setIsEliteReward(false);
       setScreen('combat');
@@ -807,6 +816,7 @@ export default function App() {
           : pool[Math.floor(Math.random() * pool.length)]; // 챕터 매치 없을 시 전체 풀
       }
       setCurrentEvent(ev);
+      if (ev?.id) setMeta(prev => recordCodex(prev, 'events', ev.id));
       setScreen('event');
     } else if (nodeType === 'fountain') {
       // 회복의 샘 — 사건 화면처럼 표시 후 체력 15% 회복
@@ -987,8 +997,15 @@ export default function App() {
 
   // 전투 패배
   const handleDefeat = () => {
-    // 사망 페널티: 누적 영혼의 70%만 획득
-    const recoveredSouls = Math.floor(runSouls * SOUL_REWARDS.deathPenalty);
+    // 무한모드: 깊이 기반 보너스 (페널티 없음 — 죽음 = 도전의 끝)
+    // 일반: 누적 영혼의 70%만 획득
+    let recoveredSouls;
+    if (currentExpedition?.endless) {
+      const depthBonus = endlessDepth * 15;
+      recoveredSouls = runSouls + depthBonus;
+    } else {
+      recoveredSouls = Math.floor(runSouls * SOUL_REWARDS.deathPenalty);
+    }
     if (recoveredSouls > 0) {
       const newMeta = addSouls(meta, recoveredSouls);
       setMeta(newMeta);
@@ -1037,6 +1054,8 @@ export default function App() {
         ...prev,
         [reward.name]: Math.min((prev[reward.name] || 0) + 1, PASSIVE_SKILLS[reward.name].maxLv)
       }));
+      // 도감 기록 — 한 번이라도 배운 패시브
+      setMeta(prev => recordCodex(prev, 'passives', reward.name));
       // ★ 추가: 활성화 슬롯이 남았다면(5개 미만) 획득 즉시 활성화 목록에 추가
       setActiveSkills(prev => {
         const currentActive = prev || [];
@@ -1048,6 +1067,7 @@ export default function App() {
     } else if (reward.type === 'relic') {
       // 1. 유물 보유 목록 추가
       setRelics(prev => [...prev, reward]);
+      setMeta(prev => recordCodex(prev, 'relics', reward.name));
       
       // 2. 유물 즉시 효과(HP/골드/보석) 적용
       const stat = reward.statBonus || {};
@@ -1090,6 +1110,7 @@ export default function App() {
       }
     } else if (reward.type === 'relic') {
       setRelics(prev => [...prev, reward]);
+      if (reward.name) setMeta(prev => recordCodex(prev, 'relics', reward.name));
       // 유물의 maxHp% / startGold / startGem 즉시 적용
       const stat = reward.statBonus || {};
       if (stat.maxHp) {
@@ -1318,9 +1339,10 @@ export default function App() {
       setScreen('title');
       return;
     }
-    
-    const isLastChapter = chapterIdx >= currentExpedition.chapters.length - 1;
-    
+
+    // 무한모드는 마지막 챕터 개념이 없음 — 항상 다음 사이클로
+    const isLastChapter = !currentExpedition.endless && chapterIdx >= currentExpedition.chapters.length - 1;
+
     if (isLastChapter) {
       // 원정 클리어
       const expSoulReward = currentExpedition.soulReward;
@@ -1383,12 +1405,21 @@ export default function App() {
         newMeta = setAchievementProgress(newMeta, 'champ_all_hard',    hardCleared,    5);
         newMeta = setAchievementProgress(newMeta, 'champ_all_hell',    hellCleared,    5);
         newMeta = setAchievementProgress(newMeta, 'champ_all_madness', madnessCleared, 5);
+      } else if (currentExpedition.category === 'daily') {
+        // 일일 챌린지 클리어 — 같은 날 첫 클리어에만 보너스 영혼
+        const dateKey = currentExpedition.dailyDateKey;
+        if (dateKey && !hasDailyCleared(newMeta, dateKey)) {
+          newMeta = recordDailyClear(newMeta, dateKey);
+          const dailyBonus = 100;
+          newMeta = addSouls(newMeta, dailyBonus);
+          setRunSouls(prev => prev + dailyBonus);
+        }
       } else {
         // 클래식 원정 (튜토리얼 또는 수련의 길)
         newMeta = recordExpeditionClear(newMeta, currentExpedition.id);
-        
+
         const expId = currentExpedition.id;
-        
+
         // 1. 튜토리얼 클리어 업적
         if (expId === 'tutorial_basic' || expId === 'tutorial_market' || expId === 'tutorial_branching' || expId === 'tutorial_curse') {
           newMeta = completeAchievement(newMeta, `clear_${expId}`, 1);
@@ -1423,12 +1454,36 @@ export default function App() {
     } else {
       // 다음 챕터
       const nextChapterIdx = chapterIdx + 1;
-      // 챔피언십이면 ID로, 클래식이면 인덱스로
-      if (currentExpedition.isChampionship) {
+      // 무한모드: 챕터 사이클 + 깊이 기반 스케일링
+      if (currentExpedition.endless) {
+        const baseChapters = currentExpedition.chapters;
+        const nextChapterId = baseChapters[nextChapterIdx % baseChapters.length];
+        const nextChapter = CHAPTERS.find(c => c.id === nextChapterId);
+        if (!nextChapter) {
+          console.error('무한모드 챕터 데이터 없음:', nextChapterId);
+          return;
+        }
+        // 원본 multipliers 보존 + 깊이 기반 스케일
+        const baseExp = currentExpedition._baseExp || currentExpedition;
+        const newDepth = nextChapterIdx;
+        const hpScale = 1 + newDepth * 0.15;
+        const dmgScale = 1 + newDepth * 0.12;
+        const scaledExp = {
+          ...baseExp,
+          enemyHpMult: (baseExp.enemyHpMult || 1.0) * hpScale,
+          enemyDmgMult: (baseExp.enemyDmgMult || 1.0) * dmgScale,
+          _baseExp: baseExp,
+        };
+        setCurrentExpedition(scaledExp);
+        setEndlessDepth(newDepth);
+        initializeRun(nextChapter, nextChapterIdx, scaledExp);
+      } else if (currentExpedition.isChampionship) {
+        // 챔피언십이면 ID로
         const nextChapterId = currentExpedition.chapters[nextChapterIdx];
         const nextChapterData = CHAMPIONSHIP_CHAPTERS[nextChapterId];
         initializeRun(nextChapterData, nextChapterIdx);
       } else {
+        // 클래식
         const nextChapterId = currentExpedition.chapters[nextChapterIdx];
         const nextChapter = CHAPTERS.find(c => c.id === nextChapterId);
         if (!nextChapter) {

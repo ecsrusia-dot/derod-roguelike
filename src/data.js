@@ -22,9 +22,9 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.5.1';
+export const GAME_VERSION = '1.8.0';
 export const VERSION_DATE = '2026-05-13';
-export const VERSION_LABEL = '직업별 전용 사건 10개 (Tier 2D)';
+export const VERSION_LABEL = '무한모드 황혼의 끝 (Tier 2B)';
 
 // =========== 패시브 스킬 ===========
 // effect 필드는 문자열 키. 실제 동작은 메인 코드의 trigger handler에서 처리.
@@ -3469,6 +3469,25 @@ export const EXPEDITIONS = [
     forcedClassId: 4,
     unlocksChampionshipFor: 4,
     // 마지막 수련 — 다음 직업 해금 없음
+  },
+  // === 무한모드: 황혼의 끝 ===
+  // 보스 클리어해도 끝나지 않고 다음 챕터로 — 깊이가 깊어질수록 적 능력치 상향.
+  // 죽을 때까지 도달한 깊이가 영혼 보상으로 환산.
+  {
+    id: 'endless_dusk',
+    name: '황혼의 끝',
+    sub: 'Endless Twilight',
+    desc: '쓰러질 때까지 이어지는 영원의 도전. 깊이가 깊어질수록 적이 강해진다.',
+    color: '#5c1a1a',
+    chapters: [1, 2, 3, 4],
+    endless: true,
+    enemyHpMult: 1.0,
+    enemyDmgMult: 1.0,
+    curseCount: 0,
+    maxRelicSelect: 3,
+    soulReward: 0,   // 깊이 기반 보너스로 대체
+    unlockId: 'tutorial_curse_clear',
+    category: 'endless',
   },
 ];
 

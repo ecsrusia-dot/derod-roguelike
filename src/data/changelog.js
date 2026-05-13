@@ -7,6 +7,43 @@
 
 export const CHANGELOG = [
   {
+    version: '1.8.0',
+    date: '2026-05-13',
+    label: '무한모드 황혼의 끝 (Tier 2B)',
+    changes: [
+      { type: 'feature', text: '무한모드 "황혼의 끝" 추가 — 보스 클리어해도 끝나지 않고 다음 챕터로 진행. 챕터는 1→2→3→4→1→2... 무한 순환' },
+      { type: 'feature', text: '깊이가 깊어질수록 적 강화: HP ×(1 + 깊이×0.15), 데미지 ×(1 + 깊이×0.12). 챕터 진행할수록 가파른 도전' },
+      { type: 'feature', text: '죽음 시 영혼 보상 = 누적 영혼 + (깊이 × 15). 일반 원정의 70% 페널티 대신 깊이 자체가 보상' },
+      { type: 'feature', text: '맵 헤더에 챕터 표기가 "Depth N"으로 전환됨 (무한모드 전용)' },
+      { type: 'feature', text: '해금 조건: 모든 튜토리얼(1~4) 클리어. 직업은 자유 선택' },
+      { type: 'system', text: 'linearSequence/branchSequence 기반 챕터 모두 사이클 가능. 챕터 데이터에 추가 작업 불필요' },
+    ],
+  },
+  {
+    version: '1.7.0',
+    date: '2026-05-13',
+    label: '일일 챌린지 (Tier 2A)',
+    changes: [
+      { type: 'feature', text: '일일 챌린지 "오늘의 시련" 추가 — 매일 자정(KST) 갱신되는 시드 기반 도전. 직업·챕터·저주 2개가 그날 고정되어 모든 플레이어가 같은 조건' },
+      { type: 'feature', text: '원정 선택 화면 클래식 탭 상단에 일일 챌린지 카드 노출. 오늘의 직업·챕터·저주를 미리 표시' },
+      { type: 'feature', text: '일일 챌린지는 횟수 제한 없음. 같은 날 첫 클리어 시 영혼 +100 보너스 (이후 클리어는 기본 +80만)' },
+      { type: 'system', text: '시드 RNG는 KST 날짜 문자열 해시 + mulberry32. 클라이언트만으로 결정적 결과 보장' },
+      { type: 'system', text: '메타에 dailyClears 맵 추가 — 날짜별 첫 클리어 기록' },
+    ],
+  },
+  {
+    version: '1.6.0',
+    date: '2026-05-13',
+    label: '도감 5탭 확장 (Tier 2C)',
+    changes: [
+      { type: 'feature', text: '도감을 5개 탭으로 확장 — 적 / 사건 / 유물 / 패시브 / 레시피. 한 번이라도 만난/획득한 항목은 모든 런에 걸쳐 영구 등록' },
+      { type: 'feature', text: '각 카테고리 카드 클릭 시 상세 정보 모달 — 적은 패턴 목록, 사건은 본문, 유물·패시브는 효과 전체 표시' },
+      { type: 'feature', text: '카테고리별 발견 % 표시 — 도감 진행도를 한눈에 확인' },
+      { type: 'system', text: '도감 트래킹 hook 자동 동작 — 전투 진입 시 적 ID, 사건 진입 시 이벤트 ID, 보상에서 유물·패시브 획득 시 자동 기록' },
+      { type: 'system', text: '메타 데이터에 codex 객체 추가 (enemies/events/relics/passives), 기존 사용자는 자동 마이그레이션' },
+    ],
+  },
+  {
     version: '1.5.1',
     date: '2026-05-13',
     label: '직업별 전용 사건 10개 (Tier 2D)',
