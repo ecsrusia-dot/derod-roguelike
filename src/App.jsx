@@ -93,7 +93,7 @@ import {
   VERSION_DATE,
   VERSION_LABEL,
 } from './data.js';
-import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex } from './storage.js';
+import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared } from './storage.js';
 
 
 
@@ -511,8 +511,10 @@ export default function App() {
   // 새로운 런 시작 (원정 선택 시)
   const startExpedition = (expedition) => {
     setCurrentExpedition(expedition);
-    // 저주 부여
-    const curses = rollCurses(expedition.curseCount);
+    // 저주 부여 — fixedCurses(일일 챌린지)는 시드 픽 그대로 사용
+    const curses = Array.isArray(expedition.fixedCurses) && expedition.fixedCurses.length > 0
+      ? [...expedition.fixedCurses]
+      : rollCurses(expedition.curseCount);
     setCurrentCurses(curses);
     setRunSouls(0);
     
@@ -1392,12 +1394,21 @@ export default function App() {
         newMeta = setAchievementProgress(newMeta, 'champ_all_hard',    hardCleared,    5);
         newMeta = setAchievementProgress(newMeta, 'champ_all_hell',    hellCleared,    5);
         newMeta = setAchievementProgress(newMeta, 'champ_all_madness', madnessCleared, 5);
+      } else if (currentExpedition.category === 'daily') {
+        // 일일 챌린지 클리어 — 같은 날 첫 클리어에만 보너스 영혼
+        const dateKey = currentExpedition.dailyDateKey;
+        if (dateKey && !hasDailyCleared(newMeta, dateKey)) {
+          newMeta = recordDailyClear(newMeta, dateKey);
+          const dailyBonus = 100;
+          newMeta = addSouls(newMeta, dailyBonus);
+          setRunSouls(prev => prev + dailyBonus);
+        }
       } else {
         // 클래식 원정 (튜토리얼 또는 수련의 길)
         newMeta = recordExpeditionClear(newMeta, currentExpedition.id);
-        
+
         const expId = currentExpedition.id;
-        
+
         // 1. 튜토리얼 클리어 업적
         if (expId === 'tutorial_basic' || expId === 'tutorial_market' || expId === 'tutorial_branching' || expId === 'tutorial_curse') {
           newMeta = completeAchievement(newMeta, `clear_${expId}`, 1);

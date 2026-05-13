@@ -7,6 +7,18 @@
 
 export const CHANGELOG = [
   {
+    version: '1.7.0',
+    date: '2026-05-13',
+    label: '일일 챌린지 (Tier 2A)',
+    changes: [
+      { type: 'feature', text: '일일 챌린지 "오늘의 시련" 추가 — 매일 자정(KST) 갱신되는 시드 기반 도전. 직업·챕터·저주 2개가 그날 고정되어 모든 플레이어가 같은 조건' },
+      { type: 'feature', text: '원정 선택 화면 클래식 탭 상단에 일일 챌린지 카드 노출. 오늘의 직업·챕터·저주를 미리 표시' },
+      { type: 'feature', text: '일일 챌린지는 횟수 제한 없음. 같은 날 첫 클리어 시 영혼 +100 보너스 (이후 클리어는 기본 +80만)' },
+      { type: 'system', text: '시드 RNG는 KST 날짜 문자열 해시 + mulberry32. 클라이언트만으로 결정적 결과 보장' },
+      { type: 'system', text: '메타에 dailyClears 맵 추가 — 날짜별 첫 클리어 기록' },
+    ],
+  },
+  {
     version: '1.6.0',
     date: '2026-05-13',
     label: '도감 5탭 확장 (Tier 2C)',

@@ -6,18 +6,24 @@
 // - 챔피언십: 5컨셉 × 4난이도 (직업 잠금 기반)
 // ============================================
 
-import React, { useState } from 'react';
-import { ChevronRight, Lock } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { ChevronRight, Lock, Calendar } from 'lucide-react';
 import { PALETTE, isUnlocked } from '../utils/helpers.js';
-import { EXPEDITIONS, CHAMPIONSHIPS, CHAMPIONSHIP_DIFFICULTIES, CLASSES } from '../data.js';
-import { isChampionshipDifficultyUnlocked, getUnlockedChampionshipClasses } from '../storage.js';
+import { EXPEDITIONS, CHAMPIONSHIPS, CHAMPIONSHIP_DIFFICULTIES, CLASSES, CURSES } from '../data.js';
+import { isChampionshipDifficultyUnlocked, getUnlockedChampionshipClasses, hasDailyCleared } from '../storage.js';
+import { buildDailyExpedition } from '../utils/dailyChallenge.js';
 
 export default function ExpeditionSelect({ meta, onSelect, onSelectChampionship, onBack }) {
   const [tab, setTab] = useState('classic');
-  
+
   const tutorials = EXPEDITIONS.filter(e => e.category === 'tutorial')
     .sort((a, b) => (a.tutorialOrder || 0) - (b.tutorialOrder || 0));
   const trainings = EXPEDITIONS.filter(e => e.category === 'training');
+
+  // 일일 챌린지 — 화면 진입 시점의 KST 날짜로 빌드
+  const daily = useMemo(() => buildDailyExpedition(CURSES), []);
+  const dailyCleared = hasDailyCleared(meta, daily.dailyDateKey);
+  const dailyClassName = CLASSES[daily.forcedClassId]?.name || '?';
   
   const unlockedClasses = getUnlockedChampionshipClasses(meta);
   const championshipUnlocked = unlockedClasses.length > 0;
@@ -45,6 +51,58 @@ export default function ExpeditionSelect({ meta, onSelect, onSelectChampionship,
       
       {tab === 'classic' && (
       <div className="flex-1 overflow-y-auto px-4 py-3">
+        {/* === 일일 챌린지 === */}
+        <div className="mb-4">
+          <p className="text-center text-[10px] mb-2 tracking-[0.3em]" style={{ color: daily.color, opacity: 0.8 }}>
+            ━━ 일일 챌린지 ━━
+          </p>
+          <p className="text-center text-[9px] mb-3" style={{ color: PALETTE.textDim, opacity: 0.6 }}>
+            매일 자정(KST) 갱신 · 모든 플레이어가 동일 조건
+          </p>
+          <button onClick={() => onSelect(daily)}
+            className="w-full text-left relative overflow-hidden transition-all"
+            style={{
+              background: `linear-gradient(135deg, ${daily.color}30, ${PALETTE.bgDeep})`,
+              border: `1.5px solid ${daily.color}`,
+              boxShadow: dailyCleared ? `0 0 12px ${daily.color}30` : 'none',
+            }}>
+            <div className="px-3 py-2.5">
+              <div className="flex items-start justify-between gap-2 mb-1">
+                <div className="flex-1">
+                  <div className="text-[9px] tracking-[0.2em] flex items-center gap-1" style={{ color: daily.color, opacity: 0.8 }}>
+                    <Calendar size={10} /> DAILY · {daily.dailyDateKey.slice(4,6)}/{daily.dailyDateKey.slice(6,8)}
+                  </div>
+                  <div className="text-sm font-bold flex items-center gap-2 mt-0.5" style={{ color: PALETTE.text }}>
+                    {daily.name}
+                    {dailyCleared && <span className="text-[9px] px-1.5 py-0.5" style={{
+                      background: `${PALETTE.legendary}20`, color: PALETTE.legendary,
+                      border: `1px solid ${PALETTE.legendary}80`,
+                    }}>오늘 완료</span>}
+                  </div>
+                </div>
+                <ChevronRight size={14} style={{ color: daily.color }} />
+              </div>
+              <p className="text-[10px] leading-relaxed" style={{ color: PALETTE.textDim }}>{daily.desc}</p>
+              <div className="flex flex-wrap gap-1 mt-2">
+                <span className="text-[9px] px-1.5 py-0.5" style={{
+                  background: `${daily.color}25`, color: daily.color,
+                }}>직업: {dailyClassName}</span>
+                <span className="text-[9px] px-1.5 py-0.5" style={{
+                  background: `${daily.color}25`, color: daily.color,
+                }}>챕터 {daily.chapters[0]}</span>
+                {daily.fixedCurses && daily.fixedCurses.map((c, i) => (
+                  <span key={i} className="text-[9px] px-1.5 py-0.5" style={{
+                    background: `${c.color}25`, color: c.color,
+                  }}>저주: {c.name}</span>
+                ))}
+                <span className="text-[9px] px-1.5 py-0.5" style={{
+                  background: `${PALETTE.twilight}20`, color: PALETTE.twilight,
+                }}>영혼 +{daily.soulReward}{dailyCleared ? '' : ' (+100 첫 클리어)'}</span>
+              </div>
+            </div>
+          </button>
+        </div>
+
         {/* 튜토리얼 */}
         <div className="mb-4">
           <p className="text-center text-[10px] mb-2 tracking-[0.3em]" style={{ color: PALETTE.dawn, opacity: 0.7 }}>

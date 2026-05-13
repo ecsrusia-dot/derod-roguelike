@@ -47,6 +47,8 @@ const DEFAULT_META = {
     relics: [],    // RELIC.name
     passives: [],  // PASSIVE_SKILLS key
   },
+  // 일일 챌린지 첫 클리어 기록 (KST 날짜 키 → true)
+  dailyClears: {},
 };
 
 // IndexedDB 열기
@@ -178,6 +180,18 @@ export function applyUnlock(meta, unlockId) {
 }
 
 // 원정 클리어 기록
+// 일일 챌린지 클리어 기록 (KST 날짜 키)
+export function recordDailyClear(meta, dateKey) {
+  if (!dateKey) return meta;
+  const clears = meta.dailyClears || {};
+  if (clears[dateKey]) return meta;
+  return { ...meta, dailyClears: { ...clears, [dateKey]: true } };
+}
+
+export function hasDailyCleared(meta, dateKey) {
+  return !!(meta && meta.dailyClears && meta.dailyClears[dateKey]);
+}
+
 // 도감 항목 추가 (이미 있으면 그대로)
 // category: 'enemies' | 'events' | 'relics' | 'passives'
 export function recordCodex(meta, category, id) {
