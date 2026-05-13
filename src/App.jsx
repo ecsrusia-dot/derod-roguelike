@@ -703,10 +703,22 @@ export default function App() {
 
   // linearSequence에서 해당 노드의 메타(객체 형태)를 가져옴 — 문자열 항목이면 null
   const getNodeMeta = (node) => {
-    const seq = chapter?.linearSequence;
-    if (!Array.isArray(seq)) return null;
-    const item = seq[node.layer];
-    return item && typeof item === 'object' ? item : null;
+    if (!node || !chapter) return null;
+    if (Array.isArray(chapter.linearSequence)) {
+      const item = chapter.linearSequence[node.layer];
+      return item && typeof item === 'object' ? item : null;
+    }
+    if (Array.isArray(chapter.branchSequence)) {
+      const layer = chapter.branchSequence[node.layer];
+      if (!layer) return null;
+      if (Array.isArray(layer)) {
+        const col = typeof node.columnIndex === 'number' ? node.columnIndex : 0;
+        const item = layer[col];
+        return item && typeof item === 'object' ? item : null;
+      }
+      return typeof layer === 'object' ? layer : null;
+    }
+    return null;
   };
 
   // 노드 진입 분기
@@ -767,12 +779,13 @@ export default function App() {
         ev = EVENTS.find(e => e.id === meta.forceEventId);
       }
       if (!ev) {
-        // 현재 챕터에 적용 가능한 사건만 필터링
+        // tutorialGift는 강제 트리거 전용 (랜덤 풀 제외)
+        const pool = EVENTS.filter(e => !e.tutorialGift);
         const chapterId = chapter.id;
-        const validEvents = EVENTS.filter(e => !e.chapter || e.chapter.includes(chapterId));
+        const validEvents = pool.filter(e => !e.chapter || e.chapter.includes(chapterId));
         ev = validEvents.length > 0
           ? validEvents[Math.floor(Math.random() * validEvents.length)]
-          : EVENTS[Math.floor(Math.random() * EVENTS.length)]; // 폴백
+          : pool[Math.floor(Math.random() * pool.length)]; // 챕터 매치 없을 시 전체 풀
       }
       setCurrentEvent(ev);
       setScreen('event');

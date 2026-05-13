@@ -22,9 +22,9 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.3.1';
+export const GAME_VERSION = '1.3.2';
 export const VERSION_DATE = '2026-05-13';
-export const VERSION_LABEL = '준비 화면 카드 정보 모달 + 튜토리얼 문구 정리';
+export const VERSION_LABEL = '튜토리얼 3 분기 버그 수정 + 카드 정보 모달 통합';
 
 // =========== 패시브 스킬 ===========
 // effect 필드는 문자열 키. 실제 동작은 메인 코드의 trigger handler에서 처리.
@@ -1724,6 +1724,7 @@ export const EVENTS = [
     title: '길 잃은 행상',
     text: '저잣거리 어귀에서 한 행상이 손짓한다.\n"여행자여, 무거운 짐을 좀 들어줄 수 있겠나? 사례는 두둑이 하지."\n그가 건넨 가죽 주머니에는 은화가 가득 들어 있다.',
     chapter: ['tutorial_market'],
+    tutorialGift: true,  // 강제 트리거 전용 — 랜덤 풀에서 제외
     choices: [
       {
         text: '은화 주머니를 받는다 (+250 은화)',
@@ -1737,6 +1738,7 @@ export const EVENTS = [
     title: '버려진 유물',
     text: '길섶에 누군가 떨어뜨린 듯한 작은 꾸러미가 놓여 있다.\n조심스레 열어보자, 옅은 빛을 내뿜는 유물 하나가 모습을 드러낸다.\n"……이건, 길 잃은 자의 행운인가."',
     chapter: ['tutorial_market'],
+    tutorialGift: true,
     choices: [
       {
         text: '유물을 거둔다 (랜덤 유물 +1)',
@@ -1751,6 +1753,7 @@ export const EVENTS = [
     title: '오래된 망원경',
     text: '낡은 망원경이 풀숲에 묻혀 있다.\n렌즈를 닦아 멀리 들여다보자, 갈라지는 세 길의 끝이 또렷이 비친다.\n"……이걸 챙기면 앞길이 보이겠군."',
     chapter: ['tutorial_branching'],
+    tutorialGift: true,
     choices: [
       {
         text: '망원경(천리안)을 거둔다',

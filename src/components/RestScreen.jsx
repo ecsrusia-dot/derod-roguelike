@@ -1,10 +1,13 @@
 // ============================================
 // components/RestScreen.jsx — 정비 화면 (보스 직전)
 // ============================================
+// 휴식/패시브 재선택/유물 재선택 + 직업 액티브 스킬 카드(클릭 → 정보 모달)
+// ============================================
 
-import React from 'react';
+import React, { useState } from 'react';
 import { PALETTE } from '../utils/helpers.js';
-import { PASSIVE_SKILLS, PREP_CONFIG } from '../data.js';
+import { PASSIVE_SKILLS, COMBAT_SKILLS, PREP_CONFIG } from '../data.js';
+import CardInfoModal, { buildActiveSkillInfo } from './CardInfoModal.jsx';
 
 export default function RestScreen({ classData, hp, maxHp, skills, relics, expedition, onChoice, onClose }) {
   const ownedSkills = Object.entries(skills)
@@ -14,6 +17,7 @@ export default function RestScreen({ classData, hp, maxHp, skills, relics, exped
   const maxRelicSelect = expedition?.maxRelicSelect || 1;
   const canReselectSkills = ownedSkills.length > maxSkillSelect;
   const canReselectRelics = relics.length > maxRelicSelect;
+  const [modalSkill, setModalSkill] = useState(null);
 
   return (
     <div className="absolute inset-0 flex flex-col" style={{ background: PALETTE.bgDeep }}>
@@ -48,7 +52,7 @@ export default function RestScreen({ classData, hp, maxHp, skills, relics, exped
           }}>
           <div className="text-sm font-bold mb-0.5" style={{ color: PALETTE.dawn }}>◇ 패시브 재선택</div>
           <div className="text-[11px]" style={{ color: PALETTE.textDim }}>
-            {canReselectSkills 
+            {canReselectSkills
               ? `보유 패시브 ${ownedSkills.length}개 中 ${maxSkillSelect}개 다시 선택`
               : `보유 패시브가 ${maxSkillSelect}개 이하라 재선택 불필요`}
           </div>
@@ -64,12 +68,54 @@ export default function RestScreen({ classData, hp, maxHp, skills, relics, exped
           }}>
           <div className="text-sm font-bold mb-0.5" style={{ color: PALETTE.legendary }}>◇ 유물 재선택</div>
           <div className="text-[11px]" style={{ color: PALETTE.textDim }}>
-            {canReselectRelics 
+            {canReselectRelics
               ? `보유 유물 ${relics.length}개 中 ${maxRelicSelect}개 다시 선택`
               : `보유 유물이 ${maxRelicSelect}개 이하라 재선택 불필요`}
           </div>
         </button>
+
+        {/* 직업 액티브 스킬 — 클릭 시 정보 모달 (참고용) */}
+        {classData && Array.isArray(classData.combatSkills) && classData.combatSkills.length > 0 && (
+          <div className="pt-3 border-t" style={{ borderColor: PALETTE.panelBorder }}>
+            <div className="flex items-center justify-between mb-2 px-1">
+              <div className="text-[11px] tracking-[0.3em]" style={{ color: classData.color }}>
+                ◇ 액티브 스킬
+              </div>
+              <div className="text-[10px]" style={{ color: PALETTE.textDim }}>참고</div>
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              {classData.combatSkills.map(name => {
+                const sk = COMBAT_SKILLS[name];
+                if (!sk) return null;
+                const typeLabel = sk.type === 'physical' ? '물리' : sk.type === 'magic' ? '마법' : sk.type === 'defense' ? '방어' : '';
+                return (
+                  <button key={name} onClick={() => setModalSkill(name)}
+                    className="text-left px-2 py-2 transition-all"
+                    style={{
+                      background: `linear-gradient(135deg, ${classData.color}20, ${classData.color}05)`,
+                      border: `1px solid ${classData.color}80`,
+                    }}>
+                    <div className="text-[12px] font-bold mb-0.5" style={{ color: PALETTE.text }}>
+                      {sk.name || name}
+                    </div>
+                    <div className="text-[9px]" style={{ color: PALETTE.textDim }}>
+                      {typeLabel}
+                      {typeof sk.cd === 'number' && sk.cd > 0 ? ` · CD ${sk.cd}` : ''}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
+
+      {modalSkill && (
+        <CardInfoModal
+          info={buildActiveSkillInfo(modalSkill, classData?.color)}
+          onClose={() => setModalSkill(null)}
+        />
+      )}
     </div>
   );
 }

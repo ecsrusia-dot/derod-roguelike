@@ -1,106 +1,14 @@
 // ============================================
 // components/PrepScreen.jsx — 전투 준비 화면 (패시브 + 유물 + 액티브 스킬)
 // ============================================
+// 카드 클릭 시 정보 모달을 표시. 선택 토글은 모달 내부 버튼으로 수행.
+// 자동 통과 모드(보유 ≤ 최대)에서는 모든 카드가 활성, 토글 버튼이 표시되지 않음.
+// ============================================
 
 import React, { useState } from 'react';
-import { Info } from 'lucide-react';
 import { PALETTE } from '../utils/helpers.js';
 import { PASSIVE_SKILLS, COMBAT_SKILLS, PREP_CONFIG } from '../data.js';
-
-// 카드별 정보 모달 — 패시브/유물/액티브 스킬 공용
-function CardInfoModal({ info, onClose }) {
-  if (!info) return null;
-  const accent = info.color || PALETTE.dawn;
-  return (
-    <div
-      className="absolute inset-0 flex items-center justify-center px-4 z-50"
-      style={{ background: 'rgba(0,0,0,0.85)' }}
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-sm flex flex-col"
-        style={{
-          background: PALETTE.panel,
-          border: `2px solid ${accent}`,
-          boxShadow: `0 0 30px ${accent}50`,
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: `1px solid ${accent}40` }}>
-          <div className="flex-1 min-w-0">
-            <div className="text-[10px] tracking-[0.3em]" style={{ color: PALETTE.textDim }}>{info.tag}</div>
-            <div className="text-base font-bold mt-0.5" style={{ color: accent, fontFamily: '"Cinzel", serif' }}>
-              {info.title}
-            </div>
-          </div>
-          {info.badge && (
-            <div className="text-[11px] px-2 py-0.5 ml-2" style={{
-              color: accent, border: `1px solid ${accent}80`, background: `${accent}15`,
-            }}>{info.badge}</div>
-          )}
-        </div>
-
-        <div className="px-4 py-4 space-y-3 max-h-[60vh] overflow-y-auto">
-          {info.subtitle && (
-            <div className="text-[12px] leading-relaxed whitespace-pre-line" style={{ color: PALETTE.text }}>
-              {info.subtitle}
-            </div>
-          )}
-          {info.stats && info.stats.length > 0 && (
-            <div className="grid grid-cols-2 gap-1.5">
-              {info.stats.map(([k, v], i) => (
-                <div key={i} className="px-2 py-1 text-[10px] flex items-center justify-between" style={{
-                  background: `${accent}10`, border: `1px solid ${accent}30`,
-                }}>
-                  <span style={{ color: PALETTE.textDim }}>{k}</span>
-                  <span style={{ color: PALETTE.text }}>{v}</span>
-                </div>
-              ))}
-            </div>
-          )}
-          {info.lines && info.lines.length > 0 && (
-            <div className="space-y-1.5">
-              {info.lines.map((line, i) => (
-                <div key={i} className="text-[11px] leading-relaxed whitespace-pre-line px-3 py-2" style={{
-                  color: PALETTE.text, background: `${accent}08`, border: `1px solid ${accent}25`,
-                }}>{line}</div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="px-3 py-3" style={{ borderTop: `1px solid ${PALETTE.panelBorder}` }}>
-          <button
-            onClick={onClose}
-            className="w-full py-2.5 text-[12px] tracking-[0.2em] font-bold"
-            style={{
-              background: `linear-gradient(180deg, ${accent}40, ${accent}20)`,
-              border: `1px solid ${accent}`,
-              color: PALETTE.text,
-            }}
-          >
-            닫기
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// 카드 우상단에 표시되는 (i) 정보 아이콘 — 클릭 시 정보 모달 오픈
-function InfoIcon({ color, onClick }) {
-  return (
-    <button
-      type="button"
-      onClick={(e) => { e.stopPropagation(); onClick && onClick(); }}
-      className="w-5 h-5 flex items-center justify-center shrink-0 transition-opacity hover:opacity-80"
-      style={{ color }}
-      aria-label="정보 보기"
-    >
-      <Info size={13} />
-    </button>
-  );
-}
+import CardInfoModal, { buildPassiveInfo, buildRelicInfo, buildActiveSkillInfo } from './CardInfoModal.jsx';
 
 export default function PrepScreen({ classData, skills, relics, ultimates, expedition, mode = 'full', currentActiveSkills = null, currentActiveRelicNames = null, onConfirm }) {
   // Lv > 0 인 보유 패시브 목록
@@ -131,7 +39,8 @@ export default function PrepScreen({ classData, skills, relics, ultimates, exped
 
   const [selectedSkills, setSelectedSkills] = useState(initialSelectedSkills);
   const [selectedRelics, setSelectedRelics] = useState(initialSelectedRelics);
-  const [infoModal, setInfoModal] = useState(null);
+  // modalState = { kind: 'passive'|'relic'|'active', name?, rel? }
+  const [modalState, setModalState] = useState(null);
 
   const toggleSkill = (name) => {
     if (skillsAutoPass || !showSkills) return;
@@ -155,69 +64,6 @@ export default function PrepScreen({ classData, skills, relics, ultimates, exped
     setSelectedRelics(newSet);
   };
 
-  // 패시브 카드 클릭 → 정보 모달
-  const openPassiveInfo = (name) => {
-    const sk = PASSIVE_SKILLS[name];
-    if (!sk) return;
-    const lv = skills[name] || 0;
-    const lines = [];
-    if (sk.desc) lines.push(sk.desc);
-    if (sk.minorEffect?.desc) {
-      lines.push(`소계: ${sk.minorEffect.desc} (현재 Lv ${lv} → 누적 적용)`);
-    }
-    if (sk.tiers) {
-      const tierLines = Object.entries(sk.tiers).map(([tierLv, t]) => {
-        const unlocked = lv >= Number(tierLv);
-        const prefix = unlocked ? '○' : '·';
-        return `${prefix} Lv.${tierLv}: ${t.text}`;
-      });
-      lines.push(tierLines.join('\n'));
-    }
-    setInfoModal({
-      color: sk.color,
-      tag: '◆ 패시브 스킬',
-      title: name,
-      badge: `Lv.${lv}`,
-      subtitle: sk.axis ? `축: ${sk.axis}` : null,
-      lines,
-    });
-  };
-
-  // 유물 카드 클릭 → 정보 모달
-  const openRelicInfo = (rel) => {
-    const stats = [];
-    if (rel.statBonus) {
-      Object.entries(rel.statBonus).forEach(([k, v]) => stats.push([k, String(v)]));
-    }
-    setInfoModal({
-      color: rel.color,
-      tag: '◆ 유물',
-      title: rel.name,
-      subtitle: rel.desc || null,
-      stats,
-    });
-  };
-
-  // 액티브 스킬 카드 클릭 → 정보 모달
-  const openActiveSkillInfo = (name) => {
-    const sk = COMBAT_SKILLS[name];
-    if (!sk) return;
-    const stats = [];
-    if (sk.type) stats.push(['타입', sk.type === 'physical' ? '물리' : sk.type === 'magic' ? '마법' : sk.type === 'defense' ? '방어' : sk.type]);
-    if (typeof sk.cost === 'number') stats.push(['마나', String(sk.cost)]);
-    if (typeof sk.cd === 'number') stats.push(['쿨다운', `${sk.cd}턴`]);
-    if (Array.isArray(sk.baseDmg)) stats.push(['데미지', `${sk.baseDmg[0]}~${sk.baseDmg[1]}`]);
-    if (typeof sk.defense === 'number') stats.push(['방어', `+${sk.defense}`]);
-    if (sk.pierce) stats.push(['특수', '방어 무시']);
-    setInfoModal({
-      color: classData?.color || PALETTE.accent,
-      tag: '◆ 액티브 스킬',
-      title: sk.name || name,
-      subtitle: sk.desc || null,
-      stats,
-    });
-  };
-
   const skillsOk = !showSkills || skillsAutoPass || selectedSkills.size === maxSkillSelect;
   const relicsOk = !showRelics || relicsAutoPass || selectedRelics.size === maxRelicSelect || relics.length === 0;
   const canConfirm = skillsOk && relicsOk;
@@ -226,6 +72,39 @@ export default function PrepScreen({ classData, skills, relics, ultimates, exped
                     mode === 'relics' ? '유물 재선택' : '전투 준비';
   const subText = mode === 'full' ? '이번 챕터 동안 활성화할 빌드를 선택합니다' :
                   mode === 'skills' ? '활성 패시브를 다시 고릅니다' : '활성 유물을 다시 고릅니다';
+
+  // 모달용 info + action 빌더
+  let modalInfo = null;
+  let modalAction = null;
+  if (modalState?.kind === 'passive') {
+    const name = modalState.name;
+    modalInfo = buildPassiveInfo(name, skills[name] || 0);
+    if (showSkills && !skillsAutoPass) {
+      const isSelected = selectedSkills.has(name);
+      const canSelect = isSelected || selectedSkills.size < maxSkillSelect;
+      modalAction = {
+        label: isSelected ? '선택 해제' : (canSelect ? '활성화' : '슬롯 가득 참'),
+        disabled: !isSelected && !canSelect,
+        color: modalInfo?.color,
+        onClick: () => { toggleSkill(name); setModalState(null); },
+      };
+    }
+  } else if (modalState?.kind === 'relic') {
+    const rel = modalState.rel;
+    modalInfo = buildRelicInfo(rel);
+    if (showRelics && !relicsAutoPass && rel) {
+      const isSelected = selectedRelics.has(rel.name);
+      const canSelect = isSelected || selectedRelics.size < maxRelicSelect;
+      modalAction = {
+        label: isSelected ? '선택 해제' : (canSelect ? '활성화' : '슬롯 가득 참'),
+        disabled: !isSelected && !canSelect,
+        color: modalInfo?.color,
+        onClick: () => { toggleRelic(rel.name); setModalState(null); },
+      };
+    }
+  } else if (modalState?.kind === 'active') {
+    modalInfo = buildActiveSkillInfo(modalState.name, classData?.color);
+  }
 
   return (
     <div className="absolute inset-0 flex flex-col" style={{ background: PALETTE.bgDeep }}>
@@ -263,10 +142,8 @@ export default function PrepScreen({ classData, skills, relics, ultimates, exped
                 const sk = PASSIVE_SKILLS[name];
                 const lv = skills[name];
                 const isSelected = selectedSkills.has(name);
-                const canSelect = skillsAutoPass || isSelected || selectedSkills.size < maxSkillSelect;
                 return (
-                  <button key={name} onClick={() => toggleSkill(name)}
-                    disabled={!canSelect && !isSelected}
+                  <button key={name} onClick={() => setModalState({ kind: 'passive', name })}
                     className="text-left px-2.5 py-2 transition-all"
                     style={{
                       background: isSelected
@@ -275,21 +152,22 @@ export default function PrepScreen({ classData, skills, relics, ultimates, exped
                       border: isSelected
                         ? `1.5px solid ${sk.color}`
                         : `1px solid ${PALETTE.panelBorder}`,
-                      opacity: !canSelect && !isSelected ? 0.4 : 1,
                     }}>
                     <div className="flex items-center justify-between">
                       <span className="text-[12px] font-bold" style={{ color: isSelected ? sk.color : PALETTE.text }}>
                         {name}
                       </span>
-                      <div className="flex items-center gap-1">
-                        <span className="text-[10px]" style={{ color: sk.color }}>Lv.{lv}</span>
-                        <InfoIcon color={sk.color} onClick={() => openPassiveInfo(name)} />
-                      </div>
+                      <span className="text-[10px]" style={{ color: sk.color }}>Lv.{lv}</span>
                     </div>
                   </button>
                 );
               })}
             </div>
+          )}
+          {showSkills && !skillsAutoPass && ownedSkills.length > 0 && (
+            <p className="text-[10px] mt-1.5 text-center" style={{ color: PALETTE.textDim }}>
+              카드를 눌러 정보를 확인하고 모달에서 활성/해제
+            </p>
           )}
         </div>
         )}
@@ -318,10 +196,8 @@ export default function PrepScreen({ classData, skills, relics, ultimates, exped
             <div className="space-y-1.5">
               {relics.map((rel, i) => {
                 const isSelected = selectedRelics.has(rel.name);
-                const canSelect = relicsAutoPass || isSelected || selectedRelics.size < maxRelicSelect;
                 return (
-                  <button key={i} onClick={() => toggleRelic(rel.name)}
-                    disabled={!canSelect && !isSelected}
+                  <button key={i} onClick={() => setModalState({ kind: 'relic', rel })}
                     className="w-full text-left px-3 py-2 transition-all"
                     style={{
                       background: isSelected
@@ -330,23 +206,24 @@ export default function PrepScreen({ classData, skills, relics, ultimates, exped
                       border: isSelected
                         ? `1.5px solid ${rel.color}`
                         : `1px solid ${PALETTE.panelBorder}`,
-                      opacity: !canSelect && !isSelected ? 0.4 : 1,
                     }}>
                     <div className="flex items-center justify-between">
                       <span className="text-[12px] font-bold" style={{ color: isSelected ? rel.color : PALETTE.text }}>
                         {rel.name}
                       </span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] truncate max-w-[150px]" style={{ color: PALETTE.textDim }}>
-                          {rel.desc || ''}
-                        </span>
-                        <InfoIcon color={rel.color} onClick={() => openRelicInfo(rel)} />
-                      </div>
+                      <span className="text-[10px] truncate max-w-[160px]" style={{ color: PALETTE.textDim }}>
+                        {rel.desc || ''}
+                      </span>
                     </div>
                   </button>
                 );
               })}
             </div>
+          )}
+          {showRelics && !relicsAutoPass && relics.length > 0 && (
+            <p className="text-[10px] mt-1.5 text-center" style={{ color: PALETTE.textDim }}>
+              카드를 눌러 정보를 확인하고 모달에서 활성/해제
+            </p>
           )}
         </div>
         )}
@@ -367,17 +244,14 @@ export default function PrepScreen({ classData, skills, relics, ultimates, exped
               if (!sk) return null;
               const typeLabel = sk.type === 'physical' ? '물리' : sk.type === 'magic' ? '마법' : sk.type === 'defense' ? '방어' : '';
               return (
-                <button key={name} onClick={() => openActiveSkillInfo(name)}
+                <button key={name} onClick={() => setModalState({ kind: 'active', name })}
                   className="text-left px-2 py-2 transition-all"
                   style={{
                     background: `linear-gradient(135deg, ${classData.color}20, ${classData.color}05)`,
                     border: `1px solid ${classData.color}80`,
                   }}>
-                  <div className="flex items-center justify-between mb-0.5">
-                    <span className="text-[12px] font-bold" style={{ color: PALETTE.text }}>
-                      {sk.name || name}
-                    </span>
-                    <InfoIcon color={classData.color} onClick={() => openActiveSkillInfo(name)} />
+                  <div className="text-[12px] font-bold mb-0.5" style={{ color: PALETTE.text }}>
+                    {sk.name || name}
                   </div>
                   <div className="text-[9px]" style={{ color: PALETTE.textDim }}>
                     {typeLabel}
@@ -408,7 +282,9 @@ export default function PrepScreen({ classData, skills, relics, ultimates, exped
         </button>
       </div>
 
-      {infoModal && <CardInfoModal info={infoModal} onClose={() => setInfoModal(null)} />}
+      {modalInfo && (
+        <CardInfoModal info={modalInfo} action={modalAction} onClose={() => setModalState(null)} />
+      )}
     </div>
   );
 }

@@ -1,11 +1,15 @@
 // ============================================
-// components/StatusPanel.jsx — 상태창 (능력치, 패시브, 유물)
+// components/StatusPanel.jsx — 상태창 (능력치, 패시브, 유물, 액티브 스킬)
+// ============================================
+// 패시브/유물/액티브 스킬 카드는 클릭 시 CardInfoModal로 상세 정보 표시.
+// 전투 중에도 상태창에서 직업 액티브 스킬을 확인할 수 있도록 포함.
 // ============================================
 
 import React, { useState } from 'react';
-import { Heart, X, Lock, Check } from 'lucide-react';
+import { Heart, X } from 'lucide-react';
 import { PALETTE } from '../utils/helpers.js';
-import { PASSIVE_SKILLS, ULTIMATE_SKILLS } from '../data.js';
+import { PASSIVE_SKILLS, COMBAT_SKILLS, ULTIMATE_SKILLS } from '../data.js';
+import CardInfoModal, { buildPassiveInfo, buildRelicInfo, buildActiveSkillInfo } from './CardInfoModal.jsx';
 
 export default function StatusPanel({ classData, hp, maxHp, skills, stats, relics, ultimates = [], activeSkills = null, activeRelicNames = null, onClose }) {
   const skillsByAxis = { attack: [], defense: [], utility: [] };
@@ -15,6 +19,17 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, relic
     }
   });
   const axisNames = { attack: '공격', defense: '방어', utility: '유틸' };
+  // modalState = { kind: 'passive'|'relic'|'active', name?, rel? }
+  const [modalState, setModalState] = useState(null);
+
+  let modalInfo = null;
+  if (modalState?.kind === 'passive') {
+    modalInfo = buildPassiveInfo(modalState.name, skills[modalState.name] || 0);
+  } else if (modalState?.kind === 'relic') {
+    modalInfo = buildRelicInfo(modalState.rel);
+  } else if (modalState?.kind === 'active') {
+    modalInfo = buildActiveSkillInfo(modalState.name, classData?.color);
+  }
 
   return (
     <div className="absolute inset-0 flex flex-col" style={{ background: PALETTE.bgDeep }}>
@@ -49,6 +64,37 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, relic
             ))}
           </div>
         </div>
+
+        {/* 액티브 스킬 — 카드 클릭 시 정보 모달 (전투 중에도 확인 가능) */}
+        {classData && Array.isArray(classData.combatSkills) && classData.combatSkills.length > 0 && (
+          <div className="px-4 py-3 border-b" style={{ borderColor: PALETTE.panelBorder }}>
+            <div className="text-[11px] tracking-[0.3em] mb-3" style={{ color: classData.color }}>◆ 액티브 스킬</div>
+            <div className="grid grid-cols-3 gap-1.5">
+              {classData.combatSkills.map(name => {
+                const sk = COMBAT_SKILLS[name];
+                if (!sk) return null;
+                const typeLabel = sk.type === 'physical' ? '물리' : sk.type === 'magic' ? '마법' : sk.type === 'defense' ? '방어' : '';
+                return (
+                  <button key={name} onClick={() => setModalState({ kind: 'active', name })}
+                    className="text-left px-2 py-2 transition-all"
+                    style={{
+                      background: `linear-gradient(135deg, ${classData.color}20, ${classData.color}05)`,
+                      border: `1px solid ${classData.color}80`,
+                    }}>
+                    <div className="text-[12px] font-bold mb-0.5" style={{ color: PALETTE.text }}>
+                      {sk.name || name}
+                    </div>
+                    <div className="text-[9px]" style={{ color: PALETTE.textDim }}>
+                      {typeLabel}
+                      {typeof sk.cd === 'number' && sk.cd > 0 ? ` · CD ${sk.cd}` : ''}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="px-4 py-3">
           <div className="text-[11px] tracking-[0.3em] mb-3" style={{ color: PALETTE.dawn }}>◆ 패시브 스킬</div>
           {Object.entries(skillsByAxis).map(([axis, list]) => (
@@ -57,15 +103,16 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, relic
                 <div className="text-[10px] mb-1.5" style={{ color: PALETTE.textDim }}>{axisNames[axis]} 축</div>
                 <div className="space-y-1.5">
                   {list.map(sk => {
-                    const tierKeys = Object.keys(sk.tiers).map(Number).sort();
-                    const activeTiers = tierKeys.filter(t => t <= sk.lv);
-                    const nextTier = tierKeys.find(t => t > sk.lv);
                     const isSealed = activeSkills && !activeSkills.includes(sk.name);
                     return (
-                      <div key={sk.name} className="px-3 py-2" style={{
-                        background: `${sk.color}10`, border: `1px solid ${sk.color}40`,
-                        opacity: isSealed ? 0.4 : 1,
-                      }}>
+                      <button key={sk.name}
+                        onClick={() => setModalState({ kind: 'passive', name: sk.name })}
+                        className="w-full text-left px-3 py-2"
+                        style={{
+                          background: `${sk.color}10`,
+                          border: `1px solid ${sk.color}40`,
+                          opacity: isSealed ? 0.5 : 1,
+                        }}>
                         <div className="flex items-center justify-between mb-1.5">
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-bold" style={{ color: sk.color }}>{sk.name}</span>
@@ -80,46 +127,21 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, relic
                             )}
                           </div>
                         </div>
-                        <div className="h-1 mb-2" style={{ background: PALETTE.bgDeep }}>
+                        <div className="h-1" style={{ background: PALETTE.bgDeep }}>
                           <div className="h-full transition-all" style={{
                             width: `${(sk.lv / sk.maxLv) * 100}%`, background: sk.color,
                           }} />
                         </div>
-                        {/* minorEffect 누적 표시 */}
-                        {sk.minorEffect && (
-                          <div className="text-[10px] flex items-start gap-1.5 mb-1" style={{ color: sk.color, opacity: 0.85 }}>
-                            <span style={{ flexShrink: 0, marginTop: '0px' }}>◇</span>
-                            <span>
-                              {sk.minorEffect.desc} 
-                              <span style={{ color: PALETTE.text, marginLeft: '4px', fontWeight: 'bold' }}>
-                                (현재 +{sk.minorEffect.perLv * sk.lv})
-                              </span>
-                            </span>
-                          </div>
-                        )}
-                        {activeTiers.length > 0 && (
-                          <div className="space-y-0.5">
-                            {activeTiers.map(t => (
-                              <div key={t} className="text-[10px] flex items-start gap-1.5" style={{ color: PALETTE.text }}>
-                                <Check size={9} style={{ color: sk.color, flexShrink: 0, marginTop: '2px' }} />
-                                <span>Lv.{t}: {sk.tiers[t].text}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        {nextTier && (
-                          <div className="text-[10px] flex items-start gap-1.5 mt-1" style={{ color: PALETTE.textDim }}>
-                            <Lock size={9} style={{ flexShrink: 0, marginTop: '2px' }} />
-                            <span>Lv.{nextTier}: {sk.tiers[nextTier].text}</span>
-                          </div>
-                        )}
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
               </div>
             )
           ))}
+          <p className="text-[10px] text-center mt-1" style={{ color: PALETTE.textDim }}>
+            카드를 눌러 누적 효과 및 마일스톤을 확인하세요
+          </p>
         </div>
         {ultimates.length > 0 && (
           <div className="px-4 py-3 border-t" style={{ borderColor: PALETTE.panelBorder }}>
@@ -135,7 +157,7 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, relic
                 if (!ultData) return null;
                 return (
                   <div key={i} className="px-3 py-2" style={{
-                    background: `${ultData.color}15`, 
+                    background: `${ultData.color}15`,
                     border: `1px solid ${ultData.color}`,
                     boxShadow: `0 0 8px ${ultData.color}40`,
                   }}>
@@ -163,10 +185,14 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, relic
               {relics.map((r, i) => {
                 const isSealed = activeRelicNames && !activeRelicNames.includes(r.name);
                 return (
-                  <div key={i} className="px-3 py-2 flex items-center gap-2" style={{
-                    background: `${r.color}10`, border: `1px solid ${r.color}40`,
-                    opacity: isSealed ? 0.4 : 1,
-                  }}>
+                  <button key={i}
+                    onClick={() => setModalState({ kind: 'relic', rel: r })}
+                    className="w-full text-left px-3 py-2 flex items-center gap-2"
+                    style={{
+                      background: `${r.color}10`,
+                      border: `1px solid ${r.color}40`,
+                      opacity: isSealed ? 0.5 : 1,
+                    }}>
                     <span className="text-base" style={{ color: r.color }}>◆</span>
                     <div className="flex-1">
                       <div className="text-[12px] font-bold flex items-center gap-2" style={{ color: PALETTE.text }}>
@@ -178,17 +204,21 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, relic
                           }}>봉인</span>
                         )}
                       </div>
-                      <div className="text-[10px]" style={{ color: PALETTE.textDim }}>
+                      <div className="text-[10px] truncate" style={{ color: PALETTE.textDim }}>
                         {r.desc || ''}
                       </div>
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
           </div>
         )}
       </div>
+
+      {modalInfo && (
+        <CardInfoModal info={modalInfo} onClose={() => setModalState(null)} />
+      )}
     </div>
   );
 }
