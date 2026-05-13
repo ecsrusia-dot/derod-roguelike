@@ -40,17 +40,13 @@ export function buildPassiveInfo(name, currentLv = null) {
 
 export function buildRelicInfo(rel) {
   if (!rel) return null;
-  const stats = [];
-  if (rel.statBonus) {
-    Object.entries(rel.statBonus).forEach(([k, v]) => stats.push([k, String(v)]));
-  }
+  // 유물은 desc 문구로만 효과를 표현. 내부 statBonus 키는 노출하지 않음.
   return {
     kind: 'relic',
     color: rel.color,
     tag: '◆ 유물',
     title: rel.name,
     subtitle: rel.desc || null,
-    stats,
   };
 }
 
