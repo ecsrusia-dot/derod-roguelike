@@ -39,6 +39,14 @@ const DEFAULT_META = {
   championshipRelicUnlocks: [],
   // 마지막 확인한 업데이트 로그 버전 (이 값과 LATEST_VERSION 다르면 첫 화면에 모달 표시)
   lastSeenVersion: null,
+  // 도감 — 한 번이라도 만난/획득한 항목 영구 기록
+  // 각 카테고리: 문자열 ID 배열
+  codex: {
+    enemies: [],   // ENEMIES key
+    events: [],    // EVENT.id
+    relics: [],    // RELIC.name
+    passives: [],  // PASSIVE_SKILLS key
+  },
 };
 
 // IndexedDB 열기
@@ -68,6 +76,8 @@ export async function loadMeta() {
         const data = request.result || { ...DEFAULT_META };
         // 누락된 필드 복구
         const safe = { ...DEFAULT_META, ...data };
+        // codex는 중첩 객체라 누락 필드 보강
+        safe.codex = { ...DEFAULT_META.codex, ...(data.codex || {}) };
         resolve(safe);
       };
       request.onerror = () => reject(request.error);
@@ -168,6 +178,19 @@ export function applyUnlock(meta, unlockId) {
 }
 
 // 원정 클리어 기록
+// 도감 항목 추가 (이미 있으면 그대로)
+// category: 'enemies' | 'events' | 'relics' | 'passives'
+export function recordCodex(meta, category, id) {
+  if (!id) return meta;
+  const codex = meta.codex || { enemies: [], events: [], relics: [], passives: [] };
+  const list = codex[category] || [];
+  if (list.includes(id)) return meta;
+  return {
+    ...meta,
+    codex: { ...codex, [category]: [...list, id] },
+  };
+}
+
 export function recordExpeditionClear(meta, expeditionId) {
   if (meta.clearedExpeditions.includes(expeditionId)) return meta;
   return {

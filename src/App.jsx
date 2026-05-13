@@ -93,7 +93,7 @@ import {
   VERSION_DATE,
   VERSION_LABEL,
 } from './data.js';
-import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta } from './storage.js';
+import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex } from './storage.js';
 
 
 
@@ -767,6 +767,7 @@ export default function App() {
       const pool = chapter.enemies.normal;
       const enemyKey = pool[Math.floor(Math.random() * pool.length)];
       setCurrentEnemy(enemyKey);
+      setMeta(prev => recordCodex(prev, 'enemies', enemyKey));
       setIsEliteReward(false);
       setIsBossReward(false);
       setScreen('combat');
@@ -774,11 +775,14 @@ export default function App() {
       const pool = chapter.enemies.elite;
       const enemyKey = pool[Math.floor(Math.random() * pool.length)];
       setCurrentEnemy(enemyKey);
+      setMeta(prev => recordCodex(prev, 'enemies', enemyKey));
       setIsEliteReward(true);
       setIsBossReward(false);
       setScreen('combat');
     } else if (nodeType === 'boss') {
-      setCurrentEnemy(chapter.enemies.boss);
+      const enemyKey = chapter.enemies.boss;
+      setCurrentEnemy(enemyKey);
+      setMeta(prev => recordCodex(prev, 'enemies', enemyKey));
       setIsBossReward(true);
       setIsEliteReward(false);
       setScreen('combat');
@@ -807,6 +811,7 @@ export default function App() {
           : pool[Math.floor(Math.random() * pool.length)]; // 챕터 매치 없을 시 전체 풀
       }
       setCurrentEvent(ev);
+      if (ev?.id) setMeta(prev => recordCodex(prev, 'events', ev.id));
       setScreen('event');
     } else if (nodeType === 'fountain') {
       // 회복의 샘 — 사건 화면처럼 표시 후 체력 15% 회복
@@ -1037,6 +1042,8 @@ export default function App() {
         ...prev,
         [reward.name]: Math.min((prev[reward.name] || 0) + 1, PASSIVE_SKILLS[reward.name].maxLv)
       }));
+      // 도감 기록 — 한 번이라도 배운 패시브
+      setMeta(prev => recordCodex(prev, 'passives', reward.name));
       // ★ 추가: 활성화 슬롯이 남았다면(5개 미만) 획득 즉시 활성화 목록에 추가
       setActiveSkills(prev => {
         const currentActive = prev || [];
@@ -1048,6 +1055,7 @@ export default function App() {
     } else if (reward.type === 'relic') {
       // 1. 유물 보유 목록 추가
       setRelics(prev => [...prev, reward]);
+      setMeta(prev => recordCodex(prev, 'relics', reward.name));
       
       // 2. 유물 즉시 효과(HP/골드/보석) 적용
       const stat = reward.statBonus || {};
@@ -1090,6 +1098,7 @@ export default function App() {
       }
     } else if (reward.type === 'relic') {
       setRelics(prev => [...prev, reward]);
+      if (reward.name) setMeta(prev => recordCodex(prev, 'relics', reward.name));
       // 유물의 maxHp% / startGold / startGem 즉시 적용
       const stat = reward.statBonus || {};
       if (stat.maxHp) {
