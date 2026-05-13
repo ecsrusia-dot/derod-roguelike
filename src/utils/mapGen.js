@@ -72,6 +72,7 @@ export function generateChapterMap(chapter, chapterIdx = 0) {
           id: nextId,
           type,
           layer: l,
+          columnIndex: c,        // 분기 시퀀스 메타 조회용
           x: xPos,
           y: yPos,
           completed: false,

@@ -7,6 +7,20 @@
 
 export const CHANGELOG = [
   {
+    version: '1.3.2',
+    date: '2026-05-13',
+    label: '튜토리얼 3 분기 버그 수정 + 카드 정보 모달 통합',
+    changes: [
+      { type: 'fix', text: '튜토리얼 3 가운데 컬럼을 따라가면 사건마다 천리안이 반복 지급되던 문제 — 강제 지급 이벤트(tutorialGift)를 일반 랜덤 풀에서 제외' },
+      { type: 'fix', text: '튜토리얼 3 진입 시 첫 노드 안내 모달이 표시되지 않던 문제 — branchSequence의 modalOverride/forceEventId를 읽지 못하던 버그 수정' },
+      { type: 'feature', text: '준비·정비 화면, 전투 중 상태창의 패시브/유물/액티브 스킬 카드 어디든 클릭 시 통합 정보 모달 표시 (별도 (i) 아이콘 제거)' },
+      { type: 'feature', text: '준비 화면에서 카드 선택/해제는 정보 모달 내부의 활성화 버튼으로 수행' },
+      { type: 'feature', text: '정비 화면·전투 중 상태창에도 직업 액티브 스킬 카드 추가 — 마나·쿨다운·데미지 범위를 어디서든 확인 가능' },
+      { type: 'system', text: '패시브 정보 모달의 마일스톤 표시를 통일 — 같은 특수문자(◇) 사용, 해금 여부는 색상 차이로 표시' },
+      { type: 'system', text: 'mapGen 분기 시퀀스에 columnIndex 저장, 노드 메타 조회가 branchSequence를 정확히 따라가도록 보강' },
+    ],
+  },
+  {
     version: '1.3.1',
     date: '2026-05-13',
     label: '준비 화면 카드 정보 모달 + 튜토리얼 문구 정리',
