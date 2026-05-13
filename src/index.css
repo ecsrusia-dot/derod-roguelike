@@ -55,3 +55,67 @@ button {
 body {
   font-family: 'Noto Serif KR', 'Cinzel', serif;
 }
+
+/* ============================================
+   전투 이팩트 키프레임 (Phase 1)
+   ============================================ */
+
+/* 화면 좌우 흔들림 — 강타·보스 공격 시 */
+@keyframes fx-shake {
+  0%   { transform: translate(0, 0); }
+  15%  { transform: translate(-6px, 1px); }
+  30%  { transform: translate(5px, -1px); }
+  45%  { transform: translate(-4px, 2px); }
+  60%  { transform: translate(4px, -2px); }
+  75%  { transform: translate(-2px, 1px); }
+  100% { transform: translate(0, 0); }
+}
+.fx-shake { animation: fx-shake 0.32s cubic-bezier(.36,.07,.19,.97) both; }
+
+/* 피격 진동 — 적/플레이어 개별 (덜한 흔들림) */
+@keyframes fx-hit-shake {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-3px, 0); }
+  40% { transform: translate(3px, 0); }
+  60% { transform: translate(-2px, 0); }
+  80% { transform: translate(2px, 0); }
+}
+.fx-hit-shake { animation: fx-hit-shake 0.28s ease-out both; }
+
+/* 흰 깜빡임 — 피격 순간 1프레임 실루엣 강조 (오버레이용) */
+@keyframes fx-white-flash {
+  0%   { opacity: 0.85; }
+  100% { opacity: 0; }
+}
+.fx-white-flash { animation: fx-white-flash 0.18s ease-out both; pointer-events: none; }
+
+/* 데미지 숫자 부유 — 위로 올라가며 페이드아웃 */
+@keyframes fx-float-up {
+  0%   { transform: translate(-50%, 0) scale(1);   opacity: 1; }
+  20%  { transform: translate(-50%, -8px) scale(1.15); opacity: 1; }
+  100% { transform: translate(-50%, -56px) scale(0.95); opacity: 0; }
+}
+.fx-float-up { animation: fx-float-up 0.95s cubic-bezier(.2,.6,.3,1) forwards; }
+
+/* 크리티컬 강조 — 더 크게 튀고 살짝 더 오래 머무름 */
+@keyframes fx-float-crit {
+  0%   { transform: translate(-50%, 0) scale(1.4);  opacity: 1; }
+  15%  { transform: translate(-50%, -10px) scale(1.6); opacity: 1; }
+  100% { transform: translate(-50%, -70px) scale(1.2); opacity: 0; }
+}
+.fx-float-crit { animation: fx-float-crit 1.15s cubic-bezier(.2,.6,.3,1) forwards; }
+
+/* 미스(회피) 텍스트 — 부드럽게 옆으로 흘리며 사라짐 */
+@keyframes fx-miss {
+  0%   { transform: translate(-50%, 0); opacity: 0.95; }
+  100% { transform: translate(-30%, -36px); opacity: 0; }
+}
+.fx-miss { animation: fx-miss 0.85s ease-out forwards; }
+
+/* 플레이어 피격 시 화면 가장자리 빨간 비네트 */
+@keyframes fx-vignette {
+  0%   { opacity: 0; }
+  20%  { opacity: 0.65; }
+  100% { opacity: 0; }
+}
+.fx-vignette { animation: fx-vignette 0.55s ease-out forwards; pointer-events: none; }

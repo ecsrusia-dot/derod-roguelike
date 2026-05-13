@@ -27,6 +27,7 @@ import {
   GAME_CONFIG 
 } from '../data.js';
 import { calculateDamage, getDisplayDamage, rollCrit, rollDodge } from '../combat/damage.js';
+import { FloatingLabel, DamageVignette, WhiteFlash } from './CombatEffects.jsx';
 
 export default function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimates = [], initialRelics = [], activeSkills = null, activeRelicNames = null, enemyKey, isBoss, expedition, curses = [], meta, onVictory, onDefeat }) {
   const [player, setPlayer] = useState(() => {
@@ -105,6 +106,29 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
   const [phase, setPhase] = useState('intro');
   const [log, setLog] = useState([]);
   const [animDmg, setAnimDmg] = useState({ player: null, enemy: null });
+
+  // === Phase 1 시각 이팩트 큐/트리거 ===
+  // 부유 라벨 큐 — 카드 형식. 부모가 absolute 컨테이너로 잡고 위에 표시.
+  // item: { id, side: 'enemy'|'player', kind: 'damage'|'crit'|'heal'|'miss', value?, label? }
+  const [fxLabels, setFxLabels] = useState([]);
+  const fxIdRef = useRef(0);
+  // 흔들림/플래시/비네트는 카운터(증가시 키 리렌더). 0이면 미발동.
+  const [fxScreenShake, setFxScreenShake] = useState(0);
+  const [fxEnemyShake, setFxEnemyShake] = useState(0);
+  const [fxPlayerShake, setFxPlayerShake] = useState(0);
+  const [fxEnemyFlash, setFxEnemyFlash] = useState(0);
+  const [fxPlayerFlash, setFxPlayerFlash] = useState(0);
+  const [fxVignette, setFxVignette] = useState(0);
+
+  // 부유 라벨 추가 (자동 제거)
+  const pushFxLabel = (side, kind, value, label) => {
+    const id = ++fxIdRef.current;
+    setFxLabels(prev => [...prev, { id, side, kind, value, label }]);
+    const lifeMs = kind === 'crit' ? 1200 : kind === 'miss' ? 900 : 1000;
+    setTimeout(() => {
+      setFxLabels(prev => prev.filter(it => it.id !== id));
+    }, lifeMs);
+  };
   // 패시브/유물 툴팁 (클릭 시 정보 표시)
   const [tooltip, setTooltip] = useState(null); // { type: 'skill'|'relic', name, content }
   // 스테이터스 전체 모달 (직업명 옆 ≡ 버튼 클릭)
@@ -283,6 +307,14 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           }
           newEnemy.currentHp = Math.max(0, newEnemy.currentHp - actualDmg);
           totalDmg += actualDmg;
+          // FX — 적 피격: 부유 데미지 라벨 + 진동 + 흰 플래시
+          if (actualDmg > 0) {
+            pushFxLabel('enemy', isCrit ? 'crit' : 'damage', actualDmg);
+            setFxEnemyShake(v => v + 1);
+            setFxEnemyFlash(v => v + 1);
+            // 크리티컬이면 화면도 가볍게 흔들기
+            if (isCrit) setFxScreenShake(v => v + 1);
+          }
           
           // === 이프리트 화염 각인 폭발 (minor 효과 + 궁극) ===
           // 폭발 조건:
@@ -539,15 +571,23 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       const dodged = rollDodge(skills, newPlayer, activeSkills, relicStat);
       if (dodged) {
         newLog.push({ type: 'system', text: `· 회피 성공!` });
+        // FX — 회피: 플레이어 위에 "회피!" 부유 라벨
+        pushFxLabel('player', 'miss', null, '회피!');
         if (hasEffect(skills, 'counterAttack', activeSkills) && Math.random() < 0.5) {
           const counterDmg = Math.floor(15 + Math.random() * 10);
           newEnemy.currentHp = Math.max(0, newEnemy.currentHp - counterDmg);
           newLog.push({ type: 'damage', text: `◆ [회피 Lv.5] 반격 ${counterDmg} 데미지` });
+          if (counterDmg > 0) {
+            pushFxLabel('enemy', 'damage', counterDmg);
+            setFxEnemyShake(v => v + 1);
+            setFxEnemyFlash(v => v + 1);
+          }
         }
       } else {
         if (newPlayer.firstHitImmune) {
           newLog.push({ type: 'passive', text: `◆ [회피 Lv.7] 첫 피격 무효!` });
           newPlayer.firstHitImmune = false;
+          pushFxLabel('player', 'miss', null, '무효!');
         } else {
           let baseDmg = Math.floor(intent.dmg[0] + Math.random() * (intent.dmg[1] - intent.dmg[0]));
           let dmg = baseDmg;
@@ -683,13 +723,20 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
             // 최종 데미지 적용 (위의 조건들에서 dmg가 0이 되었다면 실행되지 않음)
             if (dmg > 0) {
               newPlayer.hp = Math.max(0, newPlayer.hp - dmg);
-              newLog.push({ 
-                type: 'damageTaken', 
+              newLog.push({
+                type: 'damageTaken',
                 text: `· ${dmg} 데미지`,
                 breakdown: takenBreakdown.join(' / '),
               });
               setAnimDmg({ player: dmg, enemy: null });
               setTimeout(() => setAnimDmg({ player: null, enemy: null }), 800);
+              // FX — 플레이어 피격: 부유 데미지 + 진동 + 흰 플래시 + 빨간 비네트 + 화면 흔들림(강타)
+              pushFxLabel('player', 'damage', dmg);
+              setFxPlayerShake(v => v + 1);
+              setFxPlayerFlash(v => v + 1);
+              setFxVignette(v => v + 1);
+              // 강타(heavy)면 화면 흔들림
+              if (intent.heavy) setFxScreenShake(v => v + 1);
             }
           }
         }
@@ -836,7 +883,12 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           }
           newEnemy.currentHp = Math.max(0, newEnemy.currentHp - actualDmg);
           newLog.push({ type: 'damage', text: `◆ [심안류] 반격! ${actualDmg} 데미지` });
-          
+          if (actualDmg > 0) {
+            pushFxLabel('enemy', 'damage', actualDmg);
+            setFxEnemyShake(v => v + 1);
+            setFxEnemyFlash(v => v + 1);
+          }
+
           // Lv.7: 반격 발생 시 다음 턴 반드시 치명타
           if (simanLv >= 7) {
             newPlayer.buffs = { ...newPlayer.buffs, guaranteedCritNext: true };
@@ -1213,8 +1265,18 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     }
   };
 
+  // 부유 라벨을 적/플레이어 컨테이너용으로 분리
+  const fxEnemyLabels = fxLabels.filter(l => l.side === 'enemy');
+  const fxPlayerLabels = fxLabels.filter(l => l.side === 'player');
+
   return (
-    <div className="absolute inset-0 flex flex-col" style={{ background: PALETTE.bgDeep }}>
+    <div
+      key={`shake-${fxScreenShake}`}
+      className={`absolute inset-0 flex flex-col ${fxScreenShake ? 'fx-shake' : ''}`}
+      style={{ background: PALETTE.bgDeep }}
+    >
+      {/* 화면 가장자리 빨간 비네트 — 플레이어 피격 시 짧게 */}
+      <DamageVignette trigger={fxVignette} />
       {/* 최상단 턴 정보 (높이 고정) */}
       <div className="px-4 py-2 border-b flex items-center justify-between shrink-0" style={{ borderColor: PALETTE.panelBorder, background: PALETTE.panel }}>
         <span className="text-[10px] tracking-[0.3em]" style={{ color: PALETTE.accent }}>━━ 전투 ━━</span>
@@ -1224,12 +1286,21 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       {/* 메인 컨테이너: 3분할 + 스킬 버튼 세로 배치 */}
       <div className="flex-1 flex flex-col min-h-0">
         {/* === 1/3: 적 영역 (일러스트 + 정보 BAR 오버레이) === */}
-        <div className="flex-1 min-h-0 relative overflow-hidden border-b" style={{ borderColor: PALETTE.panelBorder }}>
+        <div
+          key={`enemy-shake-${fxEnemyShake}`}
+          className={`flex-1 min-h-0 relative overflow-hidden border-b ${fxEnemyShake ? 'fx-hit-shake' : ''}`}
+          style={{ borderColor: PALETTE.panelBorder }}
+        >
           {/* 적 일러스트 미구현 — 어두운 배경 + 패턴 */}
           <div className="absolute inset-0 bg-[#0a0608] flex items-center justify-center">
             <div className="absolute inset-0 opacity-20" style={{ background: `repeating-linear-gradient(45deg, transparent 0px, transparent 8px, ${enemy.color}15 8px, ${enemy.color}15 9px)` }} />
             <div className="text-[12px] tracking-[0.3em] relative grayscale" style={{ color: PALETTE.textDim }}>[ 적 모습 미구현 ]</div>
           </div>
+          {/* FX 오버레이 — 흰 플래시 + 부유 라벨 */}
+          <WhiteFlash trigger={fxEnemyFlash} />
+          {fxEnemyLabels.map(l => (
+            <FloatingLabel key={l.id} kind={l.kind} value={l.value} label={l.label} />
+          ))}
           {/* 정보 BAR 오버레이 (하단 + 그라디언트) */}
           <div className="absolute inset-x-0 bottom-0">
             <div className="absolute inset-0" style={{ background: `linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.7) 60%, rgba(0,0,0,0.9) 100%)`, pointerEvents: 'none' }} />
@@ -1239,7 +1310,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                 <span className="text-[12px] font-bold drop-shadow-md" style={{ color: enemy.color }}>{enemy.name}</span>
                 <span className="text-[11px] tabular-nums drop-shadow-md" style={{ color: PALETTE.text }}>{animDmg.enemy && <span className="mr-1 animate-pulse" style={{ color: PALETTE.accent }}>-{animDmg.enemy}</span>}{enemy.currentHp}/{enemy.hp}</span>
               </div>
-              <div className="h-1.5 relative mb-1.5" style={{ background: 'rgba(0,0,0,0.7)' }}><div className="absolute inset-y-0 left-0 transition-all" style={{ width: `${(enemy.currentHp/enemy.hp)*100}%`, background: `linear-gradient(90deg, ${PALETTE.blood}, ${enemy.color})` }} /></div>
+              <div className="h-1.5 relative mb-1.5" style={{ background: 'rgba(0,0,0,0.7)' }}><div className="absolute inset-y-0 left-0" style={{ width: `${(enemy.currentHp/enemy.hp)*100}%`, background: `linear-gradient(90deg, ${PALETTE.blood}, ${enemy.color})`, transition: 'width 0.45s cubic-bezier(.4,0,.2,1)' }} /></div>
               {/* 2줄: 디버프 카드 (고정 높이) */}
               <div className="flex items-center gap-1.5 flex-wrap min-h-[18px] mb-1">
                 {enemy.defense > 0 && getSkillLevel(skills, '심안') >= 7 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.defense}40`, color: PALETTE.defense, border: `1px solid ${PALETTE.defense}80` }}>◈ 방어 {enemy.defense}</span>)}
@@ -1308,10 +1379,18 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         </div>
 
         {/* === 3/3: 내 영역 (일러스트 + 정보 BAR 오버레이) === */}
-        <div className="flex-1 min-h-0 relative overflow-hidden">
+        <div
+          key={`player-shake-${fxPlayerShake}`}
+          className={`flex-1 min-h-0 relative overflow-hidden ${fxPlayerShake ? 'fx-hit-shake' : ''}`}
+        >
+          {/* FX 오버레이 — 흰 플래시 + 부유 라벨 */}
+          <WhiteFlash trigger={fxPlayerFlash} />
+          {fxPlayerLabels.map(l => (
+            <FloatingLabel key={l.id} kind={l.kind} value={l.value} label={l.label} />
+          ))}
           {/* 내 전투 일러스트 — 가로형, 가득 채움 */}
-          <img 
-            src={classData.combatImage || classData.image} 
+          <img
+            src={classData.combatImage || classData.image}
             alt="Player Avatar" 
             className="absolute inset-0 w-full h-full object-cover" 
             style={{ objectPosition: 'center center' }} 
@@ -1336,7 +1415,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                 </div>
                 <span className="text-[11px] tabular-nums font-bold drop-shadow-md" style={{ color: PALETTE.text }}>{animDmg.player && <span className="mr-1 animate-pulse" style={{ color: PALETTE.accent }}>-{animDmg.player}</span>}{player.hp}/{player.maxHp}</span>
               </div>
-              <div className="h-1.5 relative mb-1.5" style={{ background: 'rgba(0,0,0,0.7)' }}><div className="absolute inset-y-0 left-0 transition-all" style={{ width: `${(player.hp/player.maxHp)*100}%`, background: `linear-gradient(90deg, ${PALETTE.blood}, ${PALETTE.green})` }} /></div>
+              <div className="h-1.5 relative mb-1.5" style={{ background: 'rgba(0,0,0,0.7)' }}><div className="absolute inset-y-0 left-0" style={{ width: `${(player.hp/player.maxHp)*100}%`, background: `linear-gradient(90deg, ${PALETTE.blood}, ${PALETTE.green})`, transition: 'width 0.45s cubic-bezier(.4,0,.2,1)' }} /></div>
               {/* 2줄: 버프/상태 카드 (고정 높이) */}
               <div className="flex items-center gap-1.5 flex-wrap min-h-[18px]">
                 <span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.twilight}50`, color: '#fff', border: `1px solid ${PALETTE.twilight}` }}>✦ 에테르 {player.ether}/{player.maxEther}</span>

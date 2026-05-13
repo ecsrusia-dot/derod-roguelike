@@ -7,6 +7,20 @@
 
 export const CHANGELOG = [
   {
+    version: '1.10.0',
+    date: '2026-05-13',
+    label: '전투 시각 이팩트 Phase 1 — 박진감 업그레이드',
+    changes: [
+      { type: 'feature', text: '전투 시 데미지 숫자가 적/플레이어 위로 떠올랐다 사라지는 부유 라벨 표시 (이전엔 HP 옆 작은 숫자)' },
+      { type: 'feature', text: '크리티컬 시 데미지 숫자가 1.5배 크기·황금색·잔광으로 강조' },
+      { type: 'feature', text: '회피 성공 시 "회피!" 부유 라벨이 떠오름' },
+      { type: 'feature', text: '강타/보스 공격에 화면 흔들림, 일반 피격에 적/플레이어 진동 + 흰색 깜빡임' },
+      { type: 'feature', text: '플레이어 피격 시 화면 가장자리 빨간 비네트로 위기감 표현' },
+      { type: 'balance', text: 'HP 바 감소를 0.45초 부드러운 트랜지션으로 변경 (이전 150ms → 더 무거운 체감)' },
+      { type: 'system', text: '재사용 가능한 FX 컴포넌트 분리 (FloatingLabel / DamageVignette / WhiteFlash), Phase 2 이팩트 확장 시 활용 가능' },
+    ],
+  },
+  {
     version: '1.9.0',
     date: '2026-05-13',
     label: '맵 진행 이어하기 — 앱 종료 후 재개 가능',
