@@ -22,9 +22,9 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.10.1';
+export const GAME_VERSION = '1.11.0';
 export const VERSION_DATE = '2026-05-13';
-export const VERSION_LABEL = '협업 인수인계 문서(CLAUDE.md) 추가';
+export const VERSION_LABEL = '전투 시각 이팩트 Phase 2 — 스킬 타입 비주얼·상태이상 시각화';
 
 // =========== 패시브 스킬 ===========
 // effect 필드는 문자열 키. 실제 동작은 메인 코드의 trigger handler에서 처리.

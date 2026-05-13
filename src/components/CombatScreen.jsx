@@ -27,7 +27,7 @@ import {
   GAME_CONFIG 
 } from '../data.js';
 import { calculateDamage, getDisplayDamage, rollCrit, rollDodge } from '../combat/damage.js';
-import { FloatingLabel, DamageVignette, WhiteFlash } from './CombatEffects.jsx';
+import { FloatingLabel, DamageVignette, WhiteFlash, SlashFx, MagicImpactFx, MagicParticles, BarrierRing, StatusOverlay } from './CombatEffects.jsx';
 
 export default function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimates = [], initialRelics = [], activeSkills = null, activeRelicNames = null, enemyKey, isBoss, expedition, curses = [], meta, onVictory, onDefeat }) {
   const [player, setPlayer] = useState(() => {
@@ -119,6 +119,12 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
   const [fxEnemyFlash, setFxEnemyFlash] = useState(0);
   const [fxPlayerFlash, setFxPlayerFlash] = useState(0);
   const [fxVignette, setFxVignette] = useState(0);
+  // === Phase 2 트리거 === (각 카운터가 증가하면 해당 이팩트 1회 재생)
+  const [fxSlash, setFxSlash] = useState(0);
+  const [fxSlashCrit, setFxSlashCrit] = useState(false);
+  const [fxMagicImpact, setFxMagicImpact] = useState(0);
+  const [fxMagicParticles, setFxMagicParticles] = useState(0);
+  const [fxBarrier, setFxBarrier] = useState(0);
 
   // 부유 라벨 추가 (자동 제거)
   const pushFxLabel = (side, kind, value, label) => {
@@ -253,6 +259,16 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     }
 
     if (skill.type === 'physical' || skill.type === 'magic') {
+      // === Phase 2 FX: 스킬 타입별 임팩트 트리거 (스킬 1회당 1번) ===
+      // React state는 동일 핸들러 안에서 배치되므로, 아래에서 isCrit 확정 후
+      // setFxSlashCrit(true)를 호출해도 첫 렌더에 반영됨.
+      if (skill.type === 'physical') {
+        setFxSlashCrit(false);
+        setFxSlash(v => v + 1);
+      } else {
+        setFxMagicImpact(v => v + 1);
+        setFxMagicParticles(v => v + 1);
+      }
       // 마력 Lv.7 (50% × 2회) / 신탁 각성 (50% × 3회)
       const hasOracleAwaken = hasUltimate(ultimates, 'ult_oracleAwaken');
       const echoChance = 0.5;  // 둘 다 50% 확률
@@ -312,8 +328,11 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
             pushFxLabel('enemy', isCrit ? 'crit' : 'damage', actualDmg);
             setFxEnemyShake(v => v + 1);
             setFxEnemyFlash(v => v + 1);
-            // 크리티컬이면 화면도 가볍게 흔들기
-            if (isCrit) setFxScreenShake(v => v + 1);
+            // 크리티컬이면 화면도 가볍게 흔들기 + 슬래시도 황금색으로
+            if (isCrit) {
+              setFxScreenShake(v => v + 1);
+              if (skill.type === 'physical') setFxSlashCrit(true);
+            }
           }
           
           // === 이프리트 화염 각인 폭발 (minor 효과 + 궁극) ===
@@ -495,6 +514,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     if (skill.type === 'defense') {
       newPlayer.defense += skill.defense;
       newLog.push({ type: 'system', text: `· 방어 +${skill.defense}` });
+      // Phase 2 FX: 결계 링 펄스
+      setFxBarrier(v => v + 1);
       if (skill.dodgeBuff) {
         newPlayer.buffs = { ...newPlayer.buffs, dodgeBuff: skill.dodgeBuff, dodgeBuffTurns: 1 };
       }
@@ -1296,8 +1317,12 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
             <div className="absolute inset-0 opacity-20" style={{ background: `repeating-linear-gradient(45deg, transparent 0px, transparent 8px, ${enemy.color}15 8px, ${enemy.color}15 9px)` }} />
             <div className="text-[12px] tracking-[0.3em] relative grayscale" style={{ color: PALETTE.textDim }}>[ 적 모습 미구현 ]</div>
           </div>
-          {/* FX 오버레이 — 흰 플래시 + 부유 라벨 */}
+          {/* FX 오버레이 — 흰 플래시 + 부유 라벨 + Phase 2 임팩트 */}
           <WhiteFlash trigger={fxEnemyFlash} />
+          <StatusOverlay debuffs={enemy.debuffs} />
+          <SlashFx trigger={fxSlash} crit={fxSlashCrit} />
+          <MagicImpactFx trigger={fxMagicImpact} color={classData.color || '#a479d4'} />
+          <MagicParticles trigger={fxMagicParticles} color={classData.color || '#c8a8e8'} />
           {fxEnemyLabels.map(l => (
             <FloatingLabel key={l.id} kind={l.kind} value={l.value} label={l.label} />
           ))}
@@ -1383,8 +1408,9 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           key={`player-shake-${fxPlayerShake}`}
           className={`flex-1 min-h-0 relative overflow-hidden ${fxPlayerShake ? 'fx-hit-shake' : ''}`}
         >
-          {/* FX 오버레이 — 흰 플래시 + 부유 라벨 */}
+          {/* FX 오버레이 — 흰 플래시 + 부유 라벨 + 결계 링 */}
           <WhiteFlash trigger={fxPlayerFlash} />
+          <BarrierRing trigger={fxBarrier} color={PALETTE.ice || '#7ba3c4'} />
           {fxPlayerLabels.map(l => (
             <FloatingLabel key={l.id} kind={l.kind} value={l.value} label={l.label} />
           ))}

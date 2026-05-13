@@ -119,3 +119,77 @@ body {
   100% { opacity: 0; }
 }
 .fx-vignette { animation: fx-vignette 0.55s ease-out forwards; pointer-events: none; }
+
+/* ============================================
+   전투 이팩트 키프레임 (Phase 2)
+   ============================================ */
+
+/* 슬래시(검선) — SVG path 위에 stroke-dashoffset 애니메이션으로 그어지듯 / 짧게 빛남 */
+@keyframes fx-slash-stroke {
+  0%   { stroke-dashoffset: 320; opacity: 0; }
+  15%  { opacity: 1; }
+  60%  { stroke-dashoffset: 0; opacity: 1; }
+  100% { stroke-dashoffset: 0; opacity: 0; }
+}
+.fx-slash-stroke {
+  stroke-dasharray: 320;
+  stroke-dashoffset: 320;
+  animation: fx-slash-stroke 0.55s cubic-bezier(.2,.7,.2,1) forwards;
+}
+
+/* 슬래시 잔광 — 검선 뒤로 살짝 퍼지는 잔불 */
+@keyframes fx-slash-glow {
+  0%   { transform: scale(0.7); opacity: 0; }
+  30%  { transform: scale(1.1); opacity: 0.55; }
+  100% { transform: scale(1.4); opacity: 0; }
+}
+.fx-slash-glow { animation: fx-slash-glow 0.6s ease-out forwards; }
+
+/* 마법 임팩트 — 룬 원형이 확장/회전하며 사라짐 */
+@keyframes fx-magic-rune {
+  0%   { transform: rotate(0deg) scale(0.3); opacity: 0; }
+  20%  { opacity: 1; }
+  100% { transform: rotate(140deg) scale(1.6); opacity: 0; }
+}
+.fx-magic-rune { animation: fx-magic-rune 0.7s ease-out forwards; transform-origin: center; }
+
+/* 마법 입자 — 중앙에서 8방향으로 흩어짐. JS에서 인덱스로 회전각 부여 */
+@keyframes fx-particle-fly {
+  0%   { transform: translate(-50%, -50%) rotate(var(--p-angle, 0deg)) translateX(0) scale(1); opacity: 0; }
+  15%  { opacity: 1; }
+  100% { transform: translate(-50%, -50%) rotate(var(--p-angle, 0deg)) translateX(var(--p-dist, 60px)) scale(0.2); opacity: 0; }
+}
+.fx-particle {
+  animation: fx-particle-fly 0.75s cubic-bezier(.2,.7,.3,1) forwards;
+  transform-origin: center;
+}
+
+/* 방어 결계 링 — 플레이어 둘레로 확장 펄스 */
+@keyframes fx-barrier-pulse {
+  0%   { transform: translate(-50%, -50%) scale(0.4); opacity: 0; }
+  30%  { transform: translate(-50%, -50%) scale(0.9); opacity: 0.95; }
+  100% { transform: translate(-50%, -50%) scale(1.6); opacity: 0; }
+}
+.fx-barrier-pulse { animation: fx-barrier-pulse 0.8s cubic-bezier(.2,.7,.2,1) forwards; }
+
+/* 상태이상: 출혈 — 빨간 액 드립 (반복) */
+@keyframes fx-bleed-drip {
+  0%   { transform: translateY(-6px); opacity: 0; }
+  20%  { opacity: 0.85; }
+  100% { transform: translateY(38px); opacity: 0; }
+}
+.fx-bleed-drip { animation: fx-bleed-drip 1.6s ease-in infinite; }
+
+/* 상태이상: 화염 각인 — 주황 글로우 깜빡임 (반복) */
+@keyframes fx-ignite-glow {
+  0%, 100% { opacity: 0.25; transform: scale(1); }
+  50%      { opacity: 0.7;  transform: scale(1.08); }
+}
+.fx-ignite-glow { animation: fx-ignite-glow 1.4s ease-in-out infinite; }
+
+/* 상태이상: 기절 — 별 회전 (반복) */
+@keyframes fx-stun-orbit {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+.fx-stun-orbit { animation: fx-stun-orbit 2.4s linear infinite; transform-origin: center; }

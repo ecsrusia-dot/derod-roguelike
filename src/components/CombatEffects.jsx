@@ -84,3 +84,221 @@ export function WhiteFlash({ trigger }) {
     />
   );
 }
+
+// ============================================
+// Phase 2: 스킬 타입별 이팩트
+// ============================================
+
+// 슬래시(물리 공격) — 대각선 검선 + 잔광. crit이면 노란/금색, 평타면 흰색
+export function SlashFx({ trigger, crit }) {
+  if (!trigger) return null;
+  const color = crit ? '#ffd86b' : '#f4e6c8';
+  const glow = crit ? 'rgba(255,216,107,0.55)' : 'rgba(244,230,200,0.4)';
+  return (
+    <div
+      key={trigger}
+      className="absolute inset-0 pointer-events-none flex items-center justify-center"
+      style={{ zIndex: 22 }}
+    >
+      {/* 잔광 */}
+      <div
+        className="absolute fx-slash-glow"
+        style={{
+          width: 220, height: 220,
+          background: `radial-gradient(circle, ${glow} 0%, transparent 65%)`,
+          filter: 'blur(4px)',
+        }}
+      />
+      {/* SVG 검선 — 좌상→우하 대각선 */}
+      <svg
+        viewBox="0 0 200 200"
+        className="absolute"
+        style={{ width: 240, height: 240, overflow: 'visible' }}
+      >
+        <path
+          d="M 18 162 Q 70 110 100 96 T 184 32"
+          fill="none"
+          stroke={color}
+          strokeWidth={crit ? 5 : 3.5}
+          strokeLinecap="round"
+          className="fx-slash-stroke"
+          style={{ filter: `drop-shadow(0 0 6px ${color})` }}
+        />
+      </svg>
+    </div>
+  );
+}
+
+// 마법 임팩트 — 룬 원형 + 십자 빔
+export function MagicImpactFx({ trigger, color = '#a479d4' }) {
+  if (!trigger) return null;
+  return (
+    <div
+      key={trigger}
+      className="absolute inset-0 pointer-events-none flex items-center justify-center"
+      style={{ zIndex: 22 }}
+    >
+      <svg
+        viewBox="0 0 200 200"
+        className="absolute fx-magic-rune"
+        style={{
+          width: 200, height: 200,
+          filter: `drop-shadow(0 0 8px ${color})`,
+        }}
+      >
+        <circle cx="100" cy="100" r="74" fill="none" stroke={color} strokeWidth="2.5" opacity="0.85" />
+        <circle cx="100" cy="100" r="58" fill="none" stroke={color} strokeWidth="1.5" opacity="0.6" strokeDasharray="6 8" />
+        <circle cx="100" cy="100" r="40" fill="none" stroke={color} strokeWidth="1.2" opacity="0.5" />
+        {/* 룬 표식 6개 */}
+        {[0, 60, 120, 180, 240, 300].map(deg => (
+          <g key={deg} transform={`rotate(${deg} 100 100)`}>
+            <rect x="96" y="22" width="8" height="10" fill={color} opacity="0.9" />
+          </g>
+        ))}
+      </svg>
+    </div>
+  );
+}
+
+// 마법 입자 — 8개 입자가 중앙에서 방사형으로 흩어짐
+export function MagicParticles({ trigger, color = '#c8a8e8', count = 10 }) {
+  if (!trigger) return null;
+  const particles = Array.from({ length: count }, (_, i) => {
+    const angle = (360 / count) * i + (trigger % 23);
+    const dist = 70 + ((i * 13) % 50);
+    const size = 5 + ((i * 7) % 4);
+    const delay = (i % 4) * 0.04;
+    return { angle, dist, size, delay, i };
+  });
+  return (
+    <div
+      key={trigger}
+      className="absolute inset-0 pointer-events-none flex items-center justify-center"
+      style={{ zIndex: 23 }}
+    >
+      {particles.map(p => (
+        <span
+          key={p.i}
+          className="absolute fx-particle"
+          style={{
+            top: '50%', left: '50%',
+            width: p.size, height: p.size,
+            background: color,
+            borderRadius: '50%',
+            boxShadow: `0 0 ${p.size * 2}px ${color}`,
+            animationDelay: `${p.delay}s`,
+            '--p-angle': `${p.angle}deg`,
+            '--p-dist': `${p.dist}px`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+// 방어 결계 링 — 플레이어 둘레로 확장하는 청록 펄스
+export function BarrierRing({ trigger, color = '#7ba3c4' }) {
+  if (!trigger) return null;
+  return (
+    <div
+      key={trigger}
+      className="absolute inset-0 pointer-events-none flex items-center justify-center"
+      style={{ zIndex: 22 }}
+    >
+      <div
+        className="absolute fx-barrier-pulse"
+        style={{
+          top: '50%', left: '50%',
+          width: 180, height: 180,
+          border: `3px solid ${color}`,
+          borderRadius: '50%',
+          boxShadow: `0 0 18px ${color}, inset 0 0 18px ${color}`,
+        }}
+      />
+      <div
+        className="absolute fx-barrier-pulse"
+        style={{
+          top: '50%', left: '50%',
+          width: 110, height: 110,
+          border: `2px solid ${color}`,
+          borderRadius: '50%',
+          opacity: 0.7,
+          animationDelay: '0.12s',
+        }}
+      />
+    </div>
+  );
+}
+
+// 상태이상 오버레이 — 적의 debuffs에 따라 지속 표시되는 환경 효과
+// bleed > 0 : 빨간 액 드립이 위에서 흘러내림
+// igniteTurns > 0 : 주황색 글로우가 깜빡임
+// stunned > 0 : 별 3개가 적 머리 위에서 회전
+export function StatusOverlay({ debuffs }) {
+  if (!debuffs) return null;
+  const bleed = debuffs.bleed > 0 && debuffs.bleedTurns > 0;
+  const ignite = debuffs.igniteDmg > 0 && debuffs.igniteTurns > 0;
+  const stunned = debuffs.stunned > 0;
+  if (!bleed && !ignite && !stunned) return null;
+
+  return (
+    <>
+      {/* 화염 글로우 — 적 영역 전체에 깔리는 배경 */}
+      {ignite && (
+        <div
+          className="absolute inset-0 fx-ignite-glow pointer-events-none"
+          style={{
+            zIndex: 18,
+            background: `radial-gradient(ellipse at center, rgba(255,107,53,0.32) 0%, rgba(255,107,53,0.08) 50%, transparent 75%)`,
+          }}
+        />
+      )}
+      {/* 출혈 드립 — 상단에 여러 위치에서 떨어지는 빨간 액 */}
+      {bleed && (
+        <div className="absolute inset-x-0 top-0 pointer-events-none" style={{ zIndex: 19, height: 60 }}>
+          {[18, 38, 58, 76].slice(0, Math.min(4, Math.max(1, debuffs.bleed))).map((leftPct, i) => (
+            <span
+              key={i}
+              className="absolute fx-bleed-drip"
+              style={{
+                left: `${leftPct}%`,
+                top: 0,
+                width: 4, height: 14,
+                background: 'linear-gradient(180deg, #c4453d 0%, #8b1f1f 100%)',
+                borderRadius: '50% 50% 40% 40% / 60% 60% 40% 40%',
+                boxShadow: '0 0 6px rgba(196,69,61,0.7)',
+                animationDelay: `${i * 0.35}s`,
+              }}
+            />
+          ))}
+        </div>
+      )}
+      {/* 기절 별 — 중앙 상단에서 회전 */}
+      {stunned && (
+        <div
+          className="absolute pointer-events-none fx-stun-orbit"
+          style={{
+            zIndex: 21,
+            top: '15%', left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: 60, height: 60,
+          }}
+        >
+          {[0, 120, 240].map(deg => (
+            <span
+              key={deg}
+              className="absolute text-base"
+              style={{
+                top: '50%', left: '50%',
+                transform: `rotate(${deg}deg) translateX(28px) rotate(-${deg}deg)`,
+                color: '#ffd86b',
+                textShadow: '0 0 6px rgba(255,216,107,0.8)',
+                fontFamily: 'serif',
+              }}
+            >★</span>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}

@@ -7,6 +7,19 @@
 
 export const CHANGELOG = [
   {
+    version: '1.11.0',
+    date: '2026-05-13',
+    label: '전투 시각 이팩트 Phase 2 — 스킬 타입 비주얼·상태이상 시각화',
+    changes: [
+      { type: 'feature', text: '물리 공격 시 대각선 검선(슬래시) SVG가 적 위로 그어진다 — 치명타 시 황금색·굵은 선·잔광 강조' },
+      { type: 'feature', text: '마법 공격 시 룬 원형 진(陣)이 회전·확장하며 사라지는 마법 임팩트 추가' },
+      { type: 'feature', text: '마법 공격 시 직업색 입자 8~10개가 적 중심에서 방사형으로 튀어나가는 입자 버스트' },
+      { type: 'feature', text: '방어 스킬 사용 시 플레이어 둘레에 청록 결계 링이 이중 펄스로 확장' },
+      { type: 'feature', text: '적 상태이상 시각화 — 출혈 시 빨간 액 드립, 화염 각인 시 주황 글로우, 기절 시 머리 위 별 회전' },
+      { type: 'system', text: 'CombatEffects.jsx에 SlashFx/MagicImpactFx/MagicParticles/BarrierRing/StatusOverlay 컴포넌트 추가 — Phase 3 보스 컷인·궁극 컷인 확장 시 재사용 가능' },
+    ],
+  },
+  {
     version: '1.10.1',
     date: '2026-05-13',
     label: '협업 인수인계 문서(CLAUDE.md) 추가',
