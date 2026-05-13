@@ -1104,6 +1104,16 @@ export default function App() {
         // 능력치 영구 상승
         setStats(prev => ({ ...prev, [reward.name]: (prev[reward.name] || 0) + reward.value }));
       }
+      else if (reward.type === 'specific_relic') {
+        // 지정된 이름의 유물을 확정 지급 (튜토리얼용)
+        const target = RELICS.find(r => r.name === reward.relicName);
+        if (target) {
+          const ownedNames = relics.map(r => r.name);
+          if (!ownedNames.includes(target.name)) {
+            applyReward({ type: 'relic', ...target });
+          }
+        }
+      }
       else if (reward.type === 'random_relic') {
         // 보유한 유물은 제외 (중복 불가)
         const ownedNames = relics.map(r => r.name);
@@ -1346,7 +1356,7 @@ export default function App() {
         const expId = currentExpedition.id;
         
         // 1. 튜토리얼 클리어 업적
-        if (expId === 'tutorial_basic' || expId === 'tutorial_market') {
+        if (expId === 'tutorial_basic' || expId === 'tutorial_market' || expId === 'tutorial_branching') {
           newMeta = completeAchievement(newMeta, `clear_${expId}`, 1);
         }
         

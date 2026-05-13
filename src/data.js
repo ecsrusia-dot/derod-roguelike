@@ -22,9 +22,9 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.2.1';
+export const GAME_VERSION = '1.3.0';
 export const VERSION_DATE = '2026-05-13';
-export const VERSION_LABEL = '튜토리얼 클리어 화면·대장간 안내 문구 정리';
+export const VERSION_LABEL = '튜토리얼 3 갈림길의 시험 (분기 선택)';
 
 // =========== 패시브 스킬 ===========
 // effect 필드는 문자열 키. 실제 동작은 메인 코드의 trigger handler에서 처리.
@@ -1628,7 +1628,40 @@ export const CHAPTERS = [
     ],
     enemies: { normal: ['goblin', 'iceWolf', 'frostGiant'], elite: ['cultist'], boss: 'iceMage' },
   },
-  
+  {
+    id: 'tutorial_branching',
+    name: '갈림길의 시험',
+    sub: 'The Trial of Crossroads',
+    desc: '세 갈래 길이 가로지른다. 어디로 향하느냐에 따라 얻는 것이 달라진다.',
+    nodeCount: 13,
+    biome: 'tutorial',
+    color: '#b48ad4',
+    isTutorial: true,
+    // 분기 시퀀스 — 다열 노드 구조
+    // 레이어 0~1: 단일 / 레이어 2~4: 3열 / 레이어 5~6: 단일 (정비에서 합류)
+    branchSequence: [
+      { type: 'prep' },
+      { type: 'event', forceEventId: 'tutorial_farsight_grant' },
+      [{ type: 'battle' }, { type: 'battle' }, { type: 'battle' }],
+      [
+        { type: 'shop' },
+        { type: 'event' },
+        {
+          type: 'forge',
+          tutorialForge: true,  // 튜토리얼 한정 보너스 유물 1개 지급
+          modalOverride: {
+            desc: '보유한 유물 두 개를 희생해 더 강한 패시브로 단련한다.',
+            detail: '두 유물의 조합이 정해진 레시피와 일치하면 패시브 스킬 Lv +1, 일치하지 않으면 영혼 +50의 위로 보상이 주어집니다.\n\n※ 튜토리얼 한정: 조합을 직접 체험해볼 수 있도록, 이번 대장간 진입 시 랜덤 유물 1개를 특별 지급합니다. 일반 원정의 대장간 노드에서는 유물을 따로 주지 않으니, 보유 유물 2개 이상일 때만 사용 가능합니다.',
+          },
+        },
+      ],
+      [{ type: 'battle' }, { type: 'event' }, { type: 'battle' }],
+      { type: 'rest' },
+      { type: 'boss' },
+    ],
+    enemies: { normal: ['goblin', 'iceWolf'], elite: ['cultist'], boss: 'wraith' },
+  },
+
   // === 기존 클래식 챕터 (수련의 길에서 사용) ===
   {
     id: 1, name: '북부 극지대', sub: 'The Northern Wastes',
@@ -1703,6 +1736,20 @@ export const EVENTS = [
         text: '유물을 거둔다 (랜덤 유물 +1)',
         result: '유물이 짐 속으로 들어간다.\n앞쪽 대장간에서 무언가에 쓸 수 있을지도 모른다.',
         reward: { type: 'random_relic' },
+      },
+    ],
+  },
+  // === 튜토리얼 3 (갈림길의 시험) 전용 사건 ===
+  {
+    id: 'tutorial_farsight_grant',
+    title: '오래된 망원경',
+    text: '낡은 망원경이 풀숲에 묻혀 있다.\n렌즈를 닦아 멀리 들여다보자, 갈라지는 세 길의 끝이 또렷이 비친다.\n"……이걸 챙기면 앞길이 보이겠군."',
+    chapter: ['tutorial_branching'],
+    choices: [
+      {
+        text: '망원경(천리안)을 거둔다',
+        result: '천리안이 손에 들어왔다.\n이제 맵의 모든 노드가 미리 공개된다. 어느 갈래로 갈지 직접 정할 수 있다.',
+        reward: { type: 'specific_relic', relicName: '천리안' },
       },
     ],
   },
@@ -2633,7 +2680,26 @@ export const EXPEDITIONS = [
     category: 'tutorial',
     tutorialOrder: 2,
   },
-  
+  // === 튜토리얼 3: 갈림길의 시험 ===
+  {
+    id: 'tutorial_branching',
+    name: '갈림길의 시험',
+    sub: 'The Trial of Crossroads',
+    desc: '세 갈래 길이 갈라진다. 어디로 향하느냐에 따라 얻는 것이 달라진다.',
+    color: '#b48ad4',
+    chapters: ['tutorial_branching'],
+    enemyHpMult: 1.0,
+    enemyDmgMult: 1.0,
+    curseCount: 0,
+    maxRelicSelect: 1,
+    soulReward: 40,
+    unlockId: 'tutorial_market_clear',    // 튜토리얼 2 클리어 후 해금
+    isTutorial: true,
+    forcedClassId: 0,
+    category: 'tutorial',
+    tutorialOrder: 3,
+  },
+
   // === 수련의 길 (5직업) — 챔피언십 해금 트리거 ===
   {
     id: 'training_lanthert',
@@ -2647,7 +2713,7 @@ export const EXPEDITIONS = [
     curseCount: 0,
     maxRelicSelect: 1,
     soulReward: 80,
-    unlockId: 'tutorial_market_clear',    // 튜토리얼 2 클리어 후 해금
+    unlockId: 'tutorial_branching_clear',    // 튜토리얼 3 클리어 후 해금
     category: 'training',
     forcedClassId: 0,
     unlocksChampionshipFor: 0,            // 클리어 시 챔피언십(방랑검사) 해금
@@ -3215,9 +3281,11 @@ export const ACHIEVEMENTS = [
   // === 튜토리얼 진행 업적 ===
   { id: 'clear_tutorial_basic', cat: 'tutorial', kind: 'first', target: 1, reward: 50, 
     name: '여명의 첫 발걸음', desc: '튜토리얼 - 노드 입문 클리어' },
-  { id: 'clear_tutorial_market', cat: 'tutorial', kind: 'first', target: 1, reward: 80, 
+  { id: 'clear_tutorial_market', cat: 'tutorial', kind: 'first', target: 1, reward: 80,
     name: '상인과 대장장이', desc: '튜토리얼 - 황혼의 시장 클리어' },
-  
+  { id: 'clear_tutorial_branching', cat: 'tutorial', kind: 'first', target: 1, reward: 100,
+    name: '갈림길을 가르는 자', desc: '튜토리얼 - 갈림길의 시험 클리어' },
+
   // === 수련의 길 클리어 업적 (5직업) ===
   // 보상: 직업 순서대로 100/150/200/250/300
   { id: 'clear_training_lanthert', cat: 'training', class: 'lanthert', kind: 'first', target: 1, reward: 100, 
