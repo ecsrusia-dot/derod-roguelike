@@ -22,9 +22,9 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.11.0';
+export const GAME_VERSION = '1.12.0';
 export const VERSION_DATE = '2026-05-13';
-export const VERSION_LABEL = '전투 시각 이팩트 Phase 2 — 스킬 타입 비주얼·상태이상 시각화';
+export const VERSION_LABEL = '직업 액티브 궁극 + 영혼 게이지 — 방랑검사 프로토타입';
 
 // =========== 패시브 스킬 ===========
 // effect 필드는 문자열 키. 실제 동작은 메인 코드의 trigger handler에서 처리.
@@ -179,6 +179,7 @@ export const CLASSES = [
     startSkills: { 심안류: 3, 심안: 2 },
     stats: { 근력: 18, 민첩: 15, 지능: 14, 매력: 11 },
     combatSkills: ['참격', '관통', '방검'],
+    ultimateId: 'lanthert_shadowStrike',  // 직업 액티브 궁극 (영혼 게이지 100 발동)
     color: '#c4453d',
     locked: false,        // 항상 사용 가능 (시작 직업)
     image: './classes/lanthert.jpg',
@@ -252,6 +253,30 @@ export const CLASSES = [
     combatImage: './classes/combat/priest_combat.jpg',
   },
 ];
+
+// =========== 직업별 액티브 궁극 (영혼 게이지 100 발동) ===========
+// 전투 중 "영혼 게이지(soulGauge, 0~100)"가 100에 도달하면 발동 가능.
+// 게이지 충전:
+//   - 적에게 데미지 입힐 때: +floor(dmg / 5)
+//   - 피격 (실제 피해 > 0): +floor(damage / 3)
+//   - 매 턴 시작: +5 자연 충전
+//   - 치명타 발동: +10 보너스
+// 발동 시 게이지는 0으로 리셋.
+//
+// 1직업당 1개의 시그니처 궁극 — 클래스 정체성 강화.
+// 프로토타입: 방랑검사 1개 (lanthert_shadowStrike). 나머지 4직업은 다음 업데이트.
+export const CLASS_ULTIMATES = {
+  lanthert_shadowStrike: {
+    id: 'lanthert_shadowStrike',
+    classId: 'lanthert',
+    name: '무영(無影)의 일격',
+    quote: '검은 그림자보다 빠르다.',
+    desc: '적의 현재 HP의 30%를 방어 무시로 즉시 제거. 다음 1턴 치명타 확정.',
+    color: '#c4453d',
+    icon: '☄',
+    effect: 'classult_shadowStrike',
+  },
+};
 
 // =========== 전투 스킬 ===========
 // type: physical / magic / defense / buff
@@ -4067,7 +4092,7 @@ export const ACHIEVEMENTS = [
   { id: 'special_all_lv7', cat: 'special', kind: 'event', target: 1, reward: 350, name: '여명의 의지', desc: '한 런에서 패시브 5종 모두 Lv.7 보유' },
   { id: 'special_three_curses', cat: 'special', kind: 'event', target: 1, reward: 500, name: '황혼의 손길', desc: '저주 3개 모두 받은 채 원정 클리어' },
   { id: 'special_event_perfect', cat: 'special', kind: 'event', target: 1, reward: 200, name: '운명의 심판자', desc: '한 런에서 모든 사건 성공' },
-  { id: 'special_lanthert_3ult', cat: 'special', kind: 'event', target: 1, reward: 600, name: '검의 길', desc: '방랑검사 궁극 3종 모두 1런에 진화' },
+  { id: 'special_lanthert_3ult', cat: 'special', kind: 'event', target: 1, reward: 600, name: '검의 길', desc: '방랑검사 각성 3종 모두 1런에 진화' },
   { id: 'special_all_class_e4', cat: 'meta', kind: 'event', target: 5, reward: 3000, name: '미답의 도전자', desc: '모든 직업으로 망각 원정 클리어' },
   { id: 'special_max_meta', cat: 'meta', kind: 'event', target: 1, reward: 1000, name: '영혼의 수호자', desc: '영혼 제단 모든 강화 최대 단계' },
   

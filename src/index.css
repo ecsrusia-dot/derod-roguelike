@@ -193,3 +193,33 @@ body {
   100% { transform: rotate(360deg); }
 }
 .fx-stun-orbit { animation: fx-stun-orbit 2.4s linear infinite; transform-origin: center; }
+
+/* ============================================
+   액티브 궁극 컷인 (Phase 2.5)
+   ============================================ */
+
+/* 풀스크린 골든 버스트 — 컷인 배경 */
+@keyframes fx-ult-burst {
+  0%   { opacity: 0; }
+  20%  { opacity: 1; }
+  80%  { opacity: 0.85; }
+  100% { opacity: 0; }
+}
+.fx-ult-burst { animation: fx-ult-burst 0.9s ease-out forwards; }
+
+/* 궁극명 배너 — 화면 중앙에서 좌→우로 슬라이드 */
+@keyframes fx-ult-banner {
+  0%   { transform: translate(-50%, -50%) translateX(-120%); opacity: 0; }
+  20%  { transform: translate(-50%, -50%) translateX(0%);    opacity: 1; }
+  75%  { transform: translate(-50%, -50%) translateX(0%);    opacity: 1; }
+  100% { transform: translate(-50%, -50%) translateX(120%);  opacity: 0; }
+}
+.fx-ult-banner { animation: fx-ult-banner 0.9s cubic-bezier(.2,.7,.3,1) forwards; }
+
+/* 궁극명 글자 — 페이드인+살짝 확대 */
+@keyframes fx-ult-name {
+  0%   { transform: scale(1.4); opacity: 0; letter-spacing: 0.8em; }
+  25%  { transform: scale(1);   opacity: 1; letter-spacing: 0.3em; }
+  100% { transform: scale(1);   opacity: 1; letter-spacing: 0.3em; }
+}
+.fx-ult-name { animation: fx-ult-name 0.55s ease-out forwards; display: inline-block; }

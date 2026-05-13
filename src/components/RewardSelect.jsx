@@ -27,7 +27,7 @@ export default function RewardSelect({ rewards: initialRewards, gem, skills, rel
     if (r.type === 'ultimate') {
       // 궁극 진화 카드 - 가장 화려하게
       title = `★ ${r.ultimate.name}`;
-      desc = `${r.skillName} 궁극 진화\n${r.ultimate.desc}\n⚠ ${r.skillName} Lv → 0 리셋, 관련 유물 소멸`;
+      desc = `${r.skillName} 각성\n${r.ultimate.desc}\n⚠ ${r.skillName} Lv → 0 리셋, 관련 유물 소멸`;
       color = r.ultimate.color || PALETTE.legendary;
       icon = '☆';
     } else if (r.type === 'skill') {
