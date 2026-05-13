@@ -93,7 +93,7 @@ import {
   VERSION_DATE,
   VERSION_LABEL,
 } from './data.js';
-import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared } from './storage.js';
+import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun } from './storage.js';
 
 
 
@@ -422,6 +422,32 @@ export default function App() {
     }
   }, [meta, metaLoaded, authMode, firebaseUser]);
 
+  // 진행 중인 런 스냅샷 자동 저장 — 맵 화면 진입/갱신 시점에 실행
+  // 앱이 어떤 식으로든 종료되어도 다음 접속에서 이어하기 가능.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!metaLoaded) return;
+    if (screen !== 'map') return;
+    if (!chapter || !mapData || !currentExpedition) return;
+    const snapshot = {
+      v: 1,
+      selectedClass,
+      expedition: currentExpedition,
+      curses: currentCurses,
+      chapterId: chapter.id,
+      chapterIdx,
+      endlessDepth,
+      mapData,
+      activeNodeId,
+      hp, maxHp, gold, gem, runSouls,
+      skills, stats, relics, ultimates,
+      activeSkills, activeRelicNames,
+      isEliteReward, isBossReward, hasRerolled,
+    };
+    setMeta(prev => saveActiveRun(prev, snapshot));
+    // 의도적으로 좁은 deps — 맵 진입·노드 완료 트리거에서만 스냅샷 갱신
+  }, [screen, chapter, chapterIdx, mapData]);
+
   // 보상 시스템
   const [currentRewards, setCurrentRewards] = useState([]);
   const [hasRerolled, setHasRerolled] = useState(false);
@@ -511,7 +537,49 @@ export default function App() {
   };
 
   // 새로운 런 시작 (원정 선택 시)
+  // 진행 중이던 런 복원 — 메타에 저장된 스냅샷이 있을 때만 호출
+  const resumeActiveRun = () => {
+    const s = meta?.activeRun;
+    if (!s || s.v !== 1) return false;
+    // 챕터 데이터 조회 — 챔피언십이면 별도 풀에서
+    const ch = s.expedition?.isChampionship
+      ? CHAMPIONSHIP_CHAPTERS[s.chapterId]
+      : CHAPTERS.find(c => c.id === s.chapterId);
+    if (!ch) {
+      console.error('이어하기 실패: 챕터 데이터를 찾을 수 없음', s.chapterId);
+      // 손상된 스냅샷은 정리
+      setMeta(prev => clearActiveRun(prev));
+      return false;
+    }
+    setSelectedClass(s.selectedClass);
+    setCurrentExpedition(s.expedition);
+    setCurrentCurses(s.curses || []);
+    setChapter(ch);
+    setChapterIdx(s.chapterIdx || 0);
+    setEndlessDepth(s.endlessDepth || 0);
+    setMapData(s.mapData);
+    setActiveNodeId(s.activeNodeId);
+    setHp(s.hp);
+    setMaxHp(s.maxHp);
+    setGold(s.gold);
+    setGem(s.gem);
+    setRunSouls(s.runSouls || 0);
+    setSkills(s.skills || {});
+    setStats(s.stats || {});
+    setRelics(s.relics || []);
+    setUltimates(s.ultimates || []);
+    setActiveSkills(s.activeSkills);
+    setActiveRelicNames(s.activeRelicNames);
+    setIsEliteReward(!!s.isEliteReward);
+    setIsBossReward(!!s.isBossReward);
+    setHasRerolled(!!s.hasRerolled);
+    setScreen('map');
+    return true;
+  };
+
   const startExpedition = (expedition) => {
+    // 새 런 시작 시 이전 진행 스냅샷은 폐기 (맵 진입 시 자동으로 새 스냅샷 기록됨)
+    setMeta(prev => clearActiveRun(prev));
     setCurrentExpedition(expedition);
     setEndlessDepth(0);  // 무한모드 깊이 초기화
     // 저주 부여 — fixedCurses(일일 챌린지)는 시드 픽 그대로 사용
@@ -543,6 +611,8 @@ export default function App() {
   
   // 챔피언십 원정 시작 (5원정 × 4난이도)
   const startChampionship = (championship, difficulty) => {
+    // 새 런 시작 — 이전 진행 스냅샷 폐기
+    setMeta(prev => clearActiveRun(prev));
     // 챔피언십을 expedition 형식으로 변환 (initializeRun과 호환)
     const champExpedition = {
       // 챔피언십 식별자
@@ -1006,10 +1076,10 @@ export default function App() {
     } else {
       recoveredSouls = Math.floor(runSouls * SOUL_REWARDS.deathPenalty);
     }
-    if (recoveredSouls > 0) {
-      const newMeta = addSouls(meta, recoveredSouls);
-      setMeta(newMeta);
-    }
+    // 런 종료 — 영혼 보상 적용 + 진행 중 스냅샷 정리
+    let newMeta = recoveredSouls > 0 ? addSouls(meta, recoveredSouls) : meta;
+    newMeta = clearActiveRun(newMeta);
+    setMeta(newMeta);
     setRunSouls(recoveredSouls);  // 화면 표시용
     setScreen('defeat');
   };
@@ -1502,6 +1572,7 @@ export default function App() {
     setRunSouls(0);
     setSelectedChampionship(null);
     setSelectedDifficulty(null);
+    setMeta(prev => clearActiveRun(prev));
     setScreen('title');
   };
   
@@ -1540,7 +1611,7 @@ export default function App() {
               onSelectGuest={handleSelectGuest} 
               onSelectGoogle={handleSelectGoogle} 
             />}
-            {screen === 'title' && authMode && <TitleScreen meta={meta} onStart={() => setScreen('expeditionSelect')} onAltar={enterAltar} onAchievements={() => { setPrevAchievementsBack('title'); setScreen('achievements'); }} onChangelog={() => setShowChangelog({ firstSeen: false })} onAccount={() => setScreen('account')} />}
+            {screen === 'title' && authMode && <TitleScreen meta={meta} onStart={() => setScreen('expeditionSelect')} onResume={resumeActiveRun} onAltar={enterAltar} onAchievements={() => { setPrevAchievementsBack('title'); setScreen('achievements'); }} onChangelog={() => setShowChangelog({ firstSeen: false })} onAccount={() => setScreen('account')} />}
             {screen === 'account' && <AccountScreen 
               authMode={authMode} 
               firebaseUser={firebaseUser} 
