@@ -752,6 +752,17 @@ export default function App() {
     setActiveNodeId(node.id);
     setActiveNodeType(nodeType);
 
+    // 튜토리얼: 노드에 addCurseId가 지정되어 있으면 저주 누적
+    // (전투/강적/보스 노드에서 적용 — 같은 화면 사이클 내 setState라 다음 렌더에 반영됨)
+    const nodeMeta = getNodeMeta(node);
+    if (nodeMeta?.addCurseId) {
+      const curseId = nodeMeta.addCurseId;
+      const curseObj = CURSES.find(c => c.id === curseId);
+      if (curseObj && !currentCurses.some(c => c.id === curseId)) {
+        setCurrentCurses(prev => [...prev, curseObj]);
+      }
+    }
+
     if (nodeType === 'battle') {
       const pool = chapter.enemies.normal;
       const enemyKey = pool[Math.floor(Math.random() * pool.length)];
@@ -1369,7 +1380,7 @@ export default function App() {
         const expId = currentExpedition.id;
         
         // 1. 튜토리얼 클리어 업적
-        if (expId === 'tutorial_basic' || expId === 'tutorial_market' || expId === 'tutorial_branching') {
+        if (expId === 'tutorial_basic' || expId === 'tutorial_market' || expId === 'tutorial_branching' || expId === 'tutorial_curse') {
           newMeta = completeAchievement(newMeta, `clear_${expId}`, 1);
         }
         

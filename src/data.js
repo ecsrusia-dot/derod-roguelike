@@ -22,9 +22,9 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.3.2';
+export const GAME_VERSION = '1.4.0';
 export const VERSION_DATE = '2026-05-13';
-export const VERSION_LABEL = '튜토리얼 3 분기 버그 수정 + 카드 정보 모달 통합';
+export const VERSION_LABEL = '튜토리얼 4 저주의 시련 (저주 누적 체험)';
 
 // =========== 패시브 스킬 ===========
 // effect 필드는 문자열 키. 실제 동작은 메인 코드의 trigger handler에서 처리.
@@ -1667,6 +1667,61 @@ export const CHAPTERS = [
     ],
     enemies: { normal: ['goblin', 'iceWolf'], elite: ['cultist'], boss: 'wraith' },
   },
+  {
+    id: 'tutorial_curse',
+    name: '저주의 시련',
+    sub: 'The Trial of Curses',
+    desc: '강적과 마주할수록 어둠이 짙어진다. 난이도가 오를수록 늘어나는 저주를 직접 체험하라.',
+    nodeCount: 7,
+    biome: 'tutorial',
+    color: '#8b1f1f',
+    isTutorial: true,
+    // 일직선 시퀀스: 준비 - 강적 - 강적+저주1 - 강적+저주2 - 강적+저주3 - 정비 - 보스
+    // addCurseId가 지정된 노드 진입 시 해당 저주가 누적됩니다.
+    linearSequence: [
+      {
+        type: 'prep',
+        modalOverride: {
+          desc: '저주를 익히는 시련에 앞서, 준비를 마칩니다.',
+          detail: '이번 챕터는 저주 시스템을 익히는 단계입니다.\n\n실제 원정·챔피언십에서는 난이도가 오를수록 저주 수가 늘어납니다.\n· 일반: 0개\n· 하드: 1개\n· 지옥: 2개\n· 광기: 3개\n\n앞으로 강적을 마주할 때마다 저주가 하나씩 추가됩니다. 누적 패널티를 직접 체감해 보세요.',
+        },
+      },
+      {
+        type: 'elite',
+        modalOverride: {
+          desc: '강적 — 저주 없는 기준 전투.',
+          detail: '저주가 부여되지 않은 상태에서 강적과 한 번 맞붙습니다.\n\n이후 같은 강적이라도 저주가 어떻게 난이도를 흔드는지 비교해 보세요.',
+        },
+      },
+      {
+        type: 'elite',
+        addCurseId: 'curse_fragility',
+        modalOverride: {
+          desc: '강적 · 저주 1단계 — 깨지기 쉬운 영혼.',
+          detail: '이번 전투부터 저주 [깨지기 쉬운 영혼]이 활성화됩니다.\n· 받는 모든 데미지 +15%\n\n같은 강적이지만 한 발 한 발이 더 아프게 느껴질 것입니다.',
+        },
+      },
+      {
+        type: 'elite',
+        addCurseId: 'curse_weakness',
+        modalOverride: {
+          desc: '강적 · 저주 2단계 — 약화의 저주 추가.',
+          detail: '이번 전투부터 두 번째 저주가 함께 활성화됩니다.\n· [약화의 저주] 주는 모든 데미지 -15%\n\n버티는 데 더 오래 걸리고, 피해도 더 크게 받습니다. 누적되는 패널티의 무게를 느껴 보세요.',
+        },
+      },
+      {
+        type: 'elite',
+        addCurseId: 'curse_decay',
+        modalOverride: {
+          desc: '강적 · 저주 3단계 — 부패의 저주까지.',
+          detail: '세 번째 저주가 추가됩니다.\n· [부패의 저주] 모든 회복 효과 -50%\n\n곧 나올 정비 노드에서의 회복도 절반밖에 받지 못합니다. 광기 난이도의 무게가 어떤지 가늠해 보세요.',
+        },
+      },
+      { type: 'rest' },
+      { type: 'boss' },
+    ],
+    enemies: { normal: ['goblin', 'iceWolf'], elite: ['cultist', 'iceMage'], boss: 'wraith' },
+  },
 
   // === 기존 클래식 챕터 (수련의 길에서 사용) ===
   {
@@ -2708,6 +2763,25 @@ export const EXPEDITIONS = [
     category: 'tutorial',
     tutorialOrder: 3,
   },
+  // === 튜토리얼 4: 저주의 시련 ===
+  {
+    id: 'tutorial_curse',
+    name: '저주의 시련',
+    sub: 'The Trial of Curses',
+    desc: '강적과 거듭 맞붙으며 저주가 한 단계씩 늘어난다. 난이도 곡선을 체감하라.',
+    color: '#8b1f1f',
+    chapters: ['tutorial_curse'],
+    enemyHpMult: 1.0,
+    enemyDmgMult: 1.0,
+    curseCount: 0,  // 시작 시 저주 없음. 노드 진입마다 누적됨.
+    maxRelicSelect: 1,
+    soulReward: 50,
+    unlockId: 'tutorial_branching_clear',    // 튜토리얼 3 클리어 후 해금
+    isTutorial: true,
+    forcedClassId: 0,
+    category: 'tutorial',
+    tutorialOrder: 4,
+  },
 
   // === 수련의 길 (5직업) — 챔피언십 해금 트리거 ===
   {
@@ -2722,7 +2796,7 @@ export const EXPEDITIONS = [
     curseCount: 0,
     maxRelicSelect: 1,
     soulReward: 80,
-    unlockId: 'tutorial_branching_clear',    // 튜토리얼 3 클리어 후 해금
+    unlockId: 'tutorial_curse_clear',    // 튜토리얼 4 클리어 후 해금
     category: 'training',
     forcedClassId: 0,
     unlocksChampionshipFor: 0,            // 클리어 시 챔피언십(방랑검사) 해금
@@ -3294,6 +3368,8 @@ export const ACHIEVEMENTS = [
     name: '상인과 대장장이', desc: '튜토리얼 - 황혼의 시장 클리어' },
   { id: 'clear_tutorial_branching', cat: 'tutorial', kind: 'first', target: 1, reward: 100,
     name: '갈림길을 가르는 자', desc: '튜토리얼 - 갈림길의 시험 클리어' },
+  { id: 'clear_tutorial_curse', cat: 'tutorial', kind: 'first', target: 1, reward: 120,
+    name: '저주를 견딘 자', desc: '튜토리얼 - 저주의 시련 클리어' },
 
   // === 수련의 길 클리어 업적 (5직업) ===
   // 보상: 직업 순서대로 100/150/200/250/300
