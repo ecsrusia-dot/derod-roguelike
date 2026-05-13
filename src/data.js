@@ -22,9 +22,9 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.9.0';
+export const GAME_VERSION = '1.10.0';
 export const VERSION_DATE = '2026-05-13';
-export const VERSION_LABEL = '맵 진행 이어하기 — 앱 종료 후 재개 가능';
+export const VERSION_LABEL = '전투 시각 이팩트 Phase 1 — 박진감 업그레이드';
 
 // =========== 패시브 스킬 ===========
 // effect 필드는 문자열 키. 실제 동작은 메인 코드의 trigger handler에서 처리.
