@@ -791,7 +791,15 @@ export default function App() {
       }
       if (!ev) {
         // tutorialGift는 강제 트리거 전용 (랜덤 풀 제외)
-        const pool = EVENTS.filter(e => !e.tutorialGift);
+        // classOnly가 지정된 사건은 현재 직업 ID가 포함된 경우만 풀에 남김
+        const myClassId = classData?.id;
+        const pool = EVENTS.filter(e => {
+          if (e.tutorialGift) return false;
+          if (Array.isArray(e.classOnly) && e.classOnly.length > 0) {
+            if (!myClassId || !e.classOnly.includes(myClassId)) return false;
+          }
+          return true;
+        });
         const chapterId = chapter.id;
         const validEvents = pool.filter(e => !e.chapter || e.chapter.includes(chapterId));
         ev = validEvents.length > 0

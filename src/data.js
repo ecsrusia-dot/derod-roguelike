@@ -22,9 +22,9 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.5.0';
+export const GAME_VERSION = '1.5.1';
 export const VERSION_DATE = '2026-05-13';
-export const VERSION_LABEL = '콘텐츠 확장: 사건 30 / 유물 8 / 레시피 13 / 저주 4';
+export const VERSION_LABEL = '직업별 전용 사건 10개 (Tier 2D)';
 
 // =========== 패시브 스킬 ===========
 // effect 필드는 문자열 키. 실제 동작은 메인 코드의 trigger handler에서 처리.
@@ -2768,6 +2768,151 @@ export const EVENTS = [
         fail: { text: '불꽃에 화상을 입는다.', penalty: { hp: -30 } } },
       { text: '제물로 은화를 바친다 (-200)', cost: { gold: 200 }, result: '화로가 응답한다.', reward: { type: 'gem', value: 8 } },
       { text: '발걸음을 돌린다', result: '화로는 계속 타오른다.', reward: null },
+    ],
+  },
+
+  // ============================================================
+  // === 직업 전용 사건 (classOnly 필터) ===
+  // 같은 챕터를 다른 직업으로 돌 때 직업 정체성에 맞는 사건이 등장.
+  // 챕터 제약 없음 — 어느 챕터에서도 해당 직업이면 등장 가능.
+  // ============================================================
+  // --- 방랑검사 (lanthert) ---
+  {
+    id: 'lanthert_oldMentor',
+    title: '옛 스승의 흔적',
+    text: '낯익은 검흔이 나무에 새겨져 있다.\n오래 전 너에게 검을 가르쳤던 스승의 자취. 가까운 곳에 누군가 있다.',
+    classOnly: ['lanthert'],
+    choices: [
+      { text: '검흔을 따라간다 (민첩 검정)', stat: '민첩', dc: 14,
+        success: { text: '스승이 남긴 검편을 손에 쥔다.', reward: { type: 'random_relic' } },
+        fail: { text: '발자국이 흩어진다.', penalty: null } },
+      { text: '스승의 가르침을 떠올린다', result: '잊고 있던 형(型)이 떠오른다.', reward: { type: 'skill_random_lv' } },
+      { text: '경의만 표하고 떠난다', result: '검흔은 그 자리에 남는다.', reward: null },
+    ],
+  },
+  {
+    id: 'lanthert_blindTrial',
+    title: '어둠 속의 시험',
+    text: '깊은 안개. 눈은 무의미하다.\n검은 너의 또 다른 눈 — 그 사실을 시험할 시간이다.',
+    classOnly: ['lanthert'],
+    choices: [
+      { text: '심안에 의지해 나아간다 (지능 검정)', stat: '지능', dc: 15,
+        success: { text: '어둠을 가르고 보석을 발견한다.', reward: { type: 'gem', value: 6 } },
+        fail: { text: '안개에 베인다.', penalty: { hp: -25 } } },
+      { text: '소리에 집중한다 (민첩 검정)', stat: '민첩', dc: 13,
+        success: { text: '발자국 소리를 따라 안전한 길을 찾는다.', reward: { type: 'gold', value: 100 } },
+        fail: { text: '발을 헛디딘다.', penalty: { hp: -20 } } },
+      { text: '안개를 피해 돌아간다', result: '시간만 지나간다.', reward: null },
+    ],
+  },
+  // --- 술법사 (sage) ---
+  {
+    id: 'sage_lostGrimoire',
+    title: '잊혀진 마법서',
+    text: '낡은 책장에 정념계 마법서가 놓여 있다.\n잉크가 살아 움직이며 페이지를 넘긴다.',
+    classOnly: ['sage'],
+    choices: [
+      { text: '책을 해독한다 (지능 검정)', stat: '지능', dc: 15,
+        success: { text: '잊혀진 주문을 익힌다.', reward: { type: 'skill_random_lv' } },
+        fail: { text: '마법서가 반발한다.', penalty: { hp: -30 } } },
+      { text: '책을 가져간다', result: '책이 짐에 짓눌리며 보석을 토한다.', reward: { type: 'gem', value: 4 } },
+      { text: '책을 덮는다', result: '책장은 다시 잠잠해진다.', reward: null },
+    ],
+  },
+  {
+    id: 'sage_passionOverflow',
+    title: '정념의 폭주',
+    text: '너의 손끝에서 마력이 들끓는다.\n다스리지 못하면 너를 태울지도 모른다.',
+    classOnly: ['sage'],
+    choices: [
+      { text: '폭주를 다스린다 (지능 검정)', stat: '지능', dc: 14,
+        success: { text: '마력을 끌어내려 흡수한다.', reward: { type: 'maxhp', value: 30 } },
+        fail: { text: '마력이 너를 태운다.', penalty: { hp: -40 } } },
+      { text: '폭주를 쏟아낸다 (근력 검정)', stat: '근력', dc: 13,
+        success: { text: '폭발의 잔여가 보석으로 굳는다.', reward: { type: 'gem', value: 5 } },
+        fail: { text: '대지가 너를 짓누른다.', penalty: { hp: -25 } } },
+      { text: '결계를 친다', result: '마력이 잦아든다.', reward: null },
+    ],
+  },
+  // --- 혼혈 마족 (demonblood) ---
+  {
+    id: 'demonblood_kin',
+    title: '마족의 동족',
+    text: '비슷한 핏줄이 너를 알아본다.\n"형제여, 너의 잠재력이 보이는군."',
+    classOnly: ['demonblood'],
+    choices: [
+      { text: '핏줄의 거래에 응한다 (HP -30)', penalty: { hp: -30 }, result: '핏줄이 끓어오른다.', reward: { type: 'random_relic' } },
+      { text: '대화로 정보를 얻는다 (매력 검정)', stat: '매력', dc: 14,
+        success: { text: '동족이 자신의 결정을 건넨다.', reward: { type: 'gem', value: 5 } },
+        fail: { text: '동족이 비웃으며 사라진다.', penalty: null } },
+      { text: '동족을 거부한다', result: '동족의 그림자가 멀어진다.', reward: null },
+    ],
+  },
+  {
+    id: 'demonblood_bloodThirst',
+    title: '핏줄의 갈증',
+    text: '내면의 마족이 깨어난다.\n주변의 모든 생명이 너의 표적이 된다 — 견딜 것인가, 풀어줄 것인가.',
+    classOnly: ['demonblood'],
+    choices: [
+      { text: '갈증을 견딘다 (지능 검정)', stat: '지능', dc: 15,
+        success: { text: '광기를 다스리고 한 단계 성장한다.', reward: { type: 'skill_random_lv' } },
+        fail: { text: '내면의 마족이 너를 갉아먹는다.', penalty: { hp: -35 } } },
+      { text: '갈증에 굴복한다', result: '주변의 그림자가 너의 일부가 된다.', reward: { type: 'gold', value: 120 } },
+      { text: '주문으로 봉인한다', result: '갈증이 가라앉는다.', reward: { type: 'heal', value: 30 } },
+    ],
+  },
+  // --- 숲의 정령사 (elf) ---
+  {
+    id: 'elf_forestCall',
+    title: '숲의 부름',
+    text: '나뭇잎이 너의 이름을 부른다.\n숲은 여전히 너를 기억하고 있다.',
+    classOnly: ['elf'],
+    choices: [
+      { text: '나무와 교감한다 (지능 검정)', stat: '지능', dc: 14,
+        success: { text: '숲이 잊혀진 비밀을 건넨다.', reward: { type: 'random_relic' } },
+        fail: { text: '교감이 어긋난다.', penalty: null } },
+      { text: '바람의 안내를 받는다', result: '숨겨진 보물의 위치가 보인다.', reward: { type: 'gold', value: 100 } },
+      { text: '경의만 표하고 떠난다', result: '숲이 한숨을 쉰다.', reward: { type: 'heal', value: 25 } },
+    ],
+  },
+  {
+    id: 'elf_twilightKin',
+    title: '황혼의 동족',
+    text: '먼 곳에 동족의 노래가 들린다.\n홀로 남은 황혼의 자녀가 너를 부른다.',
+    classOnly: ['elf'],
+    choices: [
+      { text: '함께 노래한다 (매력 검정)', stat: '매력', dc: 13,
+        success: { text: '노래가 영혼을 채운다.', reward: { type: 'maxhp', value: 25 } },
+        fail: { text: '노래가 어긋나 흩어진다.', penalty: null } },
+      { text: '동족의 선물을 받는다', result: '오래된 결정을 손에 쥔다.', reward: { type: 'gem', value: 5 } },
+      { text: '대화 없이 떠난다', result: '동족이 다음을 기약한다.', reward: null },
+    ],
+  },
+  // --- 여명의 사제 (priest) ---
+  {
+    id: 'priest_dawnOracle',
+    title: '여명의 신탁',
+    text: '돌제단 위에 한 줄기 빛이 내린다.\n신탁이 너에게 길을 보여주려 한다.',
+    classOnly: ['priest'],
+    choices: [
+      { text: '신탁을 받든다 (매력 검정)', stat: '매력', dc: 14,
+        success: { text: '여명의 축복이 너를 감싼다.', reward: { type: 'skill_random_lv' } },
+        fail: { text: '신탁이 흔들리며 사라진다.', penalty: null } },
+      { text: '신탁에 응답한다', result: '빛이 보석으로 응축된다.', reward: { type: 'gem', value: 4 } },
+      { text: '머리를 숙이고 떠난다', result: '제단이 잠잠해진다.', reward: { type: 'heal', value: 35 } },
+    ],
+  },
+  {
+    id: 'priest_doubtTrial',
+    title: '의심의 시험',
+    text: '신앙이 흔들린다 — "너는 정말 빛의 편인가?"\n네 안의 의심이 너를 시험한다.',
+    classOnly: ['priest'],
+    choices: [
+      { text: '의심을 끌어안는다 (지능 검정)', stat: '지능', dc: 15,
+        success: { text: '시험을 통과해 한 걸음 더 깊은 신앙으로 나아간다.', reward: { type: 'skill_random_lv' } },
+        fail: { text: '의심이 너를 갉아먹는다.', penalty: { hp: -30 } } },
+      { text: '맹세를 다시 한다', result: '신앙이 굳건해진다.', reward: { type: 'maxhp', value: 20 } },
+      { text: '시험을 외면한다', result: '의심은 그림자로 남는다.', reward: null },
     ],
   },
 ];

@@ -7,6 +7,20 @@
 
 export const CHANGELOG = [
   {
+    version: '1.5.1',
+    date: '2026-05-13',
+    label: '직업별 전용 사건 10개 (Tier 2D)',
+    changes: [
+      { type: 'feature', text: '5개 직업 각각 전용 사건 2개씩, 총 10개 추가. 같은 챕터를 다른 직업으로 돌면 새로운 직업 정체성 이벤트 등장' },
+      { type: 'feature', text: '방랑검사 — 옛 스승의 흔적 / 어둠 속의 시험' },
+      { type: 'feature', text: '술법사 — 잊혀진 마법서 / 정념의 폭주' },
+      { type: 'feature', text: '혼혈 마족 — 마족의 동족 / 핏줄의 갈증' },
+      { type: 'feature', text: '숲의 정령사 — 숲의 부름 / 황혼의 동족' },
+      { type: 'feature', text: '여명의 사제 — 여명의 신탁 / 의심의 시험' },
+      { type: 'system', text: '이벤트 데이터에 classOnly 필터 추가 — 사건이 특정 직업에만 등장하도록 지정 가능 (이벤트 풀 필터에 적용)' },
+    ],
+  },
+  {
     version: '1.5.0',
     date: '2026-05-13',
     label: '콘텐츠 확장: 사건 30 / 유물 8 / 레시피 13 / 저주 4',
