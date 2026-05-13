@@ -8,22 +8,26 @@ import { RELICS } from '../data.js';
 export default function ExpeditionClearScreen({ expedition, soulsGained, firstClear, onContinue }) {
   // 신규 해금 유물 정보 찾기
   const newRelic = firstClear?.newRelic ? RELICS.find(r => r.name === firstClear.newRelic) : null;
-  
+  const isTutorial = expedition.isTutorial === true;
+  const clearLabel = isTutorial ? 'TUTORIAL CLEAR' : 'EXPEDITION CLEAR';
+  const flavor = isTutorial
+    ? '"한 걸음의 끝.\n다음 시련이 기다린다."'
+    : '"원정의 끝.\n영혼이 깃든다."';
+
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center px-6 py-8" style={{
       background: `radial-gradient(ellipse at center, ${expedition.color}40, ${PALETTE.bgDeep} 70%)`,
     }}>
       <div className="text-center mb-6">
-        <div className="text-xs tracking-[0.4em] mb-3" style={{ color: PALETTE.legendary }}>━━ EXPEDITION CLEAR ━━</div>
+        <div className="text-xs tracking-[0.4em] mb-3" style={{ color: PALETTE.legendary }}>━━ {clearLabel} ━━</div>
         <h2 className="text-3xl font-bold mb-2" style={{
           color: PALETTE.legendary, fontFamily: '"Cinzel", serif',
           textShadow: `0 0 30px ${PALETTE.legendary}80`,
         }}>{expedition.name}</h2>
         <p className="text-xs italic mt-2" style={{ color: PALETTE.textDim }}>{expedition.sub}</p>
       </div>
-      <p className="text-sm text-center leading-relaxed mb-6 italic" style={{ color: PALETTE.text }}>
-        "원정의 끝.<br/>
-        영혼이 깃든다."
+      <p className="text-sm text-center leading-relaxed mb-6 italic whitespace-pre-line" style={{ color: PALETTE.text }}>
+        {flavor}
       </p>
       
       {/* 영혼 획득 카운터 */}
