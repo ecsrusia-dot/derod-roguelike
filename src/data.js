@@ -22,9 +22,9 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.2.0';
-export const VERSION_DATE = '2026-05-12';
-export const VERSION_LABEL = '튜토리얼 2 황혼의 시장 (상점·대장간 학습)';
+export const GAME_VERSION = '1.2.1';
+export const VERSION_DATE = '2026-05-13';
+export const VERSION_LABEL = '튜토리얼 클리어 화면·대장간 안내 문구 정리';
 
 // =========== 패시브 스킬 ===========
 // effect 필드는 문자열 키. 실제 동작은 메인 코드의 trigger handler에서 처리.
@@ -1620,7 +1620,7 @@ export const CHAPTERS = [
         tutorialForge: true,  // 진입 시 랜덤 유물 +1 (조합용 두 번째 유물)
         modalOverride: {
           desc: '보유한 유물 두 개를 희생해 더 강한 패시브로 단련한다.',
-          detail: '대장간 진입 시 유물을 하나 더 받게 됩니다. 두 유물의 조합이 정해진 레시피와 일치하면 패시브 스킬 Lv +1, 일치하지 않으면 영혼 +50의 위로 보상이 주어집니다. 운에 맡기되, 도감에서 레시피를 모아 나가세요.',
+          detail: '두 유물의 조합이 정해진 레시피와 일치하면 패시브 스킬 Lv +1, 일치하지 않으면 영혼 +50의 위로 보상이 주어집니다. 도감에서 레시피를 모아 나가세요.\n\n※ 튜토리얼 한정: 조합을 직접 체험해볼 수 있도록, 이번 대장간 진입 시 랜덤 유물 1개를 특별 지급합니다. 일반 원정의 대장간 노드에서는 유물을 따로 주지 않으니, 보유 유물 2개 이상일 때만 사용 가능합니다.',
         },
       },
       { type: 'rest' },
@@ -2614,11 +2614,11 @@ export const EXPEDITIONS = [
     category: 'tutorial',
     tutorialOrder: 1,
   },
-  // === 튜토리얼 2: 대장간 길목 ===
+  // === 튜토리얼 2: 황혼의 시장 ===
   {
     id: 'tutorial_market',
-    name: '대장간 길목',
-    sub: 'The Path of Trade',
+    name: '황혼의 시장',
+    sub: 'The Twilight Market',
     desc: '은화를 모으고 유물을 단련하라. 상점과 대장간을 익혀라.',
     color: '#c46535',
     chapters: ['tutorial_market'],
@@ -3216,7 +3216,7 @@ export const ACHIEVEMENTS = [
   { id: 'clear_tutorial_basic', cat: 'tutorial', kind: 'first', target: 1, reward: 50, 
     name: '여명의 첫 발걸음', desc: '튜토리얼 - 노드 입문 클리어' },
   { id: 'clear_tutorial_market', cat: 'tutorial', kind: 'first', target: 1, reward: 80, 
-    name: '상인과 대장장이', desc: '튜토리얼 - 대장간 길목 클리어' },
+    name: '상인과 대장장이', desc: '튜토리얼 - 황혼의 시장 클리어' },
   
   // === 수련의 길 클리어 업적 (5직업) ===
   // 보상: 직업 순서대로 100/150/200/250/300
