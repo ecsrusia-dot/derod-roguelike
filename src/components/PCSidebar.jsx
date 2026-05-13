@@ -195,7 +195,7 @@ export default function PCSidebar({
               </div>
               {ultimates && ultimates.length > 0 && (
                 <div className="text-[10px] mt-1" style={{ color: PALETTE.legendary }}>
-                  ✦ 궁극 {ultimates.length}개
+                  ✦ 각성 {ultimates.length}개
                 </div>
               )}
             </button>
@@ -314,7 +314,7 @@ export default function PCSidebar({
                       {ultimates && ultimates.length > 0 && (
                         <div className="mb-3">
                           <div className="text-[10px] tracking-[0.2em] mb-2" style={{ color: PALETTE.legendary }}>
-                            ✦ 궁극기
+                            ✦ 각성기
                           </div>
                           {ultimates.map((ult, i) => (
                             <div key={i} className="px-3 py-2 mb-2" style={{

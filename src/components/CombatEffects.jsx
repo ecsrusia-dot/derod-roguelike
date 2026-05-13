@@ -230,6 +230,57 @@ export function BarrierRing({ trigger, color = '#7ba3c4' }) {
   );
 }
 
+// 액티브 궁극 컷인 — 화면 전체에 골든 버스트 + 궁극명 배너 (~0.9초)
+// info: { name, color } 이거나 null
+export function UltimateCutin({ info }) {
+  if (!info) return null;
+  return (
+    <div
+      key={info.name}
+      className="absolute inset-0 pointer-events-none flex items-center justify-center fx-ult-burst"
+      style={{
+        zIndex: 60,
+        background: `radial-gradient(ellipse at center, ${info.color}aa 0%, ${info.color}33 30%, rgba(0,0,0,0.85) 75%)`,
+      }}
+    >
+      {/* 골든 광선 */}
+      <div
+        className="absolute"
+        style={{
+          width: '200%', height: 80,
+          top: '50%', left: '50%',
+          transform: 'translate(-50%, -50%)',
+          background: `linear-gradient(90deg, transparent 0%, rgba(255,216,107,0.85) 50%, transparent 100%)`,
+          filter: 'blur(3px)',
+        }}
+      />
+      {/* 궁극명 배너 */}
+      <div
+        className="absolute fx-ult-banner"
+        style={{
+          top: '50%', left: '50%',
+          padding: '14px 36px',
+          background: `linear-gradient(180deg, rgba(0,0,0,0.85), rgba(0,0,0,0.65))`,
+          border: `1px solid #ffd86b`,
+          boxShadow: `0 0 24px ${info.color}, 0 0 12px #ffd86b`,
+        }}
+      >
+        <div className="text-[9px] tracking-[0.4em] mb-1 text-center" style={{ color: '#ffd86b' }}>★ 궁극 발동 ★</div>
+        <div
+          className="text-2xl font-bold fx-ult-name text-center whitespace-nowrap"
+          style={{
+            color: '#fff',
+            textShadow: `0 0 12px ${info.color}, 0 0 18px #ffd86b, 0 2px 4px rgba(0,0,0,0.9)`,
+            fontFamily: '"Cinzel", "Noto Serif KR", serif',
+          }}
+        >
+          {info.name}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // 상태이상 오버레이 — 적의 debuffs에 따라 지속 표시되는 환경 효과
 // bleed > 0 : 빨간 액 드립이 위에서 흘러내림
 // igniteTurns > 0 : 주황색 글로우가 깜빡임

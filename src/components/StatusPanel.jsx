@@ -145,7 +145,7 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, relic
         </div>
         {ultimates.length > 0 && (
           <div className="px-4 py-3 border-t" style={{ borderColor: PALETTE.panelBorder }}>
-            <div className="text-[11px] tracking-[0.3em] mb-3" style={{ color: PALETTE.legendary }}>★ 궁극 스킬</div>
+            <div className="text-[11px] tracking-[0.3em] mb-3" style={{ color: PALETTE.legendary }}>★ 각성 스킬</div>
             <div className="space-y-1.5">
               {ultimates.map((ultId, i) => {
                 let ultData = null;

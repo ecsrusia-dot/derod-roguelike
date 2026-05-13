@@ -19,21 +19,23 @@ import {
   getSkillLevel,
   applySealsToSkills,
 } from '../utils/helpers.js';
-import { 
-  PASSIVE_SKILLS, 
-  ULTIMATE_SKILLS, 
-  ENEMIES, 
-  COMBAT_SKILLS, 
-  GAME_CONFIG 
+import {
+  PASSIVE_SKILLS,
+  ULTIMATE_SKILLS,
+  ENEMIES,
+  COMBAT_SKILLS,
+  GAME_CONFIG,
+  CLASS_ULTIMATES,
 } from '../data.js';
 import { calculateDamage, getDisplayDamage, rollCrit, rollDodge } from '../combat/damage.js';
-import { FloatingLabel, DamageVignette, WhiteFlash, SlashFx, MagicImpactFx, MagicParticles, BarrierRing, StatusOverlay } from './CombatEffects.jsx';
+import { FloatingLabel, DamageVignette, WhiteFlash, SlashFx, MagicImpactFx, MagicParticles, BarrierRing, StatusOverlay, UltimateCutin } from './CombatEffects.jsx';
 
 export default function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimates = [], initialRelics = [], activeSkills = null, activeRelicNames = null, enemyKey, isBoss, expedition, curses = [], meta, onVictory, onDefeat }) {
   const [player, setPlayer] = useState(() => {
     let p = {
       ...initialPlayer, defense: 0, buffs: {}, debuffs: {}, cooldowns: {},
       ether: 3, maxEther: 3, firstHitImmune: false, revivedThisCombat: false,
+      soulGauge: 0,  // 영혼 게이지 (0~100). 100에서 직업 액티브 궁극 발동 가능
     };
     // 메타 강화: 최대 에테르 +1
     if (meta) {
@@ -125,6 +127,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
   const [fxMagicImpact, setFxMagicImpact] = useState(0);
   const [fxMagicParticles, setFxMagicParticles] = useState(0);
   const [fxBarrier, setFxBarrier] = useState(0);
+  // 액티브 궁극 컷인 (직업 이미지 + 궁극명 풀스크린 0.9초)
+  const [fxUltimateCutin, setFxUltimateCutin] = useState(null); // { name, color } or null
 
   // 부유 라벨 추가 (자동 제거)
   const pushFxLabel = (side, kind, value, label) => {
@@ -323,6 +327,12 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           }
           newEnemy.currentHp = Math.max(0, newEnemy.currentHp - actualDmg);
           totalDmg += actualDmg;
+          // 영혼 게이지: 데미지 입힘 +dmg/5, 치명타 +10 보너스
+          if (classData.ultimateId && actualDmg > 0) {
+            let gain = Math.floor(actualDmg / 5);
+            if (isCrit) gain += 10;
+            newPlayer.soulGauge = Math.min(100, (newPlayer.soulGauge || 0) + gain);
+          }
           // FX — 적 피격: 부유 데미지 라벨 + 진동 + 흰 플래시
           if (actualDmg > 0) {
             pushFxLabel('enemy', isCrit ? 'crit' : 'damage', actualDmg);
@@ -570,6 +580,64 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     setTimeout(() => { executeEnemyTurn(newPlayer, newEnemy, newLog); }, 350);
   };
 
+  // === 직업 액티브 궁극 발동 ===
+  // 영혼 게이지 100에서만 호출됨. 발동 시 게이지 0으로 리셋, 컷인 0.9초 후
+  // 효과 적용 → 적 턴으로 전환. 효과는 ult.effect ID로 분기 (CLASS_ULTIMATES).
+  const handleUltimate = () => {
+    if (phase !== 'playerTurn') return;
+    if (actionLockRef.current) return;
+    if (!classData.ultimateId) return;
+    if ((player.soulGauge || 0) < 100) return;
+    const ult = CLASS_ULTIMATES[classData.ultimateId];
+    if (!ult) return;
+
+    actionLockRef.current = true;
+
+    // 컷인 표시 (CSS 키프레임이 자동 종료)
+    setFxUltimateCutin({ name: ult.name, color: ult.color });
+    setTimeout(() => setFxUltimateCutin(null), 900);
+
+    // 0.9초 컷인 후 효과 적용
+    setTimeout(() => {
+      let newPlayer = { ...player, soulGauge: 0 };
+      let newEnemy = { ...enemy };
+      const newLog = [...log, { type: 'crit', text: `★ ${ult.name} 발동! ${ult.quote ? `「${ult.quote}」` : ''}` }];
+
+      // === 효과 분기 ===
+      if (ult.effect === 'classult_shadowStrike') {
+        // 적 현재 HP 30%, 방어 무시, 다음 공격 치명타 확정
+        const cut = Math.max(1, Math.floor(newEnemy.currentHp * 0.30));
+        newEnemy.currentHp = Math.max(0, newEnemy.currentHp - cut);
+        newPlayer.buffs = { ...newPlayer.buffs, guaranteedCrit: 1 };
+        newLog.push({ type: 'damage', text: `· ${enemy.name}에게 ${cut} 데미지 [방어 무시]` });
+        newLog.push({ type: 'passive', text: `◆ 다음 공격 치명타 확정` });
+
+        // FX — 슬래시(치명) + 화면 흔들림 + 적 흔들림 + 흰 플래시
+        setFxSlashCrit(true);
+        setFxSlash(v => v + 1);
+        setFxScreenShake(v => v + 1);
+        setFxEnemyShake(v => v + 1);
+        setFxEnemyFlash(v => v + 1);
+        pushFxLabel('enemy', 'crit', cut);
+      }
+
+      setPlayer(newPlayer);
+      setEnemy(newEnemy);
+      setLog(newLog);
+
+      // 적이 죽었으면 승리 처리
+      if (newEnemy.currentHp <= 0) {
+        actionLockRef.current = false;
+        setTimeout(() => setPhase('victory'), 400);
+        return;
+      }
+
+      // 적 턴으로 진행
+      setPhase('enemyTurn');
+      setTimeout(() => { executeEnemyTurn(newPlayer, newEnemy, newLog); }, 350);
+    }, 900);
+  };
+
   const executeEnemyTurn = (curPlayer, curEnemy, curLog) => {
     const newLog = [...curLog];
     let newPlayer = { ...curPlayer };
@@ -744,6 +812,10 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
             // 최종 데미지 적용 (위의 조건들에서 dmg가 0이 되었다면 실행되지 않음)
             if (dmg > 0) {
               newPlayer.hp = Math.max(0, newPlayer.hp - dmg);
+              // 영혼 게이지: 피격 시 더 빠르게 충전 (위기일수록 한 방을)
+              if (classData.ultimateId) {
+                newPlayer.soulGauge = Math.min(100, (newPlayer.soulGauge || 0) + Math.floor(dmg / 3));
+              }
               newLog.push({
                 type: 'damageTaken',
                 text: `· ${dmg} 데미지`,
@@ -1003,6 +1075,11 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     let newPlayer = { ...curPlayer };
     let newEnemy = { ...curEnemy };
     const newTurn = turn + 1;
+
+    // 영혼 게이지 자연 충전 (매 턴 +5)
+    if (classData.ultimateId) {
+      newPlayer.soulGauge = Math.min(100, (newPlayer.soulGauge || 0) + 5);
+    }
 
     if (newEnemy.debuffs?.bleed > 0 && newEnemy.debuffs?.bleedTurns > 0) {
       // 잔혹 minor: 출혈 1스택당 데미지 +1/Lv
@@ -1298,6 +1375,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     >
       {/* 화면 가장자리 빨간 비네트 — 플레이어 피격 시 짧게 */}
       <DamageVignette trigger={fxVignette} />
+      {/* 액티브 궁극 컷인 — 전체 화면을 덮는 0.9초 골든 버스트 */}
+      <UltimateCutin info={fxUltimateCutin} />
       {/* 최상단 턴 정보 (높이 고정) */}
       <div className="px-4 py-2 border-b flex items-center justify-between shrink-0" style={{ borderColor: PALETTE.panelBorder, background: PALETTE.panel }}>
         <span className="text-[10px] tracking-[0.3em]" style={{ color: PALETTE.accent }}>━━ 전투 ━━</span>
@@ -1457,15 +1536,36 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           </div>
         </div>
 
-        {/* 스킬 버튼 — 고정 높이 */}
-        <div className="shrink-0 border-t px-2.5 flex flex-col justify-center h-[88px]" style={{
-          borderColor: PALETTE.panelBorder, 
+        {/* 스킬 버튼 — 고정 높이 (영혼 게이지 + 4번째 궁극 슬롯이 있으면 +12px) */}
+        <div className="shrink-0 border-t px-2.5 flex flex-col justify-center" style={{
+          borderColor: PALETTE.panelBorder,
           background: PALETTE.bgDeep,
+          height: classData.ultimateId ? 104 : 88,
         }}>
+          {/* 영혼 게이지 바 (직업 궁극 보유 시) */}
+          {classData.ultimateId && phase === 'playerTurn' && (() => {
+            const gauge = player.soulGauge || 0;
+            const ready = gauge >= 100;
+            return (
+              <div className="w-full mb-1.5 flex items-center gap-2">
+                <span className="text-[9px] tracking-[0.2em]" style={{ color: ready ? '#ffd86b' : PALETTE.textDim }}>혼</span>
+                <div className="flex-1 h-1.5 relative" style={{ background: 'rgba(0,0,0,0.55)', border: `1px solid ${ready ? '#ffd86b' : PALETTE.panelBorder}` }}>
+                  <div className="absolute inset-y-0 left-0 transition-all" style={{
+                    width: `${gauge}%`,
+                    background: ready
+                      ? `linear-gradient(90deg, #ffd86b, #fff4b8, #ffd86b)`
+                      : `linear-gradient(90deg, ${PALETTE.legendary}, #ffd86b)`,
+                    boxShadow: ready ? '0 0 8px rgba(255,216,107,0.8)' : 'none',
+                  }} />
+                </div>
+                <span className="text-[9px] tabular-nums" style={{ color: ready ? '#ffd86b' : PALETTE.textDim }}>{gauge}/100</span>
+              </div>
+            );
+          })()}
           {phase === 'intro' && <div className="text-center text-[11px] font-bold w-full" style={{ color: PALETTE.textDim }}>전투 준비 중...</div>}
           {phase === 'enemyTurn' && <div className="text-center text-[11px] font-bold w-full" style={{ color: PALETTE.accent }}>◂ 적의 턴 ◂</div>}
           {phase === 'playerTurn' && (
-            <div className="grid grid-cols-3 gap-1.5 w-full">
+            <div className={`grid gap-1.5 w-full ${classData.ultimateId ? 'grid-cols-4' : 'grid-cols-3'}`}>
               {classData.combatSkills.map(skillKey => {
                 const skill = COMBAT_SKILLS[skillKey];
                 if (!skill) return null;
@@ -1502,6 +1602,35 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                   </button>
                 );
               })}
+              {/* 4번째 버튼: 직업 액티브 궁극 (영혼 게이지 100에서 활성화) */}
+              {classData.ultimateId && (() => {
+                const ult = CLASS_ULTIMATES[classData.ultimateId];
+                if (!ult) return null;
+                const ready = (player.soulGauge || 0) >= 100;
+                return (
+                  <button
+                    onClick={() => handleUltimate()}
+                    disabled={!ready}
+                    title={`${ult.name}\n${ult.desc}`}
+                    className={`py-2 transition-all flex flex-col items-center gap-0.5 ${ready ? 'fx-hit-shake' : ''}`}
+                    style={{
+                      background: ready ? `linear-gradient(180deg, ${ult.color}60, ${ult.color}25)` : 'rgba(0,0,0,0.55)',
+                      border: `1px solid ${ready ? '#ffd86b' : PALETTE.panelBorder}`,
+                      color: ready ? '#fff' : PALETTE.textDim,
+                      opacity: ready ? 1 : 0.55,
+                      boxShadow: ready ? '0 0 10px rgba(255,216,107,0.55)' : 'none',
+                    }}
+                  >
+                    <span className="text-[11px] font-bold flex items-center gap-0.5">
+                      <span style={{ color: ready ? '#ffd86b' : PALETTE.textDim }}>★</span>
+                      {ult.name}
+                    </span>
+                    <span className="text-[9px]" style={{ color: ready ? '#ffd86b' : PALETTE.textDim }}>
+                      {ready ? '발동 가능' : `혼 ${player.soulGauge || 0}/100`}
+                    </span>
+                  </button>
+                );
+              })()}
             </div>
           )}
           {phase === 'victory' && (
@@ -1771,7 +1900,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
             )}
             {tooltip.type === 'ultimate' && tooltip.ult && (
               <>
-                <div className="text-[10px] tracking-[0.3em] mb-1" style={{ color: tooltip.ult.color || PALETTE.legendary }}>★ 궁극</div>
+                <div className="text-[10px] tracking-[0.3em] mb-1" style={{ color: tooltip.ult.color || PALETTE.legendary }}>★ 각성</div>
                 <div className="text-base font-bold mb-2" style={{ color: PALETTE.text }}>{tooltip.ult.name}</div>
                 <p className="text-[11px] whitespace-pre-line" style={{ color: PALETTE.textDim }}>{tooltip.ult.desc}</p>
               </>
