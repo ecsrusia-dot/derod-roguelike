@@ -49,6 +49,9 @@ const DEFAULT_META = {
   },
   // 일일 챌린지 첫 클리어 기록 (KST 날짜 키 → true)
   dailyClears: {},
+  // 진행 중인 런 스냅샷 (맵 화면 진입 시 자동 저장 — 앱 종료/새로고침 후 이어하기 용)
+  // null = 진행 중 런 없음. 객체 = 재개 가능한 런 상태.
+  activeRun: null,
 };
 
 // IndexedDB 열기
@@ -180,6 +183,18 @@ export function applyUnlock(meta, unlockId) {
 }
 
 // 원정 클리어 기록
+// 진행 중인 런 스냅샷 저장 (맵 화면 진입 시 호출)
+export function saveActiveRun(meta, snapshot) {
+  if (!snapshot) return meta;
+  return { ...meta, activeRun: snapshot };
+}
+
+// 진행 중인 런 삭제 (사망/원정 클리어/새 런 시작 시)
+export function clearActiveRun(meta) {
+  if (!meta || meta.activeRun == null) return meta;
+  return { ...meta, activeRun: null };
+}
+
 // 일일 챌린지 클리어 기록 (KST 날짜 키)
 export function recordDailyClear(meta, dateKey) {
   if (!dateKey) return meta;

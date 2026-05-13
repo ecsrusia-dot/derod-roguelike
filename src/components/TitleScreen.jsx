@@ -2,10 +2,21 @@
 // components/TitleScreen.jsx — 메인 타이틀 화면
 // ============================================
 import React from 'react';
+import { PlayCircle } from 'lucide-react';
 import { PALETTE } from '../utils/helpers.js';
-import { GAME_VERSION, VERSION_DATE, VERSION_LABEL } from '../data.js';
+import { GAME_VERSION, VERSION_DATE, VERSION_LABEL, CLASSES } from '../data.js';
 
-export default function TitleScreen({ meta, onStart, onAltar, onAchievements, onChangelog, onAccount }) {
+export default function TitleScreen({ meta, onStart, onResume, onAltar, onAchievements, onChangelog, onAccount }) {
+  // 진행 중인 런이 있는지 — 이어하기 버튼 노출 여부 결정
+  const activeRun = meta?.activeRun;
+  const canResume = !!(activeRun && activeRun.v === 1 && activeRun.expedition);
+  const resumeClassName = canResume ? (CLASSES[activeRun.selectedClass]?.name || '') : '';
+  const resumeExpName = canResume ? (activeRun.expedition?.name || '') : '';
+  const resumeChapterDepth = canResume
+    ? (activeRun.expedition?.endless
+        ? `Depth ${(activeRun.chapterIdx || 0) + 1}`
+        : `Ch.${(activeRun.chapterIdx || 0) + 1}`)
+    : '';
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-between py-12 px-8" style={{
       background: `radial-gradient(ellipse at center, ${PALETTE.panel} 0%, ${PALETTE.bgDeep} 70%)`,
@@ -40,6 +51,22 @@ export default function TitleScreen({ meta, onStart, onAltar, onAchievements, on
       </div>
       
       <div className="w-full flex flex-col gap-2.5">
+        {canResume && onResume && (
+          <button onClick={onResume} className="w-full py-3 transition-all hover:scale-[1.02]" style={{
+            background: `linear-gradient(180deg, ${PALETTE.dawn}50, ${PALETTE.dawn}20)`,
+            color: PALETTE.text,
+            border: `1.5px solid ${PALETTE.dawn}`,
+            boxShadow: `0 0 20px ${PALETTE.dawn}40`,
+          }}>
+            <div className="flex items-center justify-center gap-2">
+              <PlayCircle size={16} style={{ color: PALETTE.dawn }} />
+              <span style={{ fontFamily: '"Cinzel", serif', letterSpacing: '0.25em', fontSize: '13px' }}>이어하기</span>
+            </div>
+            <div className="text-[10px] mt-1" style={{ color: PALETTE.textDim }}>
+              {resumeClassName} · {resumeExpName} · {resumeChapterDepth}
+            </div>
+          </button>
+        )}
         <button onClick={onStart} className="w-full py-3 transition-all hover:scale-[1.02]" style={{
           background: `linear-gradient(180deg, ${PALETTE.accent}, ${PALETTE.accentDim})`,
           color: PALETTE.text,
@@ -48,7 +75,7 @@ export default function TitleScreen({ meta, onStart, onAltar, onAchievements, on
           letterSpacing: '0.3em',
           fontSize: '14px',
           boxShadow: `0 0 20px ${PALETTE.accent}40`,
-        }}>여정 시작</button>
+        }}>{canResume ? '새 여정 시작' : '여정 시작'}</button>
         
         <button onClick={onAltar} className="w-full py-2.5 transition-all hover:scale-[1.02]" style={{
           background: `linear-gradient(180deg, ${PALETTE.twilight}40, ${PALETTE.twilight}20)`,
