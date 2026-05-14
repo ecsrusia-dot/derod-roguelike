@@ -124,7 +124,7 @@ public/enemies/<enemyKey>_intro.jpg
 보케.
 ```
 
-### 6.3 동상 거인 (일반 · 전투 일러스트 16:9)
+### 6.3 동상 거인 (강적 · 전투 일러스트 16:9)
 
 `enemyKey: frostGiant`
 
@@ -148,7 +148,7 @@ public/enemies/<enemyKey>_intro.jpg
 비율 (1792×1024 픽셀), 거인이 약간 우측 중앙, 부드러운 보케.
 ```
 
-### 6.4 동토의 약탈자 (강적 · 전투 일러스트 16:9)
+### 6.4 동토의 약탈자 (일반 · 전투 일러스트 16:9)
 
 `enemyKey: tundraRaider`
 
