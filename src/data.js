@@ -22,9 +22,9 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.17.0';
+export const GAME_VERSION = '1.17.1';
 export const VERSION_DATE = '2026-05-14';
-export const VERSION_LABEL = '챕터 3 적 일러스트 6장 적용 (봉인된 신전)';
+export const VERSION_LABEL = '튜토리얼 4 저주의 시련 너프 — elite 4→3, 보스전 저주 2개로';
 
 // =========== 패시브 스킬 ===========
 // effect 필드는 문자열 키. 실제 동작은 메인 코드의 trigger handler에서 처리.
@@ -1698,12 +1698,14 @@ export const CHAPTERS = [
     name: '저주의 시련',
     sub: 'The Trial of Curses',
     desc: '강적과 마주할수록 어둠이 짙어진다. 난이도가 오를수록 늘어나는 저주를 직접 체험하라.',
-    nodeCount: 7,
+    nodeCount: 6,
     biome: 'tutorial',
     color: '#8b1f1f',
     isTutorial: true,
-    // 일직선 시퀀스: 준비 - 강적 - 강적+저주1 - 강적+저주2 - 강적+저주3 - 정비 - 보스
+    // 일직선 시퀀스: 준비 - 강적 - 강적+저주1 - 강적+저주2 - 정비 - 보스
     // addCurseId가 지정된 노드 진입 시 해당 저주가 누적됩니다.
+    // 1.17.1 너프: elite 4→3 (저주 3단계 부패의 저주 노드 제거). 보스전 저주 2개로 진입.
+    // 부패의 저주(회복-50%)가 rest 회복을 무력화시켜 보스(한기의 마녀 HP 320) 부담 과중하던 문제 해소.
     linearSequence: [
       {
         type: 'prep',
@@ -1733,14 +1735,6 @@ export const CHAPTERS = [
         modalOverride: {
           desc: '강적 · 저주 2단계 — 약화의 저주 추가.',
           detail: '이번 전투부터 두 번째 저주가 함께 활성화됩니다.\n· [약화의 저주] 주는 모든 데미지 -15%\n\n버티는 데 더 오래 걸리고, 피해도 더 크게 받습니다. 누적되는 패널티의 무게를 느껴 보세요.',
-        },
-      },
-      {
-        type: 'elite',
-        addCurseId: 'curse_decay',
-        modalOverride: {
-          desc: '강적 · 저주 3단계 — 부패의 저주까지.',
-          detail: '세 번째 저주가 추가됩니다.\n· [부패의 저주] 모든 회복 효과 -50%\n\n곧 나올 정비 노드에서의 회복도 절반밖에 받지 못합니다. 광기 난이도의 무게가 어떤지 가늠해 보세요.',
         },
       },
       { type: 'rest' },
