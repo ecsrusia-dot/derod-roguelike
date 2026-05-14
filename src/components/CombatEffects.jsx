@@ -196,7 +196,7 @@ export function MagicParticles({ trigger, color = '#c8a8e8', count = 10 }) {
   );
 }
 
-// 방어 결계 링 — 플레이어 둘레로 확장하는 청록 펄스
+// 방어 결계 링 — 플레이어 둘레로 확장하는 청록 펄스 (defense 스킬 사용 시)
 export function BarrierRing({ trigger, color = '#7ba3c4' }) {
   if (!trigger) return null;
   return (
@@ -226,6 +226,192 @@ export function BarrierRing({ trigger, color = '#7ba3c4' }) {
           animationDelay: '0.12s',
         }}
       />
+    </div>
+  );
+}
+
+// 방어 소진 펄스 — 적 공격이 방어를 깎을 때 작은 파편 + 빠른 펄스
+export function BarrierBreakFx({ trigger, color = '#7ba3c4' }) {
+  if (!trigger) return null;
+  const shards = [0, 45, 90, 135, 180, 225, 270, 315];
+  return (
+    <div
+      key={trigger}
+      className="absolute inset-0 pointer-events-none flex items-center justify-center"
+      style={{ zIndex: 23 }}
+    >
+      <div
+        className="absolute fx-barrier-break"
+        style={{
+          top: '50%', left: '50%',
+          width: 90, height: 90,
+          border: `2px solid ${color}`,
+          borderRadius: '50%',
+          boxShadow: `0 0 12px ${color}`,
+        }}
+      />
+      {shards.map(angle => (
+        <span
+          key={angle}
+          className="absolute fx-barrier-shard"
+          style={{
+            top: '50%', left: '50%',
+            width: 6, height: 2,
+            background: color,
+            boxShadow: `0 0 6px ${color}`,
+            '--s-angle': `${angle}deg`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+// 관통 스러스트 — 좌→우 직선 빔 + 끝점 임팩트 (방랑검사 슬롯 2)
+export function ThrustFx({ trigger, crit }) {
+  if (!trigger) return null;
+  const color = crit ? '#ffd86b' : '#cfd6e0';
+  const glow = crit ? 'rgba(255,216,107,0.65)' : 'rgba(207,214,224,0.45)';
+  return (
+    <div
+      key={trigger}
+      className="absolute inset-0 pointer-events-none flex items-center justify-center"
+      style={{ zIndex: 22 }}
+    >
+      {/* 직선 빔 — 좌측에서 빠르게 관통 */}
+      <div
+        className="absolute fx-thrust-line"
+        style={{
+          top: '50%', left: '50%',
+          width: 260, height: crit ? 6 : 4,
+          background: `linear-gradient(90deg, transparent 0%, ${color} 45%, #fff 50%, ${color} 55%, transparent 100%)`,
+          boxShadow: `0 0 14px ${color}, 0 0 24px ${glow}`,
+          borderRadius: 2,
+        }}
+      />
+      {/* 끝점 임팩트 — 중앙에서 폭발 */}
+      <div
+        className="absolute fx-thrust-tip"
+        style={{
+          top: '50%', left: '50%',
+          width: 60, height: 60,
+          background: `radial-gradient(circle, ${color} 0%, ${glow} 35%, transparent 70%)`,
+          borderRadius: '50%',
+          filter: 'blur(1px)',
+        }}
+      />
+    </div>
+  );
+}
+
+// 방검 다이아몬드 가드 — 회전 사각형 + 사방 스파크 (방랑검사 슬롯 3)
+export function BladeGuardFx({ trigger, color = '#9bb8d4' }) {
+  if (!trigger) return null;
+  const sparks = [0, 90, 180, 270];
+  return (
+    <div
+      key={trigger}
+      className="absolute inset-0 pointer-events-none flex items-center justify-center"
+      style={{ zIndex: 22 }}
+    >
+      {/* 다이아몬드 (45도 회전 사각형) */}
+      <div
+        className="absolute fx-blade-guard"
+        style={{
+          top: '50%', left: '50%',
+          width: 130, height: 130,
+          border: `3px solid ${color}`,
+          boxShadow: `0 0 18px ${color}, inset 0 0 14px ${color}`,
+          background: `linear-gradient(135deg, ${color}22 0%, transparent 100%)`,
+        }}
+      />
+      {/* 내부 작은 다이아몬드 */}
+      <div
+        className="absolute fx-blade-guard"
+        style={{
+          top: '50%', left: '50%',
+          width: 70, height: 70,
+          border: `2px solid ${color}`,
+          opacity: 0.7,
+          animationDelay: '0.1s',
+        }}
+      />
+      {/* 사방 스파크 */}
+      {sparks.map(angle => (
+        <span
+          key={angle}
+          className="absolute fx-blade-guard-spark"
+          style={{
+            top: '50%', left: '50%',
+            width: 10, height: 2,
+            background: color,
+            boxShadow: `0 0 8px ${color}`,
+            '--g-angle': `${angle}deg`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+// 무영(無影)의 일격 — 3중 슬래시 (X자 + 가로) + 그림자 오라 (방랑검사 슬롯 4)
+export function ShadowStrikeFx({ trigger }) {
+  if (!trigger) return null;
+  const color = '#ffd86b';
+  const shadow = '#1a0f0a';
+  return (
+    <div
+      key={trigger}
+      className="absolute inset-0 pointer-events-none flex items-center justify-center"
+      style={{ zIndex: 24 }}
+    >
+      {/* 그림자 오라 — 검은 배경 + 골든 림 */}
+      <div
+        className="absolute fx-shadow-aura"
+        style={{
+          width: 280, height: 280,
+          background: `radial-gradient(circle, ${shadow}cc 0%, ${shadow}66 35%, transparent 70%)`,
+          boxShadow: `0 0 40px rgba(255,216,107,0.6), inset 0 0 30px rgba(255,216,107,0.3)`,
+          borderRadius: '50%',
+        }}
+      />
+      {/* 3중 슬래시 SVG — 시차를 두고 발동 */}
+      <svg
+        viewBox="0 0 200 200"
+        className="absolute"
+        style={{ width: 280, height: 280, overflow: 'visible' }}
+      >
+        {/* 슬래시 1: 좌상→우하 대각선 */}
+        <path
+          d="M 18 162 Q 70 110 100 96 T 184 32"
+          fill="none"
+          stroke={color}
+          strokeWidth={5}
+          strokeLinecap="round"
+          className="fx-shadow-strike"
+          style={{ filter: `drop-shadow(0 0 8px ${color})` }}
+        />
+        {/* 슬래시 2: 우상→좌하 대각선 (X자 완성) */}
+        <path
+          d="M 184 162 Q 130 110 100 96 T 18 32"
+          fill="none"
+          stroke={color}
+          strokeWidth={5}
+          strokeLinecap="round"
+          className="fx-shadow-strike fx-shadow-strike-2"
+          style={{ filter: `drop-shadow(0 0 8px ${color})` }}
+        />
+        {/* 슬래시 3: 가로 (피니시) */}
+        <path
+          d="M 14 100 Q 80 90 100 100 T 186 100"
+          fill="none"
+          stroke="#fff"
+          strokeWidth={6}
+          strokeLinecap="round"
+          className="fx-shadow-strike fx-shadow-strike-3"
+          style={{ filter: `drop-shadow(0 0 12px ${color})` }}
+        />
+      </svg>
     </div>
   );
 }

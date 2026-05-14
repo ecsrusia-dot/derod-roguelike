@@ -22,9 +22,9 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.14.1';
+export const GAME_VERSION = '1.15.0';
 export const VERSION_DATE = '2026-05-14';
-export const VERSION_LABEL = '적 일러스트 경로 핫픽스 (GitHub Pages 베이스 호환)';
+export const VERSION_LABEL = '방랑검사 스킬 이펙트 차별화 + 무영의 일격 재설계';
 
 // =========== 패시브 스킬 ===========
 // effect 필드는 문자열 키. 실제 동작은 메인 코드의 trigger handler에서 처리.
@@ -271,7 +271,7 @@ export const CLASS_ULTIMATES = {
     classId: 'lanthert',
     name: '무영(無影)의 일격',
     quote: '검은 그림자보다 빠르다.',
-    desc: '적의 현재 HP의 30%를 방어 무시로 즉시 제거. 다음 1턴 치명타 확정.',
+    desc: '적에게 80 데미지 (방어 무시). 다음 3턴간 반격 확률 100%, 다음 공격 치명타 확정.',
     color: '#c4453d',
     icon: '☄',
     effect: 'classult_shadowStrike',

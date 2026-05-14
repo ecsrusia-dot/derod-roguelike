@@ -164,13 +164,79 @@ body {
   transform-origin: center;
 }
 
-/* 방어 결계 링 — 플레이어 둘레로 확장 펄스 */
+/* 방어 결계 링 — 플레이어 둘레로 확장 펄스 (방어 스킬 사용 시) */
 @keyframes fx-barrier-pulse {
   0%   { transform: translate(-50%, -50%) scale(0.4); opacity: 0; }
   30%  { transform: translate(-50%, -50%) scale(0.9); opacity: 0.95; }
   100% { transform: translate(-50%, -50%) scale(1.6); opacity: 0; }
 }
 .fx-barrier-pulse { animation: fx-barrier-pulse 0.8s cubic-bezier(.2,.7,.2,1) forwards; }
+
+/* 방어 소진 — 작은 파편 + 빠른 셰이크 (적 공격이 방어를 깎을 때) */
+@keyframes fx-barrier-break {
+  0%   { transform: translate(-50%, -50%) scale(1.0); opacity: 0; }
+  20%  { transform: translate(-50%, -50%) scale(1.15); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(0.7); opacity: 0; }
+}
+.fx-barrier-break { animation: fx-barrier-break 0.45s cubic-bezier(.3,.7,.4,1) forwards; }
+@keyframes fx-barrier-shard {
+  0%   { transform: translate(-50%, -50%) rotate(var(--s-angle,0deg)) translateX(0)   scale(1);   opacity: 0; }
+  15%  { opacity: 1; }
+  100% { transform: translate(-50%, -50%) rotate(var(--s-angle,0deg)) translateX(38px) scale(0.4); opacity: 0; }
+}
+.fx-barrier-shard { animation: fx-barrier-shard 0.5s cubic-bezier(.2,.7,.3,1) forwards; transform-origin: center; }
+
+/* === 방랑검사 슬롯 2 — 관통 (스러스트 라인) === */
+/* 좌측에서 우측으로 가는 직선 빔. 빠르고 날카로움 */
+@keyframes fx-thrust-line {
+  0%   { transform: translate(-120%, -50%) scaleX(0.3); opacity: 0; }
+  20%  { transform: translate(-50%, -50%)  scaleX(1);   opacity: 1; }
+  100% { transform: translate(80%,  -50%)  scaleX(0.5); opacity: 0; }
+}
+.fx-thrust-line { animation: fx-thrust-line 0.45s cubic-bezier(.2,.85,.2,1) forwards; transform-origin: center; }
+@keyframes fx-thrust-tip {
+  0%   { transform: translate(-50%, -50%) scale(0.2); opacity: 0; }
+  40%  { transform: translate(-50%, -50%) scale(1.4); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(2.2); opacity: 0; }
+}
+.fx-thrust-tip { animation: fx-thrust-tip 0.55s ease-out forwards; }
+
+/* === 방랑검사 슬롯 3 — 방검 (다이아몬드 가드) === */
+/* 결계 링 대신 다이아몬드 4면체로 차별화 */
+@keyframes fx-blade-guard {
+  0%   { transform: translate(-50%, -50%) rotate(45deg) scale(0.5); opacity: 0; }
+  30%  { transform: translate(-50%, -50%) rotate(45deg) scale(1.0); opacity: 0.95; }
+  100% { transform: translate(-50%, -50%) rotate(45deg) scale(1.45); opacity: 0; }
+}
+.fx-blade-guard { animation: fx-blade-guard 0.75s cubic-bezier(.2,.7,.2,1) forwards; }
+@keyframes fx-blade-guard-spark {
+  0%   { transform: translate(-50%, -50%) rotate(var(--g-angle,0deg)) translateX(20px) scale(0.4); opacity: 0; }
+  30%  { opacity: 1; }
+  100% { transform: translate(-50%, -50%) rotate(var(--g-angle,0deg)) translateX(80px) scale(0.2); opacity: 0; }
+}
+.fx-blade-guard-spark { animation: fx-blade-guard-spark 0.7s cubic-bezier(.2,.7,.3,1) forwards; transform-origin: center; }
+
+/* === 방랑검사 슬롯 4 — 무영(無影)의 일격 (3중 슬래시) === */
+/* 시차를 두고 3개의 검선이 X자 + 가로로 그어짐 */
+@keyframes fx-shadow-strike {
+  0%   { stroke-dashoffset: 320; opacity: 0; }
+  20%  { opacity: 1; }
+  70%  { stroke-dashoffset: 0; opacity: 1; }
+  100% { stroke-dashoffset: 0; opacity: 0; }
+}
+.fx-shadow-strike {
+  stroke-dasharray: 320;
+  stroke-dashoffset: 320;
+  animation: fx-shadow-strike 0.55s cubic-bezier(.2,.7,.2,1) forwards;
+}
+.fx-shadow-strike-2 { animation-delay: 0.12s; opacity: 0; animation-fill-mode: both; }
+.fx-shadow-strike-3 { animation-delay: 0.24s; opacity: 0; animation-fill-mode: both; }
+@keyframes fx-shadow-aura {
+  0%   { transform: scale(0.4); opacity: 0; }
+  30%  { transform: scale(1.1); opacity: 0.75; }
+  100% { transform: scale(1.7); opacity: 0; }
+}
+.fx-shadow-aura { animation: fx-shadow-aura 0.9s ease-out forwards; }
 
 /* 상태이상: 출혈 — 빨간 액 드립 (반복) */
 @keyframes fx-bleed-drip {
