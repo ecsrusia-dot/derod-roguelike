@@ -22,9 +22,9 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.13.1';
+export const GAME_VERSION = '1.14.0';
 export const VERSION_DATE = '2026-05-14';
-export const VERSION_LABEL = '챕터 1 티어 재조정 — 동상 거인 강적 승격 / 동토의 약탈자 일반 강등';
+export const VERSION_LABEL = '챕터 1 적 일러스트 + 보스 진입 시네마틱 컷신';
 
 // =========== 패시브 스킬 ===========
 // effect 필드는 문자열 키. 실제 동작은 메인 코드의 trigger handler에서 처리.

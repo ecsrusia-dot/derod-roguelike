@@ -127,6 +127,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
   const [fxMagicImpact, setFxMagicImpact] = useState(0);
   const [fxMagicParticles, setFxMagicParticles] = useState(0);
   const [fxBarrier, setFxBarrier] = useState(0);
+  const [enemyImgFailed, setEnemyImgFailed] = useState(false);
   // 액티브 궁극 컷인 (직업 이미지 + 궁극명 풀스크린 0.9초)
   const [fxUltimateCutin, setFxUltimateCutin] = useState(null); // { name, color } or null
 
@@ -1391,11 +1392,22 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           className={`flex-1 min-h-0 relative overflow-hidden border-b ${fxEnemyShake ? 'fx-hit-shake' : ''}`}
           style={{ borderColor: PALETTE.panelBorder }}
         >
-          {/* 적 일러스트 미구현 — 어두운 배경 + 패턴 */}
-          <div className="absolute inset-0 bg-[#0a0608] flex items-center justify-center">
-            <div className="absolute inset-0 opacity-20" style={{ background: `repeating-linear-gradient(45deg, transparent 0px, transparent 8px, ${enemy.color}15 8px, ${enemy.color}15 9px)` }} />
-            <div className="text-[12px] tracking-[0.3em] relative grayscale" style={{ color: PALETTE.textDim }}>[ 적 모습 미구현 ]</div>
-          </div>
+          {/* 적 전투 일러스트 — public/enemies/classic/chapter_<n>/<key>_combat.jpg
+              일러 없으면 어두운 배경 + 사선 패턴 placeholder로 폴백 */}
+          {enemyImgFailed || !enemy.chapter ? (
+            <div className="absolute inset-0 bg-[#0a0608] flex items-center justify-center">
+              <div className="absolute inset-0 opacity-20" style={{ background: `repeating-linear-gradient(45deg, transparent 0px, transparent 8px, ${enemy.color}15 8px, ${enemy.color}15 9px)` }} />
+              <div className="text-[12px] tracking-[0.3em] relative grayscale" style={{ color: PALETTE.textDim }}>[ 적 모습 미구현 ]</div>
+            </div>
+          ) : (
+            <img
+              src={`/enemies/classic/chapter_${enemy.chapter}/${enemyKey}_combat.jpg`}
+              alt={enemy.name}
+              className="absolute inset-0 w-full h-full object-cover"
+              style={{ objectPosition: 'center center' }}
+              onError={() => setEnemyImgFailed(true)}
+            />
+          )}
           {/* FX 오버레이 — 흰 플래시 + 부유 라벨 + Phase 2 임팩트 */}
           <WhiteFlash trigger={fxEnemyFlash} />
           <StatusOverlay debuffs={enemy.debuffs} />

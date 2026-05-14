@@ -223,3 +223,48 @@ body {
   100% { transform: scale(1);   opacity: 1; letter-spacing: 0.3em; }
 }
 .fx-ult-name { animation: fx-ult-name 0.55s ease-out forwards; display: inline-block; }
+
+/* === 보스 진입 컷신 (BossIntroScreen) === */
+/* 전체 페이드인 — 검은 화면에서 일러로 */
+@keyframes fx-boss-intro-enter {
+  0%   { opacity: 0; }
+  35%  { opacity: 1; }
+  100% { opacity: 1; }
+}
+.fx-boss-intro-enter { animation: fx-boss-intro-enter 0.5s ease-out forwards; }
+
+/* 전체 페이드아웃 — 전투로 넘어갈 때 */
+@keyframes fx-boss-intro-exit {
+  0%   { opacity: 1; }
+  100% { opacity: 0; }
+}
+.fx-boss-intro-exit { animation: fx-boss-intro-exit 0.4s ease-in forwards; }
+
+/* 일러 미세 줌인 — 2.5초 동안 1.0 → 1.04로 천천히 */
+@keyframes fx-boss-intro-zoom {
+  0%   { transform: scale(1.00); }
+  100% { transform: scale(1.04); }
+}
+.fx-boss-intro-zoom { animation: fx-boss-intro-zoom 2.5s ease-out forwards; }
+
+/* 상단 ◆ 보스 등장 ◆ 라벨 — 페이드인 + 글자 간격 수축 */
+@keyframes fx-boss-intro-label {
+  0%   { opacity: 0; letter-spacing: 1em; }
+  50%  { opacity: 1; letter-spacing: 0.5em; }
+  100% { opacity: 1; letter-spacing: 0.5em; }
+}
+.fx-boss-intro-label { animation: fx-boss-intro-label 0.7s ease-out forwards; animation-delay: 0.3s; opacity: 0; animation-fill-mode: both; }
+
+/* 하단 보스 이름 배너 — 아래에서 위로 라이즈 + 페이드 */
+@keyframes fx-boss-intro-banner {
+  0%   { transform: translate(-50%, 40px); opacity: 0; }
+  100% { transform: translate(-50%, 0);    opacity: 1; }
+}
+.fx-boss-intro-banner { animation: fx-boss-intro-banner 0.6s cubic-bezier(.2,.7,.3,1) forwards; animation-delay: 0.8s; opacity: 0; animation-fill-mode: both; }
+
+/* 스킵 안내 — 1초 후 페이드인 */
+@keyframes fx-boss-intro-skip {
+  0%   { opacity: 0; }
+  100% { opacity: 0.5; }
+}
+.fx-boss-intro-skip { animation: fx-boss-intro-skip 0.4s ease-out forwards; animation-delay: 1.2s; opacity: 0; animation-fill-mode: both; }
