@@ -157,37 +157,9 @@ midshot from a low angle to emphasize scale, 4:3 landscape, giant
 slightly off-center to the right.
 ```
 
-### 6.4 마족 첩자 (엘리트 · 전투 일러스트 1600×1200)
+### 6.4 동토의 약탈자 (엘리트 · 전투 일러스트 1600×1200)
 
-`enemyKey: cultist`
-
-```
-Dark fantasy digital painting illustration, Korean MMO art style,
-semi-realistic with anime-influenced facial structure, cinematic lighting
-with strong rim light and twilight atmosphere, painterly textures,
-intricate detail on armor/clothing including chainmail, embroidery,
-gemstones and sparkling magical particles, rich color palette of deep
-purple, gold, crimson and obsidian black, high contrast with dramatic
-depth of field, 85mm cinematic composition, soft bokeh background,
-masterpiece quality, ultra detailed, sharp focus on subject.
-
-Subject: a demon-blood Naxellion cultist spy, slim figure in a hooded
-crimson and obsidian-black robe with intricate gold-thread Naxellion
-sigils embroidered along the hem and sleeves, pale gaunt face partially
-shadowed by hood with glowing crimson eyes visible, holding a curved
-obsidian sacrificial dagger dripping black ichor, demonic tattooed sigils
-glowing faintly along exposed forearm, ritualistic silver chains around
-waist. Background: frozen tundra with cracked permafrost ground and
-aurora sky above, faint floating crimson demonic glyphs hovering nearby
-in the air, ritual blood drawn in a circle on the snow, broken
-expedition crates half-buried. Composition: midshot 4:3 landscape,
-subject slightly off-center left, three-quarter ritualistic pose with
-dagger raised.
-```
-
-### 6.5 한기의 마녀 (엘리트 · 전투 일러스트 1600×1200)
-
-`enemyKey: iceMage`
+`enemyKey: tundraRaider`
 
 ```
 Dark fantasy digital painting illustration, Korean MMO art style,
@@ -199,21 +171,24 @@ purple, gold, crimson and obsidian black, high contrast with dramatic
 depth of field, 85mm cinematic composition, soft bokeh background,
 masterpiece quality, ultra detailed, sharp focus on subject.
 
-Subject: a frost witch sorceress, beautiful pale woman with long
-silver-blue hair flowing in cold wind, dressed in deep midnight-blue
-mage robes with pale cyan crystalline embroidery and silver chainmail
-underlayer, intricate frost-rune jewelry, holding a tall icy staff topped
-with a floating spinning glacial crystal that emits cyan light, summoning
-a glowing ice spear hovering beside her, her glowing pale-cyan eyes
-focused with cold malice, frost particles drifting around her body.
-Background: frozen tundra at deep twilight, icy cliffs with blizzard
-wind and aurora sky in violet-green, cracked permafrost ground reflecting
-the cyan magical light, broken expedition camp ruins in mid-distance.
-Composition: midshot 4:3 landscape, sorceress slightly off-center to the
-left in a casting pose, soft bokeh.
+Subject: a feral northern tundra raider, hardened human barbarian warrior
+driven mad by the cold, weathered scarred face with cold-burned cheeks
+and wild matted hair tied with bone beads, lean muscular build wrapped
+in layered furs (wolf pelt cloak with frosted tips, mammoth hide
+gauntlets), tarnished iron plate fragments held together with leather
+straps and crude rivets, wielding a heavy frost-encrusted battle axe in
+one hand and a jagged ice-hooked dagger in the other, dried-blood war
+paint streaked across forehead, savage gold-amber eyes burning with
+desperation. Background: frozen tundra at deep twilight, icy cliffs and
+blizzard wind, aurora sky in soft violet-green ribbons, cracked
+permafrost ground stained with old blood, scattered broken expedition
+crates half-buried in snow, raider's makeshift camp with skull totems in
+mid-distance, soft bokeh on background. Composition: midshot 4:3
+landscape, subject slightly off-center, three-quarter aggressive
+charging pose with axe raised.
 ```
 
-### 6.6 극지의 망령 (보스 · 전투 일러스트 1600×1200)
+### 6.5 극지의 망령 (엘리트 · 전투 일러스트 1600×1200)
 
 `enemyKey: wraith`
 
@@ -227,24 +202,25 @@ purple, gold, crimson and obsidian black, high contrast with dramatic
 depth of field, 85mm cinematic composition, soft bokeh background,
 masterpiece quality, ultra detailed, sharp focus on subject.
 
-Subject: a polar wraith boss, translucent ghostly figure of a long-dead
-expedition leader hovering above the frozen ground, ragged frost-armor
-fragments and broken sword orbiting around the spectral form, blue-white
-ethereal flames rising from shoulders and back, hollow glowing pale-blue
-sockets where eyes should be, twisted icy chains trailing behind in the
-air, jaw locked open in a silent eternal scream, fragments of the
-expedition's cloak still recognizable but corrupted with frost. Background:
-frozen tundra graveyard at deep night, vast aurora sky pulsing violet and
-green above, frozen corpses of past adventurers half-buried in the ice
-ground, blizzard wind sweeping past horizontally, faint expedition
-campfire long extinguished in mid-distance. Composition: midshot 4:3
-landscape, the wraith dominating center-right of frame in a threatening
-forward-leaning pose, oppressive cinematic scale, soft bokeh.
+Subject: a polar wraith, translucent ghostly figure of a long-dead
+expedition member hovering just above the frozen ground, faded armor
+fragments and broken belongings drifting around the spectral form,
+blue-white ethereal flames flickering from shoulders, hollow glowing
+pale-blue sockets where eyes should be, faint icy mist trailing behind,
+mouth open in a hushed cursed whisper, tattered fragments of the
+expedition's cloak still recognizable but corrupted with frost.
+Background: frozen tundra at deep night, aurora sky pulsing violet and
+green above, a single frozen corpse half-buried nearby in the ice
+ground, blizzard wind sweeping past horizontally, faint extinguished
+campfire in mid-distance, soft bokeh on background. Composition: midshot
+4:3 landscape, the wraith slightly off-center, eerie restrained pose
+(not as imposing as a boss reveal — this is a lesser undead, an elite
+not a final encounter).
 ```
 
-### 6.7 극지의 망령 — 보스 진입 풀컷 (1080×1920, 9:16)
+### 6.6 한기의 마녀 (보스 · 전투 일러스트 1600×1200)
 
-`enemyKey: wraith` (별도 파일 `wraith_intro.jpg`)
+`enemyKey: iceMage`
 
 ```
 Dark fantasy digital painting illustration, Korean MMO art style,
@@ -256,23 +232,66 @@ purple, gold, crimson and obsidian black, high contrast with dramatic
 depth of field, 85mm cinematic composition, soft bokeh background,
 masterpiece quality, ultra detailed, sharp focus on subject.
 
-Subject: a polar wraith boss in full body shot, translucent ghostly
-figure of a long-dead expedition leader hovering above the frozen ground,
-ragged frost-armor fragments and a broken sword orbiting around the
-spectral form, blue-white ethereal flames rising from shoulders and back,
-hollow glowing pale-blue sockets where eyes should be, twisted icy chains
-trailing behind in the air, jaw locked open in a silent eternal scream,
-fragments of the expedition's cloak still recognizable but corrupted with
-frost, arms outstretched wide in an intimidating boss-reveal pose,
-spectral lower body trailing off into mist. Background: frozen tundra
-graveyard at deep night, vast aurora sky filling the upper half of the
-frame with pulsing violet and green ribbons, frozen corpses of past
-expedition members half-buried in the ice ground, blizzard wind streaking
-through the scene, faint extinguished campfire in the foreground snow,
-oppressive cinematic scale showing vast desolate emptiness. Composition:
-full body shot 9:16 portrait orientation, subject centered vertically,
-environment giving sense of vast desolate scale, dramatic cinematic boss
-reveal framing, low camera angle looking up slightly.
+Subject: the absolute-zero frost witch, true sovereign of the northern
+wastes, a tall and statuesque pale woman with long flowing silver-blue
+hair lifted by glacial wind, crowned with a circlet of jagged ice spikes,
+dressed in elaborate deep midnight-blue mage robes with intricate cyan
+crystalline embroidery, silver chainmail underlayer detailed with
+frost-rune engravings, layered glacier-fur shoulder mantle, glowing
+pale-cyan gemstones embedded in collar and belt, holding a tall ornate
+icy staff topped with a slowly spinning glacial sigil emitting brilliant
+cyan light, multiple glowing ice spears hovering threateningly around
+her, her glowing pale-cyan eyes burning with imperious cold malice,
+dense frost particles and snowflake glyphs drifting in a swirling halo
+around her body. Background: frozen tundra at deep twilight under
+massive aurora sky pulsing violet and green, towering icy cliffs framing
+her like a throne hall, cracked permafrost ground reflecting cyan
+magical light, frozen corpses of past challengers half-buried at her
+feet, distant ruins of the expedition camp swallowed in blizzard.
+Composition: midshot 4:3 landscape, sorceress dominating center of
+frame in a commanding casting pose with staff held high, oppressive
+boss-tier presence, soft bokeh.
+```
+
+### 6.7 한기의 마녀 — 보스 진입 풀컷 (1080×1920, 9:16)
+
+`enemyKey: iceMage` (별도 파일 `iceMage_intro.jpg`)
+
+```
+Dark fantasy digital painting illustration, Korean MMO art style,
+semi-realistic with anime-influenced facial structure, cinematic lighting
+with strong rim light and twilight atmosphere, painterly textures,
+intricate detail on armor/clothing including chainmail, embroidery,
+gemstones and sparkling magical particles, rich color palette of deep
+purple, gold, crimson and obsidian black, high contrast with dramatic
+depth of field, 85mm cinematic composition, soft bokeh background,
+masterpiece quality, ultra detailed, sharp focus on subject.
+
+Subject: the absolute-zero frost witch boss in full body shot, true
+sovereign of the northern wastes, a tall statuesque pale woman with long
+flowing silver-blue hair lifted dramatically by glacial wind, crowned
+with a circlet of jagged ice spikes, dressed in elaborate deep
+midnight-blue mage robes with flowing layered skirts of crystalline ice
+filaments, intricate cyan crystalline embroidery throughout, silver
+chainmail underlayer detailed with frost-rune engravings, layered
+glacier-fur shoulder mantle trailing behind her, glowing pale-cyan
+gemstones embedded in collar and belt, holding a tall ornate icy staff
+topped with a slowly spinning glacial sigil emitting brilliant cyan
+light, multiple glowing ice spears hovering threateningly in a circle
+around her, her glowing pale-cyan eyes burning with imperious cold
+malice, dense frost particles and snowflake glyphs drifting in a
+swirling halo around her body, regal commanding pose with staff held
+diagonally and free hand outstretched preparing a spell. Background:
+frozen tundra at deep twilight under vast aurora sky filling the upper
+half of the frame with pulsing violet and green ribbons, towering icy
+cliffs framing the scene like a natural throne hall, cracked permafrost
+ground reflecting cyan magical light, frozen corpses of past challengers
+half-buried at her feet, distant ruins of the expedition camp swallowed
+in blizzard, oppressive cinematic scale of vast frozen sovereignty.
+Composition: full body shot 9:16 portrait orientation, subject centered
+vertically, environment giving sense of vast desolate scale, dramatic
+cinematic boss reveal framing, low camera angle looking up slightly to
+emphasize her sovereignty.
 ```
 
 ---
