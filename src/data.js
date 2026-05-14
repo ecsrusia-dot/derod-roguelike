@@ -22,9 +22,9 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.17.2';
+export const GAME_VERSION = '1.18.0';
 export const VERSION_DATE = '2026-05-14';
-export const VERSION_LABEL = '패시브 카드 즉시 토글 (전투 준비 + 정비 화면)';
+export const VERSION_LABEL = '구 IP(나크젤리온/엘디마이어) 잔재 제거 — 마왕/여명의 봉인으로 재구성';
 
 // =========== 패시브 스킬 ===========
 // effect 필드는 문자열 키. 실제 동작은 메인 코드의 trigger handler에서 처리.
@@ -207,7 +207,7 @@ export const CLASSES = [
   {
     id: 'demonblood', name: '혼혈 마족', sub: 'Demon Heritage',
     quote: '걱정마, 밤이되기전에 돌아올께!',
-    desc: '나크젤리온의 피가 흐르는 자. 분노가 곧 힘이 된다.',
+    desc: '마왕의 피가 흐르는 자. 분노가 곧 힘이 된다.',
     startSkills: { 잔혹: 3, 강타: 1 },
     stats: { 근력: 19, 민첩: 13, 지능: 13, 매력: 9 },
     combatSkills: ['광폭참격', '피의 일격', '광기'],
@@ -496,7 +496,7 @@ export const ENEMIES = {
   },
   sealMage: {
     name: '봉인 마법사', hp: 200, color: '#5c4a8c',
-    desc: '엘디마이어의 봉인을 유지하는 마법사',
+    desc: '여명의 봉인을 유지하는 마법사',
     tier: 'normal', chapter: 3,
     patterns: [
       { name: '봉인 광선', dmg: [24, 30], type: 'attack' },
@@ -520,7 +520,7 @@ export const ENEMIES = {
   },
   oblivionSealer: {
     name: '망각의 봉인자', hp: 460, color: '#5c4a8c',
-    desc: '엘디마이어의 마지막 수호자',
+    desc: '여명의 봉인을 지키는 마지막 수호자',
     isBoss: true, tier: 'boss', chapter: 3,
     patterns: [
       { name: '망각의 일격', dmg: [28, 36], type: 'attack' },
@@ -546,7 +546,7 @@ export const ENEMIES = {
   },
   wrathDemon: {
     name: '분노한 악마', hp: 280, color: '#c4453d',
-    desc: '나크젤리온의 분노가 형상화된 존재',
+    desc: '마왕의 분노가 형상화된 존재',
     tier: 'normal', chapter: 4,
     patterns: [
       { name: '광기의 발톱', dmg: [28, 36], type: 'attack' },
@@ -570,7 +570,7 @@ export const ENEMIES = {
   },
   demonApostle: {
     name: '마왕의 사도', hp: 340, color: '#5c1a1a',
-    desc: '나크젤리온의 직속 사도',
+    desc: '마왕의 직속 사도',
     tier: 'elite', chapter: 4,
     patterns: [
       { name: '사도의 일격', dmg: [32, 40], type: 'attack' },
@@ -581,7 +581,7 @@ export const ENEMIES = {
     drop: { gold: [160, 210], gem: [3, 5] },
   },
   nakzelionShadow: {
-    name: '나크젤리온의 그림자', hp: 580, color: '#0a0608',
+    name: '마왕의 그림자', hp: 580, color: '#0a0608',
     desc: '마왕의 분신. 진정한 마왕은 더 깊은 곳에 있다',
     isBoss: true, tier: 'boss', chapter: 4,
     patterns: [
@@ -1354,7 +1354,7 @@ export const ENEMIES = {
     drop: { gold: [320, 420], gem: [7, 10] },
   },
   
-  // === 챕터 4: 나크젤리온의 영역 (rift_4) — 절대 폭딜 ===
+  // === 챕터 4: 마왕의 영역 (rift_4) — 절대 폭딜 ===
   champ_rift_avatar: {
     name: '마계의 화신', hp: 195, color: '#a52a2a',
     desc: '마계 그 자체가 형상을 갖춘 존재',
@@ -1367,8 +1367,8 @@ export const ENEMIES = {
     drop: { gold: [80, 120] },
   },
   champ_rift_elite4: {
-    name: '나크젤리온의 사도', hp: 270, color: '#3a0a0a',
-    desc: '마왕 나크젤리온을 섬기는 절대 사도',
+    name: '절대 사도', hp: 270, color: '#3a0a0a',
+    desc: '마왕을 섬기는 절대 사도',
     tier: 'elite', chapter: 'rift_4',
     patterns: [
       { name: '사도의 일격', dmg: [26, 34], type: 'attack', shock: 60 },
@@ -1378,14 +1378,14 @@ export const ENEMIES = {
     drop: { gold: [140, 200], gem: [4, 6] },
   },
   champ_rift_boss4: {
-    name: '나크젤리온의 화신', hp: 540, color: '#3a0a0a',
+    name: '마왕의 화신', hp: 540, color: '#3a0a0a',
     desc: '마계의 균열 가장 깊은 곳에 봉인된 마왕의 화신',
     isBoss: true, tier: 'boss', chapter: 'rift_4',
     patterns: [
       { name: '화신의 강타', dmg: [22, 28], type: 'attack', shock: 50 },
       { name: '마계의 절규', dmg: [16, 22], type: 'attack', shock: 80 },
       { name: '심부의 분노', dmg: [34, 44], type: 'attack', shock: 60 },
-      { name: '나크젤리온의 분쇄', dmg: [50, 64], type: 'attack', heavy: true, shock: 90 },  // 한 방에 충격 90
+      { name: '마왕의 분쇄', dmg: [50, 64], type: 'attack', heavy: true, shock: 90 },  // 한 방에 충격 90
       { name: '마왕의 옥좌', dmg: [0, 0], type: 'defend', defense: 65 },
     ],
     drop: { gold: [400, 520], gem: [10, 14] },
@@ -1758,13 +1758,13 @@ export const CHAPTERS = [
   },
   {
     id: 3, name: '봉인된 신전', sub: 'The Sealed Sanctum',
-    desc: '엘디마이어의 파편이 깨어나는 곳. 시간이 뒤틀린다.',
+    desc: '여명의 봉인이 깨어나는 곳. 시간이 뒤틀린다.',
     nodeCount: 28, biome: 'ruin', color: '#5c4a8c',
     enemies: { normal: ['timeKeeper', 'brokenGolem', 'sealMage'], elite: ['ancientPriest'], boss: 'oblivionSealer' },
   },
   {
     id: 4, name: '마계의 균열', sub: 'The Demon Rift',
-    desc: '나크젤리온의 군세가 쏟아지는 차원의 틈.',
+    desc: '마왕의 군세가 쏟아지는 차원의 틈.',
     nodeCount: 32, biome: 'demon', color: '#8b1f1f',
     enemies: { normal: ['demonScout', 'wrathDemon', 'riftBreach'], elite: ['demonApostle'], boss: 'nakzelionShadow' },
   },
@@ -2959,7 +2959,7 @@ export const RELICS = [
     desc: '치명타율 +15%' },
   { name: '명검 로비아의 파편', statBonus: { critDmg: 30 }, weight: 4, color: '#e8b04a',
     desc: '치명타 데미지 +30%' },
-  { name: '나크젤리온의 송곳니', statBonus: { lifesteal: 8 }, weight: 3, color: '#5c1a1a',
+  { name: '마왕의 송곳니', statBonus: { lifesteal: 8 }, weight: 3, color: '#5c1a1a',
     desc: '적 처치 시 HP +8' },
   { name: '광기의 가면', statBonus: { dmgDealt: 20, dmgTaken: 10 }, weight: 3, color: '#c4453d',
     desc: '주는 데미지 +20%, 받는 데미지 +10%' },
@@ -3035,7 +3035,7 @@ export const RELICS = [
 // 정의되지 않은 조합 또는 이미 Lv.7인 패시브 시도 시 → 영혼 +50 보상만
 export const FORGE_RECIPES = [
   { ingredients: ['레카르도의 검편', '광기의 가면'], result: '강타' },
-  { ingredients: ['나크젤리온의 송곳니', '가시 갑옷'], result: '잔혹' },
+  { ingredients: ['마왕의 송곳니', '가시 갑옷'], result: '잔혹' },
   { ingredients: ['현자의 서', '에테르의 결정'], result: '마력' },
   { ingredients: ['대지의 심장', '수신사의 가면'], result: '신앙' },
   { ingredients: ['마족의 발톱', '명검 로비아의 파편'], result: '정밀' },
@@ -3044,14 +3044,14 @@ export const FORGE_RECIPES = [
   { ingredients: ['에테르의 결정', '대지의 심장'], result: '재생' },
   { ingredients: ['황혼의 모래시계', '왕의 보고'], result: '가속' },
   { ingredients: ['왕의 보고', '네잎 클로버'], result: '운명' },
-  { ingredients: ['광기의 가면', '나크젤리온의 송곳니'], result: '광폭' },
+  { ingredients: ['광기의 가면', '마왕의 송곳니'], result: '광폭' },
   { ingredients: ['천리안', '마족의 발톱'], result: '심안' },
   // === 신규 레시피 (새 유물 ↔ 기존 유물 조합) ===
   // 공격축
   { ingredients: ['사냥꾼의 활시위', '명검 로비아의 파편'], result: '정밀' },
   { ingredients: ['뱀파이어의 인장', '레카르도의 검편'], result: '잔혹' },
   { ingredients: ['폭풍의 인장', '광기의 가면'], result: '강타' },
-  { ingredients: ['뱀파이어의 인장', '나크젤리온의 송곳니'], result: '광폭' },
+  { ingredients: ['뱀파이어의 인장', '마왕의 송곳니'], result: '광폭' },
   // 방어축
   { ingredients: ['강철의 맹세', '수호의 방패'], result: '수비' },
   { ingredients: ['거룩한 부적', '네잎 클로버'], result: '회피' },
@@ -3696,7 +3696,7 @@ export const CHAMPIONSHIP_CHAPTERS = {
               elite: ['champ_rift_elite3'],
               boss: 'champ_rift_boss3' 
             } },
-  rift_4: { name: '나크젤리온의 옥좌', sub: 'Throne of Nakzelion', biome: 'demon', color: '#8b1f1f',
+  rift_4: { name: '마왕의 옥좌', sub: 'Throne of the Demon King', biome: 'demon', color: '#8b1f1f',
             nodeCount: 26,
             enemies: { 
               normal: ['champ_rift_avatar', 'champ_rift_demonlord', 'champ_rift_archmage'],
