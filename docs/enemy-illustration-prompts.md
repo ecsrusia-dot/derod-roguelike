@@ -28,22 +28,45 @@ DALL-E 3는 1:1 / 16:9 / 9:16 세 가지 비율만 지원. 프롬프트 안에 �
 
 ## 3. 파일 명명 규칙
 
-전투 일러스트 (가로):
+전체 구조:
 ```
-public/enemies/<enemyKey>_combat.jpg
+public/enemies/
+├── classic/                       # 메인 스토리 (튜토리얼 + 수련의 길 공용)
+│   ├── chapter_1/                 # 북부 극지대
+│   ├── chapter_2/                 # 죽은 자의 숲
+│   ├── chapter_3/                 # 봉인된 신전
+│   └── chapter_4/                 # 마계의 균열
+└── championship/                  # 챔피언십 전용 적 (별도 컨셉)
+    └── <concept>/
 ```
 
-보스 진입 풀컷 (세로):
+전투 일러스트 (가로 16:9):
 ```
-public/enemies/<enemyKey>_intro.jpg
+public/enemies/classic/chapter_<n>/<enemyKey>_combat.jpg     # 메인 스토리
+public/enemies/championship/<concept>/<enemyKey>_combat.jpg  # 챔피언십
+```
+
+보스 진입 풀컷 (세로 9:16):
+```
+public/enemies/classic/chapter_<n>/<enemyKey>_intro.jpg
+public/enemies/championship/<concept>/<enemyKey>_intro.jpg
 ```
 
 예시:
-- `public/enemies/goblin_combat.jpg`
-- `public/enemies/iceMage_combat.jpg`
-- `public/enemies/iceMage_intro.jpg`
+- `public/enemies/classic/chapter_1/goblin_combat.jpg`
+- `public/enemies/classic/chapter_1/iceMage_combat.jpg`
+- `public/enemies/classic/chapter_1/iceMage_intro.jpg`
+- `public/enemies/classic/chapter_2/fallenElf_combat.jpg` (예정)
 
-(`enemyKey`는 `src/data.js`의 `ENEMIES` 객체 키와 동일)
+`enemyKey`는 `src/data.js`의 `ENEMIES` 객체 키와 동일. `<n>`은 `ENEMIES[key].chapter` 값.
+
+런타임 경로 자동 계산:
+```js
+const subdir = enemy.championship
+  ? `championship/${enemy.concept}`
+  : `classic/chapter_${enemy.chapter}`;
+const combatSrc = `/enemies/${subdir}/${enemyKey}_combat.jpg`;
+```
 
 ---
 
@@ -124,7 +147,7 @@ public/enemies/<enemyKey>_intro.jpg
 보케.
 ```
 
-### 6.3 동상 거인 (일반 · 전투 일러스트 16:9)
+### 6.3 동상 거인 (강적 · 전투 일러스트 16:9)
 
 `enemyKey: frostGiant`
 
@@ -148,7 +171,7 @@ public/enemies/<enemyKey>_intro.jpg
 비율 (1792×1024 픽셀), 거인이 약간 우측 중앙, 부드러운 보케.
 ```
 
-### 6.4 동토의 약탈자 (강적 · 전투 일러스트 16:9)
+### 6.4 동토의 약탈자 (일반 · 전투 일러스트 16:9)
 
 `enemyKey: tundraRaider`
 

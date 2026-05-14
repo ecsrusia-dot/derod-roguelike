@@ -22,9 +22,9 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.13.0';
+export const GAME_VERSION = '1.13.1';
 export const VERSION_DATE = '2026-05-14';
-export const VERSION_LABEL = '챕터 1 적 재구성 — 동토의 약탈자 + 한기의 마녀 보스 승격';
+export const VERSION_LABEL = '챕터 1 티어 재조정 — 동상 거인 강적 승격 / 동토의 약탈자 일반 강등';
 
 // =========== 패시브 스킬 ===========
 // effect 필드는 문자열 키. 실제 동작은 메인 코드의 trigger handler에서 처리.
@@ -347,16 +347,16 @@ export const ENEMIES = {
     drop: { gold: [30, 50] },
   },
   tundraRaider: {
-    name: '동토의 약탈자', hp: 130, color: '#8b6f4d',
+    name: '동토의 약탈자', hp: 110, color: '#8b6f4d',
     desc: '한기에 미친 인간 야만전사. 옛 원정대를 약탈하며 살아남았다',
-    tier: 'elite', chapter: 1,
+    tier: 'normal', chapter: 1,
     patterns: [
-      { name: '얼어붙은 도끼', dmg: [16, 22], type: 'attack' },
-      { name: '광폭한 돌진', dmg: [24, 30], type: 'attack', heavy: true },
-      { name: '늑대 가죽 방어', dmg: [0, 0], type: 'defend', defense: 30 },
-      { name: '빙결 회수', dmg: [12, 16], type: 'attack' },
+      { name: '얼어붙은 도끼', dmg: [14, 18], type: 'attack' },
+      { name: '광폭한 돌진', dmg: [20, 26], type: 'attack', heavy: true },
+      { name: '늑대 가죽 방어', dmg: [0, 0], type: 'defend', defense: 20 },
+      { name: '빙결 회수', dmg: [10, 14], type: 'attack' },
     ],
-    drop: { gold: [65, 95], gem: [1, 2] },
+    drop: { gold: [35, 55] },
   },
   wraith: {
     name: '극지의 망령', hp: 180, color: '#7ba3c4',
@@ -407,16 +407,16 @@ export const ENEMIES = {
   
   // === 챕터 1 (북부) 추가 ===
   frostGiant: {
-    name: '동상 거인', hp: 130, color: '#7ba3c4',
-    desc: '동토의 거인. 한기를 발산한다',
-    tier: 'normal', chapter: 1,
+    name: '동상 거인', hp: 180, color: '#7ba3c4',
+    desc: '동토의 거대 거인. 한 발자국마다 땅이 갈라진다',
+    tier: 'elite', chapter: 1,
     patterns: [
-      { name: '얼어붙은 주먹', dmg: [16, 22], type: 'attack' },
-      { name: '한파', dmg: [10, 14], type: 'attack' },
-      { name: '냉기 결계', dmg: [0, 0], type: 'defend', defense: 25 },
-      { name: '눈사태', dmg: [24, 32], type: 'attack', heavy: true },
+      { name: '얼어붙은 주먹', dmg: [18, 24], type: 'attack' },
+      { name: '한파', dmg: [14, 20], type: 'attack' },
+      { name: '냉기 결계', dmg: [0, 0], type: 'defend', defense: 35 },
+      { name: '눈사태', dmg: [30, 40], type: 'attack', heavy: true },
     ],
-    drop: { gold: [40, 60] },
+    drop: { gold: [70, 100], gem: [1, 2] },
   },
   iceMage: {
     name: '한기의 마녀', hp: 320, color: '#9ad4d4',
@@ -1623,7 +1623,7 @@ export const CHAPTERS = [
     // 일직선 7노드 시퀀스: 준비 → 일반몹 → 강적 → 미지 → 사건 → 정비 → 보스
     // 각 노드 진입 시 NodeInfoModal로 설명 팝업
     linearSequence: ['prep', 'battle', 'elite', 'unknown', 'event', 'rest', 'boss'],
-    enemies: { normal: ['goblin', 'iceWolf'], elite: ['tundraRaider'], boss: 'iceMage' },
+    enemies: { normal: ['goblin', 'iceWolf'], elite: ['frostGiant'], boss: 'iceMage' },
   },
   {
     id: 'tutorial_market',
@@ -1652,7 +1652,7 @@ export const CHAPTERS = [
       { type: 'rest' },
       { type: 'boss' },
     ],
-    enemies: { normal: ['goblin', 'iceWolf', 'frostGiant'], elite: ['tundraRaider'], boss: 'iceMage' },
+    enemies: { normal: ['goblin', 'iceWolf', 'tundraRaider'], elite: ['frostGiant'], boss: 'iceMage' },
   },
   {
     id: 'tutorial_branching',
@@ -1691,7 +1691,7 @@ export const CHAPTERS = [
       { type: 'rest' },
       { type: 'boss' },
     ],
-    enemies: { normal: ['goblin', 'iceWolf'], elite: ['tundraRaider'], boss: 'iceMage' },
+    enemies: { normal: ['goblin', 'iceWolf', 'tundraRaider'], elite: ['frostGiant'], boss: 'iceMage' },
   },
   {
     id: 'tutorial_curse',
@@ -1746,7 +1746,7 @@ export const CHAPTERS = [
       { type: 'rest' },
       { type: 'boss' },
     ],
-    enemies: { normal: ['goblin', 'iceWolf'], elite: ['tundraRaider', 'wraith'], boss: 'iceMage' },
+    enemies: { normal: ['goblin', 'iceWolf', 'tundraRaider'], elite: ['frostGiant', 'wraith'], boss: 'iceMage' },
   },
 
   // === 기존 클래식 챕터 (수련의 길에서 사용) ===
@@ -1754,7 +1754,7 @@ export const CHAPTERS = [
     id: 1, name: '북부 극지대', sub: 'The Northern Wastes',
     desc: '눈보라가 멈추지 않는 변경. 한기에 미친 약탈자들이 길을 막는다.',
     nodeCount: 20, biome: 'ice', color: '#7ba3c4',
-    enemies: { normal: ['goblin', 'iceWolf', 'frostGiant'], elite: ['tundraRaider', 'wraith'], boss: 'iceMage' },
+    enemies: { normal: ['goblin', 'iceWolf', 'tundraRaider'], elite: ['frostGiant', 'wraith'], boss: 'iceMage' },
   },
   {
     id: 2, name: '죽은 자의 숲', sub: 'Forest of the Fallen',
