@@ -28,7 +28,7 @@ import {
   CLASS_ULTIMATES,
 } from '../data.js';
 import { calculateDamage, getDisplayDamage, rollCrit, rollDodge } from '../combat/damage.js';
-import { FloatingLabel, DamageVignette, WhiteFlash, SlashFx, MagicImpactFx, MagicParticles, BarrierRing, StatusOverlay, UltimateCutin } from './CombatEffects.jsx';
+import { FloatingLabel, DamageVignette, WhiteFlash, SlashFx, MagicImpactFx, MagicParticles, BarrierRing, BarrierBreakFx, ThrustFx, BladeGuardFx, ShadowStrikeFx, StatusOverlay, UltimateCutin } from './CombatEffects.jsx';
 
 export default function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimates = [], initialRelics = [], activeSkills = null, activeRelicNames = null, enemyKey, isBoss, expedition, curses = [], meta, onVictory, onDefeat }) {
   const [player, setPlayer] = useState(() => {
@@ -127,6 +127,12 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
   const [fxMagicImpact, setFxMagicImpact] = useState(0);
   const [fxMagicParticles, setFxMagicParticles] = useState(0);
   const [fxBarrier, setFxBarrier] = useState(0);
+  const [fxBarrierBreak, setFxBarrierBreak] = useState(0); // 방어 흡수 발생 시 (조건: 방어 > 0)
+  // 방랑검사 슬롯별 전용 FX
+  const [fxThrust, setFxThrust] = useState(0);              // 슬롯 2 — 관통
+  const [fxThrustCrit, setFxThrustCrit] = useState(false);
+  const [fxBladeGuard, setFxBladeGuard] = useState(0);      // 슬롯 3 — 방검
+  const [fxShadowStrike, setFxShadowStrike] = useState(0);  // 슬롯 4 — 무영의 일격
   const [enemyImgFailed, setEnemyImgFailed] = useState(false);
   // 액티브 궁극 컷인 (직업 이미지 + 궁극명 풀스크린 0.9초)
   const [fxUltimateCutin, setFxUltimateCutin] = useState(null); // { name, color } or null
@@ -268,8 +274,14 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       // React state는 동일 핸들러 안에서 배치되므로, 아래에서 isCrit 확정 후
       // setFxSlashCrit(true)를 호출해도 첫 렌더에 반영됨.
       if (skill.type === 'physical') {
-        setFxSlashCrit(false);
-        setFxSlash(v => v + 1);
+        // 방랑검사 슬롯별 차별화: 참격(기본 슬래시) / 관통(스러스트)
+        if (skillKey === '관통') {
+          setFxThrustCrit(false);
+          setFxThrust(v => v + 1);
+        } else {
+          setFxSlashCrit(false);
+          setFxSlash(v => v + 1);
+        }
       } else {
         setFxMagicImpact(v => v + 1);
         setFxMagicParticles(v => v + 1);
@@ -339,10 +351,13 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
             pushFxLabel('enemy', isCrit ? 'crit' : 'damage', actualDmg);
             setFxEnemyShake(v => v + 1);
             setFxEnemyFlash(v => v + 1);
-            // 크리티컬이면 화면도 가볍게 흔들기 + 슬래시도 황금색으로
+            // 크리티컬이면 화면도 가볍게 흔들기 + 스킬별로 다른 강조
             if (isCrit) {
               setFxScreenShake(v => v + 1);
-              if (skill.type === 'physical') setFxSlashCrit(true);
+              if (skill.type === 'physical') {
+                if (skillKey === '관통') setFxThrustCrit(true);
+                else setFxSlashCrit(true);
+              }
             }
           }
           
@@ -525,8 +540,9 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     if (skill.type === 'defense') {
       newPlayer.defense += skill.defense;
       newLog.push({ type: 'system', text: `· 방어 +${skill.defense}` });
-      // Phase 2 FX: 결계 링 펄스
-      setFxBarrier(v => v + 1);
+      // Phase 2 FX: 방검은 다이아몬드 가드, 그 외(결계/바람결계/가호)는 결계 링
+      if (skillKey === '방검') setFxBladeGuard(v => v + 1);
+      else setFxBarrier(v => v + 1);
       if (skill.dodgeBuff) {
         newPlayer.buffs = { ...newPlayer.buffs, dodgeBuff: skill.dodgeBuff, dodgeBuffTurns: 1 };
       }
@@ -606,16 +622,21 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
 
       // === 효과 분기 ===
       if (ult.effect === 'classult_shadowStrike') {
-        // 적 현재 HP 30%, 방어 무시, 다음 공격 치명타 확정
-        const cut = Math.max(1, Math.floor(newEnemy.currentHp * 0.30));
+        // 고정 80 데미지, 방어 무시 + 3턴 반격율 100% + 다음 공격 치명타 확정
+        // (현재 HP % 방식은 적이 약할 때 일반 공격보다 약해지는 문제 → 생존기 컨셉으로 재설계)
+        const cut = 80;
         newEnemy.currentHp = Math.max(0, newEnemy.currentHp - cut);
-        newPlayer.buffs = { ...newPlayer.buffs, guaranteedCrit: 1 };
+        newPlayer.buffs = {
+          ...newPlayer.buffs,
+          guaranteedCrit: 1,
+          shadowCounterTurns: 3,  // 3턴 동안 반격 확률 100%
+        };
         newLog.push({ type: 'damage', text: `· ${enemy.name}에게 ${cut} 데미지 [방어 무시]` });
+        newLog.push({ type: 'passive', text: `★ [무영의 잔영] 3턴간 반격 확률 100%` });
         newLog.push({ type: 'passive', text: `◆ 다음 공격 치명타 확정` });
 
-        // FX — 슬래시(치명) + 화면 흔들림 + 적 흔들림 + 흰 플래시
-        setFxSlashCrit(true);
-        setFxSlash(v => v + 1);
+        // FX — 전용 3중 슬래시 ShadowStrikeFx + 화면 흔들림 + 적 흔들림 + 흰 플래시
+        setFxShadowStrike(v => v + 1);
         setFxScreenShake(v => v + 1);
         setFxEnemyShake(v => v + 1);
         setFxEnemyFlash(v => v + 1);
@@ -730,7 +751,16 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
             const absorbed = Math.min(newPlayer.defense, dmg);
             newPlayer.defense -= absorbed;
             dmg -= absorbed;
-            if (absorbed > 0) takenBreakdown.push(`내 방어 -${absorbed}`);
+            if (absorbed > 0) {
+              takenBreakdown.push(`내 방어 -${absorbed}`);
+              // 방어 차감 별도 로그 — 잔여 방어 명시
+              newLog.push({
+                type: 'system',
+                text: `🛡 방어 -${absorbed} (잔여 ${newPlayer.defense})`,
+              });
+              // 방어 소진 FX — 방어 > 0 이었던 시점에만 발동 (다음 턴 방어=0이면 발동 X)
+              setFxBarrierBreak(v => v + 1);
+            }
           }
           if (hasEffect(skills, 'dmgTaken-15', activeSkills) && dmg > 0) {
             const reduced = Math.floor(dmg * 0.15);
@@ -923,12 +953,15 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       const hasShock = hasUltimate(ultimates, 'ult_counterShock');
       const hasShadow = hasUltimate(ultimates, 'ult_counterShadow');
       const hasAnyCounterUlt = hasMirror || hasShock || hasShadow;
-      
-      if (simanLv > 0 || hasAnyCounterUlt) {
-        // 반격 확률 계산 — minor: 5%/Lv, Lv.3: +20%, 궁극: +60%
+      // 방랑검사 궁극 [무영의 일격] 발동 후 3턴간 반격 100% 버프
+      const shadowStrikeBuff = (newPlayer.buffs?.shadowCounterTurns || 0) > 0;
+
+      if (simanLv > 0 || hasAnyCounterUlt || shadowStrikeBuff) {
+        // 반격 확률 계산 — minor: 5%/Lv, Lv.3: +20%, 궁극: +60%, 무영의 잔영: 100%
         let counterRate = simanLv * 5;
         if (simanLv >= 3) counterRate += 20;
         if (hasAnyCounterUlt) counterRate += 60;
+        if (shadowStrikeBuff) counterRate = 100;
         if (counterRate > 100) counterRate = 100;
         
         // 회피했고 명경지수면: 회피→반격 데미지 +100% 버프 예약
@@ -976,7 +1009,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
             actualDmg -= absorbed;
           }
           newEnemy.currentHp = Math.max(0, newEnemy.currentHp - actualDmg);
-          newLog.push({ type: 'damage', text: `◆ [심안류] 반격! ${actualDmg} 데미지` });
+          const counterLabel = shadowStrikeBuff && simanLv === 0 && !hasAnyCounterUlt ? '무영의 잔영' : '심안류';
+          newLog.push({ type: 'damage', text: `◆ [${counterLabel}] 반격! ${actualDmg} 데미지` });
           if (actualDmg > 0) {
             pushFxLabel('enemy', 'damage', actualDmg);
             setFxEnemyShake(v => v + 1);
@@ -1245,6 +1279,14 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     if (newPlayer.buffs?.shadowCritNext > 0) {
       newPlayer.buffs = { ...newPlayer.buffs, shadowCritNext: 0 };
     }
+    // 방랑검사 [무영의 잔영] 반격 100% 버프 — 매 턴 -1
+    if (newPlayer.buffs?.shadowCounterTurns > 0) {
+      const remaining = newPlayer.buffs.shadowCounterTurns - 1;
+      newPlayer.buffs = { ...newPlayer.buffs, shadowCounterTurns: remaining };
+      if (remaining === 0) {
+        newLog.push({ type: 'system', text: `· 무영의 잔영 종료` });
+      }
+    }
     // 화신강림 1턴 치명 버프 정리
     if (newPlayer.buffs?.ifritCritNext) {
       newPlayer.buffs = { ...newPlayer.buffs };
@@ -1412,6 +1454,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           <WhiteFlash trigger={fxEnemyFlash} />
           <StatusOverlay debuffs={enemy.debuffs} />
           <SlashFx trigger={fxSlash} crit={fxSlashCrit} />
+          <ThrustFx trigger={fxThrust} crit={fxThrustCrit} />
+          <ShadowStrikeFx trigger={fxShadowStrike} />
           <MagicImpactFx trigger={fxMagicImpact} color={classData.color || '#a479d4'} />
           <MagicParticles trigger={fxMagicParticles} color={classData.color || '#c8a8e8'} />
           {fxEnemyLabels.map(l => (
@@ -1499,9 +1543,11 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           key={`player-shake-${fxPlayerShake}`}
           className={`flex-1 min-h-0 relative overflow-hidden ${fxPlayerShake ? 'fx-hit-shake' : ''}`}
         >
-          {/* FX 오버레이 — 흰 플래시 + 부유 라벨 + 결계 링 */}
+          {/* FX 오버레이 — 흰 플래시 + 부유 라벨 + 방어 FX (결계/다이아/소진) */}
           <WhiteFlash trigger={fxPlayerFlash} />
           <BarrierRing trigger={fxBarrier} color={PALETTE.ice || '#7ba3c4'} />
+          <BladeGuardFx trigger={fxBladeGuard} color="#9bb8d4" />
+          <BarrierBreakFx trigger={fxBarrierBreak} color={PALETTE.ice || '#7ba3c4'} />
           {fxPlayerLabels.map(l => (
             <FloatingLabel key={l.id} kind={l.kind} value={l.value} label={l.label} />
           ))}
