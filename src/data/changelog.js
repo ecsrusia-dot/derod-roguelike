@@ -7,6 +7,17 @@
 
 export const CHANGELOG = [
   {
+    version: '1.14.0',
+    date: '2026-05-14',
+    label: '챕터 1 적 일러스트 + 보스 진입 시네마틱 컷신',
+    changes: [
+      { type: 'feature', text: '챕터 1 적 6종에 신규 전투 일러스트 적용 — 북부 고블린 / 얼음 늑대 / 동토의 약탈자 / 동상 거인 / 극지의 망령 / 한기의 마녀. 전투 화면 적 영역의 "[ 적 모습 미구현 ]" 자리에 표시' },
+      { type: 'feature', text: '신규 시스템: 보스 진입 시네마틱 컷신 (BossIntroScreen) — 보스 노드 진입 시 9:16 풀컷 일러 페이드인 + 미세 줌 + 보스 이름 배너 라이즈. 2.5초 자동 진행 또는 탭으로 즉시 스킵' },
+      { type: 'feature', text: '한기의 마녀 진입 풀컷 일러 추가 — 챕터 1 보스 한정. 챕터 2~4 보스는 일러 추가 시 자동 활성화 (시스템은 이미 준비됨)' },
+      { type: 'system', text: '적 일러스트 파일 구조 정착: public/enemies/classic/chapter_<n>/<적key>_combat.jpg 와 _intro.jpg. 챕터 2~4 적은 일러 추가 전까지 기존 placeholder 유지 (회귀 없음)' },
+    ],
+  },
+  {
     version: '1.13.1',
     date: '2026-05-14',
     label: '챕터 1 티어 재조정 — 동상 거인 강적 승격 / 동토의 약탈자 일반 강등',
