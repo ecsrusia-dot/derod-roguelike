@@ -622,9 +622,10 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
 
       // === 효과 분기 ===
       if (ult.effect === 'classult_shadowStrike') {
-        // 고정 80 데미지, 방어 무시 + 3턴 반격율 100% + 다음 공격 치명타 확정
+        // 45 데미지(방어 무시) + 3턴 반격율 100% + 다음 공격 치명타 확정
         // (현재 HP % 방식은 적이 약할 때 일반 공격보다 약해지는 문제 → 생존기 컨셉으로 재설계)
-        const cut = 80;
+        // 1.15.0 → 1.15.1: 80 데미지가 일반 적을 한 방에 처치해 반격 버프 발동 기회를 없앤다는 PM 피드백 → 45로 너프
+        const cut = 45;
         newEnemy.currentHp = Math.max(0, newEnemy.currentHp - cut);
         newPlayer.buffs = {
           ...newPlayer.buffs,
@@ -1429,11 +1430,17 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       {/* 메인 컨테이너: 3분할 + 스킬 버튼 세로 배치 */}
       <div className="flex-1 flex flex-col min-h-0">
         {/* === 1/3: 적 영역 (일러스트 + 정보 BAR 오버레이) === */}
+        {/* 외부 컨테이너는 안정적으로 mount 유지 — 자식 FX 컴포넌트가 적 공격 매번 재-마운트되어
+            애니메이션 잘못 재발되는 문제 방지. shake는 inner wrapper로 격리 */}
         <div
-          key={`enemy-shake-${fxEnemyShake}`}
-          className={`flex-1 min-h-0 relative overflow-hidden border-b ${fxEnemyShake ? 'fx-hit-shake' : ''}`}
+          className="flex-1 min-h-0 relative overflow-hidden border-b"
           style={{ borderColor: PALETTE.panelBorder }}
         >
+          {/* shake 적용용 inner wrapper — 일러만 흔들림, FX 자식들은 외부 */}
+          <div
+            key={`enemy-shake-${fxEnemyShake}`}
+            className={`absolute inset-0 ${fxEnemyShake ? 'fx-hit-shake' : ''}`}
+          >
           {/* 적 전투 일러스트 — public/enemies/classic/chapter_<n>/<key>_combat.jpg
               일러 없으면 어두운 배경 + 사선 패턴 placeholder로 폴백 */}
           {enemyImgFailed || !enemy.chapter ? (
@@ -1450,7 +1457,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
               onError={() => setEnemyImgFailed(true)}
             />
           )}
-          {/* FX 오버레이 — 흰 플래시 + 부유 라벨 + Phase 2 임팩트 */}
+          </div>
+          {/* FX 오버레이 — 흰 플래시 + 부유 라벨 + Phase 2 임팩트 (shake 영향 X, trigger 변화 시에만 재생) */}
           <WhiteFlash trigger={fxEnemyFlash} />
           <StatusOverlay debuffs={enemy.debuffs} />
           <SlashFx trigger={fxSlash} crit={fxSlashCrit} />
@@ -1539,11 +1547,31 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         </div>
 
         {/* === 3/3: 내 영역 (일러스트 + 정보 BAR 오버레이) === */}
-        <div
-          key={`player-shake-${fxPlayerShake}`}
-          className={`flex-1 min-h-0 relative overflow-hidden ${fxPlayerShake ? 'fx-hit-shake' : ''}`}
-        >
-          {/* FX 오버레이 — 흰 플래시 + 부유 라벨 + 방어 FX (결계/다이아/소진) */}
+        {/* 외부 컨테이너는 안정적으로 mount 유지 — 자식 FX 컴포넌트가 매번 재-마운트되어
+            방어 이펙트가 잘못 재발되는 문제 방지. shake는 inner wrapper로 격리 */}
+        <div className="flex-1 min-h-0 relative overflow-hidden">
+          {/* shake 적용용 inner wrapper — 일러만 흔들림 */}
+          <div
+            key={`player-shake-${fxPlayerShake}`}
+            className={`absolute inset-0 ${fxPlayerShake ? 'fx-hit-shake' : ''}`}
+          >
+            {/* 내 전투 일러스트 — 가로형, 가득 채움 */}
+            <img
+              src={classData.combatImage || classData.image}
+              alt="Player Avatar"
+              className="absolute inset-0 w-full h-full object-cover"
+              style={{ objectPosition: 'center center' }}
+              onError={(e) => {
+                // 전투 일러 없으면 기본 일러로 폴백
+                if (e.target.src.includes('combat/')) {
+                  e.target.src = classData.image;
+                } else {
+                  e.target.src = '/classes/lanthert.jpg';
+                }
+              }}
+            />
+          </div>
+          {/* FX 오버레이 — 방어 FX (결계/다이아/소진) + 흰 플래시 + 부유 라벨 (shake 영향 X) */}
           <WhiteFlash trigger={fxPlayerFlash} />
           <BarrierRing trigger={fxBarrier} color={PALETTE.ice || '#7ba3c4'} />
           <BladeGuardFx trigger={fxBladeGuard} color="#9bb8d4" />
@@ -1551,21 +1579,6 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           {fxPlayerLabels.map(l => (
             <FloatingLabel key={l.id} kind={l.kind} value={l.value} label={l.label} />
           ))}
-          {/* 내 전투 일러스트 — 가로형, 가득 채움 */}
-          <img
-            src={classData.combatImage || classData.image}
-            alt="Player Avatar" 
-            className="absolute inset-0 w-full h-full object-cover" 
-            style={{ objectPosition: 'center center' }} 
-            onError={(e) => { 
-              // 전투 일러 없으면 기본 일러로 폴백
-              if (e.target.src.includes('combat/')) {
-                e.target.src = classData.image; 
-              } else {
-                e.target.src = '/classes/lanthert.jpg'; 
-              }
-            }} 
-          />
           {/* 정보 BAR 오버레이 (하단 + 그라디언트) */}
           <div className="absolute inset-x-0 bottom-0">
             <div className="absolute inset-0" style={{ background: `linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.7) 60%, rgba(0,0,0,0.9) 100%)`, pointerEvents: 'none' }} />
@@ -1584,6 +1597,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                 <span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.twilight}50`, color: '#fff', border: `1px solid ${PALETTE.twilight}` }}>✦ 에테르 {player.ether}/{player.maxEther}</span>
                 {player.defense > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.defense}50`, color: '#fff', border: `1px solid ${PALETTE.defense}` }}>◈ 방어 {player.defense}</span>)}
                 {player.buffs?.rage > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.accent}50`, color: '#fff', border: `1px solid ${PALETTE.accent}` }}>☩ 분노 ({player.buffs.rage}T)</span>)}
+                {player.buffs?.shadowCounterTurns > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#1a0f0a90', color: '#ffd86b', border: '1px solid #ffd86b', boxShadow: '0 0 6px rgba(255,216,107,0.5)' }}>☄ 무영의 잔영 반격 100% ({player.buffs.shadowCounterTurns}T)</span>)}
+                {player.buffs?.guaranteedCrit > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#c4453d50', color: '#fff', border: '1px solid #c4453d' }}>✦ 치명타 확정</span>)}
                 {player.firstHitImmune && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.legendary}50`, color: '#fff', border: `1px solid ${PALETTE.legendary}` }}>✦ 무적 1회</span>)}
                 {player.debuffs?.frostbiteDmg > 0 && player.debuffs?.frostbiteTurns > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#7ba3c450', color: '#fff', border: '1px solid #7ba3c4' }}>❄️ 동상 {player.debuffs.frostbiteDmg} ({player.debuffs.frostbiteTurns}T)</span>)}
                 {player.debuffs?.sealedTurns > 0 && player.debuffs?.sealedSkills?.length > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#5c4a8c50', color: '#fff', border: '1px solid #5c4a8c' }}>🔒 봉인 {player.debuffs.sealedSkills.join(',')} ({player.debuffs.sealedTurns}T)</span>)}
