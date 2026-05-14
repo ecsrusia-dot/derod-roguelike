@@ -1,30 +1,30 @@
 # 적 일러스트 생성 프롬프트
 
-본 문서는 **Gemini 등 이미지 생성 AI**에 직접 입력해 적 일러스트를 만들기 위한 프롬프트 모음이다.
+본 문서는 **Microsoft Copilot Designer (DALL-E 3)**에 직접 입력해 적 일러스트를 만들기 위한 프롬프트 모음이다.
 
-직업 일러스트(`public/classes/*.jpg`)와 **동일한 그림체·텍스처·색조**가 유지되도록 공통 헤더를 두고, 각 적의 외형·배경만 차이로 둔다.
+직업 일러스트(`public/classes/*.jpg`)를 챗지피티(DALL-E 3)로 만들었기 때문에 **동일한 DALL-E 3 엔진**을 쓰는 코파일럿 디자이너가 화풍 통일에 최적이다. 제미나이(Imagen)는 디폴트 화풍이 TCG 카드 일러 톤이라 부적합 — 시도했으나 실패 확인.
 
 ---
 
-## 1. 그림체 스펙 (직업 일러스트 분석 결과)
+## 1. 사용 도구
 
-| 요소 | 특징 |
-|---|---|
-| 화풍 | CG 디지털 페인팅 / 세미 리얼리즘 + 애니메 얼굴 (한일 판타지 MMO 일러 계열) |
-| 라이팅 | 시네마틱 라이팅, 림 라이트 + 황혼/역광 |
-| 텍스처 | 자수·체인메일·보석·반짝이는 마법 입자 |
-| 색조 | 보라·금·검정 + 진홍 (다크 판타지 톤) |
-| 디테일 | 의상 정교·머리카락 윤기·깊은 심도 (bokeh) |
-| 얼굴 | 아니메 영향 받은 또렷한 눈·입술, 사실적 그림자 |
+| 도구 | URL | 비고 |
+|---|---|---|
+| **Copilot Designer (권장)** | `copilot.microsoft.com` (이미지 탭) | DALL-E 3 무료 사용. 마이크로소프트 계정 필요. 윈도우 기본 설치 |
+| Bing Image Creator (대안) | `bing.com/images/create` | 동일 엔진. 일일 부스트 15개 |
 
-## 2. 사이즈 규약
+---
+
+## 2. 사이즈 규약 (DALL-E 3 네이티브 비율)
+
+DALL-E 3는 1:1 / 16:9 / 9:16 세 가지 비율만 지원. 프롬프트 안에 비율 명시 필수.
 
 | 용도 | 비율 | 권장 픽셀 | 비고 |
 |---|---|---|---|
-| 전투 일러스트 (모든 적) | 4:3 가로 | **1600×1200** | 적이 중앙~좌측, 챕터 배경 |
-| 보스 진입 풀컷 | 9:16 세로 | **1080×1920** | 풀바디 + 시네마틱 배경 |
+| 전투 일러스트 (모든 적 공통) | **16:9 가로** | **1792×1024** | 적이 중앙~좌측, 챕터 배경 |
+| 보스 진입 풀컷 (보스만) | **9:16 세로** | **1024×1792** | 풀바디 + 시네마틱 배경 |
 
-> 모바일 PWA는 다운스케일되므로 1600×1200이면 4x retina에서도 깨끗.
+> 모바일 PWA에서는 다운스케일되므로 1792×1024면 4x retina에서도 깨끗.
 
 ## 3. 파일 명명 규칙
 
@@ -40,258 +40,232 @@ public/enemies/<enemyKey>_intro.jpg
 
 예시:
 - `public/enemies/goblin_combat.jpg`
-- `public/enemies/wraith_combat.jpg`
-- `public/enemies/wraith_intro.jpg`
+- `public/enemies/iceMage_combat.jpg`
+- `public/enemies/iceMage_intro.jpg`
 
 (`enemyKey`는 `src/data.js`의 `ENEMIES` 객체 키와 동일)
 
 ---
 
-## 4. 공통 프롬프트 헤더 (영문)
+## 4. 코파일럿 디자이너 사용 팁
 
-**모든 적 프롬프트의 맨 앞**에 붙여서 사용. 그림체·텍스처 통일을 보장한다.
-
-```
-Dark fantasy digital painting illustration, Korean MMO art style,
-semi-realistic with anime-influenced facial structure, cinematic lighting
-with strong rim light and twilight atmosphere, painterly textures,
-intricate detail on armor/clothing including chainmail, embroidery,
-gemstones and sparkling magical particles, rich color palette of deep
-purple, gold, crimson and obsidian black, high contrast with dramatic
-depth of field, 85mm cinematic composition, soft bokeh background,
-masterpiece quality, ultra detailed, sharp focus on subject.
-```
-
-## 5. 챕터별 배경 키워드
-
-| 챕터 | 배경 키워드 (영문) |
+| 팁 | 효과 |
 |---|---|
-| 1 북부 극지대 | `frozen tundra, icy cliffs, blizzard wind, aurora sky, cracked permafrost, broken expedition camp ruins` |
-| 2 죽은 자의 숲 | `twilight forest, rotting ancient trees, purple mist, glowing fungi, fallen elven ruins, mossy stone fragments` |
-| 3 봉인된 신전 | `crumbling temple interior, broken stone pillars, glowing runic seals on floor, suspended time particles, dawn light filtering through cracks` |
-| 4 마계의 균열 | `infernal rift, fractured dimension, crimson void, floating obsidian shards, hell-fire embers, demonic architecture in distance` |
+| **이전 직업 일러스트 1장 첨부** ("이 화풍으로") | 화풍 일치 ↑↑↑ |
+| 결과 마음에 안 들면 같은 채팅에서 **"더 부드럽게, 카툰 톤 빼고 다시"** | 멀티턴 보정 가능 |
+| 한 번에 4장 생성 → 가장 잘 나온 거 선택 | 시도 횟수 절약 |
+| 부스트 다 쓰면 생성 느려짐 (5~10분/장). 다음날 충전 | 페이스 조절 |
+| **한국어 자연어**로 입력 | DALL-E 3 한국어 잘 이해함. 영문보다 한국 톤 잘 살아남 |
+
+---
+
+## 5. 챕터별 배경 키워드 (한국어)
+
+| 챕터 | 배경 키워드 |
+|---|---|
+| 1 북부 극지대 | 황혼의 동토 황무지, 얼음 절벽, 눈보라, 보라-녹색 오로라, 갈라진 영구동토, 부서진 원정대 상자, 꺼져가는 모닥불 |
+| 2 죽은 자의 숲 | 황혼의 폐허림, 썩어가는 거목, 보랏빛 안개, 빛나는 버섯, 무너진 엘프 유적, 이끼 낀 돌조각 |
+| 3 봉인된 신전 | 무너진 신전 내부, 부서진 석주, 바닥의 빛나는 룬 봉인, 떠도는 시간 입자, 균열 사이로 비치는 새벽빛 |
+| 4 마계의 균열 | 지옥 균열, 깨진 차원, 진홍 공간, 떠도는 흑요석 파편, 지옥 불씨, 멀리 보이는 마계 건축물 |
 
 ---
 
 ## 6. 챕터 1 — 북부 극지대 (7개 프롬프트)
 
-> 사용법: 각 코드 블록을 **공통 헤더 + 본문**을 한 번에 복사해 Gemini에 입력.
-> 권장 aspect ratio 옵션을 같이 지정할 수 있다면 4:3 (또는 9:16) 명시.
+> 사용법: 각 코드 블록을 그대로 복사해 코파일럿 디자이너에 입력.
+> 가능하면 **`public/classes/lanthertstart.jpg`** 또는 **`sagestart.jpg`**를 첨부해서 화풍 통일도.
 
-### 6.1 북부 고블린 (일반 · 전투 일러스트 1600×1200)
+### 6.1 북부 고블린 (일반 · 전투 일러스트 16:9)
 
 `enemyKey: goblin`
 
 ```
-Dark fantasy digital painting illustration, Korean MMO art style,
-semi-realistic with anime-influenced facial structure, cinematic lighting
-with strong rim light and twilight atmosphere, painterly textures,
-intricate detail on armor/clothing including chainmail, embroidery,
-gemstones and sparkling magical particles, rich color palette of deep
-purple, gold, crimson and obsidian black, high contrast with dramatic
-depth of field, 85mm cinematic composition, soft bokeh background,
-masterpiece quality, ultra detailed, sharp focus on subject.
+다크 판타지 디지털 페인팅 일러스트. 한국 웹소설 표지 같은 부드러운
+페인터리 화풍. 라인아트 없음, 부드러운 그라데이션 음영, 시네마틱
+라이팅, 림 라이트와 황혼 분위기, 깊은 보라·황금·진홍·검정 색조.
+하스스톤·WoW 카툰 카드 일러스트 풍 절대 금지.
 
-Subject: a feral northern goblin warrior, gaunt frostbitten greenish-gray
-skin with frost burns, hunched aggressive posture, tattered fur cloak
-crusted with ice and snow, wielding a crude jagged ice-bone dagger
-dripping with frost, sharp yellow eyes glowing under matted black hair,
-crooked yellow teeth bared in a snarl, leather wraps on forearms with
-bone trinkets. Background: frozen tundra at dusk, icy cliffs and blizzard
-wind, aurora sky in violet-green ribbons above, cracked permafrost
-ground, scattered broken expedition crates half-buried in snow, faint
-campfire embers in mid-distance. Composition: midshot, subject slightly
-left of center, 4:3 landscape orientation, the goblin crouched in attack
-readiness, depth of field blurring background gently.
+캐릭터: 북부 극지대의 야생 고블린 전사. 동상에 걸린 회녹색 피부를
+부드러운 페인터리 텍스처로 표현, 가늘고 야성적인 체형 (과장되거나
+카툰스럽지 않게), 웅크린 공격 자세. 얼음에 덮인 헤진 모피 망토,
+거친 얼음 단검을 한 손에 쥠, 헝클어진 검은 머리 아래 빛나는
+호박색 눈, 이를 살짝 드러낸 절제된 표정 (과장된 만화풍 송곳니
+아님). 팔뚝에 가죽 끈과 작은 뼈 장신구.
+
+배경: 황혼의 동토 황무지, 얼음 절벽과 눈보라, 부드러운 보라-녹색
+오로라가 펼쳐진 하늘, 갈라진 영구동토 지면, 눈에 반쯤 묻힌
+부서진 원정대 나무 상자들, 중간 거리에 꺼져가는 모닥불.
+
+구도: 미들샷, 가로 16:9 비율 (1792×1024 픽셀), 주인공 약간 좌측
+중앙, 풍부한 심도 표현, 배경 보케.
 ```
 
-### 6.2 얼음 늑대 (일반 · 전투 일러스트 1600×1200)
+### 6.2 얼음 늑대 (일반 · 전투 일러스트 16:9)
 
 `enemyKey: iceWolf`
 
 ```
-Dark fantasy digital painting illustration, Korean MMO art style,
-semi-realistic with anime-influenced facial structure, cinematic lighting
-with strong rim light and twilight atmosphere, painterly textures,
-intricate detail on armor/clothing including chainmail, embroidery,
-gemstones and sparkling magical particles, rich color palette of deep
-purple, gold, crimson and obsidian black, high contrast with dramatic
-depth of field, 85mm cinematic composition, soft bokeh background,
-masterpiece quality, ultra detailed, sharp focus on subject.
+다크 판타지 디지털 페인팅 일러스트. 한국 웹소설 표지 같은 부드러운
+페인터리 화풍. 라인아트 없음, 부드러운 그라데이션 음영, 시네마틱
+라이팅, 림 라이트와 황혼 분위기, 깊은 보라·황금·진홍·검정 색조.
+하스스톤·WoW 카툰 카드 일러스트 풍 절대 금지.
 
-Subject: a massive polar ice wolf predator, frost-white fur with pale
-glacial blue underlayer, glowing cyan eyes, breath of crystallized mist
-exhaled in cold air, fangs of pure transparent ice protruding from
-snarling jaws, frost crystals on shoulders and back catching light, paws
-sinking slightly into snow. Background: frozen tundra under aurora sky
-pulsing violet and green, blizzard wind streaks of snow flying past
-horizontally, broken expedition camp ruins half-visible in distance,
-cracked permafrost ground. Composition: midshot 4:3 landscape, wolf in
-mid-stride lunging slightly toward camera, body angled three-quarters
-left, soft bokeh on background.
+캐릭터: 거대한 극지의 얼음 늑대 포식자. 서리처럼 새하얀 털과
+빙하색 푸른 빛이 도는 안쪽 털, 빛나는 청록 눈, 차가운 공기에
+얼어붙는 호흡, 으르렁거리는 입에서 드러난 투명한 얼음 송곳니,
+어깨와 등에 빛에 반짝이는 서리 결정, 눈에 살짝 잠긴 발.
+
+배경: 보라-녹색 오로라가 펄럭이는 하늘 아래 동토 황무지, 가로로
+스쳐가는 눈보라, 멀리 부서진 원정대 막사 폐허, 갈라진 영구동토
+지면.
+
+구도: 미들샷, 가로 16:9 비율 (1792×1024 픽셀), 늑대가 카메라를
+향해 살짝 도약하는 자세, 몸이 4분의 3 좌측 각도, 배경 부드러운
+보케.
 ```
 
-### 6.3 동상 거인 (일반 · 전투 일러스트 1600×1200)
+### 6.3 동상 거인 (일반 · 전투 일러스트 16:9)
 
 `enemyKey: frostGiant`
 
 ```
-Dark fantasy digital painting illustration, Korean MMO art style,
-semi-realistic with anime-influenced facial structure, cinematic lighting
-with strong rim light and twilight atmosphere, painterly textures,
-intricate detail on armor/clothing including chainmail, embroidery,
-gemstones and sparkling magical particles, rich color palette of deep
-purple, gold, crimson and obsidian black, high contrast with dramatic
-depth of field, 85mm cinematic composition, soft bokeh background,
-masterpiece quality, ultra detailed, sharp focus on subject.
+다크 판타지 디지털 페인팅 일러스트. 한국 웹소설 표지 같은 부드러운
+페인터리 화풍. 라인아트 없음, 부드러운 그라데이션 음영, 시네마틱
+라이팅, 림 라이트와 황혼 분위기, 깊은 보라·황금·진홍·검정 색조.
+하스스톤·WoW 카툰 카드 일러스트 풍 절대 금지.
 
-Subject: a hulking frost giant of the frozen tundra, towering humanoid
-figure with pale blue frostbitten skin, frozen shards embedded in
-shoulders and back like natural armor, ragged mammoth-hide loincloth and
-wraps, massive ice-encrusted club resting on shoulder, exhaling a chilling
-mist, hollow icy eyes with no pupils, beard of frozen icicles. Background:
-frozen tundra at dusk, icy cliffs forming a canyon walls, blizzard wind
-swirling around giant's feet, aurora sky above with violet-green ribbons,
-cracked permafrost ground, mammoth bones in mid-distance. Composition:
-midshot from a low angle to emphasize scale, 4:3 landscape, giant
-slightly off-center to the right.
+캐릭터: 동토 황무지의 거대한 동상 거인. 우뚝 선 인간형 체구에
+창백한 푸른 동상에 걸린 피부, 어깨와 등에 자연 갑옷처럼 박힌
+얼음 파편들, 누더기 매머드 가죽 허리띠와 천 조각, 어깨에 걸친
+얼음에 덮인 거대 곤봉, 차가운 입김을 내뱉음, 동공 없는 텅 빈
+얼음 눈, 얼음 고드름으로 된 수염.
+
+배경: 황혼의 동토 황무지, 협곡을 이루는 얼음 절벽, 거인의 발 주변
+휘몰아치는 눈보라, 머리 위 보라-녹색 오로라 하늘, 갈라진 영구동토
+지면, 중간 거리에 매머드 뼈.
+
+구도: 거인의 거대함을 강조하기 위한 로우 앵글 미들샷, 가로 16:9
+비율 (1792×1024 픽셀), 거인이 약간 우측 중앙, 부드러운 보케.
 ```
 
-### 6.4 동토의 약탈자 (엘리트 · 전투 일러스트 1600×1200)
+### 6.4 동토의 약탈자 (강적 · 전투 일러스트 16:9)
 
 `enemyKey: tundraRaider`
 
 ```
-Dark fantasy digital painting illustration, Korean MMO art style,
-semi-realistic with anime-influenced facial structure, cinematic lighting
-with strong rim light and twilight atmosphere, painterly textures,
-intricate detail on armor/clothing including chainmail, embroidery,
-gemstones and sparkling magical particles, rich color palette of deep
-purple, gold, crimson and obsidian black, high contrast with dramatic
-depth of field, 85mm cinematic composition, soft bokeh background,
-masterpiece quality, ultra detailed, sharp focus on subject.
+다크 판타지 디지털 페인팅 일러스트. 한국 웹소설 표지 같은 부드러운
+페인터리 화풍. 라인아트 없음, 부드러운 그라데이션 음영, 시네마틱
+라이팅, 림 라이트와 황혼 분위기, 깊은 보라·황금·진홍·검정 색조.
+하스스톤·WoW 카툰 카드 일러스트 풍 절대 금지.
 
-Subject: a feral northern tundra raider, hardened human barbarian warrior
-driven mad by the cold, weathered scarred face with cold-burned cheeks
-and wild matted hair tied with bone beads, lean muscular build wrapped
-in layered furs (wolf pelt cloak with frosted tips, mammoth hide
-gauntlets), tarnished iron plate fragments held together with leather
-straps and crude rivets, wielding a heavy frost-encrusted battle axe in
-one hand and a jagged ice-hooked dagger in the other, dried-blood war
-paint streaked across forehead, savage gold-amber eyes burning with
-desperation. Background: frozen tundra at deep twilight, icy cliffs and
-blizzard wind, aurora sky in soft violet-green ribbons, cracked
-permafrost ground stained with old blood, scattered broken expedition
-crates half-buried in snow, raider's makeshift camp with skull totems in
-mid-distance, soft bokeh on background. Composition: midshot 4:3
-landscape, subject slightly off-center, three-quarter aggressive
-charging pose with axe raised.
+캐릭터: 한기에 미친 야생 북부 야만 약탈자. 인간 전사. 동상에 걸린
+뺨과 거친 흉터가 있는 풍파 맞은 얼굴, 뼈 구슬로 묶은 헝클어진
+야생 머리, 가늘고 단단한 근육질 체형, 층층이 두른 모피 (서리에
+덮인 늑대 가죽 망토, 매머드 가죽 건틀릿), 가죽 끈과 거친 리벳으로
+이어붙인 녹슨 철판 갑옷 조각, 한 손에는 서리에 덮인 묵직한
+전투 도끼, 다른 손에는 갈고리 모양 얼음 단검, 이마에 마른 핏빛
+전쟁 페인트, 절망에 불타는 야성적인 황금-호박색 눈.
+
+배경: 황혼의 동토 황무지, 얼음 절벽과 눈보라, 부드러운 보라-녹색
+오로라 하늘, 오래된 핏자국이 묻은 갈라진 영구동토 지면, 눈에
+반쯤 묻힌 부서진 원정대 나무 상자, 중간 거리에 약탈자의 임시
+야영지와 해골 토템.
+
+구도: 미들샷, 가로 16:9 비율 (1792×1024 픽셀), 약탈자가 약간
+좌측, 도끼를 치켜든 4분의 3 공격 자세, 부드러운 보케.
 ```
 
-### 6.5 극지의 망령 (엘리트 · 전투 일러스트 1600×1200)
+### 6.5 극지의 망령 (강적 · 전투 일러스트 16:9)
 
 `enemyKey: wraith`
 
 ```
-Dark fantasy digital painting illustration, Korean MMO art style,
-semi-realistic with anime-influenced facial structure, cinematic lighting
-with strong rim light and twilight atmosphere, painterly textures,
-intricate detail on armor/clothing including chainmail, embroidery,
-gemstones and sparkling magical particles, rich color palette of deep
-purple, gold, crimson and obsidian black, high contrast with dramatic
-depth of field, 85mm cinematic composition, soft bokeh background,
-masterpiece quality, ultra detailed, sharp focus on subject.
+다크 판타지 디지털 페인팅 일러스트. 한국 웹소설 표지 같은 부드러운
+페인터리 화풍. 라인아트 없음, 부드러운 그라데이션 음영, 시네마틱
+라이팅, 림 라이트와 황혼 분위기, 깊은 보라·황금·진홍·검정 색조.
+하스스톤·WoW 카툰 카드 일러스트 풍 절대 금지.
 
-Subject: a polar wraith, translucent ghostly figure of a long-dead
-expedition member hovering just above the frozen ground, faded armor
-fragments and broken belongings drifting around the spectral form,
-blue-white ethereal flames flickering from shoulders, hollow glowing
-pale-blue sockets where eyes should be, faint icy mist trailing behind,
-mouth open in a hushed cursed whisper, tattered fragments of the
-expedition's cloak still recognizable but corrupted with frost.
-Background: frozen tundra at deep night, aurora sky pulsing violet and
-green above, a single frozen corpse half-buried nearby in the ice
-ground, blizzard wind sweeping past horizontally, faint extinguished
-campfire in mid-distance, soft bokeh on background. Composition: midshot
-4:3 landscape, the wraith slightly off-center, eerie restrained pose
-(not as imposing as a boss reveal — this is a lesser undead, an elite
-not a final encounter).
+캐릭터: 극지의 망령. 오래전 죽은 원정대원의 반투명한 유령 형상이
+얼어붙은 지면 바로 위에 떠 있음. 빛바랜 갑옷 조각과 부서진 소지품이
+유령 주위를 떠돔, 어깨에서 일렁이는 청백색 영혼 불꽃, 눈이 있어야
+할 자리에 텅 빈 빛나는 창백한 푸른 구멍, 뒤로 흩어지는 희미한
+얼음 안개, 입은 조용한 저주의 속삭임으로 벌어져 있음, 원정대
+망토의 누더기 조각이 서리에 부패되어 남아 있음.
+
+배경: 깊은 밤의 동토 황무지, 머리 위 보라-녹색 오로라가 일렁이는
+하늘, 옆에 반쯤 묻힌 얼어붙은 시신 한 구, 가로로 스쳐가는 눈보라,
+중간 거리에 꺼진 모닥불의 흔적.
+
+구도: 미들샷, 가로 16:9 비율 (1792×1024 픽셀), 망령이 약간
+중앙에서 비켜선 위치, 절제된 으스스한 자세 (보스급 위협이 아닌
+강적급 — 최종 보스가 아닌 일반 강적임을 표현), 부드러운 보케.
 ```
 
-### 6.6 한기의 마녀 (보스 · 전투 일러스트 1600×1200)
+### 6.6 한기의 마녀 (보스 · 전투 일러스트 16:9)
 
 `enemyKey: iceMage`
 
 ```
-Dark fantasy digital painting illustration, Korean MMO art style,
-semi-realistic with anime-influenced facial structure, cinematic lighting
-with strong rim light and twilight atmosphere, painterly textures,
-intricate detail on armor/clothing including chainmail, embroidery,
-gemstones and sparkling magical particles, rich color palette of deep
-purple, gold, crimson and obsidian black, high contrast with dramatic
-depth of field, 85mm cinematic composition, soft bokeh background,
-masterpiece quality, ultra detailed, sharp focus on subject.
+다크 판타지 디지털 페인팅 일러스트. 한국 웹소설 표지 같은 부드러운
+페인터리 화풍. 라인아트 없음, 부드러운 그라데이션 음영, 시네마틱
+라이팅, 림 라이트와 황혼 분위기, 깊은 보라·황금·진홍·검정 색조.
+하스스톤·WoW 카툰 카드 일러스트 풍 절대 금지.
 
-Subject: the absolute-zero frost witch, true sovereign of the northern
-wastes, a tall and statuesque pale woman with long flowing silver-blue
-hair lifted by glacial wind, crowned with a circlet of jagged ice spikes,
-dressed in elaborate deep midnight-blue mage robes with intricate cyan
-crystalline embroidery, silver chainmail underlayer detailed with
-frost-rune engravings, layered glacier-fur shoulder mantle, glowing
-pale-cyan gemstones embedded in collar and belt, holding a tall ornate
-icy staff topped with a slowly spinning glacial sigil emitting brilliant
-cyan light, multiple glowing ice spears hovering threateningly around
-her, her glowing pale-cyan eyes burning with imperious cold malice,
-dense frost particles and snowflake glyphs drifting in a swirling halo
-around her body. Background: frozen tundra at deep twilight under
-massive aurora sky pulsing violet and green, towering icy cliffs framing
-her like a throne hall, cracked permafrost ground reflecting cyan
-magical light, frozen corpses of past challengers half-buried at her
-feet, distant ruins of the expedition camp swallowed in blizzard.
-Composition: midshot 4:3 landscape, sorceress dominating center of
-frame in a commanding casting pose with staff held high, oppressive
-boss-tier presence, soft bokeh.
+캐릭터: 절대영도의 한기의 마녀, 북부 극지대의 진정한 지배자. 키가
+크고 위풍당당한 창백한 여인, 빙하 바람에 흩날리는 긴 은청색 머리,
+들쭉날쭉한 얼음 가시 왕관, 정교한 짙은 자정 푸른 마법사 로브에
+복잡한 청록 결정 자수, 서리 룬이 새겨진 은빛 체인메일 안감,
+빙하 모피 어깨 망토, 옷깃과 허리띠에 박힌 빛나는 청록 보석,
+정교한 얼음 지팡이 끝에 천천히 회전하며 청록빛을 내뿜는 빙하
+문양, 그녀 주위에 위협적으로 떠 있는 여러 개의 빛나는 얼음 창,
+오만한 차가운 적의로 타오르는 빛나는 청록 눈, 몸 주위에 휘몰아
+치는 후광처럼 떠다니는 짙은 서리 입자와 눈송이 문양.
+
+배경: 머리 위로 보라-녹색이 일렁이는 거대한 오로라 하늘 아래
+황혼의 동토 황무지, 그녀를 옥좌의 홀처럼 둘러싼 우뚝 선 얼음
+절벽, 청록 마법광이 비치는 갈라진 영구동토 지면, 그녀의 발치에
+반쯤 묻힌 옛 도전자들의 얼어붙은 시신, 멀리 눈보라에 삼켜진
+원정대 야영지 폐허.
+
+구도: 미들샷, 가로 16:9 비율 (1792×1024 픽셀), 마녀가 화면
+중앙을 압도하며 지팡이를 높이 든 명령적인 시전 자세, 보스급
+압도적 존재감, 부드러운 보케.
 ```
 
-### 6.7 한기의 마녀 — 보스 진입 풀컷 (1080×1920, 9:16)
+### 6.7 한기의 마녀 — 보스 진입 풀컷 (9:16)
 
 `enemyKey: iceMage` (별도 파일 `iceMage_intro.jpg`)
 
 ```
-Dark fantasy digital painting illustration, Korean MMO art style,
-semi-realistic with anime-influenced facial structure, cinematic lighting
-with strong rim light and twilight atmosphere, painterly textures,
-intricate detail on armor/clothing including chainmail, embroidery,
-gemstones and sparkling magical particles, rich color palette of deep
-purple, gold, crimson and obsidian black, high contrast with dramatic
-depth of field, 85mm cinematic composition, soft bokeh background,
-masterpiece quality, ultra detailed, sharp focus on subject.
+다크 판타지 디지털 페인팅 일러스트. 한국 웹소설 표지 같은 부드러운
+페인터리 화풍. 라인아트 없음, 부드러운 그라데이션 음영, 시네마틱
+라이팅, 림 라이트와 황혼 분위기, 깊은 보라·황금·진홍·검정 색조.
+하스스톤·WoW 카툰 카드 일러스트 풍 절대 금지.
 
-Subject: the absolute-zero frost witch boss in full body shot, true
-sovereign of the northern wastes, a tall statuesque pale woman with long
-flowing silver-blue hair lifted dramatically by glacial wind, crowned
-with a circlet of jagged ice spikes, dressed in elaborate deep
-midnight-blue mage robes with flowing layered skirts of crystalline ice
-filaments, intricate cyan crystalline embroidery throughout, silver
-chainmail underlayer detailed with frost-rune engravings, layered
-glacier-fur shoulder mantle trailing behind her, glowing pale-cyan
-gemstones embedded in collar and belt, holding a tall ornate icy staff
-topped with a slowly spinning glacial sigil emitting brilliant cyan
-light, multiple glowing ice spears hovering threateningly in a circle
-around her, her glowing pale-cyan eyes burning with imperious cold
-malice, dense frost particles and snowflake glyphs drifting in a
-swirling halo around her body, regal commanding pose with staff held
-diagonally and free hand outstretched preparing a spell. Background:
-frozen tundra at deep twilight under vast aurora sky filling the upper
-half of the frame with pulsing violet and green ribbons, towering icy
-cliffs framing the scene like a natural throne hall, cracked permafrost
-ground reflecting cyan magical light, frozen corpses of past challengers
-half-buried at her feet, distant ruins of the expedition camp swallowed
-in blizzard, oppressive cinematic scale of vast frozen sovereignty.
-Composition: full body shot 9:16 portrait orientation, subject centered
-vertically, environment giving sense of vast desolate scale, dramatic
-cinematic boss reveal framing, low camera angle looking up slightly to
-emphasize her sovereignty.
+캐릭터: 절대영도의 한기의 마녀 보스의 풀바디 샷, 북부 극지대의
+진정한 지배자. 키 크고 위풍당당한 창백한 여인, 빙하 바람에 극적
+으로 흩날리는 긴 은청색 머리, 들쭉날쭉한 얼음 가시 왕관, 정교한
+짙은 자정 푸른 마법사 로브와 결정 얼음 필라멘트의 흐르는 층층
+스커트, 전체에 복잡한 청록 결정 자수, 서리 룬이 새겨진 은빛
+체인메일 안감, 뒤로 흘러내리는 빙하 모피 어깨 망토, 옷깃과
+허리띠에 박힌 빛나는 청록 보석, 정교한 얼음 지팡이 끝에 천천히
+회전하며 청록빛을 내뿜는 빙하 문양, 그녀 주위에 원형으로 위협적
+으로 떠 있는 여러 개의 빛나는 얼음 창, 오만한 차가운 적의로
+타오르는 빛나는 청록 눈, 몸 주위에 휘몰아치는 후광처럼 떠다니는
+짙은 서리 입자와 눈송이 문양, 지팡이를 비스듬히 들고 다른 손은
+주문을 준비하며 뻗은 위풍당당한 명령적 자세.
+
+배경: 머리 위로 화면 상반부를 가득 채운 보라-녹색 거대한 오로라
+하늘 아래 황혼의 동토 황무지, 자연 옥좌의 홀처럼 장면을 둘러싼
+우뚝 선 얼음 절벽, 청록 마법광이 비치는 갈라진 영구동토 지면,
+그녀의 발치에 반쯤 묻힌 옛 도전자들의 얼어붙은 시신, 멀리
+눈보라에 삼켜진 원정대 야영지 폐허, 광활한 얼어붙은 군림의
+시네마틱 스케일.
+
+구도: 풀바디 샷, 세로 9:16 비율 (1024×1792 픽셀), 주인공이
+세로 중앙, 환경이 광활하고 황량한 스케일을 전달, 극적인
+시네마틱 보스 등장 프레이밍, 그녀의 군림을 강조하기 위해 살짝
+올려다보는 로우 카메라 앵글.
 ```
 
 ---
@@ -300,8 +274,8 @@ emphasize her sovereignty.
 
 각 일러스트 받은 후 아래를 확인:
 
-- [ ] **그림체 통일성** — 직업 일러스트와 한 화풍으로 보이는가? (CG 페인팅, 림 라이트, 색조)
-- [ ] **사이즈/비율** — 전투 4:3, 진입 9:16 정확한가?
+- [ ] **그림체 통일성** — 직업 일러스트와 한 화풍으로 보이는가? (페인터리, 부드러운 톤)
+- [ ] **사이즈/비율** — 전투 16:9, 진입 9:16 정확한가?
 - [ ] **주제 배치** — 적이 너무 가장자리에 가지 않았는가? (`object-cover`로 잘릴 수 있음)
 - [ ] **배경 챕터 매칭** — 챕터 1이면 한기·오로라가 보이는가?
 - [ ] **얼굴/표정** — 너무 평범하거나 컨셉과 어긋나지 않는가?
@@ -309,11 +283,26 @@ emphasize her sovereignty.
 
 ---
 
-## 8. 다음 작업 (TODO)
+## 8. 알려진 제약 사항
+
+### Microsoft Copilot Designer (DALL-E 3)
+- **4:3 비율 미지원** — 1:1 / 16:9 / 9:16만. 본 문서는 16:9 사용
+- Negative prompt 키워드 형식 미지원 — 자연 문장으로 표현 ("X 풍 절대 금지" 등)
+- 작가명 직접 호출은 저작권 리스크가 있어 본 문서는 의도적으로 회피
+- 일일 부스트 제한 (15장/일). 다 쓰면 생성 속도 5~10분/장으로 느려짐
+
+### 제미나이 (Imagen) — 비권장
+- 디폴트 화풍이 TCG 카드 일러 톤으로 강하게 고정. 텍스트 프롬프트로 깨기 어려움
+- 직업 일러(DALL-E 3 생성)와 화풍 통일 거의 불가능
+
+---
+
+## 9. 다음 작업 (TODO)
 
 - [ ] 챕터 2 (죽은 자의 숲) 6종 + 보스 진입 풀컷 1종
 - [ ] 챕터 3 (봉인된 신전) 5종 + 보스 진입 풀컷 1종
 - [ ] 챕터 4 (마계의 균열) 5종 + 보스 진입 풀컷 1종
 - [ ] 챔피언십 전용 적 (40+ 종) — 별도 문서
+- [ ] **직업 일러 vs 챕터 배경 분위기 충돌 문제** — 챕터 1 적 일러 완성 후 재논의 (중립 배경 재생성 / CSS 오버레이 / 풀세트 등 검토)
 - [ ] 적 일러스트가 모이면 `CombatScreen.jsx`에서 placeholder를 `<img>`로 교체 + `ENEMIES`에 `combatImage`/`introImage` 필드 추가
 - [ ] 보스 진입 시 진입 일러스트 풀컷 페이즈 추가 (NodeInfoModal 또는 별도 스크린)
