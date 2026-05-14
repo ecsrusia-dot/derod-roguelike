@@ -22,9 +22,9 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.15.1';
+export const GAME_VERSION = '1.16.0';
 export const VERSION_DATE = '2026-05-14';
-export const VERSION_LABEL = '방어 이펙트 재마운트 버그 + 무영의 일격 너프 + 버프 아이콘';
+export const VERSION_LABEL = '챕터 2 적 일러스트 7장 적용 (죽은 자의 숲)';
 
 // =========== 패시브 스킬 ===========
 // effect 필드는 문자열 키. 실제 동작은 메인 코드의 trigger handler에서 처리.
