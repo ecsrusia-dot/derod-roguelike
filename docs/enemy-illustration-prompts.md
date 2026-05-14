@@ -30,20 +30,27 @@ DALL-E 3는 1:1 / 16:9 / 9:16 세 가지 비율만 지원. 프롬프트 안에 �
 
 전투 일러스트 (가로):
 ```
-public/enemies/<enemyKey>_combat.jpg
+public/enemies/chapter_<n>/<enemyKey>_combat.jpg
 ```
 
 보스 진입 풀컷 (세로):
 ```
-public/enemies/<enemyKey>_intro.jpg
+public/enemies/chapter_<n>/<enemyKey>_intro.jpg
 ```
 
 예시:
-- `public/enemies/goblin_combat.jpg`
-- `public/enemies/iceMage_combat.jpg`
-- `public/enemies/iceMage_intro.jpg`
+- `public/enemies/chapter_1/goblin_combat.jpg`
+- `public/enemies/chapter_1/iceMage_combat.jpg`
+- `public/enemies/chapter_1/iceMage_intro.jpg`
+- `public/enemies/chapter_2/fallenElf_combat.jpg` (예정)
+- `public/enemies/championship/<적key>_combat.jpg` (챔피언십 전용 적)
 
-(`enemyKey`는 `src/data.js`의 `ENEMIES` 객체 키와 동일)
+`enemyKey`는 `src/data.js`의 `ENEMIES` 객체 키와 동일. `<n>`은 `ENEMIES[key].chapter` 값.
+
+런타임 경로는 `ENEMIES[key].chapter` 필드를 통해 자동 계산:
+```js
+const combatSrc = `/enemies/chapter_${enemy.chapter}/${enemyKey}_combat.jpg`;
+```
 
 ---
 
