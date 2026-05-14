@@ -312,7 +312,7 @@ const introSrc = `./enemies/classic/chapter_${enemy.chapter}/${enemyKey}_intro.j
 | 1 | 북부 극지대 (얼음) | ✅ 6종 + 보스 진입 컷신 완료 |
 | 2 | 죽은 자의 숲 (황혼) | ❌ placeholder만 |
 | 3 | 봉인된 신전 (봉인·시간) | ❌ placeholder만 |
-| 4 | 마계의 균열 (마족·나크젤리온) | ❌ placeholder만 |
+| 4 | 마계의 균열 (마족·마왕) | ❌ placeholder만 |
 
 ### 6.5. 챕터 1 적 구성 (1.13.0~1.13.1 정착)
 
@@ -488,7 +488,7 @@ const introSrc = `./enemies/classic/chapter_${enemy.chapter}/${enemyKey}_intro.j
 
 ### 시스템 미구현 (PM 결정 대기)
 - **Tier 3A — 신규 클래스 6번째**
-- **Tier 3B — 신규 챕터 5번째** (컨셉 후보 3가지 제시: 여명의 폐허 / 나크젤리온의 심장 / 시간의 폐허 — 추천은 B)
+- **Tier 3B — 신규 챕터 5번째** (컨셉 후보 3가지 제시: 여명의 폐허 / 마왕의 심장 / 시간의 폐허 — 추천은 B)
 - **Tier 3C — Mutator 시스템** (출정 직전 자가 선택 변형)
 
 ### 부분 진행 가능한 것
