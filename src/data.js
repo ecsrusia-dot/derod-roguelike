@@ -22,9 +22,9 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.12.0';
-export const VERSION_DATE = '2026-05-13';
-export const VERSION_LABEL = '직업 액티브 궁극 + 영혼 게이지 — 방랑검사 프로토타입';
+export const GAME_VERSION = '1.13.0';
+export const VERSION_DATE = '2026-05-14';
+export const VERSION_LABEL = '챕터 1 적 재구성 — 동토의 약탈자 + 한기의 마녀 보스 승격';
 
 // =========== 패시브 스킬 ===========
 // effect 필드는 문자열 키. 실제 동작은 메인 코드의 trigger handler에서 처리.
@@ -346,28 +346,28 @@ export const ENEMIES = {
     ],
     drop: { gold: [30, 50] },
   },
-  cultist: {
-    name: '마족 첩자', hp: 110, color: '#8b1f1f',
-    desc: '나크젤리온을 섬기는 광신도',
+  tundraRaider: {
+    name: '동토의 약탈자', hp: 130, color: '#8b6f4d',
+    desc: '한기에 미친 인간 야만전사. 옛 원정대를 약탈하며 살아남았다',
     tier: 'elite', chapter: 1,
     patterns: [
-      { name: '저주받은 칼', dmg: [14, 20], type: 'attack' },
-      { name: '피의 의식', dmg: [22, 28], type: 'attack', heavy: true },
-      { name: '암흑 결계', dmg: [0, 0], type: 'defend', defense: 30 },
+      { name: '얼어붙은 도끼', dmg: [16, 22], type: 'attack' },
+      { name: '광폭한 돌진', dmg: [24, 30], type: 'attack', heavy: true },
+      { name: '늑대 가죽 방어', dmg: [0, 0], type: 'defend', defense: 30 },
+      { name: '빙결 회수', dmg: [12, 16], type: 'attack' },
     ],
-    drop: { gold: [60, 90], gem: [1, 2] },
+    drop: { gold: [65, 95], gem: [1, 2] },
   },
   wraith: {
-    name: '극지의 망령', hp: 250, color: '#7ba3c4',
+    name: '극지의 망령', hp: 180, color: '#7ba3c4',
     desc: '얼음 속에 잠든 죽은 원정대의 영혼',
-    isBoss: true, tier: 'boss', chapter: 1,
+    tier: 'elite', chapter: 1,
     patterns: [
       { name: '얼음 손길', dmg: [18, 24], type: 'attack' },
       { name: '저주의 속삭임', dmg: [12, 16], type: 'attack' },
-      { name: '한기의 폭풍', dmg: [25, 35], type: 'attack', heavy: true },
-      { name: '망령의 가호', dmg: [0, 0], type: 'defend', defense: 35 },
+      { name: '망령의 가호', dmg: [0, 0], type: 'defend', defense: 30 },
     ],
-    drop: { gold: [150, 200], gem: [3, 5] },
+    drop: { gold: [80, 120], gem: [2, 3] },
   },
   // === 챕터 2: 죽은 자의 숲 ===
   fallenElf: {
@@ -419,16 +419,17 @@ export const ENEMIES = {
     drop: { gold: [40, 60] },
   },
   iceMage: {
-    name: '한기의 마녀', hp: 145, color: '#9ad4d4',
-    desc: '얼음을 다루는 흑마법사',
-    tier: 'elite', chapter: 1,
+    name: '한기의 마녀', hp: 320, color: '#9ad4d4',
+    desc: '북부 극지대의 진정한 지배자. 절대영도의 마법을 부린다',
+    isBoss: true, tier: 'boss', chapter: 1,
     patterns: [
-      { name: '얼음 창', dmg: [18, 24], type: 'attack' },
-      { name: '눈보라', dmg: [22, 30], type: 'attack', heavy: true },
-      { name: '서리 방벽', dmg: [0, 0], type: 'defend', defense: 35 },
-      { name: '동결 저주', dmg: [12, 16], type: 'attack' },
+      { name: '얼음 창', dmg: [22, 28], type: 'attack' },
+      { name: '눈보라', dmg: [28, 36], type: 'attack', heavy: true },
+      { name: '서리 방벽', dmg: [0, 0], type: 'defend', defense: 45 },
+      { name: '동결 저주', dmg: [16, 22], type: 'attack' },
+      { name: '절대영도', dmg: [38, 50], type: 'attack', heavy: true },
     ],
-    drop: { gold: [70, 100], gem: [1, 2] },
+    drop: { gold: [180, 250], gem: [4, 6] },
   },
   
   // === 챕터 2 (숲) 추가 ===
@@ -1622,7 +1623,7 @@ export const CHAPTERS = [
     // 일직선 7노드 시퀀스: 준비 → 일반몹 → 강적 → 미지 → 사건 → 정비 → 보스
     // 각 노드 진입 시 NodeInfoModal로 설명 팝업
     linearSequence: ['prep', 'battle', 'elite', 'unknown', 'event', 'rest', 'boss'],
-    enemies: { normal: ['goblin', 'iceWolf'], elite: ['cultist'], boss: 'wraith' },
+    enemies: { normal: ['goblin', 'iceWolf'], elite: ['tundraRaider'], boss: 'iceMage' },
   },
   {
     id: 'tutorial_market',
@@ -1651,7 +1652,7 @@ export const CHAPTERS = [
       { type: 'rest' },
       { type: 'boss' },
     ],
-    enemies: { normal: ['goblin', 'iceWolf', 'frostGiant'], elite: ['cultist'], boss: 'iceMage' },
+    enemies: { normal: ['goblin', 'iceWolf', 'frostGiant'], elite: ['tundraRaider'], boss: 'iceMage' },
   },
   {
     id: 'tutorial_branching',
@@ -1690,7 +1691,7 @@ export const CHAPTERS = [
       { type: 'rest' },
       { type: 'boss' },
     ],
-    enemies: { normal: ['goblin', 'iceWolf'], elite: ['cultist'], boss: 'wraith' },
+    enemies: { normal: ['goblin', 'iceWolf'], elite: ['tundraRaider'], boss: 'iceMage' },
   },
   {
     id: 'tutorial_curse',
@@ -1745,15 +1746,15 @@ export const CHAPTERS = [
       { type: 'rest' },
       { type: 'boss' },
     ],
-    enemies: { normal: ['goblin', 'iceWolf'], elite: ['cultist', 'iceMage'], boss: 'wraith' },
+    enemies: { normal: ['goblin', 'iceWolf'], elite: ['tundraRaider', 'wraith'], boss: 'iceMage' },
   },
 
   // === 기존 클래식 챕터 (수련의 길에서 사용) ===
   {
     id: 1, name: '북부 극지대', sub: 'The Northern Wastes',
-    desc: '눈보라가 멈추지 않는 변경. 마족의 첩자들이 잠복한다.',
+    desc: '눈보라가 멈추지 않는 변경. 한기에 미친 약탈자들이 길을 막는다.',
     nodeCount: 20, biome: 'ice', color: '#7ba3c4',
-    enemies: { normal: ['goblin', 'iceWolf', 'frostGiant'], elite: ['cultist', 'iceMage'], boss: 'wraith' },
+    enemies: { normal: ['goblin', 'iceWolf', 'frostGiant'], elite: ['tundraRaider', 'wraith'], boss: 'iceMage' },
   },
   {
     id: 2, name: '죽은 자의 숲', sub: 'Forest of the Fallen',
@@ -1863,7 +1864,7 @@ export const EVENTS = [
         text: '정신을 홀린 뒤 짐을 뒤진다. (매력 검정)',
         stat: '매력', dc: 20,
         success: { text: '노인의 정신을 뒤흔든다. 짐을 챙겨 달아난다.', reward: { type: 'gold', value: 100 } },
-        fail: { text: '노인이 뼈를 드러낸다. 망자였다!', combat: 'cultist', penalty: { hp: -50 } }
+        fail: { text: '노인이 뼈를 드러낸다. 망자였다!', combat: 'wraith', penalty: { hp: -50 } }
       },
     ],
   },
