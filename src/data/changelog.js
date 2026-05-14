@@ -7,6 +7,15 @@
 
 export const CHANGELOG = [
   {
+    version: '1.14.1',
+    date: '2026-05-14',
+    label: '적 일러스트 경로 핫픽스',
+    changes: [
+      { type: 'fix', text: '챕터 1 적 일러스트가 보이지 않던 문제 수정 — `<img src>`가 절대 경로(`/enemies/...`)로 작성돼 GitHub Pages의 `/derod-roguelike/` 베이스를 무시하고 404가 났음. 직업 일러(`./classes/...`)와 동일하게 상대 경로(`./enemies/...`)로 통일' },
+      { type: 'fix', text: '보스 진입 컷신의 풀컷 일러도 동일 원인으로 안 보이던 문제 수정' },
+    ],
+  },
+  {
     version: '1.14.0',
     date: '2026-05-14',
     label: '챕터 1 적 일러스트 + 보스 진입 시네마틱 컷신',

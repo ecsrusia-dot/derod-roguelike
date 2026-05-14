@@ -1401,7 +1401,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
             </div>
           ) : (
             <img
-              src={`/enemies/classic/chapter_${enemy.chapter}/${enemyKey}_combat.jpg`}
+              src={`./enemies/classic/chapter_${enemy.chapter}/${enemyKey}_combat.jpg`}
               alt={enemy.name}
               className="absolute inset-0 w-full h-full object-cover"
               style={{ objectPosition: 'center center' }}
