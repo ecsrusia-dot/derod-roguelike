@@ -1,7 +1,8 @@
 // ============================================
 // components/PrepScreen.jsx — 전투 준비 화면 (패시브 + 유물 + 액티브 스킬)
 // ============================================
-// 카드 클릭 시 정보 모달을 표시. 선택 토글은 모달 내부 버튼으로 수행.
+// 패시브 카드: 클릭 즉시 활성/해제 토글 (빠른 빌드 셀렉션). 정보 확인은 도감.
+// 유물·액티브 스킬 카드: 클릭 시 정보 모달, 모달 내부 버튼으로 토글.
 // 자동 통과 모드(보유 ≤ 최대)에서는 모든 카드가 활성, 토글 버튼이 표시되지 않음.
 // ============================================
 
@@ -143,7 +144,7 @@ export default function PrepScreen({ classData, skills, relics, ultimates, exped
                 const lv = skills[name];
                 const isSelected = selectedSkills.has(name);
                 return (
-                  <button key={name} onClick={() => setModalState({ kind: 'passive', name })}
+                  <button key={name} onClick={() => toggleSkill(name)}
                     className="text-left px-2.5 py-2 transition-all"
                     style={{
                       background: isSelected
@@ -166,7 +167,7 @@ export default function PrepScreen({ classData, skills, relics, ultimates, exped
           )}
           {showSkills && !skillsAutoPass && ownedSkills.length > 0 && (
             <p className="text-[10px] mt-1.5 text-center" style={{ color: PALETTE.textDim }}>
-              카드를 눌러 정보를 확인하고 모달에서 활성/해제
+              카드를 눌러 활성/해제
             </p>
           )}
         </div>

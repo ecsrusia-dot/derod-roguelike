@@ -22,9 +22,9 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.17.1';
+export const GAME_VERSION = '1.17.2';
 export const VERSION_DATE = '2026-05-14';
-export const VERSION_LABEL = '튜토리얼 4 저주의 시련 너프 — elite 4→3, 보스전 저주 2개로';
+export const VERSION_LABEL = '패시브 카드 즉시 토글 (전투 준비 + 정비 화면)';
 
 // =========== 패시브 스킬 ===========
 // effect 필드는 문자열 키. 실제 동작은 메인 코드의 trigger handler에서 처리.
