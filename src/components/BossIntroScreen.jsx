@@ -20,7 +20,7 @@ export default function BossIntroScreen({ enemyKey, onComplete }) {
   const [exiting, setExiting] = useState(false);
 
   const introSrc = enemy?.chapter
-    ? `/enemies/classic/chapter_${enemy.chapter}/${enemyKey}_intro.jpg`
+    ? `./enemies/classic/chapter_${enemy.chapter}/${enemyKey}_intro.jpg`
     : null;
 
   const finish = () => {

@@ -60,13 +60,15 @@ public/enemies/championship/<concept>/<enemyKey>_intro.jpg
 
 `enemyKey`는 `src/data.js`의 `ENEMIES` 객체 키와 동일. `<n>`은 `ENEMIES[key].chapter` 값.
 
-런타임 경로 자동 계산:
+런타임 경로 자동 계산 (Vite base 호환 위해 **상대 경로 `./` 사용 필수**):
 ```js
 const subdir = enemy.championship
   ? `championship/${enemy.concept}`
   : `classic/chapter_${enemy.chapter}`;
-const combatSrc = `/enemies/${subdir}/${enemyKey}_combat.jpg`;
+const combatSrc = `./enemies/${subdir}/${enemyKey}_combat.jpg`;
 ```
+
+⚠️ **절대 경로(`/enemies/...`) 사용 금지** — GitHub Pages 배포 시 `/derod-roguelike/` 베이스를 무시해 404. 직업 일러(`./classes/lanthert.jpg`)와 동일 컨벤션 유지.
 
 ---
 
