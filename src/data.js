@@ -22,9 +22,9 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.18.0';
-export const VERSION_DATE = '2026-05-14';
-export const VERSION_LABEL = '구 IP(나크젤리온/엘디마이어) 잔재 제거 — 마왕/여명의 봉인으로 재구성';
+export const GAME_VERSION = '1.19.0';
+export const VERSION_DATE = '2026-05-15';
+export const VERSION_LABEL = '전투 로그 UX 개선 — 턴 구분선 + 확장 모달';
 
 // =========== 패시브 스킬 ===========
 // effect 필드는 문자열 키. 실제 동작은 메인 코드의 trigger handler에서 처리.

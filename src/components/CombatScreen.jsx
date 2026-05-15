@@ -5,7 +5,7 @@
 // 디버프 (출혈/충격/봉인/동상), 회피/반격 처리 모두 포함
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { AlertTriangle, X } from 'lucide-react';
+import { AlertTriangle, X, Maximize2 } from 'lucide-react';
 import { 
   PALETTE, 
   getActivePassives, 
@@ -107,6 +107,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
   const [turn, setTurn] = useState(1);
   const [phase, setPhase] = useState('intro');
   const [log, setLog] = useState([]);
+  const [logExpanded, setLogExpanded] = useState(false);
   const [animDmg, setAnimDmg] = useState({ player: null, enemy: null });
 
   // === Phase 1 시각 이팩트 큐/트리거 ===
@@ -260,7 +261,10 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     // 모든 검증 통과 → 락 획득
     actionLockRef.current = true;
 
-    const newLog = [...log, { type: 'player', text: `▸ ${skill.name}` }];
+    const newLog = [...log,
+      { type: 'turnDivider', turn },
+      { type: 'player', text: `▸ ${skill.name}` },
+    ];
     let newPlayer = { ...player, ether: player.ether - etherCost };
     let newEnemy = { ...enemy };
 
@@ -1421,6 +1425,50 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       <DamageVignette trigger={fxVignette} />
       {/* 액티브 궁극 컷인 — 전체 화면을 덮는 0.9초 골든 버스트 */}
       <UltimateCutin info={fxUltimateCutin} />
+      {/* 전투 로그 확장 모달 — 풀스크린, 큰 텍스트로 전체 로그 확인 */}
+      {logExpanded && (
+        <div className="fixed inset-0 z-50 flex flex-col" style={{ background: PALETTE.bgDeep }}>
+          <div className="flex items-center justify-between px-4 py-3 border-b shrink-0" style={{ borderColor: PALETTE.panelBorder, background: PALETTE.panel }}>
+            <span className="text-[11px] tracking-[0.3em]" style={{ color: PALETTE.dawn }}>━━ 전투 로그 · TURN {turn} ━━</span>
+            <button
+              onClick={() => setLogExpanded(false)}
+              className="p-1.5 rounded"
+              style={{ border: `1px solid ${PALETTE.panelBorder}` }}
+              aria-label="닫기"
+            >
+              <X size={16} style={{ color: PALETTE.text }} />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1.5" style={{ background: `linear-gradient(180deg, ${PALETTE.bgDeep}, #060306)` }}>
+            {log.map((l, i) => {
+              if (l.type === 'turnDivider') {
+                return (
+                  <div key={i} className="flex items-center gap-2 py-1.5">
+                    <div className="flex-1 h-px" style={{ background: PALETTE.dawn, opacity: 0.4 }} />
+                    <span className="text-[11px] tracking-[0.3em]" style={{ color: PALETTE.dawn }}>턴 {l.turn}</span>
+                    <div className="flex-1 h-px" style={{ background: PALETTE.dawn, opacity: 0.4 }} />
+                  </div>
+                );
+              }
+              return (
+                <div key={i}>
+                  <div className="text-[13px] leading-relaxed" style={{ color: l.type === 'damage' ? PALETTE.accent : l.type === 'damageTaken' ? PALETTE.bleed : l.type === 'crit' ? PALETTE.legendary : l.type === 'passive' ? PALETTE.dawn : l.type === 'debuff' ? PALETTE.shock : l.type === 'heal' ? PALETTE.green : l.type === 'enemy_action' ? PALETTE.accent : l.type === 'victory' ? PALETTE.legendary : l.type === 'defeat' ? PALETTE.accent : PALETTE.text, opacity: l.type === 'system' ? 0.7 : 1 }}>{l.text}</div>
+                  {l.breakdown && (<div className="text-[11px] leading-relaxed pl-3" style={{ color: PALETTE.textDim, opacity: 0.7 }}>({l.breakdown})</div>)}
+                </div>
+              );
+            })}
+          </div>
+          <div className="px-4 py-3 border-t shrink-0 flex justify-center" style={{ borderColor: PALETTE.panelBorder, background: PALETTE.panel }}>
+            <button
+              onClick={() => setLogExpanded(false)}
+              className="px-6 py-2 text-[11px] tracking-[0.3em] rounded"
+              style={{ border: `1px solid ${PALETTE.panelBorder}`, color: PALETTE.text }}
+            >
+              전투 복귀
+            </button>
+          </div>
+        </div>
+      )}
       {/* 최상단 턴 정보 (높이 고정) */}
       <div className="px-4 py-2 border-b flex items-center justify-between shrink-0" style={{ borderColor: PALETTE.panelBorder, background: PALETTE.panel }}>
         <span className="text-[10px] tracking-[0.3em]" style={{ color: PALETTE.accent }}>━━ 전투 ━━</span>
@@ -1535,15 +1583,37 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           </div>
         </div>
 
-        {/* === 2/3: 전투 로그 (5줄 분량 = 약 110px 고정) === */}
-        <div className="shrink-0 h-[110px] overflow-y-auto px-3 py-2 space-y-1 border-b" style={{ borderColor: PALETTE.panelBorder, background: `linear-gradient(180deg, ${PALETTE.bgDeep}, #060306)` }}>
-          {log.map((l, i) => (
-            <div key={i}>
-              <div className="text-[11px] leading-snug" style={{ color: l.type === 'damage' ? PALETTE.accent : l.type === 'damageTaken' ? PALETTE.bleed : l.type === 'crit' ? PALETTE.legendary : l.type === 'passive' ? PALETTE.dawn : l.type === 'debuff' ? PALETTE.shock : l.type === 'heal' ? PALETTE.green : l.type === 'enemy_action' ? PALETTE.accent : l.type === 'victory' ? PALETTE.legendary : l.type === 'defeat' ? PALETTE.accent : PALETTE.text, opacity: l.type === 'system' ? 0.7 : 1 }}>{l.text}</div>
-              {l.breakdown && (<div className="text-[9px] leading-snug pl-3" style={{ color: PALETTE.textDim, opacity: 0.7 }}>({l.breakdown})</div>)}
-            </div>
-          ))}
-          <div ref={logEndRef} />
+        {/* === 2/3: 전투 로그 (5줄 분량 = 약 110px 고정, 확장 버튼 제공) === */}
+        <div className="shrink-0 relative border-b" style={{ borderColor: PALETTE.panelBorder }}>
+          <button
+            onClick={() => setLogExpanded(true)}
+            className="absolute top-1 right-1 z-10 p-1 rounded"
+            style={{ background: 'rgba(0,0,0,0.55)', border: `1px solid ${PALETTE.panelBorder}` }}
+            title="전투 로그 확장"
+            aria-label="전투 로그 확장"
+          >
+            <Maximize2 size={11} style={{ color: PALETTE.textDim }} />
+          </button>
+          <div className="h-[110px] overflow-y-auto px-3 py-2 space-y-1" style={{ background: `linear-gradient(180deg, ${PALETTE.bgDeep}, #060306)` }}>
+            {log.map((l, i) => {
+              if (l.type === 'turnDivider') {
+                return (
+                  <div key={i} className="flex items-center gap-2 py-0.5">
+                    <div className="flex-1 h-px" style={{ background: PALETTE.panelBorder }} />
+                    <span className="text-[9px] tracking-[0.2em]" style={{ color: PALETTE.textDim }}>턴 {l.turn}</span>
+                    <div className="flex-1 h-px" style={{ background: PALETTE.panelBorder }} />
+                  </div>
+                );
+              }
+              return (
+                <div key={i}>
+                  <div className="text-[11px] leading-snug" style={{ color: l.type === 'damage' ? PALETTE.accent : l.type === 'damageTaken' ? PALETTE.bleed : l.type === 'crit' ? PALETTE.legendary : l.type === 'passive' ? PALETTE.dawn : l.type === 'debuff' ? PALETTE.shock : l.type === 'heal' ? PALETTE.green : l.type === 'enemy_action' ? PALETTE.accent : l.type === 'victory' ? PALETTE.legendary : l.type === 'defeat' ? PALETTE.accent : PALETTE.text, opacity: l.type === 'system' ? 0.7 : 1 }}>{l.text}</div>
+                  {l.breakdown && (<div className="text-[9px] leading-snug pl-3" style={{ color: PALETTE.textDim, opacity: 0.7 }}>({l.breakdown})</div>)}
+                </div>
+              );
+            })}
+            <div ref={logEndRef} />
+          </div>
         </div>
 
         {/* === 3/3: 내 영역 (일러스트 + 정보 BAR 오버레이) === */}
