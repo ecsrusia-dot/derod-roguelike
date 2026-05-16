@@ -200,19 +200,18 @@ export function getDisplayDamage(skill, attacker, skills, ultimates, meta, curse
   return [calcOne(skill.baseDmg[0]) * hits, calcOne(skill.baseDmg[1]) * hits];
 }
 
-export function rollCrit(skills, attacker, meta = null, activeSkills = null, relicStat = {}) {
+export function rollCrit(skills, attacker, meta = null, activeSkills = null, relicStat = {}, ultimates = null) {
   // 1. 기본 확률 + 민첩 보너스
   let critRate = 5 + Math.max(0, (attacker.민첩 - 10) * 0.5);
-  
+
   // 2. 정밀 minor: 치명타율 +3%/Lv
   critRate += getMinorBonus(skills, 'critRate+', activeSkills);
-  
+
   // 3. 메타 강화 및 유물 보너스
   critRate += getMetaBonus(meta, 'critRate+3%') * 3;
   critRate += relicStat.critRate || 0;
 
   // 4. ★ [심안] 7단계 효과 적용
-  // getSkillLevel 대신 기존에 정의된 hasEffect를 사용합니다.
   if (hasEffect(skills, 'weaknessPoint', activeSkills)) {
     critRate += 10;
   }
@@ -221,27 +220,31 @@ export function rollCrit(skills, attacker, meta = null, activeSkills = null, rel
     critRate += 20;
   }
 
-  // 5. 최종 확률 판정
+  // 5. 무영검 궁극: 치명타 +15% 정적 보너스 (명세 일치)
+  if (hasUltimate(ultimates, 'ult_counterShadow')) {
+    critRate += 15;
+  }
+
+  // 6. 최종 확률 판정
   return Math.random() * 100 < critRate;
 }
 
-export function rollDodge(skills, defender, activeSkills = null, relicStat = {}) {
+export function rollDodge(skills, defender, activeSkills = null, relicStat = {}, ultimates = null) {
   // 1. 민첩 보너스 (기본)
   let dodgeRate = Math.max(0, (defender.민첩 - 10) * 0.3);
-  
+
   // 2. 회피 minor 스킬 보너스 (+3%/Lv)
   dodgeRate += getMinorBonus(skills, 'dodge+', activeSkills);
-  
+
   // 3. 유물 보너스
   dodgeRate += relicStat.dodge || 0;
-  
+
   // 4. 기존 특정 스킬 효과 (회피+15)
   if (hasEffect(skills, 'dodge+15', activeSkills)) {
     dodgeRate += 15;
   }
 
   // 5. ★ [심안] 5단계 (detailIntent) 효과 적용
-  // getSkillLevel 대신 hasEffect를 사용하여 일관성 유지
   if (hasEffect(skills, 'detailIntent', activeSkills)) {
     dodgeRate += 10;
   }
@@ -255,6 +258,11 @@ export function rollDodge(skills, defender, activeSkills = null, relicStat = {})
     dodgeRate += defender.buffs.mirrorDodgeNext;
   }
 
-  // 7. 최종 확률 판정
+  // 7. 명경지수 궁극: 회피율 +10% 정적 보너스 (명세 일치)
+  if (hasUltimate(ultimates, 'ult_counterMirror')) {
+    dodgeRate += 10;
+  }
+
+  // 8. 최종 확률 판정
   return Math.random() * 100 < dodgeRate;
 }
