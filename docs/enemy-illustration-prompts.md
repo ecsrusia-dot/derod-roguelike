@@ -860,10 +860,10 @@ const combatSrc = `./enemies/${subdir}/${enemyKey}_combat.jpg`;
 - [x] 챕터 1 (북부 극지대) 6종 + 보스 진입 풀컷 1종 — 1.13.0~1.14.0에 완료
 - [x] 챕터 2 (죽은 자의 숲) 6종 + 보스 진입 풀컷 1종 — 1.16.0에 완료
 - [x] 챕터 3 (봉인된 신전) 5종 + 보스 진입 풀컷 1종 — 1.17.0에 완료
-- [ ] **챕터 4 (마계의 균열) 5종 + 보스 진입 풀컷 1종 — 프롬프트 작성 완료 (9절). PM 생성 대기 — 메인 스토리 마지막 챕터**
+- [x] 챕터 4 (마계의 균열) 5종 + 보스 진입 풀컷 1종 — 1.20.0에 완료 (메인 스토리 일러 100%)
 - [ ] **챔피언십 전용 적 (5컨셉 × 16종 + 보스 진입 4종 = 100종) — 컨셉별 별도 문서로 분리**:
-  - [ ] frost (서리·동토) — `enemy-illustration-prompts-championship-frost.md` 작성 완료, PM 생성 대기
-  - [ ] forest (부패·숲) — 미작성
+  - [x] frost (서리·동토) — `enemy-illustration-prompts-championship-frost.md` 20장 완료 (1.21.0)
+  - [ ] forest (부패·숲) — `enemy-illustration-prompts-championship-forest.md` 작성 완료, PM 생성 대기
   - [ ] sanctum (신전·봉인) — 미작성
   - [ ] rift (마계·균열) — 미작성
   - [ ] dawn (천상·여명) — 미작성
