@@ -22,9 +22,9 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.21.0';
+export const GAME_VERSION = '1.21.1';
 export const VERSION_DATE = '2026-05-16';
-export const VERSION_LABEL = '챔피언십 frost 적 일러스트 20장 적용 (4보스 차별화)';
+export const VERSION_LABEL = '챔피언십 forest 보스 스킬 이름 일러 컨셉 정합화';
 
 // =========== 패시브 스킬 ===========
 // effect 필드는 문자열 키. 실제 동작은 메인 코드의 trigger handler에서 처리.
@@ -852,7 +852,7 @@ export const ENEMIES = {
     patterns: [
       { name: '광기의 손길', dmg: [16, 22], type: 'attack' },
       { name: '뿌리 폭발', dmg: [12, 16], type: 'attack' },
-      { name: '광기 분쇄', dmg: [24, 32], type: 'attack', heavy: true },
+      { name: '시든 자식 소환', dmg: [24, 32], type: 'attack', heavy: true },
       { name: '뿌리 결계', dmg: [0, 0], type: 'defend', defense: 35 },
     ],
     drop: { gold: [180, 240], gem: [3, 5] },
@@ -891,7 +891,7 @@ export const ENEMIES = {
     patterns: [
       { name: '폭군의 강타', dmg: [18, 24], type: 'attack' },
       { name: '광기의 폭주', dmg: [26, 34], type: 'attack', heavy: true },
-      { name: '나무 방패', dmg: [0, 0], type: 'defend', defense: 38 },
+      { name: '광기의 가호', dmg: [0, 0], type: 'defend', defense: 38 },
     ],
     drop: { gold: [90, 130], gem: [2, 3] },
   },
@@ -904,7 +904,7 @@ export const ENEMIES = {
       { name: '군주의 강타', dmg: [20, 26], type: 'attack' },
       { name: '망자의 분노', dmg: [14, 18], type: 'attack' },
       { name: '광기의 분쇄', dmg: [28, 38], type: 'attack', heavy: true },
-      { name: '왕좌의 가호', dmg: [0, 0], type: 'defend', defense: 45 },
+      { name: '부패 갑옷', dmg: [0, 0], type: 'defend', defense: 45 },
     ],
     drop: { gold: [240, 320], gem: [5, 7] },
   },
@@ -954,7 +954,7 @@ export const ENEMIES = {
     patterns: [
       { name: '정원사의 가지치기', dmg: [22, 28], type: 'attack' },
       { name: '광기의 만개', dmg: [16, 22], type: 'attack' },
-      { name: '광기의 폭주', dmg: [38, 50], type: 'attack', heavy: true },
+      { name: '큰 가지치기', dmg: [38, 50], type: 'attack', heavy: true },
       { name: '정원의 보호', dmg: [0, 0], type: 'defend', defense: 55 },
     ],
     drop: { gold: [320, 420], gem: [7, 10] },
@@ -979,7 +979,7 @@ export const ENEMIES = {
     tier: 'elite', chapter: 'forest_4',
     berserkPerTurn: 10,
     patterns: [
-      { name: '사도의 일격', dmg: [22, 28], type: 'attack' },
+      { name: '심부의 봉인', dmg: [22, 28], type: 'attack' },
       { name: '광기의 절대 폭주', dmg: [36, 48], type: 'attack', heavy: true },
       { name: '광기의 방벽', dmg: [0, 0], type: 'defend', defense: 50 },
     ],
@@ -991,10 +991,10 @@ export const ENEMIES = {
     isBoss: true, tier: 'boss', chapter: 'forest_4',
     berserkPerTurn: 12,  // 최종 보스 — 매 턴 +12 누적
     patterns: [
-      { name: '폭군의 강타', dmg: [22, 28], type: 'attack' },
+      { name: '거대 발톱', dmg: [22, 28], type: 'attack' },
       { name: '광기의 절규', dmg: [16, 22], type: 'attack' },
       { name: '심부의 분노', dmg: [32, 42], type: 'attack' },
-      { name: '광기의 절대 분쇄', dmg: [44, 58], type: 'attack', heavy: true },
+      { name: '신적 분쇄', dmg: [44, 58], type: 'attack', heavy: true },
       { name: '폭군의 옥좌', dmg: [0, 0], type: 'defend', defense: 65 },
     ],
     drop: { gold: [400, 520], gem: [10, 14] },
