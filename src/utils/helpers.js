@@ -230,3 +230,18 @@ export function hasCurse(curses, effectName) {
   if (!curses || curses.length === 0) return false;
   return curses.some(c => c.effect === effectName);
 }
+
+// ===== 적 일러스트 경로 헬퍼 =====
+// chapter 값으로 클래식/챔피언십 자동 판별:
+//   - number (1, 2, 3, 4) → 클래식: ./enemies/classic/chapter_<n>/
+//   - string ('frost_1', 'forest_2', …) → 챔피언십: ./enemies/championship/<concept>/
+//
+// kind는 'combat'(전투 16:9) 또는 'intro'(보스 진입 9:16)
+export function getEnemyImageSrc(enemyKey, enemy, kind = 'combat') {
+  if (!enemy?.chapter) return null;
+  if (typeof enemy.chapter === 'string') {
+    const concept = enemy.chapter.split('_')[0];
+    return `./enemies/championship/${concept}/${enemyKey}_${kind}.jpg`;
+  }
+  return `./enemies/classic/chapter_${enemy.chapter}/${enemyKey}_${kind}.jpg`;
+}

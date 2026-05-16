@@ -22,9 +22,9 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.20.0';
-export const VERSION_DATE = '2026-05-15';
-export const VERSION_LABEL = '챕터 4 적 일러스트 6장 적용 (마계의 균열)';
+export const GAME_VERSION = '1.21.0';
+export const VERSION_DATE = '2026-05-16';
+export const VERSION_LABEL = '챔피언십 frost 적 일러스트 20장 적용 (4보스 차별화)';
 
 // =========== 패시브 스킬 ===========
 // effect 필드는 문자열 키. 실제 동작은 메인 코드의 trigger handler에서 처리.
