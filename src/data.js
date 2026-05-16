@@ -22,9 +22,9 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.22.1';
+export const GAME_VERSION = '1.23.0';
 export const VERSION_DATE = '2026-05-16';
-export const VERSION_LABEL = '분노 buff 지속 3턴 → 2턴 밸런스 조정 — 광기/축복 사용 사이클 정합 (cd 3턴 = 분노 2턴 + 휴식 1턴)';
+export const VERSION_LABEL = '여명의 사제 시그니처 — 매력 활용 시스템 신설 (회복 효율+ + 받는 데미지-)';
 
 // =========== 패시브 스킬 ===========
 // effect 필드는 문자열 키. 실제 동작은 메인 코드의 trigger handler에서 처리.

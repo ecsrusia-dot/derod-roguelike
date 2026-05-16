@@ -19,6 +19,8 @@ import {
   getSkillLevel,
   applySealsToSkills,
   getEnemyImageSrc,
+  getCharismaHealBonus,
+  getCharismaDmgReduction,
 } from '../utils/helpers.js';
 import {
   PASSIVE_SKILLS,
@@ -533,6 +535,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       if (skill.selfHeal) {
         let heal = skill.selfHeal;
         if (relicStat.heal > 0) heal = Math.floor(heal * (1 + relicStat.heal / 100));
+        const charismaBonus = getCharismaHealBonus(newPlayer);
+        if (charismaBonus > 0) heal = Math.floor(heal * (1 + charismaBonus / 100));
         if (hasCurse(curses, 'curse_heal-50')) heal = Math.floor(heal * 0.5);
         newPlayer.hp = Math.min(newPlayer.maxHp, newPlayer.hp + heal);
         newLog.push({ type: 'passive', text: `◇ HP +${heal}` });
@@ -552,6 +556,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       if (skill.selfHeal) {
         let heal = skill.selfHeal;
         if (relicStat.heal > 0) heal = Math.floor(heal * (1 + relicStat.heal / 100));
+        const charismaBonus = getCharismaHealBonus(newPlayer);
+        if (charismaBonus > 0) heal = Math.floor(heal * (1 + charismaBonus / 100));
         if (hasCurse(curses, 'curse_heal-50')) heal = Math.floor(heal * 0.5);
         newPlayer.hp = Math.min(newPlayer.maxHp, newPlayer.hp + heal);
         newLog.push({ type: 'passive', text: `◇ HP +${heal}` });
@@ -788,6 +794,13 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
             const reduced = Math.floor(dmg * metaReduction);
             dmg -= reduced;
             if (reduced > 0) takenBreakdown.push(`강철의 의지 -${reduced}`);
+          }
+          // 매력 시그니처: 받는 데미지 감소 (매력 17+ 시 5단위마다 -5%)
+          const charismaReducePct = getCharismaDmgReduction(newPlayer);
+          if (charismaReducePct > 0 && dmg > 0) {
+            const reduced = Math.floor(dmg * charismaReducePct / 100);
+            dmg -= reduced;
+            if (reduced > 0) takenBreakdown.push(`매력 -${reduced}`);
           }
           // 유물: dmgTaken % (음수면 감소, 양수면 증가)
           if (relicStat.dmgTaken && dmg > 0) {
@@ -1959,7 +1972,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
               const dmgTakenMeta = getMetaBonus(meta, 'dmgTaken-3%') * 3;
               const dmgTakenRelic = relicStat.dmgTaken || 0;
               const dmgTakenLv5 = hasEffect(skills, 'dmgTaken-20', activeSkills) ? 20 : 0;
-              const dmgTakenReduce = dmgTakenMeta + dmgTakenRelic + dmgTakenLv5;
+              const dmgTakenCharisma = getCharismaDmgReduction(player);
+              const dmgTakenReduce = dmgTakenMeta + dmgTakenRelic + dmgTakenLv5 + dmgTakenCharisma;
               const dmgDealtCurse = hasCurse(curses, 'curse_dmgDealt-15') ? 15 : 0;
               const dmgTakenCurse = (hasCurse(curses, 'curse_dmgTaken+15') ? 15 : 0)
                 + (hasCurse(curses, 'curse_dmgTaken+30') ? 30 : 0);
@@ -1989,9 +2003,10 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
               const lifesteal = relicStat.lifesteal || 0;
               const reflect = relicStat.reflect || 0;
               const heal = relicStat.heal || 0;
+              const charismaHeal = getCharismaHealBonus(player);
               const cdReduce = getMinorBonus(skills, 'cdReduce+', activeSkills);
               const etherReduce = hasEffect(skills, 'etherCost-20', activeSkills);
-              const hasAny = regenLv || lifesteal || reflect || heal || cdReduce || etherReduce;
+              const hasAny = regenLv || lifesteal || reflect || heal || charismaHeal || cdReduce || etherReduce;
               if (!hasAny) return null;
               return (
                 <>
@@ -2001,6 +2016,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                     {lifesteal > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>흡혈</span><span className="font-bold tabular-nums" style={{ color: PALETTE.accent }}>+{lifesteal}</span></div>)}
                     {reflect > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>반사</span><span className="font-bold tabular-nums" style={{ color: PALETTE.accent }}>{reflect}%</span></div>)}
                     {heal > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>회복효과</span><span className="font-bold tabular-nums" style={{ color: PALETTE.green }}>+{heal}%</span></div>)}
+                    {charismaHeal > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>매력(회복)</span><span className="font-bold tabular-nums" style={{ color: PALETTE.dawn }}>+{charismaHeal}%</span></div>)}
                     {cdReduce > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>쿨다운감소</span><span className="font-bold tabular-nums" style={{ color: PALETTE.twilight }}>-{cdReduce}턴</span></div>)}
                     {etherReduce && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>에테르비용</span><span className="font-bold tabular-nums" style={{ color: PALETTE.twilight }}>-1</span></div>)}
                   </div>

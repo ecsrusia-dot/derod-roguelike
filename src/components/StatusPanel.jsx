@@ -7,7 +7,7 @@
 
 import React, { useState } from 'react';
 import { Heart, X } from 'lucide-react';
-import { PALETTE } from '../utils/helpers.js';
+import { PALETTE, getCharismaHealBonus, getCharismaDmgReduction } from '../utils/helpers.js';
 import { PASSIVE_SKILLS, COMBAT_SKILLS, ULTIMATE_SKILLS } from '../data.js';
 import CardInfoModal, { buildPassiveInfo, buildRelicInfo, buildActiveSkillInfo } from './CardInfoModal.jsx';
 
@@ -63,6 +63,23 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, relic
               </div>
             ))}
           </div>
+          {/* 매력 시그니처 효과 — 사제 정체성 (모든 직업이 매력 보석으로 효과 획득 가능) */}
+          {(() => {
+            const healPct = getCharismaHealBonus(stats);
+            const reducePct = getCharismaDmgReduction(stats);
+            if (healPct <= 0 && reducePct <= 0) return null;
+            return (
+              <div className="mt-2 pt-2 border-t flex items-center justify-center gap-3 text-[10px]" style={{ borderColor: `${classData.color}20` }}>
+                <span style={{ color: PALETTE.textDim }}>◇ 매력 시그니처</span>
+                {healPct > 0 && (
+                  <span style={{ color: PALETTE.green }}>회복 <span className="font-bold tabular-nums">+{healPct}%</span></span>
+                )}
+                {reducePct > 0 && (
+                  <span style={{ color: PALETTE.dawn }}>받는뎀 <span className="font-bold tabular-nums">-{reducePct}%</span></span>
+                )}
+              </div>
+            );
+          })()}
         </div>
 
         {/* 액티브 스킬 — 카드 클릭 시 정보 모달 (전투 중에도 확인 가능) */}
