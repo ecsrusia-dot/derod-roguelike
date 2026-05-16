@@ -973,53 +973,78 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         if (shadowStrikeBuff) counterRate = 100;
         if (counterRate > 100) counterRate = 100;
         
-        // 회피했고 명경지수면: 회피→반격 데미지 +100% 버프 예약
+        // 회피했고 명경지수면: 같은 턴 반격에 즉시 +100% 적용 (Pending에 직접 설정)
         if (dodged && hasMirror) {
-          newPlayer.buffs = { ...newPlayer.buffs, mirrorCounterDmgNext: true };
+          newPlayer.buffs = { ...newPlayer.buffs, mirrorCounterDmgPending: true };
           newLog.push({ type: 'passive', text: `★ [명경지수] 회피! 다음 반격 데미지 +100%` });
         }
-        
+
         // 반격 판정 — 사전에 굴려진 결과가 있으면 사용 (Lv.5 차단 효과와 일치)
         const rolledValue = newPlayer._pendingCounterRoll !== undefined ? newPlayer._pendingCounterRoll : Math.random() * 100;
         delete newPlayer._pendingCounterRoll;
         if (rolledValue < counterRate) {
-          // 반격 데미지 = 근력 × 1.5 (기본)
-          let counterDmg = Math.floor(newPlayer.근력 * 1.5);
-          
+          // 반격 데미지 산출식 빌드 — 일반 공격 로그와 동일 패턴
+          const baseCounterDmg = Math.floor(newPlayer.근력 * 1.5);
+          let counterDmg = baseCounterDmg;
+          const counterBreakdown = [`기본 ${baseCounterDmg}`];
+
           // minor: 반격 데미지 +5%/Lv
-          if (simanLv > 0) counterDmg = Math.floor(counterDmg * (1 + simanLv * 0.05));
+          if (simanLv > 0) {
+            const mult = 1 + simanLv * 0.05;
+            counterDmg = Math.floor(counterDmg * mult);
+            counterBreakdown.push(`심안류 ×${mult.toFixed(2)}`);
+          }
           // Lv.5: 반격 데미지 +20%
-          if (simanLv >= 5) counterDmg = Math.floor(counterDmg * 1.20);
+          if (simanLv >= 5) {
+            counterDmg = Math.floor(counterDmg * 1.20);
+            counterBreakdown.push(`Lv.5 ×1.20`);
+          }
           // Lv.7: 반격 데미지 +20%
-          if (simanLv >= 7) counterDmg = Math.floor(counterDmg * 1.20);
+          if (simanLv >= 7) {
+            counterDmg = Math.floor(counterDmg * 1.20);
+            counterBreakdown.push(`Lv.7 ×1.20`);
+          }
           // 궁극별 반격 데미지 보너스
-          if (hasMirror) counterDmg = Math.floor(counterDmg * 2.0);  // 명경지수 +100%
-          if (hasShock) counterDmg = Math.floor(counterDmg * 2.5);   // 검로일여 +150%
-          if (hasShadow) counterDmg = Math.floor(counterDmg * 2.0);  // 무영검 +100%
-          // 명경지수: 회피→반격 데미지 +100% 버프 소비
+          if (hasMirror) {
+            counterDmg = Math.floor(counterDmg * 2.0);
+            counterBreakdown.push(`명경지수 ×2.0`);
+          }
+          if (hasShock) {
+            counterDmg = Math.floor(counterDmg * 2.5);
+            counterBreakdown.push(`검로일여 ×2.5`);
+          }
+          if (hasShadow) {
+            counterDmg = Math.floor(counterDmg * 2.0);
+            counterBreakdown.push(`무영검 ×2.0`);
+          }
+          // 명경지수: 회피→반격 데미지 +100% 버프 소비 (같은 턴 회피로 설정된 Pending도 즉시 소비)
           if (newPlayer.buffs?.mirrorCounterDmgPending) {
             counterDmg = Math.floor(counterDmg * 2.0);
+            counterBreakdown.push(`회피→반격 ×2.0`);
             newPlayer.buffs = { ...newPlayer.buffs, mirrorCounterDmgPending: false };
             newLog.push({ type: 'passive', text: `★ [명경지수] 회피→반격 데미지 +100% 적용!` });
           }
           // 무영검: 누적된 미스 보너스 적용
           if (hasShadow && newPlayer.buffs?.shadowCounterStack > 0) {
             const stack = newPlayer.buffs.shadowCounterStack;
-            counterDmg = Math.floor(counterDmg * (1 + stack * 0.5));
+            const mult = 1 + stack * 0.5;
+            counterDmg = Math.floor(counterDmg * mult);
+            counterBreakdown.push(`누적 ×${mult.toFixed(1)}`);
             newLog.push({ type: 'passive', text: `★ [무영검] 누적 ×${stack} 데미지 폭발!` });
             newPlayer.buffs = { ...newPlayer.buffs, shadowCounterStack: 0 };
           }
-          
+
           // 적 방어 적용
           let actualDmg = counterDmg;
           if (newEnemy.defense > 0) {
             const absorbed = Math.min(newEnemy.defense, actualDmg);
             newEnemy.defense -= absorbed;
             actualDmg -= absorbed;
+            if (absorbed > 0) counterBreakdown.push(`적 방어 -${absorbed}`);
           }
           newEnemy.currentHp = Math.max(0, newEnemy.currentHp - actualDmg);
           const counterLabel = shadowStrikeBuff && simanLv === 0 && !hasAnyCounterUlt ? '무영의 잔영' : '심안류';
-          newLog.push({ type: 'damage', text: `◆ [${counterLabel}] 반격! ${actualDmg} 데미지` });
+          newLog.push({ type: 'damage', text: `◆ [${counterLabel}] 반격! ${actualDmg} 데미지`, breakdown: counterBreakdown.join(' / ') });
           if (actualDmg > 0) {
             pushFxLabel('enemy', 'damage', actualDmg);
             setFxEnemyShake(v => v + 1);
@@ -1063,14 +1088,6 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
             newLog.push({ type: 'passive', text: `★ [무영검] 다음 턴 치명타 확정!` });
           }
           
-          // 명경지수: 회피→반격 데미지 +100% 버프를 다음 턴으로 넘김
-          if (newPlayer.buffs?.mirrorCounterDmgNext) {
-            newPlayer.buffs = { 
-              ...newPlayer.buffs, 
-              mirrorCounterDmgPending: true,
-              mirrorCounterDmgNext: false,
-            };
-          }
         } else {
           // 반격 실패 — 무영검: 누적 +50%
           if (hasShadow) {
@@ -1673,6 +1690,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                 {player.buffs?.rage > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.accent}50`, color: '#fff', border: `1px solid ${PALETTE.accent}` }}>☩ 분노 ({player.buffs.rage}T)</span>)}
                 {player.buffs?.shadowCounterTurns > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#1a0f0a90', color: '#ffd86b', border: '1px solid #ffd86b', boxShadow: '0 0 6px rgba(255,216,107,0.5)' }}>☄ 무영의 잔영 반격 100% ({player.buffs.shadowCounterTurns}T)</span>)}
                 {player.buffs?.guaranteedCrit > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#c4453d50', color: '#fff', border: '1px solid #c4453d' }}>✦ 치명타 확정</span>)}
+                {player.buffs?.mirrorCounterDmgPending && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#88aacc50', color: '#fff', border: '1px solid #88aacc' }}>◇ 회피→반격 +100%</span>)}
                 {player.firstHitImmune && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.legendary}50`, color: '#fff', border: `1px solid ${PALETTE.legendary}` }}>✦ 무적 1회</span>)}
                 {player.debuffs?.frostbiteDmg > 0 && player.debuffs?.frostbiteTurns > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#7ba3c450', color: '#fff', border: '1px solid #7ba3c4' }}>❄️ 동상 {player.debuffs.frostbiteDmg} ({player.debuffs.frostbiteTurns}T)</span>)}
                 {player.debuffs?.sealedTurns > 0 && player.debuffs?.sealedSkills?.length > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#5c4a8c50', color: '#fff', border: '1px solid #5c4a8c' }}>🔒 봉인 {player.debuffs.sealedSkills.join(',')} ({player.debuffs.sealedTurns}T)</span>)}
@@ -1831,7 +1849,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
 
             {/* 활성 상태 — 메인 헤더의 buff/debuff 칩을 모달에서도 확인 가능 */}
             {(() => {
-              const hasAnyStatus = (player.buffs?.rage > 0) || (player.buffs?.shadowCounterTurns > 0) || (player.buffs?.guaranteedCrit > 0) || (player.buffs?.dodgeBuffTurns > 0) || player.firstHitImmune || (player.debuffs?.frostbiteDmg > 0 && player.debuffs?.frostbiteTurns > 0) || (player.debuffs?.sealedTurns > 0 && player.debuffs?.sealedSkills?.length > 0) || (player.debuffs?.shockGauge > 0) || (player.debuffs?.stunnedTurns > 0);
+              const hasAnyStatus = (player.buffs?.rage > 0) || (player.buffs?.shadowCounterTurns > 0) || (player.buffs?.guaranteedCrit > 0) || (player.buffs?.mirrorCounterDmgPending) || (player.buffs?.dodgeBuffTurns > 0) || player.firstHitImmune || (player.debuffs?.frostbiteDmg > 0 && player.debuffs?.frostbiteTurns > 0) || (player.debuffs?.sealedTurns > 0 && player.debuffs?.sealedSkills?.length > 0) || (player.debuffs?.shockGauge > 0) || (player.debuffs?.stunnedTurns > 0);
               if (!hasAnyStatus) return null;
               return (
                 <>
@@ -1840,6 +1858,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                     {player.buffs?.rage > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.accent}50`, color: '#fff', border: `1px solid ${PALETTE.accent}` }}>☩ 분노 ({player.buffs.rage}T)</span>)}
                     {player.buffs?.shadowCounterTurns > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#1a0f0a90', color: '#ffd86b', border: '1px solid #ffd86b', boxShadow: '0 0 6px rgba(255,216,107,0.5)' }}>☄ 무영의 잔영 반격 100% ({player.buffs.shadowCounterTurns}T)</span>)}
                     {player.buffs?.guaranteedCrit > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#c4453d50', color: '#fff', border: '1px solid #c4453d' }}>✦ 치명타 확정</span>)}
+                    {player.buffs?.mirrorCounterDmgPending && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#88aacc50', color: '#fff', border: '1px solid #88aacc' }}>◇ 회피→반격 +100%</span>)}
                     {player.buffs?.dodgeBuffTurns > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.green}50`, color: '#fff', border: `1px solid ${PALETTE.green}` }}>💨 회피 +{player.buffs.dodgeBuff || 0}% ({player.buffs.dodgeBuffTurns}T)</span>)}
                     {player.firstHitImmune && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.legendary}50`, color: '#fff', border: `1px solid ${PALETTE.legendary}` }}>✦ 무적 1회</span>)}
                     {player.debuffs?.frostbiteDmg > 0 && player.debuffs?.frostbiteTurns > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#7ba3c450', color: '#fff', border: '1px solid #7ba3c4' }}>❄️ 동상 {player.debuffs.frostbiteDmg} ({player.debuffs.frostbiteTurns}T)</span>)}
