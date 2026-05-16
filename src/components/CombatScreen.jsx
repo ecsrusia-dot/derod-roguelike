@@ -255,6 +255,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     const skill = COMBAT_SKILLS[skillKey];
     if (!skill) return;
     if (player.cooldowns[skillKey] > 0) return;
+    // 단독 버프 스킬은 턴당 1회 — 같은 턴 재사용 차단 (쿨타임 0이어도)
+    if (skill.type === 'buff' && player.usedBuffThisTurn) return;
     let etherCost = skill.cost || 0;
     if (etherCost > 0 && hasEffect(skills, 'etherCost-20', activeSkills)) etherCost = Math.max(0, etherCost - 1);
     if (etherCost > player.ether) return;
@@ -557,6 +559,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     }
     if (skill.type === 'buff' && skill.buff === 'rage') {
       newPlayer.buffs = { ...newPlayer.buffs, rage: 3 };
+      newPlayer.usedBuffThisTurn = true;  // 같은 턴 재사용 차단 플래그
       newLog.push({ type: 'system', text: `· 분노 발동! 3턴간 데미지 +30%` });
     }
     if (skill.cd > 0) {
@@ -564,7 +567,9 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       let cdReduce = Math.floor(getMinorBonus(skills, 'cdReduce+', activeSkills) / 4);
       // 궁극 [정념 폭주] ult_aetherStorm: 마법 스킬 쿨다운 -1
       if (skill.type === 'magic' && hasUltimate(ultimates, 'ult_aetherStorm')) cdReduce += 1;
-      const finalCd = Math.max(0, skill.cd - cdReduce);
+      let finalCd = Math.max(0, skill.cd - cdReduce);
+      // 단독 버프 스킬은 쿨타임 감소 후에도 최소 1턴 강제 (무한 사용 방지)
+      if (skill.type === 'buff') finalCd = Math.max(1, finalCd);
       if (finalCd > 0) newPlayer.cooldowns = { ...newPlayer.cooldowns, [skillKey]: finalCd };
     }
     // 궁극 [시간 역행] ult_timeRewind: 모든 마법 스킬 쿨다운 제거, 에테르 +1
@@ -592,7 +597,13 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       }, 800);
       return;
     }
-    
+
+    // 단독 버프 스킬은 적 턴 진입 X — 시간 흐름 정지, 플레이어 입력 계속 받기
+    if (skill.type === 'buff') {
+      actionLockRef.current = false;
+      return;
+    }
+
     setPhase('enemyTurn');
     setTimeout(() => { executeEnemyTurn(newPlayer, newEnemy, newLog); }, 350);
   };
@@ -1137,6 +1148,9 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     let newPlayer = { ...curPlayer };
     let newEnemy = { ...curEnemy };
     const newTurn = turn + 1;
+
+    // 새 턴 시작: 단독 버프 스킬 사용 플래그 리셋
+    newPlayer.usedBuffThisTurn = false;
 
     // 영혼 게이지 자연 충전 (매 턴 +5)
     if (classData.ultimateId) {
@@ -1736,7 +1750,9 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                 let cost = skill.cost || 0;
                 if (cost > 0 && hasEffect(skills, 'etherCost-20', activeSkills)) cost = Math.max(0, cost - 1);
                 const noEther = cost > player.ether;
-                const disabled = onCd || noEther;
+                // 단독 버프 스킬은 같은 턴 1회 제한 (쿨타임 감소 효과로 무한 사용 방지)
+                const buffUsedThisTurn = skill.type === 'buff' && player.usedBuffThisTurn;
+                const disabled = onCd || noEther || buffUsedThisTurn;
                 return (
                   <button key={skillKey} onClick={() => handlePlayerAction(skillKey)} disabled={disabled}
                     className="py-2 transition-all flex flex-col items-center gap-0.5"
@@ -1752,8 +1768,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                     }}>
                     <span className="text-[11px] font-bold">{skill.name}</span>
                     <span className="text-[9px]" style={{ color: disabled ? PALETTE.textDim : '#ddd' }}>
-                      {skill.type === 'defense' ? `+${skill.defense}` 
-                        : skill.type === 'buff' ? '버프' 
+                      {skill.type === 'defense' ? `+${skill.defense}`
+                        : skill.type === 'buff' ? '버프 · 즉시'
                         : (() => {
                             const dmgRange = getDisplayDamage(skill, player, skills, ultimates, meta, curses, activeSkills, relicStat);
                             return dmgRange ? `${dmgRange[0]}-${dmgRange[1]}` : `${skill.baseDmg[0]}-${skill.baseDmg[1]}`;
