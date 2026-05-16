@@ -312,7 +312,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         }
         
         for (let i = 0; i < hitCount; i++) {
-          let isCrit = rollCrit(skills, newPlayer, meta, activeSkills, relicStat);
+          let isCrit = rollCrit(skills, newPlayer, meta, activeSkills, relicStat, ultimates);
           // 신앙 Lv.3: 다음 공격 치명타 확정 (한 번 사용)
           if (!usedGuaranteedCrit && newPlayer.buffs?.guaranteedCrit > 0) {
             isCrit = true;
@@ -328,15 +328,10 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
             newLog.push({ type: 'passive', text: `◆ [심안류 Lv.7] 반격 후 치명타 확정!` });
           }
           // 검로일여: 기절한(또는 기절 경험한) 적 공격 시 치명타
-          if (!isCrit && hasUltimate(ultimates, 'ult_counterShock') 
+          if (!isCrit && hasUltimate(ultimates, 'ult_counterShock')
               && (newEnemy.debuffs?.stunned > 0 || newEnemy.debuffs?.everStunned)) {
             isCrit = true;
             newLog.push({ type: 'passive', text: `★ [검로일여] 기절 적 공격 → 치명타!` });
-          }
-          // 무영검: 다음 턴 치명타 확률 +30% 버프 적용
-          if (!isCrit && newPlayer.buffs?.shadowCritNext > 0 && Math.random() * 100 < newPlayer.buffs.shadowCritNext) {
-            isCrit = true;
-            newLog.push({ type: 'passive', text: `★ [무영검] 치명타 +30% 발동!` });
           }
           const dmgResult = calculateDamage(skill, newPlayer, newEnemy, skills, isCrit, ultimates, meta, curses, activeSkills, relicStat);
           let actualDmg = dmgResult.finalDmg;
@@ -688,7 +683,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     newLog.push({ type: 'enemy', text: `◂ ${enemy.name}: ${intent.name}` });
 
     if (intent.type === 'attack') {
-      const dodged = rollDodge(skills, newPlayer, activeSkills, relicStat);
+      const dodged = rollDodge(skills, newPlayer, activeSkills, relicStat, ultimates);
       if (dodged) {
         newLog.push({ type: 'system', text: `· 회피 성공!` });
         // FX — 회피: 플레이어 위에 "회피!" 부유 라벨
@@ -1063,13 +1058,18 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
             newLog.push({ type: 'passive', text: `★ [명경지수] 다음 턴 회피율 +30%` });
           }
           
-          // 검로일여: 반격 시 충격 게이지 +50
+          // 검로일여: 반격 시 충격 게이지 +50 (일반 강타와 동일하게 적 shockResist 적용)
           if (hasShock) {
+            let gaugeAdd = 50;
+            const resistActive = (newEnemy.debuffs?.shockResist || 0) > 0;
+            if (resistActive) {
+              gaugeAdd = Math.floor(gaugeAdd * GAME_CONFIG.shockResistReduction);
+            }
             const currentGauge = newEnemy.debuffs?.shockGauge || 0;
-            const newGauge = currentGauge + 50;
+            const newGauge = currentGauge + gaugeAdd;
             if (newGauge >= 100) {
-              newEnemy.debuffs = { 
-                ...newEnemy.debuffs, 
+              newEnemy.debuffs = {
+                ...newEnemy.debuffs,
                 stunned: 1, shockGauge: 0, everStunned: true,
                 // 강타와 동일하게 기절 후 충격 저항 부여
                 shockResist: GAME_CONFIG.shockResistTurns,
@@ -1078,7 +1078,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
               newLog.push({ type: 'debuff', text: `★ [검로일여] 충격 100! 기절! (${GAME_CONFIG.shockResistTurns}턴 저항)` });
             } else {
               newEnemy.debuffs = { ...newEnemy.debuffs, shockGauge: newGauge };
-              newLog.push({ type: 'debuff', text: `★ [검로일여] 충격 +50 (${newGauge}/100)` });
+              const resistText = resistActive ? ` (저항 차감)` : '';
+              newLog.push({ type: 'debuff', text: `★ [검로일여] 충격 +${gaugeAdd}${resistText} (${newGauge}/100)` });
             }
           }
           
@@ -1301,9 +1302,6 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     // 심안류 궁극 1턴 버프 정리
     if (newPlayer.buffs?.mirrorDodgeNext > 0) {
       newPlayer.buffs = { ...newPlayer.buffs, mirrorDodgeNext: 0 };
-    }
-    if (newPlayer.buffs?.shadowCritNext > 0) {
-      newPlayer.buffs = { ...newPlayer.buffs, shadowCritNext: 0 };
     }
     // 방랑검사 [무영의 잔영] 반격 100% 버프 — 매 턴 -1
     if (newPlayer.buffs?.shadowCounterTurns > 0) {
