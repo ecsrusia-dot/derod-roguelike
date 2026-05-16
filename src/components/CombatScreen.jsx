@@ -18,6 +18,7 @@ import {
   getEffectiveSkills,
   getSkillLevel,
   applySealsToSkills,
+  getEnemyImageSrc,
 } from '../utils/helpers.js';
 import {
   PASSIVE_SKILLS,
@@ -1489,7 +1490,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
             key={`enemy-shake-${fxEnemyShake}`}
             className={`absolute inset-0 ${fxEnemyShake ? 'fx-hit-shake' : ''}`}
           >
-          {/* 적 전투 일러스트 — public/enemies/classic/chapter_<n>/<key>_combat.jpg
+          {/* 적 전투 일러스트 — getEnemyImageSrc()가 chapter 값으로 classic/championship 자동 분기
               일러 없으면 어두운 배경 + 사선 패턴 placeholder로 폴백 */}
           {enemyImgFailed || !enemy.chapter ? (
             <div className="absolute inset-0 bg-[#0a0608] flex items-center justify-center">
@@ -1498,7 +1499,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
             </div>
           ) : (
             <img
-              src={`./enemies/classic/chapter_${enemy.chapter}/${enemyKey}_combat.jpg`}
+              src={getEnemyImageSrc(enemyKey, enemy, 'combat')}
               alt={enemy.name}
               className="absolute inset-0 w-full h-full object-cover"
               style={{ objectPosition: 'center center' }}

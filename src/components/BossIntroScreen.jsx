@@ -9,7 +9,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { ENEMIES } from '../data.js';
-import { PALETTE } from '../utils/helpers.js';
+import { PALETTE, getEnemyImageSrc } from '../utils/helpers.js';
 
 const AUTO_ADVANCE_MS = 2500;
 const FALLBACK_ADVANCE_MS = 300;
@@ -19,9 +19,7 @@ export default function BossIntroScreen({ enemyKey, onComplete }) {
   const [imgFailed, setImgFailed] = useState(false);
   const [exiting, setExiting] = useState(false);
 
-  const introSrc = enemy?.chapter
-    ? `./enemies/classic/chapter_${enemy.chapter}/${enemyKey}_intro.jpg`
-    : null;
+  const introSrc = getEnemyImageSrc(enemyKey, enemy, 'intro');
 
   const finish = () => {
     if (exiting) return;
