@@ -22,9 +22,9 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.23.0';
+export const GAME_VERSION = '1.24.0';
 export const VERSION_DATE = '2026-05-16';
-export const VERSION_LABEL = '여명의 사제 시그니처 — 매력 활용 시스템 신설 (회복 효율+ + 받는 데미지-)';
+export const VERSION_LABEL = '직업 해금 룰 변경 — 5직업 모두 처음부터 사용 가능, 챔피언십만 수련 클리어 조건';
 
 // =========== 패시브 스킬 ===========
 // effect 필드는 문자열 키. 실제 동작은 메인 코드의 trigger handler에서 처리.
@@ -169,8 +169,8 @@ export const PASSIVE_SKILLS = {
 };
 
 // =========== 직업 ===========
-// locked: true인 직업은 이전 직업의 수련의 길 클리어로 해금
-// 해금 순서: 방랑검사 → 술법사 → 마족 → 엘프 → 사제
+// 5직업 모두 처음부터 사용 가능 (1.24.0~). 챔피언십에서는 해당 직업의
+// 수련의 길 클리어 시 사용 가능 (isChampionshipClassUnlocked로 판단).
 export const CLASSES = [
   {
     id: 'lanthert', name: '방랑검사', sub: 'Lanthert Path',
@@ -196,8 +196,7 @@ export const CLASSES = [
     stats: { 근력: 8, 민첩: 11, 지능: 20, 매력: 14 },
     combatSkills: ['마법탄', '정념폭발', '결계'],
     color: '#5c4a8c',
-    locked: true,
-    unlockId: 'training_lanthert_clear',     // 방랑검사 수련 클리어 시 해금
+    locked: false,
     image: './classes/sage.jpg',
     winImage: './classes/sagewin.jpg',
     lossImage: './classes/sageloss.jpg',
@@ -212,8 +211,7 @@ export const CLASSES = [
     stats: { 근력: 19, 민첩: 13, 지능: 13, 매력: 9 },
     combatSkills: ['광폭참격', '피의 일격', '광기'],
     color: '#8b1f1f',
-    locked: true,
-    unlockId: 'training_sage_clear',         // 술법사 수련 클리어 시 해금
+    locked: false,
     image: './classes/demonblood.jpg',
     winImage: './classes/demonbloodwin.jpg',
     lossImage: './classes/demonbloodloss.jpg',
@@ -228,8 +226,7 @@ export const CLASSES = [
     stats: { 근력: 11, 민첩: 20, 지능: 14, 매력: 15 },
     combatSkills: ['정밀사격', '연속화살', '바람결계'],
     color: '#7a9a5e',
-    locked: true,
-    unlockId: 'training_demonblood_clear',   // 마족 수련 클리어 시 해금
+    locked: false,
     image: './classes/elf.jpg',
     winImage: './classes/elfwin.jpg',
     lossImage: './classes/elfloss.jpg',
@@ -244,8 +241,7 @@ export const CLASSES = [
     stats: { 근력: 9, 민첩: 11, 지능: 15, 매력: 19 },
     combatSkills: ['신성광선', '축복', '가호'],
     color: '#d4a574',
-    locked: true,
-    unlockId: 'training_elf_clear',          // 엘프 수련 클리어 시 해금
+    locked: false,
     image: './classes/priest.jpg',
     winImage: './classes/priestwin.jpg',
     lossImage: './classes/priestloss.jpg',
@@ -3400,11 +3396,13 @@ export const EXPEDITIONS = [
   },
 
   // === 수련의 길 (5직업) — 챔피언십 해금 트리거 ===
+  // 1.24.0~ 5개 수련 모두 튜토리얼 4 클리어 시 일괄 해금. 직업 자체는 처음부터 사용 가능하나
+  // 챔피언십에서는 해당 직업의 수련 클리어가 사용 조건. unlocksClass 필드 제거 (deprecated).
   {
     id: 'training_lanthert',
     name: '방랑검사의 수련',
     sub: 'Path of the Lanthert',
-    desc: '검을 마스터한다. 클리어 시 챔피언십에서 방랑검사 사용 가능 + 술법사 해금.',
+    desc: '검을 마스터한다. 클리어 시 챔피언십에서 방랑검사 사용 가능.',
     color: '#c4453d',
     chapters: [1, 2, 3, 4],
     enemyHpMult: 1.0,
@@ -3412,17 +3410,16 @@ export const EXPEDITIONS = [
     curseCount: 0,
     maxRelicSelect: 1,
     soulReward: 80,
-    unlockId: 'tutorial_curse_clear',    // 튜토리얼 4 클리어 후 해금
+    unlockId: 'tutorial_curse_clear',
     category: 'training',
     forcedClassId: 0,
-    unlocksChampionshipFor: 0,            // 클리어 시 챔피언십(방랑검사) 해금
-    unlocksClass: 1,                       // 클리어 시 술법사 직업 해금
+    unlocksChampionshipFor: 0,
   },
   {
     id: 'training_sage',
     name: '술법사의 수련',
     sub: 'Path of the Sage',
-    desc: '주문을 연마한다. 클리어 시 챔피언십에서 술법사 사용 가능 + 마족 해금.',
+    desc: '주문을 연마한다. 클리어 시 챔피언십에서 술법사 사용 가능.',
     color: '#7ba3c4',
     chapters: [1, 2, 3, 4],
     enemyHpMult: 1.0,
@@ -3430,17 +3427,16 @@ export const EXPEDITIONS = [
     curseCount: 0,
     maxRelicSelect: 1,
     soulReward: 80,
-    unlockId: 'training_lanthert_clear',
+    unlockId: 'tutorial_curse_clear',
     category: 'training',
     forcedClassId: 1,
     unlocksChampionshipFor: 1,
-    unlocksClass: 2,
   },
   {
     id: 'training_demonblood',
     name: '혼혈 마족의 수련',
     sub: 'Path of the Demonblood',
-    desc: '마성을 다스린다. 클리어 시 챔피언십에서 마족 사용 가능 + 엘프 해금.',
+    desc: '마성을 다스린다. 클리어 시 챔피언십에서 마족 사용 가능.',
     color: '#8b1f1f',
     chapters: [1, 2, 3, 4],
     enemyHpMult: 1.0,
@@ -3448,17 +3444,16 @@ export const EXPEDITIONS = [
     curseCount: 0,
     maxRelicSelect: 1,
     soulReward: 80,
-    unlockId: 'training_sage_clear',
+    unlockId: 'tutorial_curse_clear',
     category: 'training',
     forcedClassId: 2,
     unlocksChampionshipFor: 2,
-    unlocksClass: 3,
   },
   {
     id: 'training_elf',
     name: '엘프의 수련',
     sub: 'Path of the Elf',
-    desc: '자연을 부린다. 클리어 시 챔피언십에서 엘프 사용 가능 + 사제 해금.',
+    desc: '자연을 부린다. 클리어 시 챔피언십에서 엘프 사용 가능.',
     color: '#7a9a5e',
     chapters: [1, 2, 3, 4],
     enemyHpMult: 1.0,
@@ -3466,11 +3461,10 @@ export const EXPEDITIONS = [
     curseCount: 0,
     maxRelicSelect: 1,
     soulReward: 80,
-    unlockId: 'training_demonblood_clear',
+    unlockId: 'tutorial_curse_clear',
     category: 'training',
     forcedClassId: 3,
     unlocksChampionshipFor: 3,
-    unlocksClass: 4,
   },
   {
     id: 'training_priest',
@@ -3484,11 +3478,10 @@ export const EXPEDITIONS = [
     curseCount: 0,
     maxRelicSelect: 1,
     soulReward: 80,
-    unlockId: 'training_elf_clear',
+    unlockId: 'tutorial_curse_clear',
     category: 'training',
     forcedClassId: 4,
     unlocksChampionshipFor: 4,
-    // 마지막 수련 — 다음 직업 해금 없음
   },
   // === 무한모드: 황혼의 끝 ===
   // 보스 클리어해도 끝나지 않고 다음 챕터로 — 깊이가 깊어질수록 적 능력치 상향.
@@ -4037,16 +4030,16 @@ export const ACHIEVEMENTS = [
 
   // === 수련의 길 클리어 업적 (5직업) ===
   // 보상: 직업 순서대로 100/150/200/250/300
-  { id: 'clear_training_lanthert', cat: 'training', class: 'lanthert', kind: 'first', target: 1, reward: 100, 
-    name: '검의 수련자', desc: '방랑검사의 수련 클리어 — 술법사 해금' },
-  { id: 'clear_training_sage', cat: 'training', class: 'sage', kind: 'first', target: 1, reward: 150, 
-    name: '주문의 수련자', desc: '술법사의 수련 클리어 — 마족 해금' },
-  { id: 'clear_training_demonblood', cat: 'training', class: 'demonblood', kind: 'first', target: 1, reward: 200, 
-    name: '마성의 수련자', desc: '혼혈 마족의 수련 클리어 — 엘프 해금' },
-  { id: 'clear_training_elf', cat: 'training', class: 'elf', kind: 'first', target: 1, reward: 250, 
-    name: '자연의 수련자', desc: '엘프의 수련 클리어 — 사제 해금' },
-  { id: 'clear_training_priest', cat: 'training', class: 'priest', kind: 'first', target: 1, reward: 300, 
-    name: '신앙의 수련자', desc: '사제의 수련 클리어 — 모든 직업 마스터' },
+  { id: 'clear_training_lanthert', cat: 'training', class: 'lanthert', kind: 'first', target: 1, reward: 100,
+    name: '검의 수련자', desc: '방랑검사의 수련 클리어 — 챔피언십 방랑검사 해금' },
+  { id: 'clear_training_sage', cat: 'training', class: 'sage', kind: 'first', target: 1, reward: 150,
+    name: '주문의 수련자', desc: '술법사의 수련 클리어 — 챔피언십 술법사 해금' },
+  { id: 'clear_training_demonblood', cat: 'training', class: 'demonblood', kind: 'first', target: 1, reward: 200,
+    name: '마성의 수련자', desc: '혼혈 마족의 수련 클리어 — 챔피언십 혼혈 마족 해금' },
+  { id: 'clear_training_elf', cat: 'training', class: 'elf', kind: 'first', target: 1, reward: 250,
+    name: '자연의 수련자', desc: '엘프의 수련 클리어 — 챔피언십 숲의 정령사 해금' },
+  { id: 'clear_training_priest', cat: 'training', class: 'priest', kind: 'first', target: 1, reward: 300,
+    name: '신앙의 수련자', desc: '사제의 수련 클리어 — 챔피언십 여명의 사제 해금' },
   
   // === 수련의 길 숙달 업적 (5직업 × 10회) ===
   { id: 'master10_training_lanthert', cat: 'training', class: 'lanthert', kind: 'count', target: 10, reward: 300, 
