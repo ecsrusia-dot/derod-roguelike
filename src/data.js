@@ -22,9 +22,9 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.22.0';
+export const GAME_VERSION = '1.22.1';
 export const VERSION_DATE = '2026-05-16';
-export const VERSION_LABEL = '단독 버프 스킬 프리 액션 시스템 — 턴 소비 없이 즉시 발동 + 턴당 1회 제한';
+export const VERSION_LABEL = '분노 buff 지속 3턴 → 2턴 밸런스 조정 — 광기/축복 사용 사이클 정합 (cd 3턴 = 분노 2턴 + 휴식 1턴)';
 
 // =========== 패시브 스킬 ===========
 // effect 필드는 문자열 키. 실제 동작은 메인 코드의 trigger handler에서 처리.
@@ -302,14 +302,14 @@ export const COMBAT_SKILLS = {
   // 혼혈 마족
   광폭참격: { name: '광폭참격', cost: 0, cd: 0, type: 'physical', baseDmg: [22, 30], desc: 'HP 낮을수록 ↑', berserker: true },
   '피의 일격': { name: '피의 일격', cost: 1, cd: 2, type: 'physical', baseDmg: [27, 35], desc: '자해+출혈', selfDmg: 10, forceBleed: true },
-  광기: { name: '광기', cost: 2, cd: 3, type: 'buff', buff: 'rage', desc: '3턴 데미지+30% (광기의 분노)' },
+  광기: { name: '광기', cost: 2, cd: 3, type: 'buff', buff: 'rage', desc: '2턴 데미지+30% (광기의 분노)' },
   // 정령사
   정밀사격: { name: '정밀사격', cost: 0, cd: 0, type: 'physical', baseDmg: [18, 24], desc: '기본 활 공격' },
   연속화살: { name: '연속화살', cost: 2, cd: 3, type: 'physical', baseDmg: [15, 19], hitCount: 3, desc: '3연발' },
   바람결계: { name: '바람결계', cost: 1, cd: 1, type: 'defense', defense: 30, desc: '방어+회피', dodgeBuff: 30 },
   // 여명의 사제
   신성광선: { name: '신성광선', cost: 0, cd: 0, type: 'magic', baseDmg: [17, 25], desc: '신성 데미지+자가 회복 10', selfHeal: 10 },
-  축복: { name: '축복', cost: 1, cd: 3, type: 'buff', buff: 'rage', desc: '3턴 데미지+30% (여명의 축복)' },
+  축복: { name: '축복', cost: 1, cd: 3, type: 'buff', buff: 'rage', desc: '2턴 데미지+30% (여명의 축복)' },
   가호: { name: '가호', cost: 2, cd: 2, type: 'defense', defense: 50, desc: '방어 +50, HP 회복 +15', selfHeal: 15 },
 };
 

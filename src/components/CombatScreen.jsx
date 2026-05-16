@@ -558,9 +558,9 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       }
     }
     if (skill.type === 'buff' && skill.buff === 'rage') {
-      newPlayer.buffs = { ...newPlayer.buffs, rage: 3 };
+      newPlayer.buffs = { ...newPlayer.buffs, rage: 2 };
       newPlayer.usedBuffThisTurn = true;  // 같은 턴 재사용 차단 플래그
-      newLog.push({ type: 'system', text: `· 분노 발동! 3턴간 데미지 +30%` });
+      newLog.push({ type: 'system', text: `· 분노 발동! 2턴간 데미지 +30%` });
     }
     if (skill.cd > 0) {
       // 가속 minor: 쿨다운 -1턴 (Lv.4마다 누적)
