@@ -27,6 +27,7 @@ import {
   rollAltarSlots,
   rollCurses,
   hasCurse,
+  getCharismaHealBonus,
 } from './utils/helpers.js';
 
 // 데미지/회피/치명 함수 (combat/damage.js로 분리됨)
@@ -1171,6 +1172,9 @@ export default function App() {
       // 유물 heal % 보너스
       const relicHealPct = getActiveRelicStat(relics, activeRelicNames, 'heal');
       if (relicHealPct > 0) healValue = Math.floor(healValue * (1 + relicHealPct / 100));
+      // 매력 시그니처: 회복 효율 +%
+      const charismaBonus = getCharismaHealBonus({ ...classData?.stats, ...stats });
+      if (charismaBonus > 0) healValue = Math.floor(healValue * (1 + charismaBonus / 100));
       if (hasCurse(currentCurses, 'curse_heal-50')) healValue = Math.floor(healValue * 0.5);
       setHp(prev => Math.min(maxHp, prev + healValue));
     } else if (reward.type === 'heal_full') {
@@ -1212,6 +1216,8 @@ export default function App() {
       else if (reward.type === 'gem') setGem(prev => prev + reward.value);
       else if (reward.type === 'heal') {
         let healValue = reward.value;
+        const charismaBonus = getCharismaHealBonus({ ...classData?.stats, ...stats });
+        if (charismaBonus > 0) healValue = Math.floor(healValue * (1 + charismaBonus / 100));
         if (hasCurse(currentCurses, 'curse_heal-50')) healValue = Math.floor(healValue * 0.5);
         setHp(prev => Math.min(maxHp, prev + healValue));
       }
@@ -1308,6 +1314,8 @@ export default function App() {
       let healValue = choice.value;
       const relicHealPct = getActiveRelicStat(relics, activeRelicNames, 'heal');
       if (relicHealPct > 0) healValue = Math.floor(healValue * (1 + relicHealPct / 100));
+      const charismaBonus = getCharismaHealBonus({ ...classData?.stats, ...stats });
+      if (charismaBonus > 0) healValue = Math.floor(healValue * (1 + charismaBonus / 100));
       if (hasCurse(currentCurses, 'curse_heal-50')) healValue = Math.floor(healValue * 0.5);
       setHp(prev => Math.min(maxHp, prev + healValue));
       completeCurrentNode();

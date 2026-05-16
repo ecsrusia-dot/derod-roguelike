@@ -231,6 +231,26 @@ export function hasCurse(curses, effectName) {
   return curses.some(c => c.effect === effectName);
 }
 
+// ===== 매력 효과 헬퍼 =====
+// 1.23.0 — 여명의 사제 시그니처. 매력 능력치가 회복 효율 + 받는 데미지 감소를 제공.
+// 모든 직업이 매력 보석으로 효과를 얻을 수 있으나, 시작 매력이 가장 높은 사제(19)가 시작부터
+// 두 효과 모두 누림. 정령사(15)·술법사(14)는 회복+만 받음.
+
+// 매력 → 회복 효율 보너스 (%). 매력 11+ 시 발동.
+// 공식: max(0, (매력 - 10)) × 0.5%
+//   매력 11 → +0.5% / 매력 15 → +2.5% / 매력 19 → +4.5% / 매력 25 → +7.5%
+export function getCharismaHealBonus(stats) {
+  if (!stats || !stats.매력) return 0;
+  return Math.max(0, (stats.매력 - 10) * 0.5);
+}
+
+// 매력 → 받는 데미지 감소 (%). 매력 17+ 시 발동, 5단위마다 -5% 누진.
+//   매력 17~21 → -5% / 22~26 → -10% / 27~31 → -15%
+export function getCharismaDmgReduction(stats) {
+  if (!stats || !stats.매력 || stats.매력 < 17) return 0;
+  return (Math.floor((stats.매력 - 17) / 5) + 1) * 5;
+}
+
 // ===== 적 일러스트 경로 헬퍼 =====
 // chapter 값으로 클래식/챔피언십 자동 판별:
 //   - number (1, 2, 3, 4) → 클래식: ./enemies/classic/chapter_<n>/
