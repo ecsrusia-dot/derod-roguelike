@@ -623,7 +623,10 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     setTimeout(() => {
       let newPlayer = { ...player, soulGauge: 0 };
       let newEnemy = { ...enemy };
-      const newLog = [...log, { type: 'crit', text: `★ ${ult.name} 발동! ${ult.quote ? `「${ult.quote}」` : ''}` }];
+      const newLog = [...log,
+        { type: 'turnDivider', turn },
+        { type: 'crit', text: `★ ${ult.name} 발동! ${ult.quote ? `「${ult.quote}」` : ''}` },
+      ];
 
       // === 효과 분기 ===
       if (ult.effect === 'classult_shadowStrike') {
@@ -1825,7 +1828,29 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                 <div className="font-bold tabular-nums" style={{ color: PALETTE.text }}>{player.defense || 0}</div>
               </div>
             </div>
-            
+
+            {/* 활성 상태 — 메인 헤더의 buff/debuff 칩을 모달에서도 확인 가능 */}
+            {(() => {
+              const hasAnyStatus = (player.buffs?.rage > 0) || (player.buffs?.shadowCounterTurns > 0) || (player.buffs?.guaranteedCrit > 0) || (player.buffs?.dodgeBuffTurns > 0) || player.firstHitImmune || (player.debuffs?.frostbiteDmg > 0 && player.debuffs?.frostbiteTurns > 0) || (player.debuffs?.sealedTurns > 0 && player.debuffs?.sealedSkills?.length > 0) || (player.debuffs?.shockGauge > 0) || (player.debuffs?.stunnedTurns > 0);
+              if (!hasAnyStatus) return null;
+              return (
+                <>
+                  <div className="text-[10px] mb-1.5" style={{ color: PALETTE.textDim }}>━ 활성 상태 ━</div>
+                  <div className="flex items-center gap-1.5 flex-wrap mb-3">
+                    {player.buffs?.rage > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.accent}50`, color: '#fff', border: `1px solid ${PALETTE.accent}` }}>☩ 분노 ({player.buffs.rage}T)</span>)}
+                    {player.buffs?.shadowCounterTurns > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#1a0f0a90', color: '#ffd86b', border: '1px solid #ffd86b', boxShadow: '0 0 6px rgba(255,216,107,0.5)' }}>☄ 무영의 잔영 반격 100% ({player.buffs.shadowCounterTurns}T)</span>)}
+                    {player.buffs?.guaranteedCrit > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#c4453d50', color: '#fff', border: '1px solid #c4453d' }}>✦ 치명타 확정</span>)}
+                    {player.buffs?.dodgeBuffTurns > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.green}50`, color: '#fff', border: `1px solid ${PALETTE.green}` }}>💨 회피 +{player.buffs.dodgeBuff || 0}% ({player.buffs.dodgeBuffTurns}T)</span>)}
+                    {player.firstHitImmune && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.legendary}50`, color: '#fff', border: `1px solid ${PALETTE.legendary}` }}>✦ 무적 1회</span>)}
+                    {player.debuffs?.frostbiteDmg > 0 && player.debuffs?.frostbiteTurns > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#7ba3c450', color: '#fff', border: '1px solid #7ba3c4' }}>❄️ 동상 {player.debuffs.frostbiteDmg} ({player.debuffs.frostbiteTurns}T)</span>)}
+                    {player.debuffs?.sealedTurns > 0 && player.debuffs?.sealedSkills?.length > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#5c4a8c50', color: '#fff', border: '1px solid #5c4a8c' }}>🔒 봉인 {player.debuffs.sealedSkills.join(',')} ({player.debuffs.sealedTurns}T)</span>)}
+                    {player.debuffs?.shockGauge > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#8b1f1f50', color: '#fff', border: '1px solid #8b1f1f' }}>⚡ 충격 {player.debuffs.shockGauge}/100</span>)}
+                    {player.debuffs?.stunnedTurns > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#a52a2a50', color: '#fff', border: '1px solid #a52a2a' }}>💫 기절 ({player.debuffs.stunnedTurns}T)</span>)}
+                  </div>
+                </>
+              );
+            })()}
+
             {/* 그룹 1: 기본 능력 */}
             <div className="text-[10px] mb-1.5" style={{ color: PALETTE.textDim }}>━ 기본 능력 ━</div>
             <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] mb-3">
@@ -1859,11 +1884,14 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
               const hasShadow = hasUltimate(ultimates, 'ult_counterShadow');
               // 명경지수: 회피율 +10%
               if (hasMirror) dodgeRate += 10;
+              // 무영의 잔영 활성 시 100% 강제 (실제 반격 처리 로직과 동일 — line 962-970 참조)
+              const shadowStrikeBuff = (player.buffs?.shadowCounterTurns || 0) > 0;
               let counterRate = 0;
-              if (simanLv > 0 || hasMirror || hasShock || hasShadow) {
+              if (simanLv > 0 || hasMirror || hasShock || hasShadow || shadowStrikeBuff) {
                 counterRate = simanLv * 5;  // minor: 5%/Lv
                 if (simanLv >= 3) counterRate += 20;  // Lv.3
                 if (hasMirror || hasShock || hasShadow) counterRate += 60;  // 궁극 +60%
+                if (shadowStrikeBuff) counterRate = 100;  // 무영의 잔영: 100% 강제
                 if (counterRate > 100) counterRate = 100;  // 상한
               }
               return (
