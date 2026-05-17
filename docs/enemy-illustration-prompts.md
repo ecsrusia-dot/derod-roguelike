@@ -68,7 +68,7 @@ const subdir = enemy.championship
 const combatSrc = `./enemies/${subdir}/${enemyKey}_combat.jpg`;
 ```
 
-⚠️ **절대 경로(`/enemies/...`) 사용 금지** — GitHub Pages 배포 시 `/derod-roguelike/` 베이스를 무시해 404. 직업 일러(`./classes/lanthert.jpg`)와 동일 컨벤션 유지.
+⚠️ **절대 경로(`/enemies/...`) 사용 금지** — GitHub Pages 배포 시 `/derod-roguelike/` 베이스를 무시해 404. 직업 일러(`./classes/wanderer.jpg`)와 동일 컨벤션 유지.
 
 ---
 

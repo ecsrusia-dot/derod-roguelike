@@ -55,7 +55,7 @@ const DEFAULT_META = {
   // 직업 각인 시스템 (1.25.0~)
   // engravings[classId] = { lv: 1~10, slots: [cardId|null, cardId|null, cardId|null] }
   engravings: {
-    lanthert:   { lv: 1, slots: [null, null, null] },
+    wanderer:   { lv: 1, slots: [null, null, null] },
     sage:       { lv: 1, slots: [null, null, null] },
     demonblood: { lv: 1, slots: [null, null, null] },
     elf:        { lv: 1, slots: [null, null, null] },
@@ -67,7 +67,7 @@ const DEFAULT_META = {
   // ULTIMATE_SKILLS 직업별 픽 기록 (1.26.0~)
   // ultimatesPickedByClass[classId] = ['ult_id1', 'ult_id2', ...] (중복 없음)
   ultimatesPickedByClass: {
-    lanthert: [],
+    wanderer: [],
     sage: [],
     demonblood: [],
     elf: [],
@@ -76,7 +76,7 @@ const DEFAULT_META = {
   // 챔피언십 클리어 직업별 추적 (1.26.0~) — 기존 championshipClears와 별개 (소급 적용 안 됨)
   // championshipClearsByClass[classId][expId][difficulty] = true
   championshipClearsByClass: {
-    lanthert:   {},
+    wanderer:   {},
     sage:       {},
     demonblood: {},
     elf:        {},
@@ -85,6 +85,9 @@ const DEFAULT_META = {
   // 1.26.0 조건 시스템 추가 안내 모달 트리거 (1회만 표시)
   // null = 안내 안 보여줌 / true = 표시 필요
   awakeningConditionNotice: null,
+  // 1.35.0 lanthert → wanderer 내부 코드명 변경 안내 (1회만 표시)
+  // null = 안내 안 보여줌 / 객체 = { migratedKeys: [...] }
+  wandererRenameNotice: null,
 };
 
 // IndexedDB 열기
@@ -145,6 +148,85 @@ export async function loadMeta() {
         }
         // 1.26.0 조건 시스템 첫 마이그레이션이면 보강 후 저장 (안내 모달 재트리거 방지)
         if (!data.ultimatesPickedByClass) {
+          needsImmediateSave = true;
+        }
+        // 1.35.0 lanthert → wanderer 내부 코드명 변경 마이그레이션
+        // 기존 사용자의 lanthert 키 데이터를 wanderer로 자동 이전. 멱등성 보장 (이미 이전했으면 스킵)
+        const lanthertEng = data.engravings?.lanthert;
+        const lanthertUlt = data.ultimatesPickedByClass?.lanthert;
+        const lanthertChamp = data.championshipClearsByClass?.lanthert;
+        const migratedKeys = [];
+        if (lanthertEng && !data.engravings?.wanderer) {
+          safe.engravings = { ...safe.engravings, wanderer: lanthertEng };
+          delete safe.engravings.lanthert;
+          migratedKeys.push('engravings');
+        } else if (data.engravings?.lanthert) {
+          // wanderer가 이미 있으면 lanthert 키만 정리
+          const cleaned = { ...safe.engravings };
+          delete cleaned.lanthert;
+          safe.engravings = cleaned;
+        }
+        if (lanthertUlt && (!data.ultimatesPickedByClass?.wanderer || data.ultimatesPickedByClass.wanderer.length === 0)) {
+          safe.ultimatesPickedByClass = { ...safe.ultimatesPickedByClass, wanderer: lanthertUlt };
+          delete safe.ultimatesPickedByClass.lanthert;
+          migratedKeys.push('ultimatesPickedByClass');
+        } else if (data.ultimatesPickedByClass?.lanthert) {
+          const cleaned = { ...safe.ultimatesPickedByClass };
+          delete cleaned.lanthert;
+          safe.ultimatesPickedByClass = cleaned;
+        }
+        if (lanthertChamp && Object.keys(lanthertChamp).length > 0 && (!data.championshipClearsByClass?.wanderer || Object.keys(data.championshipClearsByClass.wanderer).length === 0)) {
+          safe.championshipClearsByClass = { ...safe.championshipClearsByClass, wanderer: lanthertChamp };
+          delete safe.championshipClearsByClass.lanthert;
+          migratedKeys.push('championshipClearsByClass');
+        } else if (data.championshipClearsByClass?.lanthert) {
+          const cleaned = { ...safe.championshipClearsByClass };
+          delete cleaned.lanthert;
+          safe.championshipClearsByClass = cleaned;
+        }
+        // 업적 ID 변경 (5건): clear_training_lanthert / master10_training_lanthert / expert_lanthert / master_lanthert / special_lanthert_3ult
+        const achRenames = [
+          ['clear_training_lanthert', 'clear_training_wanderer'],
+          ['master10_training_lanthert', 'master10_training_wanderer'],
+          ['expert_lanthert', 'expert_wanderer'],
+          ['master_lanthert', 'master_wanderer'],
+          ['special_lanthert_3ult', 'special_wanderer_3ult'],
+        ];
+        if (data.achievements) {
+          const newAch = { ...safe.achievements };
+          let achRenamed = false;
+          for (const [oldId, newId] of achRenames) {
+            if (newAch[oldId] && !newAch[newId]) {
+              newAch[newId] = newAch[oldId];
+              delete newAch[oldId];
+              achRenamed = true;
+            } else if (newAch[oldId]) {
+              delete newAch[oldId];
+              achRenamed = true;
+            }
+          }
+          if (achRenamed) {
+            safe.achievements = newAch;
+            if (!migratedKeys.includes('achievements')) migratedKeys.push('achievements');
+          }
+        }
+        // clearedExpeditions 배열에 'training_lanthert' 포함 시 'training_wanderer'로 치환
+        if (Array.isArray(data.clearedExpeditions) && data.clearedExpeditions.some(id => id === 'training_lanthert' || (typeof id === 'string' && id.includes('lanthert')))) {
+          safe.clearedExpeditions = data.clearedExpeditions
+            .map(id => (typeof id === 'string' && id.includes('lanthert')) ? id.replace(/lanthert/g, 'wanderer') : id)
+            .filter((id, idx, arr) => arr.indexOf(id) === idx);  // 중복 제거
+          if (!migratedKeys.includes('clearedExpeditions')) migratedKeys.push('clearedExpeditions');
+        }
+        // unlocks 배열에 lanthert 포함 항목 치환 (예: 'unlock_lanthert')
+        if (Array.isArray(data.unlocks) && data.unlocks.some(id => typeof id === 'string' && id.includes('lanthert'))) {
+          safe.unlocks = data.unlocks
+            .map(id => (typeof id === 'string' && id.includes('lanthert')) ? id.replace(/lanthert/g, 'wanderer') : id)
+            .filter((id, idx, arr) => arr.indexOf(id) === idx);
+          if (!migratedKeys.includes('unlocks')) migratedKeys.push('unlocks');
+        }
+        // 마이그레이션 항목 있으면 안내 모달 트리거 + 즉시 저장
+        if (migratedKeys.length > 0 && !data.wandererRenameNotice) {
+          safe.wandererRenameNotice = { migratedKeys };
           needsImmediateSave = true;
         }
         if (needsImmediateSave) {
@@ -302,7 +384,7 @@ export function recordExpeditionClear(meta, expeditionId) {
 export function isChampionshipClassUnlocked(meta, classId) {
   if (!meta || !meta.clearedExpeditions) return false;
   // training_{classId} 패턴의 expedition을 클리어했는지
-  const classKeys = ['lanthert', 'sage', 'demonblood', 'elf', 'priest'];
+  const classKeys = ['wanderer', 'sage', 'demonblood', 'elf', 'priest'];
   const key = classKeys[classId];
   if (!key) return false;
   return meta.clearedExpeditions.includes(`training_${key}`);
@@ -652,4 +734,10 @@ export function recordUltimatePickByClass(meta, classId, ultId) {
 export function clearAwakeningConditionNotice(meta) {
   if (!meta.awakeningConditionNotice) return meta;
   return { ...meta, awakeningConditionNotice: null };
+}
+
+// 1.35.0 lanthert → wanderer 코드명 변경 안내 모달 acknowledge
+export function clearWandererRenameNotice(meta) {
+  if (!meta.wandererRenameNotice) return meta;
+  return { ...meta, wandererRenameNotice: null };
 }

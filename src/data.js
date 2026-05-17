@@ -22,9 +22,9 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.34.0';
+export const GAME_VERSION = '1.35.0';
 export const VERSION_DATE = '2026-05-18';
-export const VERSION_LABEL = '술법사 일러 4컷 교체 — 정면·시작·승리·패배 풀 리소스 갱신';
+export const VERSION_LABEL = '방랑검사 내부 코드명 lanthert → wanderer 변경 + 자동 마이그레이션 — 표시명·진행도 보존';
 
 // =========== 패시브 스킬 ===========
 // effect 필드는 문자열 키. 실제 동작은 메인 코드의 trigger handler에서 처리.
@@ -147,7 +147,7 @@ export const PASSIVE_SKILLS = {
   심안류: {
     axis: 'utility', maxLv: 7, color: '#c4453d',
     desc: '맹인 검사의 감각 극대화. 공격을 흘리고 반격한다',
-    classOnly: 'lanthert',
+    classOnly: 'wanderer',
     minorEffect: { type: 'counterStat+', perLv: 5, desc: '반격율 +5%/Lv, 반격 데미지 +5%/Lv' },
     tiers: {
       3: { text: '반격 확률 +20%', trigger: 'passive', effect: 'counterRate+20' },
@@ -173,20 +173,20 @@ export const PASSIVE_SKILLS = {
 // 수련의 길 클리어 시 사용 가능 (isChampionshipClassUnlocked로 판단).
 export const CLASSES = [
   {
-    id: 'lanthert', name: '방랑검사', sub: 'Lanthert Path',
+    id: 'wanderer', name: '방랑검사', sub: 'Wanderer Path',
     quote: '다녀오겠습니다...',
     desc: '시력을 잃었던 검사. 어둠 속에서도 검을 뻗는다.',
     startSkills: { 심안류: 3, 심안: 2 },
     stats: { 근력: 18, 민첩: 15, 지능: 14, 매력: 11 },
     combatSkills: ['참격', '관통', '방검'],
-    ultimateId: 'lanthert_shadowStrike',  // 직업 액티브 궁극 (영혼 게이지 100 발동)
+    ultimateId: 'wanderer_shadowStrike',  // 직업 액티브 궁극 (영혼 게이지 100 발동)
     color: '#c4453d',
     locked: false,        // 항상 사용 가능 (시작 직업)
-    image: './classes/lanthert.jpg',
-    winImage: './classes/lanthertwin.jpg',
-    lossImage: './classes/lanthertloss.jpg',
-    startImage: './classes/lanthertstart.jpg',
-    combatImage: './classes/combat/lanthert_combat.jpg',
+    image: './classes/wanderer.jpg',
+    winImage: './classes/wandererwin.jpg',
+    lossImage: './classes/wandererloss.jpg',
+    startImage: './classes/wandererstart.jpg',
+    combatImage: './classes/combat/wanderer_combat.jpg',
   },
   {
     id: 'sage', name: '술법사', sub: 'Sorcerer of Tour',
@@ -263,9 +263,9 @@ export const CLASSES = [
 // 1직업당 1개의 시그니처 궁극 — 클래스 정체성 강화.
 // 프로토타입: 방랑검사 1.12.0~, 술법사 1.28.0~. 나머지 3직업(demonblood/elf/priest)은 다음 업데이트.
 export const CLASS_ULTIMATES = {
-  lanthert_shadowStrike: {
-    id: 'lanthert_shadowStrike',
-    classId: 'lanthert',
+  wanderer_shadowStrike: {
+    id: 'wanderer_shadowStrike',
+    classId: 'wanderer',
     name: '무영(無影)의 일격',
     quote: '검은 그림자보다 빠르다.',
     desc: '적에게 45 데미지 (방어 무시). 다음 3턴간 반격 확률 100%, 다음 공격 치명타 확정.',
@@ -2804,12 +2804,12 @@ export const EVENTS = [
   // 같은 챕터를 다른 직업으로 돌 때 직업 정체성에 맞는 사건이 등장.
   // 챕터 제약 없음 — 어느 챕터에서도 해당 직업이면 등장 가능.
   // ============================================================
-  // --- 방랑검사 (lanthert) ---
+  // --- 방랑검사 (wanderer) ---
   {
-    id: 'lanthert_oldMentor',
+    id: 'wanderer_oldMentor',
     title: '옛 스승의 흔적',
     text: '낯익은 검흔이 나무에 새겨져 있다.\n오래 전 너에게 검을 가르쳤던 스승의 자취. 가까운 곳에 누군가 있다.',
-    classOnly: ['lanthert'],
+    classOnly: ['wanderer'],
     choices: [
       { text: '검흔을 따라간다 (민첩 검정)', stat: '민첩', dc: 14,
         success: { text: '스승이 남긴 검편을 손에 쥔다.', reward: { type: 'random_relic' } },
@@ -2819,10 +2819,10 @@ export const EVENTS = [
     ],
   },
   {
-    id: 'lanthert_blindTrial',
+    id: 'wanderer_blindTrial',
     title: '어둠 속의 시험',
     text: '깊은 안개. 눈은 무의미하다.\n검은 너의 또 다른 눈 — 그 사실을 시험할 시간이다.',
-    classOnly: ['lanthert'],
+    classOnly: ['wanderer'],
     choices: [
       { text: '심안에 의지해 나아간다 (지능 검정)', stat: '지능', dc: 15,
         success: { text: '어둠을 가르고 보석을 발견한다.', reward: { type: 'gem', value: 6 } },
@@ -3411,9 +3411,9 @@ export const EXPEDITIONS = [
   // 1.24.0~ 5개 수련 모두 튜토리얼 4 클리어 시 일괄 해금. 직업 자체는 처음부터 사용 가능하나
   // 챔피언십에서는 해당 직업의 수련 클리어가 사용 조건. unlocksClass 필드 제거 (deprecated).
   {
-    id: 'training_lanthert',
+    id: 'training_wanderer',
     name: '방랑검사의 수련',
-    sub: 'Path of the Lanthert',
+    sub: 'Path of the Wanderer',
     desc: '검을 마스터한다. 클리어 시 챔피언십에서 방랑검사 사용 가능.',
     color: '#c4453d',
     chapters: [1, 2, 3, 4],
@@ -4032,7 +4032,7 @@ export const ACHIEVEMENTS = [
 
   // === 수련의 길 클리어 업적 (5직업) ===
   // 보상: 직업 순서대로 100/150/200/250/300
-  { id: 'clear_training_lanthert', cat: 'training', class: 'lanthert', kind: 'first', target: 1, reward: 100,
+  { id: 'clear_training_wanderer', cat: 'training', class: 'wanderer', kind: 'first', target: 1, reward: 100,
     name: '검의 수련자', desc: '방랑검사의 수련 클리어 — 챔피언십 방랑검사 해금' },
   { id: 'clear_training_sage', cat: 'training', class: 'sage', kind: 'first', target: 1, reward: 150,
     name: '주문의 수련자', desc: '술법사의 수련 클리어 — 챔피언십 술법사 해금' },
@@ -4044,7 +4044,7 @@ export const ACHIEVEMENTS = [
     name: '신앙의 수련자', desc: '사제의 수련 클리어 — 챔피언십 여명의 사제 해금' },
   
   // === 수련의 길 숙달 업적 (5직업 × 10회) ===
-  { id: 'master10_training_lanthert', cat: 'training', class: 'lanthert', kind: 'count', target: 10, reward: 300, 
+  { id: 'master10_training_wanderer', cat: 'training', class: 'wanderer', kind: 'count', target: 10, reward: 300, 
     name: '방랑검사의 숙달자', desc: '방랑검사의 수련 10회 클리어' },
   { id: 'master10_training_sage', cat: 'training', class: 'sage', kind: 'count', target: 10, reward: 300, 
     name: '술법사의 숙달자', desc: '술법사의 수련 10회 클리어' },
@@ -4056,14 +4056,14 @@ export const ACHIEVEMENTS = [
     name: '사제의 숙달자', desc: '사제의 수련 10회 클리어' },
   
   // === 전문가 (50회) - 직업당 1개 (가장 어려운 원정 4 기준) ===
-  { id: 'expert_lanthert', cat: 'clear', class: 'lanthert', expedition: 4, kind: 'count', target: 50, reward: 2000, name: '검의 전문가', desc: '방랑검사로 망각의 원정 50회 클리어' },
+  { id: 'expert_wanderer', cat: 'clear', class: 'wanderer', expedition: 4, kind: 'count', target: 50, reward: 2000, name: '검의 전문가', desc: '방랑검사로 망각의 원정 50회 클리어' },
   { id: 'expert_sage', cat: 'clear', class: 'sage', expedition: 4, kind: 'count', target: 50, reward: 2000, name: '술법의 전문가', desc: '술법사로 망각의 원정 50회 클리어' },
   { id: 'expert_demonblood', cat: 'clear', class: 'demonblood', expedition: 4, kind: 'count', target: 50, reward: 2000, name: '마혈의 전문가', desc: '혼혈 마족로 망각의 원정 50회 클리어' },
   { id: 'expert_elf', cat: 'clear', class: 'elf', expedition: 4, kind: 'count', target: 50, reward: 2000, name: '숲의 전문가', desc: '숲의 정령사로 망각의 원정 50회 클리어' },
   { id: 'expert_priest', cat: 'clear', class: 'priest', expedition: 4, kind: 'count', target: 50, reward: 2000, name: '신앙의 전문가', desc: '여명의 사제로 망각의 원정 50회 클리어' },
   
   // === 마스터 (100회) - 직업당 1개 ===
-  { id: 'master_lanthert', cat: 'clear', class: 'lanthert', expedition: 4, kind: 'count', target: 100, reward: 5000, name: '검의 마스터', desc: '방랑검사로 망각의 원정 100회 클리어' },
+  { id: 'master_wanderer', cat: 'clear', class: 'wanderer', expedition: 4, kind: 'count', target: 100, reward: 5000, name: '검의 마스터', desc: '방랑검사로 망각의 원정 100회 클리어' },
   { id: 'master_sage', cat: 'clear', class: 'sage', expedition: 4, kind: 'count', target: 100, reward: 5000, name: '술법의 마스터', desc: '술법사로 망각의 원정 100회 클리어' },
   { id: 'master_demonblood', cat: 'clear', class: 'demonblood', expedition: 4, kind: 'count', target: 100, reward: 5000, name: '마혈의 마스터', desc: '혼혈 마족로 망각의 원정 100회 클리어' },
   { id: 'master_elf', cat: 'clear', class: 'elf', expedition: 4, kind: 'count', target: 100, reward: 5000, name: '숲의 마스터', desc: '숲의 정령사로 망각의 원정 100회 클리어' },
@@ -4082,7 +4082,7 @@ export const ACHIEVEMENTS = [
   { id: 'special_all_lv7', cat: 'special', kind: 'event', target: 1, reward: 350, name: '여명의 의지', desc: '한 런에서 패시브 5종 모두 Lv.7 보유' },
   { id: 'special_three_curses', cat: 'special', kind: 'event', target: 1, reward: 500, name: '황혼의 손길', desc: '저주 3개 모두 받은 채 원정 클리어' },
   { id: 'special_event_perfect', cat: 'special', kind: 'event', target: 1, reward: 200, name: '운명의 심판자', desc: '한 런에서 모든 사건 성공' },
-  { id: 'special_lanthert_3ult', cat: 'special', kind: 'event', target: 1, reward: 600, name: '검의 길', desc: '방랑검사 각성 3종 모두 1런에 진화' },
+  { id: 'special_wanderer_3ult', cat: 'special', kind: 'event', target: 1, reward: 600, name: '검의 길', desc: '방랑검사 각성 3종 모두 1런에 진화' },
   { id: 'special_all_class_e4', cat: 'meta', kind: 'event', target: 5, reward: 3000, name: '미답의 도전자', desc: '모든 직업으로 망각 원정 클리어' },
   { id: 'special_max_meta', cat: 'meta', kind: 'event', target: 1, reward: 1000, name: '영혼의 수호자', desc: '영혼 제단 모든 강화 최대 단계' },
   
@@ -4197,7 +4197,7 @@ const COMMON_AWAKENING_CONDITIONS = [
 ];
 
 // 직업별 보상은 직업마다 다름 — 보상만 정의하고 condition은 위 공통 표에서 lv 매칭으로 머지
-const _LANTHERT_REWARDS = [
+const _WANDERER_REWARDS = [
   { lv: 2,  cost: 500,   reward: { type: 'slotUnlock', slot: 1 } },
   { lv: 3,  cost: 1000,  reward: { type: 'statBonus', stat: '근력', value: 2 } },
   { lv: 4,  cost: 2000,  reward: { type: 'passiveBonus', skill: '심안류', delta: 1 } },
@@ -4261,7 +4261,7 @@ function _mergeConditions(rewards) {
 }
 
 export const ENGRAVING_AWAKENING_TABLE = {
-  lanthert:   _mergeConditions(_LANTHERT_REWARDS),
+  wanderer:   _mergeConditions(_WANDERER_REWARDS),
   sage:       _mergeConditions(_SAGE_REWARDS),
   demonblood: _mergeConditions(_DEMONBLOOD_REWARDS),
   elf:        _mergeConditions(_ELF_REWARDS),
@@ -4282,37 +4282,37 @@ export const CHAMPIONSHIP_EXP_IDS = ['frost', 'forest', 'sanctum', 'rift', 'dawn
 //   - 시스템:        disableInsightPredict
 // PR 2에서는 표시만. PR 3에서 전투 적용.
 export const ENGRAVINGS = {
-  lanthert: [
+  wanderer: [
     // === Common (5) ===
-    { id: 'eng_lan_wrist',     tier: 'C', name: '단련된 손목', desc: '근력 +2',                       effect: { str: 2 } },
-    { id: 'eng_lan_reaction',  tier: 'C', name: '빠른 반응',   desc: '민첩 +2',                       effect: { dex: 2 } },
-    { id: 'eng_lan_grit',      tier: 'C', name: '검사의 끈기', desc: '시작 HP +30',                   effect: { startHp: 30 } },
-    { id: 'eng_lan_light',     tier: 'C', name: '가벼운 옷',   desc: '회피율 +2%',                    effect: { dodgeRate: 2 } },
-    { id: 'eng_lan_breath',    tier: 'C', name: '검사의 호흡', desc: '매 턴 시작 시 영혼 게이지 +1',  effect: { perTurnSoul: 1 } },
+    { id: 'eng_wan_wrist',     tier: 'C', name: '단련된 손목', desc: '근력 +2',                       effect: { str: 2 } },
+    { id: 'eng_wan_reaction',  tier: 'C', name: '빠른 반응',   desc: '민첩 +2',                       effect: { dex: 2 } },
+    { id: 'eng_wan_grit',      tier: 'C', name: '검사의 끈기', desc: '시작 HP +30',                   effect: { startHp: 30 } },
+    { id: 'eng_wan_light',     tier: 'C', name: '가벼운 옷',   desc: '회피율 +2%',                    effect: { dodgeRate: 2 } },
+    { id: 'eng_wan_breath',    tier: 'C', name: '검사의 호흡', desc: '매 턴 시작 시 영혼 게이지 +1',  effect: { perTurnSoul: 1 } },
     // === Rare (5) ===
-    { id: 'eng_lan_afterimage',   tier: 'R', name: '잔영',         desc: '회피율 +5%',                  effect: { dodgeRate: 5 } },
-    { id: 'eng_lan_counter_dmg',  tier: 'R', name: '반격의 손맛',  desc: '반격 데미지 +15%',           effect: { counterDmgPct: 15 } },
-    { id: 'eng_lan_flow',         tier: 'R', name: '검의 흐름',    desc: '물리 데미지 +10%',           effect: { physDmgPct: 10 } },
-    { id: 'eng_lan_insight_flow', tier: 'R', name: '심안의 흐름',  desc: '회피 시 영혼 게이지 +3',     effect: { dodgeSoul: 3 } },
-    { id: 'eng_lan_counter_rate', tier: 'R', name: '반격의 회로',  desc: '반격율 +5%',                  effect: { counterRatePct: 5 } },
+    { id: 'eng_wan_afterimage',   tier: 'R', name: '잔영',         desc: '회피율 +5%',                  effect: { dodgeRate: 5 } },
+    { id: 'eng_wan_counter_dmg',  tier: 'R', name: '반격의 손맛',  desc: '반격 데미지 +15%',           effect: { counterDmgPct: 15 } },
+    { id: 'eng_wan_flow',         tier: 'R', name: '검의 흐름',    desc: '물리 데미지 +10%',           effect: { physDmgPct: 10 } },
+    { id: 'eng_wan_insight_flow', tier: 'R', name: '심안의 흐름',  desc: '회피 시 영혼 게이지 +3',     effect: { dodgeSoul: 3 } },
+    { id: 'eng_wan_counter_rate', tier: 'R', name: '반격의 회로',  desc: '반격율 +5%',                  effect: { counterRatePct: 5 } },
     // === Epic (5) ===
-    { id: 'eng_lan_dodge_counter', tier: 'E', name: '흘림과 베기', desc: '회피율 +5% / 반격율 +5%',                          effect: { dodgeRate: 5, counterRatePct: 5 } },
-    { id: 'eng_lan_blind_sense',   tier: 'E', name: '맹인의 감각', desc: '회피율 +9%',                                       effect: { dodgeRate: 9 } },
-    { id: 'eng_lan_echo',          tier: 'E', name: '영혼의 반향', desc: '반격 명중 시 영혼 게이지 +5',                       effect: { counterHitSoul: 5 } },
-    { id: 'eng_lan_shockwave',     tier: 'E', name: '충격파',      desc: '반격 명중 시 적 충격 게이지 +15 (누적 100 시 기절)', effect: { counterShock: 15 } },
-    { id: 'eng_lan_battle_start',  tier: 'E', name: '검사의 심득', desc: '전투 시작 시 영혼 게이지 +15',                      effect: { startSoul: 15 } },
+    { id: 'eng_wan_dodge_counter', tier: 'E', name: '흘림과 베기', desc: '회피율 +5% / 반격율 +5%',                          effect: { dodgeRate: 5, counterRatePct: 5 } },
+    { id: 'eng_wan_blind_sense',   tier: 'E', name: '맹인의 감각', desc: '회피율 +9%',                                       effect: { dodgeRate: 9 } },
+    { id: 'eng_wan_echo',          tier: 'E', name: '영혼의 반향', desc: '반격 명중 시 영혼 게이지 +5',                       effect: { counterHitSoul: 5 } },
+    { id: 'eng_wan_shockwave',     tier: 'E', name: '충격파',      desc: '반격 명중 시 적 충격 게이지 +15 (누적 100 시 기절)', effect: { counterShock: 15 } },
+    { id: 'eng_wan_battle_start',  tier: 'E', name: '검사의 심득', desc: '전투 시작 시 영혼 게이지 +15',                      effect: { startSoul: 15 } },
     // === Legendary (2) ===
-    { id: 'eng_lan_shadow_step',   tier: 'L', name: '무영(無影)의 잔영', desc: '회피 후 다음 공격 데미지 +30%',           effect: { afterDodgeDmg: 30 } },
-    { id: 'eng_lan_thousand_blade', tier: 'L', name: '천변(千變)의 검',  desc: '반격에 기본 치명률 적용 (반격 치명타 가능)', effect: { counterCanCrit: true } },
+    { id: 'eng_wan_shadow_step',   tier: 'L', name: '무영(無影)의 잔영', desc: '회피 후 다음 공격 데미지 +30%',           effect: { afterDodgeDmg: 30 } },
+    { id: 'eng_wan_thousand_blade', tier: 'L', name: '천변(千變)의 검',  desc: '반격에 기본 치명률 적용 (반격 치명타 가능)', effect: { counterCanCrit: true } },
     // === Flaw (결함, 4) ===
-    { id: 'eng_lan_flaw_feet',   tier: 'NEG_FLAW', name: '둔한 발',   desc: '회피 확률 -5%',                  effect: { dodgeRate: -5 } },
-    { id: 'eng_lan_flaw_blade',  tier: 'NEG_FLAW', name: '무딘 검',   desc: '반격 데미지 -15%',               effect: { counterDmgPct: -15 } },
-    { id: 'eng_lan_flaw_sense',  tier: 'NEG_FLAW', name: '깨진 감각', desc: '적 다음 행동 감지 불가 - 심안 무효화', effect: { disableInsightPredict: true } },
-    { id: 'eng_lan_flaw_tremor', tier: 'NEG_FLAW', name: '떨리는 손', desc: '치명타 확률 -10%',               effect: { critRate: -10 } },
+    { id: 'eng_wan_flaw_feet',   tier: 'NEG_FLAW', name: '둔한 발',   desc: '회피 확률 -5%',                  effect: { dodgeRate: -5 } },
+    { id: 'eng_wan_flaw_blade',  tier: 'NEG_FLAW', name: '무딘 검',   desc: '반격 데미지 -15%',               effect: { counterDmgPct: -15 } },
+    { id: 'eng_wan_flaw_sense',  tier: 'NEG_FLAW', name: '깨진 감각', desc: '적 다음 행동 감지 불가 - 심안 무효화', effect: { disableInsightPredict: true } },
+    { id: 'eng_wan_flaw_tremor', tier: 'NEG_FLAW', name: '떨리는 손', desc: '치명타 확률 -10%',               effect: { critRate: -10 } },
     // === Curse (저주, 3) ===
-    { id: 'eng_lan_curse_shadow',  tier: 'NEG_CURSE', name: '묶여버린 그림자', desc: '회피율 -20% / 반격율 +10%',          effect: { dodgeRate: -20, counterRatePct: 10 } },
-    { id: 'eng_lan_curse_madness', tier: 'NEG_CURSE', name: '광기의 검',       desc: '반격 데미지 +50% / 받는 데미지 +20%', effect: { counterDmgPct: 50, dmgTakenPct: 20 } },
-    { id: 'eng_lan_curse_burn',    tier: 'NEG_CURSE', name: '영혼 폭주',       desc: '영혼 게이지 획득량 ×1.5 / 매 턴 시작 시 자동 -5 HP', effect: { soulGainMult: 0.5, perTurnHpLoss: 5 } },
+    { id: 'eng_wan_curse_shadow',  tier: 'NEG_CURSE', name: '묶여버린 그림자', desc: '회피율 -20% / 반격율 +10%',          effect: { dodgeRate: -20, counterRatePct: 10 } },
+    { id: 'eng_wan_curse_madness', tier: 'NEG_CURSE', name: '광기의 검',       desc: '반격 데미지 +50% / 받는 데미지 +20%', effect: { counterDmgPct: 50, dmgTakenPct: 20 } },
+    { id: 'eng_wan_curse_burn',    tier: 'NEG_CURSE', name: '영혼 폭주',       desc: '영혼 게이지 획득량 ×1.5 / 매 턴 시작 시 자동 -5 HP', effect: { soulGainMult: 0.5, perTurnHpLoss: 5 } },
   ],
   // 다른 4직업은 PR 후속에서 풀 작성. 현재는 UI "준비 중" 표시 대응.
   sage: [],

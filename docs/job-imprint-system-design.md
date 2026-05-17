@@ -79,7 +79,7 @@
 
 | 직업 | 주 스탯 | 보조 스탯 | 주 패시브 | 보조 패시브 | Lv.8 보너스 |
 |---|---|---|---|---|---|
-| 방랑검사 (lanthert) | 근력 | 민첩 | 심안류 | 심안 | 반격율 +5% |
+| 방랑검사 (wanderer) | 근력 | 민첩 | 심안류 | 심안 | 반격율 +5% |
 | 술법사 (sage) | 마력 | 지능 | 이프리트 | 마력 | 마법 데미지 +5% |
 | 혼혈 마족 (demonblood) | 광기 | 근력 | (광기 계열) | (광기 보조) | 광기 게이지 +5% |
 | 숲의 정령사 (elf) | 정밀 | 민첩 | (정밀 계열) | (바람 보조) | 회피율 +5% |
@@ -264,7 +264,7 @@ PM 결정: 가챠 부적 도입 여부 (없으면 순수 운빨, 있으면 영�
 ```js
 // =========== 직업 각성도 ===========
 export const AWAKENING_REWARDS = {
-  lanthert: [
+  wanderer: [
     { lv: 2, soulCost: 500,  reward: { type: 'imprintSlot', slot: 1 } },
     { lv: 3, soulCost: 1000, reward: { type: 'stat', stat: 'str', value: 2 } },
     { lv: 4, soulCost: 2000, reward: { type: 'passive', key: 'insight_stream', value: 1 } },
@@ -283,7 +283,7 @@ export const AWAKENING_REWARDS = {
 
 // =========== 직업 각인 풀 ===========
 export const IMPRINTS = {
-  lanthert: [
+  wanderer: [
     { id: 'imp_lan_wrist', tier: 'C', name: '단련된 손목', desc: '근력 +1', effect: { stat: 'str', value: 1 } },
     { id: 'imp_lan_react', tier: 'C', name: '빠른 반응', desc: '민첩 +1', effect: { stat: 'dex', value: 1 } },
     { id: 'imp_lan_grit',  tier: 'C', name: '검사의 끈기', desc: '시작 HP +10', effect: { startHp: 10 } },
@@ -321,7 +321,7 @@ export const IMPRINT_GACHA_COST = 500;
 meta = {
   // 기존 필드들...
   awakening: {
-    lanthert: { lv: 1, imprints: [null, null, null] },   // imprints[i] = imp_id or null
+    wanderer: { lv: 1, imprints: [null, null, null] },   // imprints[i] = imp_id or null
     sage:     { lv: 1, imprints: [null, null, null] },
     demonblood: { lv: 1, imprints: [null, null, null] },
     elf:      { lv: 1, imprints: [null, null, null] },

@@ -651,6 +651,87 @@ export function AwakeningConditionNoticeModal({ onClose }) {
   );
 }
 
+// === 1.35.0 lanthert → wanderer 코드명 변경 안내 모달 ===
+// 기존 사용자 데이터(각인 슬롯·궁극 픽·챔피언십 클리어·업적·해금)가 자동 이전됐음을 안내
+export function WandererRenameNoticeModal({ notice, onClose }) {
+  const migratedKeys = notice?.migratedKeys || [];
+  const keyLabels = {
+    engravings: '각인 슬롯·각성도',
+    ultimatesPickedByClass: '궁극 픽 기록',
+    championshipClearsByClass: '챔피언십 클리어',
+    achievements: '업적 진행도',
+    clearedExpeditions: '수련의 길 클리어',
+    unlocks: '해금 항목',
+  };
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center px-4" style={{
+      background: 'rgba(0, 0, 0, 0.85)',
+    }}>
+      <div className="w-full max-w-md" style={{
+        background: PALETTE.bgDeep,
+        border: `1.5px solid ${PALETTE.dawn}`,
+        boxShadow: `0 0 30px ${PALETTE.dawn}50`,
+      }}>
+        <div className="px-4 py-3 text-center" style={{
+          background: `linear-gradient(180deg, ${PALETTE.dawn}30, ${PALETTE.dawn}10)`,
+          borderBottom: `1px solid ${PALETTE.panelBorder}`,
+        }}>
+          <div className="text-[10px] tracking-[0.3em]" style={{ color: PALETTE.dawn }}>
+            1.35.0 내부 코드명 변경 안내
+          </div>
+          <div className="text-base font-bold mt-1" style={{ color: PALETTE.text }}>
+            방랑검사 데이터 자동 이전 완료
+          </div>
+        </div>
+        <div className="px-4 py-4 space-y-3" style={{ color: PALETTE.text }}>
+          <div className="text-[12px]" style={{ lineHeight: 1.6 }}>
+            방랑검사의 내부 식별자가 <code style={{ color: PALETTE.textDim }}>lanthert</code>에서
+            <code style={{ color: PALETTE.dawn }}> wanderer</code>로 변경되었습니다.
+            화면에 표시되는 이름은 그대로 <strong>방랑검사</strong>입니다.
+          </div>
+          {migratedKeys.length > 0 && (
+            <div className="p-2 text-[11px]" style={{
+              background: `${PALETTE.panel}80`,
+              border: `1px solid ${PALETTE.panelBorder}`,
+              lineHeight: 1.6,
+            }}>
+              <div style={{ color: PALETTE.dawn, marginBottom: '4px' }}>자동 이전된 데이터</div>
+              <div style={{ color: PALETTE.textDim }}>
+                {migratedKeys.map(k => (
+                  <div key={k}>◆ {keyLabels[k] || k}</div>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="p-2 text-[10px]" style={{
+            background: `${PALETTE.panel}40`,
+            border: `1px solid ${PALETTE.panelBorder}`,
+            color: PALETTE.textDim,
+            lineHeight: 1.5,
+          }}>
+            게임 진행도·영혼·각인·업적은 그대로 유지됩니다. 안전한 마이그레이션이 완료되어
+            이 안내는 다시 표시되지 않습니다.
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          className="w-full py-3 transition-all"
+          style={{
+            background: `linear-gradient(180deg, ${PALETTE.dawn}, ${PALETTE.dawn}80)`,
+            color: PALETTE.text,
+            border: `1px solid ${PALETTE.dawn}`,
+            fontSize: '12px',
+            fontFamily: '"Cinzel", serif',
+            letterSpacing: '0.3em',
+          }}
+        >
+          확인
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // === 보상 설명 텍스트 ===
 function describeReward(reward, classId) {
   if (!reward) return '';
