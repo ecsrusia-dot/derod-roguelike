@@ -29,6 +29,8 @@ import {
   hasCurse,
   getCharismaHealBonus,
   aggregateEngravingEffects,
+  computeDisplayPlayerStats,
+  computeDerivedStats,
 } from './utils/helpers.js';
 
 // 데미지/회피/치명 함수 (combat/damage.js로 분리됨)
@@ -1699,7 +1701,23 @@ export default function App() {
             {screen === 'chapterClear' && chapter && <ChapterClearScreen chapter={chapter} isLastChapter={false} hp={hp} maxHp={maxHp} meta={meta} curses={currentCurses} onContinue={handleChapterContinue} />}
             {screen === 'expeditionClear' && currentExpedition && <ExpeditionClearScreen expedition={currentExpedition} soulsGained={runSouls} firstClear={runFirstChampClear} onContinue={handleExpeditionClearContinue} />}
             {screen === 'defeat' && <DefeatScreen classData={classData} chapter={chapter} soulsGained={runSouls} onContinue={handleDefeatContinue} />}
-            {screen === 'status' && <StatusPanel classData={classData} hp={hp} maxHp={maxHp} skills={skills} stats={{ ...classData.stats, ...stats }} relics={relics} ultimates={ultimates} activeSkills={activeSkills} activeRelicNames={activeRelicNames} onClose={() => setScreen('map')} />}
+            {screen === 'status' && (() => {
+              const _baseStats = { ...classData.stats, ...stats };
+              const _displayStats = computeDisplayPlayerStats(classData, skills, _baseStats, ultimates, activeSkills);
+              const _relicStat = {
+                dodge: getActiveRelicStat(relics, activeRelicNames, 'dodge'),
+                critRate: getActiveRelicStat(relics, activeRelicNames, 'critRate'),
+                magicDmg: getActiveRelicStat(relics, activeRelicNames, 'magicDmg'),
+              };
+              const _engFx = aggregateEngravingEffects(classData?.id, meta?.engravings?.[classData?.id]?.slots);
+              const _derivedStats = computeDerivedStats(skills, ultimates, activeSkills, _relicStat, _engFx);
+              return (
+                <StatusPanel classData={classData} hp={hp} maxHp={maxHp} skills={skills}
+                  stats={_displayStats} derivedStats={_derivedStats}
+                  relics={relics} ultimates={ultimates} activeSkills={activeSkills}
+                  activeRelicNames={activeRelicNames} onClose={() => setScreen('map')} />
+              );
+            })()}
             {/* 노드 진입 설명 모달 (튜토리얼 챕터에서만) */}
             {pendingNode && (
               <NodeInfoModal
