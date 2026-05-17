@@ -21,6 +21,8 @@ import {
   getEnemyImageSrc,
   getCharismaHealBonus,
   getCharismaDmgReduction,
+  getIntellectSoulBonus,
+  getIntellectEtherBonus,
 } from '../utils/helpers.js';
 import {
   PASSIVE_SKILLS,
@@ -68,6 +70,12 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     // 이프리트 궁극: 지능 +4 (모든 궁극 공통)
     if (initialUltimates && (initialUltimates.includes('ult_eternalFire') || initialUltimates.includes('ult_ifritDescent') || initialUltimates.includes('ult_purgatoryFire'))) {
       p.지능 = (p.지능 || 0) + 4;
+    }
+    // 1.32.0~ 지능 시그니처 2단계: 시작 에테르 +1 (지능 17+, 이프리트 마일스톤·궁극 포함 후 판정)
+    const intelEther = getIntellectEtherBonus(p);
+    if (intelEther > 0) {
+      p.maxEther += intelEther;
+      p.ether += intelEther;
     }
     return p;
   });
@@ -300,6 +308,13 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         setFxMagicImpact(v => v + 1);
         setFxMagicParticles(v => v + 1);
       }
+      // 1.32.0~ 지능 시그니처 1단계: 마법 시전 시 영혼 게이지 +N (지능 11+, 5단위 누진)
+      if (skill.type === 'magic' && classData.ultimateId) {
+        const intelSoul = getIntellectSoulBonus(newPlayer);
+        if (intelSoul > 0) {
+          newPlayer.soulGauge = Math.min(100, (newPlayer.soulGauge || 0) + intelSoul);
+        }
+      }
       // 마력 Lv.7 (50% × 2회) / 신탁 각성 (50% × 3회)
       const hasOracleAwaken = hasUltimate(ultimates, 'ult_oracleAwaken');
       const echoChance = 0.5;  // 둘 다 50% 확률
@@ -527,7 +542,10 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         else if (hasIfritDescent) igniteChance = hasIfritPassive ? 0.8 : 0.5;
         else if (hasPurgatoryFire) igniteChance = hasIfritPassive ? 0.7 : 0.4;
         else if (hasIfritPassive) igniteChance = 0.3;  // 패시브만 보유
-        
+        // 1.32.0~ 이프리트 minor: 레벨당 +2% 발동율 (패시브만 보유 + 궁극 둘 다)
+        const igniteRateBonus = getMinorBonus(skills, 'ifritIgniteRate+', activeSkills) / 100;
+        igniteChance = Math.min(1, igniteChance + igniteRateBonus);
+
         if (Math.random() < igniteChance) {
           // 각인 데미지 = 지능 × 0.3 (모든 경우 동일, 영겁지화 단독에서만 누적)
           const baseIgniteDmg = Math.floor(newPlayer.지능 * 0.3);

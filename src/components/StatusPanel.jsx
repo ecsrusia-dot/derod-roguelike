@@ -7,7 +7,7 @@
 
 import React, { useState } from 'react';
 import { Heart, X } from 'lucide-react';
-import { PALETTE, getCharismaHealBonus, getCharismaDmgReduction } from '../utils/helpers.js';
+import { PALETTE, getCharismaHealBonus, getCharismaDmgReduction, getIntellectSoulBonus, getIntellectEtherBonus } from '../utils/helpers.js';
 import { PASSIVE_SKILLS, COMBAT_SKILLS, ULTIMATE_SKILLS } from '../data.js';
 import CardInfoModal, { buildPassiveInfo, buildRelicInfo, buildActiveSkillInfo } from './CardInfoModal.jsx';
 
@@ -76,6 +76,23 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                 )}
                 {reducePct > 0 && (
                   <span style={{ color: PALETTE.dawn }}>받는뎀 <span className="font-bold tabular-nums">-{reducePct}%</span></span>
+                )}
+              </div>
+            );
+          })()}
+          {/* 지능 시그니처 효과 (1.32.0~) — 술법사 정체성. 1단계 지능 11+ / 2단계 지능 17+ */}
+          {(() => {
+            const soulBonus = getIntellectSoulBonus(stats);
+            const etherBonus = getIntellectEtherBonus(stats);
+            if (soulBonus <= 0 && etherBonus <= 0) return null;
+            return (
+              <div className="mt-1 flex items-center justify-center gap-3 text-[10px]">
+                <span style={{ color: PALETTE.textDim }}>◇ 지능 시그니처</span>
+                {soulBonus > 0 && (
+                  <span style={{ color: PALETTE.legendary }}>마법 시 영혼 <span className="font-bold tabular-nums">+{soulBonus}</span></span>
+                )}
+                {etherBonus > 0 && (
+                  <span style={{ color: '#5c4a8c' }}>시작 에테르 <span className="font-bold tabular-nums">+{etherBonus}</span></span>
                 )}
               </div>
             );
