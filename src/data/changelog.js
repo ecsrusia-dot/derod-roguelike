@@ -7,6 +7,18 @@
 
 export const CHANGELOG = [
   {
+    version: '1.35.0',
+    date: '2026-05-18',
+    label: '방랑검사 내부 코드명 lanthert → wanderer 변경 + 자동 마이그레이션',
+    changes: [
+      { type: 'system', text: '[코드명 일관성 리네임] 방랑검사의 내부 식별자를 lanthert → wanderer로 일괄 변경. 표시명(방랑검사)·게임플레이·밸런스는 변경 없음. 영향: 패시브 classOnly, 직업 ID, 일러 경로 5종, 직업 액티브 궁극 ID(wanderer_shadowStrike), 이벤트 2건 ID, 수련의 길 expedition ID(training_wanderer), 업적 5건 ID, ENGRAVINGS 풀 키 + 각인 카드 24장 prefix(eng_wan_*)' },
+      { type: 'system', text: '[자동 마이그레이션] 기존 사용자의 IndexedDB meta 데이터를 첫 부팅 시 자동 이전. 마이그레이션 대상: engravings.lanthert → engravings.wanderer (각인 슬롯·각성도 Lv), ultimatesPickedByClass.lanthert → wanderer (궁극 픽 기록), championshipClearsByClass.lanthert → wanderer (챔피언십 클리어), achievements 5건 ID 변경, clearedExpeditions·unlocks 배열 내 lanthert 항목 치환. 멱등성 보장 (이미 이전했으면 스킵)' },
+      { type: 'feature', text: '[이전 안내 모달 1회 표시] 마이그레이션 발생 시 첫 부팅 화면에서 WandererRenameNoticeModal 자동 노출. 변경된 식별자 안내 + 자동 이전된 데이터 카테고리 표시 (각인 슬롯/궁극 픽/챔피언십/업적/수련 클리어/해금 중 해당 항목). 확인 클릭 시 즉시 저장으로 재트리거 방지' },
+      { type: 'system', text: '[에셋 정리] public/classes/ 일러 5개 rename — lanthert.jpg / lanthertstart.jpg / lanthertwin.jpg / lanthertloss.jpg / combat/lanthert_combat.jpg → wanderer*.jpg. 코드 경로도 함께 갱신. PWA 캐시는 다음 부팅 시 자동 갱신' },
+      { type: 'fix', text: '[CombatScreen onError 폴백 경로 정정] 절대 경로 `/classes/wanderer.jpg`로 적혀 있던 폴백을 `./classes/wanderer.jpg` 상대 경로로 변경. GH Pages 배포 시 base path `/derod-roguelike/` 무시되어 404 나던 잠재적 버그 사전 차단 (4.5절 룰 정합)' },
+    ],
+  },
+  {
     version: '1.34.0',
     date: '2026-05-18',
     label: '술법사 일러 4컷 교체 — 정면·시작·승리·패배 풀 리소스 갱신',

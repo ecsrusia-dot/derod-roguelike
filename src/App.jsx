@@ -54,7 +54,7 @@ import ForgeScreen from './components/ForgeScreen.jsx';
 import RewardSelect from './components/RewardSelect.jsx';
 import StatusPanel from './components/StatusPanel.jsx';
 import SoulAltar from './components/SoulAltar.jsx';
-import EngravingScreen, { EngravingMigrationModal, AwakeningConditionNoticeModal } from './components/EngravingScreen.jsx';
+import EngravingScreen, { EngravingMigrationModal, AwakeningConditionNoticeModal, WandererRenameNoticeModal } from './components/EngravingScreen.jsx';
 import MapView from './components/MapView.jsx';
 import CombatScreen from './components/CombatScreen.jsx';
 import NodeInfoModal from './components/NodeInfoModal.jsx';
@@ -99,7 +99,7 @@ import {
   VERSION_DATE,
   VERSION_LABEL,
 } from './data.js';
-import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice } from './storage.js';
+import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice } from './storage.js';
 
 
 
@@ -1536,7 +1536,7 @@ export default function App() {
           
           // 다음 직업 자동 해금 (unlocksClass)
           if (typeof currentExpedition.unlocksClass === 'number') {
-            const classKeys = ['lanthert', 'sage', 'demonblood', 'elf', 'priest'];
+            const classKeys = ['wanderer', 'sage', 'demonblood', 'elf', 'priest'];
             const unlockClassId = classKeys[currentExpedition.unlocksClass];
             if (unlockClassId && !newMeta.unlocks.includes(`unlock_${unlockClassId}`)) {
               newMeta = applyUnlock(newMeta, `unlock_${unlockClassId}`);
@@ -1757,6 +1757,19 @@ export default function App() {
                 onClose={() => {
                   setMeta(prev => {
                     const next = clearAwakeningConditionNotice(prev);
+                    saveMeta(next);
+                    return next;
+                  });
+                }}
+              />
+            )}
+            {/* 1.35.0 wanderer 코드명 변경 안내 모달 (앞선 두 모달 닫힌 다음 표시) */}
+            {!showChangelog && !meta?.engravingMigrationNotice && !meta?.awakeningConditionNotice && meta?.wandererRenameNotice && (
+              <WandererRenameNoticeModal
+                notice={meta.wandererRenameNotice}
+                onClose={() => {
+                  setMeta(prev => {
+                    const next = clearWandererRenameNotice(prev);
                     saveMeta(next);
                     return next;
                   });

@@ -1913,7 +1913,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                 if (e.target.src.includes('combat/')) {
                   e.target.src = classData.image;
                 } else {
-                  e.target.src = '/classes/lanthert.jpg';
+                  e.target.src = './classes/wanderer.jpg';
                 }
               }}
             />
