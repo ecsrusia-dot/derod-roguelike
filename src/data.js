@@ -22,9 +22,9 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.26.0';
+export const GAME_VERSION = '1.27.0';
 export const VERSION_DATE = '2026-05-17';
-export const VERSION_LABEL = '각성도 활성화 조건 도입 — 영혼 외 직업 진행도·궁극 픽·각성도 상호 조건 추가';
+export const VERSION_LABEL = '각인 효과 전투 적용 — 24장 풀의 effect 키가 실제 회피·반격·치명·영혼·턴에 통합';
 
 // =========== 패시브 스킬 ===========
 // effect 필드는 문자열 키. 실제 동작은 메인 코드의 trigger handler에서 처리.

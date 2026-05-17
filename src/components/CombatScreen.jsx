@@ -33,7 +33,7 @@ import {
 import { calculateDamage, getDisplayDamage, rollCrit, rollDodge } from '../combat/damage.js';
 import { FloatingLabel, DamageVignette, WhiteFlash, SlashFx, MagicImpactFx, MagicParticles, BarrierRing, BarrierBreakFx, ThrustFx, BladeGuardFx, ShadowStrikeFx, StatusOverlay, UltimateCutin } from './CombatEffects.jsx';
 
-export default function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimates = [], initialRelics = [], activeSkills = null, activeRelicNames = null, enemyKey, isBoss, expedition, curses = [], meta, onVictory, onDefeat }) {
+export default function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimates = [], initialRelics = [], activeSkills = null, activeRelicNames = null, enemyKey, isBoss, expedition, curses = [], meta, engravingFx = {}, onVictory, onDefeat }) {
   const [player, setPlayer] = useState(() => {
     let p = {
       ...initialPlayer, defense: 0, buffs: {}, debuffs: {}, cooldowns: {},
@@ -51,6 +51,11 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       p.maxEther = Math.max(1, p.maxEther - 1);
       p.ether = Math.max(1, p.ether - 1);
     }
+    // 1.27.0~ 각인: 전투 시작 시 영혼 게이지 +N
+    if (engravingFx.startSoul) {
+      p.soulGauge = Math.min(100, p.soulGauge + engravingFx.startSoul);
+    }
+    // 1.27.0~ 각인: 회피 Lv.7 효과와 별개로 firstHitImmune은 회피 Lv.7 패시브에서 처리됨 (이건 각인 효과 X)
     // 이프리트 minor (Tier 효과 누적): 지능 +2 (Lv.3) +3 (Lv.5) +4 (Lv.7)
     const ifritLv = (initialSkills && initialSkills['이프리트']) || 0;
     if (ifritLv > 0 && (!activeSkills || activeSkills.includes('이프리트'))) {
@@ -316,7 +321,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         }
         
         for (let i = 0; i < hitCount; i++) {
-          let isCrit = rollCrit(skills, newPlayer, meta, activeSkills, relicStat, ultimates);
+          let isCrit = rollCrit(skills, newPlayer, meta, activeSkills, relicStat, ultimates, engravingFx);
           // 신앙 Lv.3: 다음 공격 치명타 확정 (한 번 사용)
           if (!usedGuaranteedCrit && newPlayer.buffs?.guaranteedCrit > 0) {
             isCrit = true;
@@ -337,8 +342,12 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
             isCrit = true;
             newLog.push({ type: 'passive', text: `★ [검로일여] 기절 적 공격 → 치명타!` });
           }
-          const dmgResult = calculateDamage(skill, newPlayer, newEnemy, skills, isCrit, ultimates, meta, curses, activeSkills, relicStat);
+          const dmgResult = calculateDamage(skill, newPlayer, newEnemy, skills, isCrit, ultimates, meta, curses, activeSkills, relicStat, engravingFx);
           let actualDmg = dmgResult.finalDmg;
+          // 1.27.0~ 각인: afterDodgeDmgNext 1회 소비 (calculateDamage에서 보너스 적용 완료)
+          if (newPlayer.buffs?.afterDodgeDmgNext) {
+            newPlayer.buffs = { ...newPlayer.buffs, afterDodgeDmgNext: false };
+          }
           if (newEnemy.defense > 0 && !skill.pierce) {
             newEnemy.defense = Math.max(0, newEnemy.defense - dmgResult.defenseMitigated);
           }
@@ -348,6 +357,10 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           if (classData.ultimateId && actualDmg > 0) {
             let gain = Math.floor(actualDmg / 5);
             if (isCrit) gain += 10;
+            // 1.27.0~ 각인: 영혼 획득 ×(1 + soulGainMult)
+            if (engravingFx.soulGainMult) {
+              gain = Math.floor(gain * (1 + engravingFx.soulGainMult));
+            }
             newPlayer.soulGauge = Math.min(100, (newPlayer.soulGauge || 0) + gain);
           }
           // FX — 적 피격: 부유 데미지 라벨 + 진동 + 흰 플래시
@@ -700,11 +713,19 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     newLog.push({ type: 'enemy', text: `◂ ${enemy.name}: ${intent.name}` });
 
     if (intent.type === 'attack') {
-      const dodged = rollDodge(skills, newPlayer, activeSkills, relicStat, ultimates);
+      const dodged = rollDodge(skills, newPlayer, activeSkills, relicStat, ultimates, engravingFx);
       if (dodged) {
         newLog.push({ type: 'system', text: `· 회피 성공!` });
         // FX — 회피: 플레이어 위에 "회피!" 부유 라벨
         pushFxLabel('player', 'miss', null, '회피!');
+        // 1.27.0~ 각인: 회피 시 영혼 게이지 +N
+        if (engravingFx.dodgeSoul) {
+          newPlayer.soulGauge = Math.min(100, (newPlayer.soulGauge || 0) + engravingFx.dodgeSoul);
+        }
+        // 1.27.0~ 각인: 회피 후 다음 공격 데미지 +N% 버프 (다음 calculateDamage에서 소비)
+        if (engravingFx.afterDodgeDmg) {
+          newPlayer.buffs = { ...newPlayer.buffs, afterDodgeDmgNext: true };
+        }
         if (hasEffect(skills, 'counterAttack', activeSkills) && Math.random() < 0.5) {
           const counterDmg = Math.floor(15 + Math.random() * 10);
           newEnemy.currentHp = Math.max(0, newEnemy.currentHp - counterDmg);
@@ -745,7 +766,10 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
             let _counterRate = _simanLv * 5;
             if (_simanLv >= 3) _counterRate += 20;
             if (_hasAnyCounterUlt) _counterRate += 60;
+            // 1.27.0~ 각인 counterRatePct도 사전 굴림에 일치 적용
+            if (engravingFx.counterRatePct) _counterRate += engravingFx.counterRatePct;
             if (_counterRate > 100) _counterRate = 100;
+            if (_counterRate < 0) _counterRate = 0;
             const _rolled = Math.random() * 100;
             if (_rolled < _counterRate && _simanLv >= 5) {
               counterShieldActive = true;
@@ -787,6 +811,13 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
             const reduced = Math.floor(dmg * 0.15);
             dmg -= reduced;
             if (reduced > 0) takenBreakdown.push(`수비 Lv.5 -${reduced}`);
+          }
+          // 1.27.0~ 각인: 받는 데미지 +/- N% (음수면 감소)
+          if (engravingFx.dmgTakenPct && dmg > 0) {
+            const change = Math.floor(dmg * engravingFx.dmgTakenPct / 100);
+            dmg += change;
+            if (change < 0) takenBreakdown.push(`각인 ${change}`);
+            else if (change > 0) takenBreakdown.push(`각인 +${change}`);
           }
           // 메타 강화: 받는 데미지 -3%/단계
           const metaReduction = getMetaBonus(meta, 'dmgTaken-3%') * 0.03;
@@ -873,7 +904,10 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
               newPlayer.hp = Math.max(0, newPlayer.hp - dmg);
               // 영혼 게이지: 피격 시 더 빠르게 충전 (위기일수록 한 방을)
               if (classData.ultimateId) {
-                newPlayer.soulGauge = Math.min(100, (newPlayer.soulGauge || 0) + Math.floor(dmg / 3));
+                let hitGain = Math.floor(dmg / 3);
+                // 1.27.0~ 각인: 영혼 획득 ×(1 + soulGainMult)
+                if (engravingFx.soulGainMult) hitGain = Math.floor(hitGain * (1 + engravingFx.soulGainMult));
+                newPlayer.soulGauge = Math.min(100, (newPlayer.soulGauge || 0) + hitGain);
               }
               newLog.push({
                 type: 'damageTaken',
@@ -984,13 +1018,18 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       // 방랑검사 궁극 [무영의 일격] 발동 후 3턴간 반격 100% 버프
       const shadowStrikeBuff = (newPlayer.buffs?.shadowCounterTurns || 0) > 0;
 
-      if (simanLv > 0 || hasAnyCounterUlt || shadowStrikeBuff) {
+      // 1.27.0~ 각인: counterRatePct가 양수면 심안류 없어도 반격 가능
+      const hasEngravingCounter = (engravingFx.counterRatePct || 0) > 0;
+      if (simanLv > 0 || hasAnyCounterUlt || shadowStrikeBuff || hasEngravingCounter) {
         // 반격 확률 계산 — minor: 5%/Lv, Lv.3: +20%, 궁극: +60%, 무영의 잔영: 100%
         let counterRate = simanLv * 5;
         if (simanLv >= 3) counterRate += 20;
         if (hasAnyCounterUlt) counterRate += 60;
         if (shadowStrikeBuff) counterRate = 100;
+        // 1.27.0~ 각인: 반격율 +/- N% (음수 결함은 감소)
+        if (engravingFx.counterRatePct) counterRate += engravingFx.counterRatePct;
         if (counterRate > 100) counterRate = 100;
+        if (counterRate < 0) counterRate = 0;
         
         // 회피했고 명경지수면: 같은 턴 반격에 즉시 +100% 적용 (Pending에 직접 설정)
         if (dodged && hasMirror) {
@@ -1052,6 +1091,20 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
             newLog.push({ type: 'passive', text: `★ [무영검] 누적 ×${stack} 데미지 폭발!` });
             newPlayer.buffs = { ...newPlayer.buffs, shadowCounterStack: 0 };
           }
+          // 1.27.0~ 각인: 반격 데미지 +/- N% (counterDmgPct, 결함은 음수)
+          if (engravingFx.counterDmgPct) {
+            const change = Math.floor(counterDmg * engravingFx.counterDmgPct / 100);
+            counterDmg += change;
+            if (change !== 0) counterBreakdown.push(`각인 ${change >= 0 ? '+' : ''}${change}`);
+          }
+          // 1.27.0~ 각인: 반격에 치명 적용 (counterCanCrit — 천변의 검)
+          if (engravingFx.counterCanCrit) {
+            const counterCrit = rollCrit(skills, newPlayer, meta, activeSkills, relicStat, ultimates, engravingFx);
+            if (counterCrit) {
+              counterDmg = Math.floor(counterDmg * 1.5);
+              counterBreakdown.push(`★치명 ×1.5`);
+            }
+          }
 
           // 적 방어 적용
           let actualDmg = counterDmg;
@@ -1068,6 +1121,26 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
             pushFxLabel('enemy', 'damage', actualDmg);
             setFxEnemyShake(v => v + 1);
             setFxEnemyFlash(v => v + 1);
+            // 1.27.0~ 각인: 반격 명중 시 영혼 게이지 +N (영혼의 반향)
+            if (classData.ultimateId && engravingFx.counterHitSoul) {
+              newPlayer.soulGauge = Math.min(100, (newPlayer.soulGauge || 0) + engravingFx.counterHitSoul);
+            }
+            // 1.27.0~ 각인: 반격 명중 시 적 충격 게이지 +N (충격파)
+            if (engravingFx.counterShock) {
+              const resistActive = (newEnemy.debuffs?.shockResist || 0) > 0;
+              const shockAdd = resistActive
+                ? Math.floor(engravingFx.counterShock * GAME_CONFIG.shockResistReduction)
+                : engravingFx.counterShock;
+              const cur = newEnemy.debuffs?.shockGauge || 0;
+              const nextGauge = cur + shockAdd;
+              if (nextGauge >= 100) {
+                newEnemy.debuffs = { ...newEnemy.debuffs, shockGauge: 0, stunnedTurns: 1 };
+                newLog.push({ type: 'debuff', text: `💫 [충격파] 충격 100 — 다음 턴 기절` });
+              } else {
+                newEnemy.debuffs = { ...newEnemy.debuffs, shockGauge: nextGauge };
+                newLog.push({ type: 'debuff', text: `⚡ [충격파] 적 충격 +${shockAdd} (${nextGauge}/100)` });
+              }
+            }
           }
 
           // Lv.7: 반격 발생 시 다음 턴 반드시 치명타
@@ -1167,7 +1240,21 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
 
     // 영혼 게이지 자연 충전 (매 턴 +5)
     if (classData.ultimateId) {
-      newPlayer.soulGauge = Math.min(100, (newPlayer.soulGauge || 0) + 5);
+      let turnGain = 5;
+      // 1.27.0~ 각인: 영혼 획득 ×(1 + soulGainMult)
+      if (engravingFx.soulGainMult) turnGain = Math.floor(turnGain * (1 + engravingFx.soulGainMult));
+      newPlayer.soulGauge = Math.min(100, (newPlayer.soulGauge || 0) + turnGain);
+    }
+    // 1.27.0~ 각인: 매 턴 시작 시 영혼 +N (직업 궁극 보유 직업만, 영혼 게이지 자체)
+    if (classData.ultimateId && engravingFx.perTurnSoul) {
+      newPlayer.soulGauge = Math.min(100, (newPlayer.soulGauge || 0) + engravingFx.perTurnSoul);
+    }
+    // 1.27.0~ 각인: 매 턴 시작 시 HP -N (영혼 폭주 저주 페널티)
+    if (engravingFx.perTurnHpLoss) {
+      const loss = Math.min(newPlayer.hp - 1, engravingFx.perTurnHpLoss);  // 죽지 않도록 1 HP 보장
+      if (loss > 0) {
+        newPlayer.hp = Math.max(1, newPlayer.hp - loss);
+      }
     }
 
     if (newEnemy.debuffs?.bleed > 0 && newEnemy.debuffs?.bleedTurns > 0) {
@@ -1586,7 +1673,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
               </div>
               {/* 3줄: 심안 의도 카드 (고정 높이) */}
               <div className="min-h-[22px]">
-                {phase === 'playerTurn' && enemy.nextIntent && getSkillLevel(skills, '심안') >= 3 && (() => {
+                {phase === 'playerTurn' && enemy.nextIntent && getSkillLevel(skills, '심안') >= 3 && !engravingFx.disableInsightPredict && (() => {
                   const lv = getSkillLevel(skills, '심안');
                   const isAttack = enemy.nextIntent.type === 'attack';
                   if (lv < 5) {
@@ -1784,7 +1871,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                       {skill.type === 'defense' ? `+${skill.defense}`
                         : skill.type === 'buff' ? '버프 · 즉시'
                         : (() => {
-                            const dmgRange = getDisplayDamage(skill, player, skills, ultimates, meta, curses, activeSkills, relicStat);
+                            const dmgRange = getDisplayDamage(skill, player, skills, ultimates, meta, curses, activeSkills, relicStat, engravingFx);
                             return dmgRange ? `${dmgRange[0]}-${dmgRange[1]}` : `${skill.baseDmg[0]}-${skill.baseDmg[1]}`;
                           })()
                       }

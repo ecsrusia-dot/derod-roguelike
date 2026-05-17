@@ -7,6 +7,23 @@
 
 export const CHANGELOG = [
   {
+    version: '1.27.0',
+    date: '2026-05-17',
+    label: '각인 효과 전투 적용 — 24장 풀의 effect 키가 실제 회피·반격·치명·영혼·턴에 통합',
+    changes: [
+      { type: 'feature', text: '[각인 효과 발동] 1.25.0에서 풀·슬롯·가챠만 구현했던 24장 각인이 이제 실제 전투에 적용. 슬롯에 장착한 모든 각인의 effect 객체가 합산되어 능력치·회피·반격·치명·영혼·턴 시스템에 자동 통합. 24장 모든 effect 키 적용 (str/dex/int/cha/startHp/dodgeRate/counterRatePct/counterDmgPct/counterHitSoul/counterShock/counterCanCrit/physDmgPct/critRate/dmgTakenPct/afterDodgeDmg/perTurnSoul/dodgeSoul/startSoul/soulGainMult/perTurnHpLoss/disableInsightPredict)' },
+      { type: 'feature', text: '[능력치·HP 가산] 각인의 str/dex/int/cha → 직업 시작 능력치 가산. startHp → 시작 HP 가산. 전투 시작 전 PrepScreen에서도 반영. 예: 단련된 손목(C) = 근력 +2, 검사의 끈기(C) = 시작 HP +30' },
+      { type: 'feature', text: '[회피·반격 통합] 각인의 dodgeRate → rollDodge에 가산. counterRatePct → 심안류 반격 계산에 가산 (각인만으로도 반격 가능). counterDmgPct → 반격 데미지 +/- %. counterHitSoul → 반격 명중 시 영혼 게이지 +N. counterShock → 반격 명중 시 적 충격 게이지 +N. counterCanCrit → 반격에 치명 확률 적용 (천변의 검)' },
+      { type: 'feature', text: '[데미지·치명] physDmgPct → calculateDamage 물리 데미지 +/- %. critRate → rollCrit 치명 확률 +/- %. dmgTakenPct → 받는 데미지 +/- % (음수면 감소). afterDodgeDmg → 회피 직후 다음 공격 데미지 +N% 버프 (1회 소비)' },
+      { type: 'feature', text: '[영혼·턴 통합] startSoul → 전투 시작 영혼 게이지 +N. perTurnSoul → 매 턴 시작 영혼 +N. dodgeSoul → 회피 성공 시 영혼 +N. soulGainMult → 모든 영혼 획득 ×(1 + N). perTurnHpLoss → 매 턴 시작 HP -N (1 HP 보장)' },
+      { type: 'feature', text: '[심안 무효화] disableInsightPredict (깨진 감각 결함) → 적 다음 행동 표시 UI 차단 + 심안 Lv.5 회피 +10% 무효화' },
+      { type: 'fix', text: '[버그 수정] App.jsx → CombatScreen prop의 initialPlayer 스프레드 순서 오류 수정. `...stats, ...classData.stats`에서 classData.stats가 stats를 덮어쓰던 문제 → `...classData.stats, ...stats`로 변경. 각인 능력치 가산이 전투에 반영되도록' },
+      { type: 'system', text: '[헬퍼 신설] utils/helpers.js의 aggregateEngravingEffects(classId, slots) — 장착된 각인의 effect 객체를 단일 합산 객체로 반환. 수치형 키는 합산, 불린형은 OR. 빈 슬롯·null·미정 카드는 자동 무시' },
+      { type: 'system', text: '[damage.js 시그니처 확장] calculateDamage / getDisplayDamage / rollCrit / rollDodge 모든 함수의 마지막 인자로 engravingFx 추가 (기본값 {}). 기존 호출은 영향 없음 — 외부에서 명시적으로 engravingFx 전달 시에만 적용' },
+      { type: 'system', text: '[방랑검사 24장 우선 적용] 이번 PR은 lanthert(방랑검사) 풀의 24장만 effect 정의 완료. sage·demonblood·elf·priest는 빈 풀 상태. 다음 PR(1.28.x)에서 나머지 4직업 풀 작성 예정. 5직업 모두 시스템은 이미 작동 — 각인 데이터만 추가하면 자동으로 효과 발동' },
+    ],
+  },
+  {
     version: '1.26.0',
     date: '2026-05-17',
     label: '각성도 활성화 조건 도입 — 영혼 외 직업 진행도·궁극 픽·각성도 상호 조건 추가',

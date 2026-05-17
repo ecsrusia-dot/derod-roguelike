@@ -28,6 +28,7 @@ import {
   rollCurses,
   hasCurse,
   getCharismaHealBonus,
+  aggregateEngravingEffects,
 } from './utils/helpers.js';
 
 // 데미지/회피/치명 함수 (combat/damage.js로 분리됨)
@@ -683,14 +684,22 @@ export default function App() {
         });
       }
       setSkills(baseSkills);
-      setStats({ ...classData.stats });
-      
+      // 1.27.0~ 각인 effect 통합: 직업 능력치 + HP 가산
+      const _engSlots = meta?.engravings?.[classData.id]?.slots || [];
+      const _engFx = aggregateEngravingEffects(classData.id, _engSlots);
+      const adjustedStats = { ...classData.stats };
+      if (_engFx.str) adjustedStats.근력 = (adjustedStats.근력 || 0) + _engFx.str;
+      if (_engFx.dex) adjustedStats.민첩 = (adjustedStats.민첩 || 0) + _engFx.dex;
+      if (_engFx.int) adjustedStats.지능 = (adjustedStats.지능 || 0) + _engFx.int;
+      if (_engFx.cha) adjustedStats.매력 = (adjustedStats.매력 || 0) + _engFx.cha;
+      setStats(adjustedStats);
+
       // 시작 HP 계산
       const hpBonus = getMinorBonus(baseSkills, 'maxHp+');
       const metaHpBonus = getMetaBonus(meta, 'startHp+10') * 10;
       // 챔피언십 메타 HP (도전자 +50, 정복자 +100, 합계 +150)
       const champHpBonus = getChampionshipMetaHp(meta);
-      let startHp = GAME_CONFIG.startHp + hpBonus + metaHpBonus + champHpBonus;
+      let startHp = GAME_CONFIG.startHp + hpBonus + metaHpBonus + champHpBonus + (_engFx.startHp || 0);
       // 저주: 최대 HP -20%
       if (hasCurse(curses, 'curse_maxHp-20')) {
         startHp = Math.floor(startHp * 0.8);
@@ -1678,7 +1687,7 @@ export default function App() {
             {screen === 'map' && chapter && mapData && <MapView chapter={chapter} classData={classData} mapData={mapData} hp={hp} maxHp={maxHp} gold={gold} gem={gem} relics={relics} activeRelicNames={activeRelicNames} expedition={currentExpedition} curses={currentCurses} chapterIdx={chapterIdx} onEnterNode={handleEnterNode} onOpenStatus={() => setScreen('status')} onOpenAchievements={() => { setPrevAchievementsBack('map'); setScreen('achievements'); }} onOpenCodex={() => setScreen('codex')} onBack={() => setScreen('title')} />}
             {screen === 'codex' && <CodexScreen meta={meta} onBack={() => setScreen('map')} />}
             {screen === 'bossIntro' && currentEnemy && <BossIntroScreen enemyKey={currentEnemy} onComplete={() => setScreen('combat')} />}
-            {screen === 'combat' && currentEnemy && <CombatScreen key={`${activeNodeId}-${currentEnemy}`} classData={classData} initialPlayer={{ hp, maxHp, ...stats, ...classData.stats }} initialSkills={skills} initialUltimates={ultimates} initialRelics={relics} activeSkills={activeSkills} activeRelicNames={activeRelicNames} enemyKey={currentEnemy} isBoss={isBossReward} expedition={currentExpedition} curses={currentCurses} meta={meta} onVictory={handleVictory} onDefeat={handleDefeat} />}
+            {screen === 'combat' && currentEnemy && <CombatScreen key={`${activeNodeId}-${currentEnemy}`} classData={classData} initialPlayer={{ hp, maxHp, ...classData.stats, ...stats }} initialSkills={skills} initialUltimates={ultimates} initialRelics={relics} activeSkills={activeSkills} activeRelicNames={activeRelicNames} enemyKey={currentEnemy} isBoss={isBossReward} expedition={currentExpedition} curses={currentCurses} meta={meta} engravingFx={aggregateEngravingEffects(classData?.id, meta?.engravings?.[classData?.id]?.slots)} onVictory={handleVictory} onDefeat={handleDefeat} />}
             {screen === 'reward' && <RewardSelect rewards={currentRewards} gem={gem} skills={skills} relics={relics} ultimates={ultimates} onPick={handlePickReward} onReroll={handleReroll} hasRerolled={hasRerolled} isElite={isEliteReward} classId={classData?.id} meta={meta} expedition={currentExpedition} />}
             {screen === 'victory' && <VictoryScreen classData={classData} enemy={currentEnemy ? ENEMIES[currentEnemy] : null} gains={victoryGains} onContinue={handleVictoryContinue} />}
             {screen === 'event' && currentEvent && <EventScreen event={currentEvent} classData={classData} stats={{ ...classData.stats, ...stats }} skills={skills} onResolve={handleEventResolve} />}

@@ -309,6 +309,26 @@ export function getEngravingById(classId, cardId) {
   return pool.find(e => e.id === cardId) || null;
 }
 
+// 장착된 각인의 effect 객체를 모두 합산해 단일 객체로 반환 (1.27.0~)
+// 수치형은 합산, 불린형은 OR. 빈 슬롯·null·미정 카드는 무시.
+export function aggregateEngravingEffects(classId, slots) {
+  const result = {};
+  if (!classId || !Array.isArray(slots)) return result;
+  for (const cardId of slots) {
+    if (!cardId) continue;
+    const card = getEngravingById(classId, cardId);
+    if (!card?.effect) continue;
+    for (const [k, v] of Object.entries(card.effect)) {
+      if (typeof v === 'boolean') {
+        result[k] = (result[k] || false) || v;
+      } else if (typeof v === 'number') {
+        result[k] = (result[k] || 0) + v;
+      }
+    }
+  }
+  return result;
+}
+
 // ===== 각성도 조건 체크 (1.26.0~) =====
 
 // 조건 충족 여부. condition이 없으면 항상 true.
