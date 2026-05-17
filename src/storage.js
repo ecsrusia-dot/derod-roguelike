@@ -64,6 +64,27 @@ const DEFAULT_META = {
   // meta_startSkillLv → 각인 시스템 이관 안내 (1.25.0 첫 부팅 시 1회 표시)
   // null = 안내 안 보여줌 / 객체 = { refundedSouls: N, refundedStack: N }
   engravingMigrationNotice: null,
+  // ULTIMATE_SKILLS 직업별 픽 기록 (1.26.0~)
+  // ultimatesPickedByClass[classId] = ['ult_id1', 'ult_id2', ...] (중복 없음)
+  ultimatesPickedByClass: {
+    lanthert: [],
+    sage: [],
+    demonblood: [],
+    elf: [],
+    priest: [],
+  },
+  // 챔피언십 클리어 직업별 추적 (1.26.0~) — 기존 championshipClears와 별개 (소급 적용 안 됨)
+  // championshipClearsByClass[classId][expId][difficulty] = true
+  championshipClearsByClass: {
+    lanthert:   {},
+    sage:       {},
+    demonblood: {},
+    elf:        {},
+    priest:     {},
+  },
+  // 1.26.0 조건 시스템 추가 안내 모달 트리거 (1회만 표시)
+  // null = 안내 안 보여줌 / true = 표시 필요
+  awakeningConditionNotice: null,
 };
 
 // IndexedDB 열기
@@ -97,9 +118,17 @@ export async function loadMeta() {
         safe.codex = { ...DEFAULT_META.codex, ...(data.codex || {}) };
         // engravings는 직업별 중첩이라 누락 직업 보강 (신규 직업 추가 대비)
         safe.engravings = { ...DEFAULT_META.engravings, ...(data.engravings || {}) };
+        // 1.26.0 직업별 추적 데이터 보강
+        safe.ultimatesPickedByClass = { ...DEFAULT_META.ultimatesPickedByClass, ...(data.ultimatesPickedByClass || {}) };
+        safe.championshipClearsByClass = { ...DEFAULT_META.championshipClearsByClass, ...(data.championshipClearsByClass || {}) };
+        // 1.26.0 조건 시스템 신설 안내 — ultimatesPickedByClass 키가 데이터에 없었다면 첫 마이그레이션
+        if (!data.ultimatesPickedByClass && !data.awakeningConditionNotice) {
+          safe.awakeningConditionNotice = true;
+        }
         // 1.25.0 마이그레이션: meta_startSkillLv → 각인 시스템 이관 + 영혼 100% 환불
         // 이미 마이그레이션 했으면 (upgrades에 키 없으면) 스킵
         const oldStack = safe.upgrades?.meta_startSkillLv;
+        let needsImmediateSave = false;
         if (oldStack && oldStack > 0) {
           // 환불 계산 (cost: stack 0 → 500, stack 1 → 2000)
           let refund = 0;
@@ -112,7 +141,14 @@ export async function loadMeta() {
           safe.upgrades = newUpgrades;
           // 안내 모달 트리거 데이터 저장
           safe.engravingMigrationNotice = { refundedSouls: refund, refundedStack: oldStack };
-          // 즉시 저장해 재실행(중복 환불) 방지
+          needsImmediateSave = true;
+        }
+        // 1.26.0 조건 시스템 첫 마이그레이션이면 보강 후 저장 (안내 모달 재트리거 방지)
+        if (!data.ultimatesPickedByClass) {
+          needsImmediateSave = true;
+        }
+        if (needsImmediateSave) {
+          // 즉시 저장해 재실행 방지
           saveMeta(safe).then(() => resolve(safe)).catch(() => resolve(safe));
           return;
         }
@@ -573,4 +609,47 @@ export function applyEngravingSlot(meta, classId, slotIdx, cardId, costPaid = 0)
 export function clearEngravingMigrationNotice(meta) {
   if (!meta.engravingMigrationNotice) return meta;
   return { ...meta, engravingMigrationNotice: null };
+}
+
+// =========== 각성도 조건 추적 (1.26.0~) ===========
+
+// 챔피언십 클리어를 직업별로 추가 기록 (기존 recordChampionshipClear와 별개로 호출)
+export function recordChampionshipClearByClass(meta, classId, expId, difficulty) {
+  if (!classId || !expId || !difficulty) return meta;
+  const byClass = meta.championshipClearsByClass || {};
+  const classClears = byClass[classId] || {};
+  const expClears = classClears[expId] || {};
+  if (expClears[difficulty]) return meta;
+  return {
+    ...meta,
+    championshipClearsByClass: {
+      ...byClass,
+      [classId]: {
+        ...classClears,
+        [expId]: { ...expClears, [difficulty]: true },
+      },
+    },
+  };
+}
+
+// ULTIMATE_SKILLS 픽을 직업별로 기록 (직업 런에서 궁극 보상 픽 시 호출)
+// 중복 픽은 무시 (Set 의미)
+export function recordUltimatePickByClass(meta, classId, ultId) {
+  if (!classId || !ultId) return meta;
+  const byClass = meta.ultimatesPickedByClass || {};
+  const picked = byClass[classId] || [];
+  if (picked.includes(ultId)) return meta;
+  return {
+    ...meta,
+    ultimatesPickedByClass: {
+      ...byClass,
+      [classId]: [...picked, ultId],
+    },
+  };
+}
+
+// 1.26.0 조건 시스템 안내 모달 acknowledge
+export function clearAwakeningConditionNotice(meta) {
+  if (!meta.awakeningConditionNotice) return meta;
+  return { ...meta, awakeningConditionNotice: null };
 }

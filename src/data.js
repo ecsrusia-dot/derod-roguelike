@@ -22,9 +22,9 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.25.0';
+export const GAME_VERSION = '1.26.0';
 export const VERSION_DATE = '2026-05-17';
-export const VERSION_LABEL = '직업 각인 시스템 도입 (방랑검사) — 각성도 10단계 + 각인 슬롯 3칸 + 가챠';
+export const VERSION_LABEL = '각성도 활성화 조건 도입 — 영혼 외 직업 진행도·궁극 픽·각성도 상호 조건 추가';
 
 // =========== 패시브 스킬 ===========
 // effect 필드는 문자열 키. 실제 동작은 메인 코드의 trigger handler에서 처리.
@@ -4160,63 +4160,104 @@ export const ENGRAVING_GACHA_COST = 500;
 //   - passiveBonus: { skill, delta } (시작 패시브 +Lv)
 //   - statPctBonus: { key, pct } (반격율·치명타율 등 % 보너스)
 // PR 2에서는 데이터만 표시. PR 3에서 전투 적용.
+// 9단계 활성화 조건 (1.26.0~). 모든 직업 동일 패턴:
+//   Lv.2 = 수련의 길 클리어 / Lv.3 = ULTIMATE_SKILLS 1개 픽 /
+//   Lv.4·6·8 = 챔피언십 normal/hard/hell 5컨셉 올 클리어 /
+//   Lv.5 = 시작 패시브 1개의 3궁극 모두 픽 (택일) /
+//   Lv.7 = 3개 직업이 Lv.5 이상 / Lv.9 = 5직업 Lv.6 이상 / Lv.10 = 5직업 Lv.8 이상
+//
+// condition.type 종류:
+//   - trainingClear: 해당 직업의 수련의 길 클리어
+//   - ultimatePickedCount: 해당 직업 런에서 ULTIMATE_SKILLS N개 이상 픽
+//   - ultimateAllOfOnePassive: 해당 직업 런에서 시작 패시브 1개의 3궁극 모두 픽
+//   - championshipAllClear: 해당 직업 챔피언십 5컨셉 + 지정 난이도 모두 클리어
+//   - engravingsLvReached: 임의 직업 N개가 각성도 minLv 이상
+const COMMON_AWAKENING_CONDITIONS = [
+  { lv: 2,  condition: { type: 'trainingClear' } },
+  { lv: 3,  condition: { type: 'ultimatePickedCount', count: 1 } },
+  { lv: 4,  condition: { type: 'championshipAllClear', difficulty: 'normal' } },
+  { lv: 5,  condition: { type: 'ultimateAllOfOnePassive' } },
+  { lv: 6,  condition: { type: 'championshipAllClear', difficulty: 'hard' } },
+  { lv: 7,  condition: { type: 'engravingsLvReached', minLv: 5, classCount: 3 } },
+  { lv: 8,  condition: { type: 'championshipAllClear', difficulty: 'hell' } },
+  { lv: 9,  condition: { type: 'engravingsLvReached', minLv: 6, classCount: 5 } },
+  { lv: 10, condition: { type: 'engravingsLvReached', minLv: 8, classCount: 5 } },
+];
+
+// 직업별 보상은 직업마다 다름 — 보상만 정의하고 condition은 위 공통 표에서 lv 매칭으로 머지
+const _LANTHERT_REWARDS = [
+  { lv: 2,  cost: 500,   reward: { type: 'slotUnlock', slot: 1 } },
+  { lv: 3,  cost: 1000,  reward: { type: 'statBonus', stat: '근력', value: 2 } },
+  { lv: 4,  cost: 2000,  reward: { type: 'passiveBonus', skill: '심안류', delta: 1 } },
+  { lv: 5,  cost: 4000,  reward: { type: 'slotUnlock', slot: 2 } },
+  { lv: 6,  cost: 8000,  reward: { type: 'statBonus', stat: '민첩', value: 2 } },
+  { lv: 7,  cost: 12000, reward: { type: 'passiveBonus', skill: '심안', delta: 1 } },
+  { lv: 8,  cost: 16000, reward: { type: 'statPctBonus', key: 'counterRate', pct: 5 } },
+  { lv: 9,  cost: 22000, reward: { type: 'slotUnlock', slot: 3 } },
+  { lv: 10, cost: 30000, reward: { type: 'statBonus', stat: 'statTotal', value: 5 } },
+];
+const _SAGE_REWARDS = [
+  { lv: 2,  cost: 500,   reward: { type: 'slotUnlock', slot: 1 } },
+  { lv: 3,  cost: 1000,  reward: { type: 'statBonus', stat: '지능', value: 2 } },
+  { lv: 4,  cost: 2000,  reward: { type: 'passiveBonus', skill: '이프리트', delta: 1 } },
+  { lv: 5,  cost: 4000,  reward: { type: 'slotUnlock', slot: 2 } },
+  { lv: 6,  cost: 8000,  reward: { type: 'statBonus', stat: '매력', value: 2 } },
+  { lv: 7,  cost: 12000, reward: { type: 'passiveBonus', skill: '마력', delta: 1 } },
+  { lv: 8,  cost: 16000, reward: { type: 'statPctBonus', key: 'magDmg', pct: 5 } },
+  { lv: 9,  cost: 22000, reward: { type: 'slotUnlock', slot: 3 } },
+  { lv: 10, cost: 30000, reward: { type: 'statBonus', stat: 'statTotal', value: 5 } },
+];
+const _DEMONBLOOD_REWARDS = [
+  { lv: 2,  cost: 500,   reward: { type: 'slotUnlock', slot: 1 } },
+  { lv: 3,  cost: 1000,  reward: { type: 'statBonus', stat: '근력', value: 2 } },
+  { lv: 4,  cost: 2000,  reward: { type: 'passiveBonus', skill: '잔혹', delta: 1 } },
+  { lv: 5,  cost: 4000,  reward: { type: 'slotUnlock', slot: 2 } },
+  { lv: 6,  cost: 8000,  reward: { type: 'statBonus', stat: '민첩', value: 2 } },
+  { lv: 7,  cost: 12000, reward: { type: 'passiveBonus', skill: '강타', delta: 1 } },
+  { lv: 8,  cost: 16000, reward: { type: 'statPctBonus', key: 'physDmg', pct: 5 } },
+  { lv: 9,  cost: 22000, reward: { type: 'slotUnlock', slot: 3 } },
+  { lv: 10, cost: 30000, reward: { type: 'statBonus', stat: 'statTotal', value: 5 } },
+];
+const _ELF_REWARDS = [
+  { lv: 2,  cost: 500,   reward: { type: 'slotUnlock', slot: 1 } },
+  { lv: 3,  cost: 1000,  reward: { type: 'statBonus', stat: '민첩', value: 2 } },
+  { lv: 4,  cost: 2000,  reward: { type: 'passiveBonus', skill: '회피', delta: 1 } },
+  { lv: 5,  cost: 4000,  reward: { type: 'slotUnlock', slot: 2 } },
+  { lv: 6,  cost: 8000,  reward: { type: 'statBonus', stat: '매력', value: 2 } },
+  { lv: 7,  cost: 12000, reward: { type: 'passiveBonus', skill: '정밀', delta: 1 } },
+  { lv: 8,  cost: 16000, reward: { type: 'statPctBonus', key: 'dodge', pct: 5 } },
+  { lv: 9,  cost: 22000, reward: { type: 'slotUnlock', slot: 3 } },
+  { lv: 10, cost: 30000, reward: { type: 'statBonus', stat: 'statTotal', value: 5 } },
+];
+const _PRIEST_REWARDS = [
+  { lv: 2,  cost: 500,   reward: { type: 'slotUnlock', slot: 1 } },
+  { lv: 3,  cost: 1000,  reward: { type: 'statBonus', stat: '매력', value: 2 } },
+  { lv: 4,  cost: 2000,  reward: { type: 'passiveBonus', skill: '신앙', delta: 1 } },
+  { lv: 5,  cost: 4000,  reward: { type: 'slotUnlock', slot: 2 } },
+  { lv: 6,  cost: 8000,  reward: { type: 'statBonus', stat: '지능', value: 2 } },
+  { lv: 7,  cost: 12000, reward: { type: 'passiveBonus', skill: '재생', delta: 1 } },
+  { lv: 8,  cost: 16000, reward: { type: 'statPctBonus', key: 'heal', pct: 5 } },
+  { lv: 9,  cost: 22000, reward: { type: 'slotUnlock', slot: 3 } },
+  { lv: 10, cost: 30000, reward: { type: 'statBonus', stat: 'statTotal', value: 5 } },
+];
+
+function _mergeConditions(rewards) {
+  return rewards.map(r => {
+    const c = COMMON_AWAKENING_CONDITIONS.find(cc => cc.lv === r.lv);
+    return c ? { ...r, condition: c.condition } : r;
+  });
+}
+
 export const ENGRAVING_AWAKENING_TABLE = {
-  lanthert: [
-    { lv: 2,  cost: 500,   reward: { type: 'slotUnlock', slot: 1 } },
-    { lv: 3,  cost: 1000,  reward: { type: 'statBonus', stat: '근력', value: 2 } },
-    { lv: 4,  cost: 2000,  reward: { type: 'passiveBonus', skill: '심안류', delta: 1 } },
-    { lv: 5,  cost: 4000,  reward: { type: 'slotUnlock', slot: 2 } },
-    { lv: 6,  cost: 8000,  reward: { type: 'statBonus', stat: '민첩', value: 2 } },
-    { lv: 7,  cost: 12000, reward: { type: 'passiveBonus', skill: '심안', delta: 1 } },
-    { lv: 8,  cost: 16000, reward: { type: 'statPctBonus', key: 'counterRate', pct: 5 } },
-    { lv: 9,  cost: 22000, reward: { type: 'slotUnlock', slot: 3 } },
-    { lv: 10, cost: 30000, reward: { type: 'statBonus', stat: 'statTotal', value: 5 } },
-  ],
-  sage: [
-    { lv: 2,  cost: 500,   reward: { type: 'slotUnlock', slot: 1 } },
-    { lv: 3,  cost: 1000,  reward: { type: 'statBonus', stat: '지능', value: 2 } },
-    { lv: 4,  cost: 2000,  reward: { type: 'passiveBonus', skill: '이프리트', delta: 1 } },
-    { lv: 5,  cost: 4000,  reward: { type: 'slotUnlock', slot: 2 } },
-    { lv: 6,  cost: 8000,  reward: { type: 'statBonus', stat: '매력', value: 2 } },
-    { lv: 7,  cost: 12000, reward: { type: 'passiveBonus', skill: '마력', delta: 1 } },
-    { lv: 8,  cost: 16000, reward: { type: 'statPctBonus', key: 'magDmg', pct: 5 } },
-    { lv: 9,  cost: 22000, reward: { type: 'slotUnlock', slot: 3 } },
-    { lv: 10, cost: 30000, reward: { type: 'statBonus', stat: 'statTotal', value: 5 } },
-  ],
-  demonblood: [
-    { lv: 2,  cost: 500,   reward: { type: 'slotUnlock', slot: 1 } },
-    { lv: 3,  cost: 1000,  reward: { type: 'statBonus', stat: '근력', value: 2 } },
-    { lv: 4,  cost: 2000,  reward: { type: 'passiveBonus', skill: '잔혹', delta: 1 } },
-    { lv: 5,  cost: 4000,  reward: { type: 'slotUnlock', slot: 2 } },
-    { lv: 6,  cost: 8000,  reward: { type: 'statBonus', stat: '민첩', value: 2 } },
-    { lv: 7,  cost: 12000, reward: { type: 'passiveBonus', skill: '강타', delta: 1 } },
-    { lv: 8,  cost: 16000, reward: { type: 'statPctBonus', key: 'physDmg', pct: 5 } },
-    { lv: 9,  cost: 22000, reward: { type: 'slotUnlock', slot: 3 } },
-    { lv: 10, cost: 30000, reward: { type: 'statBonus', stat: 'statTotal', value: 5 } },
-  ],
-  elf: [
-    { lv: 2,  cost: 500,   reward: { type: 'slotUnlock', slot: 1 } },
-    { lv: 3,  cost: 1000,  reward: { type: 'statBonus', stat: '민첩', value: 2 } },
-    { lv: 4,  cost: 2000,  reward: { type: 'passiveBonus', skill: '회피', delta: 1 } },
-    { lv: 5,  cost: 4000,  reward: { type: 'slotUnlock', slot: 2 } },
-    { lv: 6,  cost: 8000,  reward: { type: 'statBonus', stat: '매력', value: 2 } },
-    { lv: 7,  cost: 12000, reward: { type: 'passiveBonus', skill: '정밀', delta: 1 } },
-    { lv: 8,  cost: 16000, reward: { type: 'statPctBonus', key: 'dodge', pct: 5 } },
-    { lv: 9,  cost: 22000, reward: { type: 'slotUnlock', slot: 3 } },
-    { lv: 10, cost: 30000, reward: { type: 'statBonus', stat: 'statTotal', value: 5 } },
-  ],
-  priest: [
-    { lv: 2,  cost: 500,   reward: { type: 'slotUnlock', slot: 1 } },
-    { lv: 3,  cost: 1000,  reward: { type: 'statBonus', stat: '매력', value: 2 } },
-    { lv: 4,  cost: 2000,  reward: { type: 'passiveBonus', skill: '신앙', delta: 1 } },
-    { lv: 5,  cost: 4000,  reward: { type: 'slotUnlock', slot: 2 } },
-    { lv: 6,  cost: 8000,  reward: { type: 'statBonus', stat: '지능', value: 2 } },
-    { lv: 7,  cost: 12000, reward: { type: 'passiveBonus', skill: '재생', delta: 1 } },
-    { lv: 8,  cost: 16000, reward: { type: 'statPctBonus', key: 'heal', pct: 5 } },
-    { lv: 9,  cost: 22000, reward: { type: 'slotUnlock', slot: 3 } },
-    { lv: 10, cost: 30000, reward: { type: 'statBonus', stat: 'statTotal', value: 5 } },
-  ],
+  lanthert:   _mergeConditions(_LANTHERT_REWARDS),
+  sage:       _mergeConditions(_SAGE_REWARDS),
+  demonblood: _mergeConditions(_DEMONBLOOD_REWARDS),
+  elf:        _mergeConditions(_ELF_REWARDS),
+  priest:     _mergeConditions(_PRIEST_REWARDS),
 };
+
+// 챔피언십 컨셉 ID 목록 (5컨셉 올 클리어 검사용)
+export const CHAMPIONSHIP_EXP_IDS = ['frost', 'forest', 'sanctum', 'rift', 'dawn'];
 
 // 만렙 누적 영혼: 500+1000+2000+4000+8000+12000+16000+22000+30000 = 95,500
 

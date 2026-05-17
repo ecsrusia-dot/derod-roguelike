@@ -12,6 +12,9 @@ import {
   ULTIMATE_SKILLS,
   ENGRAVINGS,
   ENGRAVING_TIERS,
+  ENGRAVING_AWAKENING_TABLE,
+  CHAMPIONSHIP_EXP_IDS,
+  CLASSES,
 } from '../data.js';
 
 // ===== 색상 팔레트 =====
@@ -304,4 +307,111 @@ export function getEngravingById(classId, cardId) {
   if (!cardId) return null;
   const pool = ENGRAVINGS[classId] || [];
   return pool.find(e => e.id === cardId) || null;
+}
+
+// ===== 각성도 조건 체크 (1.26.0~) =====
+
+// 조건 충족 여부. condition이 없으면 항상 true.
+export function isAwakeningConditionMet(meta, classId, lv) {
+  const table = ENGRAVING_AWAKENING_TABLE[classId] || [];
+  const step = table.find(s => s.lv === lv);
+  if (!step || !step.condition) return true;
+  return checkCondition(meta, classId, step.condition);
+}
+
+function checkCondition(meta, classId, cond) {
+  switch (cond.type) {
+    case 'trainingClear': {
+      const cleared = meta?.clearedExpeditions || [];
+      return cleared.includes(`training_${classId}`);
+    }
+    case 'ultimatePickedCount': {
+      const picked = meta?.ultimatesPickedByClass?.[classId] || [];
+      return picked.length >= (cond.count || 1);
+    }
+    case 'championshipAllClear': {
+      const byClass = meta?.championshipClearsByClass?.[classId] || {};
+      return CHAMPIONSHIP_EXP_IDS.every(expId =>
+        byClass[expId]?.[cond.difficulty] === true
+      );
+    }
+    case 'ultimateAllOfOnePassive': {
+      const cls = CLASSES.find(c => c.id === classId);
+      if (!cls) return false;
+      const picked = meta?.ultimatesPickedByClass?.[classId] || [];
+      const startPassives = Object.keys(cls.startSkills || {});
+      // 시작 패시브 중 1개의 ULTIMATE_SKILLS 모두를 픽했는지 (택일)
+      return startPassives.some(passive => {
+        const ults = ULTIMATE_SKILLS[passive] || [];
+        return ults.length > 0 && ults.every(u => picked.includes(u.id));
+      });
+    }
+    case 'engravingsLvReached': {
+      const engravings = meta?.engravings || {};
+      const passing = Object.values(engravings).filter(e => (e?.lv || 1) >= cond.minLv).length;
+      return passing >= cond.classCount;
+    }
+    default:
+      return true;
+  }
+}
+
+// 조건 텍스트 (UI 표시용)
+export function describeAwakeningCondition(condition, classId) {
+  if (!condition) return null;
+  const cls = CLASSES.find(c => c.id === classId);
+  const className = cls?.name || '';
+  switch (condition.type) {
+    case 'trainingClear':
+      return `${className} 수련의 길 클리어`;
+    case 'ultimatePickedCount':
+      return `${className} 런에서 궁극 보상 ${condition.count || 1}개 픽`;
+    case 'championshipAllClear': {
+      const diffLabels = { normal: '일반', hard: '하드', hell: '지옥', madness: '광기' };
+      return `${className} 챔피언십 ${diffLabels[condition.difficulty] || condition.difficulty} 5컨셉 모두 클리어`;
+    }
+    case 'ultimateAllOfOnePassive': {
+      const startPassives = Object.keys(cls?.startSkills || {});
+      return `${className} 시작 패시브 [${startPassives.join(' or ')}] 1개의 3궁극 모두 픽`;
+    }
+    case 'engravingsLvReached':
+      return `${condition.classCount}개 직업의 각성도 Lv.${condition.minLv} 이상 도달`;
+    default:
+      return null;
+  }
+}
+
+// 조건 진행도 텍스트 — 미충족 시 현재 진행도를 같이 표시
+export function describeAwakeningConditionProgress(meta, condition, classId) {
+  if (!condition) return null;
+  switch (condition.type) {
+    case 'ultimatePickedCount': {
+      const picked = meta?.ultimatesPickedByClass?.[classId] || [];
+      return `(${picked.length} / ${condition.count || 1})`;
+    }
+    case 'championshipAllClear': {
+      const byClass = meta?.championshipClearsByClass?.[classId] || {};
+      const cleared = CHAMPIONSHIP_EXP_IDS.filter(expId => byClass[expId]?.[condition.difficulty]).length;
+      return `(${cleared} / ${CHAMPIONSHIP_EXP_IDS.length})`;
+    }
+    case 'ultimateAllOfOnePassive': {
+      const cls = CLASSES.find(c => c.id === classId);
+      if (!cls) return null;
+      const picked = meta?.ultimatesPickedByClass?.[classId] || [];
+      const startPassives = Object.keys(cls.startSkills || {});
+      const counts = startPassives.map(passive => {
+        const ults = ULTIMATE_SKILLS[passive] || [];
+        const got = ults.filter(u => picked.includes(u.id)).length;
+        return `${passive} ${got}/${ults.length}`;
+      });
+      return `(${counts.join(' · ')})`;
+    }
+    case 'engravingsLvReached': {
+      const engravings = meta?.engravings || {};
+      const passing = Object.values(engravings).filter(e => (e?.lv || 1) >= condition.minLv).length;
+      return `(${passing} / ${condition.classCount})`;
+    }
+    default:
+      return null;
+  }
 }
