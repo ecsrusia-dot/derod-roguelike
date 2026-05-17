@@ -78,7 +78,7 @@ PM은 비개발자. 결정이 필요할 때:
 
 - **이름**: derod-roguelike (게임 내 표시: "Dawn and Twilight" / "던앤트와일라잇")
 - **장르**: 한국어 텍스트 기반 다크 판타지 모바일 PWA 로그라이크
-- **현재 게임 버전**: `src/data.js`의 `GAME_VERSION` 참조 (이 문서 갱신 시점 **1.21.0** — 챔피언십 frost 일러 20장 적용)
+- **현재 게임 버전**: `src/data.js`의 `GAME_VERSION` 참조 (이 문서 갱신 시점 **1.27.0** — 각인 효과 전투 적용 완료, 직업 각인 시스템 풀스택 완성)
 - **배포**: GitHub Pages (`main` 브랜치 머지 시 `.github/workflows/deploy.yml`이 자동 빌드·배포)
 - **호스팅 경로**: `https://<owner>.github.io/derod-roguelike/` — `vite.config.js`의 `base: '/derod-roguelike/'`. ⚠️ 에셋 경로는 항상 **상대 경로(`./`)** 사용 (4.5절 참조)
 
@@ -94,20 +94,20 @@ PM은 비개발자. 결정이 필요할 때:
 
 ```
 src/
-├── App.jsx                       # 메인 게임 루프 (1900+ 줄)
-├── data.js                       # 모든 게임 콘텐츠 + GAME_VERSION (4000+ 줄)
-├── storage.js                    # IndexedDB 메타 (souls, codex, dailyClears, activeRun…)
+├── App.jsx                       # 메인 게임 루프 (1900+ 줄). 1.27.0~ 각인 fx prop 전달
+├── data.js                       # 모든 게임 콘텐츠 + GAME_VERSION (4300+ 줄). 1.25.0~ ENGRAVINGS/ENGRAVING_TIERS/ENGRAVING_AWAKENING_TABLE 추가
+├── storage.js                    # IndexedDB 메타. 1.25.0~ engravings / 1.26.0~ ultimatesPickedByClass·championshipClearsByClass
 ├── main.jsx / index.css          # 진입점 + 전역 스타일 + FX 키프레임
-├── combat/damage.js              # 데미지·치명·회피 계산
+├── combat/damage.js              # 데미지·치명·회피 계산. 1.27.0~ engravingFx 인자
 ├── data/changelog.js             # 버전별 changelog (인게임 모달용)
 ├── utils/
-│   ├── helpers.js                # PALETTE, 패시브/유물/저주 헬퍼, isUnlocked
+│   ├── helpers.js                # PALETTE, 패시브/유물/저주 헬퍼, getEnemyImageSrc, getEngravingById/aggregateEngravingEffects(1.27.0~), isAwakeningConditionMet(1.26.0~)
 │   ├── mapGen.js                 # linearSequence / branchSequence / 일반 가중치
 │   ├── rewards.js                # 보상 풀·롤
 │   └── dailyChallenge.js         # 일일 챌린지 시드/빌더
 ├── cloud/                        # Firebase auth + sync
-└── components/                   # 26+ 화면 컴포넌트
-    ├── CombatScreen.jsx          # 전투 (1700+ 줄, 가장 큼). 적 일러 <img>는 line 1394 부근
+└── components/                   # 27+ 화면 컴포넌트
+    ├── CombatScreen.jsx          # 전투 (1800+ 줄, 가장 큼). 1.27.0~ engravingFx prop으로 13곳 통합
     ├── BossIntroScreen.jsx       # ★ 보스 진입 시네마틱 컷신 (1.14.0 신설)
     ├── CodexScreen.jsx           # 5탭 도감 (적/사건/유물/패시브/레시피)
     ├── CardInfoModal.jsx         # 공용 정보 모달 + buildPassive/Relic/ActiveSkillInfo 헬퍼
@@ -119,6 +119,7 @@ src/
     ├── StatusPanel.jsx           # 전투 중 상태창
     ├── MapView.jsx               # 챕터 맵
     ├── TitleScreen.jsx           # 메인 (이어하기 버튼 포함)
+    ├── EngravingScreen.jsx       # ★ 직업 각인 시스템 (1.25.0~). 각성도 10단계 + 슬롯 3칸 + 가챠. EngravingMigrationModal + AwakeningConditionNoticeModal(1.26.0~) export
     └── …
 
 public/
@@ -367,7 +368,7 @@ const introSrc = getEnemyImageSrc(enemyKey, enemy, 'intro');
 
 ---
 
-## 6. 게임 시스템 현황 (1.14.1 기준)
+## 6. 게임 시스템 현황 (1.27.0 기준)
 
 ### 6.1. 모드 구조
 
@@ -437,7 +438,7 @@ const introSrc = getEnemyImageSrc(enemyKey, enemy, 'intro');
 - **무한모드 "황혼의 끝"**: 챕터 1→2→3→4→1→… 무한 순환, 깊이×0.15 HP/0.12 dmg 스케일
 - **챔피언십**: 5컨셉 × 4난이도 (normal/hard/hell/madness), 직업별 해금
 
-#### 챔피언십 5컨셉 일러 진행 상태 (1.21.0)
+#### 챔피언십 5컨셉 일러 진행 상태 (1.27.0 시점, 1.21.0 이후 변화 없음)
 
 | 컨셉 | 일러 상태 | 비고 |
 |---|---|---|
@@ -456,6 +457,88 @@ const introSrc = getEnemyImageSrc(enemyKey, enemy, 'intro');
 | 궁극 컷인 | 풀스크린 골든 버스트 + 궁극명 배너 0.9초 (`UltimateCutin`) | ✅ (1.12.0) |
 | **보스 진입 컷신** | 9:16 풀컷 일러 페이드인 + 보스 이름 배너 + 2.5초 자동 스킵 (`BossIntroScreen`) | ✅ (1.14.0) |
 | Phase 3 | 보스 임팩트 프레임, 승리 골든 버스트, 사망 흑백 페이드 | ❌ |
+
+### 6.9. 직업 각인 시스템 (1.25.0~1.27.0) — 메타 강화 신축
+
+이 세션(1.25.0~1.27.0)에서 한 큰 신축 시스템. **5직업 영원한 메타 진행도** + **장기 목표 게이트** + **빌드 다양화**의 세 축.
+
+#### 6.9.1. 데이터 구조
+
+| 구성 | 위치 | 설명 |
+|---|---|---|
+| `ENGRAVINGS[classId]` | `src/data.js` | 직업별 카드 풀. 1.27.0 시점 lanthert만 24장 작성. sage·demonblood·elf·priest는 빈 배열 |
+| `ENGRAVING_TIERS` | `src/data.js` | C/R/E/L + NEG_FLAW/NEG_CURSE 등급 + 가중치 |
+| `ENGRAVING_AWAKENING_TABLE[classId]` | `src/data.js` | 직업별 각성도 9단계 보상 + 1.26.0~ `condition` 활성화 조건 |
+| `CHAMPIONSHIP_EXP_IDS` | `src/data.js` | `['frost', 'forest', 'sanctum', 'rift', 'dawn']` — 챔피언십 올 클리어 검사용 |
+| `meta.engravings[classId]` | `src/storage.js` | `{ lv: 1~10, slots: [cardId|null, cardId|null, cardId|null] }` |
+| `meta.ultimatesPickedByClass[classId]` | `src/storage.js` | 1.26.0~ 직업별 ULTIMATE_SKILLS 픽 기록 |
+| `meta.championshipClearsByClass[classId][expId][difficulty]` | `src/storage.js` | 1.26.0~ 직업별 챔피언십 클리어 추적 (기존 `championshipClears`와 별개) |
+
+#### 6.9.2. 카드 effect 키 21종 (lanthert 24장 풀에 사용)
+
+| 카테고리 | 키 | 적용 위치 |
+|---|---|---|
+| 능력치 | `str` / `dex` / `int` / `cha` / `startHp` | `App.jsx` 직업 시작 시점 (PrepScreen에도 반영) |
+| 회피·치명·데미지 | `dodgeRate` / `critRate` / `physDmgPct` / `dmgTakenPct` / `afterDodgeDmg` | `damage.js` rollDodge·rollCrit·calculateDamage + `CombatScreen` 피격 처리 |
+| 반격 | `counterRatePct` / `counterDmgPct` / `counterHitSoul` / `counterShock` / `counterCanCrit` | `CombatScreen` 심안류 반격 시스템 (사전 굴림도 일치 적용) |
+| 영혼·턴 | `startSoul` / `perTurnSoul` / `dodgeSoul` / `soulGainMult` / `perTurnHpLoss` | `CombatScreen` useState init + endTurn + 회피 + 영혼 획득 3경로 |
+| 시스템 | `disableInsightPredict` | UI 의도 카드 차단 + Lv.5 detailIntent 회피 보너스 무효 |
+
+음수 effect (결함·저주) 모두 정상 작동.
+
+#### 6.9.3. 핵심 코드 패턴
+
+```js
+// utils/helpers.js — fx bag 집계
+export function aggregateEngravingEffects(classId, slots) {
+  // 슬롯 → 합산 effect 객체. 수치 합산, 불린 OR. 빈 슬롯 무시
+}
+
+// App.jsx — CombatScreen에 prop으로 전달
+<CombatScreen ... engravingFx={aggregateEngravingEffects(classData?.id, meta?.engravings?.[classData?.id]?.slots)} />
+
+// damage.js — 모든 함수의 마지막 인자로 engravingFx = {}
+export function rollDodge(skills, defender, activeSkills, relicStat, ultimates, engravingFx = {}) { ... }
+```
+
+**확장성**: 새 effect 키 추가 시 1~2곳 switch 분기만 추가. 새 직업 풀 추가 시 코드 0줄 — 데이터(ENGRAVINGS) + storage 슬롯만.
+
+#### 6.9.4. 각성도 활성화 조건 (1.26.0~)
+
+영혼만으로 만렙 도달 불가. **영혼 + 조건 둘 다 충족**해야 강화. 9단계 공통 패턴:
+
+| Lv | 조건 |
+|---|---|
+| 2 | 해당 직업 수련의 길 클리어 |
+| 3 | 해당 직업 런에서 ULTIMATE_SKILLS 1개 이상 픽 |
+| 4 | 해당 직업으로 챔피언십 normal 5컨셉 모두 클리어 |
+| 5 | 해당 직업 시작 패시브 1개의 3궁극 모두 픽 (택일) |
+| 6 | 해당 직업으로 챔피언십 hard 5컨셉 모두 클리어 |
+| 7 | 3개 이상 직업의 각성도 Lv.5 이상 |
+| 8 | 해당 직업으로 챔피언십 hell 5컨셉 모두 클리어 |
+| 9 | 모든 직업 각성도 Lv.6 이상 |
+| 10 | 모든 직업 각성도 Lv.8 이상 |
+
+조건 정의는 `COMMON_AWAKENING_CONDITIONS` 공통 표 → `_mergeConditions` 머지. madness는 조건에 미사용 (너무 어려움). **만렙 = 5직업 챔피언십 지옥 정복**.
+
+조건 체크: `utils/helpers.js`의 `isAwakeningConditionMet(meta, classId, lv)` / 진행도: `describeAwakeningConditionProgress`.
+
+#### 6.9.5. 다음 작업 (1.28.0~)
+
+- **4직업 풀 작성** (sage·demonblood·elf·priest 각 24장) — 코드 0줄, 데이터만. 1.28.0~1.31.0 분할 가능
+- **풀 작성 가이드**: lanthert 풀과 비례 — Common 5 / Rare 5 / Epic 5 / Legendary 2 / Flaw 4 / Curse 3 = 24장. effect 키는 21종 중 직업 컨셉에 맞는 것 사용
+- **PrepScreen 표시**: 능력치/HP 가산이 PrepScreen에도 보이도록 (1.27.0에서 처리됐는지 실기기 확인)
+- **각성도 진행 조회 UI** (선택): 다음 단계 카드 외에 전체 9단계 진행도를 한눈에
+
+#### 6.9.6. 신규 모달
+
+| 모달 | 트리거 | 컴포넌트 |
+|---|---|---|
+| `EngravingMigrationModal` | 1.25.0 첫 부팅 — `meta_startSkillLv` 영혼 환불 안내 | `EngravingScreen.jsx` export |
+| `AwakeningConditionNoticeModal` | 1.26.0 첫 부팅 — 조건 시스템 추가 + 소급 불가 안내 | `EngravingScreen.jsx` export |
+| `ChangelogModal` | 1.27.0 changelog 신규 항목 표시 | `App.jsx` 자동 |
+
+모달 트리거 데이터는 `loadMeta` 마이그레이션에서 자동 세팅. acknowledge 시 `clearXxxNotice(meta)` 호출 + saveMeta.
 
 ## 7. PM 커뮤니케이션 스타일
 
@@ -603,16 +686,17 @@ PM이 PNG를 푸시했다면 **JPG 변환 + 코드 헬퍼 연결 + 버전 갱신
 - **🔥 에셋 경로**: 4.5절 — 반드시 `./` 상대 경로. 절대 경로는 GH Pages 배포 후 404.
 - **📷 채팅 첨부 이미지**: 5.5절 — PM 채팅 첨부 PNG는 Claude 디스크에 저장 안 됨. PM이 직접 repo에 넣어야 함.
 
-## 11. 작업 로드맵 (1.21.0 기준)
+## 11. 작업 로드맵 (1.27.0 기준)
 
 ### ⭐ 진행 가능한 다음 작업 (우선순위 순)
 
-1. **챔피언십 forest 컨셉 일러 20장 (PM 생성)** — 프롬프트 완료, 다음은 PM이 Copilot Designer로 생성 + repo 저장 → Claude 변환·코드 PR (frost 사이클 그대로 반복)
-2. **챔피언십 sanctum 컨셉 프롬프트 20장 작성** — 신전·봉인 (신성·법진·시간). 4보스 차별화 forest·frost와 모두 다르게
-3. **챔피언십 rift 컨셉 프롬프트 20장 작성** — 마계·균열 (마족·핏빛·차원)
-4. **챔피언십 dawn 컨셉 프롬프트 20장 작성** — 천상·여명 (천사·빛·골든)
-5. **도감 일러 노출** — `CodexScreen.jsx`에 신규 일러 썸네일. 발견 못 한 적은 그레이스케일
-6. **타 직업(술법사·마족·엘프·사제) 전투 일러 개편** — 동일 파이프라인 (방랑검사 1.12.0 완료)
+1. **4직업 각인 풀 24장씩 작성** (sage / demonblood / elf / priest) — 코드 인프라는 1.27.0에서 완성. 데이터(`ENGRAVINGS[classId]`)만 추가하면 자동 적용. **1.28.0~1.31.0 시리즈로 분할 가능** (1직업 = 1 PR). 풀 구성: Common 5 + Rare 5 + Epic 5 + Legendary 2 + Flaw 4 + Curse 3 = 24장. effect 키는 21종 중 직업 컨셉에 맞는 것 사용 (예: sage = magicDmgPct·ifritFlamePct, elf = dodgeRate·critRate)
+2. **챔피언십 forest 컨셉 일러 20장 (PM 생성)** — 프롬프트 완료, 다음은 PM이 Copilot Designer로 생성 + repo 저장 → Claude 변환·코드 PR (frost 사이클 그대로 반복)
+3. **챔피언십 sanctum 컨셉 프롬프트 20장 작성** — 신전·봉인 (신성·법진·시간). 4보스 차별화 forest·frost와 모두 다르게
+4. **챔피언십 rift 컨셉 프롬프트 20장 작성** — 마계·균열 (마족·핏빛·차원)
+5. **챔피언십 dawn 컨셉 프롬프트 20장 작성** — 천상·여명 (천사·빛·골든)
+6. **도감 일러 노출** — `CodexScreen.jsx`에 신규 일러 썸네일. 발견 못 한 적은 그레이스케일
+7. **타 직업(술법사·마족·엘프·사제) 전투 일러 개편** — 동일 파이프라인 (방랑검사 1.12.0 완료)
 
 ### 시스템 미구현 (PM 결정 대기)
 - **Tier 3A** — 신규 클래스 6번째
@@ -622,13 +706,15 @@ PM이 PNG를 푸시했다면 **JPG 변환 + 코드 헬퍼 연결 + 버전 갱신
 ### 부분 진행 가능한 것
 - **이팩트 Phase 3** (보스 임팩트 프레임, 승리 골든 버스트, 사망 흑백 페이드)
 - **튜토리얼 5/6/7** (보상 선택의 갈림길 / 전투의 흐름 / 영혼의 행로)
-- **나머지 4직업 시그니처 궁극** (방랑검사만 1.12.0에 추가됨)
+- **나머지 4직업 시그니처 궁극** (방랑검사만 1.12.0에 추가됨. 각인 시스템은 ULTIMATE_SKILLS 기반이라 무관)
+- **각인 시스템 보조 UI**: PrepScreen에서 장착 각인 능력치 표시 / 각성도 전체 9단계 한눈에 보기
 
 ### 잠재적 개선
 - 일일 챌린지 리더보드 (Firebase 활용)
 - 무한모드 깊이 기록·랭킹
 - 도감 발견율 → 영혼 보너스
 - 챔피언십 변형 (mutator)
+- 각인 가챠 비용 차등 (legendary 가챠 비용 더 높게)
 
 ## 12. 첫 메시지 권장 응답
 
@@ -651,18 +737,41 @@ PM이 PNG를 푸시했다면 **JPG 변환 + 코드 헬퍼 연결 + 버전 갱신
 
 ---
 
-**마지막 업데이트**: 1.21.0 (챔피언십 frost 일러 20장 적용) 완료 시점 — PR #42 머지 후 갱신.
+**마지막 업데이트**: 1.27.0 (각인 효과 전투 적용) 완료 시점 — PR #55 머지 후 갱신.
 
-### 변경 핵심 (vs 이전 1.14.1)
-- ⚠️ **0절 신설** — PM 업무 스타일 절대 룰. 모든 응답·결정에 무조건 적용
-- **메인 스토리 일러 100%** 완료 (챕터 1·2·3·4 모두)
-- **챔피언십 5컨셉 중 1번째 (frost) 완료** — 4보스 차별화 컨셉 (인간 전사 / 거인 / 사룡 / 무형 망령) 적용
-- **`getEnemyImageSrc` 헬퍼 신설** (`src/utils/helpers.js`) — chapter 값 타입으로 클래식/챔피언십 자동 분기. forest 등 새 컨셉 추가 시 코드 수정 0줄
-- **7절 PM 응대 패턴 강화** — 추상 피드백 응대 4단계 / 큰 청크 PR 분할 / 이미지+코드 한 PR / 사전 문제 처리 흐름
-- **브랜치 명**: 시스템 메시지에 박힌 값 사용 (세션마다 다를 수 있음. 최근 `claude/review-claude-md-7f1ib`)
+### 변경 핵심 (vs 이전 1.21.0)
+
+이 세션에서 진행한 큰 추가는 **직업 각인 시스템 풀스택 구축** (1.25.0~1.27.0). 챔피언십 일러는 frost 이후 추가 진행 없음 (PM 일러 생성 대기).
+
+| 버전 | PR | 작업 |
+|---|---|---|
+| 1.25.0 | #53 | 각인 시스템 도입 — 5직업 각성도 10단계 + 슬롯 3칸 + 가챠. `EngravingScreen.jsx` 신축. `meta_startSkillLv` 영혼 환불 마이그레이션 |
+| 1.26.0 | #54 | 각성도 활성화 조건 — 9단계 모두에 `condition` 추가. 직업별 추적 데이터(`ultimatesPickedByClass`·`championshipClearsByClass`) 신설. 영혼만으로 강화 불가. `AwakeningConditionNoticeModal` 1회 안내 |
+| 1.27.0 | #55 | 각인 effect 21종 모두 실제 전투 적용. `aggregateEngravingEffects` 신설. damage.js 4함수 시그니처 확장 (engravingFx 인자). CombatScreen 13곳 통합. initialPlayer spread 순서 버그 사이드 수정 |
+
+### 새 코드 패턴 (이번 세션 학습)
+
+| 패턴 | 적용 |
+|---|---|
+| **fx bag 집계** | 장착물 → 단일 합산 effect 객체 → 전투에 prop 전달. 수치 합산 + 불린 OR. 새 키 추가 시 1~2곳만 수정. 미장착 시 빈 객체라 회귀 안전 |
+| **함수 시그니처 확장** | 기존 호출 호환 위해 새 인자는 **항상 마지막 + 기본값 `= {}`**. damage.js의 calculateDamage/rollDodge/rollCrit가 좋은 예 |
+| **조건 게이트 + 비용 분리** | 영혼(비용) + 조건(해금 게이트) 명확 분리. 강화 버튼 라벨 자동 전환 — "조건 미달 / 영혼 부족 / 강화 가능". PM 설계 결정으로 명문화 |
+| **마이그레이션 모달 1회 표시 트리거** | `loadMeta` 마이그레이션에서 자동 세팅 (`engravingMigrationNotice` / `awakeningConditionNotice`). 첫 부팅 시 표시 → ack 후 `clearXxxNotice` + saveMeta. 즉시 저장으로 재트리거 방지 |
+| **큰 시스템 PR 3분할** | 데이터+UI (PR #53) → 조건 게이트 (PR #54) → 효과 적용 (PR #55) 순. 각 PR 회귀 영역이 독립적. PM 검토·머지 사이클을 자연스럽게 분리 |
+| **메인 작업 중 사이드 버그 발견 시** | 작업 흐름에 자연스럽게 묶기 (별도 PR로 분리하지 않음). 1.27.0의 initialPlayer spread 순서 수정이 사례. 커밋 메시지·PR 본문에 "사이드 버그 수정" 명시 |
+
+### 브랜치
+- 시스템 메시지에 박힌 값 사용 (세션마다 다를 수 있음. 이 세션 동안 `claude/review-claude-md-DpUq4`)
+- 머지 후 새 PR은 **반드시 `git fetch origin main` + `git checkout -B <브랜치> origin/main`**으로 최신 main에서 분기
 
 ### 다음 세션이 시작될 때 (PM 메시지: "새세션에서 다음작업 진행")
-- 다음 작업 1순위는 **챔피언십 forest 일러 PM 생성 대기** (프롬프트는 작성 완료). PM이 PNG를 `public/enemies/championship/forest/`에 푸시하면 Claude가 JPG 변환 + 게임 통합
-- PM이 forest 일러를 생성하지 않은 상태라면 **챔피언십 sanctum 프롬프트 20장 작성**으로 이동 (11.2절)
-- 모든 컨셉 프롬프트 작성은 frost·forest 룰(4보스 차별화, 4단계 환경 분리, 컨셉 간 다른 형태) 동일 적용
-- PM이 직접 다른 작업을 지시하면 그것을 우선 — 위 1순위는 기본값일 뿐
+
+| 우선순위 | 작업 | 메모 |
+|---|---|---|
+| 1 | **4직업 각인 풀 작성** (sage 또는 데모블러드 먼저) | 코드 인프라 완성. 데이터만 추가. 1직업 = 1 PR (1.28.0~1.31.0). 6.9.5절 가이드 참조 |
+| 2 | 챔피언십 forest 일러 (PM 생성 대기) | 프롬프트 완료. PM이 PNG 푸시하면 Claude가 JPG 변환 + 게임 통합 |
+| 3 | 챔피언십 sanctum 프롬프트 20장 작성 | forest와 다른 4보스 차별화 컨셉 (frost/forest 룰 적용) |
+| 4 | rift / dawn 프롬프트 | sanctum 작성 완료 후 |
+| 5 | PrepScreen에 각인 능력치 표시 | 1.27.0이 각인 효과 적용했지만 PrepScreen UI 갱신은 미확인 — 실기기 검증 후 진행 |
+
+PM이 직접 다른 작업을 지시하면 그것을 우선 — 위 1순위는 기본값일 뿐. **첫 응답은 0절 응답 템플릿 + 표 기반**, 산문체 X.

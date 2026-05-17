@@ -15,7 +15,7 @@ import {
   getMetaBonus,
 } from '../utils/helpers.js';
 
-export function calculateDamage(skill, attacker, defender, skills, isCrit, ultimates = [], meta = null, curses = [], activeSkills = null, relicStat = {}) {
+export function calculateDamage(skill, attacker, defender, skills, isCrit, ultimates = [], meta = null, curses = [], activeSkills = null, relicStat = {}, engravingFx = {}) {
   if (skill.type === 'defense' || skill.type === 'buff') return { finalDmg: 0, defenseMitigated: 0, breakdown: [], isCrit: false };
   let base = Math.floor(skill.baseDmg[0] + Math.random() * (skill.baseDmg[1] - skill.baseDmg[0]));
   let dmg = base;
@@ -89,6 +89,22 @@ export function calculateDamage(skill, attacker, defender, skills, isCrit, ultim
     const stunBonus = Math.floor(dmg * 0.5);
     dmg += stunBonus;
     breakdown.push(`강타 Lv.7 +${stunBonus}`);
+  }
+  // 1.27.0~ 각인: 물리 데미지 +N%
+  if (skill.type === 'physical' && engravingFx.physDmgPct) {
+    const engBonus = Math.floor(dmg * engravingFx.physDmgPct / 100);
+    if (engBonus !== 0) {
+      dmg += engBonus;
+      breakdown.push(`각인 ${engBonus >= 0 ? '+' : ''}${engBonus}`);
+    }
+  }
+  // 1.27.0~ 각인: 회피 직후 다음 공격 데미지 +N% (afterDodgeDmg, attacker.buffs.afterDodgeDmgNext에 저장)
+  if (engravingFx.afterDodgeDmg && attacker.buffs?.afterDodgeDmgNext) {
+    const dodgeBonus = Math.floor(dmg * engravingFx.afterDodgeDmg / 100);
+    if (dodgeBonus > 0) {
+      dmg += dodgeBonus;
+      breakdown.push(`★잔영 +${dodgeBonus}`);
+    }
   }
 if (isCrit) {
   // 1. 기본 치명타 배율 설정 (1.5배)
@@ -164,7 +180,7 @@ if (isCrit) {
 
 // 스킬 버튼에 표시할 최종 데미지 범위 계산 (치명타 제외, 적 방어 무시)
 // calculateDamage와 동일한 보정을 적용하지만 랜덤 없이 baseDmg 양 끝값으로
-export function getDisplayDamage(skill, attacker, skills, ultimates, meta, curses, activeSkills, relicStat) {
+export function getDisplayDamage(skill, attacker, skills, ultimates, meta, curses, activeSkills, relicStat, engravingFx = {}) {
   if (!skill.baseDmg) return null;
   const calcOne = (base) => {
     let dmg = base;
@@ -193,6 +209,10 @@ export function getDisplayDamage(skill, attacker, skills, ultimates, meta, curse
     const relicDmgPct = (relicStat.dmgDealt || 0) / 100;
     if (relicDmgPct > 0) dmg += Math.floor(dmg * relicDmgPct);
     if (hasCurse(curses, 'curse_dmgDealt-15')) dmg -= Math.floor(dmg * 0.15);
+    // 1.27.0~ 각인: 물리 데미지 +N%
+    if (skill.type === 'physical' && engravingFx.physDmgPct) {
+      dmg += Math.floor(dmg * engravingFx.physDmgPct / 100);
+    }
     return Math.max(0, dmg);
   };
   // hitCount 처리 (연속화살 등)
@@ -200,7 +220,7 @@ export function getDisplayDamage(skill, attacker, skills, ultimates, meta, curse
   return [calcOne(skill.baseDmg[0]) * hits, calcOne(skill.baseDmg[1]) * hits];
 }
 
-export function rollCrit(skills, attacker, meta = null, activeSkills = null, relicStat = {}, ultimates = null) {
+export function rollCrit(skills, attacker, meta = null, activeSkills = null, relicStat = {}, ultimates = null, engravingFx = {}) {
   // 1. 기본 확률 + 민첩 보너스
   let critRate = 5 + Math.max(0, (attacker.민첩 - 10) * 0.5);
 
@@ -225,11 +245,16 @@ export function rollCrit(skills, attacker, meta = null, activeSkills = null, rel
     critRate += 15;
   }
 
-  // 6. 최종 확률 판정
+  // 6. 1.27.0~ 각인: 치명타 확률 +N% (음수 = 결함 페널티)
+  if (engravingFx.critRate) {
+    critRate += engravingFx.critRate;
+  }
+
+  // 7. 최종 확률 판정
   return Math.random() * 100 < critRate;
 }
 
-export function rollDodge(skills, defender, activeSkills = null, relicStat = {}, ultimates = null) {
+export function rollDodge(skills, defender, activeSkills = null, relicStat = {}, ultimates = null, engravingFx = {}) {
   // 1. 민첩 보너스 (기본)
   let dodgeRate = Math.max(0, (defender.민첩 - 10) * 0.3);
 
@@ -244,8 +269,8 @@ export function rollDodge(skills, defender, activeSkills = null, relicStat = {},
     dodgeRate += 15;
   }
 
-  // 5. ★ [심안] 5단계 (detailIntent) 효과 적용
-  if (hasEffect(skills, 'detailIntent', activeSkills)) {
+  // 5. ★ [심안] 5단계 (detailIntent) 효과 적용 (각인 disableInsightPredict 결함 시 무효화)
+  if (hasEffect(skills, 'detailIntent', activeSkills) && !engravingFx.disableInsightPredict) {
     dodgeRate += 10;
   }
 
@@ -263,6 +288,11 @@ export function rollDodge(skills, defender, activeSkills = null, relicStat = {},
     dodgeRate += 10;
   }
 
-  // 8. 최종 확률 판정
+  // 8. 1.27.0~ 각인: 회피율 +N% (음수 = 결함 페널티)
+  if (engravingFx.dodgeRate) {
+    dodgeRate += engravingFx.dodgeRate;
+  }
+
+  // 9. 최종 확률 판정
   return Math.random() * 100 < dodgeRate;
 }
