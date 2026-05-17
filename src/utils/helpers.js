@@ -283,18 +283,17 @@ export function getIntellectEtherBonus(stats) {
 // 이전) 해결을 위한 함수.
 export function computeDisplayPlayerStats(classData, skills, baseStats, ultimates, activeSkills = null) {
   const out = { ...(classData?.stats || {}), ...(baseStats || {}) };
-  // 이프리트 마일스톤 (Lv.3 +2 / Lv.5 +3 / Lv.7 +4 — 누적)
+  // 이프리트 마일스톤 (Lv.3 +2 / Lv.5 +3 — 누적. 1.33.0~ Lv.7 +4 마일스톤 제거)
   const ifritLv = (skills && skills['이프리트']) || 0;
   if (ifritLv > 0 && (!activeSkills || activeSkills.includes('이프리트'))) {
     if (ifritLv >= 3) out.지능 = (out.지능 || 0) + 2;
     if (ifritLv >= 5) out.지능 = (out.지능 || 0) + 3;
-    if (ifritLv >= 7) out.지능 = (out.지능 || 0) + 4;
   }
-  // 이프리트 궁극 +4 지능
+  // 이프리트 궁극 +10 지능 (1.33.0~ 상향, 이전 +4)
   if (hasUltimate(ultimates, 'ult_eternalFire') ||
       hasUltimate(ultimates, 'ult_ifritDescent') ||
       hasUltimate(ultimates, 'ult_purgatoryFire')) {
-    out.지능 = (out.지능 || 0) + 4;
+    out.지능 = (out.지능 || 0) + 10;
   }
   // 신앙 minor: 모든 능력치 +allStats+/Lv (실제 전투에서 intro phase 적용)
   const allStatsBonus = getMinorBonus(skills || {}, 'allStats+', activeSkills);

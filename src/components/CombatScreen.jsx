@@ -394,21 +394,18 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           }
           
           // === 이프리트 화염 각인 폭발 (minor 효과 + 궁극) ===
-          // 폭발 조건:
-          // - 이프리트 패시브 보유 (Lv.0+ 활성): 항상 가능
-          // - 화신강림/연옥지화 단독: 가능
-          // - 영겁지화 단독: 폭발 비활성
-          // - 영겁지화 + 패시브: 폭발 가능
+          // 1.33.0~ 폭발 조건:
+          // - 영겁지화 보유: 폭발 비활성 (단독·+패시브·+다른궁극 모두). 화염 각인·겁화 모두 비활성
+          // - 화신강림/연옥지화 (영겁지화 없음): 폭발 가능
+          // - 이프리트 패시브만 (궁극 없음): 폭발 가능
           const ifritLvForExplode = (skills && skills['이프리트']) || 0;
           const hasIfritPassiveExplode = ifritLvForExplode > 0 && (!activeSkills || activeSkills.includes('이프리트'));
           const hasEternalFireExplode = hasUltimate(ultimates, 'ult_eternalFire');
           const hasIfritDescentExplode = hasUltimate(ultimates, 'ult_ifritDescent');
           const hasPurgatoryFireExplode = hasUltimate(ultimates, 'ult_purgatoryFire');
-          
-          // 영겁지화 단독 → 폭발 비활성
-          const eternalSoloDisable = hasEternalFireExplode && !hasIfritPassiveExplode;
-          // 폭발 가능 조건
-          const canExplode = !eternalSoloDisable && (hasIfritPassiveExplode || hasIfritDescentExplode || hasPurgatoryFireExplode || hasEternalFireExplode);
+
+          // 영겁지화 보유 시 폭발 전면 비활성
+          const canExplode = !hasEternalFireExplode && (hasIfritPassiveExplode || hasIfritDescentExplode || hasPurgatoryFireExplode);
           
           if (isCrit && canExplode && newEnemy.debuffs?.igniteDmg > 0 && newEnemy.debuffs?.igniteTurns > 0) {
             const remainTurns = newEnemy.debuffs.igniteEternal ? 5 : newEnemy.debuffs.igniteTurns;
@@ -426,10 +423,10 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
               igniteJustApplied: false,
             };
             
-            // 화신강림: 폭발 후 다음 1턴 치명타 +20%
+            // 화신강림: 폭발 후 다음 1턴 치명타 +30% (1.33.0~ 상향)
             if (hasIfritDescentExplode) {
               newPlayer.buffs = { ...newPlayer.buffs, ifritCritNext: true };
-              newLog.push({ type: 'passive', text: `★ [화신강림] 다음 턴 치명타 확률 +20%` });
+              newLog.push({ type: 'passive', text: `★ [화신강림] 다음 턴 치명타 확률 +30%` });
             }
           }
 
@@ -536,48 +533,65 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       const hasAnyIfritUlt = hasEternalFire || hasIfritDescent || hasPurgatoryFire;
       
       if (skill.type === 'magic' && (hasIfritPassive || hasAnyIfritUlt) && newEnemy.currentHp > 0) {
-        // 발동 확률 계산
+        // 1.33.0~ 발동율 통일: 궁극 보유 시 공통 70% / 패시브만 30%. minor +2%/Lv는 별도 합산
         let igniteChance = 0;
-        if (hasEternalFire) igniteChance = hasIfritPassive ? 0.7 : 0.4;
-        else if (hasIfritDescent) igniteChance = hasIfritPassive ? 0.8 : 0.5;
-        else if (hasPurgatoryFire) igniteChance = hasIfritPassive ? 0.7 : 0.4;
-        else if (hasIfritPassive) igniteChance = 0.3;  // 패시브만 보유
-        // 1.32.0~ 이프리트 minor: 레벨당 +2% 발동율 (패시브만 보유 + 궁극 둘 다)
+        if (hasAnyIfritUlt) igniteChance = 0.7;
+        else if (hasIfritPassive) igniteChance = 0.3;
+        // 이프리트 minor: 레벨당 +2% 발동율 (패시브 + 궁극 모두 합산)
         const igniteRateBonus = getMinorBonus(skills, 'ifritIgniteRate+', activeSkills) / 100;
-        igniteChance = Math.min(1, igniteChance + igniteRateBonus);
+        igniteChance += igniteRateBonus;
+        // 영겁지화 미발동 누적 보너스: 미발동 1회당 +10% (각인 발동까지 누적)
+        const eternalMissStack = newPlayer.buffs?.eternalFireMissStack || 0;
+        if (hasEternalFire) igniteChance += eternalMissStack * 0.1;
+        igniteChance = Math.min(1, igniteChance);
 
         if (Math.random() < igniteChance) {
-          // 각인 데미지 = 지능 × 0.3 (모든 경우 동일, 영겁지화 단독에서만 누적)
-          const baseIgniteDmg = Math.floor(newPlayer.지능 * 0.3);
-          // Lv.7 효과: 지속 +1턴 (3 → 4) — 패시브 Lv.7 활성 시만
-          let igniteTurns = (hasIfritPassive && ifritLvForIgnite >= 7) ? 4 : 3;
-          
+          // 각인 데미지: 영겁 ×0.5 / 화신 ×0.4 / 연옥 ×0.3 / 패시브만 ×0.3
+          let dmgMult = 0.3;
+          if (hasEternalFire) dmgMult = 0.5;
+          else if (hasIfritDescent) dmgMult = 0.4;
+          else if (hasPurgatoryFire) dmgMult = 0.3;
+          const baseIgniteDmg = Math.floor(newPlayer.지능 * dmgMult);
+
+          // 각인 지속: 영겁 영구 / 화신 3T / 연옥 4T / 패시브만 3T (1.33.0~ Lv.7 +1T 효과 제거)
           let newIgniteDmg;
           let newIgniteTurns;
           let isEternal;
-          
+
           if (hasEternalFire) {
-            // 영겁지화 — 항상 누적, 영구 지속 (패시브 유무 무관)
-            // 차이: 단독은 폭발 X, 패시브 함께면 폭발 O (canExplode에서 처리)
+            // 영겁지화 — 스택 누적, 영구 지속
             const prevDmg = newEnemy.debuffs?.igniteDmg || 0;
             newIgniteDmg = prevDmg + baseIgniteDmg;
-            newIgniteTurns = 999;  // 영구
+            newIgniteTurns = 999;
             isEternal = true;
-          } else {
-            // 일반 (패시브, 화신강림, 연옥지화) — 데미지 갱신, 턴수 갱신
+          } else if (hasPurgatoryFire) {
             newIgniteDmg = baseIgniteDmg;
-            newIgniteTurns = igniteTurns;
+            newIgniteTurns = 4;
+            isEternal = false;
+          } else {
+            // 화신강림 또는 패시브만
+            newIgniteDmg = baseIgniteDmg;
+            newIgniteTurns = 3;
             isEternal = false;
           }
-          
-          newEnemy.debuffs = { 
-            ...newEnemy.debuffs, 
-            igniteDmg: newIgniteDmg, 
+
+          newEnemy.debuffs = {
+            ...newEnemy.debuffs,
+            igniteDmg: newIgniteDmg,
             igniteTurns: newIgniteTurns,
             igniteEternal: isEternal,
             igniteJustApplied: true,  // 이번 턴 부여 여부 (연옥지화 +20% 마법딜에 사용)
           };
+          // 영겁지화 발동 시 미발동 스택 초기화
+          if (hasEternalFire) {
+            newPlayer.buffs = { ...newPlayer.buffs, eternalFireMissStack: 0 };
+          }
           newLog.push({ type: 'debuff', text: `🔥 [화염 각인] ${newIgniteDmg} 데미지 ${isEternal ? '영구' : newIgniteTurns + 'T'}` });
+        } else if (hasEternalFire) {
+          // 영겁지화 미발동 — 다음 발동율 +10% 누적
+          const nextStack = eternalMissStack + 1;
+          newPlayer.buffs = { ...newPlayer.buffs, eternalFireMissStack: nextStack };
+          newLog.push({ type: 'passive', text: `☆ [영겁지화] 미발동 — 다음 발동율 +${nextStack * 10}%` });
         }
       }
       // 자가 회복 (사제 - 신성광선)
@@ -2046,12 +2060,18 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           )}
           {phase === 'victory' && (
             <button onClick={() => {
-              // 연옥지화: 화염 각인 또는 겁화 보유 적 처치 시 HP +50 (1.29.0~ 겁화 OR 확장)
+              // 연옥지화: 화염 각인 또는 겁화 보유 적 처치 시 즉시 HP +50
+              // 1.33.0~ 회복 유물(heal%)·매력 시그니처·저주 적용 (다른 회복 경로와 동일 처리)
               let finalHp = player.hp;
               const hasIgnite = enemy.debuffs?.igniteDmg > 0 && enemy.debuffs?.igniteTurns > 0;
               const hasEternalFire = enemy.debuffs?.eternalFireDmg > 0 && enemy.debuffs?.eternalFireTurns > 0;
               if (hasUltimate(ultimates, 'ult_purgatoryFire') && (hasIgnite || hasEternalFire)) {
-                finalHp = Math.min(player.maxHp, player.hp + 50);
+                let heal = 50;
+                if (relicStat.heal > 0) heal = Math.floor(heal * (1 + relicStat.heal / 100));
+                const charismaBonus = getCharismaHealBonus(player);
+                if (charismaBonus > 0) heal = Math.floor(heal * (1 + charismaBonus / 100));
+                if (hasCurse(curses, 'curse_heal-50')) heal = Math.floor(heal * 0.5);
+                finalHp = Math.min(player.maxHp, player.hp + heal);
               }
               onVictory(finalHp, enemy.drop);
             }}

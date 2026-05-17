@@ -252,9 +252,9 @@ export function rollCrit(skills, attacker, meta = null, activeSkills = null, rel
   if (hasEffect(skills, 'weaknessPoint', activeSkills)) {
     critRate += 10;
   }
-  // 화신강림: 폭발 후 다음 1턴 치명타 +20%
+  // 화신강림: 폭발 후 다음 1턴 치명타 +30% (1.33.0~ 상향, 이전 +20%)
   if (attacker.buffs?.ifritCritNext) {
-    critRate += 20;
+    critRate += 30;
   }
 
   // 5. 무영검 궁극: 치명타 +15% 정적 보너스 (명세 일치)

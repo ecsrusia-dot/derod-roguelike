@@ -47,6 +47,11 @@ export function rollRewards(count = 3, eliteBonus = false, skills = {}, relics =
         const hasAnySimanUlt = (skillUltimates || []).some(u => ultimates.includes(u.id));
         if (hasAnySimanUlt) return false;
       }
+      // 1.33.0~ 이프리트: 궁극 1개라도 획득 시 보상 풀에서 영구 제외 (술법사 전용, 심안류 패턴)
+      if (r.name === '이프리트') {
+        const hasAnyIfritUlt = (skillUltimates || []).some(u => ultimates.includes(u.id));
+        if (hasAnyIfritUlt) return false;
+      }
       
       if (currentLv >= 7) {
         // Lv.7 도달 — 궁극 진화 가능한지 확인
