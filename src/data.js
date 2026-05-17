@@ -22,9 +22,9 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.30.0';
+export const GAME_VERSION = '1.31.0';
 export const VERSION_DATE = '2026-05-17';
-export const VERSION_LABEL = '이프리트 3궁극 desc에 겁화 동작 반영 — 영겁지화·화신강림·연옥지화';
+export const VERSION_LABEL = '캐릭터 정보창 능력치 라이브 표시 — 패시브 마일스톤·궁극·각인 반영 + 파생 능력치 5종 추가';
 
 // =========== 패시브 스킬 ===========
 // effect 필드는 문자열 키. 실제 동작은 메인 코드의 trigger handler에서 처리.

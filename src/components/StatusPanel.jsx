@@ -11,7 +11,7 @@ import { PALETTE, getCharismaHealBonus, getCharismaDmgReduction } from '../utils
 import { PASSIVE_SKILLS, COMBAT_SKILLS, ULTIMATE_SKILLS } from '../data.js';
 import CardInfoModal, { buildPassiveInfo, buildRelicInfo, buildActiveSkillInfo } from './CardInfoModal.jsx';
 
-export default function StatusPanel({ classData, hp, maxHp, skills, stats, relics, ultimates = [], activeSkills = null, activeRelicNames = null, onClose }) {
+export default function StatusPanel({ classData, hp, maxHp, skills, stats, derivedStats = null, relics, ultimates = [], activeSkills = null, activeRelicNames = null, onClose }) {
   const skillsByAxis = { attack: [], defense: [], utility: [] };
   Object.entries(skills).forEach(([name, lv]) => {
     if (lv > 0 && PASSIVE_SKILLS[name]) {
@@ -77,6 +77,29 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, relic
                 {reducePct > 0 && (
                   <span style={{ color: PALETTE.dawn }}>받는뎀 <span className="font-bold tabular-nums">-{reducePct}%</span></span>
                 )}
+              </div>
+            );
+          })()}
+          {/* 파생 능력치 (1.31.0~) — 방어 무시/치명타율/회피율/마법딜/물리딜. 0인 항목은 숨김. */}
+          {derivedStats && (() => {
+            const items = [];
+            if (derivedStats.armorIgnore > 0) items.push({ label: '방어 무시', value: `+${derivedStats.armorIgnore}`, color: PALETTE.accent });
+            if (derivedStats.critRate > 0) items.push({ label: '치명타율', value: `+${derivedStats.critRate}%`, color: PALETTE.legendary });
+            if (derivedStats.dodgeRate > 0) items.push({ label: '회피율', value: `+${derivedStats.dodgeRate}%`, color: PALETTE.green });
+            if (derivedStats.magicDmgPct > 0) items.push({ label: '마법 딜', value: `+${derivedStats.magicDmgPct}%`, color: '#5c4a8c' });
+            if (derivedStats.physDmg > 0) items.push({ label: '물리 딜', value: `+${derivedStats.physDmg}`, color: '#c4453d' });
+            if (items.length === 0) return null;
+            return (
+              <div className="mt-2 pt-2 border-t" style={{ borderColor: `${classData.color}20` }}>
+                <div className="text-[9px] mb-1 text-center" style={{ color: PALETTE.textDim, letterSpacing: '0.15em' }}>◇ 파생 능력치</div>
+                <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[10px]">
+                  {items.map((it, i) => (
+                    <span key={i}>
+                      <span style={{ color: PALETTE.textDim }}>{it.label} </span>
+                      <span className="font-bold tabular-nums" style={{ color: it.color }}>{it.value}</span>
+                    </span>
+                  ))}
+                </div>
               </div>
             );
           })()}

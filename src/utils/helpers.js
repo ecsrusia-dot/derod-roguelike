@@ -256,6 +256,81 @@ export function getCharismaDmgReduction(stats) {
   return (Math.floor((stats.매력 - 17) / 5) + 1) * 5;
 }
 
+// ===== 표시용 능력치 합산 (1.31.0~) =====
+// StatusPanel 등 정보창 전용. CombatScreen.jsx의 player 초기화·intro 로직과
+// 동일한 결과를 내도록 일치시킴 (단 ULTIMATE_SKILLS와 PASSIVE_SKILLS의
+// 분기는 CombatScreen이 우선. 여기서 누락된 효과가 있어도 실제 게임 동작은
+// CombatScreen 인라인 로직이 책임).
+//
+// 누락 시 캐릭터 정보창의 능력치가 base 값으로 고정되어 표시되는 버그(1.30.0
+// 이전) 해결을 위한 함수.
+export function computeDisplayPlayerStats(classData, skills, baseStats, ultimates, activeSkills = null) {
+  const out = { ...(classData?.stats || {}), ...(baseStats || {}) };
+  // 이프리트 마일스톤 (Lv.3 +2 / Lv.5 +3 / Lv.7 +4 — 누적)
+  const ifritLv = (skills && skills['이프리트']) || 0;
+  if (ifritLv > 0 && (!activeSkills || activeSkills.includes('이프리트'))) {
+    if (ifritLv >= 3) out.지능 = (out.지능 || 0) + 2;
+    if (ifritLv >= 5) out.지능 = (out.지능 || 0) + 3;
+    if (ifritLv >= 7) out.지능 = (out.지능 || 0) + 4;
+  }
+  // 이프리트 궁극 +4 지능
+  if (hasUltimate(ultimates, 'ult_eternalFire') ||
+      hasUltimate(ultimates, 'ult_ifritDescent') ||
+      hasUltimate(ultimates, 'ult_purgatoryFire')) {
+    out.지능 = (out.지능 || 0) + 4;
+  }
+  // 신앙 minor: 모든 능력치 +allStats+/Lv (실제 전투에서 intro phase 적용)
+  const allStatsBonus = getMinorBonus(skills || {}, 'allStats+', activeSkills);
+  if (allStatsBonus > 0) {
+    out.근력 = (out.근력 || 0) + allStatsBonus;
+    out.민첩 = (out.민첩 || 0) + allStatsBonus;
+    out.지능 = (out.지능 || 0) + allStatsBonus;
+    out.매력 = (out.매력 || 0) + allStatsBonus;
+  }
+  // 운명의 저울 (ult_destinyScale): 모든 능력치 +10
+  if (hasUltimate(ultimates, 'ult_destinyScale')) {
+    out.근력 = (out.근력 || 0) + 10;
+    out.민첩 = (out.민첩 || 0) + 10;
+    out.지능 = (out.지능 || 0) + 10;
+    out.매력 = (out.매력 || 0) + 10;
+  }
+  return out;
+}
+
+// 표시용 파생 능력치 (방어 무시·치명타율·회피율·마법딜+·물리딜+)
+// 0인 항목은 컴포넌트 단에서 행 자체를 숨김 (StatusPanel.jsx 참조).
+// 정확도: 패시브·유물·각인·궁극의 정적(고정) 효과만 합산. 동적 조건부 효과
+// (예: 연옥지화 "겁화 보유 적 공격 시 +20%", 정밀 "단발사격 시 치명타 +N" 등)는
+// 제외 — 표시에 혼란 유발하므로 정적 보너스만 안내.
+export function computeDerivedStats(skills, ultimates, activeSkills = null, relicStat = {}, engravingFx = {}) {
+  const s = skills || {};
+  // 방어 무시 (절대값)
+  let armorIgnore = 0;
+  const ifritLv = s['이프리트'] || 0;
+  const ifritActive = !activeSkills || activeSkills.includes('이프리트');
+  if (ifritActive && ifritLv >= 3) armorIgnore += 5;
+  if (ifritActive && ifritLv >= 5) armorIgnore += 10;
+  if (hasUltimate(ultimates, 'ult_ifritDescent')) armorIgnore += 25;
+  // 회피율 (%)
+  let dodgeRate = getMinorBonus(s, 'dodge+', activeSkills);
+  if (hasEffect(s, 'dodge+15', activeSkills)) dodgeRate += 15;
+  if (hasEffect(s, 'detailIntent', activeSkills)) dodgeRate += 10;
+  dodgeRate += relicStat.dodge || 0;
+  dodgeRate += engravingFx.dodgeRate || 0;
+  // 치명타율 (%)
+  let critRate = 0;
+  if (hasEffect(s, 'weaknessPoint', activeSkills)) critRate += 10;
+  critRate += relicStat.critRate || 0;
+  critRate += engravingFx.critRate || 0;
+  // 마법 데미지+ (%)
+  let magicDmgPct = getMinorBonus(s, 'magicDmg+', activeSkills);
+  if (hasEffect(s, 'magicDmg+30', activeSkills)) magicDmgPct += 30;
+  magicDmgPct += relicStat.magicDmg || 0;
+  // 물리 데미지+ (절대값 — minor type 'physDmg+'은 데미지 합산에 절대값으로 더해짐)
+  const physDmg = getMinorBonus(s, 'physDmg+', activeSkills);
+  return { armorIgnore, dodgeRate, critRate, magicDmgPct, physDmg };
+}
+
 // ===== 적 일러스트 경로 헬퍼 =====
 // chapter 값으로 클래식/챔피언십 자동 판별:
 //   - number (1, 2, 3, 4) → 클래식: ./enemies/classic/chapter_<n>/
