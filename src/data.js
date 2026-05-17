@@ -22,9 +22,9 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.28.0';
+export const GAME_VERSION = '1.29.0';
 export const VERSION_DATE = '2026-05-17';
-export const VERSION_LABEL = '술법사 화염술사 1차 — 시그니처 궁극 [영겁의 화염] 신설 + 시작 액티브 화염장막 교체';
+export const VERSION_LABEL = '겁화(劫火) 분리 — 시그니처 [영겁의 화염]이 화염 각인과 별도 디버프 부여, 둘 다 보유 시 더블 폭발';
 
 // =========== 패시브 스킬 ===========
 // effect 필드는 문자열 키. 실제 동작은 메인 코드의 trigger handler에서 처리.

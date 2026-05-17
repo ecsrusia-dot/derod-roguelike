@@ -64,12 +64,17 @@ export function calculateDamage(skill, attacker, defender, skills, isCrit, ultim
     dmg += bookBonus;
     if (bookBonus > 0) breakdown.push(`마법 데미지 +${bookBonus}`);
   }
-  // 연옥지화: 화염 각인 보유 적 공격 시 마법 데미지 +20% (각인 부여 턴 미적용)
+  // 연옥지화: 화염 각인 또는 겁화 보유 적 공격 시 마법 데미지 +20% (각인 부여 턴 미적용)
   // calculateDamage는 데미지 계산 후 부여이므로, defender.debuffs.igniteDmg > 0 = 이전 턴 부여된 각인
-  if (skill.type === 'magic' && hasUltimate(ultimates, 'ult_purgatoryFire') && defender.debuffs?.igniteDmg > 0 && defender.debuffs?.igniteTurns > 0) {
-    const purgatoryBonus = Math.floor(dmg * 0.2);
-    dmg += purgatoryBonus;
-    breakdown.push(`연옥지화 +${purgatoryBonus}`);
+  // 1.29.0~ 겁화도 OR 조건으로 확장 — 시그니처 발동 직후 마법 공격도 보너스 받음 (단 겁화도 부여 턴 미적용)
+  if (skill.type === 'magic' && hasUltimate(ultimates, 'ult_purgatoryFire')) {
+    const hasIgnite = defender.debuffs?.igniteDmg > 0 && defender.debuffs?.igniteTurns > 0 && !defender.debuffs?.igniteJustApplied;
+    const hasEternalFire = defender.debuffs?.eternalFireDmg > 0 && defender.debuffs?.eternalFireTurns > 0 && !defender.debuffs?.eternalFireJustApplied;
+    if (hasIgnite || hasEternalFire) {
+      const purgatoryBonus = Math.floor(dmg * 0.2);
+      dmg += purgatoryBonus;
+      breakdown.push(`연옥지화 +${purgatoryBonus}`);
+    }
   }
   // 궁극 [정념 폭주] 마력_aetherStorm: 마법 데미지 ×2.0
   if (skill.type === 'magic' && hasUltimate(ultimates, 'ult_aetherStorm')) {
