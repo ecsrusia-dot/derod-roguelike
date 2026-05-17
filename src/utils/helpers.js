@@ -5,11 +5,13 @@
 // 모든 함수는 인자만으로 동작 — 사이드 이펙트 없음
 // ============================================
 
-import { 
-  PASSIVE_SKILLS, 
-  META_UPGRADES, 
+import {
+  PASSIVE_SKILLS,
+  META_UPGRADES,
   CURSES,
-  ULTIMATE_SKILLS 
+  ULTIMATE_SKILLS,
+  ENGRAVINGS,
+  ENGRAVING_TIERS,
 } from '../data.js';
 
 // ===== 색상 팔레트 =====
@@ -264,4 +266,42 @@ export function getEnemyImageSrc(enemyKey, enemy, kind = 'combat') {
     return `./enemies/championship/${concept}/${enemyKey}_${kind}.jpg`;
   }
   return `./enemies/classic/chapter_${enemy.chapter}/${enemyKey}_${kind}.jpg`;
+}
+
+// ===== 직업 각인 시스템 (1.25.0~) =====
+
+// 등급별 가중치 weighted random — 결과: tier 키 ('C' | 'R' | 'E' | 'L' | 'NEG_FLAW' | 'NEG_CURSE')
+export function rollEngravingTier() {
+  const total = Object.values(ENGRAVING_TIERS).reduce((sum, t) => sum + t.weight, 0);
+  let r = Math.random() * total;
+  for (const [key, info] of Object.entries(ENGRAVING_TIERS)) {
+    r -= info.weight;
+    if (r <= 0) return key;
+  }
+  return 'C';
+}
+
+// 풀에서 등급 매칭 카드 중 1장 균등 random. 해당 등급에 카드가 없으면 더 흔한 등급으로 폴백.
+export function pickEngravingByTier(classId, tier) {
+  const pool = ENGRAVINGS[classId] || [];
+  let candidates = pool.filter(e => e.tier === tier);
+  if (candidates.length === 0) {
+    // 폴백: 같은 풀 안의 아무 카드 1장 (풀이 비어있으면 null)
+    if (pool.length === 0) return null;
+    candidates = pool;
+  }
+  return candidates[Math.floor(Math.random() * candidates.length)];
+}
+
+// 가챠 1회 — 등급 롤 + 카드 픽 → 카드 객체 반환 (없으면 null)
+export function rollEngravingCard(classId) {
+  const tier = rollEngravingTier();
+  return pickEngravingByTier(classId, tier);
+}
+
+// 카드 ID로 풀에서 카드 객체 찾기 (UI 표시용)
+export function getEngravingById(classId, cardId) {
+  if (!cardId) return null;
+  const pool = ENGRAVINGS[classId] || [];
+  return pool.find(e => e.id === cardId) || null;
 }
