@@ -51,7 +51,7 @@ import ForgeScreen from './components/ForgeScreen.jsx';
 import RewardSelect from './components/RewardSelect.jsx';
 import StatusPanel from './components/StatusPanel.jsx';
 import SoulAltar from './components/SoulAltar.jsx';
-import EngravingScreen, { EngravingMigrationModal } from './components/EngravingScreen.jsx';
+import EngravingScreen, { EngravingMigrationModal, AwakeningConditionNoticeModal } from './components/EngravingScreen.jsx';
 import MapView from './components/MapView.jsx';
 import CombatScreen from './components/CombatScreen.jsx';
 import NodeInfoModal from './components/NodeInfoModal.jsx';
@@ -96,7 +96,7 @@ import {
   VERSION_DATE,
   VERSION_LABEL,
 } from './data.js';
-import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice } from './storage.js';
+import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice } from './storage.js';
 
 
 
@@ -1103,12 +1103,20 @@ export default function App() {
     if (reward.type === 'ultimate') {
       // 궁극 진화: 패시브 Lv → 0 리셋, 궁극 ID 추가
       const skillName = reward.skillName;
-      
+
       // 패시브 Lv을 0으로 리셋
       setSkills(prev => ({ ...prev, [skillName]: 0 }));
-      
+
       // 궁극 ID 추가
       setUltimates(prev => [...prev, reward.ultimate.id]);
+      // 1.26.0~ 각성도 조건 추적: 직업별 ULTIMATE_SKILLS 픽 기록
+      if (classData?.id && reward.ultimate?.id) {
+        setMeta(prev => {
+          const next = recordUltimatePickByClass(prev, classData.id, reward.ultimate.id);
+          saveMeta(next);
+          return next;
+        });
+      }
       
       // 재생이었다면 minor 보너스 HP는 잃음
       if (skillName === '재생') {
@@ -1438,8 +1446,11 @@ export default function App() {
         const diffId = currentExpedition.difficultyId;
         const wasFirstClear = !hasChampionshipClear(newMeta, champId, diffId);
         
-        // 챔피언십 클리어 기록
+        // 챔피언십 클리어 기록 (기존 직업 무관 + 1.26.0~ 직업별 추적)
         newMeta = recordChampionshipClear(newMeta, champId, diffId);
+        if (classData?.id) {
+          newMeta = recordChampionshipClearByClass(newMeta, classData.id, champId, diffId);
+        }
         
         // 첫 클리어 시 신규 유물 해금 (원정별 대표 1종)
         let newlyUnlockedRelic = null;
@@ -1707,6 +1718,18 @@ export default function App() {
                 onClose={() => {
                   setMeta(prev => {
                     const next = clearEngravingMigrationNotice(prev);
+                    saveMeta(next);
+                    return next;
+                  });
+                }}
+              />
+            )}
+            {/* 1.26.0 각성도 조건 신설 안내 모달 (engraving 모달이 닫힌 다음 표시) */}
+            {!showChangelog && !meta?.engravingMigrationNotice && meta?.awakeningConditionNotice && (
+              <AwakeningConditionNoticeModal
+                onClose={() => {
+                  setMeta(prev => {
+                    const next = clearAwakeningConditionNotice(prev);
                     saveMeta(next);
                     return next;
                   });

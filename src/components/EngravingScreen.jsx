@@ -7,7 +7,14 @@
 // ============================================
 import React, { useState } from 'react';
 import { ArrowLeft, Lock, Sparkles } from 'lucide-react';
-import { PALETTE, rollEngravingCard, getEngravingById } from '../utils/helpers.js';
+import {
+  PALETTE,
+  rollEngravingCard,
+  getEngravingById,
+  isAwakeningConditionMet,
+  describeAwakeningCondition,
+  describeAwakeningConditionProgress,
+} from '../utils/helpers.js';
 import { saveMeta, getAwakeningLv, getEngravingSlots, getUnlockedSlotCount, applyAwakening, applyEngravingSlot } from '../storage.js';
 import {
   CLASSES,
@@ -35,7 +42,10 @@ export default function EngravingScreen({ meta, onMetaUpdate, onBack }) {
   const table = ENGRAVING_AWAKENING_TABLE[classId] || [];
   const nextStep = table.find(s => s.lv === lv + 1);  // 현재 lv 다음 단계
   const isMaxed = lv >= AWAKEN_MAX_LV;
-  const canAwaken = !!nextStep && !isMaxed && hasPool && (meta?.souls || 0) >= (nextStep?.cost || 0);
+  // 1.26.0~ 조건 시스템: 영혼 + 조건 둘 다 충족해야 강화 가능
+  const conditionMet = !nextStep ? true : isAwakeningConditionMet(meta, classId, nextStep.lv);
+  const canAfford = !!nextStep && (meta?.souls || 0) >= (nextStep?.cost || 0);
+  const canAwaken = !!nextStep && !isMaxed && hasPool && canAfford && conditionMet;
 
   // 각성도 강화 핸들러
   const handleAwaken = () => {
@@ -207,6 +217,26 @@ export default function EngravingScreen({ meta, onMetaUpdate, onBack }) {
             <div className="text-sm font-bold mb-1" style={{ color: PALETTE.text }}>
               Lv.{nextStep.lv}: {describeReward(nextStep.reward, classId)}
             </div>
+            {/* 활성화 조건 표시 (1.26.0~) */}
+            {nextStep.condition && (
+              <div className="mt-2 px-2 py-1.5" style={{
+                background: conditionMet ? `${PALETTE.green}15` : `${PALETTE.accent}15`,
+                border: `1px solid ${conditionMet ? PALETTE.green : PALETTE.accent}80`,
+              }}>
+                <div className="text-[9px] tracking-[0.2em] mb-0.5" style={{
+                  color: conditionMet ? PALETTE.green : PALETTE.accent,
+                }}>
+                  {conditionMet ? '◆ 활성화 조건 충족' : '◆ 활성화 조건 미달'}
+                </div>
+                <div className="text-[11px]" style={{ color: PALETTE.text, lineHeight: 1.4 }}>
+                  {describeAwakeningCondition(nextStep.condition, classId)}
+                  {' '}
+                  <span style={{ color: PALETTE.textDim }}>
+                    {describeAwakeningConditionProgress(meta, nextStep.condition, classId) || ''}
+                  </span>
+                </div>
+              </div>
+            )}
             <button
               onClick={handleAwaken}
               disabled={!canAwaken}
@@ -222,7 +252,7 @@ export default function EngravingScreen({ meta, onMetaUpdate, onBack }) {
                 cursor: canAwaken ? 'pointer' : 'not-allowed',
               }}
             >
-              {(meta?.souls || 0) < nextStep.cost ? '영혼 부족' : '각성도 강화'}
+              {!conditionMet ? '조건 미달' : !canAfford ? '영혼 부족' : '각성도 강화'}
             </button>
           </div>
         )}
@@ -527,6 +557,79 @@ export function EngravingMigrationModal({ notice, onClose }) {
           <div className="text-[11px]" style={{ color: PALETTE.textDim, lineHeight: 1.5 }}>
             ◆ 시작 패시브 +1Lv 효과는 각성도 <strong style={{ color: PALETTE.dawn }}>Lv.4·Lv.7</strong> 강화로 직업별 개별 적용됩니다.<br/>
             ◆ 타이틀의 <strong style={{ color: PALETTE.dawn }}>「직업 각인」</strong> 메뉴에서 강화·각인 가챠를 진행할 수 있습니다.
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          className="w-full py-3 transition-all"
+          style={{
+            background: `linear-gradient(180deg, ${PALETTE.dawn}, ${PALETTE.dawn}80)`,
+            color: PALETTE.text,
+            border: `1px solid ${PALETTE.dawn}`,
+            fontSize: '12px',
+            fontFamily: '"Cinzel", serif',
+            letterSpacing: '0.3em',
+          }}
+        >
+          확인
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// === 1.26.0 각성도 조건 신설 안내 모달 ===
+// 활성화 조건 추가 + 직업별 추적 데이터 소급 적용 불가 안내
+export function AwakeningConditionNoticeModal({ onClose }) {
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center px-4" style={{
+      background: 'rgba(0, 0, 0, 0.85)',
+    }}>
+      <div className="w-full max-w-md" style={{
+        background: PALETTE.bgDeep,
+        border: `1.5px solid ${PALETTE.dawn}`,
+        boxShadow: `0 0 30px ${PALETTE.dawn}50`,
+      }}>
+        <div className="px-4 py-3 text-center" style={{
+          background: `linear-gradient(180deg, ${PALETTE.dawn}30, ${PALETTE.dawn}10)`,
+          borderBottom: `1px solid ${PALETTE.panelBorder}`,
+        }}>
+          <div className="text-[10px] tracking-[0.3em]" style={{ color: PALETTE.dawn }}>
+            1.26.0 시스템 추가 안내
+          </div>
+          <div className="text-base font-bold mt-1" style={{ color: PALETTE.text }}>
+            각성도 활성화 조건 신설
+          </div>
+        </div>
+        <div className="px-4 py-4 space-y-3" style={{ color: PALETTE.text }}>
+          <div className="text-[12px]" style={{ lineHeight: 1.6 }}>
+            직업 각성도 강화에 <strong style={{ color: PALETTE.dawn }}>활성화 조건</strong>이 추가되었습니다.
+            영혼이 충분해도 조건을 만족하지 못하면 강화할 수 없습니다.
+          </div>
+          <div className="p-2 text-[11px]" style={{
+            background: `${PALETTE.panel}80`,
+            border: `1px solid ${PALETTE.panelBorder}`,
+            lineHeight: 1.6,
+          }}>
+            <div style={{ color: PALETTE.dawn, marginBottom: '4px' }}>주요 조건 예시</div>
+            <div style={{ color: PALETTE.textDim }}>
+              ◆ Lv.2 = 해당 직업 수련의 길 클리어<br/>
+              ◆ Lv.3 = 해당 직업으로 궁극 보상 1개 픽<br/>
+              ◆ Lv.4·6·8 = 해당 직업 챔피언십 일반·하드·지옥 5컨셉 올 클리어<br/>
+              ◆ Lv.5 = 해당 직업 시작 패시브 1개의 3궁극 모두 픽<br/>
+              ◆ Lv.7·9·10 = 다른 직업들도 일정 각성도 이상 달성
+            </div>
+          </div>
+          <div className="p-2 text-[10px]" style={{
+            background: `${PALETTE.accent}15`,
+            border: `1px solid ${PALETTE.accent}80`,
+            color: PALETTE.text,
+            lineHeight: 1.5,
+          }}>
+            <strong style={{ color: PALETTE.accent }}>⚠ 기존 진행도 소급 적용 불가</strong>
+            <br/>이번 업데이트부터 직업별 챔피언십 클리어·궁극 픽이 추적됩니다.
+            과거 클리어 기록은 직업 정보가 없어 자동 매핑이 불가능합니다.
+            <br/>(수련의 길 클리어만 자동 인식)
           </div>
         </div>
         <button
