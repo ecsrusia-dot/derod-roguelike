@@ -22,9 +22,9 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.27.0';
+export const GAME_VERSION = '1.29.0';
 export const VERSION_DATE = '2026-05-17';
-export const VERSION_LABEL = '각인 효과 전투 적용 — 24장 풀의 effect 키가 실제 회피·반격·치명·영혼·턴에 통합';
+export const VERSION_LABEL = '겁화(劫火) 분리 — 시그니처 [영겁의 화염]이 화염 각인과 별도 디버프 부여, 둘 다 보유 시 더블 폭발';
 
 // =========== 패시브 스킬 ===========
 // effect 필드는 문자열 키. 실제 동작은 메인 코드의 trigger handler에서 처리.
@@ -194,7 +194,8 @@ export const CLASSES = [
     desc: '정념계 마법을 익힌 자. 신과 정령의 힘을 빌린다.',
     startSkills: { 이프리트: 3, 마력: 2 },
     stats: { 근력: 8, 민첩: 11, 지능: 20, 매력: 14 },
-    combatSkills: ['마법탄', '정념폭발', '결계'],
+    combatSkills: ['마법탄', '정념폭발', '화염장막'],
+    ultimateId: 'sage_eternalFlame',  // 직업 액티브 궁극 (영혼 게이지 100 발동)
     color: '#5c4a8c',
     locked: false,
     image: './classes/sage.jpg',
@@ -260,7 +261,7 @@ export const CLASSES = [
 // 발동 시 게이지는 0으로 리셋.
 //
 // 1직업당 1개의 시그니처 궁극 — 클래스 정체성 강화.
-// 프로토타입: 방랑검사 1개 (lanthert_shadowStrike). 나머지 4직업은 다음 업데이트.
+// 프로토타입: 방랑검사 1.12.0~, 술법사 1.28.0~. 나머지 3직업(demonblood/elf/priest)은 다음 업데이트.
 export const CLASS_ULTIMATES = {
   lanthert_shadowStrike: {
     id: 'lanthert_shadowStrike',
@@ -271,6 +272,16 @@ export const CLASS_ULTIMATES = {
     color: '#c4453d',
     icon: '☄',
     effect: 'classult_shadowStrike',
+  },
+  sage_eternalFlame: {
+    id: 'sage_eternalFlame',
+    classId: 'sage',
+    name: '영겁(永劫)의 화염',
+    quote: '꺼지지 않는다. 영원히.',
+    desc: '적에게 50 화염 데미지 (방어 무시). 화염 각인 100% 부여 (5턴, 지능×0.4/턴). 다음 2턴 마법 데미지 +50%.',
+    color: '#ff4500',
+    icon: '🔥',
+    effect: 'classult_eternalFlame',
   },
 };
 
@@ -295,6 +306,7 @@ export const COMBAT_SKILLS = {
   마법탄: { name: '마법탄', cost: 0, cd: 0, type: 'magic', baseDmg: [18, 24], desc: '기본 마법' },
   정념폭발: { name: '정념폭발', cost: 2, cd: 3, type: 'magic', baseDmg: [42, 52], desc: '강력한 마법' },
   결계: { name: '결계', cost: 1, cd: 1, type: 'defense', defense: 50, desc: '방어 +50' },
+  화염장막: { name: '화염장막', cost: 1, cd: 1, type: 'defense', defense: 40, desc: '방어 +40. 공격한 적에게 화염 각인 50% 반사 (1회).', reflectIgnite: 50 },
   // 혼혈 마족
   광폭참격: { name: '광폭참격', cost: 0, cd: 0, type: 'physical', baseDmg: [22, 30], desc: 'HP 낮을수록 ↑', berserker: true },
   '피의 일격': { name: '피의 일격', cost: 1, cd: 2, type: 'physical', baseDmg: [27, 35], desc: '자해+출혈', selfDmg: 10, forceBleed: true },

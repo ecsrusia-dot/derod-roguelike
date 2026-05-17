@@ -64,19 +64,32 @@ export function calculateDamage(skill, attacker, defender, skills, isCrit, ultim
     dmg += bookBonus;
     if (bookBonus > 0) breakdown.push(`마법 데미지 +${bookBonus}`);
   }
-  // 연옥지화: 화염 각인 보유 적 공격 시 마법 데미지 +20% (각인 부여 턴 미적용)
+  // 연옥지화: 화염 각인 또는 겁화 보유 적 공격 시 마법 데미지 +20% (각인 부여 턴 미적용)
   // calculateDamage는 데미지 계산 후 부여이므로, defender.debuffs.igniteDmg > 0 = 이전 턴 부여된 각인
-  if (skill.type === 'magic' && hasUltimate(ultimates, 'ult_purgatoryFire') && defender.debuffs?.igniteDmg > 0 && defender.debuffs?.igniteTurns > 0) {
-    const purgatoryBonus = Math.floor(dmg * 0.2);
-    dmg += purgatoryBonus;
-    breakdown.push(`연옥지화 +${purgatoryBonus}`);
+  // 1.29.0~ 겁화도 OR 조건으로 확장 — 시그니처 발동 직후 마법 공격도 보너스 받음 (단 겁화도 부여 턴 미적용)
+  if (skill.type === 'magic' && hasUltimate(ultimates, 'ult_purgatoryFire')) {
+    const hasIgnite = defender.debuffs?.igniteDmg > 0 && defender.debuffs?.igniteTurns > 0 && !defender.debuffs?.igniteJustApplied;
+    const hasEternalFire = defender.debuffs?.eternalFireDmg > 0 && defender.debuffs?.eternalFireTurns > 0 && !defender.debuffs?.eternalFireJustApplied;
+    if (hasIgnite || hasEternalFire) {
+      const purgatoryBonus = Math.floor(dmg * 0.2);
+      dmg += purgatoryBonus;
+      breakdown.push(`연옥지화 +${purgatoryBonus}`);
+    }
   }
   // 궁극 [정념 폭주] 마력_aetherStorm: 마법 데미지 ×2.0
   if (skill.type === 'magic' && hasUltimate(ultimates, 'ult_aetherStorm')) {
     // 기존 데미지만큼을 더해서 2배로 만듦
-    const ultBonus = dmg; 
+    const ultBonus = dmg;
     dmg += ultBonus;
     breakdown.push(`★정념폭주 +${ultBonus} (2배)`);
+  }
+  // 1.28.0~ 시그니처 [영겁의 화염] 후속 버프: 다음 2턴 마법 데미지 +N% (sage)
+  if (skill.type === 'magic' && attacker.buffs?.flameBoostTurns > 0 && attacker.buffs?.flameBoostPct > 0) {
+    const flameBonus = Math.floor(dmg * (attacker.buffs.flameBoostPct / 100));
+    if (flameBonus > 0) {
+      dmg += flameBonus;
+      breakdown.push(`★영겁의 정념 +${flameBonus}`);
+    }
   }
   // 궁극 [광기 각성] 잔혹_madness: HP 50% 이하 시 모든 데미지 +50%
   if (hasUltimate(ultimates, 'ult_madness') && attacker.hp <= attacker.maxHp * 0.5) {
@@ -201,6 +214,10 @@ export function getDisplayDamage(skill, attacker, skills, ultimates, meta, curse
       dmg += Math.floor(dmg * 0.25);
     }
     if (skill.type === 'magic' && hasUltimate(ultimates, 'ult_aetherStorm')) dmg *= 2;
+    // 1.28.0~ 시그니처 [영겁의 화염] 후속 버프
+    if (skill.type === 'magic' && attacker.buffs?.flameBoostTurns > 0 && attacker.buffs?.flameBoostPct > 0) {
+      dmg += Math.floor(dmg * (attacker.buffs.flameBoostPct / 100));
+    }
     if (hasUltimate(ultimates, 'ult_madness') && attacker.hp <= attacker.maxHp * 0.5) {
       dmg += Math.floor(dmg * 0.5);
     }
