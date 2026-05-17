@@ -23,6 +23,7 @@ import {
   getCharismaDmgReduction,
   getIntellectSoulBonus,
   getIntellectEtherBonus,
+  getIfritIgniteRate,
 } from '../utils/helpers.js';
 import {
   PASSIVE_SKILLS,
@@ -2183,6 +2184,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                 if (shadowStrikeBuff) counterRate = 100;  // 무영의 잔영: 100% 강제
                 if (counterRate > 100) counterRate = 100;  // 상한
               }
+              const ignite = getIfritIgniteRate(skills, ultimates, activeSkills);
               return (
                 <>
                   <div className="text-[10px] mb-1.5" style={{ color: PALETTE.textDim }}>━ 전투 수치 ━</div>
@@ -2191,6 +2193,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                     <div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>치명타데미지</span><span className="font-bold tabular-nums" style={{ color: PALETTE.legendary }}>+{Math.round(critDmg)}%</span></div>
                     <div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>회피율</span><span className="font-bold tabular-nums" style={{ color: PALETTE.green }}>{Math.round(dodgeRate)}%</span></div>
                     {counterRate > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>반격률</span><span className="font-bold tabular-nums" style={{ color: PALETTE.accent }}>{counterRate}%</span></div>)}
+                    {ignite.has && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>화염각인</span><span className="font-bold tabular-nums" style={{ color: '#d97706' }}>{ignite.rate}%</span></div>)}
                   </div>
                 </>
               );
