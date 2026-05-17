@@ -256,6 +256,23 @@ export function getCharismaDmgReduction(stats) {
   return (Math.floor((stats.매력 - 17) / 5) + 1) * 5;
 }
 
+// ===== 지능 효과 헬퍼 (1.32.0~) =====
+// 술법사 시그니처. 매력 시그니처(사제)와 대칭 패턴.
+// 시작 base 지능이 가장 높은 술법사(20)가 시작부터 두 효과 모두 누림 — 직업 정체성.
+//
+// 1단계 (지능 11+): 마법 시전 시 영혼 게이지 +N. 5단위 누진.
+//   지능 11~14 → +1 / 15~19 → +2 / 20~24 → +3 / 25~29 → +4
+// 2단계 (지능 17+): 시작 에테르 +1. 단일 단계 (누진 없음).
+export function getIntellectSoulBonus(stats) {
+  if (!stats || !stats.지능 || stats.지능 < 11) return 0;
+  return Math.floor((stats.지능 - 10) / 5) + 1;
+}
+
+export function getIntellectEtherBonus(stats) {
+  if (!stats || !stats.지능 || stats.지능 < 17) return 0;
+  return 1;
+}
+
 // ===== 표시용 능력치 합산 (1.31.0~) =====
 // StatusPanel 등 정보창 전용. CombatScreen.jsx의 player 초기화·intro 로직과
 // 동일한 결과를 내도록 일치시킴 (단 ULTIMATE_SKILLS와 PASSIVE_SKILLS의

@@ -22,9 +22,9 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.31.0';
+export const GAME_VERSION = '1.32.0';
 export const VERSION_DATE = '2026-05-17';
-export const VERSION_LABEL = '캐릭터 정보창 능력치 라이브 표시 — 패시브 마일스톤·궁극·각인 반영 + 파생 능력치 5종 추가';
+export const VERSION_LABEL = '이프리트 minor 신설 + 지능 시그니처 도입 — 매력 시그니처와 대칭 패턴, 술법사 정체성';
 
 // =========== 패시브 스킬 ===========
 // effect 필드는 문자열 키. 실제 동작은 메인 코드의 trigger handler에서 처리.
@@ -159,7 +159,7 @@ export const PASSIVE_SKILLS = {
     axis: 'utility', maxLv: 7, color: '#ff6b35',
     desc: '불의 정령왕의 힘. 마법으로 화염 각인을 부여하고 치명타로 폭발시킨다',
     classOnly: 'sage',
-    minorEffect: { type: 'ifritIgnite', perLv: 0, desc: '마법 공격 시 30% 화염 각인 (3턴, 지능×0.3/턴, 방어무시), 치명타 시 폭발' },
+    minorEffect: { type: 'ifritIgniteRate+', perLv: 2, desc: '화염 각인 발동율 +2%/Lv (마법 공격 시 30% 기본 + 2%/Lv, 치명타 시 폭발, 3턴, 지능×0.3/턴, 방어무시)' },
     tiers: {
       3: { text: '지능 +2, 방어 무시 +5', trigger: 'passive', effect: 'ifritT3' },
       5: { text: '지능 +3 (누적 +5), 방어 무시 +10 (누적 +15)', trigger: 'passive', effect: 'ifritT5' },
