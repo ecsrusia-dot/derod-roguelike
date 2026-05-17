@@ -7,7 +7,7 @@
 
 import React, { useState } from 'react';
 import { Heart, X } from 'lucide-react';
-import { PALETTE, getCharismaHealBonus, getCharismaDmgReduction, getIntellectSoulBonus, getIntellectEtherBonus } from '../utils/helpers.js';
+import { PALETTE, getCharismaHealBonus, getCharismaDmgReduction, getIntellectSoulBonus, getIntellectEtherBonus, getIfritIgniteRate } from '../utils/helpers.js';
 import { PASSIVE_SKILLS, COMBAT_SKILLS, ULTIMATE_SKILLS } from '../data.js';
 import CardInfoModal, { buildPassiveInfo, buildRelicInfo, buildActiveSkillInfo } from './CardInfoModal.jsx';
 
@@ -109,6 +109,46 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
             return (
               <div className="mt-2 pt-2 border-t" style={{ borderColor: `${classData.color}20` }}>
                 <div className="text-[9px] mb-1 text-center" style={{ color: PALETTE.textDim, letterSpacing: '0.15em' }}>◇ 파생 능력치</div>
+                <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[10px]">
+                  {items.map((it, i) => (
+                    <span key={i}>
+                      <span style={{ color: PALETTE.textDim }}>{it.label} </span>
+                      <span className="font-bold tabular-nums" style={{ color: it.color }}>{it.value}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+          {/* 종합 효과 (1.36.0~) — 각인·유물·패시브 누적 보너스 한눈에 보기. 0인 항목은 숨김. */}
+          {derivedStats && (() => {
+            const items = [];
+            // 공격·방어 가산
+            if (derivedStats.physDmgPct > 0) items.push({ label: '물리 딜+', value: `+${derivedStats.physDmgPct}%`, color: '#c4453d' });
+            if (derivedStats.dmgTakenPct > 0) items.push({ label: '받는 뎀', value: `+${derivedStats.dmgTakenPct}%`, color: PALETTE.accent });
+            if (derivedStats.dmgTakenPct < 0) items.push({ label: '받는 뎀', value: `${derivedStats.dmgTakenPct}%`, color: PALETTE.green });
+            if (derivedStats.afterDodgeDmg > 0) items.push({ label: '회피 후 딜', value: `+${derivedStats.afterDodgeDmg}%`, color: PALETTE.green });
+            // 반격 계열
+            if (derivedStats.counterRatePct !== 0) items.push({ label: '반격율', value: `${derivedStats.counterRatePct > 0 ? '+' : ''}${derivedStats.counterRatePct}%`, color: PALETTE.legendary });
+            if (derivedStats.counterDmgPct !== 0) items.push({ label: '반격 뎀', value: `${derivedStats.counterDmgPct > 0 ? '+' : ''}${derivedStats.counterDmgPct}%`, color: PALETTE.legendary });
+            if (derivedStats.counterHitSoul > 0) items.push({ label: '반격→영혼', value: `+${derivedStats.counterHitSoul}`, color: PALETTE.dawn });
+            if (derivedStats.counterShock > 0) items.push({ label: '반격→충격', value: `+${derivedStats.counterShock}`, color: PALETTE.twilight });
+            if (derivedStats.counterCanCrit) items.push({ label: '반격 치명', value: '가능', color: PALETTE.legendary });
+            // 영혼 게이지 계열
+            if (derivedStats.startSoul > 0) items.push({ label: '시작 영혼', value: `+${derivedStats.startSoul}`, color: PALETTE.dawn });
+            if (derivedStats.perTurnSoul > 0) items.push({ label: '턴당 영혼', value: `+${derivedStats.perTurnSoul}`, color: PALETTE.dawn });
+            if (derivedStats.dodgeSoul > 0) items.push({ label: '회피→영혼', value: `+${derivedStats.dodgeSoul}`, color: PALETTE.dawn });
+            if (derivedStats.soulGainMult !== 0) items.push({ label: '영혼 획득', value: `×${(1 + derivedStats.soulGainMult).toFixed(2)}`, color: PALETTE.legendary });
+            // 패널티 / 손실
+            if (derivedStats.perTurnHpLoss > 0) items.push({ label: '턴당 HP', value: `-${derivedStats.perTurnHpLoss}`, color: PALETTE.accent });
+            if (derivedStats.disableInsightPredict) items.push({ label: '심안 차단', value: 'ON', color: PALETTE.accent });
+            // 술법사 화염 각인 발동율
+            const ignite = getIfritIgniteRate(skills, ultimates, activeSkills);
+            if (ignite.has) items.push({ label: '화염 각인', value: `${ignite.rate}%`, color: '#d97706' });
+            if (items.length === 0) return null;
+            return (
+              <div className="mt-2 pt-2 border-t" style={{ borderColor: `${classData.color}20` }}>
+                <div className="text-[9px] mb-1 text-center" style={{ color: PALETTE.textDim, letterSpacing: '0.15em' }}>◇ 종합 효과 (각인·유물·패시브 누적)</div>
                 <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[10px]">
                   {items.map((it, i) => (
                     <span key={i}>

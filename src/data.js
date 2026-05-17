@@ -22,9 +22,9 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.35.0';
+export const GAME_VERSION = '1.36.0';
 export const VERSION_DATE = '2026-05-18';
-export const VERSION_LABEL = '방랑검사 내부 코드명 lanthert → wanderer 변경 + 자동 마이그레이션 — 표시명·진행도 보존';
+export const VERSION_LABEL = '정보창 종합 효과 패널 + 각성도 9단계 미리보기 모달 + 네비 라벨 정리';
 
 // =========== 패시브 스킬 ===========
 // effect 필드는 문자열 키. 실제 동작은 메인 코드의 trigger handler에서 처리.

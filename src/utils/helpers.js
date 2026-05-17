@@ -344,7 +344,50 @@ export function computeDerivedStats(skills, ultimates, activeSkills = null, reli
   magicDmgPct += relicStat.magicDmg || 0;
   // 물리 데미지+ (절대값 — minor type 'physDmg+'은 데미지 합산에 절대값으로 더해짐)
   const physDmg = getMinorBonus(s, 'physDmg+', activeSkills);
-  return { armorIgnore, dodgeRate, critRate, magicDmgPct, physDmg };
+  // 1.36.0~ 각인 누적 보너스도 derivedStats에 포함 (정보창 표시용)
+  const physDmgPct = engravingFx.physDmgPct || 0;
+  const dmgTakenPct = engravingFx.dmgTakenPct || 0;
+  const counterRatePct = engravingFx.counterRatePct || 0;
+  const counterDmgPct = engravingFx.counterDmgPct || 0;
+  const counterHitSoul = engravingFx.counterHitSoul || 0;
+  const counterShock = engravingFx.counterShock || 0;
+  const counterCanCrit = !!engravingFx.counterCanCrit;
+  const startSoul = engravingFx.startSoul || 0;
+  const perTurnSoul = engravingFx.perTurnSoul || 0;
+  const dodgeSoul = engravingFx.dodgeSoul || 0;
+  const afterDodgeDmg = engravingFx.afterDodgeDmg || 0;
+  const soulGainMult = engravingFx.soulGainMult || 0;
+  const perTurnHpLoss = engravingFx.perTurnHpLoss || 0;
+  const disableInsightPredict = !!engravingFx.disableInsightPredict;
+  return {
+    armorIgnore, dodgeRate, critRate, magicDmgPct, physDmg,
+    physDmgPct, dmgTakenPct,
+    counterRatePct, counterDmgPct, counterHitSoul, counterShock, counterCanCrit,
+    startSoul, perTurnSoul, dodgeSoul, afterDodgeDmg, soulGainMult, perTurnHpLoss,
+    disableInsightPredict,
+  };
+}
+
+// 술법사 화염 각인 발동율 (정보창 표시용, 1.36.0~)
+// 전투 시작 시점 기준 발동율 = 기본(패시브 30% / 궁극 70%) + minor(이프리트 Lv × 2%).
+// 영겁 미발동 누적 보너스는 전투 중 동적 변화라 미포함.
+// 반환: { rate: 0~100, has: bool } — 이프리트 패시브/궁극 없으면 has=false
+export function getIfritIgniteRate(skills, ultimates, activeSkills = null) {
+  const s = skills || {};
+  const ifritLv = s['이프리트'] || 0;
+  const hasIfritPassive = ifritLv > 0 && (!activeSkills || activeSkills.includes('이프리트'));
+  const hasEternalFire = hasUltimate(ultimates, 'ult_eternalFire');
+  const hasIfritDescent = hasUltimate(ultimates, 'ult_ifritDescent');
+  const hasPurgatoryFire = hasUltimate(ultimates, 'ult_purgatoryFire');
+  const hasAnyIfritUlt = hasEternalFire || hasIfritDescent || hasPurgatoryFire;
+  if (!hasIfritPassive && !hasAnyIfritUlt) return { rate: 0, has: false };
+  let rate = 0;
+  if (hasAnyIfritUlt) rate = 70;
+  else if (hasIfritPassive) rate = 30;
+  const minorBonus = getMinorBonus(s, 'ifritIgniteRate+', activeSkills);
+  rate += minorBonus;
+  rate = Math.min(100, rate);
+  return { rate, has: true };
 }
 
 // ===== 적 일러스트 경로 헬퍼 =====

@@ -168,7 +168,7 @@ export default function MapView({ chapter, classData, mapData, hp, maxHp, gold, 
       <div className="grid grid-cols-5 border-t" style={{ borderColor: PALETTE.panelBorder, background: PALETTE.bgDeep }}>
         <button onClick={onBack} className="py-2.5 text-[10px]" style={{ color: PALETTE.textDim }}>나가기</button>
         <button onClick={onOpenCodex} className="py-2.5 text-[10px]" style={{ color: '#c46535' }}>도감</button>
-        <button onClick={onOpenStatus} className="py-2.5 text-[10px]" style={{ color: PALETTE.dawn }}>스킬</button>
+        <button onClick={onOpenStatus} className="py-2.5 text-[10px]" style={{ color: PALETTE.dawn }}>정보</button>
         <button onClick={onOpenAchievements} className="py-2.5 text-[10px]" style={{ color: PALETTE.legendary }}>업적</button>
         <button className="py-2.5 text-[10px]" style={{ color: PALETTE.textDim }}>설정</button>
       </div>

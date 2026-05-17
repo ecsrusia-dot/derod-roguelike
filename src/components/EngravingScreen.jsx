@@ -30,6 +30,8 @@ export default function EngravingScreen({ meta, onMetaUpdate, onBack }) {
   const [selectedClassIdx, setSelectedClassIdx] = useState(0);
   // 가챠 모달: { classId, slotIdx, cost, currentCardId, newCardId }
   const [gachaResult, setGachaResult] = useState(null);
+  // 1.36.0~ 각성도 카드 클릭 시 9단계 전체 진행 모달
+  const [showProgressModal, setShowProgressModal] = useState(false);
 
   const selectedClass = CLASSES[selectedClassIdx];
   const classId = selectedClass.id;
@@ -152,15 +154,21 @@ export default function EngravingScreen({ meta, onMetaUpdate, onBack }) {
 
       {/* 선택된 직업 상세 */}
       <div className="px-4 pb-6 space-y-3">
-        {/* 각성도 카드 */}
-        <div className="p-3" style={{
-          background: `linear-gradient(180deg, ${selectedClass.color}25, ${selectedClass.color}08)`,
-          border: `1px solid ${selectedClass.color}80`,
-        }}>
+        {/* 각성도 카드 — 1.36.0~ 클릭 시 9단계 전체 모달 */}
+        <button
+          onClick={() => hasPool && setShowProgressModal(true)}
+          className="w-full text-left p-3 transition-all"
+          disabled={!hasPool}
+          style={{
+            background: `linear-gradient(180deg, ${selectedClass.color}25, ${selectedClass.color}08)`,
+            border: `1px solid ${selectedClass.color}80`,
+            opacity: hasPool ? 1 : 0.6,
+          }}
+        >
           <div className="flex items-start justify-between mb-2">
             <div>
               <div className="text-[10px] tracking-[0.2em]" style={{ color: selectedClass.color }}>
-                각성도
+                각성도 {hasPool ? '· 탭하여 단계별 보상·조건 미리보기' : ''}
               </div>
               <div className="text-base font-bold mt-0.5" style={{ color: PALETTE.text, fontFamily: '"Cinzel", serif' }}>
                 {selectedClass.name} · Lv.{lv} / {AWAKEN_MAX_LV}
@@ -179,7 +187,7 @@ export default function EngravingScreen({ meta, onMetaUpdate, onBack }) {
               background: `linear-gradient(90deg, ${selectedClass.color}, ${PALETTE.dawn})`,
             }} />
           </div>
-        </div>
+        </button>
 
         {/* 풀 미작성 안내 (방랑검사 외 4직업) */}
         {!hasPool && (
@@ -308,6 +316,15 @@ export default function EngravingScreen({ meta, onMetaUpdate, onBack }) {
           newCardId={gachaResult.newCardId}
           onKeep={handleKeepCurrent}
           onOverwrite={handleOverwrite}
+        />
+      )}
+      {/* 1.36.0~ 각성도 단계별 보상·조건 미리보기 모달 */}
+      {showProgressModal && (
+        <AwakeningProgressModal
+          classData={selectedClass}
+          currentLv={lv}
+          meta={meta}
+          onClose={() => setShowProgressModal(false)}
         />
       )}
     </div>
@@ -726,6 +743,143 @@ export function WandererRenameNoticeModal({ notice, onClose }) {
           }}
         >
           확인
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// === 1.36.0 각성도 9단계 전체 미리보기 모달 ===
+// 각성도 카드 클릭 시 표시. Lv.2~10의 보상·비용·활성화 조건을 한눈에 + 현재 Lv 강조.
+function AwakeningProgressModal({ classData, currentLv, meta, onClose }) {
+  const classId = classData.id;
+  const table = ENGRAVING_AWAKENING_TABLE[classId] || [];
+  const hasPool = (ENGRAVINGS[classId] || []).length > 0;
+  return (
+    <div className="fixed inset-0 z-[55] flex items-center justify-center px-4" style={{
+      background: 'rgba(0, 0, 0, 0.85)',
+    }}>
+      <div className="w-full max-w-md flex flex-col" style={{
+        background: PALETTE.bgDeep,
+        border: `1.5px solid ${classData.color}`,
+        boxShadow: `0 0 30px ${classData.color}50`,
+        maxHeight: '85vh',
+      }}>
+        {/* 헤더 */}
+        <div className="px-4 py-3 flex items-center justify-between border-b" style={{
+          background: `linear-gradient(180deg, ${classData.color}30, ${classData.color}10)`,
+          borderColor: PALETTE.panelBorder,
+        }}>
+          <div>
+            <div className="text-[10px] tracking-[0.3em]" style={{ color: classData.color }}>
+              AWAKENING PROGRESS
+            </div>
+            <div className="text-sm font-bold" style={{ color: PALETTE.text }}>
+              {classData.name} · 각성도 단계
+            </div>
+          </div>
+          <button onClick={onClose}><X size={18} style={{ color: PALETTE.textDim }} /></button>
+        </div>
+        {/* 본문 — 스크롤 */}
+        <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2">
+          {table.length === 0 && (
+            <div className="text-center text-[11px] py-6" style={{ color: PALETTE.textDim }}>
+              각성도 단계 데이터가 없습니다.
+            </div>
+          )}
+          {table.map(step => {
+            const isCurrent = step.lv === currentLv;
+            const isCleared = step.lv <= currentLv;
+            const isNext = step.lv === currentLv + 1;
+            const condMet = !step.condition ? true : (hasPool && isAwakeningConditionMet(meta, classId, step.lv));
+            let borderColor = PALETTE.panelBorder;
+            let bg = `${PALETTE.panel}60`;
+            let labelColor = PALETTE.textDim;
+            if (isCurrent) {
+              borderColor = classData.color;
+              bg = `${classData.color}20`;
+              labelColor = classData.color;
+            } else if (isCleared) {
+              borderColor = `${PALETTE.green}80`;
+              bg = `${PALETTE.green}10`;
+              labelColor = PALETTE.green;
+            } else if (isNext) {
+              borderColor = PALETTE.dawn;
+              bg = `${PALETTE.dawn}15`;
+              labelColor = PALETTE.dawn;
+            }
+            return (
+              <div key={step.lv} className="p-2.5" style={{ background: bg, border: `1px solid ${borderColor}` }}>
+                <div className="flex items-start justify-between mb-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-bold tracking-[0.15em]" style={{ color: labelColor }}>
+                      Lv.{step.lv}
+                    </span>
+                    {isCurrent && (
+                      <span className="text-[9px] px-1.5 py-0.5" style={{
+                        background: `${classData.color}40`, color: classData.color, letterSpacing: '0.1em',
+                      }}>현재</span>
+                    )}
+                    {isCleared && !isCurrent && (
+                      <span className="text-[9px] px-1.5 py-0.5" style={{
+                        background: `${PALETTE.green}30`, color: PALETTE.green, letterSpacing: '0.1em',
+                      }}>달성</span>
+                    )}
+                    {isNext && (
+                      <span className="text-[9px] px-1.5 py-0.5" style={{
+                        background: `${PALETTE.dawn}30`, color: PALETTE.dawn, letterSpacing: '0.1em',
+                      }}>다음</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span style={{ color: PALETTE.twilight, fontSize: '10px' }}>✦</span>
+                    <span className="text-[10px] font-bold tabular-nums" style={{ color: PALETTE.text }}>
+                      {(step.cost || 0).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+                {/* 보상 */}
+                <div className="text-[11px] mb-1" style={{ color: PALETTE.text, lineHeight: 1.4 }}>
+                  {describeReward(step.reward, classId)}
+                </div>
+                {/* 활성화 조건 */}
+                {step.condition && (
+                  <div className="mt-1.5 px-2 py-1" style={{
+                    background: condMet ? `${PALETTE.green}15` : `${PALETTE.accent}10`,
+                    border: `1px solid ${condMet ? PALETTE.green : PALETTE.accent}60`,
+                  }}>
+                    <div className="text-[8px] tracking-[0.2em]" style={{
+                      color: condMet ? PALETTE.green : PALETTE.accent, marginBottom: '2px',
+                    }}>
+                      {condMet ? '◆ 조건 충족' : '◆ 조건 미달'}
+                    </div>
+                    <div className="text-[10px]" style={{ color: PALETTE.text, lineHeight: 1.35 }}>
+                      {describeAwakeningCondition(step.condition, classId)}
+                      {' '}
+                      <span style={{ color: PALETTE.textDim }}>
+                        {describeAwakeningConditionProgress(meta, step.condition, classId) || ''}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {/* 닫기 버튼 */}
+        <button
+          onClick={onClose}
+          className="w-full py-2.5 transition-all border-t"
+          style={{
+            background: `linear-gradient(180deg, ${classData.color}40, ${classData.color}20)`,
+            color: PALETTE.text,
+            borderColor: PALETTE.panelBorder,
+            fontSize: '11px',
+            fontFamily: '"Cinzel", serif',
+            letterSpacing: '0.3em',
+          }}
+        >
+          닫기
         </button>
       </div>
     </div>
