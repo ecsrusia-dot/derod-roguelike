@@ -7,6 +7,16 @@
 
 export const CHANGELOG = [
   {
+    version: '1.34.0',
+    date: '2026-05-18',
+    label: '술법사 일러 4컷 교체 — 정면·시작·승리·패배 풀 리소스 갱신',
+    changes: [
+      { type: 'system', text: '[술법사 일러 4컷 교체] PM이 직접 생성한 신규 일러 4장(sage / sagestart / sagewin / sageloss)으로 기존 일러 전면 교체. 직업 선택 화면, 전투 시작·승리·패배 컷씬에서 즉시 적용. 코드 경로 변경 없음 (`./classes/sage*.jpg` 기존 경로 유지)' },
+      { type: 'system', text: '[리소스 최적화] PNG → JPG quality 90 변환으로 sage.jpg 2461→386 KB (84% 절감), sagestart.jpg 2624→451 KB (83%), sagewin.jpg 2561→443 KB (83%), sageloss.jpg 1986→302 KB (85%). 기존 sage.jpg 3.7MB·sagestart.jpg 3.5MB(PM 이전 변환분)도 함께 정리됨' },
+      { type: 'system', text: '[게임 동작 영향 없음] 이미지만 교체. 데이터·로직·밸런스 변경 0건. 다음 부팅 시 PWA 캐시 갱신으로 자동 반영' },
+    ],
+  },
+  {
     version: '1.33.0',
     date: '2026-05-17',
     label: '이프리트 궁극 3종 전면 상향 + Lv.7 마일스톤 제거 — 영겁 누적·화신 폭딜·연옥 시너지 차별화',
