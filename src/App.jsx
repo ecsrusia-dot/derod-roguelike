@@ -1707,7 +1707,13 @@ export default function App() {
               const _relicStat = {
                 dodge: getActiveRelicStat(relics, activeRelicNames, 'dodge'),
                 critRate: getActiveRelicStat(relics, activeRelicNames, 'critRate'),
+                critDmg: getActiveRelicStat(relics, activeRelicNames, 'critDmg'),
                 magicDmg: getActiveRelicStat(relics, activeRelicNames, 'magicDmg'),
+                lifesteal: getActiveRelicStat(relics, activeRelicNames, 'lifesteal'),
+                reflect: getActiveRelicStat(relics, activeRelicNames, 'reflect'),
+                heal: getActiveRelicStat(relics, activeRelicNames, 'heal'),
+                dmgDealt: getActiveRelicStat(relics, activeRelicNames, 'dmgDealt'),
+                dmgTaken: getActiveRelicStat(relics, activeRelicNames, 'dmgTaken'),
               };
               const _engFx = aggregateEngravingEffects(classData?.id, meta?.engravings?.[classData?.id]?.slots);
               const _derivedStats = computeDerivedStats(skills, ultimates, activeSkills, _relicStat, _engFx);
@@ -1715,7 +1721,9 @@ export default function App() {
                 <StatusPanel classData={classData} hp={hp} maxHp={maxHp} skills={skills}
                   stats={_displayStats} derivedStats={_derivedStats}
                   relics={relics} ultimates={ultimates} activeSkills={activeSkills}
-                  activeRelicNames={activeRelicNames} onClose={() => setScreen('map')} />
+                  activeRelicNames={activeRelicNames}
+                  relicStat={_relicStat} meta={meta} curses={currentCurses} engravingFx={_engFx}
+                  onClose={() => setScreen('map')} />
               );
             })()}
             {/* 노드 진입 설명 모달 (튜토리얼 챕터에서만) */}

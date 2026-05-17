@@ -7,11 +7,11 @@
 
 import React, { useState } from 'react';
 import { Heart, X } from 'lucide-react';
-import { PALETTE, getCharismaHealBonus, getCharismaDmgReduction, getIntellectSoulBonus, getIntellectEtherBonus, getIfritIgniteRate } from '../utils/helpers.js';
+import { PALETTE, getCharismaHealBonus, getCharismaDmgReduction, getIntellectSoulBonus, getIntellectEtherBonus, getIfritIgniteRate, getMinorBonus, getMetaBonus, hasEffect, hasUltimate, hasCurse } from '../utils/helpers.js';
 import { PASSIVE_SKILLS, COMBAT_SKILLS, ULTIMATE_SKILLS } from '../data.js';
 import CardInfoModal, { buildPassiveInfo, buildRelicInfo, buildActiveSkillInfo } from './CardInfoModal.jsx';
 
-export default function StatusPanel({ classData, hp, maxHp, skills, stats, derivedStats = null, relics, ultimates = [], activeSkills = null, activeRelicNames = null, onClose }) {
+export default function StatusPanel({ classData, hp, maxHp, skills, stats, derivedStats = null, relics, ultimates = [], activeSkills = null, activeRelicNames = null, relicStat = {}, meta = null, curses = [], engravingFx = {}, onClose }) {
   const skillsByAxis = { attack: [], defense: [], utility: [] };
   Object.entries(skills).forEach(([name, lv]) => {
     if (lv > 0 && PASSIVE_SKILLS[name]) {
@@ -63,99 +63,154 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
               </div>
             ))}
           </div>
-          {/* 매력 시그니처 효과 — 사제 정체성 (모든 직업이 매력 보석으로 효과 획득 가능) */}
+          {/* ━ 전투 수치 ━ (치명타·회피·방어 무시·반격·화염 각인) */}
           {(() => {
-            const healPct = getCharismaHealBonus(stats);
-            const reducePct = getCharismaDmgReduction(stats);
-            if (healPct <= 0 && reducePct <= 0) return null;
+            const playerDex = stats['민첩'] || 10;
+            let critRate = 5 + Math.max(0, (playerDex - 10) * 0.5);
+            critRate += getMinorBonus(skills, 'critRate+', activeSkills);
+            critRate += getMetaBonus(meta, 'critRate+3%') * 3;
+            critRate += relicStat.critRate || 0;
+            if (hasEffect(skills, 'weaknessPoint', activeSkills)) critRate += 10;
+            if (hasUltimate(ultimates, 'ult_counterShadow')) critRate += 15;
+            critRate += engravingFx.critRate || 0;
+            let critDmg = hasEffect(skills, 'critDmg+30', activeSkills) ? 80 : 50;
+            critDmg += relicStat.critDmg || 0;
+            if (hasEffect(skills, 'weaknessPoint', activeSkills)) critDmg += 50;
+            let dodgeRate = Math.max(0, (playerDex - 10) * 0.3);
+            dodgeRate += getMinorBonus(skills, 'dodge+', activeSkills);
+            dodgeRate += relicStat.dodge || 0;
+            if (hasEffect(skills, 'dodge+15', activeSkills)) dodgeRate += 15;
+            if (hasEffect(skills, 'detailIntent', activeSkills)) dodgeRate += 10;
+            if (hasUltimate(ultimates, 'ult_counterMirror')) dodgeRate += 10;
+            dodgeRate += engravingFx.dodgeRate || 0;
+            // 방어 무시
+            let armorIgnore = 0;
+            const ifritLv = skills['이프리트'] || 0;
+            const ifritActive = !activeSkills || activeSkills.includes('이프리트');
+            if (ifritActive && ifritLv >= 3) armorIgnore += 5;
+            if (ifritActive && ifritLv >= 5) armorIgnore += 10;
+            if (hasUltimate(ultimates, 'ult_ifritDescent')) armorIgnore += 25;
+            // 반격률
+            const simanLv = skills['심안류'] || 0;
+            const hasMirror = hasUltimate(ultimates, 'ult_counterMirror');
+            const hasShock = hasUltimate(ultimates, 'ult_counterShock');
+            const hasShadow = hasUltimate(ultimates, 'ult_counterShadow');
+            let counterRate = 0;
+            if (simanLv > 0 || hasMirror || hasShock || hasShadow) {
+              counterRate = simanLv * 5;
+              if (simanLv >= 3) counterRate += 20;
+              if (hasMirror || hasShock || hasShadow) counterRate += 60;
+              if (counterRate > 100) counterRate = 100;
+            }
+            counterRate += engravingFx.counterRatePct || 0;
+            const ignite = getIfritIgniteRate(skills, ultimates, activeSkills);
             return (
-              <div className="mt-2 pt-2 border-t flex items-center justify-center gap-3 text-[10px]" style={{ borderColor: `${classData.color}20` }}>
-                <span style={{ color: PALETTE.textDim }}>◇ 매력 시그니처</span>
-                {healPct > 0 && (
-                  <span style={{ color: PALETTE.green }}>회복 <span className="font-bold tabular-nums">+{healPct}%</span></span>
-                )}
-                {reducePct > 0 && (
-                  <span style={{ color: PALETTE.dawn }}>받는뎀 <span className="font-bold tabular-nums">-{reducePct}%</span></span>
-                )}
-              </div>
-            );
-          })()}
-          {/* 지능 시그니처 효과 (1.32.0~) — 술법사 정체성. 1단계 지능 11+ / 2단계 지능 17+ */}
-          {(() => {
-            const soulBonus = getIntellectSoulBonus(stats);
-            const etherBonus = getIntellectEtherBonus(stats);
-            if (soulBonus <= 0 && etherBonus <= 0) return null;
-            return (
-              <div className="mt-1 flex items-center justify-center gap-3 text-[10px]">
-                <span style={{ color: PALETTE.textDim }}>◇ 지능 시그니처</span>
-                {soulBonus > 0 && (
-                  <span style={{ color: PALETTE.legendary }}>마법 시 영혼 <span className="font-bold tabular-nums">+{soulBonus}</span></span>
-                )}
-                {etherBonus > 0 && (
-                  <span style={{ color: '#5c4a8c' }}>시작 에테르 <span className="font-bold tabular-nums">+{etherBonus}</span></span>
-                )}
-              </div>
-            );
-          })()}
-          {/* 파생 능력치 (1.31.0~) — 방어 무시/치명타율/회피율/마법딜/물리딜. 0인 항목은 숨김. */}
-          {derivedStats && (() => {
-            const items = [];
-            if (derivedStats.armorIgnore > 0) items.push({ label: '방어 무시', value: `+${derivedStats.armorIgnore}`, color: PALETTE.accent });
-            if (derivedStats.critRate > 0) items.push({ label: '치명타율', value: `+${derivedStats.critRate}%`, color: PALETTE.legendary });
-            if (derivedStats.dodgeRate > 0) items.push({ label: '회피율', value: `+${derivedStats.dodgeRate}%`, color: PALETTE.green });
-            if (derivedStats.magicDmgPct > 0) items.push({ label: '마법 딜', value: `+${derivedStats.magicDmgPct}%`, color: '#5c4a8c' });
-            if (derivedStats.physDmg > 0) items.push({ label: '물리 딜', value: `+${derivedStats.physDmg}`, color: '#c4453d' });
-            if (items.length === 0) return null;
-            return (
-              <div className="mt-2 pt-2 border-t" style={{ borderColor: `${classData.color}20` }}>
-                <div className="text-[9px] mb-1 text-center" style={{ color: PALETTE.textDim, letterSpacing: '0.15em' }}>◇ 파생 능력치</div>
-                <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[10px]">
-                  {items.map((it, i) => (
-                    <span key={i}>
-                      <span style={{ color: PALETTE.textDim }}>{it.label} </span>
-                      <span className="font-bold tabular-nums" style={{ color: it.color }}>{it.value}</span>
-                    </span>
-                  ))}
+              <div className="mt-3 pt-3 border-t" style={{ borderColor: `${classData.color}30` }}>
+                <div className="text-[10px] mb-1.5" style={{ color: PALETTE.textDim, letterSpacing: '0.15em' }}>━ 전투 수치 ━</div>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px]">
+                  <div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>치명타율</span><span className="font-bold tabular-nums" style={{ color: PALETTE.legendary }}>{Math.round(critRate)}%</span></div>
+                  <div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>치명타데미지</span><span className="font-bold tabular-nums" style={{ color: PALETTE.legendary }}>+{Math.round(critDmg)}%</span></div>
+                  <div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>회피율</span><span className="font-bold tabular-nums" style={{ color: PALETTE.green }}>{Math.round(dodgeRate)}%</span></div>
+                  {armorIgnore > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>방어무시</span><span className="font-bold tabular-nums" style={{ color: PALETTE.accent }}>+{armorIgnore}</span></div>)}
+                  {counterRate > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>반격률</span><span className="font-bold tabular-nums" style={{ color: PALETTE.accent }}>{counterRate}%</span></div>)}
+                  {ignite.has && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>화염각인</span><span className="font-bold tabular-nums" style={{ color: '#d97706' }}>{ignite.rate}%</span></div>)}
                 </div>
               </div>
             );
           })()}
-          {/* 종합 효과 (1.36.0~) — 각인·유물·패시브 누적 보너스 한눈에 보기. 0인 항목은 숨김. */}
-          {derivedStats && (() => {
-            const items = [];
-            // 공격·방어 가산
-            if (derivedStats.physDmgPct > 0) items.push({ label: '물리 딜+', value: `+${derivedStats.physDmgPct}%`, color: '#c4453d' });
-            if (derivedStats.dmgTakenPct > 0) items.push({ label: '받는 뎀', value: `+${derivedStats.dmgTakenPct}%`, color: PALETTE.accent });
-            if (derivedStats.dmgTakenPct < 0) items.push({ label: '받는 뎀', value: `${derivedStats.dmgTakenPct}%`, color: PALETTE.green });
-            if (derivedStats.afterDodgeDmg > 0) items.push({ label: '회피 후 딜', value: `+${derivedStats.afterDodgeDmg}%`, color: PALETTE.green });
-            // 반격 계열
-            if (derivedStats.counterRatePct !== 0) items.push({ label: '반격율', value: `${derivedStats.counterRatePct > 0 ? '+' : ''}${derivedStats.counterRatePct}%`, color: PALETTE.legendary });
-            if (derivedStats.counterDmgPct !== 0) items.push({ label: '반격 뎀', value: `${derivedStats.counterDmgPct > 0 ? '+' : ''}${derivedStats.counterDmgPct}%`, color: PALETTE.legendary });
-            if (derivedStats.counterHitSoul > 0) items.push({ label: '반격→영혼', value: `+${derivedStats.counterHitSoul}`, color: PALETTE.dawn });
-            if (derivedStats.counterShock > 0) items.push({ label: '반격→충격', value: `+${derivedStats.counterShock}`, color: PALETTE.twilight });
-            if (derivedStats.counterCanCrit) items.push({ label: '반격 치명', value: '가능', color: PALETTE.legendary });
-            // 영혼 게이지 계열
-            if (derivedStats.startSoul > 0) items.push({ label: '시작 영혼', value: `+${derivedStats.startSoul}`, color: PALETTE.dawn });
-            if (derivedStats.perTurnSoul > 0) items.push({ label: '턴당 영혼', value: `+${derivedStats.perTurnSoul}`, color: PALETTE.dawn });
-            if (derivedStats.dodgeSoul > 0) items.push({ label: '회피→영혼', value: `+${derivedStats.dodgeSoul}`, color: PALETTE.dawn });
-            if (derivedStats.soulGainMult !== 0) items.push({ label: '영혼 획득', value: `×${(1 + derivedStats.soulGainMult).toFixed(2)}`, color: PALETTE.legendary });
-            // 패널티 / 손실
-            if (derivedStats.perTurnHpLoss > 0) items.push({ label: '턴당 HP', value: `-${derivedStats.perTurnHpLoss}`, color: PALETTE.accent });
-            if (derivedStats.disableInsightPredict) items.push({ label: '심안 차단', value: 'ON', color: PALETTE.accent });
-            // 술법사 화염 각인 발동율
-            const ignite = getIfritIgniteRate(skills, ultimates, activeSkills);
-            if (ignite.has) items.push({ label: '화염 각인', value: `${ignite.rate}%`, color: '#d97706' });
-            if (items.length === 0) return null;
+          {/* ━ 데미지 보정 ━ */}
+          {(() => {
+            const physBonus = getMinorBonus(skills, 'physDmg+', activeSkills);
+            const magicBonus = getMinorBonus(skills, 'magicDmg+', activeSkills) + (hasEffect(skills, 'magicDmg+30', activeSkills) ? 30 : 0) + (relicStat.magicDmg || 0);
+            const bleedBonus = getMinorBonus(skills, 'bleedDmg+', activeSkills);
+            const simanLv = skills['심안류'] || 0;
+            const hasMirror = hasUltimate(ultimates, 'ult_counterMirror');
+            const hasShock = hasUltimate(ultimates, 'ult_counterShock');
+            const hasShadow = hasUltimate(ultimates, 'ult_counterShadow');
+            let counterDmgBonus = simanLv * 5;
+            if (simanLv >= 5) counterDmgBonus += 15;
+            if (hasMirror || hasShock || hasShadow) counterDmgBonus += 50;
+            counterDmgBonus += engravingFx.counterDmgPct || 0;
+            const physDmgPct = engravingFx.physDmgPct || 0;
+            const afterDodgeDmg = engravingFx.afterDodgeDmg || 0;
+            const metaDmgBonus = getMetaBonus(meta, 'dmgDealt+5%') * 5;
+            const relicDmgBonus = relicStat.dmgDealt || 0;
+            const allDmgBonus = metaDmgBonus + relicDmgBonus;
+            const dmgTakenMeta = getMetaBonus(meta, 'dmgTaken-3%') * 3;
+            const dmgTakenRelic = relicStat.dmgTaken || 0;
+            const dmgTakenLv5 = hasEffect(skills, 'dmgTaken-20', activeSkills) ? 20 : 0;
+            const dmgTakenCharisma = getCharismaDmgReduction(stats);
+            const dmgTakenReduce = dmgTakenMeta + dmgTakenRelic + dmgTakenLv5 + dmgTakenCharisma;
+            const dmgTakenEngFx = engravingFx.dmgTakenPct || 0;
+            const dmgDealtCurse = hasCurse(curses, 'curse_dmgDealt-15') ? 15 : 0;
+            const dmgTakenCurse = (hasCurse(curses, 'curse_dmgTaken+15') ? 15 : 0)
+              + (hasCurse(curses, 'curse_dmgTaken+30') ? 30 : 0);
+            const hasAny = physBonus || magicBonus || bleedBonus || counterDmgBonus || physDmgPct || afterDodgeDmg || allDmgBonus || dmgTakenReduce || dmgTakenEngFx || dmgDealtCurse || dmgTakenCurse;
+            if (!hasAny) return null;
             return (
-              <div className="mt-2 pt-2 border-t" style={{ borderColor: `${classData.color}20` }}>
-                <div className="text-[9px] mb-1 text-center" style={{ color: PALETTE.textDim, letterSpacing: '0.15em' }}>◇ 종합 효과 (각인·유물·패시브 누적)</div>
-                <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[10px]">
-                  {items.map((it, i) => (
-                    <span key={i}>
-                      <span style={{ color: PALETTE.textDim }}>{it.label} </span>
-                      <span className="font-bold tabular-nums" style={{ color: it.color }}>{it.value}</span>
-                    </span>
-                  ))}
+              <div className="mt-3 pt-3 border-t" style={{ borderColor: `${classData.color}30` }}>
+                <div className="text-[10px] mb-1.5" style={{ color: PALETTE.textDim, letterSpacing: '0.15em' }}>━ 데미지 보정 ━</div>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px]">
+                  {physBonus > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>물리데미지</span><span className="font-bold tabular-nums" style={{ color: PALETTE.accent }}>+{physBonus}</span></div>)}
+                  {physDmgPct > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>물리데미지+</span><span className="font-bold tabular-nums" style={{ color: '#c4453d' }}>+{physDmgPct}%</span></div>)}
+                  {magicBonus > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>마법데미지</span><span className="font-bold tabular-nums" style={{ color: PALETTE.twilight }}>+{magicBonus}%</span></div>)}
+                  {bleedBonus > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>출혈데미지</span><span className="font-bold tabular-nums" style={{ color: PALETTE.bleed }}>+{bleedBonus}%</span></div>)}
+                  {counterDmgBonus > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>반격데미지</span><span className="font-bold tabular-nums" style={{ color: PALETTE.accent }}>+{counterDmgBonus}%</span></div>)}
+                  {allDmgBonus > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>모든데미지</span><span className="font-bold tabular-nums" style={{ color: PALETTE.legendary }}>+{allDmgBonus}%</span></div>)}
+                  {afterDodgeDmg > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>회피후데미지</span><span className="font-bold tabular-nums" style={{ color: PALETTE.green }}>+{afterDodgeDmg}%</span></div>)}
+                  {dmgTakenReduce > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>받는데미지</span><span className="font-bold tabular-nums" style={{ color: PALETTE.green }}>-{dmgTakenReduce}%</span></div>)}
+                  {dmgTakenEngFx !== 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>받는데미지(각인)</span><span className="font-bold tabular-nums" style={{ color: dmgTakenEngFx > 0 ? PALETTE.accent : PALETTE.green }}>{dmgTakenEngFx > 0 ? '+' : ''}{dmgTakenEngFx}%</span></div>)}
+                  {dmgDealtCurse > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>저주(딜)</span><span className="font-bold tabular-nums" style={{ color: PALETTE.twilight }}>-{dmgDealtCurse}%</span></div>)}
+                  {dmgTakenCurse > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>저주(피)</span><span className="font-bold tabular-nums" style={{ color: PALETTE.twilight }}>+{dmgTakenCurse}%</span></div>)}
+                </div>
+              </div>
+            );
+          })()}
+          {/* ━ 기타 효과 ━ (영혼 게이지·재생·흡혈·반사·시그니처·각인 부수) */}
+          {(() => {
+            const regenLv = skills['재생'] || 0;
+            const lifesteal = relicStat.lifesteal || 0;
+            const reflect = relicStat.reflect || 0;
+            const heal = relicStat.heal || 0;
+            const charismaHeal = getCharismaHealBonus(stats);
+            const intellectSoul = getIntellectSoulBonus(stats);
+            const intellectEther = getIntellectEtherBonus(stats);
+            const cdReduce = getMinorBonus(skills, 'cdReduce+', activeSkills);
+            const etherReduce = hasEffect(skills, 'etherCost-20', activeSkills);
+            const startSoul = engravingFx.startSoul || 0;
+            const perTurnSoul = engravingFx.perTurnSoul || 0;
+            const dodgeSoul = engravingFx.dodgeSoul || 0;
+            const counterHitSoul = engravingFx.counterHitSoul || 0;
+            const counterShock = engravingFx.counterShock || 0;
+            const counterCanCrit = !!engravingFx.counterCanCrit;
+            const soulGainMult = engravingFx.soulGainMult || 0;
+            const perTurnHpLoss = engravingFx.perTurnHpLoss || 0;
+            const disableInsightPredict = !!engravingFx.disableInsightPredict;
+            const hasAny = regenLv || lifesteal || reflect || heal || charismaHeal || intellectSoul || intellectEther || cdReduce || etherReduce
+              || startSoul || perTurnSoul || dodgeSoul || counterHitSoul || counterShock || counterCanCrit || soulGainMult || perTurnHpLoss || disableInsightPredict;
+            if (!hasAny) return null;
+            return (
+              <div className="mt-3 pt-3 border-t" style={{ borderColor: `${classData.color}30` }}>
+                <div className="text-[10px] mb-1.5" style={{ color: PALETTE.textDim, letterSpacing: '0.15em' }}>━ 기타 효과 ━</div>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px]">
+                  {regenLv > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>HP재생</span><span className="font-bold tabular-nums" style={{ color: PALETTE.green }}>+{regenLv}/턴</span></div>)}
+                  {lifesteal > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>흡혈</span><span className="font-bold tabular-nums" style={{ color: PALETTE.accent }}>+{lifesteal}</span></div>)}
+                  {reflect > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>반사</span><span className="font-bold tabular-nums" style={{ color: PALETTE.accent }}>{reflect}%</span></div>)}
+                  {heal > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>회복효과</span><span className="font-bold tabular-nums" style={{ color: PALETTE.green }}>+{heal}%</span></div>)}
+                  {charismaHeal > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>매력(회복)</span><span className="font-bold tabular-nums" style={{ color: PALETTE.dawn }}>+{charismaHeal}%</span></div>)}
+                  {intellectSoul > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>지능(마법영혼)</span><span className="font-bold tabular-nums" style={{ color: PALETTE.legendary }}>+{intellectSoul}</span></div>)}
+                  {intellectEther > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>지능(시작에테르)</span><span className="font-bold tabular-nums" style={{ color: '#5c4a8c' }}>+{intellectEther}</span></div>)}
+                  {cdReduce > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>쿨다운감소</span><span className="font-bold tabular-nums" style={{ color: PALETTE.twilight }}>-{cdReduce}턴</span></div>)}
+                  {etherReduce && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>에테르비용</span><span className="font-bold tabular-nums" style={{ color: PALETTE.twilight }}>-1</span></div>)}
+                  {startSoul > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>시작영혼</span><span className="font-bold tabular-nums" style={{ color: PALETTE.dawn }}>+{startSoul}</span></div>)}
+                  {perTurnSoul > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>턴당영혼</span><span className="font-bold tabular-nums" style={{ color: PALETTE.dawn }}>+{perTurnSoul}</span></div>)}
+                  {dodgeSoul > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>회피→영혼</span><span className="font-bold tabular-nums" style={{ color: PALETTE.dawn }}>+{dodgeSoul}</span></div>)}
+                  {soulGainMult !== 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>영혼획득</span><span className="font-bold tabular-nums" style={{ color: PALETTE.legendary }}>×{(1 + soulGainMult).toFixed(2)}</span></div>)}
+                  {counterHitSoul > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>반격→영혼</span><span className="font-bold tabular-nums" style={{ color: PALETTE.dawn }}>+{counterHitSoul}</span></div>)}
+                  {counterShock > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>반격→충격</span><span className="font-bold tabular-nums" style={{ color: PALETTE.twilight }}>+{counterShock}</span></div>)}
+                  {counterCanCrit && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>반격치명</span><span className="font-bold tabular-nums" style={{ color: PALETTE.legendary }}>가능</span></div>)}
+                  {perTurnHpLoss > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>턴당HP</span><span className="font-bold tabular-nums" style={{ color: PALETTE.accent }}>-{perTurnHpLoss}</span></div>)}
+                  {disableInsightPredict && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>심안차단</span><span className="font-bold tabular-nums" style={{ color: PALETTE.accent }}>ON</span></div>)}
                 </div>
               </div>
             );

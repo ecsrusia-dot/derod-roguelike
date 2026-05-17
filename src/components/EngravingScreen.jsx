@@ -6,7 +6,7 @@
 // 전투 효과 적용은 PR 3에서 별도 처리 (이 화면은 표시·갱신만)
 // ============================================
 import React, { useState } from 'react';
-import { ArrowLeft, Lock, Sparkles } from 'lucide-react';
+import { ArrowLeft, Lock, Sparkles, X } from 'lucide-react';
 import {
   PALETTE,
   rollEngravingCard,
