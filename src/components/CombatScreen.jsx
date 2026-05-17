@@ -565,6 +565,10 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       if (skill.dodgeBuff) {
         newPlayer.buffs = { ...newPlayer.buffs, dodgeBuff: skill.dodgeBuff, dodgeBuffTurns: 1 };
       }
+      // 화염장막 (sage): 다음 적 공격 1회에 한해 50% 확률로 화염 각인 반사
+      if (skill.reflectIgnite) {
+        newPlayer.buffs = { ...newPlayer.buffs, flameBarrierPending: skill.reflectIgnite };
+      }
       // 자가 회복 (사제 - 가호)
       if (skill.selfHeal) {
         let heal = skill.selfHeal;
@@ -671,6 +675,39 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
 
         // FX — 전용 3중 슬래시 ShadowStrikeFx + 화면 흔들림 + 적 흔들림 + 흰 플래시
         setFxShadowStrike(v => v + 1);
+        setFxScreenShake(v => v + 1);
+        setFxEnemyShake(v => v + 1);
+        setFxEnemyFlash(v => v + 1);
+        pushFxLabel('enemy', 'crit', cut);
+      } else if (ult.effect === 'classult_eternalFlame') {
+        // 50 화염 데미지(방어 무시) + 화염 각인 100% 부여(5턴, 지능×0.4/턴) + 다음 2턴 마법 데미지 +50%
+        const cut = 50;
+        newEnemy.currentHp = Math.max(0, newEnemy.currentHp - cut);
+
+        // 화염 각인 강제 부여 (살아 있을 때만)
+        const igniteDmg = Math.floor((newPlayer.지능 || 0) * 0.4);
+        if (newEnemy.currentHp > 0 && igniteDmg > 0) {
+          newEnemy.debuffs = {
+            ...newEnemy.debuffs,
+            igniteDmg,
+            igniteTurns: 5,
+            igniteEternal: false,
+            igniteJustApplied: true,
+          };
+          newLog.push({ type: 'debuff', text: `🔥 [화염 각인] ${igniteDmg} 데미지 5T 부여` });
+        }
+
+        // 다음 2턴 마법 데미지 +50% 버프
+        newPlayer.buffs = {
+          ...newPlayer.buffs,
+          flameBoostPct: 50,
+          flameBoostTurns: 2,
+        };
+
+        newLog.push({ type: 'damage', text: `· ${enemy.name}에게 ${cut} 화염 데미지 [방어 무시]` });
+        newLog.push({ type: 'passive', text: `★ [영겁의 정념] 2턴간 마법 데미지 +50%` });
+
+        // FX — 화면 흔들림 + 적 흔들림 + 흰 플래시
         setFxScreenShake(v => v + 1);
         setFxEnemyShake(v => v + 1);
         setFxEnemyFlash(v => v + 1);
@@ -923,6 +960,25 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
               setFxVignette(v => v + 1);
               // 강타(heavy)면 화면 흔들림
               if (intent.heavy) setFxScreenShake(v => v + 1);
+
+              // 1.28.0~ 화염장막 (sage): 피격 시 50% 확률로 공격한 적에게 화염 각인 반사 (1회 소비)
+              const flamePct = newPlayer.buffs?.flameBarrierPending || 0;
+              if (flamePct > 0 && newEnemy.currentHp > 0) {
+                newPlayer.buffs = { ...newPlayer.buffs, flameBarrierPending: 0 };
+                if (Math.random() * 100 < flamePct) {
+                  const refIgnite = Math.floor((newPlayer.지능 || 0) * 0.3);
+                  if (refIgnite > 0) {
+                    newEnemy.debuffs = {
+                      ...newEnemy.debuffs,
+                      igniteDmg: refIgnite,
+                      igniteTurns: 3,
+                      igniteEternal: false,
+                      igniteJustApplied: true,
+                    };
+                    newLog.push({ type: 'passive', text: `🔥 [화염장막] 반사 — 화염 각인 ${refIgnite} 3T 부여` });
+                  }
+                }
+              }
             }
           }
         }
@@ -1425,6 +1481,15 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         newLog.push({ type: 'system', text: `· 무영의 잔영 종료` });
       }
     }
+    // 1.28.0~ 영겁의 화염 후속 버프 (sage): 마법 데미지 +N% 1턴 차감
+    if (newPlayer.buffs?.flameBoostTurns > 0) {
+      const remaining = newPlayer.buffs.flameBoostTurns - 1;
+      newPlayer.buffs = { ...newPlayer.buffs, flameBoostTurns: remaining };
+      if (remaining === 0) {
+        newPlayer.buffs.flameBoostPct = 0;
+        newLog.push({ type: 'system', text: `· 영겁의 정념 종료` });
+      }
+    }
     // 화신강림 1턴 치명 버프 정리
     if (newPlayer.buffs?.ifritCritNext) {
       newPlayer.buffs = { ...newPlayer.buffs };
@@ -1801,6 +1866,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                 {player.defense > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.defense}50`, color: '#fff', border: `1px solid ${PALETTE.defense}` }}>◈ 방어 {player.defense}</span>)}
                 {player.buffs?.rage > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.accent}50`, color: '#fff', border: `1px solid ${PALETTE.accent}` }}>☩ 분노 ({player.buffs.rage}T)</span>)}
                 {player.buffs?.shadowCounterTurns > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#1a0f0a90', color: '#ffd86b', border: '1px solid #ffd86b', boxShadow: '0 0 6px rgba(255,216,107,0.5)' }}>☄ 무영의 잔영 반격 100% ({player.buffs.shadowCounterTurns}T)</span>)}
+                {player.buffs?.flameBoostTurns > 0 && player.buffs?.flameBoostPct > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#ff450050', color: '#ffd1a3', border: '1px solid #ff4500', boxShadow: '0 0 6px rgba(255,69,0,0.5)' }}>🔥 영겁의 정념 +{player.buffs.flameBoostPct}% ({player.buffs.flameBoostTurns}T)</span>)}
+                {player.buffs?.flameBarrierPending > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#ff6b3550', color: '#fff', border: '1px solid #ff6b35' }}>🔥 화염장막 ({player.buffs.flameBarrierPending}%)</span>)}
                 {player.buffs?.guaranteedCrit > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#c4453d50', color: '#fff', border: '1px solid #c4453d' }}>✦ 치명타 확정</span>)}
                 {player.buffs?.mirrorCounterDmgPending && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#88aacc50', color: '#fff', border: '1px solid #88aacc' }}>◇ 회피→반격 +100%</span>)}
                 {player.firstHitImmune && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.legendary}50`, color: '#fff', border: `1px solid ${PALETTE.legendary}` }}>✦ 무적 1회</span>)}
@@ -1963,7 +2030,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
 
             {/* 활성 상태 — 메인 헤더의 buff/debuff 칩을 모달에서도 확인 가능 */}
             {(() => {
-              const hasAnyStatus = (player.buffs?.rage > 0) || (player.buffs?.shadowCounterTurns > 0) || (player.buffs?.guaranteedCrit > 0) || (player.buffs?.mirrorCounterDmgPending) || (player.buffs?.dodgeBuffTurns > 0) || player.firstHitImmune || (player.debuffs?.frostbiteDmg > 0 && player.debuffs?.frostbiteTurns > 0) || (player.debuffs?.sealedTurns > 0 && player.debuffs?.sealedSkills?.length > 0) || (player.debuffs?.shockGauge > 0) || (player.debuffs?.stunnedTurns > 0);
+              const hasAnyStatus = (player.buffs?.rage > 0) || (player.buffs?.shadowCounterTurns > 0) || (player.buffs?.flameBoostTurns > 0) || (player.buffs?.flameBarrierPending > 0) || (player.buffs?.guaranteedCrit > 0) || (player.buffs?.mirrorCounterDmgPending) || (player.buffs?.dodgeBuffTurns > 0) || player.firstHitImmune || (player.debuffs?.frostbiteDmg > 0 && player.debuffs?.frostbiteTurns > 0) || (player.debuffs?.sealedTurns > 0 && player.debuffs?.sealedSkills?.length > 0) || (player.debuffs?.shockGauge > 0) || (player.debuffs?.stunnedTurns > 0);
               if (!hasAnyStatus) return null;
               return (
                 <>
@@ -1971,6 +2038,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                   <div className="flex items-center gap-1.5 flex-wrap mb-3">
                     {player.buffs?.rage > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.accent}50`, color: '#fff', border: `1px solid ${PALETTE.accent}` }}>☩ 분노 ({player.buffs.rage}T)</span>)}
                     {player.buffs?.shadowCounterTurns > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#1a0f0a90', color: '#ffd86b', border: '1px solid #ffd86b', boxShadow: '0 0 6px rgba(255,216,107,0.5)' }}>☄ 무영의 잔영 반격 100% ({player.buffs.shadowCounterTurns}T)</span>)}
+                    {player.buffs?.flameBoostTurns > 0 && player.buffs?.flameBoostPct > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#ff450050', color: '#ffd1a3', border: '1px solid #ff4500', boxShadow: '0 0 6px rgba(255,69,0,0.5)' }}>🔥 영겁의 정념 +{player.buffs.flameBoostPct}% ({player.buffs.flameBoostTurns}T)</span>)}
+                    {player.buffs?.flameBarrierPending > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#ff6b3550', color: '#fff', border: '1px solid #ff6b35' }}>🔥 화염장막 ({player.buffs.flameBarrierPending}%)</span>)}
                     {player.buffs?.guaranteedCrit > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#c4453d50', color: '#fff', border: '1px solid #c4453d' }}>✦ 치명타 확정</span>)}
                     {player.buffs?.mirrorCounterDmgPending && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#88aacc50', color: '#fff', border: '1px solid #88aacc' }}>◇ 회피→반격 +100%</span>)}
                     {player.buffs?.dodgeBuffTurns > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.green}50`, color: '#fff', border: `1px solid ${PALETTE.green}` }}>💨 회피 +{player.buffs.dodgeBuff || 0}% ({player.buffs.dodgeBuffTurns}T)</span>)}
