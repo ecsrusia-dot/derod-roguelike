@@ -6,7 +6,7 @@ import { PlayCircle } from 'lucide-react';
 import { PALETTE } from '../utils/helpers.js';
 import { GAME_VERSION, VERSION_DATE, VERSION_LABEL, CLASSES } from '../data.js';
 
-export default function TitleScreen({ meta, onStart, onResume, onAltar, onAchievements, onChangelog, onAccount }) {
+export default function TitleScreen({ meta, onStart, onResume, onAltar, onEngravings, onAchievements, onChangelog, onAccount }) {
   // 진행 중인 런이 있는지 — 이어하기 버튼 노출 여부 결정
   const activeRun = meta?.activeRun;
   const canResume = !!(activeRun && activeRun.v === 1 && activeRun.expedition);
@@ -85,7 +85,18 @@ export default function TitleScreen({ meta, onStart, onResume, onAltar, onAchiev
           letterSpacing: '0.25em',
           fontSize: '12px',
         }}>★ 영혼의 제단</button>
-        
+
+        {onEngravings && (
+          <button onClick={onEngravings} className="w-full py-2.5 transition-all hover:scale-[1.02]" style={{
+            background: `linear-gradient(180deg, ${PALETTE.dawn}40, ${PALETTE.dawn}20)`,
+            color: PALETTE.text,
+            border: `1px solid ${PALETTE.dawn}`,
+            fontFamily: '"Cinzel", serif',
+            letterSpacing: '0.25em',
+            fontSize: '12px',
+          }}>◆ 직업 각인</button>
+        )}
+
         <button onClick={onAchievements} className="w-full py-2.5 transition-all hover:scale-[1.02]" style={{
           background: `linear-gradient(180deg, ${PALETTE.legendary}40, ${PALETTE.legendary}20)`,
           color: PALETTE.text,

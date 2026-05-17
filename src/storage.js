@@ -52,6 +52,18 @@ const DEFAULT_META = {
   // 진행 중인 런 스냅샷 (맵 화면 진입 시 자동 저장 — 앱 종료/새로고침 후 이어하기 용)
   // null = 진행 중 런 없음. 객체 = 재개 가능한 런 상태.
   activeRun: null,
+  // 직업 각인 시스템 (1.25.0~)
+  // engravings[classId] = { lv: 1~10, slots: [cardId|null, cardId|null, cardId|null] }
+  engravings: {
+    lanthert:   { lv: 1, slots: [null, null, null] },
+    sage:       { lv: 1, slots: [null, null, null] },
+    demonblood: { lv: 1, slots: [null, null, null] },
+    elf:        { lv: 1, slots: [null, null, null] },
+    priest:     { lv: 1, slots: [null, null, null] },
+  },
+  // meta_startSkillLv → 각인 시스템 이관 안내 (1.25.0 첫 부팅 시 1회 표시)
+  // null = 안내 안 보여줌 / 객체 = { refundedSouls: N, refundedStack: N }
+  engravingMigrationNotice: null,
 };
 
 // IndexedDB 열기
@@ -83,6 +95,27 @@ export async function loadMeta() {
         const safe = { ...DEFAULT_META, ...data };
         // codex는 중첩 객체라 누락 필드 보강
         safe.codex = { ...DEFAULT_META.codex, ...(data.codex || {}) };
+        // engravings는 직업별 중첩이라 누락 직업 보강 (신규 직업 추가 대비)
+        safe.engravings = { ...DEFAULT_META.engravings, ...(data.engravings || {}) };
+        // 1.25.0 마이그레이션: meta_startSkillLv → 각인 시스템 이관 + 영혼 100% 환불
+        // 이미 마이그레이션 했으면 (upgrades에 키 없으면) 스킵
+        const oldStack = safe.upgrades?.meta_startSkillLv;
+        if (oldStack && oldStack > 0) {
+          // 환불 계산 (cost: stack 0 → 500, stack 1 → 2000)
+          let refund = 0;
+          if (oldStack >= 1) refund += 500;
+          if (oldStack >= 2) refund += 2000;
+          safe.souls = (safe.souls || 0) + refund;
+          // 키 삭제
+          const newUpgrades = { ...safe.upgrades };
+          delete newUpgrades.meta_startSkillLv;
+          safe.upgrades = newUpgrades;
+          // 안내 모달 트리거 데이터 저장
+          safe.engravingMigrationNotice = { refundedSouls: refund, refundedStack: oldStack };
+          // 즉시 저장해 재실행(중복 환불) 방지
+          saveMeta(safe).then(() => resolve(safe)).catch(() => resolve(safe));
+          return;
+        }
         resolve(safe);
       };
       request.onerror = () => reject(request.error);
@@ -475,4 +508,69 @@ export function unlockChampionshipRelic(meta, relicName) {
     ...meta,
     championshipRelicUnlocks: [...cur, relicName],
   };
+}
+
+// =========== 직업 각인 시스템 헬퍼 (1.25.0~) ===========
+
+// 현재 각성도 Lv 조회 (없으면 1)
+export function getAwakeningLv(meta, classId) {
+  return meta?.engravings?.[classId]?.lv ?? 1;
+}
+
+// 슬롯 배열 조회 (없으면 [null, null, null])
+export function getEngravingSlots(meta, classId) {
+  return meta?.engravings?.[classId]?.slots ?? [null, null, null];
+}
+
+// 각성도 Lv에 따라 개방된 슬롯 개수 (Lv.2/5/9 기준)
+export function getUnlockedSlotCount(awakeningLv) {
+  if (awakeningLv >= 9) return 3;
+  if (awakeningLv >= 5) return 2;
+  if (awakeningLv >= 2) return 1;
+  return 0;
+}
+
+// 각성도 강화 적용 (영혼 차감 + Lv +1)
+// cost는 호출 측에서 검증. 슬롯 개방 시점이면 slotCard에 새 각인 ID 전달.
+export function applyAwakening(meta, classId, cost, slotIdx = null, slotCard = null) {
+  const cur = meta.engravings?.[classId] ?? { lv: 1, slots: [null, null, null] };
+  const newSlots = [...cur.slots];
+  if (slotIdx !== null && slotCard !== null) {
+    newSlots[slotIdx] = slotCard;
+  }
+  return {
+    ...meta,
+    souls: (meta.souls || 0) - cost,
+    engravings: {
+      ...(meta.engravings || {}),
+      [classId]: {
+        lv: cur.lv + 1,
+        slots: newSlots,
+      },
+    },
+  };
+}
+
+// 각인 슬롯 카드 변경 (가챠 결과 덮어쓰기). cost는 호출 측에서 차감 처리.
+export function applyEngravingSlot(meta, classId, slotIdx, cardId, costPaid = 0) {
+  const cur = meta.engravings?.[classId] ?? { lv: 1, slots: [null, null, null] };
+  const newSlots = [...cur.slots];
+  newSlots[slotIdx] = cardId;
+  return {
+    ...meta,
+    souls: (meta.souls || 0) - costPaid,
+    engravings: {
+      ...(meta.engravings || {}),
+      [classId]: {
+        ...cur,
+        slots: newSlots,
+      },
+    },
+  };
+}
+
+// 마이그레이션 안내 acknowledge — 모달 닫을 때 호출
+export function clearEngravingMigrationNotice(meta) {
+  if (!meta.engravingMigrationNotice) return meta;
+  return { ...meta, engravingMigrationNotice: null };
 }

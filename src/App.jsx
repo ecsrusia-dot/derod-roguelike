@@ -51,6 +51,7 @@ import ForgeScreen from './components/ForgeScreen.jsx';
 import RewardSelect from './components/RewardSelect.jsx';
 import StatusPanel from './components/StatusPanel.jsx';
 import SoulAltar from './components/SoulAltar.jsx';
+import EngravingScreen, { EngravingMigrationModal } from './components/EngravingScreen.jsx';
 import MapView from './components/MapView.jsx';
 import CombatScreen from './components/CombatScreen.jsx';
 import NodeInfoModal from './components/NodeInfoModal.jsx';
@@ -95,7 +96,7 @@ import {
   VERSION_DATE,
   VERSION_LABEL,
 } from './data.js';
-import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun } from './storage.js';
+import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice } from './storage.js';
 
 
 
@@ -1620,7 +1621,7 @@ export default function App() {
               onSelectGuest={handleSelectGuest} 
               onSelectGoogle={handleSelectGoogle} 
             />}
-            {screen === 'title' && authMode && <TitleScreen meta={meta} onStart={() => setScreen('expeditionSelect')} onResume={resumeActiveRun} onAltar={enterAltar} onAchievements={() => { setPrevAchievementsBack('title'); setScreen('achievements'); }} onChangelog={() => setShowChangelog({ firstSeen: false })} onAccount={() => setScreen('account')} />}
+            {screen === 'title' && authMode && <TitleScreen meta={meta} onStart={() => setScreen('expeditionSelect')} onResume={resumeActiveRun} onAltar={enterAltar} onEngravings={() => setScreen('engraving')} onAchievements={() => { setPrevAchievementsBack('title'); setScreen('achievements'); }} onChangelog={() => setShowChangelog({ firstSeen: false })} onAccount={() => setScreen('account')} />}
             {screen === 'account' && <AccountScreen 
               authMode={authMode} 
               firebaseUser={firebaseUser} 
@@ -1661,6 +1662,7 @@ export default function App() {
               else if (selectedExpedition) startExpedition(selectedExpedition);
             }} />}
             {screen === 'altar' && <SoulAltar meta={meta} slots={altarSlots} onPurchase={purchaseUpgrade} onReroll={rerollAltar} onBack={() => setScreen('title')} />}
+            {screen === 'engraving' && <EngravingScreen meta={meta} onMetaUpdate={setMeta} onBack={() => setScreen('title')} />}
             {screen === 'achievements' && <AchievementScreen meta={meta} onClaim={handleClaimAchievement} onClose={() => setScreen(prevAchievementsBack)} />}
             {screen === 'map' && chapter && mapData && <MapView chapter={chapter} classData={classData} mapData={mapData} hp={hp} maxHp={maxHp} gold={gold} gem={gem} relics={relics} activeRelicNames={activeRelicNames} expedition={currentExpedition} curses={currentCurses} chapterIdx={chapterIdx} onEnterNode={handleEnterNode} onOpenStatus={() => setScreen('status')} onOpenAchievements={() => { setPrevAchievementsBack('map'); setScreen('achievements'); }} onOpenCodex={() => setScreen('codex')} onBack={() => setScreen('title')} />}
             {screen === 'codex' && <CodexScreen meta={meta} onBack={() => setScreen('map')} />}
@@ -1698,6 +1700,19 @@ export default function App() {
               }
               setShowChangelog(null);
             }} />}
+            {/* 1.25.0 마이그레이션 안내 모달 — meta_startSkillLv → 각인 시스템 이관 (영혼 100% 환불) */}
+            {!showChangelog && meta?.engravingMigrationNotice && (
+              <EngravingMigrationModal
+                notice={meta.engravingMigrationNotice}
+                onClose={() => {
+                  setMeta(prev => {
+                    const next = clearEngravingMigrationNotice(prev);
+                    saveMeta(next);
+                    return next;
+                  });
+                }}
+              />
+            )}
           </PhoneFrame>
     </ResponsiveLayout>
   );
