@@ -142,32 +142,48 @@ export function getMetaBonus(meta, effectType) {
   return bonus;
 }
 
-// 챔피언십 메타 보유 여부
+// 1.44.2~ 챔피언십 메타 4난이도 분할 — normal/hard/hell/madness
+// 효과 통일: 시작 HP·은화. 패시브 +Lv·유물 +1은 폐기 (환불 처리됨)
+const CHAMPION_META_IDS = {
+  normal: 'meta_champion_normal',
+  hard: 'meta_champion_hard',
+  hell: 'meta_champion_hell',
+  madness: 'meta_champion_madness',
+};
+const CHAMPION_META_HP = { normal: 10, hard: 15, hell: 20, madness: 25 };
+const CHAMPION_META_GOLD = { normal: 10, hard: 15, hell: 20, madness: 25 };
+
 export function hasChampionMeta(meta, level) {
   if (!meta || !meta.upgrades) return false;
-  const id = level === 'normal' ? 'meta_champion_normal' : 'meta_champion_madness';
-  return !!meta.upgrades[id];
+  const id = CHAMPION_META_IDS[level];
+  return !!(id && meta.upgrades[id]);
 }
 
-// 챔피언십 메타: 시작 HP 보너스
+// 챔피언십 메타: 시작 HP 보너스 (1.44.2~ 4난이도 누적 가능)
 export function getChampionshipMetaHp(meta) {
   let bonus = 0;
-  if (hasChampionMeta(meta, 'normal')) bonus += 50;
-  if (hasChampionMeta(meta, 'madness')) bonus += 100;
+  for (const [level, hp] of Object.entries(CHAMPION_META_HP)) {
+    if (hasChampionMeta(meta, level)) bonus += hp;
+  }
   return bonus;
 }
 
-// 챔피언십 메타: 시작 패시브 +Lv
-export function getChampionshipMetaSkillBonus(meta) {
+// 챔피언십 메타: 시작 은화 보너스 (1.44.2 신설)
+export function getChampionshipMetaGold(meta) {
   let bonus = 0;
-  if (hasChampionMeta(meta, 'normal')) bonus += 1;
-  if (hasChampionMeta(meta, 'madness')) bonus += 2;
+  for (const [level, gold] of Object.entries(CHAMPION_META_GOLD)) {
+    if (hasChampionMeta(meta, level)) bonus += gold;
+  }
   return bonus;
 }
 
-// 챔피언십 메타: 시작 유물 +개수
-export function getChampionshipMetaRelicBonus(meta) {
-  if (hasChampionMeta(meta, 'madness')) return 1;
+// 챔피언십 메타: 시작 패시브 +Lv (1.44.2 폐기. 호환 위해 0 반환)
+export function getChampionshipMetaSkillBonus() {
+  return 0;
+}
+
+// 챔피언십 메타: 시작 유물 +개수 (1.44.2 폐기. 호환 위해 0 반환)
+export function getChampionshipMetaRelicBonus() {
   return 0;
 }
 

@@ -19,6 +19,7 @@ import {
   getMetaBonus,
   hasChampionMeta,
   getChampionshipMetaHp,
+  getChampionshipMetaGold,
   getChampionshipMetaSkillBonus,
   getChampionshipMetaRelicBonus,
   isUnlocked,
@@ -56,7 +57,7 @@ import ForgeScreen from './components/ForgeScreen.jsx';
 import RewardSelect from './components/RewardSelect.jsx';
 import StatusPanel from './components/StatusPanel.jsx';
 import SoulAltar from './components/SoulAltar.jsx';
-import EngravingScreen, { EngravingMigrationModal, AwakeningConditionNoticeModal, WandererRenameNoticeModal } from './components/EngravingScreen.jsx';
+import EngravingScreen, { EngravingMigrationModal, AwakeningConditionNoticeModal, WandererRenameNoticeModal, SoulAltarRedesignModal } from './components/EngravingScreen.jsx';
 import MapView from './components/MapView.jsx';
 import CombatScreen from './components/CombatScreen.jsx';
 import NodeInfoModal from './components/NodeInfoModal.jsx';
@@ -101,7 +102,7 @@ import {
   VERSION_DATE,
   VERSION_LABEL,
 } from './data.js';
-import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice } from './storage.js';
+import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice } from './storage.js';
 
 
 
@@ -713,9 +714,9 @@ export default function App() {
       setHp(startHp);
       setMaxHp(startHp);
       
-      // 시작 자원 (메타 강화)
-      let startGold = GAME_CONFIG.startGold + getMetaBonus(meta, 'startGold+20') * 20;
-      let startGem = GAME_CONFIG.startGem + getMetaBonus(meta, 'startGem+3') * 3;
+      // 시작 자원 (메타 강화 — 1.44.2~ startGold+10, startGem+2 + 챔피언십 은화)
+      let startGold = GAME_CONFIG.startGold + getMetaBonus(meta, 'startGold+10') * 10 + getChampionshipMetaGold(meta);
+      let startGem = GAME_CONFIG.startGem + getMetaBonus(meta, 'startGem+2') * 2;
       // 저주: 시작 시 보석 없음
       if (hasCurse(curses, 'curse_noGem')) startGem = 0;
       setGold(startGold);
@@ -1800,6 +1801,19 @@ export default function App() {
                 onClose={() => {
                   setMeta(prev => {
                     const next = clearWandererRenameNotice(prev);
+                    saveMeta(next);
+                    return next;
+                  });
+                }}
+              />
+            )}
+            {/* 1.44.2 영혼의 제단 재설계 안내 모달 (앞선 모달 모두 닫힌 다음 표시) */}
+            {!showChangelog && !meta?.engravingMigrationNotice && !meta?.awakeningConditionNotice && !meta?.wandererRenameNotice && meta?.altarRedesignNotice && (
+              <SoulAltarRedesignModal
+                notice={meta.altarRedesignNotice}
+                onClose={() => {
+                  setMeta(prev => {
+                    const next = clearAltarRedesignNotice(prev);
                     saveMeta(next);
                     return next;
                   });

@@ -92,8 +92,8 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
             const dexAutoDodge = (playerDex || 0) * 0.3;
             const dexPts = Math.max(0, playerDex - 10);
             const critMinor = getMinorBonus(skills, 'critRate+', activeSkills);
-            const critMetaStacks = getMetaBonus(meta, 'critRate+3%');
-            const critMeta = critMetaStacks * 3;
+            const critMetaStacks = getMetaBonus(meta, 'critRate+2%');
+            const critMeta = critMetaStacks * 2;
             const critRelic = relicStat.critRate || 0;
             const critWeakness = hasEffect(skills, 'weaknessPoint', activeSkills) ? 10 : 0;
             const critShadowUlt = hasUltimate(ultimates, 'ult_counterShadow') ? 15 : 0;
@@ -105,7 +105,10 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
             const critDmgWeakness = hasEffect(skills, 'weaknessPoint', activeSkills) ? 50 : 0;
             const critDmgRelic = relicStat.critDmg || 0;
             const critDmgSig = getAgilityCritDmgBonus(stats);
-            const critDmg = critDmgBase + critDmgLv4 + critDmgRelic + critDmgWeakness + critDmgSig;
+            // 1.44.2~ 메타 강화 「절명의 각인」: 치명타 데미지 +5%/단계
+            const critDmgMetaStacks = getMetaBonus(meta, 'critDmg+5%');
+            const critDmgMeta = critDmgMetaStacks * 5;
+            const critDmg = critDmgBase + critDmgLv4 + critDmgRelic + critDmgWeakness + critDmgSig + critDmgMeta;
             // 회피
             const dodgeMinor = getMinorBonus(skills, 'dodge+', activeSkills);
             const dodgeRelic = relicStat.dodge || 0;
@@ -113,7 +116,10 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
             const dodgeDetailIntent = hasEffect(skills, 'detailIntent', activeSkills) ? 10 : 0;
             const dodgeMirrorUlt = hasUltimate(ultimates, 'ult_counterMirror') ? 10 : 0;
             const dodgeEng = engravingFx.dodgeRate || 0;
-            const dodgeRate = dexAutoDodge + dodgeMinor + dodgeRelic + dodgeLv5 + dodgeDetailIntent + dodgeMirrorUlt + dodgeEng;
+            // 1.44.2~ 메타 강화 「유연한 그림자」: 회피율 +2%/단계
+            const dodgeMetaStacks = getMetaBonus(meta, 'dodgeRate+2%');
+            const dodgeMeta = dodgeMetaStacks * 2;
+            const dodgeRate = dexAutoDodge + dodgeMinor + dodgeRelic + dodgeLv5 + dodgeDetailIntent + dodgeMirrorUlt + dodgeEng + dodgeMeta;
             // 방어 무시
             const ifritLv = skills['이프리트'] || 0;
             const ifritActive = !activeSkills || activeSkills.includes('이프리트');
@@ -151,7 +157,7 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                       { label: '기본 (전 직업 공통)', value: 5, unit: '%' },
                       { label: '민첩 시그니처 기본', value: dexAutoCrit, unit: '%', note: `민첩 ${playerDex} × +0.5%/p` },
                       { label: '패시브: 치명타 발동율 누적', value: critMinor, unit: '%' },
-                      { label: '영혼의 제단: 치명타 발동율 +3% × 스택', value: critMeta, unit: '%', note: critMetaStacks > 0 ? `${critMetaStacks} 스택` : null },
+                      { label: '영혼의 제단: 치명타 발동율 +2% × 스택', value: critMeta, unit: '%', note: critMetaStacks > 0 ? `${critMetaStacks} 스택` : null },
                       { label: '유물: 치명타 발동율', value: critRelic, unit: '%' },
                       { label: '약점 노출 (심안 Lv.7)', value: critWeakness, unit: '%' },
                       { label: '카운터 새도우 궁극', value: critShadowUlt, unit: '%' },
@@ -169,6 +175,7 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                       { label: '약점 노출 (심안 Lv.7)', value: critDmgWeakness, unit: '%' },
                       { label: '유물: 치명타 데미지', value: critDmgRelic, unit: '%' },
                       { label: '민첩 시그니처 1단계', value: critDmgSig, unit: '%', note: `적용 포인트 ${dexPts}(=민첩-10) × +2%/p` },
+                      { label: '영혼의 제단: 절명의 각인 +5% × 스택', value: critDmgMeta, unit: '%', note: critDmgMetaStacks > 0 ? `${critDmgMetaStacks} 스택` : null },
                     ],
                   })} className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>치명타 데미지 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.legendary }}>+{Math.round(critDmg)}%</span></button>
                   <button onClick={() => openLine({
@@ -179,6 +186,7 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                     sources: [
                       { label: '민첩 시그니처 기본', value: dexAutoDodge, unit: '%', note: `민첩 ${playerDex} × +0.3%/p` },
                       { label: '패시브: 회피 발동율 누적', value: dodgeMinor, unit: '%' },
+                      { label: '영혼의 제단: 유연한 그림자 +2% × 스택', value: dodgeMeta, unit: '%', note: dodgeMetaStacks > 0 ? `${dodgeMetaStacks} 스택` : null },
                       { label: '유물: 회피 발동율', value: dodgeRelic, unit: '%' },
                       { label: '회피 Lv.5 (+15%)', value: dodgeLv5, unit: '%' },
                       { label: '심안 Lv.5: 의도 카드 회피 (+10%)', value: dodgeDetailIntent, unit: '%' },
@@ -253,13 +261,13 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
             const counterDmgBonus = counterBase + counterLv5 + counterUlt + counterEng;
             const physDmgPct = engravingFx.physDmgPct || 0;
             const afterDodgeDmg = engravingFx.afterDodgeDmg || 0;
-            const metaStacks = getMetaBonus(meta, 'dmgDealt+5%');
-            const metaDmgBonus = metaStacks * 5;
+            const metaStacks = getMetaBonus(meta, 'dmgDealt+2%');
+            const metaDmgBonus = metaStacks * 2;
             const relicDmgBonus = relicStat.dmgDealt || 0;
             const allDmgBonus = metaDmgBonus + relicDmgBonus;
             // 받는 데미지 감소
-            const dmgTakenMetaStacks = getMetaBonus(meta, 'dmgTaken-3%');
-            const dmgTakenMeta = dmgTakenMetaStacks * 3;
+            const dmgTakenMetaStacks = getMetaBonus(meta, 'dmgTaken-2%');
+            const dmgTakenMeta = dmgTakenMetaStacks * 2;
             const dmgTakenRelic = relicStat.dmgTaken || 0;
             const dmgTakenLv5 = hasEffect(skills, 'dmgTaken-20', activeSkills) ? 20 : 0;
             const dmgTakenCharisma = getCharismaDmgReduction(stats);
@@ -347,7 +355,7 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                       subtitle: '모든 데미지 종류(물리·마법·출혈·반격)에 곱셈으로 적용.',
                       color: PALETTE.legendary,
                       sources: [
-                        { label: '영혼의 제단: 가하는 데미지 +5% × 스택', value: metaDmgBonus, unit: '%', note: metaStacks > 0 ? `${metaStacks} 스택` : null },
+                        { label: '영혼의 제단: 가하는 데미지 +2% × 스택', value: metaDmgBonus, unit: '%', note: metaStacks > 0 ? `${metaStacks} 스택` : null },
                         { label: '유물: 가하는 데미지', value: relicDmgBonus, unit: '%' },
                       ],
                     })} className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>모든 데미지 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.legendary }}>+{allDmgBonus}%</span></button>
@@ -368,7 +376,7 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                       subtitle: '적의 공격이 깎인 후 받는 데미지의 감소량. 음수면 오히려 받는 데미지가 증가하는 상태.',
                       color: PALETTE.green,
                       sources: [
-                        { label: '영혼의 제단: 받는 데미지 -3% × 스택', value: dmgTakenMeta, unit: '%', note: dmgTakenMetaStacks > 0 ? `${dmgTakenMetaStacks} 스택` : null },
+                        { label: '영혼의 제단: 받는 데미지 -2% × 스택', value: dmgTakenMeta, unit: '%', note: dmgTakenMetaStacks > 0 ? `${dmgTakenMetaStacks} 스택` : null },
                         { label: '유물: 받는 데미지 감소', value: dmgTakenRelic, unit: '%' },
                         { label: '패시브 Lv.5: 받는 데미지 -20%', value: dmgTakenLv5, unit: '%' },
                         { label: '매력 시그니처 2단계', value: dmgTakenCharisma, unit: '%', note: (stats['매력'] || 10) < 17 ? `매력 17 필요 (현재 ${stats['매력'] || 10})` : `17~21 -5% / 22~26 -10% / 27~31 -15% (현재 -${dmgTakenCharisma}%)` },

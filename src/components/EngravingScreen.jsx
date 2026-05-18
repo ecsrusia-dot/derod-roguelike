@@ -919,3 +919,103 @@ function describeReward(reward, classId) {
       return JSON.stringify(reward);
   }
 }
+
+// === 1.44.2 영혼의 제단 재설계 안내 모달 ===
+// storage.js의 loadMeta에서 환불 처리 후 altarRedesignNotice 세팅 → 이 모달 표시
+// 변경된 모든 항목(자원/전투/원정/챔피언십)의 누적 영혼 100% 환불 명세를 표로 노출
+export function SoulAltarRedesignModal({ notice, onClose }) {
+  if (!notice) return null;
+  const details = notice.details || {};
+  // 항목별 이름 매핑 — META_UPGRADES에서 현재 ID로 찾되, 폐기된 ID는 별도 처리
+  const NAME_MAP = {
+    meta_startGold: '풍요의 축복',
+    meta_startGem: '명상의 결정',
+    meta_startRelic: '신탁의 유물',
+    meta_maxEther: '에테르의 그릇',
+    meta_dmgDealt: '강자의 길',
+    meta_dmgTaken: '강철의 의지',
+    meta_critRate: '예리한 감각',
+    meta_rerollDiscount: '운명의 손길 (폐기)',
+    meta_champion_normal: '도전자의 영혼',
+    meta_champion_madness: '정복자의 영혼',
+  };
+  const entries = Object.entries(details).filter(([, v]) => v && v.refund > 0);
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center px-4" style={{
+      background: 'rgba(0, 0, 0, 0.85)',
+    }}>
+      <div className="w-full max-w-md" style={{
+        background: PALETTE.bgDeep,
+        border: `1.5px solid ${PALETTE.twilight}`,
+        boxShadow: `0 0 30px ${PALETTE.twilight}50`,
+        maxHeight: '90vh',
+        overflowY: 'auto',
+      }}>
+        <div className="px-4 py-3 text-center" style={{
+          background: `linear-gradient(180deg, ${PALETTE.twilight}30, ${PALETTE.twilight}10)`,
+          borderBottom: `1px solid ${PALETTE.panelBorder}`,
+        }}>
+          <div className="text-[10px] tracking-[0.3em]" style={{ color: PALETTE.twilight }}>
+            1.44.2 시스템 재설계 안내
+          </div>
+          <div className="text-base font-bold mt-1" style={{ color: PALETTE.text }}>
+            영혼의 제단 재설계
+          </div>
+        </div>
+        <div className="px-4 py-4 space-y-3" style={{ color: PALETTE.text }}>
+          <div className="text-[12px]" style={{ lineHeight: 1.6 }}>
+            영혼의 제단이 <strong style={{ color: PALETTE.accent }}>전면 재설계</strong>되었습니다.
+            전투 강화 신규 3개(<strong style={{ color: PALETTE.dawn }}>유연한 그림자·절명의 각인·선견의 강철</strong>)와
+            챔피언십 4난이도 강화가 추가되었으며, 효과·비용·최대 단계가 조정되었습니다.
+          </div>
+          <div className="p-2" style={{
+            background: `${PALETTE.twilight}20`,
+            border: `1px solid ${PALETTE.twilight}80`,
+          }}>
+            <div className="text-[10px] mb-1" style={{ color: PALETTE.textDim }}>총 환불 영혼</div>
+            <div className="flex items-center gap-2">
+              <span style={{ color: PALETTE.twilight, fontSize: '20px' }}>✦</span>
+              <span className="text-2xl font-bold" style={{ color: PALETTE.text, fontFamily: '"Cinzel", serif' }}>
+                +{notice.totalRefund.toLocaleString()}
+              </span>
+            </div>
+            <div className="text-[10px] mt-1" style={{ color: PALETTE.textDim }}>
+              변경·폐기된 항목의 구매 영혼이 100% 반환되었습니다.
+            </div>
+          </div>
+          {entries.length > 0 && (
+            <div className="text-[11px]" style={{ color: PALETTE.textDim }}>
+              <div className="mb-1" style={{ color: PALETTE.text }}>환불 명세</div>
+              <div className="space-y-0.5">
+                {entries.map(([id, d]) => (
+                  <div key={id} className="flex justify-between" style={{ borderBottom: `1px dotted ${PALETTE.panelBorder}`, padding: '2px 0' }}>
+                    <span>{NAME_MAP[id] || id} × {d.stack}</span>
+                    <span style={{ color: PALETTE.twilight }}>+{d.refund.toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="text-[11px]" style={{ color: PALETTE.textDim, lineHeight: 1.5 }}>
+            ◆ 영혼의 제단에 들러 새 효과·비용으로 <strong style={{ color: PALETTE.dawn }}>재구매</strong>하실 수 있습니다.<br/>
+            ◆ 자세한 변경 내역은 <strong style={{ color: PALETTE.dawn }}>업데이트 로그</strong>를 확인해 주세요.
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          className="w-full py-3 transition-all"
+          style={{
+            background: `linear-gradient(180deg, ${PALETTE.twilight}, ${PALETTE.twilight}80)`,
+            color: PALETTE.text,
+            border: `1px solid ${PALETTE.twilight}`,
+            fontSize: '12px',
+            fontFamily: '"Cinzel", serif',
+            letterSpacing: '0.3em',
+          }}
+        >
+          확인
+        </button>
+      </div>
+    </div>
+  );
+}

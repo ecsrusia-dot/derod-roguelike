@@ -90,6 +90,11 @@ const DEFAULT_META = {
   // 1.35.0 lanthert → wanderer 내부 코드명 변경 안내 (1회만 표시)
   // null = 안내 안 보여줌 / 객체 = { migratedKeys: [...] }
   wandererRenameNotice: null,
+  // 1.44.2 영혼의 제단 재설계 — 변경/삭제 항목 전액 환불 (1회만 표시)
+  // null = 안내 안 보여줌 / 객체 = { totalRefund: N, details: { [id]: { stack, refund } } }
+  altarRedesignNotice: null,
+  // 1.44.2 마이그레이션 완료 플래그 (멱등성)
+  altarRedesignDone: false,
 };
 
 // IndexedDB 열기
@@ -310,6 +315,42 @@ export async function loadMeta() {
             safe.engravings = migratedEng;
             needsImmediateSave = true;
           }
+        }
+        // 1.44.2 마이그레이션: 영혼의 제단 재설계 — 변경/삭제 항목 전액 환불.
+        // 멱등성: altarRedesignDone 플래그로 1회만 실행.
+        if (!safe.altarRedesignDone) {
+          const LEGACY_COSTS_1442 = {
+            meta_startGold: (s) => 50 + s * 50,        // 기존 50→500 (max 10)
+            meta_startGem: (s) => 50 + s * 50,         // 기존 50→250 (max 5)
+            meta_startRelic: (s) => s === 0 ? 500 : 2000, // 기존 500, 2000
+            meta_maxEther: (s) => 200 + s * 200,       // 기존 200, 400
+            meta_dmgDealt: (s) => 500 + s * 500,       // 기존 500→2500 (max 5)
+            meta_dmgTaken: (s) => 300 + s * 300,       // 기존 300→1500 (max 5)
+            meta_critRate: (s) => 500 + s * 500,       // 기존 500→2500 (max 5)
+            meta_rerollDiscount: () => 600,            // 폐기
+            meta_champion_normal: () => 3000,
+            meta_champion_madness: () => 10000,
+          };
+          let refund1442 = 0;
+          const refundDetails = {};
+          const newUpgrades = { ...safe.upgrades };
+          for (const [id, costFn] of Object.entries(LEGACY_COSTS_1442)) {
+            const stack = safe.upgrades?.[id] || 0;
+            if (stack > 0) {
+              let itemRefund = 0;
+              for (let i = 0; i < stack; i++) itemRefund += costFn(i);
+              refund1442 += itemRefund;
+              refundDetails[id] = { stack, refund: itemRefund };
+              delete newUpgrades[id];
+            }
+          }
+          if (refund1442 > 0) {
+            safe.upgrades = newUpgrades;
+            safe.souls = (safe.souls || 0) + refund1442;
+            safe.altarRedesignNotice = { totalRefund: refund1442, details: refundDetails };
+          }
+          safe.altarRedesignDone = true;
+          needsImmediateSave = true;
         }
         if (needsImmediateSave) {
           // 즉시 저장해 재실행 방지
@@ -822,4 +863,10 @@ export function clearAwakeningConditionNotice(meta) {
 export function clearWandererRenameNotice(meta) {
   if (!meta.wandererRenameNotice) return meta;
   return { ...meta, wandererRenameNotice: null };
+}
+
+// 1.44.2 영혼의 제단 재설계 안내 모달 acknowledge
+export function clearAltarRedesignNotice(meta) {
+  if (!meta.altarRedesignNotice) return meta;
+  return { ...meta, altarRedesignNotice: null };
 }
