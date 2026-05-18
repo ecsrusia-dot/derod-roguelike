@@ -8,7 +8,7 @@
 
 import React from 'react';
 import { PALETTE } from '../utils/helpers.js';
-import { PASSIVE_SKILLS, COMBAT_SKILLS } from '../data.js';
+import { PASSIVE_SKILLS, COMBAT_SKILLS, CLASS_ULTIMATES } from '../data.js';
 
 const TIER_PREFIX = '◇';  // 모든 마일스톤에 같은 prefix 사용
 
@@ -70,6 +70,29 @@ export function buildActiveSkillInfo(name, classColor = null) {
     title: sk.name || name,
     subtitle: sk.desc || null,
     stats,
+  };
+}
+
+// 직업 소울 스킬 — classData.ultimateId 기반. 충전 방식/발동 방식을 stats로 표시.
+export function buildClassUltimateInfo(ultimateId) {
+  if (!ultimateId) return null;
+  const ult = CLASS_ULTIMATES[ultimateId];
+  if (!ult) return null;
+  return {
+    kind: 'classult',
+    color: ult.color,
+    tag: '★ 직업 소울 스킬',
+    title: ult.name,
+    badge: 'SOUL',
+    subtitle: ult.quote ? `"${ult.quote}"\n\n${ult.desc}` : ult.desc,
+    stats: [
+      ['발동', '소울 게이지 100'],
+      ['타입', '직업 시그니처'],
+      ['적 데미지', '+floor(dmg/5)'],
+      ['피격', '+floor(피해/3)'],
+      ['턴 시작', '+5'],
+      ['치명타', '+10'],
+    ],
   };
 }
 

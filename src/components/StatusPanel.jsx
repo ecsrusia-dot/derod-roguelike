@@ -8,8 +8,8 @@
 import React, { useState } from 'react';
 import { Heart, X } from 'lucide-react';
 import { PALETTE, getCharismaHealBonus, getCharismaDmgReduction, getCharismaSoulGainBonus, getIntellectStartSoul, getIntellectSoulPerMagic, getStrengthHpBonus, getStrengthSoulPerPhys, getAgilityCritDmgBonus, getAgilitySoulOnDodge, getIfritIgniteRate, getMinorBonus, getMetaBonus, hasEffect, hasUltimate, hasCurse } from '../utils/helpers.js';
-import { PASSIVE_SKILLS, COMBAT_SKILLS, ULTIMATE_SKILLS } from '../data.js';
-import CardInfoModal, { buildPassiveInfo, buildRelicInfo, buildActiveSkillInfo } from './CardInfoModal.jsx';
+import { PASSIVE_SKILLS, COMBAT_SKILLS, ULTIMATE_SKILLS, CLASS_ULTIMATES } from '../data.js';
+import CardInfoModal, { buildPassiveInfo, buildRelicInfo, buildActiveSkillInfo, buildClassUltimateInfo } from './CardInfoModal.jsx';
 import StatSignatureModal from './StatSignatureModal.jsx';
 
 export default function StatusPanel({ classData, hp, maxHp, skills, stats, derivedStats = null, relics, ultimates = [], activeSkills = null, activeRelicNames = null, relicStat = {}, meta = null, curses = [], engravingFx = {}, onClose }) {
@@ -32,6 +32,8 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
     modalInfo = buildRelicInfo(modalState.rel);
   } else if (modalState?.kind === 'active') {
     modalInfo = buildActiveSkillInfo(modalState.name, classData?.color);
+  } else if (modalState?.kind === 'classult') {
+    modalInfo = buildClassUltimateInfo(modalState.ultimateId);
   }
 
   return (
@@ -248,10 +250,14 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
         </div>
 
         {/* 액티브 스킬 — 카드 클릭 시 정보 모달 (전투 중에도 확인 가능) */}
-        {classData && Array.isArray(classData.combatSkills) && classData.combatSkills.length > 0 && (
+        {/* 1.39.0~ 직업 소울 스킬(classData.ultimateId)이 있으면 4번째 슬롯에 정보 카드. */}
+        {classData && Array.isArray(classData.combatSkills) && classData.combatSkills.length > 0 && (() => {
+          const hasUlt = !!classData.ultimateId;
+          const ult = hasUlt ? CLASS_ULTIMATES[classData.ultimateId] : null;
+          return (
           <div className="px-4 py-3 border-b" style={{ borderColor: PALETTE.panelBorder }}>
             <div className="text-[11px] tracking-[0.3em] mb-3" style={{ color: classData.color }}>◆ 액티브 스킬</div>
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className={`grid gap-1.5 ${hasUlt ? 'grid-cols-4' : 'grid-cols-3'}`}>
               {classData.combatSkills.map(name => {
                 const sk = COMBAT_SKILLS[name];
                 if (!sk) return null;
@@ -273,9 +279,28 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                   </button>
                 );
               })}
+              {/* 4번째 슬롯: 직업 소울 스킬 (소울 게이지 100 발동) */}
+              {hasUlt && ult && (
+                <button onClick={() => setModalState({ kind: 'classult', ultimateId: classData.ultimateId })}
+                  className="text-left px-2 py-2 transition-all"
+                  style={{
+                    background: `linear-gradient(135deg, ${ult.color}30, ${ult.color}08)`,
+                    border: `1px solid ${ult.color}`,
+                    boxShadow: `0 0 6px ${ult.color}40`,
+                  }}>
+                  <div className="text-[12px] font-bold mb-0.5 flex items-center gap-0.5" style={{ color: PALETTE.text }}>
+                    <span style={{ color: PALETTE.legendary }}>★</span>
+                    <span className="truncate">{ult.name}</span>
+                  </div>
+                  <div className="text-[9px]" style={{ color: PALETTE.legendary, letterSpacing: '0.05em' }}>
+                    소울 100
+                  </div>
+                </button>
+              )}
             </div>
           </div>
-        )}
+          );
+        })()}
 
         <div className="px-4 py-3">
           <div className="text-[11px] tracking-[0.3em] mb-3" style={{ color: PALETTE.dawn }}>◆ 패시브 스킬</div>
