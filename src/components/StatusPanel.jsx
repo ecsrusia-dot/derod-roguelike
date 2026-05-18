@@ -150,13 +150,13 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                     color: PALETTE.legendary,
                     sources: [
                       { label: '기본 (전 직업 공통)', value: 5, unit: '%' },
-                      { label: '민첩 자동 가산', value: dexAutoCrit, unit: '%', note: `민첩 ${playerDex} × +0.5%/p (1.42.0~ 스탯 전체)` },
-                      { label: '패시브 critRate+ 누적', value: critMinor, unit: '%' },
-                      { label: '영혼의 제단 (critRate+3% × 스택)', value: critMeta, unit: '%', note: critMetaStacks > 0 ? `${critMetaStacks} 스택` : null },
-                      { label: '유물 critRate', value: critRelic, unit: '%' },
+                      { label: '민첩 시그니처 기본', value: dexAutoCrit, unit: '%', note: `민첩 ${playerDex} × +0.5%/p (1.42.0~ 스탯 전체)` },
+                      { label: '패시브: 치명타 발동율 누적', value: critMinor, unit: '%' },
+                      { label: '영혼의 제단: 치명타 발동율 +3% × 스택', value: critMeta, unit: '%', note: critMetaStacks > 0 ? `${critMetaStacks} 스택` : null },
+                      { label: '유물: 치명타 발동율', value: critRelic, unit: '%' },
                       { label: '약점 노출 (심안 Lv.7)', value: critWeakness, unit: '%' },
                       { label: '카운터 새도우 궁극', value: critShadowUlt, unit: '%' },
-                      { label: '각인 critRate', value: critEng, unit: '%' },
+                      { label: '각인: 치명타 발동율', value: critEng, unit: '%' },
                     ],
                   })} className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>치명타 발동율 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.legendary }}>{Math.round(critRate)}%</span></button>
                   <button onClick={() => openLine({
@@ -166,9 +166,9 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                     color: PALETTE.legendary,
                     sources: [
                       { label: '기본 (전 직업 공통)', value: 50, unit: '%' },
-                      { label: '심안 Lv.4 critDmg+30', value: critDmgLv4, unit: '%' },
+                      { label: '심안 Lv.4: 치명타 데미지 +30%', value: critDmgLv4, unit: '%' },
                       { label: '약점 노출 (심안 Lv.7)', value: critDmgWeakness, unit: '%' },
-                      { label: '유물 critDmg', value: critDmgRelic, unit: '%' },
+                      { label: '유물: 치명타 데미지', value: critDmgRelic, unit: '%' },
                       { label: '민첩 시그니처 1단계', value: critDmgSig, unit: '%', note: `적용 포인트 ${dexPts}(=민첩-10) × +2%/p` },
                     ],
                   })} className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>치명타 데미지 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.legendary }}>+{Math.round(critDmg)}%</span></button>
@@ -178,13 +178,13 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                     subtitle: '적의 공격을 피할 확률.',
                     color: PALETTE.green,
                     sources: [
-                      { label: '민첩 자동 가산', value: dexAutoDodge, unit: '%', note: `민첩 ${playerDex} × +0.3%/p (1.42.0~ 스탯 전체)` },
-                      { label: '패시브 dodge+ 누적', value: dodgeMinor, unit: '%' },
-                      { label: '유물 dodge', value: dodgeRelic, unit: '%' },
+                      { label: '민첩 시그니처 기본', value: dexAutoDodge, unit: '%', note: `민첩 ${playerDex} × +0.3%/p (1.42.0~ 스탯 전체)` },
+                      { label: '패시브: 회피 발동율 누적', value: dodgeMinor, unit: '%' },
+                      { label: '유물: 회피 발동율', value: dodgeRelic, unit: '%' },
                       { label: '회피 Lv.5 (+15%)', value: dodgeLv5, unit: '%' },
-                      { label: '심안 Lv.5 detailIntent (+10%)', value: dodgeDetailIntent, unit: '%' },
+                      { label: '심안 Lv.5: 의도 카드 회피 (+10%)', value: dodgeDetailIntent, unit: '%' },
                       { label: '카운터 미러 궁극 (+10%)', value: dodgeMirrorUlt, unit: '%' },
-                      { label: '각인 dodgeRate', value: dodgeEng, unit: '%' },
+                      { label: '각인: 회피 발동율', value: dodgeEng, unit: '%' },
                     ],
                   })} className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>회피 발동율 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.green }}>{Math.round(dodgeRate)}%</span></button>
                   {armorIgnore > 0 && (
@@ -210,7 +210,7 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                         { label: `심안류 Lv.${simanLv} (×5)`, value: counterBaseLv, unit: '%' },
                         { label: '심안류 Lv.3 마일스톤 (+20)', value: counterLv3, unit: '%' },
                         { label: '반격 궁극 보유 (+60)', value: counterUlt, unit: '%' },
-                        { label: '각인 counterRatePct', value: counterEng, unit: '%' },
+                        { label: '각인: 반격 발동율', value: counterEng, unit: '%' },
                       ],
                     })} className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>반격 발동율 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.accent }}>{counterRate}%</span></button>
                   )}
@@ -279,7 +279,7 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                       totalText: `+${physBonus}`,
                       subtitle: '물리 데미지에 가산되는 고정값.',
                       color: PALETTE.accent,
-                      sources: [{ label: '패시브 physDmg+ 누적', value: physMinor }],
+                      sources: [{ label: '패시브: 물리 데미지 누적', value: physMinor }],
                     })} className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>물리 데미지 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.accent }}>+{physBonus}</span></button>
                   )}
                   {physDmgPct > 0 && (
@@ -288,7 +288,7 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                       totalText: `+${physDmgPct}%`,
                       subtitle: '물리 데미지에 곱셈으로 적용되는 각인 보너스.',
                       color: '#c4453d',
-                      sources: [{ label: '각인 physDmgPct', value: physDmgPct, unit: '%' }],
+                      sources: [{ label: '각인: 물리 데미지', value: physDmgPct, unit: '%' }],
                     })} className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>물리 데미지(각인) ◇</span><span className="font-bold tabular-nums" style={{ color: '#c4453d' }}>+{physDmgPct}%</span></button>
                   )}
                   {magicBonus > 0 && (
@@ -298,9 +298,9 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                       subtitle: '마법 데미지에 가산되는 % 보너스.',
                       color: PALETTE.twilight,
                       sources: [
-                        { label: '패시브 magicDmg+ 누적', value: magicMinor, unit: '%' },
-                        { label: '마력 Lv.5 magicDmg+30', value: magicLv5, unit: '%' },
-                        { label: '유물 magicDmg', value: magicRelic, unit: '%' },
+                        { label: '패시브: 마법 데미지 누적', value: magicMinor, unit: '%' },
+                        { label: '마력 Lv.5: 마법 데미지 +30%', value: magicLv5, unit: '%' },
+                        { label: '유물: 마법 데미지', value: magicRelic, unit: '%' },
                       ],
                     })} className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>마법 데미지 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.twilight }}>+{magicBonus}%</span></button>
                   )}
@@ -310,7 +310,7 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                       totalText: `+${bleedBonus}%`,
                       subtitle: '출혈 상태이상의 틱 데미지에 가산되는 % 보너스.',
                       color: PALETTE.bleed,
-                      sources: [{ label: '패시브 bleedDmg+ 누적', value: bleedBonus, unit: '%' }],
+                      sources: [{ label: '패시브: 출혈 데미지 누적', value: bleedBonus, unit: '%' }],
                     })} className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>출혈 데미지 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.bleed }}>+{bleedBonus}%</span></button>
                   )}
                   {counterDmgBonus > 0 && (
@@ -323,7 +323,7 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                         { label: `심안류 Lv.${simanLv} (×5)`, value: counterBase, unit: '%' },
                         { label: '심안류 Lv.5 (+15)', value: counterLv5, unit: '%' },
                         { label: '반격 궁극 보유 (+50)', value: counterUlt, unit: '%' },
-                        { label: '각인 counterDmgPct', value: counterEng, unit: '%' },
+                        { label: '각인: 반격 데미지', value: counterEng, unit: '%' },
                       ],
                     })} className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>반격 데미지 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.accent }}>+{counterDmgBonus}%</span></button>
                   )}
@@ -334,8 +334,8 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                       subtitle: '모든 데미지 종류(물리·마법·출혈·반격)에 곱셈으로 적용.',
                       color: PALETTE.legendary,
                       sources: [
-                        { label: '영혼의 제단 (dmgDealt+5% × 스택)', value: metaDmgBonus, unit: '%', note: metaStacks > 0 ? `${metaStacks} 스택` : null },
-                        { label: '유물 dmgDealt', value: relicDmgBonus, unit: '%' },
+                        { label: '영혼의 제단: 가하는 데미지 +5% × 스택', value: metaDmgBonus, unit: '%', note: metaStacks > 0 ? `${metaStacks} 스택` : null },
+                        { label: '유물: 가하는 데미지', value: relicDmgBonus, unit: '%' },
                       ],
                     })} className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>모든 데미지 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.legendary }}>+{allDmgBonus}%</span></button>
                   )}
@@ -345,7 +345,7 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                       totalText: `+${afterDodgeDmg}%`,
                       subtitle: '회피 성공 직후 다음 공격의 데미지에 가산되는 % 보너스.',
                       color: PALETTE.green,
-                      sources: [{ label: '각인 afterDodgeDmg', value: afterDodgeDmg, unit: '%' }],
+                      sources: [{ label: '각인: 회피 후 데미지', value: afterDodgeDmg, unit: '%' }],
                     })} className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>회피 후 데미지 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.green }}>+{afterDodgeDmg}%</span></button>
                   )}
                   {dmgTakenReduceTotal !== 0 && (
@@ -355,11 +355,11 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                       subtitle: '적의 공격이 깎인 후 받는 데미지의 감소량. 음수면 오히려 받는 데미지가 증가하는 상태.',
                       color: PALETTE.green,
                       sources: [
-                        { label: '영혼의 제단 (dmgTaken-3% × 스택)', value: dmgTakenMeta, unit: '%', note: dmgTakenMetaStacks > 0 ? `${dmgTakenMetaStacks} 스택` : null },
-                        { label: '유물 dmgTaken', value: dmgTakenRelic, unit: '%' },
-                        { label: '패시브 Lv.5 dmgTaken-20', value: dmgTakenLv5, unit: '%' },
+                        { label: '영혼의 제단: 받는 데미지 -3% × 스택', value: dmgTakenMeta, unit: '%', note: dmgTakenMetaStacks > 0 ? `${dmgTakenMetaStacks} 스택` : null },
+                        { label: '유물: 받는 데미지 감소', value: dmgTakenRelic, unit: '%' },
+                        { label: '패시브 Lv.5: 받는 데미지 -20%', value: dmgTakenLv5, unit: '%' },
                         { label: '매력 시그니처 2단계', value: dmgTakenCharisma, unit: '%', note: (stats['매력'] || 10) < 17 ? `매력 17 필요 (현재 ${stats['매력'] || 10})` : `17~21 -5% / 22~26 -10% / 27~31 -15% (현재 -${dmgTakenCharisma}%)` },
-                        { label: '각인 dmgTakenPct', value: dmgTakenEngFx !== 0 ? -dmgTakenEngFx : 0, unit: '%', note: dmgTakenEngFx > 0 ? '(부정 각인 — 받는 데미지 증가)' : null },
+                        { label: '각인: 받는 데미지', value: dmgTakenEngFx !== 0 ? -dmgTakenEngFx : 0, unit: '%', note: dmgTakenEngFx > 0 ? '(부정 각인 — 받는 데미지 증가)' : null },
                       ],
                     })} className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>받는 데미지 ◇</span><span className="font-bold tabular-nums" style={{ color: dmgTakenReduceTotal > 0 ? PALETTE.green : PALETTE.accent }}>{dmgTakenReduceTotal > 0 ? '-' : '+'}{Math.abs(dmgTakenReduceTotal)}%</span></button>
                   )}
@@ -369,7 +369,7 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                       totalText: `-${dmgDealtCurse}%`,
                       subtitle: '저주 효과로 가하는 데미지가 감소합니다.',
                       color: PALETTE.twilight,
-                      sources: [{ label: 'curse_dmgDealt-15', value: -dmgDealtCurse, unit: '%' }],
+                      sources: [{ label: '저주: 가하는 데미지 -15%', value: -dmgDealtCurse, unit: '%' }],
                     })} className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>저주: 가하는 데미지 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.twilight }}>-{dmgDealtCurse}%</span></button>
                   )}
                   {dmgTakenCurse > 0 && (
@@ -379,8 +379,8 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                       subtitle: '저주 효과로 받는 피해가 증가합니다.',
                       color: PALETTE.twilight,
                       sources: [
-                        { label: 'curse_dmgTaken+15', value: dmgTakenCurse15, unit: '%' },
-                        { label: 'curse_dmgTaken+30', value: dmgTakenCurse30, unit: '%' },
+                        { label: '저주: 받는 데미지 +15%', value: dmgTakenCurse15, unit: '%' },
+                        { label: '저주: 받는 데미지 +30%', value: dmgTakenCurse30, unit: '%' },
                       ],
                     })} className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>저주: 받는 피해 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.twilight }}>+{dmgTakenCurse}%</span></button>
                   )}
@@ -439,7 +439,7 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
               color: PALETTE.dawn,
               sources: [
                 { label: '지능 시그니처 1단계', value: intellectStartSoul, note: `적용 포인트 ${intPts}(=지능-10) × 0.5 = floor → +${intellectStartSoul}` },
-                { label: '각인 startSoul', value: startSoulEng },
+                { label: '각인: 시작 소울 게이지', value: startSoulEng },
               ],
             });
             const openDodgeSoulBreakdown = () => openLine({
@@ -449,16 +449,16 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
               color: PALETTE.dawn,
               sources: [
                 { label: '민첩 시그니처 2단계', value: dexDodgeSoul, note: (stats['민첩'] || 10) < 17 ? `민첩 17 필요 (현재 ${stats['민첩'] || 10})` : `17~21 +5 / 22~26 +10 (현재 +${dexDodgeSoul})` },
-                { label: '각인 dodgeSoul', value: dodgeSoulEng },
+                { label: '각인: 회피 시 소울', value: dodgeSoulEng },
               ],
             });
             const openHealBreakdown = () => openLine({
               title: '회복량 보너스',
               totalText: `+${healTotalPct}%`,
-              subtitle: `유물(heal)과 매력 시그가 곱셈으로 누적 적용됩니다.\n계산: (1 + ${heal}/100) × (1 + ${charismaHeal}/100) = ${healMult.toFixed(3)}배`,
+              subtitle: `유물 회복량과 매력 시그니처가 곱셈으로 누적 적용됩니다.\n계산: (1 + 유물 ${heal}/100) × (1 + 매력 ${charismaHeal}/100) = ${healMult.toFixed(3)}배`,
               color: PALETTE.green,
               sources: [
-                { label: '유물 heal', value: heal, unit: '%' },
+                { label: '유물: 회복량', value: heal, unit: '%' },
                 { label: '매력 시그니처 1단계', value: charismaHeal, unit: '%', note: `적용 포인트 ${Math.max(0, (stats['매력'] || 10) - 10)}(=매력-10) × +0.5%/p` },
               ],
             });
@@ -476,18 +476,18 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                       className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>HP 자동 회복 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.green }}>+{regenLv}/턴</span></button>
                   )}
                   {lifesteal > 0 && (
-                    <button onClick={() => openSimpleLine('흡혈', `+${lifesteal}`, [{ label: '유물 lifesteal', value: lifesteal }], PALETTE.accent, '적에게 가한 데미지의 일부를 회복합니다.')}
+                    <button onClick={() => openSimpleLine('흡혈', `+${lifesteal}`, [{ label: '유물: 흡혈', value: lifesteal }], PALETTE.accent, '적에게 가한 데미지의 일부를 회복합니다.')}
                       className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>흡혈 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.accent }}>+{lifesteal}</span></button>
                   )}
                   {reflect > 0 && (
-                    <button onClick={() => openSimpleLine('데미지 반사', `${reflect}%`, [{ label: '유물 reflect', value: reflect, unit: '%' }], PALETTE.accent, '받은 데미지의 일부를 적에게 되돌려줍니다.')}
+                    <button onClick={() => openSimpleLine('데미지 반사', `${reflect}%`, [{ label: '유물: 데미지 반사', value: reflect, unit: '%' }], PALETTE.accent, '받은 데미지의 일부를 적에게 되돌려줍니다.')}
                       className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>데미지 반사 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.accent }}>{reflect}%</span></button>
                   )}
                   {healTotalPct > 0 && (
                     <button onClick={openHealBreakdown} className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>회복량 보너스 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.green }}>+{healTotalPct}%</span></button>
                   )}
                   {charismaSoul > 0 && (
-                    <button onClick={() => openSimpleLine('매력 시그: 영혼 획득', `+${charismaSoul}%`, [{ label: '매력 시그니처 (자동 가산)', value: charismaSoul, unit: '%', note: `매력 ${stats['매력'] || 0} × +0.5%/p (1.42.0~ 스탯 전체)` }], PALETTE.dawn, '영구 메타 영혼 획득량 보너스 (처치 영혼·챕터 보너스·무한 깊이 보너스·대장간 등 모든 영혼 가산처).')}
+                    <button onClick={() => openSimpleLine('매력 시그: 영혼 획득', `+${charismaSoul}%`, [{ label: '매력 시그니처 기본', value: charismaSoul, unit: '%', note: `매력 ${stats['매력'] || 0} × +0.5%/p (1.42.0~ 스탯 전체)` }], PALETTE.dawn, '영구 메타 영혼 획득량 보너스 (처치 영혼·챕터 보너스·무한 깊이 보너스·대장간 등 모든 영혼 가산처).')}
                       className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>매력 시그: 영혼 획득 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.dawn }}>+{charismaSoul}%</span></button>
                   )}
                   {strHp > 0 && (
@@ -503,45 +503,45 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                       className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>지능 시그: 마법 시 소울 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.legendary }}>+{intellectMagicSoul}</span></button>
                   )}
                   {cdReduce > 0 && (
-                    <button onClick={() => openSimpleLine('쿨다운 감소', `-${cdReduce}턴`, [{ label: '패시브 cdReduce+', value: cdReduce, unit: '턴', note: `해당 패시브의 누적 보너스` }], PALETTE.twilight, '액티브 스킬의 쿨다운 턴 수가 감소합니다.')}
+                    <button onClick={() => openSimpleLine('쿨다운 감소', `-${cdReduce}턴`, [{ label: '패시브: 쿨다운 감소 누적', value: cdReduce, unit: '턴', note: `해당 패시브의 누적 보너스` }], PALETTE.twilight, '액티브 스킬의 쿨다운 턴 수가 감소합니다.')}
                       className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>쿨다운 감소 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.twilight }}>-{cdReduce}턴</span></button>
                   )}
                   {etherReduce && (
-                    <button onClick={() => openSimpleLine('에테르 비용', '-1', [{ label: '패시브 etherCost-20', value: '-1', note: '발동 중' }], PALETTE.twilight, '액티브 스킬의 에테르 비용이 1 감소합니다.')}
+                    <button onClick={() => openSimpleLine('에테르 비용', '-1', [{ label: '패시브: 에테르 비용 감소', value: '-1', note: '발동 중' }], PALETTE.twilight, '액티브 스킬의 에테르 비용이 1 감소합니다.')}
                       className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>에테르 비용 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.twilight }}>-1</span></button>
                   )}
                   {showSoul && startSoulTotal > 0 && (
                     <button onClick={openStartSoulBreakdown} className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>시작 소울 게이지 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.dawn }}>+{startSoulTotal}</span></button>
                   )}
                   {showSoul && perTurnSoul > 0 && (
-                    <button onClick={() => openSimpleLine('매 턴 소울 게이지', `+${perTurnSoul}`, [{ label: '각인 perTurnSoul', value: perTurnSoul }], PALETTE.dawn, '매 턴 시작 시 소울 게이지가 추가로 충전됩니다 (기본 +5 외).')}
+                    <button onClick={() => openSimpleLine('매 턴 소울 게이지', `+${perTurnSoul}`, [{ label: '각인: 매 턴 소울', value: perTurnSoul }], PALETTE.dawn, '매 턴 시작 시 소울 게이지가 추가로 충전됩니다 (기본 +5 외).')}
                       className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>매 턴 소울 게이지 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.dawn }}>+{perTurnSoul}</span></button>
                   )}
                   {showSoul && dodgeSoulTotal > 0 && (
                     <button onClick={openDodgeSoulBreakdown} className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>회피 시 소울 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.dawn }}>+{dodgeSoulTotal}</span></button>
                   )}
                   {showSoul && soulGainMult !== 0 && (
-                    <button onClick={() => openSimpleLine('영구 영혼 획득 배수', `×${(1 + soulGainMult).toFixed(2)}`, [{ label: '각인 soulGainMult', value: `×${(1 + soulGainMult).toFixed(2)}` }], PALETTE.legendary, '영구 메타 영혼 획득량의 배수 보너스. 매력 시그(영혼 획득)와 별개로 적용.')}
+                    <button onClick={() => openSimpleLine('영구 영혼 획득 배수', `×${(1 + soulGainMult).toFixed(2)}`, [{ label: '각인: 영혼 획득 배수', value: `×${(1 + soulGainMult).toFixed(2)}` }], PALETTE.legendary, '영구 메타 영혼 획득량의 배수 보너스. 매력 시그(영혼 획득)와 별개로 적용.')}
                       className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>영구 영혼 획득 배수 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.legendary }}>×{(1 + soulGainMult).toFixed(2)}</span></button>
                   )}
                   {showSoul && counterHitSoul > 0 && (
-                    <button onClick={() => openSimpleLine('반격 시 소울', `+${counterHitSoul}`, [{ label: '각인 counterHitSoul', value: counterHitSoul }], PALETTE.dawn, '반격 발동 시 소울 게이지가 충전됩니다.')}
+                    <button onClick={() => openSimpleLine('반격 시 소울', `+${counterHitSoul}`, [{ label: '각인: 반격 시 소울', value: counterHitSoul }], PALETTE.dawn, '반격 발동 시 소울 게이지가 충전됩니다.')}
                       className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>반격 시 소울 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.dawn }}>+{counterHitSoul}</span></button>
                   )}
                   {counterShock > 0 && (
-                    <button onClick={() => openSimpleLine('반격 시 충격', `+${counterShock}`, [{ label: '각인 counterShock', value: counterShock }], PALETTE.twilight, '반격 발동 시 적에게 충격 게이지가 누적됩니다.')}
+                    <button onClick={() => openSimpleLine('반격 시 충격', `+${counterShock}`, [{ label: '각인: 반격 시 충격', value: counterShock }], PALETTE.twilight, '반격 발동 시 적에게 충격 게이지가 누적됩니다.')}
                       className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>반격 시 충격 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.twilight }}>+{counterShock}</span></button>
                   )}
                   {counterCanCrit && (
-                    <button onClick={() => openSimpleLine('반격 치명타 가능', 'ON', [{ label: '각인 counterCanCrit', value: 'ON' }], PALETTE.legendary, '반격 공격도 치명타가 발동할 수 있습니다.')}
+                    <button onClick={() => openSimpleLine('반격 치명타 가능', 'ON', [{ label: '각인: 반격 치명타 가능', value: 'ON' }], PALETTE.legendary, '반격 공격도 치명타가 발동할 수 있습니다.')}
                       className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>반격 치명타 가능 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.legendary }}>ON</span></button>
                   )}
                   {perTurnHpLoss > 0 && (
-                    <button onClick={() => openSimpleLine('매 턴 HP 손실', `-${perTurnHpLoss}`, [{ label: '각인 perTurnHpLoss (저주)', value: perTurnHpLoss, note: '부정 효과' }], PALETTE.accent, '매 턴 시작 시 HP가 감소합니다 (부정 각인 효과).')}
+                    <button onClick={() => openSimpleLine('매 턴 HP 손실', `-${perTurnHpLoss}`, [{ label: '각인: 매 턴 HP 손실 (저주)', value: perTurnHpLoss, note: '부정 효과' }], PALETTE.accent, '매 턴 시작 시 HP가 감소합니다 (부정 각인 효과).')}
                       className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>매 턴 HP 손실 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.accent }}>-{perTurnHpLoss}</span></button>
                   )}
                   {disableInsightPredict && (
-                    <button onClick={() => openSimpleLine('심안 사용 차단', 'ON', [{ label: '각인 disableInsightPredict (저주)', value: 'ON', note: '부정 효과' }], PALETTE.accent, '심안 패시브의 적 의도 카드 표시와 detailIntent 회피 보너스가 비활성화됩니다.')}
+                    <button onClick={() => openSimpleLine('심안 사용 차단', 'ON', [{ label: '각인: 심안 사용 차단 (저주)', value: 'ON', note: '부정 효과' }], PALETTE.accent, '심안 패시브의 적 의도 카드 표시와 의도 카드 회피 보너스가 비활성화됩니다.')}
                       className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>심안 사용 차단 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.accent }}>ON</span></button>
                   )}
                 </div>
