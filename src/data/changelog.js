@@ -7,6 +7,23 @@
 
 export const CHANGELOG = [
   {
+    version: '1.37.0',
+    date: '2026-05-18',
+    label: '4 스탯 시그니처 완성 (근력·민첩 신설 + 지능 재설계 + 매력 자동 가산) + 능력치 클릭 모달',
+    changes: [
+      { type: 'feature', text: '[근력 시그니처 신설] 1단계(근력 11+) 최대 HP +5/포인트 — 방랑(18) +40 / 마족(19) +45. 2단계(근력 17+) 물리 시전 시 영혼 게이지 +1/5단위 — 17~21 +1 / 22~26 +2. 방랑검사·마족 정체성을 보강하지만 모든 직업이 보석으로 발동 가능' },
+      { type: 'feature', text: '[민첩 시그니처 신설] 1단계(민첩 11+) 치명타 데미지 +2%/포인트 — 정령사(20) +20% / 방랑(15) +10%. 2단계(민첩 17+) 회피 성공 시 영혼 게이지 +5/5단위 — 정령사(20) +5. 정령사 정체성 + 마족 듀얼 스탯 의존을 위한 신설 (재설계 예정 직업)' },
+      { type: 'balance', text: '[지능 시그니처 재설계] 기존 1단계 "마법 시 영혼 +1/5단위 (지능 11+)" → 신규 2단계로 이동 (지능 17+). 기존 2단계 "시작 에테르 +1 (지능 17+)" → 제거, 대신 신규 1단계 "전투 시작 영혼 +0.5/포인트 (지능 11+, 내림)"로 교체. 술법사(20) = +5 시작 영혼 + 마법 시 +1' },
+      { type: 'feature', text: '[매력 자동 가산 신설] 매력 능력치가 영혼 획득량 +0.5%/포인트 (임계 없이 매력 11+부터 누진). 사제(19) +4.5% / 정령(15) +2.5% / 술법(14) +2.0% / 방랑(11) +0.5%. 적용 위치: 처치 영혼 / 보스 챕터 보너스 / 무한모드 깊이 보너스 / 황혼의 대장간 영혼 보상 — 모든 영혼 가산처 일괄 적용' },
+      { type: 'feature', text: '[전투 시작 영혼 로그 노출] 직업 궁극 보유 직업의 전투 첫 로그에 "◆ 영혼 게이지 보너스 : 합계 (지능 +N + 각인 +N + 유물 +N + 메타 +N)" 형식으로 계산식 자동 표시. 0인 소스는 표시 안 함. 합계가 0이면 라인 자체 생략' },
+      { type: 'feature', text: '[능력치 클릭 시그니처 모달 신설] 정보창 상단 4 스탯(근/민/지/매) 클릭 시 StatSignatureModal 팝업. 현재 스탯 / 자동 가산 효과 / 1단계 효과(발동/미발동) / 2단계 효과(발동/미발동) + 누진 값 한눈에. 비활성 단계는 회색 박스 + "미발동" 라벨' },
+      { type: 'system', text: '[helpers.js 시그니처 헬퍼 7종 추가] getStrengthHpBonus / getStrengthSoulPerPhys / getAgilityCritDmgBonus / getAgilitySoulOnDodge / getIntellectStartSoul / getIntellectSoulPerMagic / getCharismaSoulGainBonus. 기존 getIntellectSoulBonus·getIntellectEtherBonus 제거 (의미 재정의로 인한 이름 명확화)' },
+      { type: 'system', text: '[damage.js 치명타 식 확장] calculateDamage의 critMult 계산에 민첩 시그니처 1단계(+2%/포인트) 합산. 기존 인자 시그니처 변경 없음 (attacker.민첩 직접 참조). getDisplayDamage는 치명타 미적용이라 변경 무관' },
+      { type: 'system', text: '[StatusPanel 라벨 갱신] 기타 효과 섹션에 매력(영혼)·근력(시작HP)·근력(물리영혼)·민첩(치명뎀)·민첩(회피영혼)·지능(시작영혼)·지능(마법영혼) 7종 시그니처 라인 추가. 능력치 그리드 4칸을 button으로 전환, 하단에 "능력치를 눌러 시그니처 효과를 확인하세요" 안내 문구' },
+      { type: 'system', text: '[App.jsx 영혼 가산 4곳 매력 적용] handleVictory의 처치 영혼·보스 챕터 보너스 / handleDefeat의 무한 깊이 보너스 / forgeResult의 영혼 보상에 모두 getCharismaSoulGainBonus 합산 적용. 처치 시점에 +N이 표시되어 사용자가 즉시 효과 인지 가능' },
+    ],
+  },
+  {
     version: '1.36.1',
     date: '2026-05-18',
     label: '각성도 모달 블랙스크린 핫픽스 + 정보창 4분류 재정리 + 전투 정보창 화염각인 노출',

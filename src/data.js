@@ -22,9 +22,9 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.36.1';
+export const GAME_VERSION = '1.37.0';
 export const VERSION_DATE = '2026-05-18';
-export const VERSION_LABEL = '각성도 모달 블랙스크린 핫픽스 + 정보창 4분류 재정리 + 전투 정보창 화염각인 노출';
+export const VERSION_LABEL = '근력·민첩 시그니처 신설 + 지능 시그니처 재설계 + 능력치 클릭 시그니처 모달';
 
 // =========== 패시브 스킬 ===========
 // effect 필드는 문자열 키. 실제 동작은 메인 코드의 trigger handler에서 처리.

@@ -256,21 +256,69 @@ export function getCharismaDmgReduction(stats) {
   return (Math.floor((stats.매력 - 17) / 5) + 1) * 5;
 }
 
-// ===== 지능 효과 헬퍼 (1.32.0~) =====
-// 술법사 시그니처. 매력 시그니처(사제)와 대칭 패턴.
-// 시작 base 지능이 가장 높은 술법사(20)가 시작부터 두 효과 모두 누림 — 직업 정체성.
-//
-// 1단계 (지능 11+): 마법 시전 시 영혼 게이지 +N. 5단위 누진.
-//   지능 11~14 → +1 / 15~19 → +2 / 20~24 → +3 / 25~29 → +4
-// 2단계 (지능 17+): 시작 에테르 +1. 단일 단계 (누진 없음).
-export function getIntellectSoulBonus(stats) {
-  if (!stats || !stats.지능 || stats.지능 < 11) return 0;
-  return Math.floor((stats.지능 - 10) / 5) + 1;
+// 1.37.0~ 매력 자동 가산: 영혼 획득량 +0.5%/포인트. 임계 없음.
+// 공식: max(0, (매력 - 10)) × 0.5
+//   매력 10 → 0% / 매력 11 → +0.5% / 매력 15 → +2.5% / 매력 19 → +4.5% / 매력 25 → +7.5%
+// 적용 위치: handleVictory 처치 영혼·챕터 보너스·무한 깊이 보너스·대장간 영혼 보상 등 모든 영혼 가산처.
+export function getCharismaSoulGainBonus(stats) {
+  if (!stats || !stats.매력) return 0;
+  return Math.max(0, (stats.매력 - 10) * 0.5);
 }
 
-export function getIntellectEtherBonus(stats) {
+// ===== 지능 효과 헬퍼 (1.32.0~ / 1.37.0 재정의) =====
+// 술법사 시그니처. 1.37.0에서 시작 에테르 → 전투 시작 영혼 게이지로 재설계.
+// 시작 base 지능이 가장 높은 술법사(20)가 시작부터 두 효과 모두 누림.
+//
+// 1단계 (지능 11+): 전투 시작 시 영혼 게이지 +0.5/포인트. 정수 내림.
+//   지능 11 → +0 (0.5 내림) / 12 → +1 / 14 → +2 / 15 → +2 / 20 → +5
+//   ※ 공식: floor((지능 - 10) × 0.5)
+// 2단계 (지능 17+): 마법 시전 시 영혼 게이지 +1/5단위 (기존 1단계가 2단계로 이동).
+//   지능 17~21 → +1 / 22~26 → +2
+export function getIntellectStartSoul(stats) {
+  if (!stats || !stats.지능 || stats.지능 < 11) return 0;
+  return Math.floor((stats.지능 - 10) * 0.5);
+}
+
+export function getIntellectSoulPerMagic(stats) {
   if (!stats || !stats.지능 || stats.지능 < 17) return 0;
-  return 1;
+  return Math.floor((stats.지능 - 17) / 5) + 1;
+}
+
+// ===== 근력 효과 헬퍼 (1.37.0~) =====
+// 방랑검사·마족 시그니처. 시작 base 근력이 가장 높은 마족(19)·방랑검사(18)가 두 효과 모두 누림.
+//
+// 1단계 (근력 11+): 최대 HP +5/포인트. 정수 내림.
+//   근력 11 → +5 / 18 → +40 / 19 → +45 / 25 → +75
+//   ※ 공식: max(0, (근력 - 10)) × 5
+// 2단계 (근력 17+): 물리 시전 시 영혼 게이지 +1/5단위.
+//   근력 17~21 → +1 / 22~26 → +2
+export function getStrengthHpBonus(stats) {
+  if (!stats || !stats.근력 || stats.근력 < 11) return 0;
+  return (stats.근력 - 10) * 5;
+}
+
+export function getStrengthSoulPerPhys(stats) {
+  if (!stats || !stats.근력 || stats.근력 < 17) return 0;
+  return Math.floor((stats.근력 - 17) / 5) + 1;
+}
+
+// ===== 민첩 효과 헬퍼 (1.37.0~) =====
+// 정령사·마족 시그니처. 시작 base 민첩이 가장 높은 정령사(20)가 두 효과 모두 누림.
+// ※ 민첩의 회피율·치명타율 자동 가산은 별도 (CombatScreen·StatusPanel에서 직접 계산).
+//
+// 1단계 (민첩 11+): 치명타 데미지 +2%/포인트.
+//   민첩 11 → +2% / 15 → +10% / 20 → +20% / 25 → +30%
+//   ※ 공식: max(0, (민첩 - 10)) × 2
+// 2단계 (민첩 17+): 회피 성공 시 영혼 게이지 +5/5단위.
+//   민첩 17~21 → +5 / 22~26 → +10
+export function getAgilityCritDmgBonus(stats) {
+  if (!stats || !stats.민첩 || stats.민첩 < 11) return 0;
+  return (stats.민첩 - 10) * 2;
+}
+
+export function getAgilitySoulOnDodge(stats) {
+  if (!stats || !stats.민첩 || stats.민첩 < 17) return 0;
+  return (Math.floor((stats.민첩 - 17) / 5) + 1) * 5;
 }
 
 // ===== 표시용 능력치 합산 (1.31.0~) =====

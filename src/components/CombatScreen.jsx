@@ -21,8 +21,12 @@ import {
   getEnemyImageSrc,
   getCharismaHealBonus,
   getCharismaDmgReduction,
-  getIntellectSoulBonus,
-  getIntellectEtherBonus,
+  getIntellectStartSoul,
+  getIntellectSoulPerMagic,
+  getStrengthHpBonus,
+  getStrengthSoulPerPhys,
+  getAgilityCritDmgBonus,
+  getAgilitySoulOnDodge,
   getIfritIgniteRate,
 } from '../utils/helpers.js';
 import {
@@ -54,11 +58,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       p.maxEther = Math.max(1, p.maxEther - 1);
       p.ether = Math.max(1, p.ether - 1);
     }
-    // 1.27.0~ 각인: 전투 시작 시 영혼 게이지 +N
-    if (engravingFx.startSoul) {
-      p.soulGauge = Math.min(100, p.soulGauge + engravingFx.startSoul);
-    }
     // 1.27.0~ 각인: 회피 Lv.7 효과와 별개로 firstHitImmune은 회피 Lv.7 패시브에서 처리됨 (이건 각인 효과 X)
+    // 1.37.0~ 시작 영혼 가산은 useEffect로 이동 (지능 시그니처 + 각인 + 유물 + 메타 합산 로그 출력)
     // 이프리트 minor (Tier 효과 누적): 지능 +2 (Lv.3) +3 (Lv.5) +4 (Lv.7)
     const ifritLv = (initialSkills && initialSkills['이프리트']) || 0;
     if (ifritLv > 0 && (!activeSkills || activeSkills.includes('이프리트'))) {
@@ -72,12 +73,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     if (initialUltimates && (initialUltimates.includes('ult_eternalFire') || initialUltimates.includes('ult_ifritDescent') || initialUltimates.includes('ult_purgatoryFire'))) {
       p.지능 = (p.지능 || 0) + 4;
     }
-    // 1.32.0~ 지능 시그니처 2단계: 시작 에테르 +1 (지능 17+, 이프리트 마일스톤·궁극 포함 후 판정)
-    const intelEther = getIntellectEtherBonus(p);
-    if (intelEther > 0) {
-      p.maxEther += intelEther;
-      p.ether += intelEther;
-    }
+    // 1.37.0~ 지능 시그니처 2단계 → "시작 에테르 +1" 효과는 제거됨 (시작 영혼으로 교체).
     return p;
   });
   const [enemy, setEnemy] = useState(() => {
@@ -237,7 +233,28 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     if (hasCurse(curses, 'curse_noDefense')) {
       newPlayer.defense = 0;
     }
-    
+
+    // 1.37.0~ 시작 영혼 게이지 가산 (지능 시그니처 + 각인 + 유물·메타). 직업 궁극 보유 직업만.
+    if (classData?.ultimateId) {
+      const intelStartSoul = getIntellectStartSoul(newPlayer);
+      const engStartSoul = engravingFx.startSoul || 0;
+      const relicStartSoul = relicStat.startSoul || 0;
+      const metaStartSoul = getMetaBonus(meta, 'startSoul+5') * 5;
+      const totalStartSoul = intelStartSoul + engStartSoul + relicStartSoul + metaStartSoul;
+      if (totalStartSoul > 0) {
+        newPlayer.soulGauge = Math.min(100, (newPlayer.soulGauge || 0) + totalStartSoul);
+        const parts = [];
+        if (intelStartSoul > 0) parts.push(`지능 +${intelStartSoul}`);
+        if (engStartSoul > 0) parts.push(`각인 +${engStartSoul}`);
+        if (relicStartSoul > 0) parts.push(`유물 +${relicStartSoul}`);
+        if (metaStartSoul > 0) parts.push(`메타 +${metaStartSoul}`);
+        initialLog.push({
+          type: 'passive',
+          text: `◆ 영혼 게이지 보너스 : ${totalStartSoul} (${parts.join(' + ')})`,
+        });
+      }
+    }
+
     // 신앙 Lv.7: 수신사 등극 - 전투 시작 시 적에게 신탁 발동
     let oracleDebuffs = null;
     if (hasEffect(skills, 'oracleUser', activeSkills)) {
@@ -309,11 +326,18 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         setFxMagicImpact(v => v + 1);
         setFxMagicParticles(v => v + 1);
       }
-      // 1.32.0~ 지능 시그니처 1단계: 마법 시전 시 영혼 게이지 +N (지능 11+, 5단위 누진)
-      if (skill.type === 'magic' && classData.ultimateId) {
-        const intelSoul = getIntellectSoulBonus(newPlayer);
-        if (intelSoul > 0) {
-          newPlayer.soulGauge = Math.min(100, (newPlayer.soulGauge || 0) + intelSoul);
+      // 1.37.0~ 시그니처: 마법 시전 시 영혼 +N (지능 17+, 5단위) / 물리 시전 시 영혼 +N (근력 17+, 5단위)
+      if (classData.ultimateId) {
+        if (skill.type === 'magic') {
+          const intelSoul = getIntellectSoulPerMagic(newPlayer);
+          if (intelSoul > 0) {
+            newPlayer.soulGauge = Math.min(100, (newPlayer.soulGauge || 0) + intelSoul);
+          }
+        } else if (skill.type === 'physical') {
+          const strSoul = getStrengthSoulPerPhys(newPlayer);
+          if (strSoul > 0) {
+            newPlayer.soulGauge = Math.min(100, (newPlayer.soulGauge || 0) + strSoul);
+          }
         }
       }
       // 마력 Lv.7 (50% × 2회) / 신탁 각성 (50% × 3회)
@@ -809,6 +833,13 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         // 1.27.0~ 각인: 회피 시 영혼 게이지 +N
         if (engravingFx.dodgeSoul) {
           newPlayer.soulGauge = Math.min(100, (newPlayer.soulGauge || 0) + engravingFx.dodgeSoul);
+        }
+        // 1.37.0~ 민첩 시그니처 2단계: 회피 시 영혼 +N (민첩 17+, 5단위)
+        if (classData?.ultimateId) {
+          const dexSoul = getAgilitySoulOnDodge(newPlayer);
+          if (dexSoul > 0) {
+            newPlayer.soulGauge = Math.min(100, (newPlayer.soulGauge || 0) + dexSoul);
+          }
         }
         // 1.27.0~ 각인: 회피 후 다음 공격 데미지 +N% 버프 (다음 calculateDamage에서 소비)
         if (engravingFx.afterDodgeDmg) {

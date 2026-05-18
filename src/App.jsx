@@ -28,6 +28,8 @@ import {
   rollCurses,
   hasCurse,
   getCharismaHealBonus,
+  getCharismaSoulGainBonus,
+  getStrengthHpBonus,
   aggregateEngravingEffects,
   computeDisplayPlayerStats,
   computeDerivedStats,
@@ -701,7 +703,9 @@ export default function App() {
       const metaHpBonus = getMetaBonus(meta, 'startHp+10') * 10;
       // 챔피언십 메타 HP (도전자 +50, 정복자 +100, 합계 +150)
       const champHpBonus = getChampionshipMetaHp(meta);
-      let startHp = GAME_CONFIG.startHp + hpBonus + metaHpBonus + champHpBonus + (_engFx.startHp || 0);
+      // 1.37.0~ 근력 시그니처 1단계: 최대 HP +5/포인트 (근력 11+)
+      const strHpBonus = getStrengthHpBonus(adjustedStats);
+      let startHp = GAME_CONFIG.startHp + hpBonus + metaHpBonus + champHpBonus + (_engFx.startHp || 0) + strHpBonus;
       // 저주: 최대 HP -20%
       if (hasCurse(curses, 'curse_maxHp-20')) {
         startHp = Math.floor(startHp * 0.8);
@@ -1030,12 +1034,20 @@ export default function App() {
     } else if (isEliteReward) {
       soulGain = SOUL_REWARDS.eliteKill;
     }
+    // 1.37.0~ 매력 자동 가산: 영혼 획득 +0.5%/포인트
+    const charismaSoulPct = getCharismaSoulGainBonus(stats);
+    if (charismaSoulPct > 0) {
+      soulGain = Math.floor(soulGain * (1 + charismaSoulPct / 100));
+    }
     setRunSouls(prev => prev + soulGain);
 
     // 보스라면 챕터 보너스도 추가
     let chapterBonusSouls = 0;
     if (isBossReward) {
       chapterBonusSouls = SOUL_REWARDS.chapterClear[chapterIdx] || 5;
+      if (charismaSoulPct > 0) {
+        chapterBonusSouls = Math.floor(chapterBonusSouls * (1 + charismaSoulPct / 100));
+      }
       setRunSouls(prev => prev + chapterBonusSouls);
     }
     
@@ -1084,8 +1096,13 @@ export default function App() {
     // 무한모드: 깊이 기반 보너스 (페널티 없음 — 죽음 = 도전의 끝)
     // 일반: 누적 영혼의 70%만 획득
     let recoveredSouls;
+    // 1.37.0~ 매력 자동 가산: 무한 깊이 보너스에 +0.5%/포인트 적용 (처치 영혼은 누적 시점에 이미 가산됨)
+    const charismaSoulPct = getCharismaSoulGainBonus(stats);
     if (currentExpedition?.endless) {
-      const depthBonus = endlessDepth * 15;
+      let depthBonus = endlessDepth * 15;
+      if (charismaSoulPct > 0) {
+        depthBonus = Math.floor(depthBonus * (1 + charismaSoulPct / 100));
+      }
       recoveredSouls = runSouls + depthBonus;
     } else {
       recoveredSouls = Math.floor(runSouls * SOUL_REWARDS.deathPenalty);
@@ -1389,7 +1406,12 @@ export default function App() {
       setSkills(prev => ({ ...prev, [result.skillName]: (prev[result.skillName] || 0) + 1 }));
     } else if (result.type === 'souls') {
       // 영혼 +50 (해당 런 누적, 원정 클리어/사망 시 메타에 반영)
-      setRunSouls(prev => prev + result.value);
+      // 1.37.0~ 매력 자동 가산: 영혼 보상 +0.5%/포인트
+      const charismaSoulPct = getCharismaSoulGainBonus(stats);
+      const forgeSouls = charismaSoulPct > 0
+        ? Math.floor(result.value * (1 + charismaSoulPct / 100))
+        : result.value;
+      setRunSouls(prev => prev + forgeSouls);
     }
     
     // === 업적 트래킹 ===
