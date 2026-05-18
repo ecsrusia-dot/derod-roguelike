@@ -23,7 +23,6 @@ import {
 const SIGNATURES = {
   근력: {
     color: PALETTE.accent,
-    sub: '검술·압박',
     auto: '물리 데미지 +0.5/포인트 (자동 가산)',
     tier1: {
       label: '1단계 · 근력 11+',
@@ -40,7 +39,6 @@ const SIGNATURES = {
   },
   민첩: {
     color: PALETTE.green,
-    sub: '회피·정밀',
     auto: '회피율 +0.3%/포인트 · 치명타율 +0.5%/포인트 (자동 가산)',
     tier1: {
       label: '1단계 · 민첩 11+',
@@ -57,7 +55,6 @@ const SIGNATURES = {
   },
   지능: {
     color: PALETTE.legendary,
-    sub: '주문·정신',
     auto: '마법 데미지 +0.7/포인트 (자동 가산)',
     tier1: {
       label: '1단계 · 지능 11+',
@@ -74,7 +71,6 @@ const SIGNATURES = {
   },
   매력: {
     color: PALETTE.dawn,
-    sub: '신앙·축복',
     auto: '영혼 획득량 +0.5%/포인트 (자동 가산)',
     tier1: {
       label: '1단계 · 매력 11+',
@@ -115,7 +111,6 @@ export default function StatSignatureModal({ stat, stats, onClose }) {
           <div className="flex items-center gap-2">
             <span className="text-[10px] tracking-[0.25em]" style={{ color: cfg.color }}>◆ 시그니처</span>
             <span className="text-base font-bold" style={{ color: PALETTE.text }}>{stat}</span>
-            <span className="text-[10px]" style={{ color: PALETTE.textDim }}>· {cfg.sub}</span>
           </div>
           <button onClick={onClose}><X size={16} style={{ color: PALETTE.textDim }} /></button>
         </div>
@@ -151,10 +146,6 @@ export default function StatSignatureModal({ stat, stats, onClose }) {
             </div>
             <div className="text-[11px] leading-snug" style={{ color: PALETTE.text }}>{cfg.tier2.desc}</div>
           </div>
-
-          <p className="text-[9px] text-center mt-3" style={{ color: PALETTE.textDim }}>
-            모든 직업이 보석으로 시그니처 효과를 누릴 수 있습니다
-          </p>
         </div>
       </div>
     </div>
