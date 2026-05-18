@@ -78,7 +78,7 @@ PM은 비개발자. 결정이 필요할 때:
 
 - **이름**: derod-roguelike (게임 내 표시: "Dawn and Twilight" / "던앤트와일라잇")
 - **장르**: 한국어 텍스트 기반 다크 판타지 모바일 PWA 로그라이크
-- **현재 게임 버전**: `src/data.js`의 `GAME_VERSION` 참조 (이 문서 갱신 시점 **1.27.0** — 각인 효과 전투 적용 완료, 직업 각인 시스템 풀스택 완성)
+- **현재 게임 버전**: `src/data.js`의 `GAME_VERSION` 참조 (이 문서 갱신 시점 **1.41.0** — 정보창 가독성 시리즈(1.38.0~1.41.0) 완료. 명칭 통일·소울 스킬 분리·시그니처 합산·출처 모달·계산식 명확화 모두 적용)
 - **배포**: GitHub Pages (`main` 브랜치 머지 시 `.github/workflows/deploy.yml`이 자동 빌드·배포)
 - **호스팅 경로**: `https://<owner>.github.io/derod-roguelike/` — `vite.config.js`의 `base: '/derod-roguelike/'`. ⚠️ 에셋 경로는 항상 **상대 경로(`./`)** 사용 (4.5절 참조)
 
@@ -95,28 +95,29 @@ PM은 비개발자. 결정이 필요할 때:
 ```
 src/
 ├── App.jsx                       # 메인 게임 루프 (1900+ 줄). 1.27.0~ 각인 fx prop 전달
-├── data.js                       # 모든 게임 콘텐츠 + GAME_VERSION (4300+ 줄). 1.25.0~ ENGRAVINGS/ENGRAVING_TIERS/ENGRAVING_AWAKENING_TABLE 추가
+├── data.js                       # 모든 게임 콘텐츠 + GAME_VERSION (4300+ 줄). 1.25.0~ ENGRAVINGS/ENGRAVING_TIERS/ENGRAVING_AWAKENING_TABLE / 1.38.0~ CLASS_ULTIMATES 주석에 "소울 스킬·소울 게이지" 용어 통일
 ├── storage.js                    # IndexedDB 메타. 1.25.0~ engravings / 1.26.0~ ultimatesPickedByClass·championshipClearsByClass
 ├── main.jsx / index.css          # 진입점 + 전역 스타일 + FX 키프레임
 ├── combat/damage.js              # 데미지·치명·회피 계산. 1.27.0~ engravingFx 인자
 ├── data/changelog.js             # 버전별 changelog (인게임 모달용)
 ├── utils/
-│   ├── helpers.js                # PALETTE, 패시브/유물/저주 헬퍼, getEnemyImageSrc, getEngravingById/aggregateEngravingEffects(1.27.0~), isAwakeningConditionMet(1.26.0~)
+│   ├── helpers.js                # PALETTE, 패시브/유물/저주 헬퍼, getEnemyImageSrc, aggregateEngravingEffects(1.27.0~), isAwakeningConditionMet(1.26.0~), 4스탯 시그니처 헬퍼 9종(1.37.0~)
 │   ├── mapGen.js                 # linearSequence / branchSequence / 일반 가중치
 │   ├── rewards.js                # 보상 풀·롤
 │   └── dailyChallenge.js         # 일일 챌린지 시드/빌더
 ├── cloud/                        # Firebase auth + sync
-└── components/                   # 27+ 화면 컴포넌트
-    ├── CombatScreen.jsx          # 전투 (1800+ 줄, 가장 큼). 1.27.0~ engravingFx prop으로 13곳 통합
+└── components/                   # 28+ 화면 컴포넌트
+    ├── CombatScreen.jsx          # 전투 (2000+ 줄, 가장 큼). 1.27.0~ engravingFx prop / 1.38.0~ "소울 스킬·소울 게이지" 용어 통일
     ├── BossIntroScreen.jsx       # ★ 보스 진입 시네마틱 컷신 (1.14.0 신설)
     ├── CodexScreen.jsx           # 5탭 도감 (적/사건/유물/패시브/레시피)
-    ├── CardInfoModal.jsx         # 공용 정보 모달 + buildPassive/Relic/ActiveSkillInfo 헬퍼
+    ├── CardInfoModal.jsx         # 공용 정보 모달. buildPassive/Relic/ActiveSkillInfo + buildClassUltimateInfo(1.39.0~) + buildBreakdownInfo(1.40.0~)
     ├── CombatEffects.jsx         # FX 컴포넌트 (FloatingLabel/DamageVignette/WhiteFlash/UltimateCutin)
     ├── NodeInfoModal.jsx         # 노드 진입 안내 (튜토리얼). 보스 컷신은 별도 컴포넌트
     ├── ExpeditionSelect.jsx      # 3탭 (클래식 / 챌린지 / 챔피언십)
     ├── PrepScreen.jsx            # 전투 준비 (패시브·유물·액티브 스킬)
     ├── RestScreen.jsx            # 보스 직전 정비
-    ├── StatusPanel.jsx           # 전투 중 상태창
+    ├── StatusPanel.jsx           # 캐릭터 정보창. 1.39.0~ 액티브/소울 스킬 4번째 슬롯 / 1.40.0~ 시그니처 합산 + 출처 모달 / 1.41.0~ 전 라인 클릭 모달(35개) + 액티브/소울 별도 섹션 분리 + 회복 합산 + 계산식 명확화
+    ├── StatSignatureModal.jsx    # ★ 능력치(근/민/지/매) 시그니처 설명 모달 (1.37.0~). 1.41.0~ formula(stats) 함수로 "적용 포인트 N(=스탯-10) × +단위/p" 형식 통일
     ├── MapView.jsx               # 챕터 맵
     ├── TitleScreen.jsx           # 메인 (이어하기 버튼 포함)
     ├── EngravingScreen.jsx       # ★ 직업 각인 시스템 (1.25.0~). 각성도 10단계 + 슬롯 3칸 + 가챠. EngravingMigrationModal + AwakeningConditionNoticeModal(1.26.0~) export
@@ -393,13 +394,19 @@ const introSrc = getEnemyImageSrc(enemyKey, enemy, 'intro');
 
 ### 6.3. 직업 5종
 
-| ID | 이름 | 시작 패시브 | 시그니처 궁극 |
+| ID | 이름 | 시작 패시브 | 직업 소울 스킬 (1.38.0~ 명명) |
 |---|---|---|---|
-| `lanthert` | 방랑검사 | 심안류 Lv.3, 심안 Lv.2 | 무영(無影)의 일격 (1.12.0~) |
-| `sage` | 술법사 | 이프리트 Lv.3, 마력 Lv.2 | (다음 업데이트) |
+| `wanderer` | 방랑검사 | 심안류 Lv.3, 심안 Lv.2 | 무영(無影)의 일격 (1.12.0~) |
+| `sage` | 술법사 | 이프리트 Lv.3, 마력 Lv.2 | 영겁(永劫)의 화염 (이전 세션 추가, 1.38.0 명명 통일에 포함) |
 | `demonblood` | 혼혈 마족 | (광기 계열) | (미정) |
 | `elf` | 숲의 정령사 | (정밀·바람 계열) | (미정) |
 | `priest` | 여명의 사제 | (신앙·축복 계열) | (미정) |
+
+**1.38.0 명명 정리**:
+- **소울 스킬** = 직업 시그니처 액티브(이전: "액티브 궁극") — `classData.ultimateId` + `CLASS_ULTIMATES[ultimateId]`
+- **소울 게이지** = 전투 중 0~100 충전(이전: "영혼 게이지") — `player.soulGauge`, 100에서 소울 스킬 발동 가능
+- **각성 스킬** = 패시브 7Lv 보상(`ULTIMATE_SKILLS`) — 별개 시스템
+- **영혼** = 영구 메타 재화(영혼의 제단·사망 시 70% 보존) — 변경 없음
 
 **1.24.0~** 5직업 모두 클래식 모드에서 처음부터 사용 가능. 챔피언십에서는 해당 직업의 수련의 길 클리어 시 사용 가능 (`isChampionshipClassUnlocked` 기준). 수련의 길 5종은 모두 튜토리얼 4 클리어 시 일괄 해금.
 
@@ -539,6 +546,107 @@ export function rollDodge(skills, defender, activeSkills, relicStat, ultimates, 
 | `ChangelogModal` | 1.27.0 changelog 신규 항목 표시 | `App.jsx` 자동 |
 
 모달 트리거 데이터는 `loadMeta` 마이그레이션에서 자동 세팅. acknowledge 시 `clearXxxNotice(meta)` 호출 + saveMeta.
+
+### 6.10. 정보창 가독성 시스템 (1.38.0~1.41.0) — UI 정보 노출 풀스택
+
+이 세션(1.38.0~1.41.0)의 두 번째 큰 작업. PM 비개발자가 "내 효과가 어디서 오는지" 한눈에 검증할 수 있도록 정보창(StatusPanel) 전체를 재설계.
+
+#### 6.10.1. 4단계 변천 (PR A/B/C + 추가 다듬기)
+
+| 버전 | PR | 핵심 변화 |
+|---|---|---|
+| 1.38.0 | #67 | **용어 통일** — "액티브 궁극 → 소울 스킬", "영혼 게이지 → 소울 게이지", "혼 → 소울" (63건 일괄 치환). 데이터 키(`ultimateId` / `soulGauge` / `CLASS_ULTIMATES`)는 코드 호환 유지 |
+| 1.39.0 | #68 | **소울 스킬 정보 카드** — StatusPanel "액티브 스킬" 4번째 슬롯에 직업 소울 스킬 카드 + 탭 시 정보 모달. `buildClassUltimateInfo` 헬퍼 신설 |
+| 1.40.0 | #69 | **시그니처 합산 + 출처 모달** — 분산 라인 4종(치명타 데미지 / 시작 소울 / 회피 시 소울 / 받는 데미지) 합산 통합. 합산 라인 ◇ 탭 시 출처 모달. `buildBreakdownInfo` 헬퍼 신설. 라벨 19종 풀네임화 |
+| 1.41.0 | #70 | **모든 라인 클릭 모달 + 회복 합산 + 액티브/소울 별도 섹션 + 계산식 명확화** — 35개 라인 모두 ◇ + 클릭 모달. 액티브 3컬럼 + 별도 "★ 직업 소울 스킬" 풀폭 섹션. `StatSignatureModal.formula(stats)` 함수 추가 |
+
+#### 6.10.2. 핵심 헬퍼 (CardInfoModal.jsx)
+
+| 헬퍼 | 버전 | 입력 → 출력 |
+|---|---|---|
+| `buildPassiveInfo(name, lv)` | 기존 | 패시브 카드 정보 모달 |
+| `buildRelicInfo(rel)` | 기존 | 유물 카드 정보 모달 |
+| `buildActiveSkillInfo(name, color)` | 기존 | 액티브 스킬 카드 정보 모달 |
+| **`buildClassUltimateInfo(ultimateId)`** | 1.39.0 | `CLASS_ULTIMATES[ultimateId]` → 소울 스킬 정보 모달 (충전 조건 6종 stats) |
+| **`buildBreakdownInfo({ title, totalText, subtitle, sources, color })`** | 1.40.0 | 합산 라인 출처 분해 모달. `sources` 배열에서 value 0인 항목 자동 필터링 |
+
+#### 6.10.3. 합산 라인 5종 (StatusPanel)
+
+| 합산 라인 | 출처 | 계산 |
+|---|---|---|
+| **치명타 데미지** | 기본(50) + 심안 Lv.4(+30) + 약점 노출(+50) + 유물 critDmg + 민첩 시그 1단계 | 합산 |
+| **시작 소울 게이지** | 지능 시그 1단계 + 각인 startSoul | 합산 |
+| **회피 시 소울** | 민첩 시그 2단계 + 각인 dodgeSoul | 합산 |
+| **받는 데미지** | 메타(dmgTaken-3%×N) + 유물 + 패시브 Lv.5(-20) + 매력 시그 2단계 - 각인 dmgTakenPct | 합산 (음수 각인은 빼기) |
+| **회복량 보너스** (1.41.0~) | 유물 heal × 매력 시그 1단계 | **곱셈** `(1+a/100)×(1+b/100)` — 단순 합산과 다름! |
+
+회복량은 곱셈이라 특수: 표시값 `Math.round((healMult - 1) * 1000) / 10`. 모달엔 두 출처 + 계산식 노출.
+
+#### 6.10.4. 라인 클릭 패턴 (1.41.0~)
+
+모든 라인은 `<button onClick={() => openLine({...})}>` 형식. 헬퍼:
+
+```js
+const openLine = (info) => setModalState({ kind: 'breakdown', info: buildBreakdownInfo(info) });
+
+// 사용
+openLine({
+  title: '치명타 데미지',
+  totalText: `+${Math.round(critDmg)}%`,
+  subtitle: '치명타 발동 시 가하는 추가 데미지의 합산.',
+  color: PALETTE.legendary,
+  sources: [
+    { label: '기본 (전 직업 공통)', value: 50, unit: '%' },
+    { label: '민첩 시그니처 1단계', value: critDmgSig, unit: '%',
+      note: `적용 포인트 ${dexPts}(=민첩-10) × +2%/p` },
+    ...
+  ],
+});
+```
+
+**규칙**:
+- `value: 0` 출처는 자동 필터링 (보유한 출처만 표시)
+- `unit`: `'%'` / `''` / `'/턴'` 등 자유. 숫자면 `+N{unit}`, 문자열이면 그대로
+- `note`: 임계 미달은 `미달 (X 이상 필요)`, 5단위 누진은 `17~21 +N / 22~26 +M (현재 +K)`
+- 영어 키 노출 OK (`각인 startSoul` 등) — 코드 추적 가능
+
+#### 6.10.5. 계산식 표기 규칙 (1.41.0~)
+
+`StatSignatureModal`과 `buildBreakdownInfo` note 모두 동일 형식:
+
+| 시그 유형 | 표기 |
+|---|---|
+| 임계 + 포인트 배수 (예: 매력 1단계) | `적용 포인트 N(=매력-10) × +0.5%/p` |
+| 5단위 누진 (예: 매력 2단계) | `17~21 -5% / 22~26 -10% / 27~31 -15% (현재 -N%)` |
+| 임계 미달 | `매력 17 필요 (현재 15)` |
+
+**왜 이 형식인가**: 기존 "매력 15 × 0.5%/p"는 `15 × 0.5 = 7.5%`로 오해 가능. "적용 포인트 5(=매력-10) × 0.5%/p"로 풀어 쓰면 `5 × 0.5 = 2.5%`로 정확.
+
+#### 6.10.6. 액티브/소울 분리 섹션 (1.41.0~)
+
+```
+◆ 액티브 스킬     <- 3컬럼 그리드 (참격·관통·방검 등)
+─────────────
+★ 직업 소울 스킬   <- 풀폭 카드 1개 (★ 아이콘 + 이름 + desc + "SOUL 100" 뱃지 + 황금 글로우)
+```
+
+데모블러드·정령사·사제(ultimateId 없음)는 소울 스킬 섹션 자체 미표시. 액티브 섹션만.
+
+#### 6.10.7. 직업 소울 스킬 미보유 직업 게이트
+
+```js
+const showSoul = !!classData?.ultimateId;
+// "기타 효과" 섹션에서 소울 게이지 관련 라인 6종(시작 소울·매 턴·회피·소울 배수·반격→소울·반격→충격) 모두
+// {showSoul && ...} 조건으로 표시
+```
+
+게이지 자체가 없는 직업에 라인을 보여주지 않아 혼란 방지. 단 매력 시그(영혼 획득)·영구 영혼 획득 배수는 영구 영혼이라 그대로 표시.
+
+#### 6.10.8. 다음 작업 (이 시스템 확장)
+
+- **PrepScreen·RestScreen·CombatScreen ≡ 모달**에도 같은 출처 모달 패턴 확산 (1.41.0은 정보창만)
+- **모달 출처 라벨 한글화** — 현재 "각인 startSoul" / "유물 critRate" 영어 키 노출. PM이 어색하다 판단하면 한글 풀명으로
+- **합산 라인 확장 가능 효과** — `magicDmgBonus`(패시브+Lv.5+유물 3개 합산)도 합산 라인 후보
 
 ## 7. PM 커뮤니케이션 스타일
 
@@ -686,27 +794,29 @@ PM이 PNG를 푸시했다면 **JPG 변환 + 코드 헬퍼 연결 + 버전 갱신
 - **🔥 에셋 경로**: 4.5절 — 반드시 `./` 상대 경로. 절대 경로는 GH Pages 배포 후 404.
 - **📷 채팅 첨부 이미지**: 5.5절 — PM 채팅 첨부 PNG는 Claude 디스크에 저장 안 됨. PM이 직접 repo에 넣어야 함.
 
-## 11. 작업 로드맵 (1.27.0 기준)
+## 11. 작업 로드맵 (1.41.0 기준)
 
 ### ⭐ 진행 가능한 다음 작업 (우선순위 순)
 
-1. **4직업 각인 풀 24장씩 작성** (sage / demonblood / elf / priest) — 코드 인프라는 1.27.0에서 완성. 데이터(`ENGRAVINGS[classId]`)만 추가하면 자동 적용. **1.28.0~1.31.0 시리즈로 분할 가능** (1직업 = 1 PR). 풀 구성: Common 5 + Rare 5 + Epic 5 + Legendary 2 + Flaw 4 + Curse 3 = 24장. effect 키는 21종 중 직업 컨셉에 맞는 것 사용 (예: sage = magicDmgPct·ifritFlamePct, elf = dodgeRate·critRate)
-2. **챔피언십 forest 컨셉 일러 20장 (PM 생성)** — 프롬프트 완료, 다음은 PM이 Copilot Designer로 생성 + repo 저장 → Claude 변환·코드 PR (frost 사이클 그대로 반복)
-3. **챔피언십 sanctum 컨셉 프롬프트 20장 작성** — 신전·봉인 (신성·법진·시간). 4보스 차별화 forest·frost와 모두 다르게
-4. **챔피언십 rift 컨셉 프롬프트 20장 작성** — 마계·균열 (마족·핏빛·차원)
-5. **챔피언십 dawn 컨셉 프롬프트 20장 작성** — 천상·여명 (천사·빛·골든)
-6. **도감 일러 노출** — `CodexScreen.jsx`에 신규 일러 썸네일. 발견 못 한 적은 그레이스케일
-7. **타 직업(술법사·마족·엘프·사제) 전투 일러 개편** — 동일 파이프라인 (방랑검사 1.12.0 완료)
+1. **4직업 각인 풀 24장씩 작성** (sage / demonblood / elf / priest) — 코드 인프라는 1.27.0에서 완성. wanderer만 24장 작성, 나머지 4직업은 `ENGRAVINGS[classId] = []` 빈 배열 상태. 데이터만 추가하면 자동 적용. **1.42.0~1.45.0 시리즈로 분할 가능** (1직업 = 1 PR). 풀 구성: Common 5 + Rare 5 + Epic 5 + Legendary 2 + Flaw 4 + Curse 3 = 24장. effect 키는 21종 중 직업 컨셉에 맞는 것 사용 (예: sage = magicDmgPct·ifritFlamePct·intMagicSoul, demonblood = physDmgPct·perTurnHpLoss·berserker, elf = dodgeRate·critRate·dodgeSoul, priest = startHp·heal계열·startSoul)
+2. **PrepScreen·RestScreen에 출처 모달 확산 (1.41.0 후속)** — 정보창에 도입한 ◇ 클릭 모달 패턴을 다른 화면에도 적용. `buildBreakdownInfo` 재사용. PM이 정보 일관성을 좋아함
+3. **모달 출처 라벨 한글화** — 현재 "각인 startSoul" / "유물 critRate" 영어 키 노출. PM 피드백 받으면 한글 풀명으로 (예: "각인: 시작 소울 보너스")
+4. **챔피언십 forest 컨셉 일러 20장 (PM 생성)** — 프롬프트 완료, 다음은 PM이 Copilot Designer로 생성 + repo 저장 → Claude 변환·코드 PR (frost 사이클 그대로 반복)
+5. **챔피언십 sanctum 컨셉 프롬프트 20장 작성** — 신전·봉인 (신성·법진·시간). 4보스 차별화 forest·frost와 모두 다르게
+6. **챔피언십 rift 컨셉 프롬프트 20장 작성** — 마계·균열 (마족·핏빛·차원)
+7. **챔피언십 dawn 컨셉 프롬프트 20장 작성** — 천상·여명 (천사·빛·골든)
+8. **도감 일러 노출** — `CodexScreen.jsx`에 신규 일러 썸네일. 발견 못 한 적은 그레이스케일
+9. **타 직업(술법사·마족·엘프·사제) 전투 일러 개편** — 동일 파이프라인 (방랑검사 1.12.0 완료)
 
 ### 시스템 미구현 (PM 결정 대기)
 - **Tier 3A** — 신규 클래스 6번째
 - **Tier 3B** — 신규 챕터 5번째 (컨셉 후보: 여명의 폐허 / 마왕의 심장 / 시간의 폐허)
 - **Tier 3C** — Mutator 시스템 (출정 직전 자가 선택 변형)
+- **3직업 소울 스킬** (demonblood/elf/priest) — 1.38.0~1.41.0에서 wanderer·sage만 정의. 나머지 3직업 `CLASS_ULTIMATES` 추가 필요. 정보창에 자동 노출됨
 
 ### 부분 진행 가능한 것
 - **이팩트 Phase 3** (보스 임팩트 프레임, 승리 골든 버스트, 사망 흑백 페이드)
 - **튜토리얼 5/6/7** (보상 선택의 갈림길 / 전투의 흐름 / 영혼의 행로)
-- **나머지 4직업 시그니처 궁극** (방랑검사만 1.12.0에 추가됨. 각인 시스템은 ULTIMATE_SKILLS 기반이라 무관)
 - **각인 시스템 보조 UI**: PrepScreen에서 장착 각인 능력치 표시 / 각성도 전체 9단계 한눈에 보기
 
 ### 잠재적 개선
@@ -737,41 +847,45 @@ PM이 PNG를 푸시했다면 **JPG 변환 + 코드 헬퍼 연결 + 버전 갱신
 
 ---
 
-**마지막 업데이트**: 1.27.0 (각인 효과 전투 적용) 완료 시점 — PR #55 머지 후 갱신.
+**마지막 업데이트**: 1.41.0 (정보창 가독성 시리즈) 완료 시점 — PR #70 머지 후 갱신.
 
-### 변경 핵심 (vs 이전 1.21.0)
+### 변경 핵심 (vs 이전 1.27.0)
 
-이 세션에서 진행한 큰 추가는 **직업 각인 시스템 풀스택 구축** (1.25.0~1.27.0). 챔피언십 일러는 frost 이후 추가 진행 없음 (PM 일러 생성 대기).
+이 세션에서 진행한 큰 작업은 **정보창 가독성 풀스택 재설계** (1.38.0~1.41.0). 4개 PR + PM 추가 피드백 1 PR로 총 5개 PR 시리즈. 챔피언십 일러는 여전히 frost 이후 진행 없음 (PM 일러 생성 대기).
 
 | 버전 | PR | 작업 |
 |---|---|---|
-| 1.25.0 | #53 | 각인 시스템 도입 — 5직업 각성도 10단계 + 슬롯 3칸 + 가챠. `EngravingScreen.jsx` 신축. `meta_startSkillLv` 영혼 환불 마이그레이션 |
-| 1.26.0 | #54 | 각성도 활성화 조건 — 9단계 모두에 `condition` 추가. 직업별 추적 데이터(`ultimatesPickedByClass`·`championshipClearsByClass`) 신설. 영혼만으로 강화 불가. `AwakeningConditionNoticeModal` 1회 안내 |
-| 1.27.0 | #55 | 각인 effect 21종 모두 실제 전투 적용. `aggregateEngravingEffects` 신설. damage.js 4함수 시그니처 확장 (engravingFx 인자). CombatScreen 13곳 통합. initialPlayer spread 순서 버그 사이드 수정 |
+| 1.38.0 | #67 | **용어 통일** — "액티브 궁극 → 소울 스킬", "영혼 게이지 → 소울 게이지" 63건 일괄 치환. 데이터 키 호환 유지 |
+| 1.39.0 | #68 | **소울 스킬 정보 카드** — StatusPanel 4번째 슬롯 + `buildClassUltimateInfo` 헬퍼. 이후 1.41.0에서 별도 섹션으로 재구성 |
+| 1.40.0 | #69 | **시그니처 합산 + 출처 모달 + 풀네임** — 합산 라인 4종(치명타 데미지 / 시작 소울 / 회피 시 소울 / 받는 데미지) + `buildBreakdownInfo` 헬퍼 + 19종 풀네임화 |
+| 1.41.0 | #70 | **모든 라인 클릭 모달 (35개) + 회복 합산 + 액티브/소울 별도 섹션 + 계산식 명확화** — PM 추가 피드백 4건 통합. `StatSignatureModal.formula(stats)` 추가. 회복은 곱셈 적용 정확 표시 |
 
 ### 새 코드 패턴 (이번 세션 학습)
 
 | 패턴 | 적용 |
 |---|---|
-| **fx bag 집계** | 장착물 → 단일 합산 effect 객체 → 전투에 prop 전달. 수치 합산 + 불린 OR. 새 키 추가 시 1~2곳만 수정. 미장착 시 빈 객체라 회귀 안전 |
-| **함수 시그니처 확장** | 기존 호출 호환 위해 새 인자는 **항상 마지막 + 기본값 `= {}`**. damage.js의 calculateDamage/rollDodge/rollCrit가 좋은 예 |
-| **조건 게이트 + 비용 분리** | 영혼(비용) + 조건(해금 게이트) 명확 분리. 강화 버튼 라벨 자동 전환 — "조건 미달 / 영혼 부족 / 강화 가능". PM 설계 결정으로 명문화 |
-| **마이그레이션 모달 1회 표시 트리거** | `loadMeta` 마이그레이션에서 자동 세팅 (`engravingMigrationNotice` / `awakeningConditionNotice`). 첫 부팅 시 표시 → ack 후 `clearXxxNotice` + saveMeta. 즉시 저장으로 재트리거 방지 |
-| **큰 시스템 PR 3분할** | 데이터+UI (PR #53) → 조건 게이트 (PR #54) → 효과 적용 (PR #55) 순. 각 PR 회귀 영역이 독립적. PM 검토·머지 사이클을 자연스럽게 분리 |
-| **메인 작업 중 사이드 버그 발견 시** | 작업 흐름에 자연스럽게 묶기 (별도 PR로 분리하지 않음). 1.27.0의 initialPlayer spread 순서 수정이 사례. 커밋 메시지·PR 본문에 "사이드 버그 수정" 명시 |
+| **출처 분해 모달 (`buildBreakdownInfo`)** | 합산 라인 ◇ 탭 → `sources` 배열 출처 분해. value 0 자동 필터. note에 "적용 포인트 N(=스탯-10) × 단위/p" 형식 통일. 신규 효과는 sources 1줄만 추가 |
+| **모든 라인 button 패턴 (1.41.0)** | StatusPanel 35개 라인 모두 `<button onClick={() => openLine({...})}>`. 헬퍼 `openLine` 하나로 일관. 정보 노출 일관성 + 새 라인 추가 작업 표준화 |
+| **곱셈 적용 효과 표시** | 회복량처럼 `(1+a/100)×(1+b/100)` 곱셈은 합산값 ≠ 실제값. `Math.round((mult - 1) * 1000) / 10`로 정확 % 표시 + 모달에 계산식 노출 |
+| **계산식 표기 통일 ("적용 포인트 N(=스탯-10) × 단위/p")** | 기존 "민첩 15 × 2%/p" = 30%로 오해 가능 → "적용 포인트 5(=민첩-10) × +2%/p"로 명확. 5단위 누진은 "17~21 +N / 22~26 +M (현재 +K)" |
+| **PR 3분할 + 추가 피드백 4번째 PR** | 큰 PM 요청은 3분할 (A/B/C) + 머지 후 PM 추가 피드백은 별도 4번째 PR(1.41.0). 시리즈가 5 PR로 늘어남. 각 PR 회귀 영역 독립 유지 |
+| **용어 통일은 일괄 치환 + 데이터 키 호환** | 1.38.0의 "영혼 게이지 → 소울 게이지" 등은 사용자에게 보이는 텍스트만 치환, 데이터 키(`soulGauge` / `ultimateId` / `CLASS_ULTIMATES`)는 코드 호환 유지. 마이그레이션 불필요 |
+| **fx bag 집계** (1.27.0 기존) | 장착물 → 단일 합산 effect 객체 → 전투에 prop 전달. 수치 합산 + 불린 OR. 새 키 추가 시 1~2곳만 수정. 미장착 시 빈 객체라 회귀 안전 |
+| **함수 시그니처 확장** (1.27.0 기존) | 기존 호출 호환 위해 새 인자는 **항상 마지막 + 기본값 `= {}`**. damage.js의 calculateDamage/rollDodge/rollCrit가 좋은 예 |
 
 ### 브랜치
-- 시스템 메시지에 박힌 값 사용 (세션마다 다를 수 있음. 이 세션 동안 `claude/review-claude-md-DpUq4`)
+- 시스템 메시지에 박힌 값 사용 (세션마다 다를 수 있음. 이 세션 동안 `claude/review-claude-md-pr55-JcasV`)
 - 머지 후 새 PR은 **반드시 `git fetch origin main` + `git checkout -B <브랜치> origin/main`**으로 최신 main에서 분기
 
 ### 다음 세션이 시작될 때 (PM 메시지: "새세션에서 다음작업 진행")
 
 | 우선순위 | 작업 | 메모 |
 |---|---|---|
-| 1 | **4직업 각인 풀 작성** (sage 또는 데모블러드 먼저) | 코드 인프라 완성. 데이터만 추가. 1직업 = 1 PR (1.28.0~1.31.0). 6.9.5절 가이드 참조 |
-| 2 | 챔피언십 forest 일러 (PM 생성 대기) | 프롬프트 완료. PM이 PNG 푸시하면 Claude가 JPG 변환 + 게임 통합 |
-| 3 | 챔피언십 sanctum 프롬프트 20장 작성 | forest와 다른 4보스 차별화 컨셉 (frost/forest 룰 적용) |
-| 4 | rift / dawn 프롬프트 | sanctum 작성 완료 후 |
-| 5 | PrepScreen에 각인 능력치 표시 | 1.27.0이 각인 효과 적용했지만 PrepScreen UI 갱신은 미확인 — 실기기 검증 후 진행 |
+| 1 | **4직업 각인 풀 작성** (sage / demonblood / elf / priest 모두 빈 배열 상태. 1직업씩) | 코드 인프라 완성. 데이터만 추가. 1직업 = 1 PR (1.42.0~1.45.0). 6.9.5절 가이드 참조 |
+| 2 | **PrepScreen·RestScreen 출처 모달 확산** | 정보창에 도입한 패턴(buildBreakdownInfo + ◇ + openLine 헬퍼)을 다른 화면에도 적용. 1.41.0 시리즈 일관성 마무리 |
+| 3 | 챔피언십 forest 일러 (PM 생성 대기) | 프롬프트 완료. PM이 PNG 푸시하면 Claude가 JPG 변환 + 게임 통합 |
+| 4 | 챔피언십 sanctum 프롬프트 20장 작성 | forest와 다른 4보스 차별화 컨셉 (frost/forest 룰 적용) |
+| 5 | rift / dawn 프롬프트 | sanctum 작성 완료 후 |
+| 6 | 3직업 소울 스킬 설계 (demonblood/elf/priest) | `CLASS_ULTIMATES` 데이터만 추가하면 정보창에 자동 노출됨. PM과 컨셉 결정 필요 |
 
 PM이 직접 다른 작업을 지시하면 그것을 우선 — 위 1순위는 기본값일 뿐. **첫 응답은 0절 응답 템플릿 + 표 기반**, 산문체 X.
