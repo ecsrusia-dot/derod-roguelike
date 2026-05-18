@@ -1,0 +1,44 @@
+// =========== 게임 밸런스 상수 ===========
+export const GAME_CONFIG = {
+  // 시작 자원
+  startHp: 300,
+  startGold: 120,
+  startGem: 15,
+  
+  // 보상 / 리롤
+  rerollCost: 15,
+  rerollDiscountCost: 2, // 운명 Lv.3 적용 시
+  
+  // 챕터 간 회복률
+  chapterHealRatio: 0.7,
+  
+  // 야영 옵션 효과치
+  rest: {
+    healRatio: 0.4,
+    gemAmount: 5,
+    maxhpAmount: 20,
+  },
+  
+  // 출혈 데미지 (스택당)
+  bleedDmgPerStack: 5,
+  
+  // 충격 게이지
+  shockGaugeBase: 30,       // 강타 Lv.3 기본
+  shockGaugeBonus: 10,       // 강타 Lv.5 추가
+  shockResistTurns: 3,       // 기절 후 저항 지속 턴
+  shockResistReduction: 0.7, // 저항 시 게이지 누적량 70%
+  
+  // 능력 검정 주사위
+  diceRoll: { min: 1, max: 6 },
+  
+  // 노드 그래프
+  minLayers: 4,
+  branchProbability: 0.4, // 두 갈래 분기 확률
+};
+
+
+// =========== 전투 준비 시스템 ===========
+export const PREP_CONFIG = {
+  maxSkillSelect: 5,    // 활성 패시브 개수 (모든 원정 동일)
+};
+
