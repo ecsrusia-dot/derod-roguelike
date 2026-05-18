@@ -141,7 +141,6 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
             return (
               <div className="mt-3 pt-3 border-t" style={{ borderColor: `${classData.color}30` }}>
                 <div className="text-[10px] mb-1.5" style={{ color: PALETTE.textDim, letterSpacing: '0.15em' }}>━ 전투 수치 ━</div>
-                <p className="text-[9px] mb-1.5" style={{ color: PALETTE.textDim }}>각 라인을 눌러 산출 근거를 확인하세요</p>
                 <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px]">
                   <button onClick={() => openLine({
                     title: '치명타 발동율',
@@ -150,7 +149,7 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                     color: PALETTE.legendary,
                     sources: [
                       { label: '기본 (전 직업 공통)', value: 5, unit: '%' },
-                      { label: '민첩 시그니처 기본', value: dexAutoCrit, unit: '%', note: `민첩 ${playerDex} × +0.5%/p (1.42.0~ 스탯 전체)` },
+                      { label: '민첩 시그니처 기본', value: dexAutoCrit, unit: '%', note: `민첩 ${playerDex} × +0.5%/p` },
                       { label: '패시브: 치명타 발동율 누적', value: critMinor, unit: '%' },
                       { label: '영혼의 제단: 치명타 발동율 +3% × 스택', value: critMeta, unit: '%', note: critMetaStacks > 0 ? `${critMetaStacks} 스택` : null },
                       { label: '유물: 치명타 발동율', value: critRelic, unit: '%' },
@@ -178,7 +177,7 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                     subtitle: '적의 공격을 피할 확률.',
                     color: PALETTE.green,
                     sources: [
-                      { label: '민첩 시그니처 기본', value: dexAutoDodge, unit: '%', note: `민첩 ${playerDex} × +0.3%/p (1.42.0~ 스탯 전체)` },
+                      { label: '민첩 시그니처 기본', value: dexAutoDodge, unit: '%', note: `민첩 ${playerDex} × +0.3%/p` },
                       { label: '패시브: 회피 발동율 누적', value: dodgeMinor, unit: '%' },
                       { label: '유물: 회피 발동율', value: dodgeRelic, unit: '%' },
                       { label: '회피 Lv.5 (+15%)', value: dodgeLv5, unit: '%' },
@@ -229,10 +228,15 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
               </div>
             );
           })()}
-          {/* ━ 데미지 보정 ━ 1.41.0~ 모든 라인 클릭 시 출처 분해 모달 */}
+          {/* ━ 데미지 보정 ━ */}
           {(() => {
             const physMinor = getMinorBonus(skills, 'physDmg+', activeSkills);
             const physBonus = physMinor;
+            // 1.44.1~ 근력/지능 자동 가산 % 변환 — 정보창에 노출
+            const playerStr = stats['근력'] || 10;
+            const playerInt = stats['지능'] || 10;
+            const strSigPct = Math.round((playerStr * 0.4) * 10) / 10;
+            const intSigPct = Math.round((playerInt * 0.4) * 10) / 10;
             const magicMinor = getMinorBonus(skills, 'magicDmg+', activeSkills);
             const magicLv5 = hasEffect(skills, 'magicDmg+30', activeSkills) ? 30 : 0;
             const magicRelic = relicStat.magicDmg || 0;
@@ -271,7 +275,6 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
             return (
               <div className="mt-3 pt-3 border-t" style={{ borderColor: `${classData.color}30` }}>
                 <div className="text-[10px] mb-1.5" style={{ color: PALETTE.textDim, letterSpacing: '0.15em' }}>━ 데미지 보정 ━</div>
-                <p className="text-[9px] mb-1.5" style={{ color: PALETTE.textDim }}>각 라인을 눌러 산출 근거를 확인하세요</p>
                 <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px]">
                   {physBonus > 0 && (
                     <button onClick={() => openLine({
@@ -282,28 +285,38 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                       sources: [{ label: '패시브: 물리 데미지 누적', value: physMinor }],
                     })} className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>물리 데미지 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.accent }}>+{physBonus}</span></button>
                   )}
-                  {physDmgPct > 0 && (
+                  {(strSigPct > 0 || physDmgPct > 0) && (() => {
+                    const physPctTotal = Math.round((strSigPct + physDmgPct) * 10) / 10;
+                    return (
                     <button onClick={() => openLine({
-                      title: '물리 데미지(각인)',
-                      totalText: `+${physDmgPct}%`,
-                      subtitle: '물리 데미지에 곱셈으로 적용되는 각인 보너스.',
+                      title: '물리 데미지 (%)',
+                      totalText: `+${physPctTotal}%`,
+                      subtitle: '물리 데미지에 곱셈으로 적용되는 % 보너스.',
                       color: '#c4453d',
-                      sources: [{ label: '각인: 물리 데미지', value: physDmgPct, unit: '%' }],
-                    })} className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>물리 데미지(각인) ◇</span><span className="font-bold tabular-nums" style={{ color: '#c4453d' }}>+{physDmgPct}%</span></button>
-                  )}
-                  {magicBonus > 0 && (
+                      sources: [
+                        { label: '근력 시그니처 기본', value: strSigPct, unit: '%', note: `근력 ${playerStr} × +0.4%/p` },
+                        { label: '각인: 물리 데미지', value: physDmgPct, unit: '%' },
+                      ],
+                    })} className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>물리 데미지 (%) ◇</span><span className="font-bold tabular-nums" style={{ color: '#c4453d' }}>+{physPctTotal}%</span></button>
+                    );
+                  })()}
+                  {(magicBonus > 0 || intSigPct > 0) && (() => {
+                    const magicPctTotal = Math.round((magicBonus + intSigPct) * 10) / 10;
+                    return (
                     <button onClick={() => openLine({
                       title: '마법 데미지',
-                      totalText: `+${magicBonus}%`,
+                      totalText: `+${magicPctTotal}%`,
                       subtitle: '마법 데미지에 가산되는 % 보너스.',
                       color: PALETTE.twilight,
                       sources: [
+                        { label: '지능 시그니처 기본', value: intSigPct, unit: '%', note: `지능 ${playerInt} × +0.4%/p` },
                         { label: '패시브: 마법 데미지 누적', value: magicMinor, unit: '%' },
-                        { label: '마력 Lv.5: 마법 데미지 +30%', value: magicLv5, unit: '%' },
+                        { label: '마력 Lv.3: 마법 데미지 +30%', value: magicLv5, unit: '%' },
                         { label: '유물: 마법 데미지', value: magicRelic, unit: '%' },
                       ],
-                    })} className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>마법 데미지 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.twilight }}>+{magicBonus}%</span></button>
-                  )}
+                    })} className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>마법 데미지 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.twilight }}>+{magicPctTotal}%</span></button>
+                    );
+                  })()}
                   {bleedBonus > 0 && (
                     <button onClick={() => openLine({
                       title: '출혈 데미지',
@@ -469,7 +482,6 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
             return (
               <div className="mt-3 pt-3 border-t" style={{ borderColor: `${classData.color}30` }}>
                 <div className="text-[10px] mb-1.5" style={{ color: PALETTE.textDim, letterSpacing: '0.15em' }}>━ 기타 효과 ━</div>
-                <p className="text-[9px] mb-1.5" style={{ color: PALETTE.textDim }}>각 라인을 눌러 산출 근거를 확인하세요</p>
                 <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px]">
                   {regenLv > 0 && (
                     <button onClick={() => openSimpleLine('HP 자동 회복', `+${regenLv}/턴`, [{ label: '재생 패시브', value: regenLv, unit: '/턴', note: `Lv.${regenLv}` }], PALETTE.green, '매 턴 시작 시 HP를 회복합니다.')}
@@ -487,7 +499,7 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                     <button onClick={openHealBreakdown} className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>회복량 보너스 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.green }}>+{healTotalPct}%</span></button>
                   )}
                   {charismaSoul > 0 && (
-                    <button onClick={() => openSimpleLine('매력 시그: 영혼 획득', `+${charismaSoul}%`, [{ label: '매력 시그니처 기본', value: charismaSoul, unit: '%', note: `매력 ${stats['매력'] || 0} × +0.5%/p (1.42.0~ 스탯 전체)` }], PALETTE.dawn, '영구 메타 영혼 획득량 보너스 (처치 영혼·챕터 보너스·무한 깊이 보너스·대장간 등 모든 영혼 가산처).')}
+                    <button onClick={() => openSimpleLine('매력 시그: 영혼 획득', `+${charismaSoul}%`, [{ label: '매력 시그니처 기본', value: charismaSoul, unit: '%', note: `매력 ${stats['매력'] || 0} × +0.5%/p` }], PALETTE.dawn, '영구 메타 영혼 획득량 보너스 (처치 영혼·챕터 보너스·무한 깊이 보너스·대장간 등 모든 영혼 가산처).')}
                       className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>매력 시그: 영혼 획득 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.dawn }}>+{charismaSoul}%</span></button>
                   )}
                   {strHp > 0 && (

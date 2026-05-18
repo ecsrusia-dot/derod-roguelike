@@ -597,11 +597,15 @@ export function describeAwakeningConditionProgress(meta, condition, classId) {
       if (!cls) return null;
       const picked = meta?.ultimatesPickedByClass?.[classId] || [];
       const startPassives = Object.keys(cls.startSkills || {});
-      const counts = startPassives.map(passive => {
-        const ults = ULTIMATE_SKILLS[passive] || [];
-        const got = ults.filter(u => picked.includes(u.id)).length;
-        return `${passive} ${got}/${ults.length}`;
-      });
+      // 1.44.1~ ULTIMATE_SKILLS 없는 패시브(직업 전용 아닌)는 진행도 표시 제외
+      const counts = startPassives
+        .filter(passive => (ULTIMATE_SKILLS[passive] || []).length > 0)
+        .map(passive => {
+          const ults = ULTIMATE_SKILLS[passive];
+          const got = ults.filter(u => picked.includes(u.id)).length;
+          return `${passive} ${got}/${ults.length}`;
+        });
+      if (counts.length === 0) return null;
       return `(${counts.join(' · ')})`;
     }
     case 'engravingsLvReached': {

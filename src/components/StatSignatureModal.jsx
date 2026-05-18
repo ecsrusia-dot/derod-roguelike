@@ -23,7 +23,7 @@ import {
 const SIGNATURES = {
   근력: {
     color: PALETTE.accent,
-    auto: { desc: '물리 데미지 +0.5/포인트', note: '임계 없이 근력 포인트 전체 가산' },
+    auto: { desc: '물리 데미지 +0.4%/포인트', note: '임계 없이 근력 포인트 전체 가산. 데미지 보정에 % 합산' },
     tier1: {
       label: '1단계 · 근력 11+',
       desc: '최대 HP +5 / 적용 포인트',
@@ -41,7 +41,7 @@ const SIGNATURES = {
   },
   민첩: {
     color: PALETTE.green,
-    auto: { desc: '회피율 +0.3%/포인트 · 치명타율 +0.5%/포인트', note: '임계 없이 민첩 포인트 전체 가산 (1.42.0~)' },
+    auto: { desc: '회피율 +0.3%/포인트 · 치명타율 +0.5%/포인트', note: '임계 없이 민첩 포인트 전체 가산' },
     tier1: {
       label: '1단계 · 민첩 11+',
       desc: '치명타 데미지 +2% / 적용 포인트',
@@ -59,7 +59,7 @@ const SIGNATURES = {
   },
   지능: {
     color: PALETTE.legendary,
-    auto: { desc: '마법 데미지 +0.7/포인트', note: '임계 없이 지능 포인트 전체 가산' },
+    auto: { desc: '마법 데미지 +0.4%/포인트', note: '임계 없이 지능 포인트 전체 가산. 데미지 보정에 % 합산' },
     tier1: {
       label: '1단계 · 지능 11+',
       desc: '전투 시작 시 소울 게이지 +0.5 / 적용 포인트 (내림)',
@@ -77,7 +77,7 @@ const SIGNATURES = {
   },
   매력: {
     color: PALETTE.dawn,
-    auto: { desc: '영혼 획득량 +0.5%/포인트', note: '임계 없이 매력 포인트 전체 가산 (1.42.0~). 처치 영혼·챕터 보너스 등 모든 영혼 가산처 적용' },
+    auto: { desc: '영혼 획득량 +0.5%/포인트', note: '임계 없이 매력 포인트 전체 가산. 처치 영혼·챕터 보너스 등 모든 영혼 가산처 적용' },
     tier1: {
       label: '1단계 · 매력 11+',
       desc: '회복 효율 +0.5% / 적용 포인트',
