@@ -22,20 +22,28 @@ export function calculateDamage(skill, attacker, defender, skills, isCrit, ultim
   let dmg = base;
   let breakdown = [`기본 ${base}`];
   if (skill.type === 'physical') {
-    const strBonus = Math.floor((attacker.근력 - 10) * 0.5);
-    dmg += strBonus;
-    if (strBonus > 0) breakdown.push(`근력 +${strBonus}`);
-    // 강타 minor: 물리 데미지 +2/Lv
+    // 1.44.1~ 근력 자동 가산: 절대값 → %로 변경. 포인트당 0.4%, 임계 없음.
+    const strSigPct = (attacker.근력 || 0) * 0.4;
+    if (strSigPct > 0) {
+      const strBonus = Math.floor(dmg * strSigPct / 100);
+      dmg += strBonus;
+      if (strBonus > 0) breakdown.push(`근력 시그 +${strBonus}`);
+    }
+    // 강타 minor: 물리 데미지 +2/Lv (절대값)
     const physBonus = getMinorBonus(skills, 'physDmg+', activeSkills);
     if (physBonus > 0) {
       dmg += physBonus;
       breakdown.push(`강타 +${physBonus}`);
     }
   } else if (skill.type === 'magic') {
-    const intBonus = Math.floor((attacker.지능 - 10) * 0.7);
-    dmg += intBonus;
-    if (intBonus > 0) breakdown.push(`지능 +${intBonus}`);
-    // 마력 minor: 마법 데미지 +4%/Lv
+    // 1.44.1~ 지능 자동 가산: 절대값 → %로 변경. 포인트당 0.4%, 임계 없음.
+    const intSigPct = (attacker.지능 || 0) * 0.4;
+    if (intSigPct > 0) {
+      const intBonus = Math.floor(dmg * intSigPct / 100);
+      dmg += intBonus;
+      if (intBonus > 0) breakdown.push(`지능 시그 +${intBonus}`);
+    }
+    // 마력 minor: 마법 데미지 +5%/Lv
     const magicMinorPct = getMinorBonus(skills, 'magicDmg+', activeSkills);
     if (magicMinorPct > 0) {
       const magicMinorBonus = Math.floor(dmg * (magicMinorPct / 100));
@@ -54,8 +62,9 @@ export function calculateDamage(skill, attacker, defender, skills, isCrit, ultim
     dmg += rageBonus;
     breakdown.push(`분노 +${rageBonus}`);
   }
-  if (skill.type === 'magic' && hasEffect(skills, 'magicDmg+25', activeSkills)) {
-    const magicBonus = Math.floor(dmg * 0.25);
+  if (skill.type === 'magic' && hasEffect(skills, 'magicDmg+30', activeSkills)) {
+    // 1.44.1~ 마력 Lv.3 = +30% (이전 코드 0.25 = +25%로 누락. 정보창과 일치하도록 0.30으로 정정)
+    const magicBonus = Math.floor(dmg * 0.30);
     dmg += magicBonus;
     breakdown.push(`마력 Lv.3 +${magicBonus}`);
   }
@@ -188,10 +197,14 @@ export function getDisplayDamage(skill, attacker, skills, ultimates, meta, curse
   const calcOne = (base) => {
     let dmg = base;
     if (skill.type === 'physical') {
-      dmg += Math.floor((attacker.근력 - 10) * 0.5);
+      // 1.44.1~ 근력 자동 가산 % 변환
+      const strSigPct = (attacker.근력 || 0) * 0.4;
+      if (strSigPct > 0) dmg += Math.floor(dmg * strSigPct / 100);
       dmg += getMinorBonus(skills, 'physDmg+', activeSkills);
     } else if (skill.type === 'magic') {
-      dmg += Math.floor((attacker.지능 - 10) * 0.7);
+      // 1.44.1~ 지능 자동 가산 % 변환
+      const intSigPct = (attacker.지능 || 0) * 0.4;
+      if (intSigPct > 0) dmg += Math.floor(dmg * intSigPct / 100);
       const magicMinorPct = getMinorBonus(skills, 'magicDmg+', activeSkills);
       if (magicMinorPct > 0) dmg += Math.floor(dmg * (magicMinorPct / 100));
     }
@@ -200,8 +213,8 @@ export function getDisplayDamage(skill, attacker, skills, ultimates, meta, curse
       dmg += Math.floor(dmg * (1 - hpRatio) * 0.5);
     }
     if (attacker.buffs?.rage > 0) dmg += Math.floor(dmg * 0.3);
-    if (skill.type === 'magic' && hasEffect(skills, 'magicDmg+25', activeSkills)) {
-      dmg += Math.floor(dmg * 0.25);
+    if (skill.type === 'magic' && hasEffect(skills, 'magicDmg+30', activeSkills)) {
+      dmg += Math.floor(dmg * 0.30);
     }
     // 1.28.0~ 시그니처 [영겁의 화염] 후속 버프
     if (skill.type === 'magic' && attacker.buffs?.flameBoostTurns > 0 && attacker.buffs?.flameBoostPct > 0) {
