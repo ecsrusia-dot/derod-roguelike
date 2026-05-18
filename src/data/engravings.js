@@ -3,14 +3,12 @@
 // PR 2: 데이터 + UI + 마이그레이션. 전투 적용은 PR 3에서.
 
 // 등급별 가중치 (총 100%). 각인 가챠 결과의 분포 결정.
-// 1.46.0~ 가중치 조정 (PM 결정): 레전더리 5%→8% 상승, 결함 3%→4%, 저주 2% 유지
-//   가챠 비용 500 영혼 × Lv 8% → 평균 12.5번 = 6,250 영혼/Lv 1장 (이전 10,000)
 export const ENGRAVING_TIERS = {
-  C:         { weight: 38, color: '#cccccc', label: 'Common',    glow: false },
-  R:         { weight: 28, color: '#7ba3c4', label: 'Rare',      glow: false },
+  C:         { weight: 40, color: '#cccccc', label: 'Common',    glow: false },
+  R:         { weight: 30, color: '#7ba3c4', label: 'Rare',      glow: false },
   E:         { weight: 20, color: '#9b5fc4', label: 'Epic',      glow: true  },
-  L:         { weight: 8,  color: '#e8b04a', label: 'Legendary', glow: true  },
-  NEG_FLAW:  { weight: 4,  color: '#777777', label: '결함',       glow: false },
+  L:         { weight: 5,  color: '#e8b04a', label: 'Legendary', glow: true  },
+  NEG_FLAW:  { weight: 3,  color: '#777777', label: '결함',       glow: false },
   NEG_CURSE: { weight: 2,  color: '#444444', label: '저주',       glow: true  },
 };
 
