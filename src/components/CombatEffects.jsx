@@ -544,9 +544,8 @@ export function StatusOverlay({ debuffs }) {
 // 1.45.0 술법사 화염 이펙트 6종
 // ============================================
 
-// A. 영겁의 화염 컷인 — 풀스크린 주황·적색 화염 + "永劫" 한자 상단 글로우 (0.9초)
-// 1.45.1: 모바일 Safari 렌더 호환성 — mix-blend-mode·conic-gradient 제거, radial 단순화
-// 1.45.1: 한자 위치 화면 상단 25%로 이동해 UltimateCutin 한글 스킬명(중앙)과 안 겹침
+// A. 영겁의 화염 컷인 — 풀스크린 주황·적색 화염 + 한자 "永劫"(적 카드 중앙) + 한글 스킬명(로그 영역) (0.9초)
+// 1.45.2: PM 피드백 — 한자는 적 카드 영역(top 17%), 한글 스킬명은 로그 영역(top 45%)으로 분리. UltimateCutin은 술법사 영겁 발동 시 스킵
 export function EternalFlameCutin({ trigger }) {
   if (!trigger) return null;
   const flameOrange = '#ff7a1a';
@@ -565,26 +564,26 @@ export function EternalFlameCutin({ trigger }) {
           willChange: 'opacity, transform',
         }}
       />
-      {/* 화염 코어 1 — 큰 radial */}
+      {/* 화염 코어 1 — 큰 radial (적 카드 영역에 위치, top 17%) */}
       <div
         className="absolute fx-flame-burst pointer-events-none"
         style={{
-          top: '50%', left: '50%',
+          top: '17%', left: '50%',
           transform: 'translate(-50%, -50%)',
-          width: 340, height: 340,
+          width: 280, height: 280,
           background: `radial-gradient(circle, ${flameOrange}ee 0%, ${flameRed}aa 40%, transparent 75%)`,
           borderRadius: '50%',
           filter: 'blur(8px)',
           willChange: 'opacity, transform',
         }}
       />
-      {/* 화염 코어 2 — 백광 중심 */}
+      {/* 화염 코어 2 — 백광 중심 (적 카드 영역에 위치) */}
       <div
         className="absolute fx-flame-burst pointer-events-none"
         style={{
-          top: '50%', left: '50%',
+          top: '17%', left: '50%',
           transform: 'translate(-50%, -50%)',
-          width: 160, height: 160,
+          width: 130, height: 130,
           background: `radial-gradient(circle, rgba(255,250,220,0.95) 0%, ${flameOrange}aa 40%, transparent 70%)`,
           borderRadius: '50%',
           filter: 'blur(4px)',
@@ -592,14 +591,14 @@ export function EternalFlameCutin({ trigger }) {
           willChange: 'opacity, transform',
         }}
       />
-      {/* "永劫" 한자 — 화면 상단 25%로 이동, 한글 스킬명(중앙)과 안 겹침 */}
+      {/* "永劫" 한자 — 적 카드 중앙 (top 17%) */}
       <div
         className="absolute fx-flame-kanji pointer-events-none"
         style={{
-          top: '24%', left: '50%',
+          top: '17%', left: '50%',
           transform: 'translate(-50%, -50%)',
           fontFamily: '"Cinzel", "Noto Serif KR", serif',
-          fontSize: 76,
+          fontSize: 84,
           fontWeight: 'bold',
           color: '#fff6d8',
           textShadow: `0 0 18px ${flameOrange}, 0 0 36px ${flameRed}, 0 0 56px ${flameRed}`,
@@ -608,6 +607,27 @@ export function EternalFlameCutin({ trigger }) {
         }}
       >
         永劫
+      </div>
+      {/* 한글 스킬명 — 로그 영역 가운데 (top 45%) */}
+      <div
+        className="absolute fx-flame-kanji pointer-events-none"
+        style={{
+          top: '45%', left: '50%',
+          transform: 'translate(-50%, -50%)',
+          fontFamily: '"Noto Serif KR", "Cinzel", serif',
+          fontSize: 26,
+          fontWeight: 'bold',
+          color: '#fff6d8',
+          textShadow: `0 0 12px ${flameOrange}, 0 0 24px ${flameRed}`,
+          letterSpacing: '0.3em',
+          whiteSpace: 'nowrap',
+          willChange: 'opacity, transform',
+          animationDelay: '0.15s',
+          opacity: 0,
+          animationFillMode: 'forwards',
+        }}
+      >
+        영겁(永劫)의 화염
       </div>
     </div>
   );
@@ -694,16 +714,17 @@ export function ExplosionFx({ trigger }) {
   if (!trigger) return null;
   const flameOrange = '#ff7a1a';
   const flameRed = '#c4282d';
-  // 5개 화염구 위치: 좌·우·중앙 산포 + 시차 발사
+  // 1.45.2: 5개 화염구가 다양한 각도(상·하·좌·우·대각)에서 시차로 적 중앙에 모임
+  // (0,0)이 도착점(적 중앙). 시작점은 다양한 방향에서.
   const projectiles = [
-    { x0: -40, y0: 130, delay: 0.0 },
-    { x0:  40, y0: 130, delay: 0.05 },
-    { x0: -20, y0: 140, delay: 0.1 },
-    { x0:  20, y0: 140, delay: 0.15 },
-    { x0:   0, y0: 150, delay: 0.2 },
+    { x0: -180, y0:  -30, delay: 0.00 },  // 좌측
+    { x0:  180, y0:  -50, delay: 0.07 },  // 우측
+    { x0:   20, y0: -200, delay: 0.14 },  // 상단
+    { x0: -140, y0:  140, delay: 0.21 },  // 좌하 대각
+    { x0:  150, y0:  120, delay: 0.28 },  // 우하 대각
   ];
-  // 폭발 시작 시점: 마지막 화염구 도착 시점 = 0.2 + 0.35 = 0.55초 후
-  const explodeDelay = '0.55s';
+  // 폭발 시작 시점: 마지막 화염구 도착 시점 = 0.28 + 0.35 = 0.63초 후
+  const explodeDelay = '0.63s';
   return (
     <div
       key={trigger}
@@ -812,16 +833,61 @@ export function IgniteGlowAura({ active }) {
   );
 }
 
-// C. 각인 폭발 임팩트 — 치명타 시 화염 각인 폭발 풀스크린 흰→주황 플래시 (0.45초)
+// C. 각인 폭발 임팩트 — 치명타 시 화염 각인 폭발 (0.4초)
+// 1.45.2 재설계: 익스플로젼(풀스크린 둥근 폭발)과 시각적 패턴 완전 차별화 →
+//   적 카드 영역 한정 + 빨간 균열 라인 6개 방사형 + 카드 빨간 글로우. 적 카드 안쪽에 배치
 export function IgniteExplodeFx({ trigger }) {
+  if (!trigger) return null;
+  const crackRed = '#ff2820';
+  return (
+    <div
+      key={trigger}
+      className="absolute inset-0 pointer-events-none flex items-center justify-center"
+      style={{ zIndex: 23 }}
+    >
+      {/* 적 카드 영역 빨간 글로우 */}
+      <div
+        className="absolute inset-0 fx-ignite-card-flash"
+        style={{
+          background: `radial-gradient(circle at 50% 50%, rgba(255,40,32,0.55) 0%, rgba(255,80,30,0.25) 50%, transparent 80%)`,
+        }}
+      />
+      {/* 6개 균열 라인 방사형 (수직·수평·45도 × 2) */}
+      {[0, 30, 60, 90, 120, 150].map((deg) => (
+        <div
+          key={deg}
+          className="absolute fx-ignite-crack"
+          style={{
+            width: 3,
+            height: 240,
+            background: `linear-gradient(to bottom, transparent 0%, ${crackRed} 20%, #fff5b0 50%, ${crackRed} 80%, transparent 100%)`,
+            transform: `rotate(${deg}deg)`,
+            filter: `drop-shadow(0 0 4px ${crackRed})`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+// 크리티컬 풀스크린 화면효과 — 1.45.2 신설
+// 익스플로젼·각인 폭발과 시각적 패턴 차별화: 둥근 폭발 X, 화면 가장자리 노란 비네트만 (0.3초)
+export function CritScreenFx({ trigger }) {
   if (!trigger) return null;
   return (
     <div
       key={trigger}
       className="absolute inset-0 pointer-events-none"
-      style={{ zIndex: 23 }}
+      style={{ zIndex: 25 }}
     >
-      <div className="absolute inset-0 fx-ignite-explode" />
+      {/* 화면 가장자리 노란 비네트 — 안쪽으로 갈수록 투명 */}
+      <div
+        className="absolute inset-0 fx-crit-vignette"
+        style={{
+          background: `radial-gradient(ellipse at center, transparent 40%, rgba(255,200,40,0.35) 75%, rgba(255,180,30,0.6) 100%)`,
+          boxShadow: 'inset 0 0 80px rgba(255,200,40,0.7)',
+        }}
+      />
     </div>
   );
 }
