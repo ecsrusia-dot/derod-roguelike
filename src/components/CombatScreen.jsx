@@ -455,23 +455,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
             }
           }
 
-          // 1.29.0~ 겁화 폭발 (시그니처 [영겁의 화염]으로 부여된 별도 디버프)
-          // 화염 각인과 동일 공식 (데미지 × 남은턴 × 2) — 둘 다 보유 시 두 폭발 합산으로 더블 데미지
-          if (isCrit && canExplode && newEnemy.debuffs?.eternalFireDmg > 0 && newEnemy.debuffs?.eternalFireTurns > 0) {
-            const remainTurns = newEnemy.debuffs.eternalFireTurns;
-            const eternalExplosionDmg = newEnemy.debuffs.eternalFireDmg * remainTurns * 2;
-            newEnemy.currentHp = Math.max(0, newEnemy.currentHp - eternalExplosionDmg);
-            totalDmg += eternalExplosionDmg;
-            newLog.push({ type: 'crit', text: `🌋 [겁화 폭발] ${eternalExplosionDmg} 데미지` });
-
-            // 폭발 후 겁화 소멸
-            newEnemy.debuffs = {
-              ...newEnemy.debuffs,
-              eternalFireDmg: 0,
-              eternalFireTurns: 0,
-              eternalFireJustApplied: false,
-            };
-          }
+          // 1.42.0~ 겁화는 각인폭발 대상에서 제외 (영겁의 화염 → 무한 도트 정체성).
+          // 이전(1.29.0~1.41.0): 치명타 시 겁화도 폭발했으나, 영겁의 화염은 "꺼지지 않는 도트"가 정체성이라 폭발 비활성화.
 
           const echoTag = (echo > 0) ? ` [재시전 ${echo}]` : '';
           newLog.push({
@@ -755,21 +740,23 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         setFxEnemyFlash(v => v + 1);
         pushFxLabel('enemy', 'crit', cut);
       } else if (ult.effect === 'classult_eternalFlame') {
-        // 50 화염 데미지(방어 무시) + 겁화 부여(5턴, 지능×0.4/턴) + 다음 2턴 마법 데미지 +50%
-        // 1.29.0~ 겁화는 화염 각인과 별도 디버프. 둘 다 보유 가능 → 매 턴 두 도트 별도 발동 + 마법 크리 시 더블 폭발
+        // 50 화염 데미지(방어 무시) + 겁화 영구 부여(지능×0.4/턴) + 다음 2턴 마법 데미지 +50%
+        // 1.42.0~ 겁화 무한 도트로 재설계: 영구 지속(9999T) + 각인폭발 대상 제외.
+        //   이전(1.29.0~1.41.0): 5T 한정 + 치명타 시 폭발 가능. 폭발이 정체성을 흐려 무한 도트로 통일.
         const cut = 50;
         newEnemy.currentHp = Math.max(0, newEnemy.currentHp - cut);
 
-        // 겁화 강제 부여 (재발동 시 갱신 = 5T 리셋)
+        // 겁화 강제 부여 (영구 지속, 재발동 시 데미지만 갱신)
         const eternalDmg = Math.floor((newPlayer.지능 || 0) * 0.4);
         if (newEnemy.currentHp > 0 && eternalDmg > 0) {
           newEnemy.debuffs = {
             ...newEnemy.debuffs,
             eternalFireDmg: eternalDmg,
-            eternalFireTurns: 5,
+            eternalFireTurns: 9999,
+            eternalFireEternal: true,
             eternalFireJustApplied: true,
           };
-          newLog.push({ type: 'debuff', text: `🌋 [겁화] ${eternalDmg} 데미지 5T 부여` });
+          newLog.push({ type: 'debuff', text: `🌋 [겁화] ${eternalDmg} 데미지 영구 부여` });
         }
 
         // 다음 2턴 마법 데미지 +50% 버프
@@ -1462,17 +1449,21 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     }
 
     // === 1.29.0~ 겁화 도트 처리 (화염 각인과 별도) ===
+    // 1.42.0~ 영구 플래그(eternalFireEternal) 시 턴 감소 X — 무한 도트.
     if (newEnemy.debuffs?.eternalFireDmg > 0 && newEnemy.debuffs?.eternalFireTurns > 0) {
       const eternalDmg = newEnemy.debuffs.eternalFireDmg;
       // 겁화도 방어 무시
       newEnemy.currentHp = Math.max(0, newEnemy.currentHp - eternalDmg);
 
-      const newTurns = newEnemy.debuffs.eternalFireTurns - 1;
-      newEnemy.debuffs = {
-        ...newEnemy.debuffs,
-        eternalFireTurns: newTurns,
-        eternalFireDmg: newTurns <= 0 ? 0 : newEnemy.debuffs.eternalFireDmg,
-      };
+      const isEternal = newEnemy.debuffs.eternalFireEternal;
+      if (!isEternal) {
+        const newTurns = newEnemy.debuffs.eternalFireTurns - 1;
+        newEnemy.debuffs = {
+          ...newEnemy.debuffs,
+          eternalFireTurns: newTurns,
+          eternalFireDmg: newTurns <= 0 ? 0 : newEnemy.debuffs.eternalFireDmg,
+        };
+      }
       newLog.push({ type: 'debuff', text: `🌋 겁화 ${eternalDmg} 데미지` });
       if (newEnemy.currentHp <= 0) {
         setEnemy(newEnemy);
@@ -1840,7 +1831,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                 {enemy.defense > 0 && getSkillLevel(skills, '심안') >= 7 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.defense}40`, color: PALETTE.defense, border: `1px solid ${PALETTE.defense}80` }}>◈ 방어 {enemy.defense}</span>)}
                 {enemy.debuffs?.bleed > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.bleed}40`, color: PALETTE.bleed, border: `1px solid ${PALETTE.bleed}80` }}>◆ 출혈 {enemy.debuffs.bleed} ({enemy.debuffs.bleedTurns}T)</span>)}
                 {enemy.debuffs?.igniteDmg > 0 && enemy.debuffs?.igniteTurns > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#ff6b3540', color: '#ff6b35', border: '1px solid #ff6b3580' }}>🔥 화염 {enemy.debuffs.igniteDmg} ({enemy.debuffs.igniteEternal ? '∞' : enemy.debuffs.igniteTurns + 'T'})</span>)}
-                {enemy.debuffs?.eternalFireDmg > 0 && enemy.debuffs?.eternalFireTurns > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#8b1a1a40', color: '#ff8888', border: '1px solid #8b1a1a' }}>🌋 겁화 {enemy.debuffs.eternalFireDmg} ({enemy.debuffs.eternalFireTurns}T)</span>)}
+                {enemy.debuffs?.eternalFireDmg > 0 && enemy.debuffs?.eternalFireTurns > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#8b1a1a40', color: '#ff8888', border: '1px solid #8b1a1a' }}>🌋 겁화 {enemy.debuffs.eternalFireDmg} ({enemy.debuffs.eternalFireEternal ? '∞' : `${enemy.debuffs.eternalFireTurns}T`})</span>)}
                 {enemy.berserkStacks > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#c4453d40', color: '#c4453d', border: '1px solid #c4453d80' }}>🩸 광폭 +{enemy.berserkStacks}</span>)}
                 {enemy.regen > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#9ad4a340', color: '#9ad4a3', border: '1px solid #9ad4a380' }}>✨ 회복 +{enemy.regen}/T</span>)}
                 {enemy.debuffs?.shockGauge > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.shock}40`, color: PALETTE.shock, border: `1px solid ${PALETTE.shock}80` }}>⚡ 충격 {enemy.debuffs.shockGauge}/100</span>)}
