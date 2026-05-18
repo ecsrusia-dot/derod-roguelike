@@ -7,6 +7,18 @@
 
 export const CHANGELOG = [
   {
+    version: '1.45.1',
+    date: '2026-05-18',
+    label: '술법사 화염 이펙트 핫픽스 — 영겁 컷인 모바일 호환성 + 한자/한글 겹침 해소 + 파이어볼·익스플로젼 발사체 비행',
+    changes: [
+      { type: 'fix', text: '[영겁의 화염 컷인 화면 밀림·진행불가 픽스] 모바일 Safari에서 conic-gradient + mix-blend-mode:screen 조합이 렌더 멈춤 유발 → 모두 제거하고 radial-gradient 2겹 + 백광 중심으로 단순화. overflow:hidden + pointer-events:none + willChange 명시. 추가 안전장치: 0.9초 후 trigger를 0으로 리셋해 컴포넌트 unmount 강제' },
+      { type: 'fix', text: '[영겁 한자/한글 스킬명 겹침 해소] 기존 UltimateCutin "영겁(永劫)의 화염" 한글 배너(중앙)와 EternalFlameCutin "永劫" 한자(중앙)가 같은 줄에 겹쳐 가림 → 한자 위치를 화면 상단 24%로 이동, 폰트 크기 88→76. 한글은 중앙 유지' },
+      { type: 'fix', text: '[파이어볼 발사체 비행 추가] 임팩트만 표시되던 1.45.0 비주얼 재설계 → 작은 화염구가 적 카드 하단(플레이어 쪽)에서 적 위치로 0.35초 비행 + 회전 + 꼬리 잔상 + 도착 후 임팩트 폭발. 총 0.75초 (비행 0.35 + 임팩트 0.4)' },
+      { type: 'fix', text: '[익스플로젼 화염구 다발 비행 추가] 동일한 비주얼 재설계 → 화염구 5개가 시차(0.05초씩) 발사 → 모두 적 위치 도착 후 풀스크린 폭발 + 8방향 파편. 총 1.05초 (마지막 화염구 0.55초 + 폭발 0.5초)' },
+      { type: 'system', text: '[CSS 키프레임 추가] fx-fireball-fly(발사체 비행 + 회전 0.35초), fx-fireball-trail(꼬리 잔상 0.4초) 2종 신설. EternalFlameCutin/FireballFx/ExplosionFx 3개 컴포넌트 재작성' },
+    ],
+  },
+  {
     version: '1.45.0',
     date: '2026-05-18',
     label: '술법사 화염 이펙트 6종 신설 — 영겁의 화염 컷인 + 파이어볼/익스플로젼 + 화염 각인 글로우/폭발 + 화염장막 결계/반사',

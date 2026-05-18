@@ -544,7 +544,9 @@ export function StatusOverlay({ debuffs }) {
 // 1.45.0 술법사 화염 이펙트 6종
 // ============================================
 
-// A. 영겁의 화염 컷인 — 풀스크린 주황·적색 화염 소용돌이 + "永劫" 한자 글로우 (0.9초)
+// A. 영겁의 화염 컷인 — 풀스크린 주황·적색 화염 + "永劫" 한자 상단 글로우 (0.9초)
+// 1.45.1: 모바일 Safari 렌더 호환성 — mix-blend-mode·conic-gradient 제거, radial 단순화
+// 1.45.1: 한자 위치 화면 상단 25%로 이동해 UltimateCutin 한글 스킬명(중앙)과 안 겹침
 export function EternalFlameCutin({ trigger }) {
   if (!trigger) return null;
   const flameOrange = '#ff7a1a';
@@ -552,58 +554,57 @@ export function EternalFlameCutin({ trigger }) {
   return (
     <div
       key={trigger}
-      className="absolute inset-0 pointer-events-none flex items-center justify-center"
+      className="absolute inset-0 pointer-events-none overflow-hidden"
       style={{ zIndex: 26 }}
     >
-      {/* 풀스크린 어두운 배경 그라데이션 */}
+      {/* 풀스크린 어두운 배경 그라데이션 (radial만 사용 — 모바일 안전) */}
       <div
-        className="absolute inset-0 fx-flame-burst"
+        className="absolute inset-0 fx-flame-burst pointer-events-none"
         style={{
-          background: `radial-gradient(circle at 50% 50%, ${flameOrange}66 0%, ${flameRed}55 30%, rgba(20,5,0,0.85) 70%, rgba(0,0,0,0.95) 100%)`,
+          background: `radial-gradient(circle at 50% 50%, ${flameOrange}77 0%, ${flameRed}66 30%, rgba(20,5,0,0.85) 70%, rgba(0,0,0,0.92) 100%)`,
+          willChange: 'opacity, transform',
         }}
       />
-      {/* 주황·적 화염 소용돌이 — 두 겹으로 역회전 느낌 */}
+      {/* 화염 코어 1 — 큰 radial */}
       <div
-        className="absolute fx-flame-vortex"
+        className="absolute fx-flame-burst pointer-events-none"
         style={{
-          width: 420, height: 420,
-          background: `conic-gradient(from 0deg, ${flameOrange}00, ${flameOrange}cc 20%, ${flameRed}ee 45%, ${flameOrange}bb 70%, ${flameOrange}00 100%)`,
+          top: '50%', left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: 340, height: 340,
+          background: `radial-gradient(circle, ${flameOrange}ee 0%, ${flameRed}aa 40%, transparent 75%)`,
           borderRadius: '50%',
           filter: 'blur(8px)',
-          mixBlendMode: 'screen',
+          willChange: 'opacity, transform',
         }}
       />
+      {/* 화염 코어 2 — 백광 중심 */}
       <div
-        className="absolute fx-flame-vortex"
+        className="absolute fx-flame-burst pointer-events-none"
         style={{
-          width: 320, height: 320,
-          background: `conic-gradient(from 180deg, ${flameRed}00, ${flameRed}dd 25%, ${flameOrange}ee 50%, ${flameRed}cc 75%, ${flameRed}00 100%)`,
-          borderRadius: '50%',
-          filter: 'blur(5px)',
-          mixBlendMode: 'screen',
-          animationDirection: 'reverse',
-        }}
-      />
-      {/* 중심 백광 코어 */}
-      <div
-        className="absolute fx-flame-burst"
-        style={{
+          top: '50%', left: '50%',
+          transform: 'translate(-50%, -50%)',
           width: 160, height: 160,
           background: `radial-gradient(circle, rgba(255,250,220,0.95) 0%, ${flameOrange}aa 40%, transparent 70%)`,
           borderRadius: '50%',
           filter: 'blur(4px)',
+          animationDuration: '0.55s',
+          willChange: 'opacity, transform',
         }}
       />
-      {/* "永劫" 한자 — 중앙 글로우 */}
+      {/* "永劫" 한자 — 화면 상단 25%로 이동, 한글 스킬명(중앙)과 안 겹침 */}
       <div
-        className="absolute fx-flame-kanji"
+        className="absolute fx-flame-kanji pointer-events-none"
         style={{
+          top: '24%', left: '50%',
+          transform: 'translate(-50%, -50%)',
           fontFamily: '"Cinzel", "Noto Serif KR", serif',
-          fontSize: 88,
+          fontSize: 76,
           fontWeight: 'bold',
           color: '#fff6d8',
-          textShadow: `0 0 20px ${flameOrange}, 0 0 40px ${flameRed}, 0 0 60px ${flameRed}`,
+          textShadow: `0 0 18px ${flameOrange}, 0 0 36px ${flameRed}, 0 0 56px ${flameRed}`,
           letterSpacing: '0.2em',
+          willChange: 'opacity, transform',
         }}
       >
         永劫
@@ -612,27 +613,56 @@ export function EternalFlameCutin({ trigger }) {
   );
 }
 
-// 파이어볼 (소효과) — 작은 주황 불꽃 임팩트, 마법탄 시전 시 (0.5초)
+// 파이어볼 (소효과) — 1.45.1 재설계: 작은 화염구가 적 카드 하단 → 중앙으로 비행 → 폭발
+// 0.35초 비행 + 0.4초 임팩트 = 총 0.75초 (비행 끝나는 시점에 임팩트 시작)
 export function FireballFx({ trigger }) {
   if (!trigger) return null;
   const flameOrange = '#ff7a1a';
+  const flameRed = '#c4282d';
   return (
     <div
       key={trigger}
       className="absolute inset-0 pointer-events-none flex items-center justify-center"
       style={{ zIndex: 22 }}
     >
-      {/* 작은 불꽃 임팩트 — 중심 코어 + 외곽 글로우 */}
+      {/* 1단계: 발사체 비행 (0.35초) — 적 카드 하단에서 중앙으로 상승하며 회전 */}
+      <div
+        className="absolute fx-fireball-fly"
+        style={{
+          width: 36, height: 36,
+          background: `radial-gradient(circle, rgba(255,250,210,1) 0%, ${flameOrange} 45%, ${flameRed}cc 75%, transparent 100%)`,
+          borderRadius: '50%',
+          filter: `drop-shadow(0 0 12px ${flameOrange}) drop-shadow(0 0 6px ${flameRed})`,
+          '--fx-x0': '0px',
+          '--fx-y0': '120px',
+        }}
+      />
+      {/* 발사체 꼬리 */}
+      <div
+        className="absolute fx-fireball-trail"
+        style={{
+          width: 24, height: 60,
+          background: `linear-gradient(to top, transparent 0%, ${flameOrange}aa 50%, rgba(255,250,210,0.9) 100%)`,
+          borderRadius: '50%',
+          filter: 'blur(4px)',
+          '--fx-tx': '0px',
+          '--fx-ty': '90px',
+        }}
+      />
+      {/* 2단계: 도착 후 임팩트 폭발 (0.35초 딜레이 후 0.4초) */}
       <div
         className="absolute fx-flame-ember"
         style={{
           width: 120, height: 120,
-          background: `radial-gradient(circle, rgba(255,250,210,0.9) 0%, ${flameOrange}cc 35%, rgba(196,40,45,0.5) 65%, transparent 85%)`,
+          background: `radial-gradient(circle, rgba(255,250,210,0.95) 0%, ${flameOrange}dd 35%, ${flameRed}88 65%, transparent 85%)`,
           borderRadius: '50%',
           filter: 'blur(3px)',
+          animationDelay: '0.35s',
+          opacity: 0,
+          animationFillMode: 'forwards',
         }}
       />
-      {/* 4개 작은 입자 */}
+      {/* 임팩트 입자 4방향 (도착 후) */}
       {[0, 90, 180, 270].map((deg, i) => {
         const rad = (deg * Math.PI) / 180;
         const dx = Math.cos(rad) * 50;
@@ -647,7 +677,9 @@ export function FireballFx({ trigger }) {
               borderRadius: '50%',
               '--fx-dx': `${dx}px`,
               '--fx-dy': `${dy}px`,
-              animationDuration: '0.5s',
+              animationDelay: '0.35s',
+              opacity: 0,
+              animationFillMode: 'forwards',
             }}
           />
         );
@@ -656,18 +688,62 @@ export function FireballFx({ trigger }) {
   );
 }
 
-// 익스플로젼 (대효과) — 풀스크린 폭발 + 파편 8방향 (0.7초)
+// 익스플로젼 (대효과) — 1.45.1 재설계: 화염구 5개 다발이 시차 발사 → 적 위치 풀스크린 폭발
+// 화염구 5개 각각 0.35초 비행 (시차 0.05초씩) → 마지막 비행 종료 시 풀스크린 폭발 (0.5초)
 export function ExplosionFx({ trigger }) {
   if (!trigger) return null;
   const flameOrange = '#ff7a1a';
   const flameRed = '#c4282d';
+  // 5개 화염구 위치: 좌·우·중앙 산포 + 시차 발사
+  const projectiles = [
+    { x0: -40, y0: 130, delay: 0.0 },
+    { x0:  40, y0: 130, delay: 0.05 },
+    { x0: -20, y0: 140, delay: 0.1 },
+    { x0:  20, y0: 140, delay: 0.15 },
+    { x0:   0, y0: 150, delay: 0.2 },
+  ];
+  // 폭발 시작 시점: 마지막 화염구 도착 시점 = 0.2 + 0.35 = 0.55초 후
+  const explodeDelay = '0.55s';
   return (
     <div
       key={trigger}
       className="absolute inset-0 pointer-events-none flex items-center justify-center"
       style={{ zIndex: 24 }}
     >
-      {/* 풀스크린 폭발 코어 */}
+      {/* 1단계: 5개 화염구 시차 비행 */}
+      {projectiles.map((p, i) => (
+        <React.Fragment key={`proj-${i}`}>
+          <div
+            className="absolute fx-fireball-fly"
+            style={{
+              width: 30, height: 30,
+              background: `radial-gradient(circle, rgba(255,250,210,1) 0%, ${flameOrange} 45%, ${flameRed}cc 75%, transparent 100%)`,
+              borderRadius: '50%',
+              filter: `drop-shadow(0 0 10px ${flameOrange})`,
+              '--fx-x0': `${p.x0}px`,
+              '--fx-y0': `${p.y0}px`,
+              animationDelay: `${p.delay}s`,
+              opacity: 0,
+              animationFillMode: 'forwards',
+            }}
+          />
+          <div
+            className="absolute fx-fireball-trail"
+            style={{
+              width: 18, height: 50,
+              background: `linear-gradient(to top, transparent 0%, ${flameOrange}99 50%, rgba(255,250,210,0.8) 100%)`,
+              borderRadius: '50%',
+              filter: 'blur(3px)',
+              '--fx-tx': `${p.x0}px`,
+              '--fx-ty': `${p.y0 - 30}px`,
+              animationDelay: `${p.delay}s`,
+              opacity: 0,
+              animationFillMode: 'forwards',
+            }}
+          />
+        </React.Fragment>
+      ))}
+      {/* 2단계: 풀스크린 폭발 (마지막 화염구 도착 후) */}
       <div
         className="absolute fx-flame-burst"
         style={{
@@ -675,6 +751,9 @@ export function ExplosionFx({ trigger }) {
           background: `radial-gradient(circle, rgba(255,250,220,0.95) 0%, ${flameOrange}dd 25%, ${flameRed}cc 50%, rgba(80,15,10,0.6) 80%, transparent 100%)`,
           borderRadius: '50%',
           filter: 'blur(6px)',
+          animationDelay: explodeDelay,
+          opacity: 0,
+          animationFillMode: 'forwards',
         }}
       />
       {/* 백광 중심 */}
@@ -685,9 +764,12 @@ export function ExplosionFx({ trigger }) {
           background: `radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(255,220,140,0.7) 50%, transparent 80%)`,
           borderRadius: '50%',
           animationDuration: '0.45s',
+          animationDelay: explodeDelay,
+          opacity: 0,
+          animationFillMode: 'forwards',
         }}
       />
-      {/* 8방향 파편 */}
+      {/* 8방향 파편 (폭발과 동시) */}
       {[0, 45, 90, 135, 180, 225, 270, 315].map((deg, i) => {
         const rad = (deg * Math.PI) / 180;
         const dist = 120 + (i % 2 === 0 ? 20 : 0);
@@ -704,6 +786,9 @@ export function ExplosionFx({ trigger }) {
               filter: `drop-shadow(0 0 6px ${flameOrange})`,
               '--fx-dx': `${dx}px`,
               '--fx-dy': `${dy}px`,
+              animationDelay: explodeDelay,
+              opacity: 0,
+              animationFillMode: 'forwards',
             }}
           />
         );
