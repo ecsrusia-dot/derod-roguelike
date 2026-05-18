@@ -23,15 +23,18 @@ export const ENGRAVING_GACHA_COST = 500;
 //   - statPctBonus: { key, pct } (반격율·치명타율 등 % 보너스)
 // PR 2에서는 데이터만 표시. PR 3에서 전투 적용.
 // 9단계 활성화 조건 (1.26.0~). 모든 직업 동일 패턴:
-//   Lv.2 = 수련의 길 클리어 / Lv.3 = ULTIMATE_SKILLS 1개 픽 /
+//   Lv.2 = 수련의 길 클리어 / Lv.3 = 직업 전용 패시브의 각성 스킬 1개 픽 /
 //   Lv.4·6·8 = 챔피언십 normal/hard/hell 5컨셉 올 클리어 /
-//   Lv.5 = 시작 패시브 1개의 3궁극 모두 픽 (택일) /
+//   Lv.5 = 직업 전용 패시브의 3 각성 스킬 모두 픽 /
 //   Lv.7 = 3개 직업이 Lv.5 이상 / Lv.9 = 5직업 Lv.6 이상 / Lv.10 = 5직업 Lv.8 이상
+//
+// 1.43.0~ 각성 스킬은 직업 전용 패시브(심안류/이프리트)만 보유.
+// demonblood/elf/priest는 직업 전용 패시브 추가 시 Lv.3·Lv.5 활성화.
 //
 // condition.type 종류:
 //   - trainingClear: 해당 직업의 수련의 길 클리어
-//   - ultimatePickedCount: 해당 직업 런에서 ULTIMATE_SKILLS N개 이상 픽
-//   - ultimateAllOfOnePassive: 해당 직업 런에서 시작 패시브 1개의 3궁극 모두 픽
+//   - ultimatePickedCount: 해당 직업 런에서 직업 전용 패시브의 각성 스킬 N개 이상 픽
+//   - ultimateAllOfOnePassive: 해당 직업 런에서 직업 전용 패시브의 3 각성 스킬 모두 픽
 //   - championshipAllClear: 해당 직업 챔피언십 5컨셉 + 지정 난이도 모두 클리어
 //   - engravingsLvReached: 임의 직업 N개가 각성도 minLv 이상
 const COMMON_AWAKENING_CONDITIONS = [

@@ -229,6 +229,52 @@ export async function loadMeta() {
           safe.wandererRenameNotice = { migratedKeys };
           needsImmediateSave = true;
         }
+        // 1.43.0 마이그레이션: 보조 패시브 4종(강타·잔혹·마력·신앙)의 각성 스킬 12개 폐기.
+        // meta.ultimatesPickedByClass에서 폐기 ID 제거 + activeRun 안의 player.ultimates도 정리.
+        const DISCONTINUED_ULTS = new Set([
+          '강타_광역폭발', '강타_즉시처형', '강타_영구침묵',
+          '잔혹_피의축제', '잔혹_사형선고', '잔혹_광기각성',
+          '마력_시간역행', '마력_정념폭주', '마력_신탁각성',
+          '신앙_여명의축복', '신앙_황혼의저주', '신앙_운명의저울',
+        ]);
+        let ultDiscontinuedCount = 0;
+        if (safe.ultimatesPickedByClass) {
+          const cleanedByClass = {};
+          for (const [classId, ultList] of Object.entries(safe.ultimatesPickedByClass)) {
+            if (Array.isArray(ultList)) {
+              const filtered = ultList.filter(id => {
+                if (DISCONTINUED_ULTS.has(id)) {
+                  ultDiscontinuedCount++;
+                  return false;
+                }
+                return true;
+              });
+              cleanedByClass[classId] = filtered;
+            } else {
+              cleanedByClass[classId] = ultList;
+            }
+          }
+          safe.ultimatesPickedByClass = cleanedByClass;
+        }
+        // activeRun이 있고 player.ultimates에 폐기 ID가 있으면 제거
+        if (safe.activeRun?.player?.ultimates && Array.isArray(safe.activeRun.player.ultimates)) {
+          const filtered = safe.activeRun.player.ultimates.filter(id => {
+            if (DISCONTINUED_ULTS.has(id)) {
+              ultDiscontinuedCount++;
+              return false;
+            }
+            return true;
+          });
+          if (filtered.length !== safe.activeRun.player.ultimates.length) {
+            safe.activeRun = {
+              ...safe.activeRun,
+              player: { ...safe.activeRun.player, ultimates: filtered },
+            };
+          }
+        }
+        if (ultDiscontinuedCount > 0) {
+          needsImmediateSave = true;
+        }
         if (needsImmediateSave) {
           // 즉시 저장해 재실행 방지
           saveMeta(safe).then(() => resolve(safe)).catch(() => resolve(safe));

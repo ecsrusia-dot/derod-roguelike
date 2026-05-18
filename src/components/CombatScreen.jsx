@@ -194,16 +194,6 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       initialLog.push({ type: 'passive', text: `◆ [신앙 누적] 모든 능력치 +${allStatsBonus}` });
     }
     
-    // 궁극 [운명의 저울] ult_destinyScale: 모든 능력치 +10
-    if (hasUltimate(ultimates, 'ult_destinyScale')) {
-      newPlayer.근력 = (newPlayer.근력 || 10) + 10;
-      newPlayer.민첩 = (newPlayer.민첩 || 10) + 10;
-      newPlayer.지능 = (newPlayer.지능 || 10) + 10;
-      newPlayer.매력 = (newPlayer.매력 || 10) + 10;
-      newPlayer.destinyScaleUses = 0;
-      initialLog.push({ type: 'passive', text: `★ [운명의 저울] 모든 능력치 +10, 치명적 회피 0/2` });
-    }
-    
     // 수비 minor: 시작 방어 +5/Lv
     const minorDef = getMinorBonus(skills, 'startDef+', activeSkills);
     if (minorDef > 0) {
@@ -340,14 +330,13 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           }
         }
       }
-      // 마력 Lv.7 (50% × 2회) / 신탁 각성 (50% × 3회)
-      const hasOracleAwaken = hasUltimate(ultimates, 'ult_oracleAwaken');
-      const echoChance = 0.5;  // 둘 다 50% 확률
-      const canEcho = skill.type === 'magic' && (hasEffect(skills, 'magicEcho', activeSkills) || hasOracleAwaken);
-      
+      // 마력 Lv.7 (50% × 2회 재시전)
+      const echoChance = 0.5;
+      const canEcho = skill.type === 'magic' && hasEffect(skills, 'magicEcho', activeSkills);
+
       let echoTimes = 1;
       if (canEcho && Math.random() < echoChance) {
-        echoTimes = hasOracleAwaken ? 3 : 2;
+        echoTimes = 2;
       }
       
       const hitCount = skill.hitCount || 1;
@@ -356,8 +345,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       
       for (let echo = 0; echo < echoTimes; echo++) {
         if (echo > 0) {
-          const effectName = hasOracleAwaken ? '신탁 각성' : '마력 Lv.7';
-          newLog.push({ type: 'passive', text: `◆ [${effectName}] 마법 재시전! (${echo}/${echoTimes - 1})` });
+          newLog.push({ type: 'passive', text: `◆ [마력 Lv.7] 마법 재시전! (${echo}/${echoTimes - 1})` });
         }
         
         for (let i = 0; i < hitCount; i++) {
@@ -471,7 +459,6 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
             if (p.effect === 'applyShockGauge') {
               let gaugeAdd = GAME_CONFIG.shockGaugeBase;
               if (hasEffect(skills, 'shockBonus', activeSkills)) gaugeAdd = GAME_CONFIG.shockGaugeBase + GAME_CONFIG.shockGaugeBonus;
-              if (hasUltimate(ultimates, 'ult_shockBlast')) gaugeAdd = 60;
               if (newEnemy.debuffs?.shockResist > 0) {
                 gaugeAdd = Math.floor(gaugeAdd * GAME_CONFIG.shockResistReduction);
               }
@@ -479,26 +466,17 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
               let newGauge = currentGauge + gaugeAdd;
               if (newGauge >= 100) {
                 newLog.push({ type: 'debuff', text: `◆ [${p.skillName} Lv.${p.tierLv}] 충격 ${currentGauge}+${gaugeAdd}=100! 기절!` });
-                newEnemy.debuffs = { 
-                  ...newEnemy.debuffs, 
+                newEnemy.debuffs = {
+                  ...newEnemy.debuffs,
                   stunned: 1, shockGauge: 0,
                   shockResist: GAME_CONFIG.shockResistTurns,
                   shockResistTurns: GAME_CONFIG.shockResistTurns,
-                  everStunned: true,  
+                  everStunned: true,
                 };
                 if (hasEffect(skills, 'shockBonus', activeSkills)) {
                   const bonusDmg = 15;
                   newEnemy.currentHp = Math.max(0, newEnemy.currentHp - bonusDmg);
                   newLog.push({ type: 'damage', text: `· [강타 Lv.5] 기절 추가 데미지 ${bonusDmg}` });
-                }
-                if (hasUltimate(ultimates, 'ult_shockBlast')) {
-                  newEnemy.currentHp = Math.max(0, newEnemy.currentHp - 30);
-                  newLog.push({ type: 'damage', text: `★ [광역 폭발] 폭발 데미지 30` });
-                }
-                if (hasUltimate(ultimates, 'ult_shockExecute')) {
-                  const execDmg = Math.floor(newEnemy.maxHp * 0.25);
-                  newEnemy.currentHp = Math.max(0, newEnemy.currentHp - execDmg);
-                  newLog.push({ type: 'damage', text: `★ [즉시 처형] HP 25% 제거 (${execDmg})` });
                 }
               } else {
                 newEnemy.debuffs = { ...newEnemy.debuffs, shockGauge: newGauge };
@@ -510,8 +488,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
               newEnemy.debuffs = { ...newEnemy.debuffs, bleed: newStacks, bleedTurns: 3 };
             }
             if (p.effect === 'execute') {
-              const execThreshold = hasUltimate(ultimates, 'ult_deathSentence') ? 0.35 : 0.2;
-              const execChance = hasUltimate(ultimates, 'ult_deathSentence') ? 0.3 : 0.15;
+              const execThreshold = 0.2;
+              const execChance = 0.15;
               if (newEnemy.currentHp > 0 && newEnemy.currentHp <= newEnemy.maxHp * execThreshold && Math.random() < execChance) {
                 newLog.push({ type: 'system', text: `◆ [잔혹 Lv.7] 즉사 발동!` });
                 newEnemy.currentHp = 0;
@@ -647,19 +625,11 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     }
     if (skill.cd > 0) {
       // 가속 minor: 쿨다운 -1턴 (Lv.4마다 누적)
-      let cdReduce = Math.floor(getMinorBonus(skills, 'cdReduce+', activeSkills) / 4);
-      // 궁극 [정념 폭주] ult_aetherStorm: 마법 스킬 쿨다운 -1
-      if (skill.type === 'magic' && hasUltimate(ultimates, 'ult_aetherStorm')) cdReduce += 1;
+      const cdReduce = Math.floor(getMinorBonus(skills, 'cdReduce+', activeSkills) / 4);
       let finalCd = Math.max(0, skill.cd - cdReduce);
       // 단독 버프 스킬은 쿨타임 감소 후에도 최소 1턴 강제 (무한 사용 방지)
       if (skill.type === 'buff') finalCd = Math.max(1, finalCd);
       if (finalCd > 0) newPlayer.cooldowns = { ...newPlayer.cooldowns, [skillKey]: finalCd };
-    }
-    // 궁극 [시간 역행] ult_timeRewind: 모든 마법 스킬 쿨다운 제거, 에테르 +1
-    if (skill.type === 'magic' && hasUltimate(ultimates, 'ult_timeRewind')) {
-      newPlayer.ether = Math.min(newPlayer.maxEther || 3, newPlayer.ether + 1);
-      newPlayer.cooldowns = {}; 
-      newLog.push({ type: 'passive', text: `★ [시간 역행] 모든 마법 스킬 쿨다운 제거, 에테르 +1` });
     }
 
     setPlayer(newPlayer);
@@ -965,38 +935,17 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
             dmg += inc;
             takenBreakdown.push(`심연 +${inc}`);
           }
-          // 궁극 [황혼의 저주]: 받는 데미지 -25%
-          if (hasUltimate(ultimates, 'ult_deblanCurse') && dmg > 0) {
-            const reduced = Math.floor(dmg * 0.25);
-            dmg -= reduced;
-            if (reduced > 0) takenBreakdown.push(`황혼의 저주 -${reduced}`);
-            // 30% 확률로 적 자해
-            if (Math.random() < 0.3) {
-              const counterDmg = Math.floor(dmg * 0.5);
-              newEnemy.currentHp = Math.max(0, newEnemy.currentHp - counterDmg);
-              newLog.push({ type: 'passive', text: `★ [황혼의 저주] 적 자해 ${counterDmg}` });
-            }
-          }
           if (dmg > 0) {
             // [체크] 이번 공격을 맞으면 죽는가?
             const isFatalDamage = newPlayer.hp - dmg <= 0;
-          
+
             if (isFatalDamage) {
-              // 1순위: [운명의 저울] - 치명타 상황에서만 횟수 차감 후 100% 회피
-              if (hasUltimate(ultimates, 'ult_destinyScale') && (newPlayer.destinyScaleUses || 0) < 2) {
-                newPlayer.destinyScaleUses = (newPlayer.destinyScaleUses || 0) + 1;
-                newLog.push({ 
-                  type: 'passive', 
-                  text: `★ [운명의 저울] 치명적 피격 회피! (${newPlayer.destinyScaleUses}/2)` 
-                });
-                dmg = 0; // 데미지 무효화
-              } 
-              // 2순위: [신의 가호] - 30% 확률로 생존
-              else if (hasEffect(skills, 'divineSave', activeSkills) && Math.random() < 0.3) {
+              // 1순위: [신의 가호] - 30% 확률로 생존
+              if (hasEffect(skills, 'divineSave', activeSkills) && Math.random() < 0.3) {
                 newLog.push({ type: 'passive', text: `◆ [신앙 Lv.5] 신의 가호!` });
                 dmg = newPlayer.hp - 1; // 체력을 1로 만듦
-              } 
-              // 3순위: [부활] - 전투당 1회 체력 50% 회복
+              }
+              // 2순위: [부활] - 전투당 1회 체력 50% 회복
               else if (hasEffect(skills, 'revive', activeSkills) && !newPlayer.revivedThisCombat) {
                 newPlayer.hp = Math.floor(newPlayer.maxHp * 0.5);
                 newPlayer.revivedThisCombat = true;
@@ -1004,7 +953,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                 dmg = 0; // 데미지 무효화
               }
             }
-          
+
+
             // 최종 데미지 적용 (위의 조건들에서 dmg가 0이 되었다면 실행되지 않음)
             if (dmg > 0) {
               newPlayer.hp = Math.max(0, newPlayer.hp - dmg);
@@ -1385,25 +1335,15 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     if (newEnemy.debuffs?.bleed > 0 && newEnemy.debuffs?.bleedTurns > 0) {
       // 잔혹 minor: 출혈 1스택당 데미지 +1/Lv
       const bleedBonus = getMinorBonus(skills, 'bleedDmg+', activeSkills);
-      let bleedDmg = newEnemy.debuffs.bleed * (GAME_CONFIG.bleedDmgPerStack + bleedBonus);
-      // 궁극 [피의 축제] ult_bloodFeast: 출혈 데미지 ×2
-      if (hasUltimate(ultimates, 'ult_bloodFeast')) {
-        bleedDmg *= 2;
-      }
+      const bleedDmg = newEnemy.debuffs.bleed * (GAME_CONFIG.bleedDmgPerStack + bleedBonus);
       newEnemy.currentHp = Math.max(0, newEnemy.currentHp - bleedDmg);
       newEnemy.debuffs = {
         ...newEnemy.debuffs,
         bleedTurns: newEnemy.debuffs.bleedTurns - 1,
         bleed: newEnemy.debuffs.bleedTurns - 1 <= 0 ? 0 : newEnemy.debuffs.bleed,
       };
-      newLog.push({ type: 'debuff', text: `◆ 출혈 ${bleedDmg} 데미지${hasUltimate(ultimates, 'ult_bloodFeast') ? ' [×2 피의축제]' : ''}` });
+      newLog.push({ type: 'debuff', text: `◆ 출혈 ${bleedDmg} 데미지` });
       if (newEnemy.currentHp <= 0) {
-        // 궁극 [피의 축제]: 출혈 처치 시 HP 30 흡수
-        if (hasUltimate(ultimates, 'ult_bloodFeast')) {
-          newPlayer.hp = Math.min(newPlayer.maxHp, newPlayer.hp + 30);
-          newLog.push({ type: 'passive', text: `★ [피의 축제] HP 30 흡수` });
-          setPlayer(newPlayer);
-        }
         setEnemy(newEnemy);
         setLog([...newLog, { type: 'victory', text: `━━ ${enemy.name} 처치 (출혈 사망) ━━` }]);
         setPhase('victory');
@@ -1611,9 +1551,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     let guaranteedCrit = false;
     getActivePassives(skills, 'onTurnStart', activeSkills).forEach(p => {
       if (p.effect === 'regenPerTurn') {
-        let regen = 3;
-        // 궁극 [여명의 축복]: 회복 효과 +50%
-        if (hasUltimate(ultimates, 'ult_derodBlessing')) regen = Math.floor(regen * 1.5);
+        const regen = 3;
         newPlayer.hp = Math.min(newPlayer.maxHp, newPlayer.hp + regen);
         newLog.push({ type: 'passive', text: `◆ [재생 Lv.3] HP +${regen}` });
       }
@@ -1629,20 +1567,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         newLog.push({ type: 'passive', text: `◆ [신앙 Lv.3] 다음 공격 치명타 확정!` });
       }
     });
-    
-    // 궁극 [여명의 축복]: 매 턴 HP +5
-    if (hasUltimate(ultimates, 'ult_derodBlessing')) {
-      newPlayer.hp = Math.min(newPlayer.maxHp, newPlayer.hp + 5);
-      newLog.push({ type: 'passive', text: `★ [여명의 축복] HP +5` });
-    }
-    // 궁극 [영구 침묵] 강타_ult_perpetualStun: 매 턴 25% 확률로 적 기절
-    if (hasUltimate(ultimates, 'ult_perpetualStun') && newEnemy.debuffs?.everStunned) {
-      if (Math.random() < 0.25) {
-        newEnemy.debuffs = { ...newEnemy.debuffs, stunned: 1 };
-        newLog.push({ type: 'passive', text: `★ [영구 침묵] 적 기절!` });
-      }
-    }
-    // 궁극 [운명의 저울]: 모든 능력치 +5 (전투 시작 한 번만, useEffect에서 처리)
+
 
     const patterns = newEnemy.patterns;
     newEnemy.nextIntent = patterns[Math.floor(Math.random() * patterns.length)];

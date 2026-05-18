@@ -77,13 +77,6 @@ export function calculateDamage(skill, attacker, defender, skills, isCrit, ultim
       breakdown.push(`연옥지화 +${purgatoryBonus}`);
     }
   }
-  // 궁극 [정념 폭주] 마력_aetherStorm: 마법 데미지 ×2.0
-  if (skill.type === 'magic' && hasUltimate(ultimates, 'ult_aetherStorm')) {
-    // 기존 데미지만큼을 더해서 2배로 만듦
-    const ultBonus = dmg;
-    dmg += ultBonus;
-    breakdown.push(`★정념폭주 +${ultBonus} (2배)`);
-  }
   // 1.28.0~ 시그니처 [영겁의 화염] 후속 버프: 다음 2턴 마법 데미지 +N% (sage)
   if (skill.type === 'magic' && attacker.buffs?.flameBoostTurns > 0 && attacker.buffs?.flameBoostPct > 0) {
     const flameBonus = Math.floor(dmg * (attacker.buffs.flameBoostPct / 100));
@@ -91,12 +84,6 @@ export function calculateDamage(skill, attacker, defender, skills, isCrit, ultim
       dmg += flameBonus;
       breakdown.push(`★영겁의 정념 +${flameBonus}`);
     }
-  }
-  // 궁극 [광기 각성] 잔혹_madness: HP 50% 이하 시 모든 데미지 +50%
-  if (hasUltimate(ultimates, 'ult_madness') && attacker.hp <= attacker.maxHp * 0.5) {
-    const ultBonus = Math.floor(dmg * 0.5);
-    dmg += ultBonus;
-    breakdown.push(`★광기각성 +${ultBonus}`);
   }
   // 강타 Lv.7: 기절(stunned)한 적에게 +50% 데미지
   if (defender.debuffs?.stunned > 0 && hasEffect(skills, 'shockExploit', activeSkills)) {
@@ -216,13 +203,9 @@ export function getDisplayDamage(skill, attacker, skills, ultimates, meta, curse
     if (skill.type === 'magic' && hasEffect(skills, 'magicDmg+25', activeSkills)) {
       dmg += Math.floor(dmg * 0.25);
     }
-    if (skill.type === 'magic' && hasUltimate(ultimates, 'ult_aetherStorm')) dmg *= 2;
     // 1.28.0~ 시그니처 [영겁의 화염] 후속 버프
     if (skill.type === 'magic' && attacker.buffs?.flameBoostTurns > 0 && attacker.buffs?.flameBoostPct > 0) {
       dmg += Math.floor(dmg * (attacker.buffs.flameBoostPct / 100));
-    }
-    if (hasUltimate(ultimates, 'ult_madness') && attacker.hp <= attacker.maxHp * 0.5) {
-      dmg += Math.floor(dmg * 0.5);
     }
     const metaDmgBonus = getMetaBonus(meta, 'dmgDealt+5%') * 0.05;
     if (metaDmgBonus > 0) dmg += Math.floor(dmg * metaDmgBonus);
