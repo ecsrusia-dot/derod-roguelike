@@ -62,12 +62,7 @@ export function calculateDamage(skill, attacker, defender, skills, isCrit, ultim
     dmg += rageBonus;
     breakdown.push(`분노 +${rageBonus}`);
   }
-  if (skill.type === 'magic' && hasEffect(skills, 'magicDmg+30', activeSkills)) {
-    // 1.44.1~ 마력 Lv.3 = +30% (이전 코드 0.25 = +25%로 누락. 정보창과 일치하도록 0.30으로 정정)
-    const magicBonus = Math.floor(dmg * 0.30);
-    dmg += magicBonus;
-    breakdown.push(`마력 Lv.3 +${magicBonus}`);
-  }
+  // 1.45.3: 마력 Lv.3 magicDmg+30 효과 폐기 (재시전 +5%로 변경됨)
   // 마법 데미지 보너스 (현자의 서, 한기의 결정 등 magicDmg stat 보유 유물)
   if (skill.type === 'magic' && relicStat.magicDmg > 0) {
     const bookBonus = Math.floor(dmg * (relicStat.magicDmg / 100));
@@ -215,9 +210,7 @@ export function getDisplayDamage(skill, attacker, skills, ultimates, meta, curse
       dmg += Math.floor(dmg * (1 - hpRatio) * 0.5);
     }
     if (attacker.buffs?.rage > 0) dmg += Math.floor(dmg * 0.3);
-    if (skill.type === 'magic' && hasEffect(skills, 'magicDmg+30', activeSkills)) {
-      dmg += Math.floor(dmg * 0.30);
-    }
+    // 1.45.3: 마력 Lv.3 magicDmg+30 효과 폐기 (재시전 +5%로 변경됨)
     // 1.28.0~ 시그니처 [영겁의 화염] 후속 버프
     if (skill.type === 'magic' && attacker.buffs?.flameBoostTurns > 0 && attacker.buffs?.flameBoostPct > 0) {
       dmg += Math.floor(dmg * (attacker.buffs.flameBoostPct / 100));

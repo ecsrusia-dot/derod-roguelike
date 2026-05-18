@@ -7,7 +7,7 @@
 
 import React, { useState } from 'react';
 import { Heart, X } from 'lucide-react';
-import { PALETTE, getCharismaHealBonus, getCharismaDmgReduction, getCharismaSoulGainBonus, getIntellectStartSoul, getIntellectSoulPerMagic, getStrengthHpBonus, getStrengthSoulPerPhys, getAgilityCritDmgBonus, getAgilitySoulOnDodge, getIfritIgniteRate, getMinorBonus, getMetaBonus, hasEffect, hasUltimate, hasCurse } from '../utils/helpers.js';
+import { PALETTE, getCharismaHealBonus, getCharismaDmgReduction, getCharismaSoulGainBonus, getIntellectStartSoul, getIntellectSoulPerMagic, getStrengthHpBonus, getStrengthSoulPerPhys, getAgilityCritDmgBonus, getAgilitySoulOnDodge, getIfritIgniteRate, getMinorBonus, getMagicEchoChance, getMetaBonus, hasEffect, hasUltimate, hasCurse } from '../utils/helpers.js';
 import { PASSIVE_SKILLS, COMBAT_SKILLS, ULTIMATE_SKILLS, CLASS_ULTIMATES } from '../data.js';
 import CardInfoModal, { buildPassiveInfo, buildRelicInfo, buildActiveSkillInfo, buildClassUltimateInfo, buildBreakdownInfo } from './CardInfoModal.jsx';
 import StatSignatureModal from './StatSignatureModal.jsx';
@@ -245,10 +245,10 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
             const playerInt = stats['지능'] || 10;
             const strSigPct = Math.round((playerStr * 0.4) * 10) / 10;
             const intSigPct = Math.round((playerInt * 0.4) * 10) / 10;
+            // 1.45.3: 마력 Lv.3 magicDmg+30 효과 폐기 (재시전 +5%로 변경)
             const magicMinor = getMinorBonus(skills, 'magicDmg+', activeSkills);
-            const magicLv5 = hasEffect(skills, 'magicDmg+30', activeSkills) ? 30 : 0;
             const magicRelic = relicStat.magicDmg || 0;
-            const magicBonus = magicMinor + magicLv5 + magicRelic;
+            const magicBonus = magicMinor + magicRelic;
             const bleedBonus = getMinorBonus(skills, 'bleedDmg+', activeSkills);
             const simanLv = skills['심안류'] || 0;
             const hasMirror = hasUltimate(ultimates, 'ult_counterMirror');
@@ -423,7 +423,8 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
             const strPhysSoul = getStrengthSoulPerPhys(stats);
             const dexDodgeSoul = getAgilitySoulOnDodge(stats);
             const cdReduce = getMinorBonus(skills, 'cdReduce+', activeSkills);
-            const etherReduce = hasEffect(skills, 'etherCost-20', activeSkills);
+            // 1.45.3: etherCost-20 폐기 (마력 Lv5 재시전 +10%로 변경됨). 마법 재시전 확률 누적 합산
+            const magicEchoPct = getMagicEchoChance(skills, activeSkills);
             const startSoulEng = engravingFx.startSoul || 0;
             const perTurnSoul = engravingFx.perTurnSoul || 0;
             const dodgeSoulEng = engravingFx.dodgeSoul || 0;
@@ -444,7 +445,7 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
             const showSoul = !!classData?.ultimateId;
             const hasAny = regenLv || lifesteal || reflect || heal || charismaHeal || charismaSoul
               || strHp || strPhysSoul || intellectMagicSoul
-              || cdReduce || etherReduce
+              || cdReduce || magicEchoPct
               || (showSoul && (startSoulTotal || perTurnSoul || dodgeSoulTotal || counterHitSoul || soulGainMult))
               || counterShock || counterCanCrit || perTurnHpLoss || disableInsightPredict;
             if (!hasAny) return null;
@@ -518,17 +519,29 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                     <button onClick={() => openSimpleLine('근력 시그: 물리 시 소울', `+${strPhysSoul}`, [{ label: '근력 시그니처 2단계', value: strPhysSoul, note: (stats['근력'] || 10) < 17 ? `근력 17 필요 (현재 ${stats['근력'] || 10})` : `17~21 +1 / 22~26 +2 (현재 +${strPhysSoul})` }], PALETTE.dawn, '물리 스킬 시전 시 소울 게이지가 충전됩니다.')}
                       className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>근력 시그: 물리 시 소울 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.dawn }}>+{strPhysSoul}</span></button>
                   )}
-                  {intellectMagicSoul > 0 && (
-                    <button onClick={() => openSimpleLine('지능 시그: 마법 시 소울', `+${intellectMagicSoul}`, [{ label: '지능 시그니처 2단계', value: intellectMagicSoul, note: (stats['지능'] || 10) < 17 ? `지능 17 필요 (현재 ${stats['지능'] || 10})` : `17~21 +1 / 22~26 +2 (현재 +${intellectMagicSoul})` }], PALETTE.legendary, '마법 스킬 시전 시 소울 게이지가 충전됩니다.')}
-                      className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>지능 시그: 마법 시 소울 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.legendary }}>+{intellectMagicSoul}</span></button>
-                  )}
+                  {intellectMagicSoul > 0 && (() => {
+                    // 1.45.3: 산출 근거 개선 — 임계 시작점·5단위 누진 의미·단위 명시
+                    const intVal = stats['지능'] || 10;
+                    const note = intVal < 17
+                      ? `지능 17 이상 필요 (현재 지능 ${intVal})`
+                      : `지능 17부터 5단위마다 +1/시전 누적 (지능 17 = +1, 22 = +2, 27 = +3, ...). 현재 지능 ${intVal} → +${intellectMagicSoul}/시전`;
+                    return (
+                      <button onClick={() => openSimpleLine('지능 시그: 마법 시 소울', `+${intellectMagicSoul}/시전`, [{ label: '지능 시그니처 2단계', value: intellectMagicSoul, unit: '/시전', note }], PALETTE.legendary, '마법 스킬 시전 시 소울 게이지가 충전됩니다. 임계 지능 17 + 5단위 누진.')}
+                        className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>지능 시그: 마법 시 소울 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.legendary }}>+{intellectMagicSoul}/시전</span></button>
+                    );
+                  })()}
                   {cdReduce > 0 && (
                     <button onClick={() => openSimpleLine('쿨다운 감소', `-${cdReduce}턴`, [{ label: '패시브: 쿨다운 감소 누적', value: cdReduce, unit: '턴', note: `해당 패시브의 누적 보너스` }], PALETTE.twilight, '액티브 스킬의 쿨다운 턴 수가 감소합니다.')}
                       className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>쿨다운 감소 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.twilight }}>-{cdReduce}턴</span></button>
                   )}
-                  {etherReduce && (
-                    <button onClick={() => openSimpleLine('에테르 비용', '-1', [{ label: '패시브: 에테르 비용 감소', value: '-1', note: '발동 중' }], PALETTE.twilight, '액티브 스킬의 에테르 비용이 1 감소합니다.')}
-                      className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>에테르 비용 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.twilight }}>-1</span></button>
+                  {magicEchoPct > 0 && (
+                    <button onClick={() => {
+                      const sources = [];
+                      if (hasEffect(skills, 'magicEcho+5', activeSkills)) sources.push({ label: '마력 Lv.3 (재시전 +5%)', value: 5, unit: '%' });
+                      if (hasEffect(skills, 'magicEcho+10', activeSkills)) sources.push({ label: '마력 Lv.5 (재시전 +10% 추가)', value: 10, unit: '%' });
+                      if (hasEffect(skills, 'magicEcho+15', activeSkills)) sources.push({ label: '마력 Lv.7 (재시전 +15% 추가)', value: 15, unit: '%' });
+                      openSimpleLine('마법 재시전 확률', `${magicEchoPct}%`, sources, PALETTE.legendary, '마법 스킬 시전 시 해당 확률로 같은 스킬이 즉시 재시전됩니다. 누적 합산 (만렙 총 30%).');
+                    }} className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>마법 재시전 확률 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.legendary }}>{magicEchoPct}%</span></button>
                   )}
                   {showSoul && startSoulTotal > 0 && (
                     <button onClick={openStartSoulBreakdown} className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>시작 소울 게이지 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.dawn }}>+{startSoulTotal}</span></button>

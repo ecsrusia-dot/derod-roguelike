@@ -7,6 +7,19 @@
 
 export const CHANGELOG = [
   {
+    version: '1.45.3',
+    date: '2026-05-18',
+    label: '영겁 우측 쏠림 픽스 + 각인 폭발 풀스크린 글로우 제거 + 마력 패시브 재시전 누진 재설계 + 마법 시 소울 산출 근거 개선',
+    changes: [
+      { type: 'fix', text: '[영겁의 화염 컷인 우측 쏠림 픽스] EternalFlameCutin 인라인 transform:translate(-50%,-50%)와 fx-flame-burst 키프레임 transform:scale()이 충돌하여 translate가 덮어쓰이며 좌측 모서리 기준으로 그려져 우측으로 쏠리던 버그 → 부모 div(위치) + 자식 div(애니메이션) 분리. 화염 코어·한자·한글명 4개 모두 동일 패턴으로 재구성' },
+      { type: 'fix', text: '[각인 폭발 풀스크린 빨간 글로우 제거] IgniteExplodeFx의 풀스크린 inset-0 radial-gradient 빨간 글로우가 PM에게 익스플로젼처럼 보이던 버그 → 풀스크린 글로우 완전 제거, 균열 라인 6개만 + 적 카드 상단 영역(top 17%)에 위치 고정. 라인 크기 240→160 축소. 풀스크린 효과 0건' },
+      { type: 'balance', text: '[마력 패시브 너프 + 재시전 누진 재설계] minor +5%/Lv → +3%/Lv (Lv7 만렙 35%→21%). Lv3 magicDmg+30 폐기 → 재시전 +5%, Lv5 etherCost-1 폐기 → 재시전 +10% 추가, Lv7 magicEcho 50% → 재시전 +15% 추가. 누적 합산 (Lv7 만렙 총 30%, 기존 50% 대비 너프). 마법 시전 시 해당 확률로 같은 스킬 즉시 1회 재시전' },
+      { type: 'feature', text: '[마법 재시전 확률 상태창 표시] StatusPanel 기타 효과 섹션에 「마법 재시전 확률」 라인 추가. ◇ 클릭 시 출처 모달(Lv.3/5/7 각각 +5/+10/+15) 표시. 합산값 백분율로 노출' },
+      { type: 'fix', text: '[지능 시그: 마법 시 소울 산출 근거 개선] 모달 note "17~21 +1 / 22~26 +2 (현재 +2)" 표현이 모호하던 PM 피드백 반영 → "지능 17부터 5단위마다 +1/시전 누적 (지능 17=+1, 22=+2, 27=+3, ...). 현재 지능 N → +M/시전" 형식으로 풀어쓰기 + 단위 "/시전" 명시 + 임계 미달 시 "지능 17 이상 필요 (현재 지능 N)"' },
+      { type: 'system', text: '[헬퍼 함수 신설] utils/helpers.js에 getMagicEchoChance(skills, activeSkills) 추가. magicEcho+5/+10/+15 effect 키 누적 합산하여 백분율 반환. CombatScreen·StatusPanel·전투 분기 모두 이 헬퍼 사용. 폐기된 magicEcho/magicDmg+30/etherCost-20 effect 키는 마이그레이션 불필요 (런타임 키 — 패시브 데이터 변경 즉시 반영)' },
+    ],
+  },
+  {
     version: '1.45.2',
     date: '2026-05-18',
     label: '술법사 화염 이펙트 2차 보정 — 잔상 픽스 + 크리티컬/익스플로젼/각인 폭발 3종 차별화 + 영겁 컷인 한자·한글 분리',

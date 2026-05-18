@@ -35,12 +35,13 @@ export const PASSIVE_SKILLS = {
   },
   마력: {
     axis: 'attack', maxLv: 7, color: '#5c4a8c',
-    desc: '마법 데미지 강화',
-    minorEffect: { type: 'magicDmg+', perLv: 5, desc: '마법 데미지 +5%/Lv' },
+    desc: '마법 데미지 강화 + 재시전',
+    // 1.45.3 너프: minor +5%→+3%/Lv. Lv3/5/7 효과 모두 재시전 확률 추가(+5/+10/+15)로 변경 — 누적 합산 (Lv7 만렙 총 30%)
+    minorEffect: { type: 'magicDmg+', perLv: 3, desc: '마법 데미지 +3%/Lv' },
     tiers: {
-      3: { text: '마법 데미지 추가 +30%', trigger: 'passive', effect: 'magicDmg+30' },
-      5: { text: '에테르 비용 -1 (최소 0)', trigger: 'passive', effect: 'etherCost-20' },
-      7: { text: '마법 공격 시 50% 확률로 재시전', trigger: 'passive', effect: 'magicEcho' }
+      3: { text: '마법 공격 시 재시전 확률 +5% (누적)', trigger: 'passive', effect: 'magicEcho+5' },
+      5: { text: '마법 공격 시 재시전 확률 +10% (누적, Lv3 포함 +15%)', trigger: 'passive', effect: 'magicEcho+10' },
+      7: { text: '마법 공격 시 재시전 확률 +15% (누적, 만렙 총 +30%)', trigger: 'passive', effect: 'magicEcho+15' }
     }
   },
   회피: {

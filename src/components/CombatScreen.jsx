@@ -11,8 +11,9 @@ import {
   getActivePassives, 
   hasEffect, 
   hasUltimate, 
-  getMinorBonus, 
-  getActiveRelicStat, 
+  getMinorBonus,
+  getMagicEchoChance,
+  getActiveRelicStat,
   getMetaBonus, 
   hasCurse,
   getEffectiveSkills,
@@ -292,8 +293,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     if (player.cooldowns[skillKey] > 0) return;
     // 단독 버프 스킬은 턴당 1회 — 같은 턴 재사용 차단 (쿨타임 0이어도)
     if (skill.type === 'buff' && player.usedBuffThisTurn) return;
+    // 1.45.3: 마력 Lv5 etherCost-20 효과 폐기 (재시전 +10%로 변경됨)
     let etherCost = skill.cost || 0;
-    if (etherCost > 0 && hasEffect(skills, 'etherCost-20', activeSkills)) etherCost = Math.max(0, etherCost - 1);
     if (etherCost > player.ether) return;
 
     // 모든 검증 통과 → 락 획득
@@ -350,12 +351,10 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           }
         }
       }
-      // 마력 Lv.7 (50% × 2회 재시전)
-      const echoChance = 0.5;
-      const canEcho = skill.type === 'magic' && hasEffect(skills, 'magicEcho', activeSkills);
-
+      // 1.45.3 마력 재시전 — Lv3 +5% / Lv5 +10% / Lv7 +15% 누적 (만렙 총 30%)
+      const echoChancePct = skill.type === 'magic' ? getMagicEchoChance(skills, activeSkills) : 0;
       let echoTimes = 1;
-      if (canEcho && Math.random() < echoChance) {
+      if (echoChancePct > 0 && Math.random() * 100 < echoChancePct) {
         echoTimes = 2;
       }
       
@@ -365,7 +364,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       
       for (let echo = 0; echo < echoTimes; echo++) {
         if (echo > 0) {
-          newLog.push({ type: 'passive', text: `◆ [마력 Lv.7] 마법 재시전! (${echo}/${echoTimes - 1})` });
+          newLog.push({ type: 'passive', text: `◆ [마력 재시전] 마법 재시전! (${echo}/${echoTimes - 1})` });
         }
         
         for (let i = 0; i < hitCount; i++) {
@@ -1986,8 +1985,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                 const skill = COMBAT_SKILLS[skillKey];
                 if (!skill) return null;
                 const onCd = (player.cooldowns[skillKey] || 0) > 0;
+                // 1.45.3: etherCost-20 효과 폐기 (마력 Lv5 재시전 +10%로 변경됨)
                 let cost = skill.cost || 0;
-                if (cost > 0 && hasEffect(skills, 'etherCost-20', activeSkills)) cost = Math.max(0, cost - 1);
                 const noEther = cost > player.ether;
                 // 단독 버프 스킬은 같은 턴 1회 제한 (쿨타임 감소 효과로 무한 사용 방지)
                 const buffUsedThisTurn = skill.type === 'buff' && player.usedBuffThisTurn;
@@ -2243,8 +2242,9 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
               const heal = relicStat.heal || 0;
               const charismaHeal = getCharismaHealBonus(player);
               const cdReduce = getMinorBonus(skills, 'cdReduce+', activeSkills);
-              const etherReduce = hasEffect(skills, 'etherCost-20', activeSkills);
-              const hasAny = regenLv || lifesteal || reflect || heal || charismaHeal || cdReduce || etherReduce;
+              // 1.45.3: etherCost-20 효과 폐기. 마력 재시전 확률을 기타 효과에 추가
+              const magicEchoPct = getMagicEchoChance(skills, activeSkills);
+              const hasAny = regenLv || lifesteal || reflect || heal || charismaHeal || cdReduce || magicEchoPct;
               if (!hasAny) return null;
               return (
                 <>
@@ -2256,7 +2256,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                     {heal > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>회복량 보너스</span><span className="font-bold tabular-nums" style={{ color: PALETTE.green }}>+{heal}%</span></div>)}
                     {charismaHeal > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>매력 시그: 회복</span><span className="font-bold tabular-nums" style={{ color: PALETTE.dawn }}>+{charismaHeal}%</span></div>)}
                     {cdReduce > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>쿨다운 감소</span><span className="font-bold tabular-nums" style={{ color: PALETTE.twilight }}>-{cdReduce}턴</span></div>)}
-                    {etherReduce && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>에테르 비용</span><span className="font-bold tabular-nums" style={{ color: PALETTE.twilight }}>-1</span></div>)}
+                    {magicEchoPct > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>마법 재시전 확률</span><span className="font-bold tabular-nums" style={{ color: PALETTE.legendary }}>{magicEchoPct}%</span></div>)}
                   </div>
                 </>
               );
