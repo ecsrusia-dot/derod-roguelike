@@ -699,8 +699,10 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     setFxUltimateCutin({ name: ult.name, color: ult.color });
     setTimeout(() => setFxUltimateCutin(null), 900);
     // 1.45.0~ 술법사 영겁의 화염 발동 시 전용 화염 컷인 추가
+    // 1.45.1: 안전성 강화 — 0.9초 후 trigger 0으로 리셋해 컴포넌트 unmount 보장
     if (classData.ultimateId === 'sage_eternalFlame') {
       setFxEternalFlame(v => v + 1);
+      setTimeout(() => setFxEternalFlame(0), 950);
     }
 
     // 0.9초 컷인 후 효과 적용

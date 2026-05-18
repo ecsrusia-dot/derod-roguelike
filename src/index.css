@@ -414,3 +414,19 @@ body {
   100% { transform: translate(var(--fx-dx, -120px), var(--fx-dy, 0px)) scale(0.7); opacity: 0; }
 }
 .fx-flame-reflect { animation: fx-flame-reflect 0.6s ease-out forwards; }
+
+/* 1.45.1 파이어볼 발사체 — 적 카드 하단(플레이어 쪽) → 적 위치로 상승 + 회전 (0.35초) */
+/* 적 카드 안에서 사용: 시작 bottom 5%, 종료 중앙(약 -45%) */
+@keyframes fx-fireball-fly {
+  0%   { transform: translate(var(--fx-x0, 0px), var(--fx-y0, 90px)) scale(0.4) rotate(0deg); opacity: 0; }
+  15%  { opacity: 1; }
+  100% { transform: translate(0px, 0px) scale(1.0) rotate(180deg); opacity: 1; }
+}
+.fx-fireball-fly { animation: fx-fireball-fly 0.35s cubic-bezier(.3,.6,.4,1) forwards; }
+
+/* 파이어볼 꼬리 — 발사체 뒤에 따라붙는 잔상 (스케일 작은 fade out) */
+@keyframes fx-fireball-trail {
+  0%   { opacity: 0.9; transform: translate(var(--fx-tx, 0px), var(--fx-ty, 30px)) scale(0.5); }
+  100% { opacity: 0;   transform: translate(0px, 0px) scale(0.2); }
+}
+.fx-fireball-trail { animation: fx-fireball-trail 0.4s ease-out forwards; }
