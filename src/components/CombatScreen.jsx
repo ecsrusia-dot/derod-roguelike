@@ -250,7 +250,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         if (metaStartSoul > 0) parts.push(`메타 +${metaStartSoul}`);
         initialLog.push({
           type: 'passive',
-          text: `◆ 시작 영혼 게이지: ${parts.join(' + ')} = ${totalStartSoul}`,
+          text: `◆ 영혼 게이지 보너스 : ${totalStartSoul} (${parts.join(' + ')})`,
         });
       }
     }

@@ -256,6 +256,15 @@ export function getCharismaDmgReduction(stats) {
   return (Math.floor((stats.매력 - 17) / 5) + 1) * 5;
 }
 
+// 1.37.0~ 매력 자동 가산: 영혼 획득량 +0.5%/포인트. 임계 없음.
+// 공식: max(0, (매력 - 10)) × 0.5
+//   매력 10 → 0% / 매력 11 → +0.5% / 매력 15 → +2.5% / 매력 19 → +4.5% / 매력 25 → +7.5%
+// 적용 위치: handleVictory 처치 영혼·챕터 보너스·무한 깊이 보너스·대장간 영혼 보상 등 모든 영혼 가산처.
+export function getCharismaSoulGainBonus(stats) {
+  if (!stats || !stats.매력) return 0;
+  return Math.max(0, (stats.매력 - 10) * 0.5);
+}
+
 // ===== 지능 효과 헬퍼 (1.32.0~ / 1.37.0 재정의) =====
 // 술법사 시그니처. 1.37.0에서 시작 에테르 → 전투 시작 영혼 게이지로 재설계.
 // 시작 base 지능이 가장 높은 술법사(20)가 시작부터 두 효과 모두 누림.

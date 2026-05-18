@@ -7,7 +7,7 @@
 
 import React, { useState } from 'react';
 import { Heart, X } from 'lucide-react';
-import { PALETTE, getCharismaHealBonus, getCharismaDmgReduction, getIntellectStartSoul, getIntellectSoulPerMagic, getStrengthHpBonus, getStrengthSoulPerPhys, getAgilityCritDmgBonus, getAgilitySoulOnDodge, getIfritIgniteRate, getMinorBonus, getMetaBonus, hasEffect, hasUltimate, hasCurse } from '../utils/helpers.js';
+import { PALETTE, getCharismaHealBonus, getCharismaDmgReduction, getCharismaSoulGainBonus, getIntellectStartSoul, getIntellectSoulPerMagic, getStrengthHpBonus, getStrengthSoulPerPhys, getAgilityCritDmgBonus, getAgilitySoulOnDodge, getIfritIgniteRate, getMinorBonus, getMetaBonus, hasEffect, hasUltimate, hasCurse } from '../utils/helpers.js';
 import { PASSIVE_SKILLS, COMBAT_SKILLS, ULTIMATE_SKILLS } from '../data.js';
 import CardInfoModal, { buildPassiveInfo, buildRelicInfo, buildActiveSkillInfo } from './CardInfoModal.jsx';
 import StatSignatureModal from './StatSignatureModal.jsx';
@@ -191,6 +191,7 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
             const reflect = relicStat.reflect || 0;
             const heal = relicStat.heal || 0;
             const charismaHeal = getCharismaHealBonus(stats);
+            const charismaSoul = getCharismaSoulGainBonus(stats);
             const intellectStartSoul = getIntellectStartSoul(stats);
             const intellectMagicSoul = getIntellectSoulPerMagic(stats);
             const strHp = getStrengthHpBonus(stats);
@@ -208,7 +209,7 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
             const soulGainMult = engravingFx.soulGainMult || 0;
             const perTurnHpLoss = engravingFx.perTurnHpLoss || 0;
             const disableInsightPredict = !!engravingFx.disableInsightPredict;
-            const hasAny = regenLv || lifesteal || reflect || heal || charismaHeal
+            const hasAny = regenLv || lifesteal || reflect || heal || charismaHeal || charismaSoul
               || intellectStartSoul || intellectMagicSoul || strHp || strPhysSoul || dexCritDmg || dexDodgeSoul
               || cdReduce || etherReduce
               || startSoul || perTurnSoul || dodgeSoul || counterHitSoul || counterShock || counterCanCrit || soulGainMult || perTurnHpLoss || disableInsightPredict;
@@ -222,6 +223,7 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                   {reflect > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>반사</span><span className="font-bold tabular-nums" style={{ color: PALETTE.accent }}>{reflect}%</span></div>)}
                   {heal > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>회복효과</span><span className="font-bold tabular-nums" style={{ color: PALETTE.green }}>+{heal}%</span></div>)}
                   {charismaHeal > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>매력(회복)</span><span className="font-bold tabular-nums" style={{ color: PALETTE.dawn }}>+{charismaHeal}%</span></div>)}
+                  {charismaSoul > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>매력(영혼)</span><span className="font-bold tabular-nums" style={{ color: PALETTE.dawn }}>+{charismaSoul}%</span></div>)}
                   {strHp > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>근력(시작HP)</span><span className="font-bold tabular-nums" style={{ color: PALETTE.accent }}>+{strHp}</span></div>)}
                   {strPhysSoul > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>근력(물리영혼)</span><span className="font-bold tabular-nums" style={{ color: PALETTE.dawn }}>+{strPhysSoul}</span></div>)}
                   {dexCritDmg > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>민첩(치명뎀)</span><span className="font-bold tabular-nums" style={{ color: PALETTE.legendary }}>+{dexCritDmg}%</span></div>)}

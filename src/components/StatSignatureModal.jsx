@@ -75,7 +75,7 @@ const SIGNATURES = {
   매력: {
     color: PALETTE.dawn,
     sub: '신앙·축복',
-    auto: '(자동 가산 효과 없음)',
+    auto: '영혼 획득량 +0.5%/포인트 (자동 가산)',
     tier1: {
       label: '1단계 · 매력 11+',
       desc: '회복 효율 +0.5%/포인트',
