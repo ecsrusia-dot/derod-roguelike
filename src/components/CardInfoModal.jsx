@@ -96,6 +96,21 @@ export function buildClassUltimateInfo(ultimateId) {
   };
 }
 
+// 1.40.0~ 합산 라인의 출처 분해 표시
+// sources: [{ label, value, unit?, color?, note? }] — value 0인 항목은 자동 필터링
+export function buildBreakdownInfo({ title, totalText, subtitle = null, sources = [], color = null }) {
+  const visible = sources.filter(s => s && (s.value !== 0 && s.value !== '' && s.value !== false && s.value != null));
+  return {
+    kind: 'breakdown',
+    color: color || PALETTE.legendary,
+    tag: '◆ 효과 출처',
+    title,
+    badge: totalText || null,
+    subtitle,
+    breakdownSources: visible,
+  };
+}
+
 export default function CardInfoModal({ info, action = null, onClose }) {
   if (!info) return null;
   const accent = info.color || PALETTE.dawn;
@@ -155,6 +170,32 @@ export default function CardInfoModal({ info, action = null, onClose }) {
                 >
                   <span style={{ color: PALETTE.textDim }}>{k}</span>
                   <span style={{ color: PALETTE.text }}>{v}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* breakdownSources — 합산 출처 목록 (1열, 1.40.0~) */}
+          {info.breakdownSources && info.breakdownSources.length > 0 && (
+            <div className="space-y-1">
+              {info.breakdownSources.map((s, i) => (
+                <div
+                  key={i}
+                  className="px-3 py-2 text-[11px] flex items-start justify-between gap-2"
+                  style={{
+                    background: `${s.color || accent}10`,
+                    border: `1px solid ${s.color || accent}30`,
+                  }}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="font-bold" style={{ color: s.color || accent }}>{s.label}</div>
+                    {s.note && (
+                      <div className="text-[10px] mt-0.5" style={{ color: PALETTE.textDim }}>{s.note}</div>
+                    )}
+                  </div>
+                  <span className="font-bold tabular-nums whitespace-nowrap" style={{ color: PALETTE.text }}>
+                    {typeof s.value === 'number' ? `+${s.value}${s.unit || ''}` : s.value}
+                  </span>
                 </div>
               ))}
             </div>

@@ -22,9 +22,9 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.39.0';
+export const GAME_VERSION = '1.40.0';
 export const VERSION_DATE = '2026-05-18';
-export const VERSION_LABEL = '상태창에 직업 소울 스킬 정보 카드 추가 (4번째 슬롯)';
+export const VERSION_LABEL = '정보창 시그니처 합산 + 출처 모달 + 라벨 풀네임 정리';
 
 // =========== 패시브 스킬 ===========
 // effect 필드는 문자열 키. 실제 동작은 메인 코드의 trigger handler에서 처리.
