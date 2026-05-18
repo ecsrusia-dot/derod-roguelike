@@ -416,11 +416,12 @@ body {
 .fx-flame-reflect { animation: fx-flame-reflect 0.6s ease-out forwards; }
 
 /* 1.45.1 파이어볼 발사체 — 적 카드 하단(플레이어 쪽) → 적 위치로 상승 + 회전 (0.35초) */
-/* 적 카드 안에서 사용: 시작 bottom 5%, 종료 중앙(약 -45%) */
+/* 1.45.2: 도착 직전(85%~100%) opacity 1→0 페이드아웃으로 잔상 제거 + 폭발과 자연스러운 연결 */
 @keyframes fx-fireball-fly {
   0%   { transform: translate(var(--fx-x0, 0px), var(--fx-y0, 90px)) scale(0.4) rotate(0deg); opacity: 0; }
   15%  { opacity: 1; }
-  100% { transform: translate(0px, 0px) scale(1.0) rotate(180deg); opacity: 1; }
+  85%  { transform: translate(0px, 0px) scale(1.0) rotate(160deg); opacity: 1; }
+  100% { transform: translate(0px, 0px) scale(1.2) rotate(180deg); opacity: 0; }
 }
 .fx-fireball-fly { animation: fx-fireball-fly 0.35s cubic-bezier(.3,.6,.4,1) forwards; }
 
@@ -430,3 +431,29 @@ body {
   100% { opacity: 0;   transform: translate(0px, 0px) scale(0.2); }
 }
 .fx-fireball-trail { animation: fx-fireball-trail 0.4s ease-out forwards; }
+
+/* 1.45.2 크리티컬 풀스크린 화면효과 — 노란 비네트 + 짧은 황금 플래시 (0.3초) */
+/* 익스플로젼·각인 폭발의 풀스크린 폭발과 시각적 패턴 차별화: 폭발 X, 가장자리 글로우만 */
+@keyframes fx-crit-vignette {
+  0%   { opacity: 0; }
+  20%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+.fx-crit-vignette { animation: fx-crit-vignette 0.3s ease-out forwards; }
+
+/* 1.45.2 각인 폭발 균열 — 적 카드 영역 한정 빨간 균열 라인 방사형 (0.4초) */
+/* 익스플로젼의 둥근 풀스크린 폭발과 시각적 패턴 완전 차별화 */
+@keyframes fx-ignite-crack {
+  0%   { opacity: 0; transform: scaleY(0); }
+  15%  { opacity: 1; transform: scaleY(1); }
+  100% { opacity: 0; transform: scaleY(1); }
+}
+.fx-ignite-crack { animation: fx-ignite-crack 0.4s ease-out forwards; transform-origin: center; }
+
+/* 1.45.2 각인 폭발 적 카드 빨간 글로우 */
+@keyframes fx-ignite-card-flash {
+  0%   { opacity: 0; }
+  25%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+.fx-ignite-card-flash { animation: fx-ignite-card-flash 0.4s ease-out forwards; }

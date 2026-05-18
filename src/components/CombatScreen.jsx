@@ -38,7 +38,7 @@ import {
   CLASS_ULTIMATES,
 } from '../data.js';
 import { calculateDamage, getDisplayDamage, rollCrit, rollDodge } from '../combat/damage.js';
-import { FloatingLabel, DamageVignette, WhiteFlash, SlashFx, MagicImpactFx, MagicParticles, BarrierRing, BarrierBreakFx, ThrustFx, BladeGuardFx, ShadowStrikeFx, StatusOverlay, UltimateCutin, EternalFlameCutin, FireballFx, ExplosionFx, IgniteGlowAura, IgniteExplodeFx, FlameBarrierFx, FlameReflectFx } from './CombatEffects.jsx';
+import { FloatingLabel, DamageVignette, WhiteFlash, SlashFx, MagicImpactFx, MagicParticles, BarrierRing, BarrierBreakFx, ThrustFx, BladeGuardFx, ShadowStrikeFx, StatusOverlay, UltimateCutin, EternalFlameCutin, FireballFx, ExplosionFx, IgniteGlowAura, IgniteExplodeFx, FlameBarrierFx, FlameReflectFx, CritScreenFx } from './CombatEffects.jsx';
 
 export default function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimates = [], initialRelics = [], activeSkills = null, activeRelicNames = null, enemyKey, isBoss, expedition, curses = [], meta, engravingFx = {}, onVictory, onDefeat }) {
   const [player, setPlayer] = useState(() => {
@@ -160,6 +160,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
   const [fxIgniteExplode, setFxIgniteExplode] = useState(0); // C. 각인 폭발 임팩트
   const [fxFlameBarrier, setFxFlameBarrier] = useState(0);  // D. 화염장막 결계
   const [fxFlameReflect, setFxFlameReflect] = useState(0);  // D. 화염장막 반사
+  // 1.45.2 크리티컬 풀스크린 화면효과 (노란 비네트)
+  const [fxCritScreen, setFxCritScreen] = useState(0);
 
   // 부유 라벨 추가 (자동 제거)
   const pushFxLabel = (side, kind, value, label) => {
@@ -414,9 +416,10 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
             pushFxLabel('enemy', isCrit ? 'crit' : 'damage', actualDmg);
             setFxEnemyShake(v => v + 1);
             setFxEnemyFlash(v => v + 1);
-            // 크리티컬이면 화면도 가볍게 흔들기 + 스킬별로 다른 강조
+            // 크리티컬이면 화면도 가볍게 흔들기 + 스킬별로 다른 강조 + 1.45.2~ 노란 비네트 화면효과
             if (isCrit) {
               setFxScreenShake(v => v + 1);
+              setFxCritScreen(v => v + 1);  // 1.45.2: 익스플로젼·각인 폭발과 차별화된 풀스크린 화면효과
               if (skill.type === 'physical') {
                 if (skillKey === '관통') setFxThrustCrit(true);
                 else setFxSlashCrit(true);
@@ -696,13 +699,13 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     actionLockRef.current = true;
 
     // 컷인 표시 (CSS 키프레임이 자동 종료)
-    setFxUltimateCutin({ name: ult.name, color: ult.color });
-    setTimeout(() => setFxUltimateCutin(null), 900);
-    // 1.45.0~ 술법사 영겁의 화염 발동 시 전용 화염 컷인 추가
-    // 1.45.1: 안전성 강화 — 0.9초 후 trigger 0으로 리셋해 컴포넌트 unmount 보장
+    // 1.45.2: 술법사 영겁 발동 시 UltimateCutin(공용 골든 배너) 스킵 — EternalFlameCutin이 한자 + 한글명 모두 처리
     if (classData.ultimateId === 'sage_eternalFlame') {
       setFxEternalFlame(v => v + 1);
       setTimeout(() => setFxEternalFlame(0), 950);
+    } else {
+      setFxUltimateCutin({ name: ult.name, color: ult.color });
+      setTimeout(() => setFxUltimateCutin(null), 900);
     }
 
     // 0.9초 컷인 후 효과 적용
@@ -1680,6 +1683,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       <UltimateCutin info={fxUltimateCutin} />
       {/* 1.45.0 영겁의 화염 풀스크린 화염 컷인 (UltimateCutin 위에 겹쳐 표시) */}
       <EternalFlameCutin trigger={fxEternalFlame} />
+      {/* 1.45.2 크리티컬 풀스크린 화면효과 — 노란 비네트 (익스플로젼·각인 폭발과 차별화) */}
+      <CritScreenFx trigger={fxCritScreen} />
       {/* 전투 로그 확장 모달 — 풀스크린, 큰 텍스트로 전체 로그 확인 */}
       {logExpanded && (
         <div className="fixed inset-0 z-50 flex flex-col" style={{ background: PALETTE.bgDeep }}>
