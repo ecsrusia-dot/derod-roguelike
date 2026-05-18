@@ -22,9 +22,9 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.37.1';
+export const GAME_VERSION = '1.38.0';
 export const VERSION_DATE = '2026-05-18';
-export const VERSION_LABEL = '시그니처 모달 UI 정리 (sub 라벨 + 보석 안내 문구 제거)';
+export const VERSION_LABEL = '용어 통일 (액티브 궁극→소울 스킬 / 영혼 게이지→소울 게이지 / 혼→소울)';
 
 // =========== 패시브 스킬 ===========
 // effect 필드는 문자열 키. 실제 동작은 메인 코드의 trigger handler에서 처리.
@@ -179,7 +179,7 @@ export const CLASSES = [
     startSkills: { 심안류: 3, 심안: 2 },
     stats: { 근력: 18, 민첩: 15, 지능: 14, 매력: 11 },
     combatSkills: ['참격', '관통', '방검'],
-    ultimateId: 'wanderer_shadowStrike',  // 직업 액티브 궁극 (영혼 게이지 100 발동)
+    ultimateId: 'wanderer_shadowStrike',  // 직업 소울 스킬 (소울 게이지 100 발동)
     color: '#c4453d',
     locked: false,        // 항상 사용 가능 (시작 직업)
     image: './classes/wanderer.jpg',
@@ -195,7 +195,7 @@ export const CLASSES = [
     startSkills: { 이프리트: 3, 마력: 2 },
     stats: { 근력: 8, 민첩: 11, 지능: 20, 매력: 14 },
     combatSkills: ['마법탄', '정념폭발', '화염장막'],
-    ultimateId: 'sage_eternalFlame',  // 직업 액티브 궁극 (영혼 게이지 100 발동)
+    ultimateId: 'sage_eternalFlame',  // 직업 소울 스킬 (소울 게이지 100 발동)
     color: '#5c4a8c',
     locked: false,
     image: './classes/sage.jpg',
@@ -251,8 +251,8 @@ export const CLASSES = [
   },
 ];
 
-// =========== 직업별 액티브 궁극 (영혼 게이지 100 발동) ===========
-// 전투 중 "영혼 게이지(soulGauge, 0~100)"가 100에 도달하면 발동 가능.
+// =========== 직업별 소울 스킬 (소울 게이지 100 발동) ===========
+// 전투 중 "소울 게이지(soulGauge, 0~100)"가 100에 도달하면 발동 가능.
 // 게이지 충전:
 //   - 적에게 데미지 입힐 때: +floor(dmg / 5)
 //   - 피격 (실제 피해 > 0): +floor(damage / 3)
@@ -4288,19 +4288,19 @@ export const ENGRAVINGS = {
     { id: 'eng_wan_reaction',  tier: 'C', name: '빠른 반응',   desc: '민첩 +2',                       effect: { dex: 2 } },
     { id: 'eng_wan_grit',      tier: 'C', name: '검사의 끈기', desc: '시작 HP +30',                   effect: { startHp: 30 } },
     { id: 'eng_wan_light',     tier: 'C', name: '가벼운 옷',   desc: '회피율 +2%',                    effect: { dodgeRate: 2 } },
-    { id: 'eng_wan_breath',    tier: 'C', name: '검사의 호흡', desc: '매 턴 시작 시 영혼 게이지 +1',  effect: { perTurnSoul: 1 } },
+    { id: 'eng_wan_breath',    tier: 'C', name: '검사의 호흡', desc: '매 턴 시작 시 소울 게이지 +1',  effect: { perTurnSoul: 1 } },
     // === Rare (5) ===
     { id: 'eng_wan_afterimage',   tier: 'R', name: '잔영',         desc: '회피율 +5%',                  effect: { dodgeRate: 5 } },
     { id: 'eng_wan_counter_dmg',  tier: 'R', name: '반격의 손맛',  desc: '반격 데미지 +15%',           effect: { counterDmgPct: 15 } },
     { id: 'eng_wan_flow',         tier: 'R', name: '검의 흐름',    desc: '물리 데미지 +10%',           effect: { physDmgPct: 10 } },
-    { id: 'eng_wan_insight_flow', tier: 'R', name: '심안의 흐름',  desc: '회피 시 영혼 게이지 +3',     effect: { dodgeSoul: 3 } },
+    { id: 'eng_wan_insight_flow', tier: 'R', name: '심안의 흐름',  desc: '회피 시 소울 게이지 +3',     effect: { dodgeSoul: 3 } },
     { id: 'eng_wan_counter_rate', tier: 'R', name: '반격의 회로',  desc: '반격율 +5%',                  effect: { counterRatePct: 5 } },
     // === Epic (5) ===
     { id: 'eng_wan_dodge_counter', tier: 'E', name: '흘림과 베기', desc: '회피율 +5% / 반격율 +5%',                          effect: { dodgeRate: 5, counterRatePct: 5 } },
     { id: 'eng_wan_blind_sense',   tier: 'E', name: '맹인의 감각', desc: '회피율 +9%',                                       effect: { dodgeRate: 9 } },
-    { id: 'eng_wan_echo',          tier: 'E', name: '영혼의 반향', desc: '반격 명중 시 영혼 게이지 +5',                       effect: { counterHitSoul: 5 } },
+    { id: 'eng_wan_echo',          tier: 'E', name: '영혼의 반향', desc: '반격 명중 시 소울 게이지 +5',                       effect: { counterHitSoul: 5 } },
     { id: 'eng_wan_shockwave',     tier: 'E', name: '충격파',      desc: '반격 명중 시 적 충격 게이지 +15 (누적 100 시 기절)', effect: { counterShock: 15 } },
-    { id: 'eng_wan_battle_start',  tier: 'E', name: '검사의 심득', desc: '전투 시작 시 영혼 게이지 +15',                      effect: { startSoul: 15 } },
+    { id: 'eng_wan_battle_start',  tier: 'E', name: '검사의 심득', desc: '전투 시작 시 소울 게이지 +15',                      effect: { startSoul: 15 } },
     // === Legendary (2) ===
     { id: 'eng_wan_shadow_step',   tier: 'L', name: '무영(無影)의 잔영', desc: '회피 후 다음 공격 데미지 +30%',           effect: { afterDodgeDmg: 30 } },
     { id: 'eng_wan_thousand_blade', tier: 'L', name: '천변(千變)의 검',  desc: '반격에 기본 치명률 적용 (반격 치명타 가능)', effect: { counterCanCrit: true } },
@@ -4312,7 +4312,7 @@ export const ENGRAVINGS = {
     // === Curse (저주, 3) ===
     { id: 'eng_wan_curse_shadow',  tier: 'NEG_CURSE', name: '묶여버린 그림자', desc: '회피율 -20% / 반격율 +10%',          effect: { dodgeRate: -20, counterRatePct: 10 } },
     { id: 'eng_wan_curse_madness', tier: 'NEG_CURSE', name: '광기의 검',       desc: '반격 데미지 +50% / 받는 데미지 +20%', effect: { counterDmgPct: 50, dmgTakenPct: 20 } },
-    { id: 'eng_wan_curse_burn',    tier: 'NEG_CURSE', name: '영혼 폭주',       desc: '영혼 게이지 획득량 ×1.5 / 매 턴 시작 시 자동 -5 HP', effect: { soulGainMult: 0.5, perTurnHpLoss: 5 } },
+    { id: 'eng_wan_curse_burn',    tier: 'NEG_CURSE', name: '영혼 폭주',       desc: '소울 게이지 획득량 ×1.5 / 매 턴 시작 시 자동 -5 HP', effect: { soulGainMult: 0.5, perTurnHpLoss: 5 } },
   ],
   // 다른 4직업은 PR 후속에서 풀 작성. 현재는 UI "준비 중" 표시 대응.
   sage: [],

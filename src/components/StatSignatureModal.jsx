@@ -32,7 +32,7 @@ const SIGNATURES = {
     },
     tier2: {
       label: '2단계 · 근력 17+',
-      desc: '물리 시전 시 영혼 게이지 +1/5단위',
+      desc: '물리 시전 시 소울 게이지 +1/5단위',
       calc: (stats) => getStrengthSoulPerPhys(stats),
       suffix: '',
     },
@@ -48,7 +48,7 @@ const SIGNATURES = {
     },
     tier2: {
       label: '2단계 · 민첩 17+',
-      desc: '회피 성공 시 영혼 게이지 +5/5단위',
+      desc: '회피 성공 시 소울 게이지 +5/5단위',
       calc: (stats) => getAgilitySoulOnDodge(stats),
       suffix: '',
     },
@@ -58,13 +58,13 @@ const SIGNATURES = {
     auto: '마법 데미지 +0.7/포인트 (자동 가산)',
     tier1: {
       label: '1단계 · 지능 11+',
-      desc: '전투 시작 시 영혼 게이지 +0.5/포인트 (내림)',
+      desc: '전투 시작 시 소울 게이지 +0.5/포인트 (내림)',
       calc: (stats) => getIntellectStartSoul(stats),
       suffix: '',
     },
     tier2: {
       label: '2단계 · 지능 17+',
-      desc: '마법 시전 시 영혼 게이지 +1/5단위',
+      desc: '마법 시전 시 소울 게이지 +1/5단위',
       calc: (stats) => getIntellectSoulPerMagic(stats),
       suffix: '',
     },

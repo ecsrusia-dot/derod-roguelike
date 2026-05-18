@@ -416,7 +416,7 @@ export function ShadowStrikeFx({ trigger }) {
   );
 }
 
-// 액티브 궁극 컷인 — 화면 전체에 골든 버스트 + 궁극명 배너 (~0.9초)
+// 소울 스킬 컷인 — 화면 전체에 골든 버스트 + 궁극명 배너 (~0.9초)
 // info: { name, color } 이거나 null
 export function UltimateCutin({ info }) {
   if (!info) return null;

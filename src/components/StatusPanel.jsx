@@ -184,7 +184,7 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
               </div>
             );
           })()}
-          {/* ━ 기타 효과 ━ (영혼 게이지·재생·흡혈·반사·시그니처·각인 부수) */}
+          {/* ━ 기타 효과 ━ (소울 게이지·재생·흡혈·반사·시그니처·각인 부수) */}
           {(() => {
             const regenLv = skills['재생'] || 0;
             const lifesteal = relicStat.lifesteal || 0;

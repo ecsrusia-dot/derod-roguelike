@@ -45,7 +45,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     let p = {
       ...initialPlayer, defense: 0, buffs: {}, debuffs: {}, cooldowns: {},
       ether: 3, maxEther: 3, firstHitImmune: false, revivedThisCombat: false,
-      soulGauge: 0,  // 영혼 게이지 (0~100). 100에서 직업 액티브 궁극 발동 가능
+      soulGauge: 0,  // 소울 게이지 (0~100). 100에서 직업 소울 스킬 발동 가능
     };
     // 메타 강화: 최대 에테르 +1
     if (meta) {
@@ -148,7 +148,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
   const [fxBladeGuard, setFxBladeGuard] = useState(0);      // 슬롯 3 — 방검
   const [fxShadowStrike, setFxShadowStrike] = useState(0);  // 슬롯 4 — 무영의 일격
   const [enemyImgFailed, setEnemyImgFailed] = useState(false);
-  // 액티브 궁극 컷인 (직업 이미지 + 궁극명 풀스크린 0.9초)
+  // 소울 스킬 컷인 (직업 이미지 + 궁극명 풀스크린 0.9초)
   const [fxUltimateCutin, setFxUltimateCutin] = useState(null); // { name, color } or null
 
   // 부유 라벨 추가 (자동 제거)
@@ -234,7 +234,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       newPlayer.defense = 0;
     }
 
-    // 1.37.0~ 시작 영혼 게이지 가산 (지능 시그니처 + 각인 + 유물·메타). 직업 궁극 보유 직업만.
+    // 1.37.0~ 시작 소울 게이지 가산 (지능 시그니처 + 각인 + 유물·메타). 직업 소울 스킬 보유 직업만.
     if (classData?.ultimateId) {
       const intelStartSoul = getIntellectStartSoul(newPlayer);
       const engStartSoul = engravingFx.startSoul || 0;
@@ -250,7 +250,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         if (metaStartSoul > 0) parts.push(`메타 +${metaStartSoul}`);
         initialLog.push({
           type: 'passive',
-          text: `◆ 영혼 게이지 보너스 : ${totalStartSoul} (${parts.join(' + ')})`,
+          text: `◆ 소울 게이지 보너스 : ${totalStartSoul} (${parts.join(' + ')})`,
         });
       }
     }
@@ -393,7 +393,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           }
           newEnemy.currentHp = Math.max(0, newEnemy.currentHp - actualDmg);
           totalDmg += actualDmg;
-          // 영혼 게이지: 데미지 입힘 +dmg/5, 치명타 +10 보너스
+          // 소울 게이지: 데미지 입힘 +dmg/5, 치명타 +10 보너스
           if (classData.ultimateId && actualDmg > 0) {
             let gain = Math.floor(actualDmg / 5);
             if (isCrit) gain += 10;
@@ -706,8 +706,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     setTimeout(() => { executeEnemyTurn(newPlayer, newEnemy, newLog); }, 350);
   };
 
-  // === 직업 액티브 궁극 발동 ===
-  // 영혼 게이지 100에서만 호출됨. 발동 시 게이지 0으로 리셋, 컷인 0.9초 후
+  // === 직업 소울 스킬 발동 ===
+  // 소울 게이지 100에서만 호출됨. 발동 시 게이지 0으로 리셋, 컷인 0.9초 후
   // 효과 적용 → 적 턴으로 전환. 효과는 ult.effect ID로 분기 (CLASS_ULTIMATES).
   const handleUltimate = () => {
     if (phase !== 'playerTurn') return;
@@ -830,7 +830,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         newLog.push({ type: 'system', text: `· 회피 성공!` });
         // FX — 회피: 플레이어 위에 "회피!" 부유 라벨
         pushFxLabel('player', 'miss', null, '회피!');
-        // 1.27.0~ 각인: 회피 시 영혼 게이지 +N
+        // 1.27.0~ 각인: 회피 시 소울 게이지 +N
         if (engravingFx.dodgeSoul) {
           newPlayer.soulGauge = Math.min(100, (newPlayer.soulGauge || 0) + engravingFx.dodgeSoul);
         }
@@ -1021,7 +1021,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
             // 최종 데미지 적용 (위의 조건들에서 dmg가 0이 되었다면 실행되지 않음)
             if (dmg > 0) {
               newPlayer.hp = Math.max(0, newPlayer.hp - dmg);
-              // 영혼 게이지: 피격 시 더 빠르게 충전 (위기일수록 한 방을)
+              // 소울 게이지: 피격 시 더 빠르게 충전 (위기일수록 한 방을)
               if (classData.ultimateId) {
                 let hitGain = Math.floor(dmg / 3);
                 // 1.27.0~ 각인: 영혼 획득 ×(1 + soulGainMult)
@@ -1259,7 +1259,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
             pushFxLabel('enemy', 'damage', actualDmg);
             setFxEnemyShake(v => v + 1);
             setFxEnemyFlash(v => v + 1);
-            // 1.27.0~ 각인: 반격 명중 시 영혼 게이지 +N (영혼의 반향)
+            // 1.27.0~ 각인: 반격 명중 시 소울 게이지 +N (영혼의 반향)
             if (classData.ultimateId && engravingFx.counterHitSoul) {
               newPlayer.soulGauge = Math.min(100, (newPlayer.soulGauge || 0) + engravingFx.counterHitSoul);
             }
@@ -1376,14 +1376,14 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     // 새 턴 시작: 단독 버프 스킬 사용 플래그 리셋
     newPlayer.usedBuffThisTurn = false;
 
-    // 영혼 게이지 자연 충전 (매 턴 +5)
+    // 소울 게이지 자연 충전 (매 턴 +5)
     if (classData.ultimateId) {
       let turnGain = 5;
       // 1.27.0~ 각인: 영혼 획득 ×(1 + soulGainMult)
       if (engravingFx.soulGainMult) turnGain = Math.floor(turnGain * (1 + engravingFx.soulGainMult));
       newPlayer.soulGauge = Math.min(100, (newPlayer.soulGauge || 0) + turnGain);
     }
-    // 1.27.0~ 각인: 매 턴 시작 시 영혼 +N (직업 궁극 보유 직업만, 영혼 게이지 자체)
+    // 1.27.0~ 각인: 매 턴 시작 시 영혼 +N (직업 소울 스킬 보유 직업만, 소울 게이지 자체)
     if (classData.ultimateId && engravingFx.perTurnSoul) {
       newPlayer.soulGauge = Math.min(100, (newPlayer.soulGauge || 0) + engravingFx.perTurnSoul);
     }
@@ -1731,7 +1731,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     >
       {/* 화면 가장자리 빨간 비네트 — 플레이어 피격 시 짧게 */}
       <DamageVignette trigger={fxVignette} />
-      {/* 액티브 궁극 컷인 — 전체 화면을 덮는 0.9초 골든 버스트 */}
+      {/* 소울 스킬 컷인 — 전체 화면을 덮는 0.9초 골든 버스트 */}
       <UltimateCutin info={fxUltimateCutin} />
       {/* 전투 로그 확장 모달 — 풀스크린, 큰 텍스트로 전체 로그 확인 */}
       {logExpanded && (
@@ -1991,19 +1991,19 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           </div>
         </div>
 
-        {/* 스킬 버튼 — 고정 높이 (영혼 게이지 + 4번째 궁극 슬롯이 있으면 +12px) */}
+        {/* 스킬 버튼 — 고정 높이 (소울 게이지 + 4번째 궁극 슬롯이 있으면 +12px) */}
         <div className="shrink-0 border-t px-2.5 flex flex-col justify-center" style={{
           borderColor: PALETTE.panelBorder,
           background: PALETTE.bgDeep,
           height: classData.ultimateId ? 104 : 88,
         }}>
-          {/* 영혼 게이지 바 (직업 궁극 보유 시) */}
+          {/* 소울 게이지 바 (직업 소울 스킬 보유 시) */}
           {classData.ultimateId && phase === 'playerTurn' && (() => {
             const gauge = player.soulGauge || 0;
             const ready = gauge >= 100;
             return (
               <div className="w-full mb-1.5 flex items-center gap-2">
-                <span className="text-[9px] tracking-[0.2em]" style={{ color: ready ? '#ffd86b' : PALETTE.textDim }}>혼</span>
+                <span className="text-[9px] tracking-[0.2em]" style={{ color: ready ? '#ffd86b' : PALETTE.textDim }}>소울</span>
                 <div className="flex-1 h-1.5 relative" style={{ background: 'rgba(0,0,0,0.55)', border: `1px solid ${ready ? '#ffd86b' : PALETTE.panelBorder}` }}>
                   <div className="absolute inset-y-0 left-0 transition-all" style={{
                     width: `${gauge}%`,
@@ -2059,7 +2059,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                   </button>
                 );
               })}
-              {/* 4번째 버튼: 직업 액티브 궁극 (영혼 게이지 100에서 활성화) */}
+              {/* 4번째 버튼: 직업 소울 스킬 (소울 게이지 100에서 활성화) */}
               {classData.ultimateId && (() => {
                 const ult = CLASS_ULTIMATES[classData.ultimateId];
                 if (!ult) return null;
@@ -2083,7 +2083,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                       {ult.name}
                     </span>
                     <span className="text-[9px]" style={{ color: ready ? '#ffd86b' : PALETTE.textDim }}>
-                      {ready ? '발동 가능' : `혼 ${player.soulGauge || 0}/100`}
+                      {ready ? '발동 가능' : `소울 ${player.soulGauge || 0}/100`}
                     </span>
                   </button>
                 );
