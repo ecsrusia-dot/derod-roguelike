@@ -545,7 +545,9 @@ export function StatusOverlay({ debuffs }) {
 // ============================================
 
 // A. 영겁의 화염 컷인 — 풀스크린 주황·적색 화염 + 한자 "永劫"(적 카드 중앙) + 한글 스킬명(로그 영역) (0.9초)
-// 1.45.2: PM 피드백 — 한자는 적 카드 영역(top 17%), 한글 스킬명은 로그 영역(top 45%)으로 분리. UltimateCutin은 술법사 영겁 발동 시 스킵
+// 1.45.3: 위치 우측 쏠림 픽스 — 부모 div(position·translate) / 자식 div(fx-flame-burst 애니메이션) 분리.
+//   기존: 인라인 transform:translate(-50%,-50%)와 fx-flame-burst 키프레임 transform:scale()이 충돌 → translate 덮어씀 → 좌측 모서리 기준으로 그려져 우측으로 쏠림
+//   수정: 부모가 위치, 자식이 애니메이션. transform 충돌 제거
 export function EternalFlameCutin({ trigger }) {
   if (!trigger) return null;
   const flameOrange = '#ff7a1a';
@@ -556,7 +558,7 @@ export function EternalFlameCutin({ trigger }) {
       className="absolute inset-0 pointer-events-none overflow-hidden"
       style={{ zIndex: 26 }}
     >
-      {/* 풀스크린 어두운 배경 그라데이션 (radial만 사용 — 모바일 안전) */}
+      {/* 풀스크린 어두운 배경 그라데이션 (inset-0 사용 — translate 불필요, 충돌 없음) */}
       <div
         className="absolute inset-0 fx-flame-burst pointer-events-none"
         style={{
@@ -564,70 +566,97 @@ export function EternalFlameCutin({ trigger }) {
           willChange: 'opacity, transform',
         }}
       />
-      {/* 화염 코어 1 — 큰 radial (적 카드 영역에 위치, top 17%) */}
+      {/* 화염 코어 1 — 큰 radial (부모가 위치 / 자식이 애니메이션) */}
       <div
-        className="absolute fx-flame-burst pointer-events-none"
+        className="absolute pointer-events-none"
         style={{
           top: '17%', left: '50%',
           transform: 'translate(-50%, -50%)',
           width: 280, height: 280,
-          background: `radial-gradient(circle, ${flameOrange}ee 0%, ${flameRed}aa 40%, transparent 75%)`,
-          borderRadius: '50%',
-          filter: 'blur(8px)',
-          willChange: 'opacity, transform',
         }}
-      />
-      {/* 화염 코어 2 — 백광 중심 (적 카드 영역에 위치) */}
+      >
+        <div
+          className="fx-flame-burst"
+          style={{
+            width: '100%', height: '100%',
+            background: `radial-gradient(circle, ${flameOrange}ee 0%, ${flameRed}aa 40%, transparent 75%)`,
+            borderRadius: '50%',
+            filter: 'blur(8px)',
+            willChange: 'opacity, transform',
+          }}
+        />
+      </div>
+      {/* 화염 코어 2 — 백광 중심 */}
       <div
-        className="absolute fx-flame-burst pointer-events-none"
+        className="absolute pointer-events-none"
         style={{
           top: '17%', left: '50%',
           transform: 'translate(-50%, -50%)',
           width: 130, height: 130,
-          background: `radial-gradient(circle, rgba(255,250,220,0.95) 0%, ${flameOrange}aa 40%, transparent 70%)`,
-          borderRadius: '50%',
-          filter: 'blur(4px)',
-          animationDuration: '0.55s',
-          willChange: 'opacity, transform',
         }}
-      />
-      {/* "永劫" 한자 — 적 카드 중앙 (top 17%) */}
+      >
+        <div
+          className="fx-flame-burst"
+          style={{
+            width: '100%', height: '100%',
+            background: `radial-gradient(circle, rgba(255,250,220,0.95) 0%, ${flameOrange}aa 40%, transparent 70%)`,
+            borderRadius: '50%',
+            filter: 'blur(4px)',
+            animationDuration: '0.55s',
+            willChange: 'opacity, transform',
+          }}
+        />
+      </div>
+      {/* "永劫" 한자 — 적 카드 중앙 (top 17%) — 부모가 위치 / 자식이 fx-flame-kanji */}
       <div
-        className="absolute fx-flame-kanji pointer-events-none"
+        className="absolute pointer-events-none"
         style={{
           top: '17%', left: '50%',
           transform: 'translate(-50%, -50%)',
-          fontFamily: '"Cinzel", "Noto Serif KR", serif',
-          fontSize: 84,
-          fontWeight: 'bold',
-          color: '#fff6d8',
-          textShadow: `0 0 18px ${flameOrange}, 0 0 36px ${flameRed}, 0 0 56px ${flameRed}`,
-          letterSpacing: '0.2em',
-          willChange: 'opacity, transform',
+          whiteSpace: 'nowrap',
         }}
       >
-        永劫
+        <div
+          className="fx-flame-kanji"
+          style={{
+            fontFamily: '"Cinzel", "Noto Serif KR", serif',
+            fontSize: 84,
+            fontWeight: 'bold',
+            color: '#fff6d8',
+            textShadow: `0 0 18px ${flameOrange}, 0 0 36px ${flameRed}, 0 0 56px ${flameRed}`,
+            letterSpacing: '0.2em',
+            willChange: 'opacity, transform',
+          }}
+        >
+          永劫
+        </div>
       </div>
-      {/* 한글 스킬명 — 로그 영역 가운데 (top 45%) */}
+      {/* 한글 스킬명 — 로그 영역 가운데 (top 45%) — 부모가 위치 / 자식이 fx-flame-kanji */}
       <div
-        className="absolute fx-flame-kanji pointer-events-none"
+        className="absolute pointer-events-none"
         style={{
           top: '45%', left: '50%',
           transform: 'translate(-50%, -50%)',
-          fontFamily: '"Noto Serif KR", "Cinzel", serif',
-          fontSize: 26,
-          fontWeight: 'bold',
-          color: '#fff6d8',
-          textShadow: `0 0 12px ${flameOrange}, 0 0 24px ${flameRed}`,
-          letterSpacing: '0.3em',
           whiteSpace: 'nowrap',
-          willChange: 'opacity, transform',
-          animationDelay: '0.15s',
-          opacity: 0,
-          animationFillMode: 'forwards',
         }}
       >
-        영겁(永劫)의 화염
+        <div
+          className="fx-flame-kanji"
+          style={{
+            fontFamily: '"Noto Serif KR", "Cinzel", serif',
+            fontSize: 26,
+            fontWeight: 'bold',
+            color: '#fff6d8',
+            textShadow: `0 0 12px ${flameOrange}, 0 0 24px ${flameRed}`,
+            letterSpacing: '0.3em',
+            willChange: 'opacity, transform',
+            animationDelay: '0.15s',
+            opacity: 0,
+            animationFillMode: 'forwards',
+          }}
+        >
+          영겁(永劫)의 화염
+        </div>
       </div>
     </div>
   );
@@ -834,38 +863,44 @@ export function IgniteGlowAura({ active }) {
 }
 
 // C. 각인 폭발 임팩트 — 치명타 시 화염 각인 폭발 (0.4초)
-// 1.45.2 재설계: 익스플로젼(풀스크린 둥근 폭발)과 시각적 패턴 완전 차별화 →
-//   적 카드 영역 한정 + 빨간 균열 라인 6개 방사형 + 카드 빨간 글로우. 적 카드 안쪽에 배치
+// 1.45.3 재재설계: PM 피드백 — 풀스크린 빨간 글로우가 익스플로젼처럼 보임 → 글로우 제거
+//   균열 라인 6개만 + 적 카드 상단 영역(top 17%)에 고정. 라인 크기 축소(240→160).
+//   풀스크린 효과 0건. 익스플로젼(풀스크린 둥근 폭발)과 시각적 패턴 완전 분리.
 export function IgniteExplodeFx({ trigger }) {
   if (!trigger) return null;
   const crackRed = '#ff2820';
   return (
     <div
       key={trigger}
-      className="absolute inset-0 pointer-events-none flex items-center justify-center"
+      className="absolute inset-0 pointer-events-none"
       style={{ zIndex: 23 }}
     >
-      {/* 적 카드 영역 빨간 글로우 */}
+      {/* 적 카드 영역 (top 17%)에 위치한 균열 라인 6개 방사형 */}
       <div
-        className="absolute inset-0 fx-ignite-card-flash"
+        className="absolute"
         style={{
-          background: `radial-gradient(circle at 50% 50%, rgba(255,40,32,0.55) 0%, rgba(255,80,30,0.25) 50%, transparent 80%)`,
+          top: '17%', left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: 160, height: 160,
         }}
-      />
-      {/* 6개 균열 라인 방사형 (수직·수평·45도 × 2) */}
-      {[0, 30, 60, 90, 120, 150].map((deg) => (
-        <div
-          key={deg}
-          className="absolute fx-ignite-crack"
-          style={{
-            width: 3,
-            height: 240,
-            background: `linear-gradient(to bottom, transparent 0%, ${crackRed} 20%, #fff5b0 50%, ${crackRed} 80%, transparent 100%)`,
-            transform: `rotate(${deg}deg)`,
-            filter: `drop-shadow(0 0 4px ${crackRed})`,
-          }}
-        />
-      ))}
+      >
+        {[0, 30, 60, 90, 120, 150].map((deg) => (
+          <div
+            key={deg}
+            className="absolute fx-ignite-crack"
+            style={{
+              top: '50%', left: '50%',
+              marginTop: -80, marginLeft: -1.5,
+              width: 3,
+              height: 160,
+              background: `linear-gradient(to bottom, transparent 0%, ${crackRed} 20%, #fff5b0 50%, ${crackRed} 80%, transparent 100%)`,
+              transform: `rotate(${deg}deg)`,
+              transformOrigin: 'center',
+              filter: `drop-shadow(0 0 4px ${crackRed})`,
+            }}
+          />
+        ))}
+      </div>
     </div>
   );
 }

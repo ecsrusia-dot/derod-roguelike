@@ -80,6 +80,16 @@ export function hasEffect(skills, effectName, activeSkills = null) {
   return false;
 }
 
+// 1.45.3 마력 패시브 재시전 확률 누적 합산 (Lv3 +5% / Lv5 +10% / Lv7 +15% = 만렙 30%)
+// 반환: 백분율 (0~30 정수)
+export function getMagicEchoChance(skills, activeSkills = null) {
+  let chance = 0;
+  if (hasEffect(skills, 'magicEcho+5', activeSkills)) chance += 5;
+  if (hasEffect(skills, 'magicEcho+10', activeSkills)) chance += 10;
+  if (hasEffect(skills, 'magicEcho+15', activeSkills)) chance += 15;
+  return chance;
+}
+
 // 궁극 효과 보유 여부
 export function hasUltimate(ultimates, effectName) {
   if (!ultimates || ultimates.length === 0) return false;
