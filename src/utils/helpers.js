@@ -351,13 +351,6 @@ export function computeDisplayPlayerStats(classData, skills, baseStats, ultimate
     out.지능 = (out.지능 || 0) + allStatsBonus;
     out.매력 = (out.매력 || 0) + allStatsBonus;
   }
-  // 운명의 저울 (ult_destinyScale): 모든 능력치 +10
-  if (hasUltimate(ultimates, 'ult_destinyScale')) {
-    out.근력 = (out.근력 || 0) + 10;
-    out.민첩 = (out.민첩 || 0) + 10;
-    out.지능 = (out.지능 || 0) + 10;
-    out.매력 = (out.매력 || 0) + 10;
-  }
   return out;
 }
 
@@ -567,14 +560,17 @@ export function describeAwakeningCondition(condition, classId) {
     case 'trainingClear':
       return `${className} 수련의 길 클리어`;
     case 'ultimatePickedCount':
-      return `${className} 런에서 궁극 보상 ${condition.count || 1}개 픽`;
+      return `${className} 직업 전용 패시브의 각성 스킬 ${condition.count || 1}개 픽`;
     case 'championshipAllClear': {
       const diffLabels = { normal: '일반', hard: '하드', hell: '지옥', madness: '광기' };
       return `${className} 챔피언십 ${diffLabels[condition.difficulty] || condition.difficulty} 5컨셉 모두 클리어`;
     }
     case 'ultimateAllOfOnePassive': {
+      // 1.43.0~ 직업 전용 패시브(ULTIMATE_SKILLS 보유)만 각성 가능
       const startPassives = Object.keys(cls?.startSkills || {});
-      return `${className} 시작 패시브 [${startPassives.join(' or ')}] 1개의 3궁극 모두 픽`;
+      const eligible = startPassives.filter(p => (ULTIMATE_SKILLS[p] || []).length > 0);
+      if (eligible.length === 0) return `${className} 직업 전용 패시브 미정 (Lv.5 미달성 — 추후 업데이트)`;
+      return `${className} 직업 전용 패시브 [${eligible.join(' or ')}]의 3 각성 스킬 모두 픽`;
     }
     case 'engravingsLvReached':
       return `${condition.classCount}개 직업의 각성도 Lv.${condition.minLv} 이상 도달`;

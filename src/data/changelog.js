@@ -7,6 +7,19 @@
 
 export const CHANGELOG = [
   {
+    version: '1.43.0',
+    date: '2026-05-18',
+    label: '각성 스킬 직업 전용 패시브 한정 + 보조 패시브 4종 12 각성 스킬 폐기',
+    changes: [
+      { type: 'balance', text: '[각성 스킬 직업 전용 한정] 패시브 Lv.7 이후 등장하는 "각성 스킬"을 직업 전용 패시브(심안류·이프리트)만 보유하도록 제한. 보조 패시브(강타·잔혹·마력·신앙)의 각성 스킬 12종을 전면 폐기. 직업별 정체성 강화 — 각성은 "그 직업의 정수"가 됨' },
+      { type: 'balance', text: '[폐기된 각성 스킬 12종] 강타(광역 폭발·즉시 처형·영구 침묵) / 잔혹(피의 축제·사형 선고·광기 각성) / 마력(시간 역행·정념 폭주·신탁 각성) / 신앙(여명의 축복·황혼의 저주·운명의 저울) 모두 폐기. 보조 패시브는 Lv.7이 진짜 최대치가 됨. Lv.7 도달 후엔 다른 패시브 픽으로 자연 분산' },
+      { type: 'system', text: '[자동 마이그레이션] 기존 사용자가 폐기된 각성 스킬을 픽한 상태였다면, 첫 부팅 시 meta.ultimatesPickedByClass + activeRun의 player.ultimates에서 자동 제거. 영혼 환불은 없음 (각성은 영혼이 아닌 보상 픽이라). 진행 중 런이 있다면 해당 효과만 사라지고 게임은 계속 진행 가능' },
+      { type: 'system', text: '[코드 정리 — 42곳 effect 핸들러 제거] CombatScreen.jsx·damage.js·helpers.js에서 폐기된 ult_xxx 12개 키의 hasUltimate 체크·효과 처리 모두 제거. dead code 0줄. 번들 사이즈 -3kB' },
+      { type: 'system', text: '[각성도 조건 멘트 정리] engravings.js Lv.3·Lv.5 조건 코멘트를 "직업 전용 패시브의 각성 스킬" 명시로 갱신. helpers.js의 describeAwakeningCondition도 같이 갱신 — 시작 패시브 중 ULTIMATE_SKILLS 보유한 패시브만 자동 인식. demonblood/elf/priest는 "직업 전용 패시브 미정 (Lv.5 미달성 — 추후 업데이트)" 명시' },
+      { type: 'system', text: '[향후 확장 계획] demonblood·elf·priest 3직업의 직업 전용 패시브 추가 시 ULTIMATE_SKILLS에 해당 패시브 키 + 3 각성 스킬 추가. 코드 변경 없이 자동으로 Lv.3·Lv.5 조건 충족 경로 열림' },
+    ],
+  },
+  {
     version: '1.42.0',
     date: '2026-05-18',
     label: '시그니처 자동 가산 단순화 + 술법사 액티브 명명 + 영겁의 화염 무한 도트 재설계',
