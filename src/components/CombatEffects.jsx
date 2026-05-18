@@ -539,3 +539,273 @@ export function StatusOverlay({ debuffs }) {
     </>
   );
 }
+
+// ============================================
+// 1.45.0 술법사 화염 이펙트 6종
+// ============================================
+
+// A. 영겁의 화염 컷인 — 풀스크린 주황·적색 화염 소용돌이 + "永劫" 한자 글로우 (0.9초)
+export function EternalFlameCutin({ trigger }) {
+  if (!trigger) return null;
+  const flameOrange = '#ff7a1a';
+  const flameRed = '#c4282d';
+  return (
+    <div
+      key={trigger}
+      className="absolute inset-0 pointer-events-none flex items-center justify-center"
+      style={{ zIndex: 26 }}
+    >
+      {/* 풀스크린 어두운 배경 그라데이션 */}
+      <div
+        className="absolute inset-0 fx-flame-burst"
+        style={{
+          background: `radial-gradient(circle at 50% 50%, ${flameOrange}66 0%, ${flameRed}55 30%, rgba(20,5,0,0.85) 70%, rgba(0,0,0,0.95) 100%)`,
+        }}
+      />
+      {/* 주황·적 화염 소용돌이 — 두 겹으로 역회전 느낌 */}
+      <div
+        className="absolute fx-flame-vortex"
+        style={{
+          width: 420, height: 420,
+          background: `conic-gradient(from 0deg, ${flameOrange}00, ${flameOrange}cc 20%, ${flameRed}ee 45%, ${flameOrange}bb 70%, ${flameOrange}00 100%)`,
+          borderRadius: '50%',
+          filter: 'blur(8px)',
+          mixBlendMode: 'screen',
+        }}
+      />
+      <div
+        className="absolute fx-flame-vortex"
+        style={{
+          width: 320, height: 320,
+          background: `conic-gradient(from 180deg, ${flameRed}00, ${flameRed}dd 25%, ${flameOrange}ee 50%, ${flameRed}cc 75%, ${flameRed}00 100%)`,
+          borderRadius: '50%',
+          filter: 'blur(5px)',
+          mixBlendMode: 'screen',
+          animationDirection: 'reverse',
+        }}
+      />
+      {/* 중심 백광 코어 */}
+      <div
+        className="absolute fx-flame-burst"
+        style={{
+          width: 160, height: 160,
+          background: `radial-gradient(circle, rgba(255,250,220,0.95) 0%, ${flameOrange}aa 40%, transparent 70%)`,
+          borderRadius: '50%',
+          filter: 'blur(4px)',
+        }}
+      />
+      {/* "永劫" 한자 — 중앙 글로우 */}
+      <div
+        className="absolute fx-flame-kanji"
+        style={{
+          fontFamily: '"Cinzel", "Noto Serif KR", serif',
+          fontSize: 88,
+          fontWeight: 'bold',
+          color: '#fff6d8',
+          textShadow: `0 0 20px ${flameOrange}, 0 0 40px ${flameRed}, 0 0 60px ${flameRed}`,
+          letterSpacing: '0.2em',
+        }}
+      >
+        永劫
+      </div>
+    </div>
+  );
+}
+
+// 파이어볼 (소효과) — 작은 주황 불꽃 임팩트, 마법탄 시전 시 (0.5초)
+export function FireballFx({ trigger }) {
+  if (!trigger) return null;
+  const flameOrange = '#ff7a1a';
+  return (
+    <div
+      key={trigger}
+      className="absolute inset-0 pointer-events-none flex items-center justify-center"
+      style={{ zIndex: 22 }}
+    >
+      {/* 작은 불꽃 임팩트 — 중심 코어 + 외곽 글로우 */}
+      <div
+        className="absolute fx-flame-ember"
+        style={{
+          width: 120, height: 120,
+          background: `radial-gradient(circle, rgba(255,250,210,0.9) 0%, ${flameOrange}cc 35%, rgba(196,40,45,0.5) 65%, transparent 85%)`,
+          borderRadius: '50%',
+          filter: 'blur(3px)',
+        }}
+      />
+      {/* 4개 작은 입자 */}
+      {[0, 90, 180, 270].map((deg, i) => {
+        const rad = (deg * Math.PI) / 180;
+        const dx = Math.cos(rad) * 50;
+        const dy = Math.sin(rad) * 50;
+        return (
+          <div
+            key={i}
+            className="absolute fx-flame-shard"
+            style={{
+              width: 14, height: 14,
+              background: `radial-gradient(circle, ${flameOrange} 0%, rgba(255,120,40,0) 70%)`,
+              borderRadius: '50%',
+              '--fx-dx': `${dx}px`,
+              '--fx-dy': `${dy}px`,
+              animationDuration: '0.5s',
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+// 익스플로젼 (대효과) — 풀스크린 폭발 + 파편 8방향 (0.7초)
+export function ExplosionFx({ trigger }) {
+  if (!trigger) return null;
+  const flameOrange = '#ff7a1a';
+  const flameRed = '#c4282d';
+  return (
+    <div
+      key={trigger}
+      className="absolute inset-0 pointer-events-none flex items-center justify-center"
+      style={{ zIndex: 24 }}
+    >
+      {/* 풀스크린 폭발 코어 */}
+      <div
+        className="absolute fx-flame-burst"
+        style={{
+          width: 380, height: 380,
+          background: `radial-gradient(circle, rgba(255,250,220,0.95) 0%, ${flameOrange}dd 25%, ${flameRed}cc 50%, rgba(80,15,10,0.6) 80%, transparent 100%)`,
+          borderRadius: '50%',
+          filter: 'blur(6px)',
+        }}
+      />
+      {/* 백광 중심 */}
+      <div
+        className="absolute fx-flame-burst"
+        style={{
+          width: 160, height: 160,
+          background: `radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(255,220,140,0.7) 50%, transparent 80%)`,
+          borderRadius: '50%',
+          animationDuration: '0.45s',
+        }}
+      />
+      {/* 8방향 파편 */}
+      {[0, 45, 90, 135, 180, 225, 270, 315].map((deg, i) => {
+        const rad = (deg * Math.PI) / 180;
+        const dist = 120 + (i % 2 === 0 ? 20 : 0);
+        const dx = Math.cos(rad) * dist;
+        const dy = Math.sin(rad) * dist;
+        return (
+          <div
+            key={i}
+            className="absolute fx-flame-shard"
+            style={{
+              width: 18, height: 18,
+              background: `radial-gradient(circle, ${flameOrange} 0%, ${flameRed} 50%, transparent 80%)`,
+              borderRadius: '50%',
+              filter: `drop-shadow(0 0 6px ${flameOrange})`,
+              '--fx-dx': `${dx}px`,
+              '--fx-dy': `${dy}px`,
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+// B. 화염 각인 글로우 오라 — 적 카드 테두리 붉은 화염 지속 (반복, 절대 위치 오버레이)
+// 사용처: 적 카드 컨테이너 안에 absolute inset-0으로 배치
+export function IgniteGlowAura({ active }) {
+  if (!active) return null;
+  return (
+    <div
+      className="absolute inset-0 fx-ignite-aura pointer-events-none"
+      style={{
+        zIndex: 5,
+        borderRadius: 'inherit',
+      }}
+    />
+  );
+}
+
+// C. 각인 폭발 임팩트 — 치명타 시 화염 각인 폭발 풀스크린 흰→주황 플래시 (0.45초)
+export function IgniteExplodeFx({ trigger }) {
+  if (!trigger) return null;
+  return (
+    <div
+      key={trigger}
+      className="absolute inset-0 pointer-events-none"
+      style={{ zIndex: 23 }}
+    >
+      <div className="absolute inset-0 fx-ignite-explode" />
+    </div>
+  );
+}
+
+// D. 화염장막 결계 — 액티브 발동 시 플레이어 앞 붉은 결계 (0.8초)
+export function FlameBarrierFx({ trigger }) {
+  if (!trigger) return null;
+  const flameOrange = '#ff7a1a';
+  const flameRed = '#c4282d';
+  return (
+    <div
+      key={trigger}
+      className="absolute inset-0 pointer-events-none flex items-center justify-center"
+      style={{ zIndex: 22 }}
+    >
+      <div
+        className="absolute fx-flame-barrier"
+        style={{
+          width: 260, height: 260,
+          borderRadius: '50%',
+          border: `4px solid ${flameOrange}`,
+          boxShadow: `0 0 30px ${flameOrange}, inset 0 0 25px ${flameRed}, 0 0 60px ${flameRed}88`,
+          background: `radial-gradient(circle, ${flameOrange}22 0%, ${flameRed}44 50%, transparent 80%)`,
+        }}
+      />
+      <div
+        className="absolute fx-flame-barrier"
+        style={{
+          width: 200, height: 200,
+          borderRadius: '50%',
+          border: `2px solid ${flameOrange}`,
+          opacity: 0.6,
+          animationDelay: '0.1s',
+        }}
+      />
+    </div>
+  );
+}
+
+// D. 화염장막 반사 — 화염장막 보유 적이 공격할 때 적→플레이어 방향 화염 입자 역방향 비행 (0.6초)
+export function FlameReflectFx({ trigger }) {
+  if (!trigger) return null;
+  const flameOrange = '#ff7a1a';
+  return (
+    <div
+      key={trigger}
+      className="absolute inset-0 pointer-events-none flex items-center justify-center"
+      style={{ zIndex: 22 }}
+    >
+      {/* 5개 화염 입자가 적→플레이어 방향(왼쪽 아래)로 비행 */}
+      {[0, 1, 2, 3, 4].map((i) => {
+        const dx = -100 - i * 15;
+        const dy = 20 - i * 10;
+        return (
+          <div
+            key={i}
+            className="absolute fx-flame-reflect"
+            style={{
+              width: 16, height: 16,
+              background: `radial-gradient(circle, rgba(255,250,220,0.9) 0%, ${flameOrange} 50%, transparent 80%)`,
+              borderRadius: '50%',
+              filter: `drop-shadow(0 0 6px ${flameOrange})`,
+              '--fx-dx': `${dx}px`,
+              '--fx-dy': `${dy}px`,
+              animationDelay: `${i * 0.05}s`,
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+}

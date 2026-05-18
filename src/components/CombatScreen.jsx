@@ -38,7 +38,7 @@ import {
   CLASS_ULTIMATES,
 } from '../data.js';
 import { calculateDamage, getDisplayDamage, rollCrit, rollDodge } from '../combat/damage.js';
-import { FloatingLabel, DamageVignette, WhiteFlash, SlashFx, MagicImpactFx, MagicParticles, BarrierRing, BarrierBreakFx, ThrustFx, BladeGuardFx, ShadowStrikeFx, StatusOverlay, UltimateCutin } from './CombatEffects.jsx';
+import { FloatingLabel, DamageVignette, WhiteFlash, SlashFx, MagicImpactFx, MagicParticles, BarrierRing, BarrierBreakFx, ThrustFx, BladeGuardFx, ShadowStrikeFx, StatusOverlay, UltimateCutin, EternalFlameCutin, FireballFx, ExplosionFx, IgniteGlowAura, IgniteExplodeFx, FlameBarrierFx, FlameReflectFx } from './CombatEffects.jsx';
 
 export default function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimates = [], initialRelics = [], activeSkills = null, activeRelicNames = null, enemyKey, isBoss, expedition, curses = [], meta, engravingFx = {}, onVictory, onDefeat }) {
   const [player, setPlayer] = useState(() => {
@@ -153,6 +153,13 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
   const [enemyImgFailed, setEnemyImgFailed] = useState(false);
   // 소울 스킬 컷인 (직업 이미지 + 궁극명 풀스크린 0.9초)
   const [fxUltimateCutin, setFxUltimateCutin] = useState(null); // { name, color } or null
+  // 1.45.0 술법사 화염 이펙트 6종
+  const [fxEternalFlame, setFxEternalFlame] = useState(0);  // A. 영겁의 화염 컷인
+  const [fxFireball, setFxFireball] = useState(0);          // 파이어볼 (소효과)
+  const [fxExplosion, setFxExplosion] = useState(0);        // 익스플로젼 (대효과)
+  const [fxIgniteExplode, setFxIgniteExplode] = useState(0); // C. 각인 폭발 임팩트
+  const [fxFlameBarrier, setFxFlameBarrier] = useState(0);  // D. 화염장막 결계
+  const [fxFlameReflect, setFxFlameReflect] = useState(0);  // D. 화염장막 반사
 
   // 부유 라벨 추가 (자동 제거)
   const pushFxLabel = (side, kind, value, label) => {
@@ -316,8 +323,16 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           setFxSlash(v => v + 1);
         }
       } else {
-        setFxMagicImpact(v => v + 1);
-        setFxMagicParticles(v => v + 1);
+        // 1.45.0~ 술법사 화염 스킬은 전용 화염 이펙트 (skillKey 기준 분기)
+        // 마법탄(파이어볼) → 소효과, 정념폭발(익스플로젼) → 대효과, 그 외 마법 → 기본 보라 임팩트
+        if (skillKey === '마법탄') {
+          setFxFireball(v => v + 1);
+        } else if (skillKey === '정념폭발') {
+          setFxExplosion(v => v + 1);
+        } else {
+          setFxMagicImpact(v => v + 1);
+          setFxMagicParticles(v => v + 1);
+        }
       }
       // 1.37.0~ 시그니처: 마법 시전 시 영혼 +N (지능 17+, 5단위) / 물리 시전 시 영혼 +N (근력 17+, 5단위)
       if (classData.ultimateId) {
@@ -429,6 +444,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
             newEnemy.currentHp = Math.max(0, newEnemy.currentHp - explosionDmg);
             totalDmg += explosionDmg;
             newLog.push({ type: 'crit', text: `🔥 [화염 폭발] ${explosionDmg} 데미지` });
+            // 1.45.0~ 각인 폭발 임팩트 FX
+            setFxIgniteExplode(v => v + 1);
             
             // 폭발 후 각인 소멸
             newEnemy.debuffs = { 
@@ -600,8 +617,9 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     if (skill.type === 'defense') {
       newPlayer.defense += skill.defense;
       newLog.push({ type: 'system', text: `· 방어 +${skill.defense}` });
-      // Phase 2 FX: 방검은 다이아몬드 가드, 그 외(결계/바람결계/가호)는 결계 링
+      // Phase 2 FX: 방검 → 다이아몬드 가드, 화염장막 → 붉은 화염 결계, 그 외 → 일반 결계 링
       if (skillKey === '방검') setFxBladeGuard(v => v + 1);
+      else if (skillKey === '화염장막') setFxFlameBarrier(v => v + 1);
       else setFxBarrier(v => v + 1);
       if (skill.dodgeBuff) {
         newPlayer.buffs = { ...newPlayer.buffs, dodgeBuff: skill.dodgeBuff, dodgeBuffTurns: 1 };
@@ -680,6 +698,10 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     // 컷인 표시 (CSS 키프레임이 자동 종료)
     setFxUltimateCutin({ name: ult.name, color: ult.color });
     setTimeout(() => setFxUltimateCutin(null), 900);
+    // 1.45.0~ 술법사 영겁의 화염 발동 시 전용 화염 컷인 추가
+    if (classData.ultimateId === 'sage_eternalFlame') {
+      setFxEternalFlame(v => v + 1);
+    }
 
     // 0.9초 컷인 후 효과 적용
     setTimeout(() => {
@@ -998,6 +1020,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                       igniteJustApplied: true,
                     };
                     newLog.push({ type: 'passive', text: `🔥 [화염장막] 반사 — 화염 각인 ${refIgnite} 3T 부여` });
+                    // 1.45.0~ 화염장막 반사 FX
+                    setFxFlameReflect(v => v + 1);
                   }
                 }
               }
@@ -1652,6 +1676,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       <DamageVignette trigger={fxVignette} />
       {/* 소울 스킬 컷인 — 전체 화면을 덮는 0.9초 골든 버스트 */}
       <UltimateCutin info={fxUltimateCutin} />
+      {/* 1.45.0 영겁의 화염 풀스크린 화염 컷인 (UltimateCutin 위에 겹쳐 표시) */}
+      <EternalFlameCutin trigger={fxEternalFlame} />
       {/* 전투 로그 확장 모달 — 풀스크린, 큰 텍스트로 전체 로그 확인 */}
       {logExpanded && (
         <div className="fixed inset-0 z-50 flex flex-col" style={{ background: PALETTE.bgDeep }}>
@@ -1736,11 +1762,17 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           {/* FX 오버레이 — 흰 플래시 + 부유 라벨 + Phase 2 임팩트 (shake 영향 X, trigger 변화 시에만 재생) */}
           <WhiteFlash trigger={fxEnemyFlash} />
           <StatusOverlay debuffs={enemy.debuffs} />
+          {/* 1.45.0 화염 각인 글로우 — debuffs.igniteDmg > 0 지속 표시 */}
+          <IgniteGlowAura active={enemy.debuffs?.igniteDmg > 0 && enemy.debuffs?.igniteTurns > 0} />
           <SlashFx trigger={fxSlash} crit={fxSlashCrit} />
           <ThrustFx trigger={fxThrust} crit={fxThrustCrit} />
           <ShadowStrikeFx trigger={fxShadowStrike} />
           <MagicImpactFx trigger={fxMagicImpact} color={classData.color || '#a479d4'} />
           <MagicParticles trigger={fxMagicParticles} color={classData.color || '#c8a8e8'} />
+          {/* 1.45.0 술법사 화염 이펙트 — 파이어볼/익스플로젼/각인 폭발 */}
+          <FireballFx trigger={fxFireball} />
+          <ExplosionFx trigger={fxExplosion} />
+          <IgniteExplodeFx trigger={fxIgniteExplode} />
           {fxEnemyLabels.map(l => (
             <FloatingLabel key={l.id} kind={l.kind} value={l.value} label={l.label} />
           ))}
@@ -1874,6 +1906,9 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           <BarrierRing trigger={fxBarrier} color={PALETTE.ice || '#7ba3c4'} />
           <BladeGuardFx trigger={fxBladeGuard} color="#9bb8d4" />
           <BarrierBreakFx trigger={fxBarrierBreak} color={PALETTE.ice || '#7ba3c4'} />
+          {/* 1.45.0 화염장막 결계 + 반사 */}
+          <FlameBarrierFx trigger={fxFlameBarrier} />
+          <FlameReflectFx trigger={fxFlameReflect} />
           {fxPlayerLabels.map(l => (
             <FloatingLabel key={l.id} kind={l.kind} value={l.value} label={l.label} />
           ))}
