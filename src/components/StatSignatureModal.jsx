@@ -23,64 +23,72 @@ import {
 const SIGNATURES = {
   근력: {
     color: PALETTE.accent,
-    auto: '물리 데미지 +0.5/포인트 (자동 가산)',
+    auto: { desc: '물리 데미지 +0.5/포인트', note: '임계 없이 근력 포인트 전체 가산' },
     tier1: {
       label: '1단계 · 근력 11+',
-      desc: '최대 HP +5/포인트',
+      desc: '최대 HP +5 / 적용 포인트',
+      formula: (stats) => `근력 ${stats?.근력 || 0} → 적용 포인트 ${Math.max(0, (stats?.근력 || 0) - 10)} (근력 - 10) × +5 HP/p`,
       calc: (stats) => getStrengthHpBonus(stats),
       suffix: '',
     },
     tier2: {
       label: '2단계 · 근력 17+',
-      desc: '물리 시전 시 소울 게이지 +1/5단위',
+      desc: '물리 스킬 시전 시 소울 게이지 +1 (5단위 누진)',
+      formula: (stats) => `근력 ${stats?.근력 || 0} → ${(stats?.근력 || 0) < 17 ? '미달 (17 이상 필요)' : `17~21 +1 / 22~26 +2 (현재 +${getStrengthSoulPerPhys(stats)})`}`,
       calc: (stats) => getStrengthSoulPerPhys(stats),
       suffix: '',
     },
   },
   민첩: {
     color: PALETTE.green,
-    auto: '회피율 +0.3%/포인트 · 치명타율 +0.5%/포인트 (자동 가산)',
+    auto: { desc: '회피율 +0.3%/포인트 · 치명타율 +0.5%/포인트', note: '임계 없이 (민첩 - 10) 만큼 가산' },
     tier1: {
       label: '1단계 · 민첩 11+',
-      desc: '치명타 데미지 +2%/포인트',
+      desc: '치명타 데미지 +2% / 적용 포인트',
+      formula: (stats) => `민첩 ${stats?.민첩 || 0} → 적용 포인트 ${Math.max(0, (stats?.민첩 || 0) - 10)} (민첩 - 10) × +2%/p`,
       calc: (stats) => getAgilityCritDmgBonus(stats),
       suffix: '%',
     },
     tier2: {
       label: '2단계 · 민첩 17+',
-      desc: '회피 성공 시 소울 게이지 +5/5단위',
+      desc: '회피 성공 시 소울 게이지 +5 (5단위 누진)',
+      formula: (stats) => `민첩 ${stats?.민첩 || 0} → ${(stats?.민첩 || 0) < 17 ? '미달 (17 이상 필요)' : `17~21 +5 / 22~26 +10 (현재 +${getAgilitySoulOnDodge(stats)})`}`,
       calc: (stats) => getAgilitySoulOnDodge(stats),
       suffix: '',
     },
   },
   지능: {
     color: PALETTE.legendary,
-    auto: '마법 데미지 +0.7/포인트 (자동 가산)',
+    auto: { desc: '마법 데미지 +0.7/포인트', note: '임계 없이 지능 포인트 전체 가산' },
     tier1: {
       label: '1단계 · 지능 11+',
-      desc: '전투 시작 시 소울 게이지 +0.5/포인트 (내림)',
+      desc: '전투 시작 시 소울 게이지 +0.5 / 적용 포인트 (내림)',
+      formula: (stats) => `지능 ${stats?.지능 || 0} → 적용 포인트 ${Math.max(0, (stats?.지능 || 0) - 10)} (지능 - 10) × 0.5 = floor → +${getIntellectStartSoul(stats)}`,
       calc: (stats) => getIntellectStartSoul(stats),
       suffix: '',
     },
     tier2: {
       label: '2단계 · 지능 17+',
-      desc: '마법 시전 시 소울 게이지 +1/5단위',
+      desc: '마법 스킬 시전 시 소울 게이지 +1 (5단위 누진)',
+      formula: (stats) => `지능 ${stats?.지능 || 0} → ${(stats?.지능 || 0) < 17 ? '미달 (17 이상 필요)' : `17~21 +1 / 22~26 +2 (현재 +${getIntellectSoulPerMagic(stats)})`}`,
       calc: (stats) => getIntellectSoulPerMagic(stats),
       suffix: '',
     },
   },
   매력: {
     color: PALETTE.dawn,
-    auto: '영혼 획득량 +0.5%/포인트 (자동 가산)',
+    auto: { desc: '영혼 획득량 +0.5% / 적용 포인트', note: '임계 없이 (매력 - 10) 만큼 가산. 처치 영혼·챕터 보너스 등 모든 영혼 가산처 적용' },
     tier1: {
       label: '1단계 · 매력 11+',
-      desc: '회복 효율 +0.5%/포인트',
+      desc: '회복 효율 +0.5% / 적용 포인트',
+      formula: (stats) => `매력 ${stats?.매력 || 0} → 적용 포인트 ${Math.max(0, (stats?.매력 || 0) - 10)} (매력 - 10) × +0.5%/p`,
       calc: (stats) => getCharismaHealBonus(stats),
       suffix: '%',
     },
     tier2: {
       label: '2단계 · 매력 17+',
-      desc: '받는 데미지 -5%/5단위',
+      desc: '받는 데미지 -5% (5단위 누진)',
+      formula: (stats) => `매력 ${stats?.매력 || 0} → ${(stats?.매력 || 0) < 17 ? '미달 (17 이상 필요)' : `17~21 -5% / 22~26 -10% / 27~31 -15% (현재 -${getCharismaDmgReduction(stats)}%)`}`,
       calc: (stats) => getCharismaDmgReduction(stats),
       suffix: '%',
     },
@@ -121,8 +129,11 @@ export default function StatSignatureModal({ stat, stats, onClose }) {
             <div className="text-3xl font-bold tabular-nums" style={{ color: cfg.color }}>{current}</div>
           </div>
 
-          <div className="text-[10px] mb-3 px-2 py-2" style={{ background: `${cfg.color}08`, color: PALETTE.textDim, border: `1px dashed ${cfg.color}30` }}>
-            {cfg.auto}
+          {/* 자동 가산 */}
+          <div className="mb-3 px-3 py-2" style={{ background: `${cfg.color}08`, border: `1px dashed ${cfg.color}30` }}>
+            <div className="text-[10px] tracking-[0.15em] mb-0.5" style={{ color: cfg.color }}>자동 가산 (임계 없음)</div>
+            <div className="text-[11px]" style={{ color: PALETTE.text }}>{cfg.auto.desc}</div>
+            <div className="text-[10px] mt-0.5" style={{ color: PALETTE.textDim }}>{cfg.auto.note}</div>
           </div>
 
           {/* 1단계 */}
@@ -133,7 +144,10 @@ export default function StatSignatureModal({ stat, stats, onClose }) {
                 {t1Active ? `+${t1Val}${cfg.tier1.suffix} 발동` : '미발동'}
               </span>
             </div>
-            <div className="text-[11px] leading-snug" style={{ color: PALETTE.text }}>{cfg.tier1.desc}</div>
+            <div className="text-[11px] leading-snug mb-1" style={{ color: PALETTE.text }}>{cfg.tier1.desc}</div>
+            <div className="text-[10px] leading-snug px-2 py-1" style={{ color: PALETTE.textDim, background: 'rgba(0,0,0,0.25)' }}>
+              ▸ {cfg.tier1.formula(stats)}
+            </div>
           </div>
 
           {/* 2단계 */}
@@ -144,7 +158,10 @@ export default function StatSignatureModal({ stat, stats, onClose }) {
                 {t2Active ? `+${t2Val}${cfg.tier2.suffix} 발동` : '미발동'}
               </span>
             </div>
-            <div className="text-[11px] leading-snug" style={{ color: PALETTE.text }}>{cfg.tier2.desc}</div>
+            <div className="text-[11px] leading-snug mb-1" style={{ color: PALETTE.text }}>{cfg.tier2.desc}</div>
+            <div className="text-[10px] leading-snug px-2 py-1" style={{ color: PALETTE.textDim, background: 'rgba(0,0,0,0.25)' }}>
+              ▸ {cfg.tier2.formula(stats)}
+            </div>
           </div>
         </div>
       </div>
