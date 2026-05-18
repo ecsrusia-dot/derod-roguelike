@@ -11,7 +11,7 @@ export const CHANGELOG = [
     date: '2026-05-18',
     label: '술법사 각인 풀 24장 신설 + 신규 effect 키 3종 (magicDmgPct·igniteDmgPct·magicSoulBonus)',
     changes: [
-      { type: 'feature', text: '[술법사 각인 풀 24장 신설] 균형 컨셉 — 이프리트 화염 + 마력 마법 + 영겁 소울 융합. Common 5 / Rare 5 / Epic 5 / Legendary 2 / Flaw 4 / Curse 3. 영혼의 제단 「각인」 가챠에서 sage 슬롯이 활성화. 1.25.0 인프라 그대로 적용 (코드 변경 없이 데이터만 추가하면 자동 동작)' },
+      { type: 'feature', text: '[술법사 각인 풀 24장 신설] 균형 컨셉 — 이프리트 화염 + 마력 마법 + 영겁 소울 융합. Common 5 / Rare 5 / Epic 5 / Legendary 2 / Flaw 4 / Curse 3. 타이틀 화면 「◆ 직업 각인」 → 술법사 슬롯의 가챠가 활성화. 1.25.0 인프라 그대로 적용 (코드 변경 없이 데이터만 추가하면 자동 동작)' },
       { type: 'feature', text: '[신규 effect 키 3종] magicDmgPct (마법 데미지 +N% × 슬롯 합산) / igniteDmgPct (화염 각인 데미지 +N% × 슬롯 합산) / magicSoulBonus (마법 시전 시 소울 +N × 슬롯 합산). 모두 술법사 풀에서 사용. fx bag 패턴 그대로 — aggregateEngravingEffects 합산 후 damage.js·CombatScreen 분기에서 적용' },
       { type: 'system', text: '[적용 위치] damage.js calculateDamage: skill.type === \'magic\' 분기에 engravingFx.magicDmgPct 가산 (2곳: 메인 + 마법 추가 데미지). CombatScreen: 화염 각인 부여 시점에 engravingFx.igniteDmgPct 곱셈 적용, 마법 시전 시점에 engravingFx.magicSoulBonus 가산. 비술법사 직업/비마법 스킬은 무영향 (회귀 0건)' },
       { type: 'system', text: '[향후 작업] 다음 PR — (1) StatusPanel에 술법사 각인 효과 출처 노출 (magicDmgPct/igniteDmgPct/magicSoulBonus 라인) (2) 4직업 중 demonblood·elf·priest 풀 작성 (각 24장)' },
