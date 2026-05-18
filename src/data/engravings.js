@@ -17,10 +17,11 @@ export const ENGRAVING_GACHA_COST = 500;
 
 // 각성도 단계별 보상 (lv 2~10). lv 1은 시작 상태.
 // reward 종류:
-//   - slotUnlock: 1·2·3 (각인 슬롯 개방 + 즉시 랜덤 각인 1장 부여)
-//   - statBonus: { 근력|민첩|지능|매력|statTotal: N } (영구 능력치)
+//   - slotUnlock: { slot } (각인 슬롯 개방 + 즉시 랜덤 각인 1장 부여)
+//   - statBonus: { stat: 근력|민첩|지능|매력|statTotal, value } (영구 능력치)
 //   - passiveBonus: { skill, delta } (시작 패시브 +Lv)
 //   - statPctBonus: { key, pct } (반격율·치명타율 등 % 보너스)
+//   - composite: { parts: [reward, reward, ...] } (1.44.0~ 복합 보상)
 // PR 2에서는 데이터만 표시. PR 3에서 전투 적용.
 // 9단계 활성화 조건 (1.26.0~). 모든 직업 동일 패턴:
 //   Lv.2 = 수련의 길 클리어 / Lv.3 = 직업 전용 패시브의 각성 스킬 1개 픽 /
@@ -30,6 +31,15 @@ export const ENGRAVING_GACHA_COST = 500;
 //
 // 1.43.0~ 각성 스킬은 직업 전용 패시브(심안류/이프리트)만 보유.
 // demonblood/elf/priest는 직업 전용 패시브 추가 시 Lv.3·Lv.5 활성화.
+//
+// 1.44.0~ 보상 매트릭스 재설계:
+//   슬롯 해금 Lv: 2 → 5 → 8 (이전 2/5/9)
+//   Lv.4: 직업 핵심 패시브 +1Lv (심안류·이프리트·잔혹·회피·신앙)
+//   Lv.6: 직업 보조 패시브 +1Lv (심안·마력·강타·정밀·재생)
+//   Lv.7: 직업별 statPctBonus 5% (반격율·화염각인·물리·회피·전투회복)
+//   Lv.9: 능력치 +3 + statPctBonus +5%/10% 복합 (composite)
+//   Lv.10: 직업 2 패시브 모두 +1Lv 복합 (composite)
+//   ※ demonblood/elf/priest는 전용 패시브 신규 구현 후 변동 예정.
 //
 // condition.type 종류:
 //   - trainingClear: 해당 직업의 수련의 길 클리어
@@ -50,60 +60,92 @@ const COMMON_AWAKENING_CONDITIONS = [
 ];
 
 // 직업별 보상은 직업마다 다름 — 보상만 정의하고 condition은 위 공통 표에서 lv 매칭으로 머지
+// 1.44.0 매트릭스: 모든 직업 비용·해금조건 동일. 보상만 직업별 색깔.
 const _WANDERER_REWARDS = [
   { lv: 2,  cost: 500,   reward: { type: 'slotUnlock', slot: 1 } },
   { lv: 3,  cost: 1000,  reward: { type: 'statBonus', stat: '근력', value: 2 } },
   { lv: 4,  cost: 2000,  reward: { type: 'passiveBonus', skill: '심안류', delta: 1 } },
   { lv: 5,  cost: 4000,  reward: { type: 'slotUnlock', slot: 2 } },
-  { lv: 6,  cost: 8000,  reward: { type: 'statBonus', stat: '민첩', value: 2 } },
-  { lv: 7,  cost: 12000, reward: { type: 'passiveBonus', skill: '심안', delta: 1 } },
-  { lv: 8,  cost: 16000, reward: { type: 'statPctBonus', key: 'counterRate', pct: 5 } },
-  { lv: 9,  cost: 22000, reward: { type: 'slotUnlock', slot: 3 } },
-  { lv: 10, cost: 30000, reward: { type: 'statBonus', stat: 'statTotal', value: 5 } },
+  { lv: 6,  cost: 8000,  reward: { type: 'passiveBonus', skill: '심안', delta: 1 } },
+  { lv: 7,  cost: 12000, reward: { type: 'statPctBonus', key: 'counterRate', pct: 5 } },
+  { lv: 8,  cost: 16000, reward: { type: 'slotUnlock', slot: 3 } },
+  { lv: 9,  cost: 22000, reward: { type: 'composite', parts: [
+    { type: 'statBonus', stat: '근력', value: 3 },
+    { type: 'statPctBonus', key: 'counterRate', pct: 5 },
+  ]}},
+  { lv: 10, cost: 30000, reward: { type: 'composite', parts: [
+    { type: 'passiveBonus', skill: '심안류', delta: 1 },
+    { type: 'passiveBonus', skill: '심안', delta: 1 },
+  ]}},
 ];
 const _SAGE_REWARDS = [
   { lv: 2,  cost: 500,   reward: { type: 'slotUnlock', slot: 1 } },
   { lv: 3,  cost: 1000,  reward: { type: 'statBonus', stat: '지능', value: 2 } },
   { lv: 4,  cost: 2000,  reward: { type: 'passiveBonus', skill: '이프리트', delta: 1 } },
   { lv: 5,  cost: 4000,  reward: { type: 'slotUnlock', slot: 2 } },
-  { lv: 6,  cost: 8000,  reward: { type: 'statBonus', stat: '매력', value: 2 } },
-  { lv: 7,  cost: 12000, reward: { type: 'passiveBonus', skill: '마력', delta: 1 } },
-  { lv: 8,  cost: 16000, reward: { type: 'statPctBonus', key: 'magDmg', pct: 5 } },
-  { lv: 9,  cost: 22000, reward: { type: 'slotUnlock', slot: 3 } },
-  { lv: 10, cost: 30000, reward: { type: 'statBonus', stat: 'statTotal', value: 5 } },
+  { lv: 6,  cost: 8000,  reward: { type: 'passiveBonus', skill: '마력', delta: 1 } },
+  { lv: 7,  cost: 12000, reward: { type: 'statPctBonus', key: 'igniteRate', pct: 5 } },
+  { lv: 8,  cost: 16000, reward: { type: 'slotUnlock', slot: 3 } },
+  { lv: 9,  cost: 22000, reward: { type: 'composite', parts: [
+    { type: 'statBonus', stat: '지능', value: 3 },
+    { type: 'statPctBonus', key: 'igniteRate', pct: 5 },
+  ]}},
+  { lv: 10, cost: 30000, reward: { type: 'composite', parts: [
+    { type: 'passiveBonus', skill: '이프리트', delta: 1 },
+    { type: 'passiveBonus', skill: '마력', delta: 1 },
+  ]}},
 ];
+// ※ demonblood/elf/priest는 전용 패시브 신규 구현 후 변동 예정 (1.44.0 임시).
 const _DEMONBLOOD_REWARDS = [
   { lv: 2,  cost: 500,   reward: { type: 'slotUnlock', slot: 1 } },
   { lv: 3,  cost: 1000,  reward: { type: 'statBonus', stat: '근력', value: 2 } },
   { lv: 4,  cost: 2000,  reward: { type: 'passiveBonus', skill: '잔혹', delta: 1 } },
   { lv: 5,  cost: 4000,  reward: { type: 'slotUnlock', slot: 2 } },
-  { lv: 6,  cost: 8000,  reward: { type: 'statBonus', stat: '민첩', value: 2 } },
-  { lv: 7,  cost: 12000, reward: { type: 'passiveBonus', skill: '강타', delta: 1 } },
-  { lv: 8,  cost: 16000, reward: { type: 'statPctBonus', key: 'physDmg', pct: 5 } },
-  { lv: 9,  cost: 22000, reward: { type: 'slotUnlock', slot: 3 } },
-  { lv: 10, cost: 30000, reward: { type: 'statBonus', stat: 'statTotal', value: 5 } },
+  { lv: 6,  cost: 8000,  reward: { type: 'passiveBonus', skill: '강타', delta: 1 } },
+  { lv: 7,  cost: 12000, reward: { type: 'statPctBonus', key: 'physDmg', pct: 5 } },
+  { lv: 8,  cost: 16000, reward: { type: 'slotUnlock', slot: 3 } },
+  { lv: 9,  cost: 22000, reward: { type: 'composite', parts: [
+    { type: 'statBonus', stat: '근력', value: 3 },
+    { type: 'statPctBonus', key: 'physDmg', pct: 5 },
+  ]}},
+  { lv: 10, cost: 30000, reward: { type: 'composite', parts: [
+    { type: 'passiveBonus', skill: '잔혹', delta: 1 },
+    { type: 'passiveBonus', skill: '강타', delta: 1 },
+  ]}},
 ];
 const _ELF_REWARDS = [
   { lv: 2,  cost: 500,   reward: { type: 'slotUnlock', slot: 1 } },
   { lv: 3,  cost: 1000,  reward: { type: 'statBonus', stat: '민첩', value: 2 } },
   { lv: 4,  cost: 2000,  reward: { type: 'passiveBonus', skill: '회피', delta: 1 } },
   { lv: 5,  cost: 4000,  reward: { type: 'slotUnlock', slot: 2 } },
-  { lv: 6,  cost: 8000,  reward: { type: 'statBonus', stat: '매력', value: 2 } },
-  { lv: 7,  cost: 12000, reward: { type: 'passiveBonus', skill: '정밀', delta: 1 } },
-  { lv: 8,  cost: 16000, reward: { type: 'statPctBonus', key: 'dodge', pct: 5 } },
-  { lv: 9,  cost: 22000, reward: { type: 'slotUnlock', slot: 3 } },
-  { lv: 10, cost: 30000, reward: { type: 'statBonus', stat: 'statTotal', value: 5 } },
+  { lv: 6,  cost: 8000,  reward: { type: 'passiveBonus', skill: '정밀', delta: 1 } },
+  { lv: 7,  cost: 12000, reward: { type: 'statPctBonus', key: 'dodge', pct: 5 } },
+  { lv: 8,  cost: 16000, reward: { type: 'slotUnlock', slot: 3 } },
+  { lv: 9,  cost: 22000, reward: { type: 'composite', parts: [
+    { type: 'statBonus', stat: '민첩', value: 3 },
+    { type: 'statPctBonus', key: 'dodge', pct: 5 },
+  ]}},
+  { lv: 10, cost: 30000, reward: { type: 'composite', parts: [
+    { type: 'passiveBonus', skill: '회피', delta: 1 },
+    { type: 'passiveBonus', skill: '정밀', delta: 1 },
+  ]}},
 ];
 const _PRIEST_REWARDS = [
   { lv: 2,  cost: 500,   reward: { type: 'slotUnlock', slot: 1 } },
   { lv: 3,  cost: 1000,  reward: { type: 'statBonus', stat: '매력', value: 2 } },
   { lv: 4,  cost: 2000,  reward: { type: 'passiveBonus', skill: '신앙', delta: 1 } },
   { lv: 5,  cost: 4000,  reward: { type: 'slotUnlock', slot: 2 } },
-  { lv: 6,  cost: 8000,  reward: { type: 'statBonus', stat: '지능', value: 2 } },
-  { lv: 7,  cost: 12000, reward: { type: 'passiveBonus', skill: '재생', delta: 1 } },
-  { lv: 8,  cost: 16000, reward: { type: 'statPctBonus', key: 'heal', pct: 5 } },
-  { lv: 9,  cost: 22000, reward: { type: 'slotUnlock', slot: 3 } },
-  { lv: 10, cost: 30000, reward: { type: 'statBonus', stat: 'statTotal', value: 5 } },
+  { lv: 6,  cost: 8000,  reward: { type: 'passiveBonus', skill: '재생', delta: 1 } },
+  { lv: 7,  cost: 12000, reward: { type: 'statPctBonus', key: 'combatHeal', pct: 10 } },
+  { lv: 8,  cost: 16000, reward: { type: 'slotUnlock', slot: 3 } },
+  { lv: 9,  cost: 22000, reward: { type: 'composite', parts: [
+    { type: 'statBonus', stat: '매력', value: 3 },
+    { type: 'statPctBonus', key: 'combatHeal', pct: 10 },
+  ]}},
+  { lv: 10, cost: 30000, reward: { type: 'composite', parts: [
+    { type: 'passiveBonus', skill: '신앙', delta: 1 },
+    { type: 'passiveBonus', skill: '재생', delta: 1 },
+  ]}},
 ];
 
 function _mergeConditions(rewards) {

@@ -5,6 +5,8 @@
 // 저장되는 것: 영혼, 강화 단계, 해금 항목, 클리어 기록
 // ============================================
 
+import { ENGRAVINGS, ENGRAVING_TIERS } from './data.js';
+
 const DB_NAME = 'derod_meta';
 const DB_VERSION = 1;
 const STORE_NAME = 'meta';
@@ -274,6 +276,40 @@ export async function loadMeta() {
         }
         if (ultDiscontinuedCount > 0) {
           needsImmediateSave = true;
+        }
+        // 1.44.0 마이그레이션: 슬롯 3 해금 Lv.9 → Lv.8 변경.
+        // Lv.8 이상이지만 slots[2]가 null인 직업은 자동으로 랜덤 각인 1장 부여.
+        let slot3MigratedCount = 0;
+        if (safe.engravings) {
+          const migratedEng = { ...safe.engravings };
+          for (const [classId, engData] of Object.entries(safe.engravings)) {
+            const lv = engData?.lv || 1;
+            const slots = engData?.slots || [null, null, null];
+            if (lv >= 8 && !slots[2]) {
+              // ENGRAVINGS 풀이 빈 직업(sage/demonblood/elf/priest)은 건너뜀
+              const pool = ENGRAVINGS[classId] || [];
+              if (pool.length === 0) continue;
+              // 가중치 기반 랜덤 픽 (rollEngravingCard 로직 미니 버전)
+              const weights = pool.map(c => ENGRAVING_TIERS[c.tier]?.weight || 0);
+              const total = weights.reduce((s, w) => s + w, 0);
+              if (total === 0) continue;
+              let r = Math.random() * total;
+              let picked = pool[0];
+              for (let i = 0; i < pool.length; i++) {
+                r -= weights[i];
+                if (r <= 0) { picked = pool[i]; break; }
+              }
+              migratedEng[classId] = {
+                ...engData,
+                slots: [slots[0], slots[1], picked.id],
+              };
+              slot3MigratedCount++;
+            }
+          }
+          if (slot3MigratedCount > 0) {
+            safe.engravings = migratedEng;
+            needsImmediateSave = true;
+          }
         }
         if (needsImmediateSave) {
           // 즉시 저장해 재실행 방지
@@ -686,9 +722,9 @@ export function getEngravingSlots(meta, classId) {
   return meta?.engravings?.[classId]?.slots ?? [null, null, null];
 }
 
-// 각성도 Lv에 따라 개방된 슬롯 개수 (Lv.2/5/9 기준)
+// 각성도 Lv에 따라 개방된 슬롯 개수 (1.44.0~ Lv.2/5/8 기준, 이전 Lv.2/5/9)
 export function getUnlockedSlotCount(awakeningLv) {
-  if (awakeningLv >= 9) return 3;
+  if (awakeningLv >= 8) return 3;
   if (awakeningLv >= 5) return 2;
   if (awakeningLv >= 2) return 1;
   return 0;

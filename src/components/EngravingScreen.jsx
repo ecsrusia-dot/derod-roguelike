@@ -898,14 +898,22 @@ function describeReward(reward, classId) {
     case 'passiveBonus':
       return `시작 패시브 ${reward.skill} +${reward.delta}Lv`;
     case 'statPctBonus': {
+      // 1.44.0~ 새 키: igniteRate(화염각인 발동율), combatHeal(전투회복 — 자힐·처치힐)
       const labels = {
         counterRate: '반격율',
         magDmg: '마법 데미지',
         physDmg: '물리 데미지',
         dodge: '회피율',
         heal: '회복량',
+        igniteRate: '화염 각인 발동율',
+        combatHeal: '전투회복 (자힐·처치힐)',
       };
       return `${labels[reward.key] || reward.key} +${reward.pct}%`;
+    }
+    case 'composite': {
+      // 1.44.0~ 복합 보상 — 각 part를 콤마로 연결
+      const parts = Array.isArray(reward.parts) ? reward.parts : [];
+      return parts.map(p => describeReward(p, classId)).join(' / ');
     }
     default:
       return JSON.stringify(reward);

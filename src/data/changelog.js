@@ -7,6 +7,21 @@
 
 export const CHANGELOG = [
   {
+    version: '1.44.0',
+    date: '2026-05-18',
+    label: '각성도 보상 매트릭스 재설계 + 슬롯 해금 Lv.9→Lv.8 이동 + composite 보상 타입',
+    changes: [
+      { type: 'balance', text: '[각성도 보상 매트릭스 재설계] 5직업 9단계 보상을 PM 매트릭스대로 전면 재설계. 해금 조건·영혼 비용(총 95,500)은 유지. 보상만 변경 — 패시브 강화 비중 증가 + Lv.9·10에 복합 보상 도입' },
+      { type: 'balance', text: '[슬롯 해금 Lv.9 → Lv.8 이동] 각인 슬롯 3 해금 단계를 한 칸 앞으로. 슬롯 해금: Lv.2 → Lv.5 → Lv.8 (이전 Lv.2/5/9). 기존 Lv.8 도달자는 마이그레이션으로 슬롯 3 자동 부여' },
+      { type: 'feature', text: '[Lv.7 statPctBonus 다양화] 직업별 % 보너스가 Lv.8 → Lv.7로 이동 + 효과 종류 갱신: 방랑검사 반격율 +5% / 술법사 화염 각인 발동율 +5% (신규 키 igniteRate) / 마족 물리 데미지 +5% / 정령사 회피 +5% / 사제 전투회복 +10% 자힐·처치힐 (신규 키 combatHeal)' },
+      { type: 'feature', text: '[Lv.9·Lv.10 복합 보상] 새 reward 타입 composite 도입. Lv.9 = 능력치 +3 + Lv.7 statPctBonus 재발동(누적). Lv.10 = 직업 2 시작 패시브 모두 +1Lv (방랑검사 심안류+심안 / 술법사 이프리트+마력 / 마족 잔혹+강타 / 정령사 회피+정밀 / 사제 신앙+재생)' },
+      { type: 'system', text: '[Lv.6 → 보조 패시브 +1Lv] 이전 능력치 +2였던 Lv.6 보상이 직업별 보조 시작 패시브 +1Lv로 변경. 5직업 모두 핵심·보조 두 시작 패시브 강화 흐름 통일 (Lv.4 = 핵심, Lv.6 = 보조)' },
+      { type: 'system', text: '[Lv.10 statTotal +5 → 패시브 2종 +1Lv] 만렙 보상이 "모든 능력치 +5"에서 "직업 정수 두 패시브 모두 +1Lv"로 재정의. 직업 정체성 더 강화 (1.43.0 각성 스킬 직업 전용 한정과 같은 방향)' },
+      { type: 'system', text: '[describeReward composite 분기 + 새 라벨] EngravingScreen·AwakeningProgressModal에서 자동으로 composite 보상이 "X / Y" 형식으로 표시. igniteRate → "화염 각인 발동율" / combatHeal → "전투회복 (자힐·처치힐)" 라벨 추가' },
+      { type: 'system', text: '[마이그레이션 안내] demonblood/elf/priest의 Lv.4·Lv.6·Lv.10 보상은 현재 보조 패시브(잔혹·강타·회피·정밀·신앙·재생)를 사용 중. 향후 3직업 전용 패시브 신규 구현 후 해당 패시브로 교체 예정 (PM 메모)' },
+    ],
+  },
+  {
     version: '1.43.1',
     date: '2026-05-18',
     label: '정보창 출처 모달 라벨 한글 메타명으로 통일 (시그니처 기본·영혼의 제단·각인·유물 등)',
