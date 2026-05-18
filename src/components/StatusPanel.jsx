@@ -7,9 +7,10 @@
 
 import React, { useState } from 'react';
 import { Heart, X } from 'lucide-react';
-import { PALETTE, getCharismaHealBonus, getCharismaDmgReduction, getIntellectSoulBonus, getIntellectEtherBonus, getIfritIgniteRate, getMinorBonus, getMetaBonus, hasEffect, hasUltimate, hasCurse } from '../utils/helpers.js';
+import { PALETTE, getCharismaHealBonus, getCharismaDmgReduction, getIntellectStartSoul, getIntellectSoulPerMagic, getStrengthHpBonus, getStrengthSoulPerPhys, getAgilityCritDmgBonus, getAgilitySoulOnDodge, getIfritIgniteRate, getMinorBonus, getMetaBonus, hasEffect, hasUltimate, hasCurse } from '../utils/helpers.js';
 import { PASSIVE_SKILLS, COMBAT_SKILLS, ULTIMATE_SKILLS } from '../data.js';
 import CardInfoModal, { buildPassiveInfo, buildRelicInfo, buildActiveSkillInfo } from './CardInfoModal.jsx';
+import StatSignatureModal from './StatSignatureModal.jsx';
 
 export default function StatusPanel({ classData, hp, maxHp, skills, stats, derivedStats = null, relics, ultimates = [], activeSkills = null, activeRelicNames = null, relicStat = {}, meta = null, curses = [], engravingFx = {}, onClose }) {
   const skillsByAxis = { attack: [], defense: [], utility: [] };
@@ -21,6 +22,8 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
   const axisNames = { attack: '공격', defense: '방어', utility: '유틸' };
   // modalState = { kind: 'passive'|'relic'|'active', name?, rel? }
   const [modalState, setModalState] = useState(null);
+  // 1.37.0~ 능력치 클릭 → 시그니처 설명 모달
+  const [statSigStat, setStatSigStat] = useState(null);
 
   let modalInfo = null;
   if (modalState?.kind === 'passive') {
@@ -56,13 +59,28 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
             </div>
           </div>
           <div className="grid grid-cols-4 gap-2 mt-3 pt-3 border-t" style={{ borderColor: `${classData.color}30` }}>
-            {Object.entries(stats).filter(([k]) => ['근력', '민첩', '지능', '매력'].includes(k)).map(([k, v]) => (
-              <div key={k} className="text-center">
-                <div className="text-[9px]" style={{ color: PALETTE.textDim }}>{k}</div>
-                <div className="text-sm font-bold" style={{ color: PALETTE.text }}>{v}</div>
-              </div>
-            ))}
+            {['근력', '민첩', '지능', '매력'].map((k) => {
+              const v = stats[k];
+              if (v === undefined) return null;
+              return (
+                <button
+                  key={k}
+                  onClick={() => setStatSigStat(k)}
+                  className="text-center transition-all"
+                  style={{
+                    background: `${classData.color}10`,
+                    border: `1px solid ${classData.color}40`,
+                    padding: '6px 4px',
+                  }}
+                  title={`${k} 시그니처 설명`}
+                >
+                  <div className="text-[9px]" style={{ color: PALETTE.textDim }}>{k}</div>
+                  <div className="text-sm font-bold" style={{ color: PALETTE.text }}>{v}</div>
+                </button>
+              );
+            })}
           </div>
+          <p className="text-[9px] text-center mt-1" style={{ color: PALETTE.textDim }}>능력치를 눌러 시그니처 효과를 확인하세요</p>
           {/* ━ 전투 수치 ━ (치명타·회피·방어 무시·반격·화염 각인) */}
           {(() => {
             const playerDex = stats['민첩'] || 10;
@@ -173,8 +191,12 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
             const reflect = relicStat.reflect || 0;
             const heal = relicStat.heal || 0;
             const charismaHeal = getCharismaHealBonus(stats);
-            const intellectSoul = getIntellectSoulBonus(stats);
-            const intellectEther = getIntellectEtherBonus(stats);
+            const intellectStartSoul = getIntellectStartSoul(stats);
+            const intellectMagicSoul = getIntellectSoulPerMagic(stats);
+            const strHp = getStrengthHpBonus(stats);
+            const strPhysSoul = getStrengthSoulPerPhys(stats);
+            const dexCritDmg = getAgilityCritDmgBonus(stats);
+            const dexDodgeSoul = getAgilitySoulOnDodge(stats);
             const cdReduce = getMinorBonus(skills, 'cdReduce+', activeSkills);
             const etherReduce = hasEffect(skills, 'etherCost-20', activeSkills);
             const startSoul = engravingFx.startSoul || 0;
@@ -186,7 +208,9 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
             const soulGainMult = engravingFx.soulGainMult || 0;
             const perTurnHpLoss = engravingFx.perTurnHpLoss || 0;
             const disableInsightPredict = !!engravingFx.disableInsightPredict;
-            const hasAny = regenLv || lifesteal || reflect || heal || charismaHeal || intellectSoul || intellectEther || cdReduce || etherReduce
+            const hasAny = regenLv || lifesteal || reflect || heal || charismaHeal
+              || intellectStartSoul || intellectMagicSoul || strHp || strPhysSoul || dexCritDmg || dexDodgeSoul
+              || cdReduce || etherReduce
               || startSoul || perTurnSoul || dodgeSoul || counterHitSoul || counterShock || counterCanCrit || soulGainMult || perTurnHpLoss || disableInsightPredict;
             if (!hasAny) return null;
             return (
@@ -198,8 +222,12 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                   {reflect > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>반사</span><span className="font-bold tabular-nums" style={{ color: PALETTE.accent }}>{reflect}%</span></div>)}
                   {heal > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>회복효과</span><span className="font-bold tabular-nums" style={{ color: PALETTE.green }}>+{heal}%</span></div>)}
                   {charismaHeal > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>매력(회복)</span><span className="font-bold tabular-nums" style={{ color: PALETTE.dawn }}>+{charismaHeal}%</span></div>)}
-                  {intellectSoul > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>지능(마법영혼)</span><span className="font-bold tabular-nums" style={{ color: PALETTE.legendary }}>+{intellectSoul}</span></div>)}
-                  {intellectEther > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>지능(시작에테르)</span><span className="font-bold tabular-nums" style={{ color: '#5c4a8c' }}>+{intellectEther}</span></div>)}
+                  {strHp > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>근력(시작HP)</span><span className="font-bold tabular-nums" style={{ color: PALETTE.accent }}>+{strHp}</span></div>)}
+                  {strPhysSoul > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>근력(물리영혼)</span><span className="font-bold tabular-nums" style={{ color: PALETTE.dawn }}>+{strPhysSoul}</span></div>)}
+                  {dexCritDmg > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>민첩(치명뎀)</span><span className="font-bold tabular-nums" style={{ color: PALETTE.legendary }}>+{dexCritDmg}%</span></div>)}
+                  {dexDodgeSoul > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>민첩(회피영혼)</span><span className="font-bold tabular-nums" style={{ color: PALETTE.dawn }}>+{dexDodgeSoul}</span></div>)}
+                  {intellectStartSoul > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>지능(시작영혼)</span><span className="font-bold tabular-nums" style={{ color: PALETTE.dawn }}>+{intellectStartSoul}</span></div>)}
+                  {intellectMagicSoul > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>지능(마법영혼)</span><span className="font-bold tabular-nums" style={{ color: PALETTE.legendary }}>+{intellectMagicSoul}</span></div>)}
                   {cdReduce > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>쿨다운감소</span><span className="font-bold tabular-nums" style={{ color: PALETTE.twilight }}>-{cdReduce}턴</span></div>)}
                   {etherReduce && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>에테르비용</span><span className="font-bold tabular-nums" style={{ color: PALETTE.twilight }}>-1</span></div>)}
                   {startSoul > 0 && (<div className="flex justify-between" style={{ color: PALETTE.textDim }}><span>시작영혼</span><span className="font-bold tabular-nums" style={{ color: PALETTE.dawn }}>+{startSoul}</span></div>)}
@@ -370,6 +398,9 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
 
       {modalInfo && (
         <CardInfoModal info={modalInfo} onClose={() => setModalState(null)} />
+      )}
+      {statSigStat && (
+        <StatSignatureModal stat={statSigStat} stats={stats} onClose={() => setStatSigStat(null)} />
       )}
     </div>
   );

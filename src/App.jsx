@@ -28,6 +28,7 @@ import {
   rollCurses,
   hasCurse,
   getCharismaHealBonus,
+  getStrengthHpBonus,
   aggregateEngravingEffects,
   computeDisplayPlayerStats,
   computeDerivedStats,
@@ -701,7 +702,9 @@ export default function App() {
       const metaHpBonus = getMetaBonus(meta, 'startHp+10') * 10;
       // 챔피언십 메타 HP (도전자 +50, 정복자 +100, 합계 +150)
       const champHpBonus = getChampionshipMetaHp(meta);
-      let startHp = GAME_CONFIG.startHp + hpBonus + metaHpBonus + champHpBonus + (_engFx.startHp || 0);
+      // 1.37.0~ 근력 시그니처 1단계: 최대 HP +5/포인트 (근력 11+)
+      const strHpBonus = getStrengthHpBonus(adjustedStats);
+      let startHp = GAME_CONFIG.startHp + hpBonus + metaHpBonus + champHpBonus + (_engFx.startHp || 0) + strHpBonus;
       // 저주: 최대 HP -20%
       if (hasCurse(curses, 'curse_maxHp-20')) {
         startHp = Math.floor(startHp * 0.8);

@@ -7,12 +7,13 @@
 // rollDodge: 회피 확률 판정
 // ============================================
 
-import { 
+import {
   getMinorBonus,
   hasEffect,
   hasUltimate,
   hasCurse,
   getMetaBonus,
+  getAgilityCritDmgBonus,
 } from '../utils/helpers.js';
 
 export function calculateDamage(skill, attacker, defender, skills, isCrit, ultimates = [], meta = null, curses = [], activeSkills = null, relicStat = {}, engravingFx = {}) {
@@ -132,9 +133,11 @@ if (isCrit) {
   }
   // 4. 유물 보너스 합산
   critMult += (relicStat.critDmg || 0) / 100;
-  // 5. 최종 데미지 계산 (소수점 버림)
+  // 5. 1.37.0~ 민첩 시그니처 1단계: 치명타 데미지 +2%/포인트 (민첩 11+)
+  critMult += getAgilityCritDmgBonus(attacker) / 100;
+  // 6. 최종 데미지 계산 (소수점 버림)
   dmg = Math.floor(dmg * critMult);
-  // 6. 로그 기록 (소수점 1자리까지 표시하여 가독성 확보)
+  // 7. 로그 기록 (소수점 1자리까지 표시하여 가독성 확보)
   const critLabel = hasEffect(skills, 'weaknessPoint', activeSkills) ? '약점 간파' : '치명타';
   breakdown.push(`${critLabel} ×${critMult.toFixed(1)}`);
 }
