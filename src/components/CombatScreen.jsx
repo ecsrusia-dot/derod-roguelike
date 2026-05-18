@@ -338,6 +338,10 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         }
       }
       // 1.37.0~ 시그니처: 마법 시전 시 영혼 +N (지능 17+, 5단위) / 물리 시전 시 영혼 +N (근력 17+, 5단위)
+      // 1.46.0~ 각인 magicSoulBonus: 마법 시전 시 추가 소울 +N (술법사 풀, ultimateId 무관 적용)
+      if (skill.type === 'magic' && engravingFx.magicSoulBonus) {
+        newPlayer.soulGauge = Math.min(100, (newPlayer.soulGauge || 0) + engravingFx.magicSoulBonus);
+      }
       if (classData.ultimateId) {
         if (skill.type === 'magic') {
           const intelSoul = getIntellectSoulPerMagic(newPlayer);
@@ -583,6 +587,11 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
             newIgniteDmg = baseIgniteDmg;
             newIgniteTurns = 3;
             isEternal = false;
+          }
+
+          // 1.46.0~ 각인: 화염 각인 데미지 +N% (술법사 풀)
+          if (engravingFx.igniteDmgPct) {
+            newIgniteDmg = Math.floor(newIgniteDmg * (1 + engravingFx.igniteDmgPct / 100));
           }
 
           newEnemy.debuffs = {
