@@ -94,9 +94,10 @@ export default function SoulAltar({ meta, onPurchase, onReroll, slots, onBack })
                   <div className="flex items-start justify-between mb-1">
                     <div className="flex-1">
                       <div className="text-[9px] tracking-[0.2em]" style={{ color: upgrade.color, opacity: 0.7 }}>
-                        {upgrade.category === 'unlock' ? 'UNLOCK' : 
+                        {upgrade.category === 'unlock' ? 'UNLOCK' :
                          upgrade.category === 'resource' ? 'RESOURCE' :
-                         upgrade.category === 'combat' ? 'COMBAT' : 'EXPEDITION'}
+                         upgrade.category === 'combat' ? 'COMBAT' :
+                         upgrade.category === 'champion' ? 'CHAMPION' : 'EXPEDITION'}
                       </div>
                       <div className="text-sm font-bold mt-0.5" style={{ color: PALETTE.text }}>
                         {upgrade.name}

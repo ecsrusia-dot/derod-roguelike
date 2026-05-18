@@ -52,6 +52,9 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       const etherBonus = getMetaBonus(meta, 'maxEther+1');
       p.maxEther += etherBonus;
       p.ether += etherBonus;
+      // 1.44.2~ 메타 강화: 전투 시작 방어 +5/Lv
+      const startDefenseBonus = getMetaBonus(meta, 'startDefense+5') * 5;
+      if (startDefenseBonus > 0) p.defense += startDefenseBonus;
     }
     // 저주: 에테르 -1
     if (hasCurse(curses, 'curse_ether-1')) {
@@ -782,7 +785,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     newLog.push({ type: 'enemy', text: `◂ ${enemy.name}: ${intent.name}` });
 
     if (intent.type === 'attack') {
-      const dodged = rollDodge(skills, newPlayer, activeSkills, relicStat, ultimates, engravingFx);
+      const dodged = rollDodge(skills, newPlayer, activeSkills, relicStat, ultimates, engravingFx, meta);
       if (dodged) {
         newLog.push({ type: 'system', text: `· 회피 성공!` });
         // FX — 회피: 플레이어 위에 "회피!" 부유 라벨
@@ -895,8 +898,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
             if (change < 0) takenBreakdown.push(`각인 ${change}`);
             else if (change > 0) takenBreakdown.push(`각인 +${change}`);
           }
-          // 메타 강화: 받는 데미지 -3%/단계
-          const metaReduction = getMetaBonus(meta, 'dmgTaken-3%') * 0.03;
+          // 메타 강화: 받는 데미지 -2%/단계 (1.44.2~)
+          const metaReduction = getMetaBonus(meta, 'dmgTaken-2%') * 0.02;
           if (metaReduction > 0 && dmg > 0) {
             const reduced = Math.floor(dmg * metaReduction);
             dmg -= reduced;
@@ -2102,7 +2105,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
               const playerDex = player.민첩 || 10;
               let critRate = 5 + Math.max(0, (playerDex - 10) * 0.5);
               critRate += getMinorBonus(skills, 'critRate+', activeSkills);
-              critRate += getMetaBonus(meta, 'critRate+3%') * 3;
+              critRate += getMetaBonus(meta, 'critRate+2%') * 2;
               critRate += relicStat.critRate || 0;
               if (hasEffect(skills, 'weaknessPoint', activeSkills)) critRate += 10;
               // 무영검: 치명타 +15%
@@ -2159,10 +2162,10 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
               let counterDmgBonus = simanLv * 5;
               if (simanLv >= 5) counterDmgBonus += 15;
               if (hasMirror || hasShock || hasShadow) counterDmgBonus += 50;
-              const metaDmgBonus = getMetaBonus(meta, 'dmgDealt+5%') * 5;
+              const metaDmgBonus = getMetaBonus(meta, 'dmgDealt+2%') * 2;
               const relicDmgBonus = relicStat.dmgDealt || 0;
               const allDmgBonus = metaDmgBonus + relicDmgBonus;
-              const dmgTakenMeta = getMetaBonus(meta, 'dmgTaken-3%') * 3;
+              const dmgTakenMeta = getMetaBonus(meta, 'dmgTaken-2%') * 2;
               const dmgTakenRelic = relicStat.dmgTaken || 0;
               const dmgTakenLv5 = hasEffect(skills, 'dmgTaken-20', activeSkills) ? 20 : 0;
               const dmgTakenCharisma = getCharismaDmgReduction(player);

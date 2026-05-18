@@ -1,8 +1,9 @@
 // =========== 메타 강화 (영혼의 제단) ===========
 // stackable: true는 단계별 누적 / false는 1회성 해금
-// 매번 제단 입장 시 6개 풀에서 랜덤 3개 등장
+// 매번 제단 입장 시 풀에서 랜덤 3개 등장 (canPurchaseUpgrade 통과 항목만)
+// 1.44.2 재설계: 자원 균일화(×20) + 전투 강화 확장(7개) + 챔피언십 4난이도 분할 + rerollDiscount 폐기
 export const META_UPGRADES = [
-  // === 시작 자원 강화 ===
+  // === 자원 강화 (4) ===
   {
     id: 'meta_startHp',
     name: '강인한 시작',
@@ -10,92 +11,125 @@ export const META_UPGRADES = [
     category: 'resource',
     stackable: true,
     maxStacks: 20,
-    cost: (stack) => 50 + stack * 50,  // 30, 50, 70, 90, 110, 130, 150, 170, 190, 210
+    cost: (stack) => 50 + stack * 50,  // 50→1000, 합 10,500
     effect: 'startHp+10',
     color: '#9ad4a3',
   },
   {
     id: 'meta_startGold',
     name: '풍요의 축복',
-    desc: '시작 은화 +20',
+    desc: '시작 은화 +10',
     category: 'resource',
     stackable: true,
-    maxStacks: 10,
-    cost: (stack) => 50 + stack * 50,  // 20, 35, 50, ... 125
-    effect: 'startGold+20',
+    maxStacks: 20,
+    cost: (stack) => 50 + stack * 50,  // 50→1000, 합 10,500
+    effect: 'startGold+10',
     color: '#d4a574',
   },
   {
     id: 'meta_startGem',
     name: '명상의 결정',
-    desc: '시작 보석 +3',
+    desc: '시작 보석 +2',
     category: 'resource',
     stackable: true,
-    maxStacks: 5,
-    cost: (stack) => 50 + stack * 50,  // 50, 80, 110, 140, 170
-    effect: 'startGem+3',
+    maxStacks: 20,
+    cost: (stack) => 50 + stack * 50,  // 50→1000, 합 10,500
+    effect: 'startGem+2',
     color: '#7ba3c4',
   },
-  {
-    id: 'meta_maxEther',
-    name: '에테르의 그릇',
-    desc: '최대 에테르 +1',
-    category: 'resource',
-    stackable: true,
-    maxStacks: 2,
-    cost: (stack) => 200 + stack * 200,  // 200, 400
-    effect: 'maxEther+1',
-    color: '#5c4a8c',
-  },
-  
-  // === 전투 강화 ===
-  // 'meta_startSkillLv' (단련된 영혼) — 1.25.0에 직업 각인 시스템(각성도 Lv.4·Lv.7)으로 이관 + 영혼 100% 환불
   {
     id: 'meta_startRelic',
     name: '신탁의 유물',
     desc: '시작 시 무작위 유물 +1',
-    category: 'combat',
+    category: 'resource',
     stackable: true,
-    maxStacks: 2,             // 5 → 2 너프
-    cost: (stack) => stack === 0 ? 500 : 2000,  // 500, 2000
+    maxStacks: 2,
+    cost: (stack) => stack === 0 ? 1000 : 2000,  // 1000, 2000, 합 3,000
     effect: 'startRelic+1',
     color: '#e8b04a',
+  },
+
+  // === 전투 강화 (7) ===
+  {
+    id: 'meta_maxEther',
+    name: '에테르의 그릇',
+    desc: '최대 에테르 +1',
+    category: 'combat',
+    stackable: true,
+    maxStacks: 2,
+    cost: (stack) => stack === 0 ? 1500 : 3000,  // 1500, 3000, 합 4,500
+    effect: 'maxEther+1',
+    color: '#5c4a8c',
   },
   {
     id: 'meta_dmgDealt',
     name: '강자의 길',
-    desc: '주는 모든 데미지 +5%',
+    desc: '주는 모든 데미지 +2%',
     category: 'combat',
     stackable: true,
-    maxStacks: 5,
-    cost: (stack) => 500 + stack * 500,  // 500, 1000, 1500, 2000, 2500
-    effect: 'dmgDealt+5%',
+    maxStacks: 10,
+    cost: (stack) => 700 + stack * 100,  // 700→1600, 합 11,500
+    effect: 'dmgDealt+2%',
     color: '#c4453d',
   },
   {
     id: 'meta_dmgTaken',
     name: '강철의 의지',
-    desc: '받는 모든 데미지 -3%',
+    desc: '받는 모든 데미지 -2%',
     category: 'combat',
     stackable: true,
-    maxStacks: 5,
-    cost: (stack) => 300 + stack * 300,  // 300, 600, 900, 1200, 1500
-    effect: 'dmgTaken-3%',
+    maxStacks: 10,
+    cost: (stack) => 700 + stack * 100,  // 700→1600, 합 11,500
+    effect: 'dmgTaken-2%',
     color: '#7ba3c4',
   },
   {
     id: 'meta_critRate',
-    name: '예리함의 시야',
-    desc: '치명타율 +3%',
+    name: '예리한 감각',
+    desc: '치명타율 +2%',
     category: 'combat',
     stackable: true,
     maxStacks: 5,
-    cost: (stack) => 500 + stack * 500,  // 500, 1000, 1500, 2000, 2500
-    effect: 'critRate+3%',
+    cost: (stack) => 1500 + stack * 300,  // 1500→2700, 합 10,500
+    effect: 'critRate+2%',
     color: '#d4a574',
   },
-  
-  // === 원정 강화 ===
+  {
+    id: 'meta_dodgeRate',
+    name: '유연한 그림자',
+    desc: '회피율 +2%',
+    category: 'combat',
+    stackable: true,
+    maxStacks: 5,
+    cost: (stack) => 1500 + stack * 300,  // 1500→2700, 합 10,500
+    effect: 'dodgeRate+2%',
+    color: '#9aa8c4',
+  },
+  {
+    id: 'meta_critDmg',
+    name: '절명의 각인',
+    desc: '치명타 데미지 +5%',
+    category: 'combat',
+    stackable: true,
+    maxStacks: 5,
+    cost: (stack) => 1500 + stack * 300,  // 1500→2700, 합 10,500
+    effect: 'critDmg+5%',
+    color: '#c4774a',
+  },
+  {
+    id: 'meta_startDefense',
+    name: '선견의 강철',
+    desc: '전투 시작 시 방어 +5',
+    category: 'combat',
+    stackable: true,
+    maxStacks: 10,
+    cost: (stack) => 700 + stack * 100,  // 700→1600, 합 11,500
+    effect: 'startDefense+5',
+    color: '#5c8c7a',
+  },
+
+  // === 원정 강화 (2) ===
+  // 1.44.2 폐기: meta_rerollDiscount (운명의 손길) — 효과 키 'reroll-1'이 코드에 적용 안 되던 죽은 항목. 환불 처리.
   {
     id: 'meta_chapterHeal',
     name: '여정의 가호',
@@ -103,57 +137,66 @@ export const META_UPGRADES = [
     category: 'expedition',
     stackable: true,
     maxStacks: 3,
-    cost: (stack) => 1000 + stack * 1000,  // 1000, 2000, 3000
+    cost: (stack) => 1000 + stack * 1000,  // 1000, 2000, 3000, 합 6,000
     effect: 'chapterHeal+10%',
     color: '#9ad4a3',
   },
   {
-    id: 'meta_rerollDiscount',
-    name: '운명의 손길',
-    desc: '리롤 비용 -10 영혼',
-    category: 'expedition',
-    stackable: false,
-    cost: () => 600,
-    effect: 'reroll-1',
-    color: '#5c4a8c',
-  },
-  {
     id: 'meta_extraReward',
     name: '풍성한 보상',
-    desc: '보상 3중1 → 4중1',
+    desc: '보상 3중1 → 4중1 (첫 보상만)',
     category: 'expedition',
     stackable: false,
     cost: () => 800,
     effect: 'reward+1',
     color: '#e8b04a',
   },
-  
-  // === 해금 ===
-  // 직업 해금은 수련의 길 클리어로 자동 해금 (영혼 구매 불필요)
-  // 원정 해금도 진행 기반 (튜토리얼 → 수련 → 챔피언십)으로 변경
-  
-  // === 챔피언십 메타 강화 (도전자 보상) ===
+
+  // === 챔피언십 메타 강화 (4난이도, 조건부 해금) ===
+  // 1.44.2 재설계: 효과 통일 (시작 HP·은화), 4난이도 신설 (normal/hard/hell/madness)
   {
     id: 'meta_champion_normal',
     name: '도전자의 영혼',
-    desc: '시작 HP +50, 시작 패시브 +1Lv (모든 챔피언십 일반 클리어 후 구매 가능)',
+    desc: '시작 HP +10, 시작 은화 +10 (5원정 일반 전 클리어)',
     category: 'champion',
     stackable: false,
     cost: () => 3000,
-    requireChampionshipAll: 'normal',  // 5원정 모두 일반 클리어 필요
+    requireChampionshipAll: 'normal',
     effect: 'champion_normal',
     color: '#d4a574',
   },
   {
+    id: 'meta_champion_hard',
+    name: '용맹의 영혼',
+    desc: '시작 HP +15, 시작 은화 +15 (5원정 하드 전 클리어)',
+    category: 'champion',
+    stackable: false,
+    cost: () => 6000,
+    requireChampionshipAll: 'hard',
+    effect: 'champion_hard',
+    color: '#c47a45',
+  },
+  {
+    id: 'meta_champion_hell',
+    name: '지옥의 영혼',
+    desc: '시작 HP +20, 시작 은화 +20 (5원정 지옥 전 클리어)',
+    category: 'champion',
+    stackable: false,
+    cost: () => 9000,
+    requireChampionshipAll: 'hell',
+    effect: 'champion_hell',
+    color: '#c4453d',
+  },
+  {
     id: 'meta_champion_madness',
-    name: '정복자의 영혼',
-    desc: '시작 HP +100, 시작 패시브 +2Lv, 시작 유물 +1 (모든 챔피언십 광기 클리어 후 구매 가능)',
+    name: '광기의 영혼',
+    desc: '시작 HP +25, 시작 은화 +25 (5원정 광기 전 클리어)',
     category: 'champion',
     stackable: false,
     cost: () => 10000,
     requireChampionshipAll: 'madness',
     effect: 'champion_madness',
-    color: '#c4453d',
+    color: '#a02828',
   },
 ];
 

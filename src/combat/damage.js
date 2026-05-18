@@ -131,14 +131,16 @@ if (isCrit) {
   critMult += (relicStat.critDmg || 0) / 100;
   // 5. 1.37.0~ 민첩 시그니처 1단계: 치명타 데미지 +2%/포인트 (민첩 11+)
   critMult += getAgilityCritDmgBonus(attacker) / 100;
+  // 5-2. 1.44.2~ 메타 강화 「절명의 각인」: 치명타 데미지 +5%/단계
+  critMult += getMetaBonus(meta, 'critDmg+5%') * 0.05;
   // 6. 최종 데미지 계산 (소수점 버림)
   dmg = Math.floor(dmg * critMult);
   // 7. 로그 기록 (소수점 1자리까지 표시하여 가독성 확보)
   const critLabel = hasEffect(skills, 'weaknessPoint', activeSkills) ? '약점 간파' : '치명타';
   breakdown.push(`${critLabel} ×${critMult.toFixed(1)}`);
 }
-  // 메타 강화: 주는 데미지 +5%/단계
-  const metaDmgBonus = getMetaBonus(meta, 'dmgDealt+5%') * 0.05;
+  // 메타 강화: 주는 데미지 +2%/단계 (1.44.2~)
+  const metaDmgBonus = getMetaBonus(meta, 'dmgDealt+2%') * 0.02;
   if (metaDmgBonus > 0) {
     const bonus = Math.floor(dmg * metaDmgBonus);
     dmg += bonus;
@@ -220,7 +222,7 @@ export function getDisplayDamage(skill, attacker, skills, ultimates, meta, curse
     if (skill.type === 'magic' && attacker.buffs?.flameBoostTurns > 0 && attacker.buffs?.flameBoostPct > 0) {
       dmg += Math.floor(dmg * (attacker.buffs.flameBoostPct / 100));
     }
-    const metaDmgBonus = getMetaBonus(meta, 'dmgDealt+5%') * 0.05;
+    const metaDmgBonus = getMetaBonus(meta, 'dmgDealt+2%') * 0.02;
     if (metaDmgBonus > 0) dmg += Math.floor(dmg * metaDmgBonus);
     const relicDmgPct = (relicStat.dmgDealt || 0) / 100;
     if (relicDmgPct > 0) dmg += Math.floor(dmg * relicDmgPct);
@@ -243,8 +245,8 @@ export function rollCrit(skills, attacker, meta = null, activeSkills = null, rel
   // 2. 정밀 minor: 치명타율 +3%/Lv
   critRate += getMinorBonus(skills, 'critRate+', activeSkills);
 
-  // 3. 메타 강화 및 유물 보너스
-  critRate += getMetaBonus(meta, 'critRate+3%') * 3;
+  // 3. 메타 강화 및 유물 보너스 (1.44.2~ critRate +2%/단계)
+  critRate += getMetaBonus(meta, 'critRate+2%') * 2;
   critRate += relicStat.critRate || 0;
 
   // 4. ★ [심안] 7단계 효과 적용
@@ -270,15 +272,16 @@ export function rollCrit(skills, attacker, meta = null, activeSkills = null, rel
   return Math.random() * 100 < critRate;
 }
 
-export function rollDodge(skills, defender, activeSkills = null, relicStat = {}, ultimates = null, engravingFx = {}) {
+export function rollDodge(skills, defender, activeSkills = null, relicStat = {}, ultimates = null, engravingFx = {}, meta = null) {
   // 1. 민첩 자동 가산 (1.42.0~ 민첩 × 0.3%/포인트, 임계 없음)
   let dodgeRate = (defender.민첩 || 0) * 0.3;
 
   // 2. 회피 minor 스킬 보너스 (+3%/Lv)
   dodgeRate += getMinorBonus(skills, 'dodge+', activeSkills);
 
-  // 3. 유물 보너스
+  // 3. 유물 보너스 + 메타 강화 「유연한 그림자」 (1.44.2~ +2%/단계)
   dodgeRate += relicStat.dodge || 0;
+  dodgeRate += getMetaBonus(meta, 'dodgeRate+2%') * 2;
 
   // 4. 기존 특정 스킬 효과 (회피+15)
   if (hasEffect(skills, 'dodge+15', activeSkills)) {
