@@ -7,6 +7,20 @@
 
 export const CHANGELOG = [
   {
+    version: '1.45.0',
+    date: '2026-05-18',
+    label: '술법사 화염 이펙트 6종 신설 — 영겁의 화염 컷인 + 파이어볼/익스플로젼 + 화염 각인 글로우/폭발 + 화염장막 결계/반사',
+    changes: [
+      { type: 'feature', text: '[영겁의 화염 풀스크린 컷인] 술법사 직업 소울 스킬 발동 시 주황·적색 화염 소용돌이 (2겹 역회전) + 중심 백광 코어 + "永劫" 한자 글로우 0.9초 풀스크린 시네마틱. 방랑검사 무영의 일격(ShadowStrikeFx)과 동일한 차별화 패턴. UltimateCutin 공용 배너 위에 겹쳐 표시' },
+      { type: 'feature', text: '[파이어볼 / 익스플로젼 화염 이펙트 분리] 술법사 기본 액티브 스킬에 전용 화염 임팩트. 파이어볼(마법탄, 소효과) — 작은 주황 불꽃 + 4입자 (0.5초). 익스플로젼(정념폭발, 대효과) — 풀스크린 폭발 + 8방향 파편 + 백광 중심 (0.7초). 기존 마법(이프리트·신성광선 등)은 기존 보라 MagicImpactFx 유지' },
+      { type: 'feature', text: '[화염 각인 글로우 지속] 적 카드에 화염 각인(igniteDmg > 0) 부여 시 카드 테두리 붉은 화염 일렁임이 지속 표시 (CSS 1.6초 반복). 각인 보유 적이 한눈에 보임' },
+      { type: 'feature', text: '[각인 폭발 임팩트] 치명타 시 화염 각인 폭발 발동 → 풀스크린 흰→주황 방사형 플래시 (0.45초). 이프리트 폭딜 빌드의 핵심 쾌감 강조' },
+      { type: 'feature', text: '[화염장막 결계] 술법사 액티브 화염장막 시전 시 플레이어 앞 붉은 화염 결계 링 펄스 (이중 링, 0.8초). 기존 BarrierRing(파란 결계)과 차별화' },
+      { type: 'feature', text: '[화염장막 반사] 화염장막 보유 적 공격이 반사 발동 시 적→플레이어 방향으로 화염 입자 5개 역방향 비행 (0.6초)' },
+      { type: 'system', text: '[코드 구조] index.css 9개 키프레임(fx-flame-vortex/kanji/ember/burst/shard, fx-ignite-aura/explode, fx-flame-barrier/reflect) + CombatEffects.jsx 7개 컴포넌트 신설. CombatScreen.jsx 트리거 6곳 연결. 풀스크린 컷인은 conic-gradient 소용돌이 + radial-gradient 백광 + 한자 글로우 3겹 합성. 회귀 0건 (술법사 외 직업·기존 마법 동작 유지)' },
+    ],
+  },
+  {
     version: '1.44.2',
     date: '2026-05-18',
     label: '영혼의 제단 전면 재설계 — 자원 균일화 + 전투 강화 7개로 확장 + 챔피언십 4난이도 분할 + 100% 환불',
