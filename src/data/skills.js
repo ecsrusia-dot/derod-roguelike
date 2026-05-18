@@ -15,9 +15,9 @@ export const COMBAT_SKILLS = {
   참격: { name: '참격', cost: 0, cd: 0, type: 'physical', baseDmg: [20, 26], desc: '기본 검 공격' },
   관통: { name: '관통', cost: 2, cd: 2, type: 'physical', baseDmg: [32, 40], desc: '방어 무시', pierce: true },
   방검: { name: '방검', cost: 1, cd: 2, type: 'defense', defense: 30, desc: '방어 +30' },
-  // 술법사
-  마법탄: { name: '마법탄', cost: 0, cd: 0, type: 'magic', baseDmg: [18, 24], desc: '기본 마법' },
-  정념폭발: { name: '정념폭발', cost: 2, cd: 3, type: 'magic', baseDmg: [42, 52], desc: '강력한 마법' },
+  // 술법사 (1.42.0~ 표시명 변경: 마법탄→파이어볼, 정념폭발→익스플로젼. 코드 키는 호환 유지)
+  마법탄: { name: '파이어볼', cost: 0, cd: 0, type: 'magic', baseDmg: [18, 24], desc: '기본 마법' },
+  정념폭발: { name: '익스플로젼', cost: 2, cd: 3, type: 'magic', baseDmg: [42, 52], desc: '강력한 마법' },
   결계: { name: '결계', cost: 1, cd: 1, type: 'defense', defense: 50, desc: '방어 +50' },
   화염장막: { name: '화염장막', cost: 1, cd: 1, type: 'defense', defense: 40, desc: '방어 +40. 공격한 적에게 화염 각인 50% 반사 (1회).', reflectIgnite: 50 },
   // 혼혈 마족

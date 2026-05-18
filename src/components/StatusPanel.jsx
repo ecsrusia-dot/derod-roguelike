@@ -88,8 +88,8 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
           {/* ━ 전투 수치 ━ 1.41.0~ 모든 라인 클릭 시 출처 분해 모달 */}
           {(() => {
             const playerDex = stats['민첩'] || 10;
-            const dexAutoCrit = Math.max(0, (playerDex - 10) * 0.5);
-            const dexAutoDodge = Math.max(0, (playerDex - 10) * 0.3);
+            const dexAutoCrit = (playerDex || 0) * 0.5;
+            const dexAutoDodge = (playerDex || 0) * 0.3;
             const dexPts = Math.max(0, playerDex - 10);
             const critMinor = getMinorBonus(skills, 'critRate+', activeSkills);
             const critMetaStacks = getMetaBonus(meta, 'critRate+3%');
@@ -150,7 +150,7 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                     color: PALETTE.legendary,
                     sources: [
                       { label: '기본 (전 직업 공통)', value: 5, unit: '%' },
-                      { label: '민첩 자동 가산', value: dexAutoCrit, unit: '%', note: `적용 포인트 ${dexPts}(=민첩-10) × +0.5%/p` },
+                      { label: '민첩 자동 가산', value: dexAutoCrit, unit: '%', note: `민첩 ${playerDex} × +0.5%/p (1.42.0~ 스탯 전체)` },
                       { label: '패시브 critRate+ 누적', value: critMinor, unit: '%' },
                       { label: '영혼의 제단 (critRate+3% × 스택)', value: critMeta, unit: '%', note: critMetaStacks > 0 ? `${critMetaStacks} 스택` : null },
                       { label: '유물 critRate', value: critRelic, unit: '%' },
@@ -178,7 +178,7 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                     subtitle: '적의 공격을 피할 확률.',
                     color: PALETTE.green,
                     sources: [
-                      { label: '민첩 자동 가산', value: dexAutoDodge, unit: '%', note: `적용 포인트 ${dexPts}(=민첩-10) × +0.3%/p` },
+                      { label: '민첩 자동 가산', value: dexAutoDodge, unit: '%', note: `민첩 ${playerDex} × +0.3%/p (1.42.0~ 스탯 전체)` },
                       { label: '패시브 dodge+ 누적', value: dodgeMinor, unit: '%' },
                       { label: '유물 dodge', value: dodgeRelic, unit: '%' },
                       { label: '회피 Lv.5 (+15%)', value: dodgeLv5, unit: '%' },
@@ -487,7 +487,7 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                     <button onClick={openHealBreakdown} className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>회복량 보너스 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.green }}>+{healTotalPct}%</span></button>
                   )}
                   {charismaSoul > 0 && (
-                    <button onClick={() => openSimpleLine('매력 시그: 영혼 획득', `+${charismaSoul}%`, [{ label: '매력 시그니처 (자동 가산)', value: charismaSoul, unit: '%', note: `적용 포인트 ${Math.max(0, (stats['매력'] || 10) - 10)}(=매력-10) × +0.5%/p` }], PALETTE.dawn, '영구 메타 영혼 획득량 보너스 (처치 영혼·챕터 보너스·무한 깊이 보너스·대장간 등 모든 영혼 가산처).')}
+                    <button onClick={() => openSimpleLine('매력 시그: 영혼 획득', `+${charismaSoul}%`, [{ label: '매력 시그니처 (자동 가산)', value: charismaSoul, unit: '%', note: `매력 ${stats['매력'] || 0} × +0.5%/p (1.42.0~ 스탯 전체)` }], PALETTE.dawn, '영구 메타 영혼 획득량 보너스 (처치 영혼·챕터 보너스·무한 깊이 보너스·대장간 등 모든 영혼 가산처).')}
                       className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>매력 시그: 영혼 획득 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.dawn }}>+{charismaSoul}%</span></button>
                   )}
                   {strHp > 0 && (

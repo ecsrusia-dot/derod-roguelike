@@ -241,8 +241,8 @@ export function getDisplayDamage(skill, attacker, skills, ultimates, meta, curse
 }
 
 export function rollCrit(skills, attacker, meta = null, activeSkills = null, relicStat = {}, ultimates = null, engravingFx = {}) {
-  // 1. 기본 확률 + 민첩 보너스
-  let critRate = 5 + Math.max(0, (attacker.민첩 - 10) * 0.5);
+  // 1. 기본 확률 + 민첩 자동 가산 (1.42.0~ 민첩 × 0.5%/포인트, 임계 없음)
+  let critRate = 5 + (attacker.민첩 || 0) * 0.5;
 
   // 2. 정밀 minor: 치명타율 +3%/Lv
   critRate += getMinorBonus(skills, 'critRate+', activeSkills);
@@ -275,8 +275,8 @@ export function rollCrit(skills, attacker, meta = null, activeSkills = null, rel
 }
 
 export function rollDodge(skills, defender, activeSkills = null, relicStat = {}, ultimates = null, engravingFx = {}) {
-  // 1. 민첩 보너스 (기본)
-  let dodgeRate = Math.max(0, (defender.민첩 - 10) * 0.3);
+  // 1. 민첩 자동 가산 (1.42.0~ 민첩 × 0.3%/포인트, 임계 없음)
+  let dodgeRate = (defender.민첩 || 0) * 0.3;
 
   // 2. 회피 minor 스킬 보너스 (+3%/Lv)
   dodgeRate += getMinorBonus(skills, 'dodge+', activeSkills);
