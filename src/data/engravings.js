@@ -3,13 +3,14 @@
 // PR 2: 데이터 + UI + 마이그레이션. 전투 적용은 PR 3에서.
 
 // 등급별 가중치 (총 100%). 각인 가챠 결과의 분포 결정.
+// 1.46.0~ 가중치 조정 (PM 결정): 부정(결함+저주) 비중 5%→15%로 증가 — 빌드 다양성·리스크 강화
 export const ENGRAVING_TIERS = {
   C:         { weight: 40, color: '#cccccc', label: 'Common',    glow: false },
-  R:         { weight: 30, color: '#7ba3c4', label: 'Rare',      glow: false },
-  E:         { weight: 20, color: '#9b5fc4', label: 'Epic',      glow: true  },
+  R:         { weight: 25, color: '#7ba3c4', label: 'Rare',      glow: false },
+  E:         { weight: 15, color: '#9b5fc4', label: 'Epic',      glow: true  },
   L:         { weight: 5,  color: '#e8b04a', label: 'Legendary', glow: true  },
-  NEG_FLAW:  { weight: 3,  color: '#777777', label: '결함',       glow: false },
-  NEG_CURSE: { weight: 2,  color: '#444444', label: '저주',       glow: true  },
+  NEG_FLAW:  { weight: 8,  color: '#777777', label: '결함',       glow: false },
+  NEG_CURSE: { weight: 7,  color: '#444444', label: '저주',       glow: true  },
 };
 
 // 가챠 비용 (칸별 1회 변경)
@@ -208,32 +209,33 @@ export const ENGRAVINGS = {
   ],
   // 1.46.0~ 술법사 풀 24장 (균형 컨셉 — 이프리트 화염 + 마력 마법 + 영겁 소울)
   // effect 키: int·startHp·cha / magicDmgPct·critRate·dodgeRate / igniteDmgPct·magicSoulBonus /
-  //            startSoul·perTurnSoul·soulGainMult / -dmgTakenPct·-dodgeRate·perTurnHpLoss·disableInsightPredict
+  //            igniteApplyPct·soulOnIgniteApply·igniteSuppress (신규, 술법사 전용) /
+  //            startSoul·perTurnSoul·soulGainMult / -dmgTakenPct·-dodgeRate·perTurnHpLoss
   sage: [
     // === Common (5) ===
     { id: 'eng_sage_focus',      tier: 'C', name: '집중된 사고',  desc: '지능 +2',                        effect: { int: 2 } },
     { id: 'eng_sage_robe',       tier: 'C', name: '술사의 로브',  desc: '시작 HP +30',                    effect: { startHp: 30 } },
     { id: 'eng_sage_breath',     tier: 'C', name: '주문의 호흡',  desc: '매 턴 시작 시 소울 게이지 +1',   effect: { perTurnSoul: 1 } },
-    { id: 'eng_sage_ember',      tier: 'C', name: '작은 불씨',    desc: '마법 데미지 +5%',                effect: { magicDmgPct: 5 } },
+    { id: 'eng_sage_ember',      tier: 'C', name: '작은 불씨',    desc: '마법 데미지 +3%',                effect: { magicDmgPct: 3 } },
     { id: 'eng_sage_charm',      tier: 'C', name: '매혹의 미소',  desc: '매력 +2',                        effect: { cha: 2 } },
 
     // === Rare (5) ===
-    { id: 'eng_sage_arcane',     tier: 'R', name: '비전(秘傳)의 흐름', desc: '마법 데미지 +10%',                  effect: { magicDmgPct: 10 } },
-    { id: 'eng_sage_flame_seed', tier: 'R', name: '불의 씨앗',         desc: '화염 각인 데미지 +20%',             effect: { igniteDmgPct: 20 } },
-    { id: 'eng_sage_chant',      tier: 'R', name: '영창의 가락',       desc: '마법 시전 시 소울 게이지 +1',       effect: { magicSoulBonus: 1 } },
-    { id: 'eng_sage_sharp_mind', tier: 'R', name: '예리한 정신',       desc: '치명타 발동율 +5%',                 effect: { critRate: 5 } },
-    { id: 'eng_sage_wisdom',     tier: 'R', name: '현자의 통찰',       desc: '지능 +4',                           effect: { int: 4 } },
+    { id: 'eng_sage_arcane',     tier: 'R', name: '비전(秘傳)의 흐름', desc: '마법 데미지 +5%',                              effect: { magicDmgPct: 5 } },
+    { id: 'eng_sage_flame_seed', tier: 'R', name: '불의 씨앗',         desc: '화염 각인 데미지 +20%',                        effect: { igniteDmgPct: 20 } },
+    { id: 'eng_sage_chant',      tier: 'R', name: '영창의 가락',       desc: '화염 각인 부여 시 소울 게이지 +3',             effect: { soulOnIgniteApply: 3 } },
+    { id: 'eng_sage_ignite_rate',tier: 'R', name: '예리한 정신',       desc: '화염 각인 부여 확률 +10%',                     effect: { igniteApplyPct: 10 } },
+    { id: 'eng_sage_wisdom',     tier: 'R', name: '현자의 통찰',       desc: '지능 +4',                                      effect: { int: 4 } },
 
     // === Epic (5) ===
-    { id: 'eng_sage_inferno',    tier: 'E', name: '인페르노의 화신',  desc: '화염 각인 데미지 +35%',              effect: { igniteDmgPct: 35 } },
-    { id: 'eng_sage_chant_loud', tier: 'E', name: '강령의 영창',      desc: '마법 시전 시 소울 게이지 +2',        effect: { magicSoulBonus: 2 } },
-    { id: 'eng_sage_pyro',       tier: 'E', name: '파이로카인의 권능', desc: '마법 데미지 +12% / 치명타 발동율 +3%', effect: { magicDmgPct: 12, critRate: 3 } },
-    { id: 'eng_sage_meditation', tier: 'E', name: '명상의 결실',      desc: '전투 시작 시 소울 게이지 +15',       effect: { startSoul: 15 } },
-    { id: 'eng_sage_soul_burn',  tier: 'E', name: '영혼의 연소',      desc: '소울 게이지 획득 +25%',              effect: { soulGainMult: 0.25 } },
+    { id: 'eng_sage_pyro',       tier: 'E', name: '파이로카인의 권능', desc: '마법 데미지 +7% / 치명타 발동율 +3%',         effect: { magicDmgPct: 7, critRate: 3 } },
+    { id: 'eng_sage_inferno',    tier: 'E', name: '이프리트의 화신',  desc: '화염 각인 데미지 +40%',                       effect: { igniteDmgPct: 40 } },
+    { id: 'eng_sage_chant_loud', tier: 'E', name: '강령의 영창',      desc: '마법 시전 시 소울 게이지 +3',                 effect: { magicSoulBonus: 3 } },
+    { id: 'eng_sage_meditation', tier: 'E', name: '명상의 결실',      desc: '전투 시작 시 소울 게이지 +15',                effect: { startSoul: 15 } },
+    { id: 'eng_sage_soul_speed', tier: 'E', name: '영혼 가속',        desc: '소울 게이지 획득 +20%',                       effect: { soulGainMult: 0.20 } },
 
     // === Legendary (2) ===
-    { id: 'eng_sage_eternal',    tier: 'L', name: '영겁(永劫)의 인장', desc: '마법 데미지 +20% / 화염 각인 데미지 +30%', effect: { magicDmgPct: 20, igniteDmgPct: 30 } },
-    { id: 'eng_sage_arch_mage',  tier: 'L', name: '대마법사의 권위',   desc: '마법 시전 시 소울 게이지 +3 / 매 턴 소울 +2', effect: { magicSoulBonus: 3, perTurnSoul: 2 } },
+    { id: 'eng_sage_inferno_seal', tier: 'L', name: '화신(火神)의 인장', desc: '마법 데미지 +10% / 화염 각인 데미지 +50%',                     effect: { magicDmgPct: 10, igniteDmgPct: 50 } },
+    { id: 'eng_sage_arch_mage',    tier: 'L', name: '대마법사의 권위',    desc: '마법 시전 시 소울 게이지 +3 / 매 턴 소울 +2',                effect: { magicSoulBonus: 3, perTurnSoul: 2 } },
 
     // === Flaw (결함, 4) ===
     { id: 'eng_sage_flaw_fatigue',  tier: 'NEG_FLAW', name: '주문의 피로',  desc: '매 턴 HP -3 (자가 피해)',         effect: { perTurnHpLoss: 3 } },
@@ -242,9 +244,9 @@ export const ENGRAVINGS = {
     { id: 'eng_sage_flaw_unfocus',  tier: 'NEG_FLAW', name: '흐트러진 정신', desc: '치명타 발동율 -8%',               effect: { critRate: -8 } },
 
     // === Curse (저주, 3) ===
-    { id: 'eng_sage_curse_pyro',     tier: 'NEG_CURSE', name: '파이로마니아의 광기', desc: '화염 각인 데미지 +50% / 받는 데미지 +25%',     effect: { igniteDmgPct: 50, dmgTakenPct: 25 } },
-    { id: 'eng_sage_curse_arcane',   tier: 'NEG_CURSE', name: '금단의 마법진',       desc: '마법 데미지 +30% / 매 턴 HP -5',               effect: { magicDmgPct: 30, perTurnHpLoss: 5 } },
-    { id: 'eng_sage_curse_oblivion', tier: 'NEG_CURSE', name: '망각의 인장',         desc: '마법 시전 시 소울 +4 / 적 다음 행동 감지 불가', effect: { magicSoulBonus: 4, disableInsightPredict: true } },
+    { id: 'eng_sage_curse_pyro',     tier: 'NEG_CURSE', name: '파이로마니아의 광기', desc: '화염 각인 데미지 +50% / 소울 게이지 획득 -25%',          effect: { igniteDmgPct: 50, soulGainMult: -0.25 } },
+    { id: 'eng_sage_curse_arcane',   tier: 'NEG_CURSE', name: '금단의 마법진',       desc: '화염 각인 부여 확률 +100% / 매 턴 HP -5',                effect: { igniteApplyPct: 100, perTurnHpLoss: 5 } },
+    { id: 'eng_sage_curse_oblivion', tier: 'NEG_CURSE', name: '망각의 인장',         desc: '마법 시전 시 소울 게이지 +4 / 화염 각인 부여 0%로 고정', effect: { magicSoulBonus: 4, igniteSuppress: true } },
   ],
   demonblood: [],
   elf: [],

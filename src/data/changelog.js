@@ -9,12 +9,14 @@ export const CHANGELOG = [
   {
     version: '1.46.0',
     date: '2026-05-18',
-    label: '술법사 각인 풀 24장 신설 + 신규 effect 키 3종 (magicDmgPct·igniteDmgPct·magicSoulBonus)',
+    label: '술법사 각인 풀 24장 신설 + 신규 effect 키 6종 + 가중치 조정 + 빈 슬롯 가챠 복구',
     changes: [
-      { type: 'feature', text: '[술법사 각인 풀 24장 신설] 균형 컨셉 — 이프리트 화염 + 마력 마법 + 영겁 소울 융합. Common 5 / Rare 5 / Epic 5 / Legendary 2 / Flaw 4 / Curse 3. 타이틀 화면 「◆ 직업 각인」 → 술법사 슬롯의 가챠가 활성화. 1.25.0 인프라 그대로 적용 (코드 변경 없이 데이터만 추가하면 자동 동작)' },
-      { type: 'feature', text: '[신규 effect 키 3종] magicDmgPct (마법 데미지 +N% × 슬롯 합산) / igniteDmgPct (화염 각인 데미지 +N% × 슬롯 합산) / magicSoulBonus (마법 시전 시 소울 +N × 슬롯 합산). 모두 술법사 풀에서 사용. fx bag 패턴 그대로 — aggregateEngravingEffects 합산 후 damage.js·CombatScreen 분기에서 적용' },
-      { type: 'system', text: '[적용 위치] damage.js calculateDamage: skill.type === \'magic\' 분기에 engravingFx.magicDmgPct 가산 (2곳: 메인 + 마법 추가 데미지). CombatScreen: 화염 각인 부여 시점에 engravingFx.igniteDmgPct 곱셈 적용, 마법 시전 시점에 engravingFx.magicSoulBonus 가산. 비술법사 직업/비마법 스킬은 무영향 (회귀 0건)' },
-      { type: 'system', text: '[향후 작업] 다음 PR — (1) StatusPanel에 술법사 각인 효과 출처 노출 (magicDmgPct/igniteDmgPct/magicSoulBonus 라인) (2) 4직업 중 demonblood·elf·priest 풀 작성 (각 24장)' },
+      { type: 'feature', text: '[술법사 각인 풀 24장 신설] 균형 컨셉 — 이프리트 화염 + 마력 마법 + 영겁 소울 융합. Common 5 / Rare 5 / Epic 5 / Legendary 2 / Flaw 4 / Curse 3. 타이틀 「◆ 직업 각인」 → 술법사 슬롯의 가챠가 활성화. 1.25.0 인프라 그대로 적용 (데이터만 추가하면 자동 동작)' },
+      { type: 'balance', text: '[ENGRAVING_TIERS 가중치 조정] 전 직업 공통: Common 40 / Rare 30→25 / Epic 20→15 / Legendary 5 / 결함 3→8 / 저주 2→7. 부정(결함+저주) 비중 5%→15%로 증가 — 빌드 다양성과 리스크 강화. 레전더리 5% 유지' },
+      { type: 'feature', text: '[신규 effect 키 6종] magicDmgPct (마법 데미지 +N%) / igniteDmgPct (화염 각인 데미지 +N%) / magicSoulBonus (마법 시전 시 소울 +N) / igniteApplyPct (화염 각인 부여 확률 +N%, 이프리트 없어도 작동) / soulOnIgniteApply (화염 각인 부여 시 소울 +N) / igniteSuppress (화염 각인 부여 0% 강제 봉인). 모두 술법사 풀에서 사용. fx bag 패턴 — aggregateEngravingEffects 합산 후 damage.js·CombatScreen 분기에서 적용' },
+      { type: 'system', text: '[적용 위치] damage.js: skill.type === \'magic\' 분기 2곳에 magicDmgPct 가산. CombatScreen 화염 각인 분기 (line ~549): igniteApplyPct 합산 + igniteSuppress 시 분기 봉인 + soulOnIgniteApply 부여 성공 시 소울 가산 + igniteDmgPct 곱셈. CombatScreen 마법 시전 (line ~341): magicSoulBonus 가산. 비술법사 직업/비마법 스킬 무영향' },
+      { type: 'fix', text: '[빈 슬롯 가챠 복구] EngravingScreen SlotCard: 슬롯 개방됨 + 카드 null 상태에서 가챠 버튼이 누락되어 영구 잠긴 상태가 되는 버그 수정. 1.25.0 마이그레이션 직후 방랑검사 슬롯1이 비어 있어 리롤 불가했던 사례 해결. "다시 강화 시 자동 부여" 거짓 안내를 "각인 가챠로 새 카드를 부여하세요"로 정정 + 가챠 버튼 활성화' },
+      { type: 'system', text: '[향후 작업] 다음 PR — (1) StatusPanel에 술법사 각인 효과 출처 6종 노출 (2) 4직업 중 demonblood·elf·priest 풀 작성 (각 24장)' },
     ],
   },
   {

@@ -546,7 +546,10 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       const hasPurgatoryFire = hasUltimate(ultimates, 'ult_purgatoryFire');
       const hasAnyIfritUlt = hasEternalFire || hasIfritDescent || hasPurgatoryFire;
       
-      if (skill.type === 'magic' && (hasIfritPassive || hasAnyIfritUlt) && newEnemy.currentHp > 0) {
+      // 1.46.0~ 각인 igniteApplyPct: 이프리트 없이도 화염 각인 부여 가능 (술법사 풀)
+      // 1.46.0~ 각인 igniteSuppress: 화염 각인 부여 강제 봉인 (술법사 저주, 이프리트 보유해도 0%)
+      const hasIgniteSource = hasIfritPassive || hasAnyIfritUlt || (engravingFx.igniteApplyPct > 0);
+      if (skill.type === 'magic' && hasIgniteSource && !engravingFx.igniteSuppress && newEnemy.currentHp > 0) {
         // 1.33.0~ 발동율 통일: 궁극 보유 시 공통 70% / 패시브만 30%. minor +2%/Lv는 별도 합산
         let igniteChance = 0;
         if (hasAnyIfritUlt) igniteChance = 0.7;
@@ -557,6 +560,10 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         // 영겁지화 미발동 누적 보너스: 미발동 1회당 +10% (각인 발동까지 누적)
         const eternalMissStack = newPlayer.buffs?.eternalFireMissStack || 0;
         if (hasEternalFire) igniteChance += eternalMissStack * 0.1;
+        // 1.46.0~ 각인 igniteApplyPct: 부여 확률 +N% (술법사 풀, 슬롯 합산)
+        if (engravingFx.igniteApplyPct) {
+          igniteChance += engravingFx.igniteApplyPct / 100;
+        }
         igniteChance = Math.min(1, igniteChance);
 
         if (Math.random() < igniteChance) {
@@ -604,6 +611,10 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           // 영겁지화 발동 시 미발동 스택 초기화
           if (hasEternalFire) {
             newPlayer.buffs = { ...newPlayer.buffs, eternalFireMissStack: 0 };
+          }
+          // 1.46.0~ 각인 soulOnIgniteApply: 화염 각인 부여 성공 시 소울 +N (술법사 풀)
+          if (engravingFx.soulOnIgniteApply) {
+            newPlayer.soulGauge = Math.min(100, (newPlayer.soulGauge || 0) + engravingFx.soulOnIgniteApply);
           }
           newLog.push({ type: 'debuff', text: `🔥 [화염 각인] ${newIgniteDmg} 데미지 ${isEternal ? '영구' : newIgniteTurns + 'T'}` });
         } else if (hasEternalFire) {

@@ -352,6 +352,7 @@ function SlotCard({ slotIdx, isUnlocked, unlockLv, card, tierInfo, canAfford, on
     );
   }
   if (!card || !tierInfo) {
+    // 1.46.0~ 빈 슬롯도 가챠로 카드 부여 가능. 이전: "다시 강화 시 자동 부여"는 거짓 안내였음 (강화는 슬롯 개방 시만 카드 부여)
     return (
       <div className="p-3" style={{
         background: `${PALETTE.panel}80`,
@@ -360,9 +361,26 @@ function SlotCard({ slotIdx, isUnlocked, unlockLv, card, tierInfo, canAfford, on
         <div className="text-[10px]" style={{ color: PALETTE.textDim }}>
           슬롯 {slotIdx + 1} (비어 있음)
         </div>
-        <div className="text-[10px] mt-0.5" style={{ color: PALETTE.textDim }}>
-          (각인 데이터 없음 — 다시 강화 시 자동 부여)
+        <div className="text-[10px] mt-0.5 mb-2" style={{ color: PALETTE.textDim, lineHeight: 1.5 }}>
+          각인 가챠로 새 카드를 부여하세요.
         </div>
+        <button
+          onClick={onGacha}
+          disabled={!canAfford}
+          className="w-full py-1.5 transition-all"
+          style={{
+            background: canAfford ? `${PALETTE.twilight}40` : `${PALETTE.panel}`,
+            color: canAfford ? PALETTE.text : PALETTE.textDim,
+            border: `1px solid ${canAfford ? PALETTE.twilight : PALETTE.panelBorder}`,
+            fontSize: '10px',
+            letterSpacing: '0.2em',
+            opacity: canAfford ? 1 : 0.6,
+            cursor: canAfford ? 'pointer' : 'not-allowed',
+          }}
+        >
+          <Sparkles size={11} className="inline mr-1" style={{ verticalAlign: '-2px' }} />
+          부여 · ✦ {ENGRAVING_GACHA_COST}
+        </button>
       </div>
     );
   }
