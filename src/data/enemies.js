@@ -493,15 +493,15 @@ export const ENEMIES = {
     ],
     drop: { gold: [25, 40] },
   },
-  champ_forest_wolf: {
-    name: '굶주린 늑대', hp: 90, color: '#5e7a4a',
-    desc: '광기에 빠진 숲의 짐승',
+  champ_forest_leopard: {
+    name: '굶주린 표범', hp: 90, color: '#6e8a4a',
+    desc: '광기에 빠진 숲의 사냥꾼',
     tier: 'normal', chapter: 'forest_1',
     berserkPerTurn: 3,
     patterns: [
-      { name: '광기의 송곳니', dmg: [12, 16], type: 'attack' },
-      { name: '울부짖음', dmg: [16, 22], type: 'attack', heavy: true },
-      { name: '경계 자세', dmg: [0, 0], type: 'defend', defense: 20 },
+      { name: '광기의 발톱', dmg: [12, 16], type: 'attack' },
+      { name: '으르렁대는 포효', dmg: [16, 22], type: 'attack', heavy: true },
+      { name: '저자세 경계', dmg: [0, 0], type: 'defend', defense: 20 },
     ],
     drop: { gold: [35, 55] },
   },
@@ -517,15 +517,15 @@ export const ENEMIES = {
     ],
     drop: { gold: [40, 60] },
   },
-  champ_forest_brute1: {
-    name: '광기의 거미', hp: 130, color: '#5e7a4a',
-    desc: '눈이 여덟인 거대한 숲의 사냥꾼',
+  champ_forest_tiger: {
+    name: '광기의 호랑이', hp: 130, color: '#8a4e1e',
+    desc: '숲의 정점에 군림하는 광기의 맹수',
     tier: 'elite', chapter: 'forest_1',
     berserkPerTurn: 4,  // 강적은 광폭 누적 빠름
     patterns: [
-      { name: '독니', dmg: [14, 19], type: 'attack' },
+      { name: '광기의 송곳니', dmg: [14, 19], type: 'attack' },
       { name: '광기의 도약', dmg: [22, 28], type: 'attack', heavy: true },
-      { name: '거미줄 결계', dmg: [0, 0], type: 'defend', defense: 32 },
+      { name: '으르렁대는 자세', dmg: [0, 0], type: 'defend', defense: 32 },
     ],
     drop: { gold: [70, 100], gem: [1, 2] },
   },

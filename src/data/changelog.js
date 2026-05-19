@@ -7,6 +7,18 @@
 
 export const CHANGELOG = [
   {
+    version: '1.48.1',
+    date: '2026-05-19',
+    label: '챔피언십 forest 적 컨셉 변경 — 굶주린 늑대 → 굶주린 표범, 광기의 거미 → 광기의 호랑이',
+    changes: [
+      { type: 'balance', text: '[forest_1 normal 컨셉 변경] 굶주린 늑대 → 굶주린 표범. enemyKey champ_forest_wolf → champ_forest_leopard. HP·광폭·드랍·패턴 데미지 모두 유지, 외형·desc·color·패턴 이름만 갱신 (광기의 송곳니 → 광기의 발톱 / 울부짖음 → 으르렁대는 포효 / 경계 자세 → 저자세 경계, color #5e7a4a → #6e8a4a)' },
+      { type: 'balance', text: '[forest_1 elite 컨셉 변경] 광기의 거미 → 광기의 호랑이. enemyKey champ_forest_brute1 → champ_forest_tiger. HP·광폭·드랍·패턴 데미지 모두 유지, 외형·desc·color·패턴 이름만 갱신 (독니 → 광기의 송곳니 / 거미줄 결계 → 으르렁대는 자세, color #5e7a4a → #8a4e1e). 광기의 도약 패턴 이름은 동물 공용이라 유지' },
+      { type: 'system', text: '[적 풀 갱신] expeditions.js의 forest_1·forest_2 normal·elite 적 풀에서 옛 키 → 새 키 전환' },
+      { type: 'system', text: '[프롬프트 문서 갱신] docs/enemy-illustration-prompts-championship-forest.md의 3.2·3.4 섹션을 표범·호랑이 컨셉으로 재작성. 폴더 구조 표 파일명도 새 키로 갱신' },
+      { type: 'system', text: '[다음 PR 예고] PM이 PNG 푸시하면 JPG 변환 + forest 일러 게임 통합 (champ_forest_leopard_combat.jpg, champ_forest_tiger_combat.jpg 등 16 combat + 4 intro)' },
+    ],
+  },
+  {
     version: '1.48.0',
     date: '2026-05-19',
     label: 'PrepScreen·RestScreen에 ◇ 출처 모달 패턴 확산 — 빌드 요약 패널 신설',
