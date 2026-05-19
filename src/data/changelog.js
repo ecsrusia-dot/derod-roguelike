@@ -7,6 +7,21 @@
 
 export const CHANGELOG = [
   {
+    version: '1.49.0',
+    date: '2026-05-19',
+    label: '챔피언십 신전 — 패시브 봉인 → 액티브 스킬 봉인 컨셉 변경 + 적 패턴별 1~2개·1~3턴 차등',
+    changes: [
+      { type: 'feature', text: '[봉인 대상 변경] 챔피언십 봉인된 신전(sanctum)의 봉인이 패시브 → 액티브 스킬로 변경. 적이 봉인 패턴을 발동하면 직업 액티브 스킬 슬롯(관통·방검·익스플로젼·결계·연속화살·바람결계·가호·축복·광기·피의 일격 등) 중 랜덤 N개가 일시 비활성화. 슬롯이 보라색 + 자물쇠 🔒 + 남은 턴수로 표시되고 클릭 차단됨' },
+      { type: 'feature', text: '[기본 스킬 보호] cost 0·cd 0인 기본 스킬(참격·정밀사격·마법탄·신성광선·광폭참격)은 봉인 제외. 어떤 봉인 상황에서도 평타는 항상 사용 가능 — 완전 무력화 방지' },
+      { type: 'feature', text: '[적 패턴별 차등] 27개 봉인 패턴 모두 sealTurns 명시 (1~3턴). seal 값은 1~2로 조정 (이전 3개 봉인 모두 2개로 감소). 적 캐릭터성에 따라 분포: 사제·신탁자 = 적게 길게 (1개/3T), 거인·폭군 = 적당히 짧게 (1개/2T), 보스 = 많이 길게 (2개/3T)' },
+      { type: 'balance', text: '[봉인 누적 시 더 긴 턴 유지] 짧은 봉인이 긴 봉인의 잔여 턴을 덮어쓰지 않음 — 신탁자(3T) 봉인 직후 거인(2T) 봉인 추가 시 통합 잔여 3T 유지' },
+      { type: 'system', text: '[패시브 봉인 시스템 폐기] applySealsToSkills 함수는 호환 위해 유지되나 더 이상 호출 안 됨. buildEffectivePassives에서 sealedSkills 인자 제거. App.jsx·initCombat.js·CombatScreen.jsx의 미사용 import 정리' },
+      { type: 'system', text: '[봉인 뱃지 한글명 표시] 액티브 스킬은 키와 표시명이 다를 수 있어(마법탄→파이어볼, 정념폭발→익스플로젼) COMBAT_SKILLS[k].name으로 변환 후 표시' },
+      { type: 'system', text: '[유물 sealResist 호환] 봉인 저항 유물 효과는 그대로 액티브 봉인에도 적용됨 — 데이터 마이그레이션 불필요' },
+      { type: 'system', text: '[다음 PR 예고] PM 일러 PNG 푸시 후 forest 일러 변환·통합 / 또는 sanctum·rift·dawn 프롬프트 작성 / 또는 demonblood·elf·priest 각인 풀 24장' },
+    ],
+  },
+  {
     version: '1.48.1',
     date: '2026-05-19',
     label: '챔피언십 forest 적 컨셉 변경 — 굶주린 늑대 → 굶주린 표범, 광기의 거미 → 광기의 호랑이',

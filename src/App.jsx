@@ -9,7 +9,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   PALETTE,
   getSkillLevel,
-  applySealsToSkills,
   getActivePassives,
   hasEffect,
   hasUltimate,

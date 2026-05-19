@@ -49,11 +49,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
   }));
   const [enemy, setEnemy] = useState(() => buildInitialEnemy({ enemyKey, expedition }));
   const skills = useMemo(
-    () => buildEffectivePassives({
-      initialSkills, initialRelics, activeRelicNames,
-      sealedSkills: player?.debuffs?.sealedSkills || [],
-    }),
-    [initialSkills, initialRelics, activeRelicNames, player?.debuffs?.sealedSkills],
+    () => buildEffectivePassives({ initialSkills, initialRelics, activeRelicNames }),
+    [initialSkills, initialRelics, activeRelicNames],
   );
   const relicStat = useMemo(
     () => buildRelicStatBag({ initialRelics, activeRelicNames }),
@@ -1022,22 +1019,28 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         const sealAvoided = sealResist > 0 && Math.random() < (sealResist / 100);
         if (!sealAvoided) {
           const sealCount = intent.seal;
-          // 보유 패시브 중 봉인 가능한 것 (시작 패시브, 이미 봉인된 것 제외)
-          const ownedSkills = Object.entries(skills)
-            .filter(([n, lv]) => lv > 0 && PASSIVE_SKILLS[n])
-            .map(([n]) => n);
+          const sealDur = intent.sealTurns || 2;  // 1.49.0~ 패턴별 차등
+          // 1.49.0~ 액티브 스킬 봉인 — 직업 액티브 슬롯 중 봉인 가능한 것
+          // 기본 스킬(cost 0 && cd 0 — 참격·정밀사격·마법탄·신성광선·광폭참격)은 봉인 제외
+          const sealableActives = (classData?.combatSkills || []).filter(key => {
+            const sk = COMBAT_SKILLS[key];
+            return sk && ((sk.cost || 0) > 0 || (sk.cd || 0) > 0);
+          });
           const alreadySealed = newPlayer.debuffs?.sealedSkills || [];
-          const sealable = ownedSkills.filter(s => !alreadySealed.includes(s));
-          // 랜덤 N개 선택
+          const sealable = sealableActives.filter(s => !alreadySealed.includes(s));
           const shuffled = [...sealable].sort(() => Math.random() - 0.5);
           const newSealed = shuffled.slice(0, sealCount);
           if (newSealed.length > 0) {
+            const mergedSealed = [...alreadySealed, ...newSealed];
+            // 봉인 누적 시 더 긴 턴수로 갱신 (짧은 봉인이 긴 봉인을 덮지 않음)
+            const mergedTurns = Math.max(newPlayer.debuffs?.sealedTurns || 0, sealDur);
             newPlayer.debuffs = {
               ...newPlayer.debuffs,
-              sealedSkills: [...alreadySealed, ...newSealed],
-              sealedTurns: 2,  // 2턴 봉인 (이번 턴 + 다음 턴)
+              sealedSkills: mergedSealed,
+              sealedTurns: mergedTurns,
             };
-            newLog.push({ type: 'debuff', text: `🔒 [봉인] ${newSealed.join(', ')} 2T` });
+            const newSealedNames = newSealed.map(k => COMBAT_SKILLS[k]?.name || k);
+            newLog.push({ type: 'debuff', text: `🔒 [봉인] ${newSealedNames.join(', ')} ${sealDur}T` });
           }
         } else {
           newLog.push({ type: 'debuff', text: `🔒 [봉인] 저항됨 (${sealResist}%)` });
@@ -1902,7 +1905,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                 {player.buffs?.mirrorCounterDmgPending && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#88aacc50', color: '#fff', border: '1px solid #88aacc' }}>◇ 회피→반격 +100%</span>)}
                 {player.firstHitImmune && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.legendary}50`, color: '#fff', border: `1px solid ${PALETTE.legendary}` }}>✦ 무적 1회</span>)}
                 {player.debuffs?.frostbiteDmg > 0 && player.debuffs?.frostbiteTurns > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#7ba3c450', color: '#fff', border: '1px solid #7ba3c4' }}>❄️ 동상 {player.debuffs.frostbiteDmg} ({player.debuffs.frostbiteTurns}T)</span>)}
-                {player.debuffs?.sealedTurns > 0 && player.debuffs?.sealedSkills?.length > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#5c4a8c50', color: '#fff', border: '1px solid #5c4a8c' }}>🔒 봉인 {player.debuffs.sealedSkills.join(',')} ({player.debuffs.sealedTurns}T)</span>)}
+                {player.debuffs?.sealedTurns > 0 && player.debuffs?.sealedSkills?.length > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#5c4a8c50', color: '#fff', border: '1px solid #5c4a8c' }}>🔒 봉인 {player.debuffs.sealedSkills.map(k => COMBAT_SKILLS[k]?.name || k).join(',')} ({player.debuffs.sealedTurns}T)</span>)}
                 {player.debuffs?.shockGauge > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#8b1f1f50', color: '#fff', border: '1px solid #8b1f1f' }}>⚡ 충격 {player.debuffs.shockGauge}/100</span>)}
                 {player.debuffs?.stunnedTurns > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#a52a2a50', color: '#fff', border: '1px solid #a52a2a' }}>💫 기절 ({player.debuffs.stunnedTurns}T)</span>)}
               </div>
@@ -1944,22 +1947,23 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                 const skill = COMBAT_SKILLS[skillKey];
                 if (!skill) return null;
                 const onCd = (player.cooldowns[skillKey] || 0) > 0;
-                // 1.45.3: etherCost-20 효과 폐기 (마력 Lv5 재시전 +10%로 변경됨)
                 let cost = skill.cost || 0;
                 const noEther = cost > player.ether;
-                // 단독 버프 스킬은 같은 턴 1회 제한 (쿨타임 감소 효과로 무한 사용 방지)
                 const buffUsedThisTurn = skill.type === 'buff' && player.usedBuffThisTurn;
-                const disabled = onCd || noEther || buffUsedThisTurn;
+                // 1.49.0~ 신전 액티브 스킬 봉인
+                const isSealed = (player.debuffs?.sealedSkills || []).includes(skillKey);
+                const disabled = onCd || noEther || buffUsedThisTurn || isSealed;
                 return (
                   <button key={skillKey} onClick={() => handlePlayerAction(skillKey)} disabled={disabled}
-                    className="py-2 transition-all flex flex-col items-center gap-0.5"
+                    className="py-2 transition-all flex flex-col items-center gap-0.5 relative"
                     style={{
-                      background: disabled ? 'rgba(0,0,0,0.5)'
+                      background: isSealed ? 'rgba(92,74,140,0.45)'
+                        : disabled ? 'rgba(0,0,0,0.5)'
                         : skill.type === 'physical' ? `${PALETTE.accent}30`
                         : skill.type === 'magic' ? `${PALETTE.twilight}30`
                         : skill.type === 'defense' ? `${PALETTE.ice}30`
                         : `${PALETTE.dawn}30`,
-                      border: `1px solid ${disabled ? PALETTE.panelBorder : skill.type === 'physical' ? PALETTE.accent : skill.type === 'magic' ? PALETTE.twilight : skill.type === 'defense' ? PALETTE.ice : PALETTE.dawn}`,
+                      border: `1px solid ${isSealed ? '#5c4a8c' : disabled ? PALETTE.panelBorder : skill.type === 'physical' ? PALETTE.accent : skill.type === 'magic' ? PALETTE.twilight : skill.type === 'defense' ? PALETTE.ice : PALETTE.dawn}`,
                       color: disabled ? PALETTE.textDim : '#fff',
                       opacity: disabled ? 0.5 : 1,
                     }}>
@@ -1974,7 +1978,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                       }
                       {cost > 0 && ` ✦${cost}`}
                     </span>
-                    {onCd && <span className="text-[9px] font-bold" style={{ color: PALETTE.accent }}>CD {player.cooldowns[skillKey]}</span>}
+                    {isSealed && <span className="text-[9px] font-bold" style={{ color: '#c0b0e8' }}>🔒 {player.debuffs?.sealedTurns || 0}T</span>}
+                    {!isSealed && onCd && <span className="text-[9px] font-bold" style={{ color: PALETTE.accent }}>CD {player.cooldowns[skillKey]}</span>}
                   </button>
                 );
               })}
@@ -2083,7 +2088,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                     {player.buffs?.dodgeBuffTurns > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.green}50`, color: '#fff', border: `1px solid ${PALETTE.green}` }}>💨 회피 +{player.buffs.dodgeBuff || 0}% ({player.buffs.dodgeBuffTurns}T)</span>)}
                     {player.firstHitImmune && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.legendary}50`, color: '#fff', border: `1px solid ${PALETTE.legendary}` }}>✦ 무적 1회</span>)}
                     {player.debuffs?.frostbiteDmg > 0 && player.debuffs?.frostbiteTurns > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#7ba3c450', color: '#fff', border: '1px solid #7ba3c4' }}>❄️ 동상 {player.debuffs.frostbiteDmg} ({player.debuffs.frostbiteTurns}T)</span>)}
-                    {player.debuffs?.sealedTurns > 0 && player.debuffs?.sealedSkills?.length > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#5c4a8c50', color: '#fff', border: '1px solid #5c4a8c' }}>🔒 봉인 {player.debuffs.sealedSkills.join(',')} ({player.debuffs.sealedTurns}T)</span>)}
+                    {player.debuffs?.sealedTurns > 0 && player.debuffs?.sealedSkills?.length > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#5c4a8c50', color: '#fff', border: '1px solid #5c4a8c' }}>🔒 봉인 {player.debuffs.sealedSkills.map(k => COMBAT_SKILLS[k]?.name || k).join(',')} ({player.debuffs.sealedTurns}T)</span>)}
                     {player.debuffs?.shockGauge > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#8b1f1f50', color: '#fff', border: '1px solid #8b1f1f' }}>⚡ 충격 {player.debuffs.shockGauge}/100</span>)}
                     {player.debuffs?.stunnedTurns > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#a52a2a50', color: '#fff', border: '1px solid #a52a2a' }}>💫 기절 ({player.debuffs.stunnedTurns}T)</span>)}
                   </div>
