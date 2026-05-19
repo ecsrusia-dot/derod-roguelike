@@ -7,6 +7,17 @@
 
 export const CHANGELOG = [
   {
+    version: '1.48.0',
+    date: '2026-05-19',
+    label: 'PrepScreen·RestScreen에 ◇ 출처 모달 패턴 확산 — 빌드 요약 패널 신설',
+    changes: [
+      { type: 'feature', text: '[빌드 요약 패널 신설] 새 컴포넌트 BuildSummaryPanel.jsx — PrepScreen(전투 준비) / RestScreen(보스 직전 정비) 두 화면에 빌드 요약 섹션 추가. 라인 6~8개(시작 HP / 물리 데미지 % / 마법 데미지 % / 회피율 / 치명타율 / 받는 데미지 / [조건부] 화염 각인 발동율 / [조건부] 시작 소울 게이지) 압축 표시. 모든 라인 ◇ 탭 시 출처 분해 모달 — StatusPanel과 동일 buildBreakdownInfo 헬퍼 재사용' },
+      { type: 'feature', text: '[PrepScreen 동적 갱신] 패시브·유물 토글 즉시 빌드 요약 값이 다시 계산됨. useMemo 의존성에 selectedSkills·selectedRelics 반영. PM이 어떤 패시브·유물 조합이 어떤 능력치를 만드는지 실시간 관찰 가능 — UX 가치 큼' },
+      { type: 'system', text: '[App.jsx props 추가] PrepScreen/RestScreen 호출처 3곳(rest·prep·reselect)에 stats·ultimates·engravingFx·meta·activeSkills·activeRelicNames props 추가. 기존 호환 — 모두 default 처리 (= [], = null, = {})' },
+      { type: 'system', text: '[향후 작업] 다음 PR — demonblood·elf·priest 각인 풀 각 24장 작성 (1.49.0~1.51.0). 4직업 시리즈 진행' },
+    ],
+  },
+  {
     version: '1.47.0',
     date: '2026-05-19',
     label: '정보창에 술법사 각인 효과 출처 6종 노출 — 1.46.0 신규 키 정보 일관성 마무리',
