@@ -221,17 +221,38 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                       ],
                     })} className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>반격 발동율 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.accent }}>{counterRate}%</span></button>
                   )}
-                  {ignite.has && (
-                    <button onClick={() => openLine({
-                      title: '화염 각인 발동율',
-                      totalText: `${ignite.rate}%`,
-                      subtitle: '공격 시 적에게 화염 각인(igniteDmg)이 적용될 확률.',
-                      color: '#d97706',
-                      sources: [
-                        { label: '이프리트 패시브 누적', value: ignite.rate, unit: '%', note: '이프리트 Lv. + 영겁지화 마일스톤 등의 누적 합계 (helpers.getIfritIgniteRate)' },
-                      ],
-                    })} className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>화염 각인 발동율 ◇</span><span className="font-bold tabular-nums" style={{ color: '#d97706' }}>{ignite.rate}%</span></button>
-                  )}
+                  {(() => {
+                    // 1.47.0~ 술법사 각인 6종 출처 노출 (1편: 화염 각인 발동율 + 봉인)
+                    const igniteApplyEng = engravingFx.igniteApplyPct || 0;
+                    const igniteSuppress = !!engravingFx.igniteSuppress;
+                    const igniteRateBase = ignite.has ? ignite.rate : 0;
+                    const igniteShow = ignite.has || igniteApplyEng > 0 || igniteSuppress;
+                    if (!igniteShow) return null;
+                    const igniteRateTotal = igniteSuppress ? 0 : Math.min(100, igniteRateBase + igniteApplyEng);
+                    return (
+                      <button onClick={() => openLine({
+                        title: '화염 각인 발동율',
+                        totalText: igniteSuppress ? '0% (봉인)' : `${igniteRateTotal}%`,
+                        subtitle: igniteSuppress
+                          ? '각인 igniteSuppress로 화염 각인 부여가 강제 봉인됨. 이프리트 패시브·각인 igniteApplyPct 모두 무효.'
+                          : '마법 공격 시 적에게 화염 각인(igniteDmg)이 적용될 확률. 이프리트 없이도 각인 igniteApplyPct만으로 부여 가능.',
+                        color: igniteSuppress ? PALETTE.curse : '#d97706',
+                        sources: igniteSuppress ? [
+                          { label: '각인: igniteSuppress (강제 봉인)', value: 'ON', note: '아래 출처 전부 무효' },
+                          { label: '이프리트 패시브 누적 (무효)', value: ignite.has ? `${ignite.rate}%` : null },
+                          { label: '각인: igniteApplyPct (무효)', value: igniteApplyEng > 0 ? `+${igniteApplyEng}%` : null },
+                        ] : [
+                          { label: '이프리트 패시브 누적', value: igniteRateBase, unit: '%', note: '이프리트 Lv. + 영겁지화 마일스톤 등의 누적 합계 (helpers.getIfritIgniteRate)' },
+                          { label: '각인: igniteApplyPct', value: igniteApplyEng, unit: '%' },
+                        ],
+                      })} className="flex justify-between text-left" style={{ color: PALETTE.textDim }}>
+                        <span>화염 각인 발동율 ◇</span>
+                        <span className="font-bold tabular-nums" style={{ color: igniteSuppress ? PALETTE.curse : '#d97706' }}>
+                          {igniteSuppress ? '0%' : `${igniteRateTotal}%`}
+                        </span>
+                      </button>
+                    );
+                  })()}
                 </div>
               </div>
             );
@@ -308,8 +329,10 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                     })} className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>물리 데미지 (%) ◇</span><span className="font-bold tabular-nums" style={{ color: '#c4453d' }}>+{physPctTotal}%</span></button>
                     );
                   })()}
-                  {(magicBonus > 0 || intSigPct > 0) && (() => {
-                    const magicPctTotal = Math.round((magicBonus + intSigPct) * 10) / 10;
+                  {(magicBonus > 0 || intSigPct > 0 || (engravingFx.magicDmgPct || 0) > 0) && (() => {
+                    // 1.47.0~ 술법사 각인 magicDmgPct 출처 추가. 폐기된 magicLv5 출처 제거 (1.45.3에서 마력 Lv.3 magicDmg+30 효과 폐기)
+                    const magicEngPct = engravingFx.magicDmgPct || 0;
+                    const magicPctTotal = Math.round((magicBonus + intSigPct + magicEngPct) * 10) / 10;
                     return (
                     <button onClick={() => openLine({
                       title: '마법 데미지',
@@ -319,8 +342,8 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                       sources: [
                         { label: '지능 시그니처 기본', value: intSigPct, unit: '%', note: `지능 ${playerInt} × +0.4%/p` },
                         { label: '패시브: 마법 데미지 누적', value: magicMinor, unit: '%' },
-                        { label: '마력 Lv.3: 마법 데미지 +30%', value: magicLv5, unit: '%' },
                         { label: '유물: 마법 데미지', value: magicRelic, unit: '%' },
+                        { label: '각인: magicDmgPct', value: magicEngPct, unit: '%' },
                       ],
                     })} className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>마법 데미지 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.twilight }}>+{magicPctTotal}%</span></button>
                     );
@@ -434,9 +457,15 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
             const soulGainMult = engravingFx.soulGainMult || 0;
             const perTurnHpLoss = engravingFx.perTurnHpLoss || 0;
             const disableInsightPredict = !!engravingFx.disableInsightPredict;
+            // 1.47.0~ 술법사 각인 3종 (igniteDmgPct·magicSoulBonus·soulOnIgniteApply)
+            const igniteDmgEng = engravingFx.igniteDmgPct || 0;
+            const magicSoulEng = engravingFx.magicSoulBonus || 0;
+            const soulOnIgniteApply = engravingFx.soulOnIgniteApply || 0;
             // 합산
             const startSoulTotal = intellectStartSoul + startSoulEng;
             const dodgeSoulTotal = dexDodgeSoul + dodgeSoulEng;
+            // 1.47.0~ 마법 시 소울 = 지능 시그니처 2단계 + 각인 magicSoulBonus (합산 통합)
+            const magicSoulTotal = intellectMagicSoul + magicSoulEng;
             // 회복량 보너스 — 유물 heal과 매력 시그가 곱셈(multiplicative)으로 적용
             // 실제 적용: baseHeal × (1 + heal/100) × (1 + charismaHeal/100)
             // 표시값: ((1+heal/100) × (1+charismaHeal/100) - 1) × 100  (소수 1자리)
@@ -444,9 +473,10 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
             const healTotalPct = Math.round((healMult - 1) * 1000) / 10;
             const showSoul = !!classData?.ultimateId;
             const hasAny = regenLv || lifesteal || reflect || heal || charismaHeal || charismaSoul
-              || strHp || strPhysSoul || intellectMagicSoul
+              || strHp || strPhysSoul || magicSoulTotal
               || cdReduce || magicEchoPct
-              || (showSoul && (startSoulTotal || perTurnSoul || dodgeSoulTotal || counterHitSoul || soulGainMult))
+              || (showSoul && (startSoulTotal || perTurnSoul || dodgeSoulTotal || counterHitSoul || soulGainMult || soulOnIgniteApply))
+              || igniteDmgEng
               || counterShock || counterCanCrit || perTurnHpLoss || disableInsightPredict;
             if (!hasAny) return null;
             // 공통 모달 오픈
@@ -519,15 +549,23 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                     <button onClick={() => openSimpleLine('근력 시그: 물리 시 소울', `+${strPhysSoul}`, [{ label: '근력 시그니처 2단계', value: strPhysSoul, note: (stats['근력'] || 10) < 17 ? `근력 17 필요 (현재 ${stats['근력'] || 10})` : `17~21 +1 / 22~26 +2 (현재 +${strPhysSoul})` }], PALETTE.dawn, '물리 스킬 시전 시 소울 게이지가 충전됩니다.')}
                       className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>근력 시그: 물리 시 소울 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.dawn }}>+{strPhysSoul}</span></button>
                   )}
-                  {intellectMagicSoul > 0 && (() => {
-                    // 1.45.3: 산출 근거 개선 — 임계 시작점·5단위 누진 의미·단위 명시
+                  {magicSoulTotal > 0 && (() => {
+                    // 1.47.0~ 지능 시그 + 각인 magicSoulBonus 합산 통합 라인
                     const intVal = stats['지능'] || 10;
-                    const note = intVal < 17
+                    const intNote = intVal < 17
                       ? `지능 17 이상 필요 (현재 지능 ${intVal})`
-                      : `지능 17부터 5단위마다 +1/시전 누적 (지능 17 = +1, 22 = +2, 27 = +3, ...). 현재 지능 ${intVal} → +${intellectMagicSoul}/시전`;
+                      : `17~21 +1 / 22~26 +2 / 27~31 +3 (현재 지능 ${intVal} → +${intellectMagicSoul}/시전)`;
                     return (
-                      <button onClick={() => openSimpleLine('지능 시그: 마법 시 소울', `+${intellectMagicSoul}/시전`, [{ label: '지능 시그니처 2단계', value: intellectMagicSoul, unit: '/시전', note }], PALETTE.legendary, '마법 스킬 시전 시 소울 게이지가 충전됩니다. 임계 지능 17 + 5단위 누진.')}
-                        className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>지능 시그: 마법 시 소울 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.legendary }}>+{intellectMagicSoul}/시전</span></button>
+                      <button onClick={() => openLine({
+                        title: '마법 시 소울 게이지',
+                        totalText: `+${magicSoulTotal}/시전`,
+                        subtitle: '마법 스킬 시전 시 소울 게이지가 충전됩니다. 임계 지능 17부터 5단위 누진 + 각인 magicSoulBonus 합산.',
+                        color: PALETTE.legendary,
+                        sources: [
+                          { label: '지능 시그니처 2단계', value: intellectMagicSoul, unit: '/시전', note: intNote },
+                          { label: '각인: magicSoulBonus', value: magicSoulEng, unit: '/시전' },
+                        ],
+                      })} className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>마법 시 소울 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.legendary }}>+{magicSoulTotal}/시전</span></button>
                     );
                   })()}
                   {cdReduce > 0 && (
@@ -568,6 +606,14 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                   {counterCanCrit && (
                     <button onClick={() => openSimpleLine('반격 치명타 가능', 'ON', [{ label: '각인: 반격 치명타 가능', value: 'ON' }], PALETTE.legendary, '반격 공격도 치명타가 발동할 수 있습니다.')}
                       className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>반격 치명타 가능 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.legendary }}>ON</span></button>
+                  )}
+                  {igniteDmgEng > 0 && (
+                    <button onClick={() => openSimpleLine('화염 각인 데미지', `+${igniteDmgEng}%`, [{ label: '각인: igniteDmgPct', value: igniteDmgEng, unit: '%' }], '#d97706', '화염 각인(igniteDmg)으로 적용되는 DoT 데미지에 곱셈으로 더해지는 % 보너스. 부여 시점에 한 번 계산됩니다.')}
+                      className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>화염 각인 데미지 ◇</span><span className="font-bold tabular-nums" style={{ color: '#d97706' }}>+{igniteDmgEng}%</span></button>
+                  )}
+                  {showSoul && soulOnIgniteApply > 0 && (
+                    <button onClick={() => openSimpleLine('화염 각인 부여 시 소울', `+${soulOnIgniteApply}`, [{ label: '각인: soulOnIgniteApply', value: soulOnIgniteApply }], PALETTE.dawn, '화염 각인을 적에게 부여한 순간 소울 게이지가 충전됩니다 (술법사 영창의 가락 등).')}
+                      className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>화염 각인 부여 시 소울 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.dawn }}>+{soulOnIgniteApply}</span></button>
                   )}
                   {perTurnHpLoss > 0 && (
                     <button onClick={() => openSimpleLine('매 턴 HP 손실', `-${perTurnHpLoss}`, [{ label: '각인: 매 턴 HP 손실 (저주)', value: perTurnHpLoss, note: '부정 효과' }], PALETTE.accent, '매 턴 시작 시 HP가 감소합니다 (부정 각인 효과).')}
