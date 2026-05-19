@@ -96,6 +96,12 @@ export function calculateDamage(skill, attacker, defender, skills, isCrit, ultim
     breakdown.push(`강타 Lv.7 +${stunBonus}`);
   }
   // 1.27.0~ 각인: 물리 데미지 +N%
+  // 1.46.0~ 각인: 마법 데미지 +N% (술법사 풀)
+  if (skill.type === 'magic' && engravingFx.magicDmgPct) {
+    const engBonus = Math.floor(dmg * engravingFx.magicDmgPct / 100);
+    dmg += engBonus;
+    if (engBonus !== 0) breakdown.push(`각인 ${engBonus >= 0 ? '+' : ''}${engBonus}`);
+  }
   if (skill.type === 'physical' && engravingFx.physDmgPct) {
     const engBonus = Math.floor(dmg * engravingFx.physDmgPct / 100);
     if (engBonus !== 0) {
@@ -223,6 +229,10 @@ export function getDisplayDamage(skill, attacker, skills, ultimates, meta, curse
     // 1.27.0~ 각인: 물리 데미지 +N%
     if (skill.type === 'physical' && engravingFx.physDmgPct) {
       dmg += Math.floor(dmg * engravingFx.physDmgPct / 100);
+    }
+    // 1.46.0~ 각인: 마법 데미지 +N% (술법사 풀)
+    if (skill.type === 'magic' && engravingFx.magicDmgPct) {
+      dmg += Math.floor(dmg * engravingFx.magicDmgPct / 100);
     }
     return Math.max(0, dmg);
   };
