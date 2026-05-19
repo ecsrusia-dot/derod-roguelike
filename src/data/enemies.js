@@ -686,9 +686,11 @@ export const ENEMIES = {
   },
   
   // ============================================================
-  // === 챔피언십 — 봉인된 신전 (sanctum) === 
-  // 컨셉: 봉인/제약 — 적이 N턴마다 플레이어 패시브 1~3개 봉인 (1~2턴)
-  // 적 패턴에 seal: N 명시 시 플레이어 보유 패시브 중 N개 임시 봉인
+  // === 챔피언십 — 봉인된 신전 (sanctum) ===
+  // 컨셉: 봉인/제약 — 적이 플레이어 액티브 스킬(기본 스킬 제외) 1~2개 봉인 (1~3턴 차등)
+  // 적 패턴에 seal: N, sealTurns: M 명시 시 플레이어 액티브 스킬 중 N개를 M턴 임시 봉인
+  // 기본 스킬(cost 0, cd 0 — 참격·정밀사격·마법탄·신성광선·광폭참격)은 봉인 제외
+  // 적 캐릭터성에 따라 차등: 사제·신탁자 = 적게 길게, 거인·폭군 = 적당히 짧게, 보스 = 많이 길게
   // ============================================================
   
   // === 챕터 1: 외곽 회랑 (sanctum_1) — 입문, 약한 봉인 ===
@@ -697,7 +699,7 @@ export const ENEMIES = {
     desc: '봉인의 비술을 익히기 시작한 사도',
     tier: 'normal', chapter: 'sanctum_1',
     patterns: [
-      { name: '봉인의 손길', dmg: [10, 14], type: 'attack', seal: 1 },  // 패시브 1개 봉인
+      { name: '봉인의 손길', dmg: [10, 14], type: 'attack', seal: 1, sealTurns: 1 },  // 약 봉인
       { name: '봉인의 일격', dmg: [14, 18], type: 'attack' },
       { name: '봉인 결계', dmg: [0, 0], type: 'defend', defense: 22 },
     ],
@@ -720,7 +722,7 @@ export const ENEMIES = {
     tier: 'normal', chapter: 'sanctum_1',
     patterns: [
       { name: '예언의 일격', dmg: [11, 15], type: 'attack' },
-      { name: '봉인의 저주', dmg: [8, 12], type: 'attack', seal: 2 },  // 패시브 2개 봉인
+      { name: '봉인의 저주', dmg: [8, 12], type: 'attack', seal: 2, sealTurns: 2 },  // 예언 = 미래 봉쇄
       { name: '예언 결계', dmg: [0, 0], type: 'defend', defense: 30 },
     ],
     drop: { gold: [40, 60] },
@@ -730,7 +732,7 @@ export const ENEMIES = {
     desc: '한 때 영웅이었던 봉인된 거대 전사',
     tier: 'elite', chapter: 'sanctum_1',
     patterns: [
-      { name: '봉인된 강타', dmg: [16, 22], type: 'attack', seal: 1 },
+      { name: '봉인된 강타', dmg: [16, 22], type: 'attack', seal: 1, sealTurns: 2 },  // 단순 강력
       { name: '거인의 일격', dmg: [22, 28], type: 'attack', heavy: true },
       { name: '신전 갑주', dmg: [0, 0], type: 'defend', defense: 35 },
     ],
@@ -742,8 +744,8 @@ export const ENEMIES = {
     isBoss: true, tier: 'boss', chapter: 'sanctum_1',
     patterns: [
       { name: '대사제의 강타', dmg: [16, 22], type: 'attack' },
-      { name: '봉인의 의식', dmg: [10, 14], type: 'attack', seal: 2 },
-      { name: '신전 분쇄', dmg: [24, 32], type: 'attack', heavy: true, seal: 1 },
+      { name: '봉인의 의식', dmg: [10, 14], type: 'attack', seal: 2, sealTurns: 3 },  // 보스 의식 = 길게
+      { name: '신전 분쇄', dmg: [24, 32], type: 'attack', heavy: true, seal: 1, sealTurns: 1 },
       { name: '대사제 결계', dmg: [0, 0], type: 'defend', defense: 38 },
     ],
     drop: { gold: [180, 240], gem: [3, 5] },
@@ -756,7 +758,7 @@ export const ENEMIES = {
     tier: 'normal', chapter: 'sanctum_2',
     patterns: [
       { name: '사제의 강타', dmg: [14, 19], type: 'attack' },
-      { name: '봉인의 손길', dmg: [10, 14], type: 'attack', seal: 2 },
+      { name: '봉인의 손길', dmg: [10, 14], type: 'attack', seal: 2, sealTurns: 1 },  // 수 많이, 짧게
       { name: '봉인 결계', dmg: [0, 0], type: 'defend', defense: 30 },
     ],
     drop: { gold: [50, 75] },
@@ -767,7 +769,7 @@ export const ENEMIES = {
     tier: 'normal', chapter: 'sanctum_2',
     patterns: [
       { name: '감시자의 일격', dmg: [16, 22], type: 'attack' },
-      { name: '봉인 분쇄', dmg: [22, 28], type: 'attack', heavy: true, seal: 1 },
+      { name: '봉인 분쇄', dmg: [22, 28], type: 'attack', heavy: true, seal: 1, sealTurns: 2 },
       { name: '감시자 자세', dmg: [0, 0], type: 'defend', defense: 32 },
     ],
     drop: { gold: [55, 80] },
@@ -777,8 +779,8 @@ export const ENEMIES = {
     desc: '봉인 그 자체가 형상을 갖춘 존재',
     tier: 'elite', chapter: 'sanctum_2',
     patterns: [
-      { name: '봉인의 강타', dmg: [18, 24], type: 'attack', seal: 1 },
-      { name: '봉인 폭발', dmg: [24, 32], type: 'attack', heavy: true, seal: 2 },
+      { name: '봉인의 강타', dmg: [18, 24], type: 'attack', seal: 1, sealTurns: 2 },
+      { name: '봉인 폭발', dmg: [24, 32], type: 'attack', heavy: true, seal: 2, sealTurns: 2 },
       { name: '봉인 결계', dmg: [0, 0], type: 'defend', defense: 38 },
     ],
     drop: { gold: [90, 130], gem: [2, 3] },
@@ -789,8 +791,8 @@ export const ENEMIES = {
     isBoss: true, tier: 'boss', chapter: 'sanctum_2',
     patterns: [
       { name: '군주의 강타', dmg: [20, 26], type: 'attack' },
-      { name: '봉인의 폭주', dmg: [12, 16], type: 'attack', seal: 3 },  // 패시브 3개 봉인
-      { name: '봉인 분쇄', dmg: [28, 38], type: 'attack', heavy: true, seal: 2 },
+      { name: '봉인의 폭주', dmg: [12, 16], type: 'attack', seal: 2, sealTurns: 3 },  // 보스 = 많이 길게
+      { name: '봉인 분쇄', dmg: [28, 38], type: 'attack', heavy: true, seal: 1, sealTurns: 2 },
       { name: '왕좌의 결계', dmg: [0, 0], type: 'defend', defense: 45 },
     ],
     drop: { gold: [240, 320], gem: [5, 7] },
@@ -802,8 +804,8 @@ export const ENEMIES = {
     desc: '봉인의 정점에 다다른 신전의 대사제',
     tier: 'normal', chapter: 'sanctum_3',
     patterns: [
-      { name: '대사제의 강타', dmg: [18, 24], type: 'attack', seal: 2 },
-      { name: '봉인의 폭발', dmg: [24, 32], type: 'attack', heavy: true, seal: 1 },
+      { name: '대사제의 강타', dmg: [18, 24], type: 'attack', seal: 2, sealTurns: 2 },
+      { name: '봉인의 폭발', dmg: [24, 32], type: 'attack', heavy: true, seal: 1, sealTurns: 1 },
       { name: '대사제 결계', dmg: [0, 0], type: 'defend', defense: 35 },
     ],
     drop: { gold: [70, 100] },
@@ -814,7 +816,7 @@ export const ENEMIES = {
     tier: 'normal', chapter: 'sanctum_3',
     patterns: [
       { name: '신탁의 일격', dmg: [16, 22], type: 'attack' },
-      { name: '봉인의 폭주', dmg: [10, 14], type: 'attack', seal: 3 },
+      { name: '봉인의 폭주', dmg: [10, 14], type: 'attack', seal: 1, sealTurns: 3 },  // 신탁자 = 적게 길게
       { name: '신탁 결계', dmg: [0, 0], type: 'defend', defense: 32 },
     ],
     drop: { gold: [60, 90] },
@@ -824,8 +826,8 @@ export const ENEMIES = {
     desc: '봉인을 무기로 휘두르는 신전의 폭군',
     tier: 'elite', chapter: 'sanctum_3',
     patterns: [
-      { name: '폭군의 강타', dmg: [22, 28], type: 'attack', seal: 2 },
-      { name: '봉인 폭렬', dmg: [32, 42], type: 'attack', heavy: true, seal: 1 },
+      { name: '폭군의 강타', dmg: [22, 28], type: 'attack', seal: 2, sealTurns: 2 },
+      { name: '봉인 폭렬', dmg: [32, 42], type: 'attack', heavy: true, seal: 1, sealTurns: 1 },
       { name: '봉인 결계', dmg: [0, 0], type: 'defend', defense: 42 },
     ],
     drop: { gold: [110, 160], gem: [3, 5] },
@@ -836,8 +838,8 @@ export const ENEMIES = {
     isBoss: true, tier: 'boss', chapter: 'sanctum_3',
     patterns: [
       { name: '봉인자의 강타', dmg: [22, 28], type: 'attack' },
-      { name: '봉인의 절대 봉쇄', dmg: [16, 22], type: 'attack', seal: 3 },
-      { name: '봉인 폭주', dmg: [38, 50], type: 'attack', heavy: true, seal: 2 },
+      { name: '봉인의 절대 봉쇄', dmg: [16, 22], type: 'attack', seal: 2, sealTurns: 3 },  // 보스 = 많이 길게
+      { name: '봉인 폭주', dmg: [38, 50], type: 'attack', heavy: true, seal: 2, sealTurns: 2 },
       { name: '심처의 결계', dmg: [0, 0], type: 'defend', defense: 55 },
     ],
     drop: { gold: [320, 420], gem: [7, 10] },
@@ -849,8 +851,8 @@ export const ENEMIES = {
     desc: '봉인 그 자체의 정점에 도달한 존재',
     tier: 'normal', chapter: 'sanctum_4',
     patterns: [
-      { name: '화신의 손길', dmg: [18, 24], type: 'attack', seal: 2 },
-      { name: '봉인의 폭격', dmg: [26, 34], type: 'attack', heavy: true, seal: 2 },
+      { name: '화신의 손길', dmg: [18, 24], type: 'attack', seal: 2, sealTurns: 2 },
+      { name: '봉인의 폭격', dmg: [26, 34], type: 'attack', heavy: true, seal: 1, sealTurns: 2 },
       { name: '봉인의 장막', dmg: [0, 0], type: 'defend', defense: 40 },
     ],
     drop: { gold: [80, 120] },
@@ -860,8 +862,8 @@ export const ENEMIES = {
     desc: '절대봉인의 군주를 섬기는 어둠의 사도',
     tier: 'elite', chapter: 'sanctum_4',
     patterns: [
-      { name: '사도의 일격', dmg: [22, 28], type: 'attack', seal: 2 },
-      { name: '절대봉인의 폭주', dmg: [36, 48], type: 'attack', heavy: true, seal: 3 },
+      { name: '사도의 일격', dmg: [22, 28], type: 'attack', seal: 2, sealTurns: 2 },
+      { name: '절대봉인의 폭주', dmg: [36, 48], type: 'attack', heavy: true, seal: 2, sealTurns: 3 },
       { name: '봉인의 방벽', dmg: [0, 0], type: 'defend', defense: 50 },
     ],
     drop: { gold: [140, 200], gem: [4, 6] },
@@ -871,10 +873,10 @@ export const ENEMIES = {
     desc: '봉인된 신전 가장 깊은 곳에 봉인된 봉인의 신',
     isBoss: true, tier: 'boss', chapter: 'sanctum_4',
     patterns: [
-      { name: '절대봉인의 강타', dmg: [22, 28], type: 'attack', seal: 2 },
-      { name: '절대봉인의 절규', dmg: [16, 22], type: 'attack', seal: 3 },
-      { name: '봉인의 절대 폭주', dmg: [32, 42], type: 'attack', seal: 2 },
-      { name: '절대봉인의 분쇄', dmg: [44, 58], type: 'attack', heavy: true, seal: 3 },
+      { name: '절대봉인의 강타', dmg: [22, 28], type: 'attack', seal: 2, sealTurns: 2 },
+      { name: '절대봉인의 절규', dmg: [16, 22], type: 'attack', seal: 1, sealTurns: 3 },  // 적게 길게
+      { name: '봉인의 절대 폭주', dmg: [32, 42], type: 'attack', seal: 2, sealTurns: 2 },
+      { name: '절대봉인의 분쇄', dmg: [44, 58], type: 'attack', heavy: true, seal: 2, sealTurns: 3 },  // 최종 보스 = 많이 길게
       { name: '봉인의 옥좌', dmg: [0, 0], type: 'defend', defense: 65 },
     ],
     drop: { gold: [400, 520], gem: [10, 14] },

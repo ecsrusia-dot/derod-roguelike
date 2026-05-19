@@ -9,7 +9,6 @@ import {
   getMetaBonus,
   hasCurse,
   getEffectiveSkills,
-  applySealsToSkills,
   getActiveRelicStat,
 } from '../utils/helpers.js';
 import { ENEMIES } from '../data.js';
@@ -77,13 +76,10 @@ export function buildInitialEnemy({ enemyKey, expedition }) {
   };
 }
 
-// 패시브 스킬 계산 — 활성 유물 효과를 패시브에 반영하고, 봉인된 패시브를 마스킹.
-export function buildEffectivePassives({ initialSkills, initialRelics, activeRelicNames, sealedSkills }) {
-  const baseSkills = getEffectiveSkills(initialSkills, initialRelics, activeRelicNames);
-  if (sealedSkills && sealedSkills.length > 0) {
-    return applySealsToSkills(baseSkills, sealedSkills);
-  }
-  return baseSkills;
+// 패시브 스킬 계산 — 활성 유물 효과를 패시브에 반영.
+// 1.49.0~ 신전 봉인은 액티브 스킬을 봉인하도록 변경되어 패시브 봉인 시스템은 사용하지 않음.
+export function buildEffectivePassives({ initialSkills, initialRelics, activeRelicNames }) {
+  return getEffectiveSkills(initialSkills, initialRelics, activeRelicNames);
 }
 
 // 활성 유물의 모든 stat 보너스를 단일 객체로 집계 (전투 중 반복 호출 비용 절감).
