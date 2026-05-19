@@ -7,6 +7,16 @@
 
 export const CHANGELOG = [
   {
+    version: '1.47.0',
+    date: '2026-05-19',
+    label: '정보창에 술법사 각인 효과 출처 6종 노출 — 1.46.0 신규 키 정보 일관성 마무리',
+    changes: [
+      { type: 'feature', text: '[정보창 출처 노출] 1.46.0 신규 키 6종을 StatusPanel에 모두 노출. magicDmgPct → 「마법 데미지」 라인 출처 추가 / igniteApplyPct·igniteSuppress → 「화염 각인 발동율」 라인 확장 (이프리트 없어도 표시, 봉인 시 0% 강제 + 무효 출처 표시) / igniteDmgPct → 신규 「화염 각인 데미지」 라인 / magicSoulBonus → 「지능 시그: 마법 시 소울」을 「마법 시 소울」 합산 라인으로 통합 / soulOnIgniteApply → 신규 「화염 각인 부여 시 소울」 라인. PM이 술법사 각인 장착 후 정보창에서 모든 출처를 ◇ 클릭으로 검증 가능' },
+      { type: 'fix', text: '[폐기 출처 제거] 마법 데미지 라인 출처에서 「마력 Lv.3: 마법 데미지 +30%」 항목 제거. 이 효과는 1.45.3에서 폐기되어 magicLv5 변수가 undefined였음 (자동 필터링으로 표시는 안 됐지만 코드 정확도 보강)' },
+      { type: 'system', text: '[다음 작업] PrepScreen·RestScreen에 같은 출처 모달 패턴 확산 / demonblood·elf·priest 각인 풀 각 24장 작성 (1.48.0~1.50.0)' },
+    ],
+  },
+  {
     version: '1.46.0',
     date: '2026-05-18',
     label: '술법사 각인 풀 24장 신설 + 신규 effect 키 6종 + 가중치 조정 + 빈 슬롯 가챠 복구',
