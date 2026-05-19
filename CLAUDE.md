@@ -78,7 +78,7 @@ PM은 비개발자. 결정이 필요할 때:
 
 - **이름**: derod-roguelike (게임 내 표시: "Dawn and Twilight" / "던앤트와일라잇")
 - **장르**: 한국어 텍스트 기반 다크 판타지 모바일 PWA 로그라이크
-- **현재 게임 버전**: `src/data.js`의 `GAME_VERSION` 참조 (이 문서 갱신 시점 **1.41.0** — 정보창 가독성 시리즈(1.38.0~1.41.0) 완료. 명칭 통일·소울 스킬 분리·시그니처 합산·출처 모달·계산식 명확화 모두 적용)
+- **현재 게임 버전**: `src/data/version.js`의 `GAME_VERSION` 참조 (이 문서 갱신 시점 **1.50.0** — forest_3 보스 교체(witch 승격, minstrel 신규 일반) 완료. 광기의 악사 신규 직업 설계서 docs/class-minstrel-design.md **v1 작성 완료(PR #91 push) → PM 결정 v2 재작성 대기**)
 - **배포**: GitHub Pages (`main` 브랜치 머지 시 `.github/workflows/deploy.yml`이 자동 빌드·배포)
 - **호스팅 경로**: `https://<owner>.github.io/derod-roguelike/` — `vite.config.js`의 `base: '/derod-roguelike/'`. ⚠️ 에셋 경로는 항상 **상대 경로(`./`)** 사용 (4.5절 참조)
 
@@ -847,7 +847,82 @@ PM이 PNG를 푸시했다면 **JPG 변환 + 코드 헬퍼 연결 + 버전 갱신
 
 ---
 
-**마지막 업데이트**: 1.41.0 (정보창 가독성 시리즈) 완료 시점 — PR #70 머지 후 갱신.
+**마지막 업데이트**: 1.50.0 시점 — forest_3 보스 교체 PR(#89/#90 머지) 완료 + 광기의 악사 설계서 v1 push 후, PM 결정 v2 재작성 대기 상태에서 세션 종료. 다음 세션은 **광기의 악사 설계서 v2 재작성**부터 시작.
+
+---
+
+## 🔥 다음 세션 즉시 작업 — 광기의 악사 설계서 v2 재작성
+
+### 현재 상태 (브랜치 / commit)
+| 항목 | 값 |
+|---|---|
+| 브랜치 | `claude/review-guidelines-wait-J9Ov3` (working tree clean, origin과 동일) |
+| 최신 commit | `7b05808 docs(minstrel): design draft for new class (Mad Minstrel)` |
+| 문서 | `docs/class-minstrel-design.md` v1 (음표·코드 자원 시스템 옵션 A) — **재작성 대기** |
+| PR | 광기의 악사 설계 PR(번호 미확인) 진행 중. 같은 브랜치에 추가 commit으로 push 가능 |
+
+### PM 결정 사항 v2 (절대 잊지 말 것 — 4가지)
+
+PM이 v1을 보고 추상 피드백 + 명시적 결정 4가지를 줌. **v2 재작성 시 반드시 반영**:
+
+| # | 결정 | 의미 |
+|---|---|---|
+| 1 | **자원 시스템 신설 X** | 음표·코드 시스템 폐기. 5직업과 동일 패턴 — 액티브는 **에테르 (cost 0~3) + 쿨다운 (cd 0~3)**, 소울은 **소울 게이지 0~100** |
+| 2 | **차별화는 직업 전용 패시브로** | 시작 패시브 2종을 광기의 악사 전용으로 설계 (5직업과 겹치지 않게). 7Lv 강화 7종 풀도 전용 |
+| 3 | **메인 스탯은 매력** | 사제(시작 19)와 매력이 겹침. 악사 시작 매력값을 사제와 비교해 PM과 결정 필요 (동일 / 이상 / 이하) |
+| 4 | **sonic 데미지 타입 신설** | 기존 physical/magic/defense/buff에 **sonic 추가**. `damage.js`·`CombatEffects.jsx`·StatusPanel·각인 effect 키(`sonicDmgPct` 등) 모두 영향 |
+
+### PM 추가 검토 지시 (v2에 옵션 포함)
+
+| 항목 | PM 지시 | 옵션 검토 필요 |
+|---|---|---|
+| **매력 시그니처에 sonic 데미지 증가 로직 추가** | 신규 단계(3단계?) 또는 자동 가산 | 임계 14+ 누진 / 임계 없음 자동 가산 0.5%/p / 5단위 누진 등 옵션 표 |
+| **매력 증가 공통 패시브 추가 검토** | A 신규 공통 패시브 / B 악사 전용만 / C 사제·악사 한정 | 추천: B (악사 직업 전용만 — 5직업 시그 차별화 보존) |
+| **sonic 신설에 따른 패시브·유물·사건 추가 검토** | 신규 추가 항목 표 (sonic 강화 패시브 / sonic 결계 유물 / 광기 류트 사건 / sonic 약점 적 등) | docs 9절에 신규 추가 검토 항목 표 작성 |
+
+### v2 docs 재구성 가이드
+
+기존 v1 docs/class-minstrel-design.md를 다음 구조로 재작성:
+
+| 절 | 변경 |
+|---|---|
+| 0. 배경 | **v1→v2 변경 사유** 명시 (음표 폐기 / 5직업 동일 패턴 채택) |
+| 1. 컨셉 개요 | 자원=소울 게이지(공통) / 액티브=에테르+쿨다운(공통) / 데미지=sonic 신규 / 메인=매력 |
+| 2. 5직업 vs 악사 동일·차별 | 동일 표 + 차별 표 분리 |
+| 3. 액티브 스킬 5종 (cost/cd) | 5직업 패턴 — `참격/관통/방검` 등과 같은 형식 |
+| 4. 직업 전용 패시브 7종 (차별화 핵심) | 광기 음파 / 광기 화음 / 매혹의 선율 / 광기의 영창 / 광인의 영감 / 광기 침투 / 광기 해방 등 7종 × Lv 1~7 |
+| 5. 직업 소울 스킬 「광기의 종말 교향곡」 | 소울 100 발동, `CLASS_ULTIMATES`에 추가될 데이터 |
+| 6. sonic 데미지 타입 신설 (영향 분석) | damage.js / CombatEffects.jsx / StatusPanel / 각인 effect 키 |
+| 7. 매력 시그니처 sonic 데미지 추가 단계 (PM 결정) | 옵션 2~3개 + 추천 |
+| 8. 매력 증가 공통 패시브 (PM 검토) | A/B/C 옵션 + 추천 |
+| 9. sonic 신설 영향 — 패시브·유물·사건 추가 검토 | 신규 추가 검토 항목 표 |
+| 10. 일러스트 가이드 | v1 그대로 |
+| 11. 챔피언십 해금 시스템 | v1 그대로 |
+| 12. 각인 풀 24장 가이드 | 음표 effect 키 폐기 → sonic·매력·광기 디버프 중심 effect 키 |
+| 13. 구현 로드맵 | 1.51.0~1.56.0 시리즈 — sonic 인프라부터 |
+| 14. PM 결정 필요 사항 | PM이 v2 보고 추가 결정할 항목 표 |
+| 15. 차별화 검증 — 6직업 매트릭스 | 메인 스탯 / 데미지 타입 / 자원 / 시작 패시브 / 소울 스킬 / 핵심 컨셉 6축 |
+
+### v2 작업 사이클
+
+```
+[1] docs/class-minstrel-design.md v2 재작성 (Write — 전체 덮어쓰기)
+[2] npm run build 검증
+[3] git commit (브랜치 그대로 — 같은 PR에 추가 commit)
+[4] git push -u origin claude/review-guidelines-wait-J9Ov3
+[5] PR 본문 갱신 (ToolSearch로 mcp__github__update_pull_request 스키마 로드 후 호출)
+[6] PM에게 v2 차별화 검증 표 + 결정 필요 항목 정리해서 응답
+```
+
+### 이번 세션에서 학습한 패턴
+
+| 패턴 | 적용 |
+|---|---|
+| **PM이 v1 보고 자원 시스템 폐기를 결정** | 큰 설계 변경은 v1 → v2 분기 + docs 재작성 (코드 미작성 단계라 비용 0) |
+| **deferred 도구 호출 시 InputValidationError** | GitHub MCP 도구(update_pull_request 등) 호출 전 **반드시 `ToolSearch`로 스키마 로드** (`query: "select:mcp__github__update_pull_request"`) |
+| **시스템 안내 메시지 ≠ 에러** | system-reminder에서 "deferred tools" 안내가 와도 작업 흐름은 유지. PM에게 "에러 아님 — 도구 사용 방식 안내"로 명확히 설명 |
+
+---
 
 ### 변경 핵심 (vs 이전 1.27.0)
 
@@ -874,18 +949,26 @@ PM이 PNG를 푸시했다면 **JPG 변환 + 코드 헬퍼 연결 + 버전 갱신
 | **함수 시그니처 확장** (1.27.0 기존) | 기존 호출 호환 위해 새 인자는 **항상 마지막 + 기본값 `= {}`**. damage.js의 calculateDamage/rollDodge/rollCrit가 좋은 예 |
 
 ### 브랜치
-- 시스템 메시지에 박힌 값 사용 (세션마다 다를 수 있음. 이 세션 동안 `claude/review-claude-md-pr55-JcasV`)
+- 시스템 메시지에 박힌 값 사용 (세션마다 다를 수 있음. 이 세션 동안 `claude/review-guidelines-wait-J9Ov3`)
 - 머지 후 새 PR은 **반드시 `git fetch origin main` + `git checkout -B <브랜치> origin/main`**으로 최신 main에서 분기
+- **이번 세션 종료 시점: 같은 브랜치에서 광기의 악사 docs v1만 push 완료, v2 재작성 대기. 다음 세션은 같은 브랜치 그대로 사용해서 v2 commit 추가**
 
 ### 다음 세션이 시작될 때 (PM 메시지: "새세션에서 다음작업 진행")
 
 | 우선순위 | 작업 | 메모 |
 |---|---|---|
-| 1 | **4직업 각인 풀 작성** (sage / demonblood / elf / priest 모두 빈 배열 상태. 1직업씩) | 코드 인프라 완성. 데이터만 추가. 1직업 = 1 PR (1.42.0~1.45.0). 6.9.5절 가이드 참조 |
+| **0** | **🔥 광기의 악사 설계서 v2 재작성** | **이번 세션 미완 작업**. PM 결정 v2 4가지(자원 신설 X / 패시브 차별화 / 매력 메인 / sonic 신설) 반영해 docs/class-minstrel-design.md 전체 재작성. 위 "🔥 다음 세션 즉시 작업" 섹션 참조 |
+| 1 | **4직업 각인 풀 작성** (sage / demonblood / elf / priest 모두 빈 배열 상태. 1직업씩) | 코드 인프라 완성. 데이터만 추가. 1직업 = 1 PR. 6.9.5절 가이드 참조 |
 | 2 | **PrepScreen·RestScreen 출처 모달 확산** | 정보창에 도입한 패턴(buildBreakdownInfo + ◇ + openLine 헬퍼)을 다른 화면에도 적용. 1.41.0 시리즈 일관성 마무리 |
 | 3 | 챔피언십 forest 일러 (PM 생성 대기) | 프롬프트 완료. PM이 PNG 푸시하면 Claude가 JPG 변환 + 게임 통합 |
 | 4 | 챔피언십 sanctum 프롬프트 20장 작성 | forest와 다른 4보스 차별화 컨셉 (frost/forest 룰 적용) |
 | 5 | rift / dawn 프롬프트 | sanctum 작성 완료 후 |
 | 6 | 3직업 소울 스킬 설계 (demonblood/elf/priest) | `CLASS_ULTIMATES` 데이터만 추가하면 정보창에 자동 노출됨. PM과 컨셉 결정 필요 |
 
-PM이 직접 다른 작업을 지시하면 그것을 우선 — 위 1순위는 기본값일 뿐. **첫 응답은 0절 응답 템플릿 + 표 기반**, 산문체 X.
+**다음 세션 첫 응답 흐름**:
+1. CLAUDE.md 0절·7절 + "🔥 다음 세션 즉시 작업" 섹션 정독
+2. PM 결정 v2 4가지 확인 응답 (산문체 X — 표로)
+3. `docs/class-minstrel-design.md` 현재 v1 구조 빠르게 확인 (Read)
+4. v2 재작성 시작 (TodoWrite로 3+ 단계 추적)
+
+PM이 직접 다른 작업을 지시하면 그것을 우선 — 위 0순위는 미완 작업이라 기본값. **첫 응답은 0절 응답 템플릿 + 표 기반**, 산문체 X.
