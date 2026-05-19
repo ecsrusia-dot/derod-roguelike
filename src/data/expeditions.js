@@ -304,14 +304,14 @@ export const CHAMPIONSHIP_CHAPTERS = {
   forest_1: { name: '시든 외곽', sub: 'Withered Outskirts', biome: 'forest', color: '#7a9a5e',
               nodeCount: 20,
               enemies: { 
-                normal: ['champ_forest_husk', 'champ_forest_wolf', 'champ_forest_dryad'],
-                elite: ['champ_forest_brute1'],
+                normal: ['champ_forest_husk', 'champ_forest_leopard', 'champ_forest_dryad'],
+                elite: ['champ_forest_tiger'],
                 boss: 'champ_forest_boss1' 
               } },
   forest_2: { name: '망자의 길', sub: 'Path of the Fallen', biome: 'forest', color: '#7a9a5e',
               nodeCount: 22,
               enemies: { 
-                normal: ['champ_forest_revenant', 'champ_forest_treant', 'champ_forest_wolf'],
+                normal: ['champ_forest_revenant', 'champ_forest_treant', 'champ_forest_leopard'],
                 elite: ['champ_forest_elite2'],
                 boss: 'champ_forest_boss2' 
               } },
