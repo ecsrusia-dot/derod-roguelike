@@ -6,19 +6,16 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { AlertTriangle, X, Maximize2 } from 'lucide-react';
-import { 
-  PALETTE, 
-  getActivePassives, 
-  hasEffect, 
-  hasUltimate, 
+import {
+  PALETTE,
+  getActivePassives,
+  hasEffect,
+  hasUltimate,
   getMinorBonus,
   getMagicEchoChance,
-  getActiveRelicStat,
-  getMetaBonus, 
+  getMetaBonus,
   hasCurse,
-  getEffectiveSkills,
   getSkillLevel,
-  applySealsToSkills,
   getEnemyImageSrc,
   getCharismaHealBonus,
   getCharismaDmgReduction,
@@ -33,93 +30,35 @@ import {
 import {
   PASSIVE_SKILLS,
   ULTIMATE_SKILLS,
-  ENEMIES,
   COMBAT_SKILLS,
   GAME_CONFIG,
   CLASS_ULTIMATES,
 } from '../data.js';
 import { calculateDamage, getDisplayDamage, rollCrit, rollDodge } from '../combat/damage.js';
+import {
+  buildInitialPlayer,
+  buildInitialEnemy,
+  buildEffectivePassives,
+  buildRelicStatBag,
+} from '../combat/initCombat.js';
 import { FloatingLabel, DamageVignette, WhiteFlash, SlashFx, MagicImpactFx, MagicParticles, BarrierRing, BarrierBreakFx, ThrustFx, BladeGuardFx, ShadowStrikeFx, StatusOverlay, UltimateCutin, EternalFlameCutin, FireballFx, ExplosionFx, IgniteGlowAura, IgniteExplodeFx, FlameBarrierFx, FlameReflectFx, CritScreenFx } from './CombatEffects.jsx';
 
 export default function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimates = [], initialRelics = [], activeSkills = null, activeRelicNames = null, enemyKey, isBoss, expedition, curses = [], meta, engravingFx = {}, onVictory, onDefeat }) {
-  const [player, setPlayer] = useState(() => {
-    let p = {
-      ...initialPlayer, defense: 0, buffs: {}, debuffs: {}, cooldowns: {},
-      ether: 3, maxEther: 3, firstHitImmune: false, revivedThisCombat: false,
-      soulGauge: 0,  // 소울 게이지 (0~100). 100에서 직업 소울 스킬 발동 가능
-    };
-    // 메타 강화: 최대 에테르 +1
-    if (meta) {
-      const etherBonus = getMetaBonus(meta, 'maxEther+1');
-      p.maxEther += etherBonus;
-      p.ether += etherBonus;
-      // 1.44.2~ 메타 강화: 전투 시작 방어 +5/Lv
-      const startDefenseBonus = getMetaBonus(meta, 'startDefense+5') * 5;
-      if (startDefenseBonus > 0) p.defense += startDefenseBonus;
-    }
-    // 저주: 에테르 -1
-    if (hasCurse(curses, 'curse_ether-1')) {
-      p.maxEther = Math.max(1, p.maxEther - 1);
-      p.ether = Math.max(1, p.ether - 1);
-    }
-    // 1.27.0~ 각인: 회피 Lv.7 효과와 별개로 firstHitImmune은 회피 Lv.7 패시브에서 처리됨 (이건 각인 효과 X)
-    // 1.37.0~ 시작 영혼 가산은 useEffect로 이동 (지능 시그니처 + 각인 + 유물 + 메타 합산 로그 출력)
-    // 이프리트 minor (Tier 효과 누적): 지능 +2 (Lv.3) +3 (Lv.5) +4 (Lv.7)
-    const ifritLv = (initialSkills && initialSkills['이프리트']) || 0;
-    if (ifritLv > 0 && (!activeSkills || activeSkills.includes('이프리트'))) {
-      let intBonus = 0;
-      if (ifritLv >= 3) intBonus += 2;
-      if (ifritLv >= 5) intBonus += 3;
-      if (ifritLv >= 7) intBonus += 4;
-      p.지능 = (p.지능 || 0) + intBonus;
-    }
-    // 이프리트 궁극: 지능 +4 (모든 궁극 공통)
-    if (initialUltimates && (initialUltimates.includes('ult_eternalFire') || initialUltimates.includes('ult_ifritDescent') || initialUltimates.includes('ult_purgatoryFire'))) {
-      p.지능 = (p.지능 || 0) + 4;
-    }
-    // 1.37.0~ 지능 시그니처 2단계 → "시작 에테르 +1" 효과는 제거됨 (시작 영혼으로 교체).
-    return p;
-  });
-  const [enemy, setEnemy] = useState(() => {
-    const e = ENEMIES[enemyKey];
-    // 원정 능력치 배율
-    const hpMult = expedition?.enemyHpMult || 1.0;
-    const dmgMult = expedition?.enemyDmgMult || 1.0;
-    const adjustedHp = Math.floor(e.hp * hpMult);
-    // 패턴의 데미지에도 배율 적용
-    const adjustedPatterns = (e.patterns || []).map(pat => ({
-      ...pat,
-      dmg: pat.dmg ? [Math.floor(pat.dmg[0] * dmgMult), Math.floor(pat.dmg[1] * dmgMult)] : pat.dmg,
-    }));
-    return { 
-      ...e, key: enemyKey, 
-      hp: adjustedHp,                              // 최대 HP (UI 표시용)
-      currentHp: adjustedHp, maxHp: adjustedHp, 
-      patterns: adjustedPatterns,
-      defense: 0, debuffs: {}, nextIntent: null 
-    };
-  });
-  // 전투 준비 봉인 시스템 (이제 패스스루 — 유물이 패시브에 영향 없음)
-  const skills = useMemo(() => {
-    const baseSkills = getEffectiveSkills(initialSkills, initialRelics, activeRelicNames);
-    // 챔피언십 신전: 봉인된 패시브 효과 비활성화
-    const sealedSkills = player?.debuffs?.sealedSkills || [];
-    if (sealedSkills.length > 0) {
-      return applySealsToSkills(baseSkills, sealedSkills);
-    }
-    return baseSkills;
-  }, [initialSkills, initialRelics, activeRelicNames, player?.debuffs?.sealedSkills]);
-  // 활성 유물의 모든 스탯 보너스를 단일 객체로 집계 (성능 최적화)
-  const relicStat = useMemo(() => {
-    const stats = {};
-    const keys = ['dmgDealt', 'dmgTaken', 'critRate', 'critDmg', 'dodge', 'maxHp', 
-                  'startGold', 'startGem', 'heal', 'reflect', 'lifesteal', 'shieldOnStart',
-                  'magicDmg', 'cdReduceChance', 'mapReveal',
-                  // 챔피언십 전용 stat
-                  'frostbiteResist', 'berserkResist', 'sealResist', 'shockResist', 'antiHeal'];
-    keys.forEach(k => stats[k] = getActiveRelicStat(initialRelics, activeRelicNames, k));
-    return stats;
-  }, [initialRelics, activeRelicNames]);
+  const [player, setPlayer] = useState(() => buildInitialPlayer({
+    initialPlayer, initialSkills, initialUltimates, activeSkills, meta, curses,
+  }));
+  const [enemy, setEnemy] = useState(() => buildInitialEnemy({ enemyKey, expedition }));
+  const skills = useMemo(
+    () => buildEffectivePassives({
+      initialSkills, initialRelics, activeRelicNames,
+      sealedSkills: player?.debuffs?.sealedSkills || [],
+    }),
+    [initialSkills, initialRelics, activeRelicNames, player?.debuffs?.sealedSkills],
+  );
+  const relicStat = useMemo(
+    () => buildRelicStatBag({ initialRelics, activeRelicNames }),
+    [initialRelics, activeRelicNames],
+  );
   const [ultimates] = useState(initialUltimates);
   const [turn, setTurn] = useState(1);
   const [phase, setPhase] = useState('intro');
