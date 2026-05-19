@@ -7,6 +7,22 @@
 
 export const CHANGELOG = [
   {
+    version: '1.50.0',
+    date: '2026-05-19',
+    label: 'forest_3 보스 교체 — 광기의 마녀(승격, 보스) + 광기의 악사 신설(류트 컨셉, 정원사 폐기)',
+    changes: [
+      { type: 'feature', text: '[광기의 마녀 → 보스 승격] 일러스트 작품성 우수로 normal → forest_3 최종 보스로 승격. HP 110 → 400, color #3d5a2c → #2d4a1c (더 진한 보스 톤), berserkPerTurn 5 → 9, drop gold [60,90] → [320,420] + gem [7,10]' },
+      { type: 'feature', text: '[광기의 마녀 패턴 4종 강화] 광기의 저주(22-28) / 광기의 만개(16-22) / 광기의 융단 폭격(38-50, heavy) / 마녀의 결계(+55 defense). 이전 정원사의 보스급 강도 그대로 마녀 스킬셋으로 재구성' },
+      { type: 'feature', text: '[광기의 정원사 폐기 + 광기의 악사 신설] 정원사 컨셉 폐기. 광기의 악사(champ_forest_minstrel) 신규 — 류트로 광기의 선율을 연주하는 광인. normal 등급, hp 110, color #6e5a3c(류트 목재 갈색)' },
+      { type: 'feature', text: '[광기의 악사 패턴 3종] 광기의 선율(14-18, 단발) / 광기의 화음(20-26, heavy) / 광기의 자장가(+32 defense). 음악 컨셉으로 통일된 류트리스트 캐릭터' },
+      { type: 'system', text: '[enemyKey 변경] champ_forest_boss3 (정원사) 삭제. champ_forest_witch (마녀)는 키 유지하되 보스 자리로 이동. champ_forest_minstrel (악사) 신규 추가' },
+      { type: 'system', text: '[expeditions.js forest_3 풀 갱신] normal: chimera+treant+minstrel (witch 제외, minstrel 신규) / boss: boss3 → witch' },
+      { type: 'system', text: '[expeditions.js forest_4 풀 갱신] normal: avatar+chimera+minstrel (witch 제외 — 보스급이 normal로 등장 방지, minstrel로 대체)' },
+      { type: 'system', text: '[일러 안내] 광기의 마녀 일러는 champ_forest_witch_combat.jpg / champ_forest_witch_intro.jpg 이름으로 public/enemies/championship/forest/ 폴더에 저장 필요 (보스로 승격되어 intro 컷신도 활성화). 폴더는 PM이 PNG 푸시 시 자동 생성' },
+      { type: 'system', text: '[다음 PR 예고] PM 일러 PNG 푸시 → forest 일러 변환·통합 / 또는 sanctum·rift·dawn 프롬프트 작성 / 또는 demonblood·elf·priest 각인 풀 24장' },
+    ],
+  },
+  {
     version: '1.49.0',
     date: '2026-05-19',
     label: '챔피언십 신전 — 패시브 봉인 → 액티브 스킬 봉인 컨셉 변경 + 적 패턴별 1~2개·1~3턴 차등',

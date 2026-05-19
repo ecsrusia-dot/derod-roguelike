@@ -608,16 +608,17 @@ export const ENEMIES = {
     drop: { gold: [70, 100] },
   },
   champ_forest_witch: {
-    name: '광기의 마녀', hp: 110, color: '#3d5a2c',
-    desc: '광기의 비술을 전수받은 어둠의 마녀',
-    tier: 'normal', chapter: 'forest_3',
-    berserkPerTurn: 5,
+    name: '광기의 마녀', hp: 400, color: '#2d4a1c',
+    desc: '광기의 정원 가장 깊은 곳에서 어둠의 비술을 완성한 마녀',
+    isBoss: true, tier: 'boss', chapter: 'forest_3',
+    berserkPerTurn: 9,
     patterns: [
-      { name: '광기 저주', dmg: [14, 18], type: 'attack' },
-      { name: '광기 폭발', dmg: [20, 26], type: 'attack', heavy: true },
-      { name: '결계 시전', dmg: [0, 0], type: 'defend', defense: 32 },
+      { name: '광기의 저주', dmg: [22, 28], type: 'attack' },
+      { name: '광기의 만개', dmg: [16, 22], type: 'attack' },
+      { name: '광기의 융단 폭격', dmg: [38, 50], type: 'attack', heavy: true },
+      { name: '마녀의 결계', dmg: [0, 0], type: 'defend', defense: 55 },
     ],
-    drop: { gold: [60, 90] },
+    drop: { gold: [320, 420], gem: [7, 10] },
   },
   champ_forest_elite3: {
     name: '광기의 화신', hp: 230, color: '#3d5a2c',
@@ -631,18 +632,17 @@ export const ENEMIES = {
     ],
     drop: { gold: [110, 160], gem: [3, 5] },
   },
-  champ_forest_boss3: {
-    name: '광기의 정원사', hp: 400, color: '#3d5a2c',
-    desc: '정원에서 광기의 꽃을 가꾸는 노쇠한 정원사',
-    isBoss: true, tier: 'boss', chapter: 'forest_3',
-    berserkPerTurn: 9,
+  champ_forest_minstrel: {
+    name: '광기의 악사', hp: 110, color: '#6e5a3c',
+    desc: '광기의 선율을 류트로 연주하는 광인',
+    tier: 'normal', chapter: 'forest_3',
+    berserkPerTurn: 5,
     patterns: [
-      { name: '정원사의 가지치기', dmg: [22, 28], type: 'attack' },
-      { name: '광기의 만개', dmg: [16, 22], type: 'attack' },
-      { name: '큰 가지치기', dmg: [38, 50], type: 'attack', heavy: true },
-      { name: '정원의 보호', dmg: [0, 0], type: 'defend', defense: 55 },
+      { name: '광기의 선율', dmg: [14, 18], type: 'attack' },
+      { name: '광기의 화음', dmg: [20, 26], type: 'attack', heavy: true },
+      { name: '광기의 자장가', dmg: [0, 0], type: 'defend', defense: 32 },
     ],
-    drop: { gold: [320, 420], gem: [7, 10] },
+    drop: { gold: [60, 90] },
   },
   
   // === 챕터 4: 심부의 폭군 (forest_4) — 극한 광폭 ===
