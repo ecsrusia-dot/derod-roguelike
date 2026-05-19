@@ -8,8 +8,9 @@ import React, { useState } from 'react';
 import { PALETTE } from '../utils/helpers.js';
 import { PASSIVE_SKILLS, COMBAT_SKILLS, PREP_CONFIG } from '../data.js';
 import CardInfoModal, { buildActiveSkillInfo } from './CardInfoModal.jsx';
+import BuildSummaryPanel from './BuildSummaryPanel.jsx';
 
-export default function RestScreen({ classData, hp, maxHp, skills, relics, expedition, onChoice, onClose }) {
+export default function RestScreen({ classData, hp, maxHp, skills, stats = {}, activeSkills = null, activeRelicNames = null, relics, ultimates = [], engravingFx = {}, meta = null, expedition, onChoice, onClose }) {
   const ownedSkills = Object.entries(skills)
     .filter(([n, lv]) => lv > 0 && PASSIVE_SKILLS[n])
     .map(([n]) => n);
@@ -18,6 +19,8 @@ export default function RestScreen({ classData, hp, maxHp, skills, relics, exped
   const canReselectSkills = ownedSkills.length > maxSkillSelect;
   const canReselectRelics = relics.length > maxRelicSelect;
   const [modalSkill, setModalSkill] = useState(null);
+  // 1.48.0~ BuildSummaryPanel 출처 분해 모달용
+  const [breakdownInfo, setBreakdownInfo] = useState(null);
 
   return (
     <div className="absolute inset-0 flex flex-col" style={{ background: PALETTE.bgDeep }}>
@@ -32,6 +35,20 @@ export default function RestScreen({ classData, hp, maxHp, skills, relics, exped
           앞에 있을 적은 강력하다. 마지막 정비를 해야 할 시간.<br/>
           단 한 가지만 선택할 수 있다.
         </p>
+
+        {/* 1.48.0~ 빌드 요약 패널 — 정비 직전 현재 빌드 상태 검증용 (정적) */}
+        <BuildSummaryPanel
+          classData={classData}
+          stats={stats}
+          skills={skills}
+          activeSkills={activeSkills}
+          relics={relics}
+          activeRelicNames={activeRelicNames}
+          ultimates={ultimates}
+          engravingFx={engravingFx}
+          meta={meta}
+          onLineClick={(info) => setBreakdownInfo(info)}
+        />
 
         <button onClick={() => onChoice({ type: 'heal', value: Math.floor(maxHp * 0.2) })}
           className="w-full text-left px-4 py-3 transition-all hover:translate-x-1"
@@ -115,6 +132,9 @@ export default function RestScreen({ classData, hp, maxHp, skills, relics, exped
           info={buildActiveSkillInfo(modalSkill, classData?.color)}
           onClose={() => setModalSkill(null)}
         />
+      )}
+      {breakdownInfo && (
+        <CardInfoModal info={breakdownInfo} onClose={() => setBreakdownInfo(null)} />
       )}
     </div>
   );

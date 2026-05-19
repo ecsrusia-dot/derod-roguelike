@@ -10,8 +10,9 @@ import React, { useState } from 'react';
 import { PALETTE } from '../utils/helpers.js';
 import { PASSIVE_SKILLS, COMBAT_SKILLS, PREP_CONFIG } from '../data.js';
 import CardInfoModal, { buildPassiveInfo, buildRelicInfo, buildActiveSkillInfo } from './CardInfoModal.jsx';
+import BuildSummaryPanel from './BuildSummaryPanel.jsx';
 
-export default function PrepScreen({ classData, skills, relics, ultimates, expedition, mode = 'full', currentActiveSkills = null, currentActiveRelicNames = null, onConfirm }) {
+export default function PrepScreen({ classData, skills, stats = {}, relics, ultimates, expedition, engravingFx = {}, meta = null, mode = 'full', currentActiveSkills = null, currentActiveRelicNames = null, onConfirm }) {
   // Lv > 0 인 보유 패시브 목록
   const ownedSkills = Object.entries(skills)
     .filter(([n, lv]) => lv > 0 && PASSIVE_SKILLS[n])
@@ -105,6 +106,9 @@ export default function PrepScreen({ classData, skills, relics, ultimates, exped
     }
   } else if (modalState?.kind === 'active') {
     modalInfo = buildActiveSkillInfo(modalState.name, classData?.color);
+  } else if (modalState?.kind === 'breakdown') {
+    // 1.48.0~ BuildSummaryPanel ◇ 라인 출처 분해 모달 (StatusPanel 패턴 확산)
+    modalInfo = modalState.info;
   }
 
   return (
@@ -119,6 +123,20 @@ export default function PrepScreen({ classData, skills, relics, ultimates, exped
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
+        {/* 1.48.0~ 빌드 요약 패널 (StatusPanel ◇ 출처 모달 패턴 확산). 선택된 패시브·유물 토글 시 즉시 갱신 */}
+        <BuildSummaryPanel
+          classData={classData}
+          stats={stats}
+          skills={skills}
+          activeSkills={Array.from(selectedSkills)}
+          relics={relics}
+          activeRelicNames={Array.from(selectedRelics)}
+          ultimates={ultimates}
+          engravingFx={engravingFx}
+          meta={meta}
+          onLineClick={(info) => setModalState({ kind: 'breakdown', info })}
+        />
+
         {showSkills && (
         <div>
           <div className="flex items-center justify-between mb-2 px-1">
