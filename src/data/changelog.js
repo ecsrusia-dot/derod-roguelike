@@ -7,6 +7,18 @@
 
 export const CHANGELOG = [
   {
+    version: '1.51.0',
+    date: '2026-05-20',
+    label: '챔피언십 forest 적 일러스트 20장 적용 (4보스 + 보스 컷신 4종 + 일반/강적 12종)',
+    changes: [
+      { type: 'feature', text: '챔피언십 forest(부패·숲) 컨셉 적 16종에 신규 전투 일러스트 일괄 적용 — 4단계 환경이 명확히 분리됨: 1단계 시든 외곽 / 2단계 망자의 길 / 3단계 광기의 정원 / 4단계 광기의 종막(심부). 색조 검녹-부패 보라 톤 통일' },
+      { type: 'feature', text: '4보스를 4가지 완전히 다른 존재 형태로 차별화 — 시든 자들의 어머니(식물 융합 모성 정령) / 망자의 군주(부패 갑옷 망자 검왕) / 광기의 마녀(광기 비술 인간 여성 마법사, 1.50.0 forest_3 보스 승격) / 광기의 종말 마에스트로(광인 음유시인 마에스트로, 1.50.2 forest_4 보스 재설계). 종족·자세·무기·시전 양식 4축 모두 분리' },
+      { type: 'feature', text: '4보스 진입 풀컷 시네마틱 9:16 일러 4종 추가 — boss1·boss2·witch(forest_3)·boss4 모두 보스 노드 진입 시 자동 컷신 활성화. frost 4보스에 이어 forest 4보스도 컷신 완비' },
+      { type: 'system', text: '적 일러스트 경로 헬퍼 `getEnemyImageSrc` 확장 — forest는 chapter 서브폴더 구조(`./enemies/championship/forest/chapter<stage>/`) 자동 라우팅. frost flat 구조와 공존. 향후 sanctum·rift·dawn은 forest와 동일 chapter 폴더 권장' },
+      { type: 'system', text: 'thornling 1장 PNG → JPG quality 90 변환으로 2.9 MB → 519 KB (82% 절감). 나머지 19장은 PM이 미리 JPG로 변환하여 푸시. 챔피언십 5컨셉 중 frost·forest 2개 완료, 나머지 sanctum·rift·dawn 3컨셉(60장) 진행 예정' },
+    ],
+  },
+  {
     version: '1.50.2',
     date: '2026-05-20',
     label: 'forest_4 보스·챕터 재설계 — 심부의 폭군(거대 키메라 신) → 광기의 종말 마에스트로(광인 음유시인) + 챕터 광기의 종막',
