@@ -461,12 +461,18 @@ export function getIfritIgniteRate(skills, ultimates, activeSkills = null) {
 // chapter 값으로 클래식/챔피언십 자동 판별:
 //   - number (1, 2, 3, 4) → 클래식: ./enemies/classic/chapter_<n>/
 //   - string ('frost_1', 'forest_2', …) → 챔피언십: ./enemies/championship/<concept>/
+//     * forest는 chapter 서브폴더 구조 (1.51.0~): ./enemies/championship/forest/chapter<stage>/
+//     * frost는 flat 구조 (1.21.0~): ./enemies/championship/frost/
+//     * 신규 컨셉(sanctum/rift/dawn)도 forest와 동일한 chapter 서브폴더 권장
 //
 // kind는 'combat'(전투 16:9) 또는 'intro'(보스 진입 9:16)
 export function getEnemyImageSrc(enemyKey, enemy, kind = 'combat') {
   if (!enemy?.chapter) return null;
   if (typeof enemy.chapter === 'string') {
-    const concept = enemy.chapter.split('_')[0];
+    const [concept, stage] = enemy.chapter.split('_');
+    if (concept === 'forest') {
+      return `./enemies/championship/${concept}/chapter${stage}/${enemyKey}_${kind}.jpg`;
+    }
     return `./enemies/championship/${concept}/${enemyKey}_${kind}.jpg`;
   }
   return `./enemies/classic/chapter_${enemy.chapter}/${enemyKey}_${kind}.jpg`;
