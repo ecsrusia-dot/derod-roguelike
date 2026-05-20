@@ -7,6 +7,20 @@
 
 export const CHANGELOG = [
   {
+    version: '1.50.2',
+    date: '2026-05-20',
+    label: 'forest_4 보스 재설계 — 심부의 폭군(거대 키메라 신) → 광기의 종말 마에스트로(광인 음유시인, 음악 용어 5패턴)',
+    changes: [
+      { type: 'feature', text: '[forest_4 최종 보스 컨셉 전면 교체] 광기의 악사 신규 직업 구현 계획 PM 보류 결정 → 일러스트(인간 남성 광인 류트 마에스트로, 광기 보라 톤)를 forest_4 최종 보스로 승격 활용. 거대 다중 머리 키메라 신 컨셉 폐기' },
+      { type: 'feature', text: '[심부의 폭군 → 광기의 종말 마에스트로] 이름 변경. HP 500 유지, color #3d5a2c(검녹) → #8a6db8(어두운 광기 보라), berserkPerTurn 12 유지, drop 유지' },
+      { type: 'feature', text: '[forest_4 챕터 이름 변경] 심부의 폭군(The Inner Tyrant) → 광기의 종막(Finale of Madness). 새 보스 마에스트로 컨셉과 일관. forest_3 광기의 정원(Garden of Madness)과 자연 연결' },
+      { type: 'feature', text: '[5패턴 음악 용어 셋트] 거대 발톱→광기의 음(22-28) / 광기의 절규→광기의 화음(16-22) / 심부의 분노→광기의 협주곡(32-42) / 신적 분쇄→광기의 종지부(44-58, heavy) / 폭군의 옥좌→광기의 무대(+65 defense). 데미지·heavy 플래그 모두 유지하여 난이도 곡선 영향 없음' },
+      { type: 'system', text: '[docs/class-minstrel-design.md 보류 표시] PM이 광기의 악사 직업 구현 전면 보류 결정. v2 설계서는 [보류] 헤더 추가하여 main에 보관, 향후 재논의 시 참고. PR #91은 머지 X 상태로 닫힘' },
+      { type: 'system', text: '[프롬프트 §6.3·§6.4 재작성] docs/enemy-illustration-prompts-championship-forest.md 심부의 폭군 전투(§6.3) + 진입 컷신(§6.4) 프롬프트 광기 마에스트로 + 심부 배경 톤으로 재작성. §1 4보스 차별화 표도 갱신 (boss4 거대 키메라 신 → 광인 마에스트로)' },
+      { type: 'system', text: '[다음 PR 예고] PM이 광기의 악사 일러를 forest_4 심부 배경으로 가공 후 champ_forest_boss4_combat.jpg + champ_forest_boss4_intro.jpg 푸시 → Claude JPG 변환 + 코드 연결' },
+    ],
+  },
+  {
     version: '1.50.0',
     date: '2026-05-19',
     label: 'forest_3 보스 교체 — 광기의 마녀(승격, 보스) + 광기의 악사 신설(류트 컨셉, 정원사 폐기)',
