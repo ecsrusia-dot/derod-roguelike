@@ -322,7 +322,7 @@ export const CHAMPIONSHIP_CHAPTERS = {
                 elite: ['champ_forest_elite3'],
                 boss: 'champ_forest_witch'
               } },
-  forest_4: { name: '심부의 폭군', sub: 'The Inner Tyrant', biome: 'forest', color: '#7a9a5e',
+  forest_4: { name: '광기의 종막', sub: 'Finale of Madness', biome: 'forest', color: '#7a9a5e',
               nodeCount: 26,
               enemies: {
                 normal: ['champ_forest_avatar', 'champ_forest_chimera', 'champ_forest_thornling'],

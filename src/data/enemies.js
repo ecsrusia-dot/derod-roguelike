@@ -645,7 +645,7 @@ export const ENEMIES = {
     drop: { gold: [60, 90] },
   },
   
-  // === 챕터 4: 심부의 폭군 (forest_4) — 극한 광폭 ===
+  // === 챕터 4: 광기의 종막 (forest_4) — 극한 광폭 ===
   champ_forest_avatar: {
     name: '광기의 화신', hp: 195, color: '#7a9a5e',
     desc: '심부에 도달한 광기의 정점',
@@ -671,16 +671,16 @@ export const ENEMIES = {
     drop: { gold: [140, 200], gem: [4, 6] },
   },
   champ_forest_boss4: {
-    name: '심부의 폭군', hp: 500, color: '#3d5a2c',
-    desc: '죽은자의 숲 가장 깊은 곳에 봉인된 광기의 신',
+    name: '광기의 종말 마에스트로', hp: 500, color: '#8a6db8',
+    desc: '심부에 봉인된 광기의 종말 교향곡을 끊임없이 연주하는 광인 마에스트로',
     isBoss: true, tier: 'boss', chapter: 'forest_4',
     berserkPerTurn: 12,  // 최종 보스 — 매 턴 +12 누적
     patterns: [
-      { name: '거대 발톱', dmg: [22, 28], type: 'attack' },
-      { name: '광기의 절규', dmg: [16, 22], type: 'attack' },
-      { name: '심부의 분노', dmg: [32, 42], type: 'attack' },
-      { name: '신적 분쇄', dmg: [44, 58], type: 'attack', heavy: true },
-      { name: '폭군의 옥좌', dmg: [0, 0], type: 'defend', defense: 65 },
+      { name: '광기의 음', dmg: [22, 28], type: 'attack' },
+      { name: '광기의 화음', dmg: [16, 22], type: 'attack' },
+      { name: '광기의 협주곡', dmg: [32, 42], type: 'attack' },
+      { name: '광기의 종지부', dmg: [44, 58], type: 'attack', heavy: true },
+      { name: '광기의 무대', dmg: [0, 0], type: 'defend', defense: 65 },
     ],
     drop: { gold: [400, 520], gem: [10, 14] },
   },
