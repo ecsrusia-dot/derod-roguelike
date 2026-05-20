@@ -318,14 +318,14 @@ export const CHAMPIONSHIP_CHAPTERS = {
   forest_3: { name: '광기의 정원', sub: 'Garden of Madness', biome: 'forest', color: '#7a9a5e',
               nodeCount: 24,
               enemies: {
-                normal: ['champ_forest_chimera', 'champ_forest_minstrel', 'champ_forest_treant'],
+                normal: ['champ_forest_chimera', 'champ_forest_thornling', 'champ_forest_treant'],
                 elite: ['champ_forest_elite3'],
                 boss: 'champ_forest_witch'
               } },
   forest_4: { name: '광기의 종막', sub: 'Finale of Madness', biome: 'forest', color: '#7a9a5e',
               nodeCount: 26,
               enemies: {
-                normal: ['champ_forest_avatar', 'champ_forest_chimera', 'champ_forest_minstrel'],
+                normal: ['champ_forest_avatar', 'champ_forest_chimera', 'champ_forest_thornling'],
                 elite: ['champ_forest_elite4', 'champ_forest_elite3'],
                 boss: 'champ_forest_boss4'
               } },

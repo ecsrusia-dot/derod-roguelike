@@ -9,15 +9,28 @@ export const CHANGELOG = [
   {
     version: '1.50.2',
     date: '2026-05-20',
-    label: 'forest_4 보스 재설계 — 심부의 폭군(거대 키메라 신) → 광기의 종말 마에스트로(광인 음유시인, 음악 용어 5패턴)',
+    label: 'forest_4 보스·챕터 재설계 — 심부의 폭군(거대 키메라 신) → 광기의 종말 마에스트로(광인 음유시인) + 챕터 광기의 종막',
     changes: [
       { type: 'feature', text: '[forest_4 최종 보스 컨셉 전면 교체] 광기의 악사 신규 직업 구현 계획 PM 보류 결정 → 일러스트(인간 남성 광인 류트 마에스트로, 광기 보라 톤)를 forest_4 최종 보스로 승격 활용. 거대 다중 머리 키메라 신 컨셉 폐기' },
       { type: 'feature', text: '[심부의 폭군 → 광기의 종말 마에스트로] 이름 변경. HP 500 유지, color #3d5a2c(검녹) → #8a6db8(어두운 광기 보라), berserkPerTurn 12 유지, drop 유지' },
       { type: 'feature', text: '[forest_4 챕터 이름 변경] 심부의 폭군(The Inner Tyrant) → 광기의 종막(Finale of Madness). 새 보스 마에스트로 컨셉과 일관. forest_3 광기의 정원(Garden of Madness)과 자연 연결' },
       { type: 'feature', text: '[5패턴 음악 용어 셋트] 거대 발톱→광기의 음(22-28) / 광기의 절규→광기의 화음(16-22) / 심부의 분노→광기의 협주곡(32-42) / 신적 분쇄→광기의 종지부(44-58, heavy) / 폭군의 옥좌→광기의 무대(+65 defense). 데미지·heavy 플래그 모두 유지하여 난이도 곡선 영향 없음' },
-      { type: 'system', text: '[docs/class-minstrel-design.md 보류 표시] PM이 광기의 악사 직업 구현 전면 보류 결정. v2 설계서는 [보류] 헤더 추가하여 main에 보관, 향후 재논의 시 참고. PR #91은 머지 X 상태로 닫힘' },
+      { type: 'system', text: '[docs/class-minstrel-design.md 보류 표시] PM이 광기의 악사 직업 구현 전면 보류 결정. v2 설계서는 [보류] 헤더 추가하여 main에 보관, 향후 재논의 시 참고. PR #91은 v1 머지된 후 v2 재작성 push 단계에서 보류 결정으로 닫힘' },
       { type: 'system', text: '[프롬프트 §6.3·§6.4 재작성] docs/enemy-illustration-prompts-championship-forest.md 심부의 폭군 전투(§6.3) + 진입 컷신(§6.4) 프롬프트 광기 마에스트로 + 심부 배경 톤으로 재작성. §1 4보스 차별화 표도 갱신 (boss4 거대 키메라 신 → 광인 마에스트로)' },
       { type: 'system', text: '[다음 PR 예고] PM이 광기의 악사 일러를 forest_4 심부 배경으로 가공 후 champ_forest_boss4_combat.jpg + champ_forest_boss4_intro.jpg 푸시 → Claude JPG 변환 + 코드 연결' },
+    ],
+  },
+  {
+    version: '1.50.1',
+    date: '2026-05-20',
+    label: 'forest_3 일반 적 교체 — 광기의 악사 폐기(직업 격상 예정) + 광기의 가시 덩굴 살수 신설',
+    changes: [
+      { type: 'feature', text: '[광기의 악사 → 적 풀에서 폐기] 광기의 악사가 신규 플레이어 직업(minstrel)으로 격상 예정(PR 설계서 #91 참조). 적 풀 충돌 방지를 위해 champ_forest_minstrel 사전 제거' },
+      { type: 'feature', text: '[광기의 가시 덩굴 살수 신설] champ_forest_thornling — 광기 정원의 가시 덩굴이 인간 실루엣으로 뭉친 식물형 살수. normal 등급, hp 110, color #5e7a4a(덩굴 녹). 보스1(상반신 정령 + 하반신 거대 뿌리 식물 융합)과 명확 구분 — 100% 가시 덩굴 인간 실루엣' },
+      { type: 'feature', text: '[가시 덩굴 살수 패턴 3종] 가시 채찍(14-18, 단발) / 덩굴 휘감기(20-26, heavy) / 가시 결계(+32 defense). 악사의 음악 컨셉을 식물·가시 컨셉으로 동일 강도 유지하며 재구성' },
+      { type: 'system', text: '[enemyKey 변경] champ_forest_minstrel 삭제, champ_forest_thornling 신규. forest_3 / forest_4 normal 풀의 minstrel 참조 2곳 thornling으로 일괄 교체' },
+      { type: 'system', text: '[프롬프트 갱신] docs/enemy-illustration-prompts-championship-forest.md 5.2 섹션 — 광기의 악사 프롬프트를 광기의 가시 덩굴 살수 프롬프트로 교체. 7절 파일 명명 갱신. 1.50.0 1회 교체(정원사→악사)에 이은 2회째 교체' },
+      { type: 'system', text: '[다음 PR 예고] PR #91(악사 직업화 설계서)에 정의된 9개 결정 사항 PM 답변 → 1.51.0 직업 인프라(음표 자원 시스템 + sonic 데미지 타입) 구현' },
     ],
   },
   {

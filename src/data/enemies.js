@@ -632,15 +632,15 @@ export const ENEMIES = {
     ],
     drop: { gold: [110, 160], gem: [3, 5] },
   },
-  champ_forest_minstrel: {
-    name: '광기의 악사', hp: 110, color: '#6e5a3c',
-    desc: '광기의 선율을 류트로 연주하는 광인',
+  champ_forest_thornling: {
+    name: '광기의 가시 덩굴 살수', hp: 110, color: '#5e7a4a',
+    desc: '광기 정원의 가시 덩굴이 인간 실루엣으로 뭉친 식물형 살수',
     tier: 'normal', chapter: 'forest_3',
     berserkPerTurn: 5,
     patterns: [
-      { name: '광기의 선율', dmg: [14, 18], type: 'attack' },
-      { name: '광기의 화음', dmg: [20, 26], type: 'attack', heavy: true },
-      { name: '광기의 자장가', dmg: [0, 0], type: 'defend', defense: 32 },
+      { name: '가시 채찍', dmg: [14, 18], type: 'attack' },
+      { name: '덩굴 휘감기', dmg: [20, 26], type: 'attack', heavy: true },
+      { name: '가시 결계', dmg: [0, 0], type: 'defend', defense: 32 },
     ],
     drop: { gold: [60, 90] },
   },
