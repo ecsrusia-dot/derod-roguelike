@@ -7,6 +7,19 @@
 
 export const CHANGELOG = [
   {
+    version: '1.50.1',
+    date: '2026-05-20',
+    label: 'forest_3 일반 적 교체 — 광기의 악사 폐기(직업 격상 예정) + 광기의 가시 덩굴 살수 신설',
+    changes: [
+      { type: 'feature', text: '[광기의 악사 → 적 풀에서 폐기] 광기의 악사가 신규 플레이어 직업(minstrel)으로 격상 예정(PR 설계서 #91 참조). 적 풀 충돌 방지를 위해 champ_forest_minstrel 사전 제거' },
+      { type: 'feature', text: '[광기의 가시 덩굴 살수 신설] champ_forest_thornling — 광기 정원의 가시 덩굴이 인간 실루엣으로 뭉친 식물형 살수. normal 등급, hp 110, color #5e7a4a(덩굴 녹). 보스1(상반신 정령 + 하반신 거대 뿌리 식물 융합)과 명확 구분 — 100% 가시 덩굴 인간 실루엣' },
+      { type: 'feature', text: '[가시 덩굴 살수 패턴 3종] 가시 채찍(14-18, 단발) / 덩굴 휘감기(20-26, heavy) / 가시 결계(+32 defense). 악사의 음악 컨셉을 식물·가시 컨셉으로 동일 강도 유지하며 재구성' },
+      { type: 'system', text: '[enemyKey 변경] champ_forest_minstrel 삭제, champ_forest_thornling 신규. forest_3 / forest_4 normal 풀의 minstrel 참조 2곳 thornling으로 일괄 교체' },
+      { type: 'system', text: '[프롬프트 갱신] docs/enemy-illustration-prompts-championship-forest.md 5.2 섹션 — 광기의 악사 프롬프트를 광기의 가시 덩굴 살수 프롬프트로 교체. 7절 파일 명명 갱신. 1.50.0 1회 교체(정원사→악사)에 이은 2회째 교체' },
+      { type: 'system', text: '[다음 PR 예고] PR #91(악사 직업화 설계서)에 정의된 9개 결정 사항 PM 답변 → 1.51.0 직업 인프라(음표 자원 시스템 + sonic 데미지 타입) 구현' },
+    ],
+  },
+  {
     version: '1.50.0',
     date: '2026-05-19',
     label: 'forest_3 보스 교체 — 광기의 마녀(승격, 보스) + 광기의 악사 신설(류트 컨셉, 정원사 폐기)',
