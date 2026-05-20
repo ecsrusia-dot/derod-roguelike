@@ -863,7 +863,7 @@ const combatSrc = `./enemies/${subdir}/${enemyKey}_combat.jpg`;
 - [x] 챕터 4 (마계의 균열) 5종 + 보스 진입 풀컷 1종 — 1.20.0에 완료 (메인 스토리 일러 100%)
 - [ ] **챔피언십 전용 적 (5컨셉 × 16종 + 보스 진입 4종 = 100종) — 컨셉별 별도 문서로 분리**:
   - [x] frost (서리·동토) — `enemy-illustration-prompts-championship-frost.md` 20장 완료 (1.21.0)
-  - [ ] forest (부패·숲) — `enemy-illustration-prompts-championship-forest.md` 작성 완료, PM 생성 대기
-  - [ ] sanctum (신전·봉인) — 미작성
+  - [x] forest (부패·숲·광기) — `enemy-illustration-prompts-championship-forest.md` 20장 완료 (PM 일러 push + PR #94 head, 머지 대기)
+  - [x] sanctum (신전·골렘·봉인된 영혼) — `enemy-illustration-prompts-championship-sanctum.md` 20장 완료 (1.52.0, 새 스타일 — 단어형 + 1.52.0 헤더/구도), PM 생성 대기
   - [ ] rift (마계·균열) — 미작성
   - [ ] dawn (천상·여명) — 미작성
