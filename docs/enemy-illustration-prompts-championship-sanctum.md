@@ -50,9 +50,9 @@ sanctum 컨셉은 챔피언십 5컨셉 중 **봉인된 신전·신성 룬·봉�
 
 ## 2. 사용법
 
-1. 각 코드 블록을 그대로 복사해 **Microsoft Copilot Designer**에 입력
+1. 각 코드 블록을 그대로 복사해 **ChatGPT (DALL-E 3)**에 입력 (1.53.0~ Copilot 폐기, ChatGPT 통일)
 2. **반드시 클래식 챕터 3 일러 1장을 첨부**해서 화풍 통일도 (예: `public/enemies/classic/chapter_3/sealedTemplar_intro.jpg`). 봉인·신성 톤은 챕터 3가 가장 가까움
-3. 결과 4장 중 가장 잘 나온 1장 선택. 마음에 안 들면 같은 채팅에서 "더 OOO하게 다시" 멀티턴 보정
+3. 한 번에 1~2장 생성 → 마음에 안 들면 같은 채팅에서 "더 OOO하게 다시" 멀티턴 보정 (ChatGPT는 보정 제어가 정확)
 4. PNG 다운로드 → `public/enemies/championship/sanctum/chapter<N>/<enemyKey>_combat.jpg` 또는 `_intro.jpg` 위치에 저장 (forest 패턴 그대로)
 5. PM이 main에 푸시 → Claude가 git pull → Pillow로 JPG 변환 후 원본 PNG 삭제 + 헬퍼 sanctum 분기 추가 PR
 
@@ -424,7 +424,7 @@ sanctum 컨셉은 챔피언십 5컨셉 중 **봉인된 신전·신성 룬·봉�
 ## 9. PM 푸시 워크플로 (forest 사이클 그대로)
 
 ```
-[1] PM이 Copilot Designer에 한국어 프롬프트 입력 + 클래식 챕터 3 일러 첨부
+[1] PM이 ChatGPT(DALL-E 3)에 한국어 프롬프트 입력 + 클래식 챕터 3 일러 첨부
 [2] 결과 4장 중 마음에 드는 것 선택 (필요 시 멀티턴 보정)
 [3] PM이 PNG 다운로드 → public/enemies/championship/sanctum/chapter<N>/ 폴더에 저장
 [4] PM이 main에 푸시 (또는 작업 브랜치에)
@@ -449,4 +449,4 @@ forest와 동일한 chapter1/2/3/4 서브폴더 구조 사용 — 헬퍼 분기�
 
 ---
 
-**다음 작업**: PM이 Copilot Designer로 sanctum 20장 일러 생성 → main 푸시 → Claude가 JPG 변환 + 헬퍼 분기 + 코드 통합 PR (forest 1.51.0 사이클 그대로).
+**다음 작업**: PM이 ChatGPT(DALL-E 3)로 sanctum 20장 일러 생성 → main 푸시 → Claude가 JPG 변환 + 헬퍼 분기 + 코드 통합 PR (forest 1.51.0 사이클 그대로).

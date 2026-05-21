@@ -201,17 +201,19 @@ src="./classes/lanthert.jpg"
 
 ---
 
-## 5. 🎨 이미지 생성 파이프라인 (코파일럿 디자이너 → 게임 통합)
+## 5. 🎨 이미지 생성 파이프라인 (챗지피티 → 게임 통합)
 
-이 프로젝트의 모든 일러스트는 **OpenAI DALL-E 3** 엔진으로 생성된다. 직업 일러는 챗지피티(DALL-E 3)로, 적 일러는 동일 엔진을 무료로 쓸 수 있는 Microsoft Copilot Designer로 생성한다.
+이 프로젝트의 모든 일러스트는 **OpenAI DALL-E 3** 엔진(챗지피티 내장)으로 생성된다. 직업 일러·적 일러 모두 챗지피티(ChatGPT, DALL-E 3)로 통일 (1.53.0~).
 
-### 5.1. 도구 선택 — Copilot Designer (DALL-E 3) 권장
+> **1.53.0 도구 변경**: Microsoft Copilot Designer → **ChatGPT**로 전환. PM 결정. 이유: Copilot Designer의 부스트 소진 시 생성 5~10분/장으로 느려지고 멀티턴 보정 제어가 떨어짐. ChatGPT는 안정적인 멀티턴 보정 + 직업 일러와 동일 인터페이스. 기존 frost·forest 일러는 Copilot Designer 사용분이며 화풍 통일은 유지됨.
+
+### 5.1. 도구 선택 — ChatGPT (DALL-E 3) 권장
 
 | 도구 | URL | 비고 |
 |---|---|---|
-| **Microsoft Copilot Designer** | `copilot.microsoft.com` (이미지 탭) | **권장**. DALL-E 3 무료. MS 계정 필요. 윈도우 기본 설치 |
-| Bing Image Creator (대안) | `bing.com/images/create` | 동일 엔진. 일일 부스트 15개 |
-| 챗지피티 (유료) | `chatgpt.com` | 직업 일러 원본 생성 도구. 동일 엔진 |
+| **ChatGPT (권장)** | `chatgpt.com` | **권장**. DALL-E 3 내장. 멀티턴 보정 우수. ChatGPT Plus 구독 권장 (무료는 일일 한도) |
+| Bing Image Creator (대안) | `bing.com/images/create` | 동일 엔진. 일일 부스트 15개. 멀티턴 보정 없음 |
+| ~~Microsoft Copilot Designer~~ | ~~`copilot.microsoft.com`~~ | ~~1.21.0~1.51.0 사용. 1.53.0 폐기 (부스트 소진 시 느림·보정 제어 약함)~~ |
 
 **제미나이(Imagen) 사용 금지** — 디폴트 화풍이 TCG·하스스톤 카드 일러 톤으로 강하게 고정되어 텍스트 프롬프트로 깨기 거의 불가능. 직업 일러와 화풍 통일 실패 확인 (3회 시도 후 포기, 1.13.0 직전).
 
@@ -221,21 +223,22 @@ DALL-E 3는 **1:1 / 16:9 / 9:16** 세 가지 비율만 지원. 프롬프트 안�
 
 | 용도 | 비율 | 권장 픽셀 | 실제 출력 (라운드다운) |
 |---|---|---|---|
-| 전투 일러스트 (적·플레이어 공통) | **16:9 가로** | 1792×1024 | 1536×1024 (Copilot이 자동 라운드) |
-| 보스 진입 풀컷 | **9:16 세로** | 1024×1792 | 1024×1536 |
+| 전투 일러스트 (적·플레이어 공통) | **16:9 가로** | 1792×1024 | 1792×1024 (ChatGPT 정확 출력) |
+| 보스 진입 풀컷 | **9:16 세로** | 1024×1792 | 1024×1792 |
 | 직업 정면 일러 / 시작·승리·패배 컷 | 1:1 또는 2:3 | 1024×1024 등 | — |
 
 > 4:3 (1600×1200) 등 비표준 비율 요청 금지. 라운드다운돼도 종횡비는 유지되므로 게임 표시에는 무관.
 
-### 5.3. 코파일럿 디자이너 사용 팁
+### 5.3. ChatGPT 사용 팁
 
 | 팁 | 효과 |
 |---|---|
 | **이전 직업 일러스트 1장 첨부** ("이 화풍으로") | 화풍 일치 ↑↑↑ |
-| 결과 마음에 안 들면 같은 채팅에서 **"더 부드럽게, 카툰 톤 빼고 다시"** 식 멀티턴 보정 | 페이지 새로고침 없이 반복 보정 가능 |
-| 한 번에 4장 생성 → 가장 잘 나온 거 선택 | 시도 횟수 절약 |
-| 부스트 다 쓰면 생성 느려짐 (5~10분/장). 다음날 충전 | 페이스 조절 |
+| 결과 마음에 안 들면 같은 채팅에서 **"더 부드럽게, 카툰 톤 빼고 다시"** 식 멀티턴 보정 | ChatGPT는 보정 제어가 Copilot보다 정확 |
+| 한 번에 1~2장 생성 → 멀티턴 보정으로 다듬기 | DALL-E 3 토큰 절약 |
+| ChatGPT Plus 한도 다 쓰면 다음 세션까지 대기 (3시간) | 페이스 조절 — 4~6장/세션 권장 |
 | **한국어 자연어**로 입력 | DALL-E 3는 한국어 입력 시 한국 웹소설 표지 톤으로 자연 이동 — 직업 일러와 일치 |
+| **시스템 메시지 우회** 필요 시 "다크 판타지 RPG 적 일러" 명시 | DALL-E 3가 폭력·잔혹 묘사 거부 시 컨텍스트 강조 |
 
 ### 5.4. 프롬프트 구조 (4단 구성)
 
@@ -289,7 +292,7 @@ Claude Code 채팅에 PM이 PNG를 첨부하면 **나는 이미지로는 볼 수
 
 → **반드시 PM이 직접 repo 폴더에 넣어야 한다**:
 
-1. PM이 코파일럿에서 PNG 다운로드 → 로컬 컴퓨터 저장
+1. PM이 ChatGPT에서 PNG 다운로드 → 로컬 컴퓨터 저장
 2. PM이 `public/enemies/classic/chapter_<n>/` 또는 `public/classes/combat/` 등 적절한 폴더에 드래그&드롭
 3. PM이 main에 푸시 (또는 작업 브랜치에)
 4. 내가 git pull → PNG 인식 후 변환 진행
@@ -298,7 +301,7 @@ PNG 파일명은 PM이 정확한 이름(예: `goblin_combat.png`)으로 저장�
 
 ### 5.6. PNG → JPG 변환 (필수)
 
-Copilot Designer는 PNG로 출력. PNG는 1장당 2~3 MB로 PWA에 부담. **반드시 JPG quality 90으로 변환** (직업 일러도 모두 .jpg). 절감 효과 약 86%.
+ChatGPT는 WebP/PNG로 출력 (다운로드 시 선택 가능, 기본 PNG). PNG는 1장당 2~3 MB로 PWA에 부담. **반드시 JPG quality 90으로 변환** (직업 일러도 모두 .jpg). 절감 효과 약 86%.
 
 ```bash
 # 필요 시 Pillow 설치 (이미 설치돼 있을 수 있음)
@@ -379,7 +382,7 @@ const introSrc = getEnemyImageSrc(enemyKey, enemy, 'intro');
 
 ```
 [1] 프롬프트 작성 (docs/enemy-illustration-prompts.md 형식)
-[2] PM이 Copilot Designer에 한국어 프롬프트 입력 + 직업 일러 1장 첨부
+[2] PM이 ChatGPT에 한국어 프롬프트 입력 + 직업 일러 1장 첨부
 [3] PM이 결과 4장 중 마음에 드는 것 선택 (필요 시 멀티턴 보정)
 [4] PM이 PNG 다운로드 → 로컬 repo의 적절한 폴더에 저장
 [5] PM이 main에 푸시 (또는 작업 브랜치에)
@@ -395,7 +398,7 @@ const introSrc = getEnemyImageSrc(enemyKey, enemy, 'intro');
 | 실패 | 원인 | 대응 |
 |---|---|---|
 | 적 일러가 배포 후 안 보임 | `<img src>` 절대 경로 사용 | 4.5절 — 반드시 `./` 접두사 |
-| 화풍이 TCG·카툰 톤으로 나옴 | Gemini Imagen 사용 | 5.1절 — Copilot Designer로 통일 |
+| 화풍이 TCG·카툰 톤으로 나옴 | Gemini Imagen 사용 | 5.1절 — ChatGPT(DALL-E 3)로 통일 |
 | PNG 그대로 커밋 | JPG 변환 안 함 | 5.6절 — Pillow 변환 필수 |
 | 캐릭터 비례 어색·표정 평범 | 한 번 시도로 만족 | 같은 채팅에서 "더 OOO하게" 멀티턴 보정 |
 | 채팅 첨부 PNG를 Claude가 읽으려 함 | 첨부는 메모리에만 존재 | 5.5절 — PM이 직접 repo에 넣어야 함 |
@@ -484,9 +487,9 @@ const introSrc = getEnemyImageSrc(enemyKey, enemy, 'intro');
 |---|---|---|
 | frost (서리·동토) | ✅ 완료 (1.21.0) | combat 16 + intro 4 = 20장. 4보스: 인간 전사 / 빙거인 / 사룡 / 무형 망령왕 |
 | forest (부패·숲·광기) | ✅ **PR #94 머지 대기** | PM 일러 20장 push 완료 (chapter1/2/3/4 서브폴더). 4보스: 식물 모성 정령 / 부패 망자 검왕 / 광기의 마녀 / 광기의 종말 마에스트로. 헬퍼 chapter 분기 PR #94 (open). 본 1.51.0 머지 후 forest 정식 완료 |
-| sanctum (신전·골렘·봉인된 영혼) | 📝 프롬프트 20장 완료 (1.52.0) | PM 일러 생성 대기 (`docs/enemy-illustration-prompts-championship-sanctum.md`). **통일 컨셉: 골렘 본체 + 봉인된 영혼 누설**. 4보스: 노년 사제 조각 골렘(영혼 누설) / 거대 왕좌 룬 갑주 골렘 / 4팔 봉인자 인형 골렘 / 거대 봉인된 신 골렘. **PM 새 스타일 헤더·구도·단어형 프롬프트** 적용 (1.52.0~) |
-| rift (마계·균열) | ❌ 프롬프트 미작성 | sanctum 동일 새 스타일 적용 예정 |
-| dawn (천상·여명) | ❌ 프롬프트 미작성 | sanctum 동일 새 스타일 적용 예정 |
+| sanctum (신전·골렘·봉인된 영혼) | 📝 프롬프트 20장 완료 (1.52.0) | PM ChatGPT 생성 대기 (`docs/enemy-illustration-prompts-championship-sanctum.md`). **통일 컨셉: 골렘 본체 + 봉인된 영혼 누설**. 4보스: 노년 사제 조각 골렘(영혼 누설) / 거대 왕좌 룬 갑주 골렘 / 4팔 봉인자 인형 골렘 / 거대 봉인된 신 골렘 |
+| rift (마계·균열·핏빛) | 📝 프롬프트 20장 완료 (1.53.0) | PM ChatGPT 생성 대기 (`docs/enemy-illustration-prompts-championship-rift.md`). **통일 컨셉: 마족 종족 + 균열 차원 배경 + 핏빛-검은 톤**. 4보스: 마족 검사(균열 돌파) / 4족 3머리 마수(거대 갈기) / 공중 부유 마족(거대 날개·마법진) / 거대 마왕(균열 솟아남·신적 스케일) |
+| dawn (천상·여명) | ❌ 프롬프트 미작성 | 1.52.0 새 스타일 + ChatGPT 도구 적용 예정 |
 
 ### 6.8. 전투 시각 이팩트
 
@@ -807,7 +810,7 @@ PM이 PNG를 푸시했다면 **JPG 변환 + 코드 헬퍼 연결 + 버전 갱신
 
 ### 9.5. 새 적 일러스트 추가 (5절 파이프라인과 함께)
 1. `docs/enemy-illustration-prompts.md`에 한국어 4단 프롬프트 작성
-2. PM이 Copilot Designer로 생성 → PNG 받음
+2. PM이 ChatGPT로 생성 → PNG 받음
 3. PM이 `public/enemies/classic/chapter_<n>/`에 PNG 드롭 + main 푸시
 4. Claude가 git pull → Pillow JPG 변환 → 원본 PNG 삭제 → 커밋
 5. 코드 연결은 자동 — `ENEMIES[key].chapter` 필드만 있으면 `CombatScreen.jsx`가 알아서 로드
@@ -835,9 +838,8 @@ PM이 PNG를 푸시했다면 **JPG 변환 + 코드 헬퍼 연결 + 버전 갱신
 2. **PrepScreen·RestScreen에 출처 모달 확산 (1.41.0 후속)** — 정보창에 도입한 ◇ 클릭 모달 패턴을 다른 화면에도 적용. `buildBreakdownInfo` 재사용. PM이 정보 일관성을 좋아함
 3. **모달 출처 라벨 한글화** — 현재 "각인 startSoul" / "유물 critRate" 영어 키 노출. PM 피드백 받으면 한글 풀명으로 (예: "각인: 시작 소울 보너스")
 4. **PR #94 머지** — forest 일러 헬퍼/버전/changelog 갱신 (PM 결정 대기, mergeable_state: clean)
-5. **챔피언십 sanctum 컨셉 일러 20장 (PM 생성)** — 1.52.0 프롬프트 완료 (`docs/enemy-illustration-prompts-championship-sanctum.md`). **통일 컨셉: 골렘 본체 + 봉인된 영혼 누설** + 새 스타일(단어형·로우앵글 클로즈업·3D 빛반사). PM이 Copilot Designer로 생성 + chapter1/2/3/4 서브폴더에 저장 → Claude가 변환·헬퍼 sanctum 분기·PR (forest 사이클 그대로)
-6. **챔피언십 rift 컨셉 프롬프트 20장 작성** — 마계·균열 (마족·핏빛·차원). 1.52.0 새 스타일 적용
-7. **챔피언십 dawn 컨셉 프롬프트 20장 작성** — 천상·여명 (천사·빛·골든). 1.52.0 새 스타일 적용
+5. **챔피언십 sanctum + rift 일러 40장 (PM 생성)** — 1.52.0·1.53.0 프롬프트 완료. **sanctum 통일 컨셉**: 골렘 본체 + 봉인된 영혼 누설 / **rift 통일 컨셉**: 마족 종족 + 균열 차원 배경 + 핏빛 톤. PM이 **ChatGPT(DALL-E 3)**로 생성 + chapter1/2/3/4 서브폴더에 저장 → Claude가 변환·헬퍼 분기·PR (forest 사이클 그대로)
+6. **챔피언십 dawn 컨셉 프롬프트 20장 작성** — 천상·여명 (천사·빛·골든). 1.52.0 새 스타일 + ChatGPT 도구 적용
 8. **도감 일러 노출** — `CodexScreen.jsx`에 신규 일러 썸네일. 발견 못 한 적은 그레이스케일
 9. **타 직업(술법사·마족·엘프·사제) 전투 일러 개편** — 동일 파이프라인 (방랑검사 1.12.0 완료)
 
@@ -880,7 +882,7 @@ PM이 PNG를 푸시했다면 **JPG 변환 + 코드 헬퍼 연결 + 버전 갱신
 
 ---
 
-**마지막 업데이트**: 1.52.0 시점 — sanctum(봉인된 신전) 일러스트 프롬프트 20장 작성 완료 (`docs/enemy-illustration-prompts-championship-sanctum.md`). **통일 컨셉: 모든 적이 골렘 본체 + 봉인된 영혼 누설** (보스는 영혼이 봉인 풀리듯 골렘 위·뒤로 솟아오름). PM 1.52.0 새 스타일 적용: 헤더에 *피부표현 극상·광채표현·잡티제거·빛반사 3D 퀄리티* 추가, 구도 *약 5° 로우 앵글 + 머리~골반 클로즈업 + 박진감 + 원본과 다른 얼굴·모션 + 아우라*, 작성 스타일 *서술형 → 단어형 키워드 나열*. frost·forest docs는 그대로 유지. forest 일러는 PR #94(머지 대기). 다음 작업: PM이 Copilot Designer로 sanctum 20장 생성 또는 rift/dawn 프롬프트 작성.
+**마지막 업데이트**: 1.53.0 시점 — **rift(마계의 균열) 일러스트 프롬프트 20장 작성 완료** (`docs/enemy-illustration-prompts-championship-rift.md`) + **PM 결정: 일러 생성 도구 코파일럿 → ChatGPT 전환** (CLAUDE.md 5절 + 메인 docs + sanctum docs + rift docs 일괄 갱신). **rift 통일 컨셉: 마족 종족 + 균열 차원 배경 + 핏빛 톤** (4보스: 마족 검사 균열 돌파 / 4족 3머리 마수 거대 갈기 / 공중 부유 마족 거대 날개 / 거대 마왕 균열에서 솟아남). 1.52.0 새 스타일(단어형·로우앵글·3D 빛반사) 동일 적용. 다음 작업: PM이 ChatGPT로 sanctum + rift 일러 생성 또는 dawn 프롬프트 작성.
 
 ---
 
