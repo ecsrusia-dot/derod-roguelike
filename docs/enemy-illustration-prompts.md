@@ -1,8 +1,10 @@
 # 적 일러스트 생성 프롬프트
 
-본 문서는 **Microsoft Copilot Designer (DALL-E 3)**에 직접 입력해 적 일러스트를 만들기 위한 프롬프트 모음이다.
+본 문서는 **ChatGPT (DALL-E 3)**에 직접 입력해 적 일러스트를 만들기 위한 프롬프트 모음이다.
 
-직업 일러스트(`public/classes/*.jpg`)를 챗지피티(DALL-E 3)로 만들었기 때문에 **동일한 DALL-E 3 엔진**을 쓰는 코파일럿 디자이너가 화풍 통일에 최적이다. 제미나이(Imagen)는 디폴트 화풍이 TCG 카드 일러 톤이라 부적합 — 시도했으나 실패 확인.
+직업 일러스트(`public/classes/*.jpg`)와 적 일러스트 모두 **ChatGPT(DALL-E 3 내장)**로 통일 생성 (1.53.0~). 제미나이(Imagen)는 디폴트 화풍이 TCG 카드 일러 톤이라 부적합 — 시도했으나 실패 확인.
+
+> **1.53.0 도구 변경**: Microsoft Copilot Designer → **ChatGPT**로 전환. 이유: ChatGPT는 멀티턴 보정 제어가 정확하고 직업 일러와 동일 인터페이스라 화풍 통일 우수. 기존 frost·forest 일러는 Copilot 사용분이며 화풍 통일은 유지됨.
 
 ---
 
@@ -10,8 +12,9 @@
 
 | 도구 | URL | 비고 |
 |---|---|---|
-| **Copilot Designer (권장)** | `copilot.microsoft.com` (이미지 탭) | DALL-E 3 무료 사용. 마이크로소프트 계정 필요. 윈도우 기본 설치 |
-| Bing Image Creator (대안) | `bing.com/images/create` | 동일 엔진. 일일 부스트 15개 |
+| **ChatGPT (권장)** | `chatgpt.com` | DALL-E 3 내장. 멀티턴 보정 우수. ChatGPT Plus 구독 권장 |
+| Bing Image Creator (대안) | `bing.com/images/create` | 동일 엔진. 일일 부스트 15개. 보정 제어 없음 |
+| ~~Microsoft Copilot Designer~~ | ~~`copilot.microsoft.com`~~ | ~~1.21.0~1.51.0 사용. 1.53.0 폐기~~ |
 
 ---
 
@@ -72,15 +75,16 @@ const combatSrc = `./enemies/${subdir}/${enemyKey}_combat.jpg`;
 
 ---
 
-## 4. 코파일럿 디자이너 사용 팁
+## 4. ChatGPT 사용 팁
 
 | 팁 | 효과 |
 |---|---|
 | **이전 직업 일러스트 1장 첨부** ("이 화풍으로") | 화풍 일치 ↑↑↑ |
-| 결과 마음에 안 들면 같은 채팅에서 **"더 부드럽게, 카툰 톤 빼고 다시"** | 멀티턴 보정 가능 |
-| 한 번에 4장 생성 → 가장 잘 나온 거 선택 | 시도 횟수 절약 |
-| 부스트 다 쓰면 생성 느려짐 (5~10분/장). 다음날 충전 | 페이스 조절 |
+| 결과 마음에 안 들면 같은 채팅에서 **"더 부드럽게, 카툰 톤 빼고 다시"** | ChatGPT는 보정 제어가 Copilot보다 정확 |
+| 한 번에 1~2장 생성 → 멀티턴 보정으로 다듬기 | DALL-E 3 토큰 절약 |
+| ChatGPT Plus 한도 다 쓰면 다음 세션까지 대기 (3시간) | 페이스 조절 — 4~6장/세션 권장 |
 | **한국어 자연어**로 입력 | DALL-E 3 한국어 잘 이해함. 영문보다 한국 톤 잘 살아남 |
+| **시스템 메시지 우회** "다크 판타지 RPG 적 일러" 명시 | DALL-E 3가 폭력·잔혹 묘사 거부 시 컨텍스트 강조 |
 
 ---
 
@@ -97,7 +101,7 @@ const combatSrc = `./enemies/${subdir}/${enemyKey}_combat.jpg`;
 
 ## 6. 챕터 1 — 북부 극지대 (7개 프롬프트)
 
-> 사용법: 각 코드 블록을 그대로 복사해 코파일럿 디자이너에 입력.
+> 사용법: 각 코드 블록을 그대로 복사해 ChatGPT에 입력 (직업 일러 1장 첨부).
 > **반드시 챕터 3 또는 챕터 4의 일러스트 1장** (예: `public/enemies/classic/chapter_3/oblivionSealer_intro.jpg` 또는 `public/enemies/classic/chapter_4/wrathDemon_combat.jpg`) **을 첨부**해서 화풍 통일도. 챕터 1은 챕터 3·4와 화풍을 통일하기 위한 재작업이므로 레퍼런스 첨부가 화풍 결정에 핵심.
 >
 > 챕터 1 배경 톤: **황혼의 동토 황무지 + 얼음 절벽 + 눈보라 + 보라-녹색 오로라 + 갈라진 영구동토 + 부서진 원정대 상자 + 꺼져가는 모닥불**. 챕터 3의 청록·신성과는 명확히 구분되는 *얼음·서리·황량* 톤 (창백한 청록·청백·은회색 위주).
@@ -297,7 +301,7 @@ const combatSrc = `./enemies/${subdir}/${enemyKey}_combat.jpg`;
 
 ## 7. 챕터 2 — 죽은 자의 숲 (7개 프롬프트)
 
-> 사용법: 각 코드 블록을 그대로 복사해 코파일럿 디자이너에 입력.
+> 사용법: 각 코드 블록을 그대로 복사해 ChatGPT에 입력 (직업 일러 1장 첨부).
 > **반드시 챕터 3 또는 챕터 4의 일러스트 1장** (예: `public/enemies/classic/chapter_3/oblivionSealer_intro.jpg`) **을 첨부**해서 화풍 통일도. 챕터 2는 챕터 3·4와 화풍을 통일하기 위한 재작업이므로 레퍼런스 첨부가 화풍 결정에 핵심.
 >
 > 챕터 2 배경 톤: **황혼의 폐허림 + 보랏빛 안개 + 썩어가는 거목 + 자줏빛 발광 버섯 + 무너진 엘프 유적 + 황혼의 보라-금 하늘**. 챕터 1의 얼음·서리와는 명확히 구분되는 *부패·이끼·황혼* 톤 (보라·녹청·암갈색 위주).
@@ -521,7 +525,7 @@ const combatSrc = `./enemies/${subdir}/${enemyKey}_combat.jpg`;
 
 ## 8. 챕터 3 — 봉인된 신전 (6개 프롬프트)
 
-> 사용법: 각 코드 블록을 그대로 복사해 코파일럿 디자이너에 입력.
+> 사용법: 각 코드 블록을 그대로 복사해 ChatGPT에 입력 (직업 일러 1장 첨부).
 > **반드시 챕터 2의 일러스트 1장** (예: `public/enemies/classic/chapter_2/twilightChild_intro.jpg`) **을 첨부**해서 화풍 통일도. 챕터 3부터는 프롬프트 첫 단을 "레퍼런스 첨부 일러 화풍 유지"로 명시했으므로 첨부 이미지가 화풍 결정에 핵심.
 >
 > 챕터 3 배경 톤: **무너진 신전 내부 + 부서진 석주 + 빛나는 룬 봉인 + 떠도는 시간 입자 + 균열 사이 새벽빛**. 챕터 2의 폐허림과는 다른 *돌·신성·시간* 색조 (창백한 청록·금·은 위주).
@@ -667,7 +671,7 @@ const combatSrc = `./enemies/${subdir}/${enemyKey}_combat.jpg`;
 
 ## 9. 챕터 4 — 마계의 균열 (6개 프롬프트)
 
-> 사용법: 각 코드 블록을 그대로 복사해 코파일럿 디자이너에 입력.
+> 사용법: 각 코드 블록을 그대로 복사해 ChatGPT에 입력 (직업 일러 1장 첨부).
 > **반드시 챕터 3의 일러스트 1장** (예: `public/enemies/classic/chapter_3/oblivionSealer_intro.jpg`) **을 첨부**해서 화풍 통일도. 챕터 4도 헤더가 첨부 이미지에 화풍을 위임하므로 첨부가 필수.
 >
 > 챕터 4 배경 톤: **지옥 균열 + 깨진 차원 + 진홍 공간 + 떠도는 흑요석 파편 + 지옥 불씨 + 멀리 마계 건축물**. 챕터 1·2·3의 청록·보라·창백한 톤과는 명확히 구분되는 **진홍·검정·암갈색** 마계 톤.
@@ -843,11 +847,18 @@ const combatSrc = `./enemies/${subdir}/${enemyKey}_combat.jpg`;
 
 ## 11. 알려진 제약 사항
 
-### Microsoft Copilot Designer (DALL-E 3)
+### ChatGPT (DALL-E 3) — 1.53.0~ 권장
+
 - **4:3 비율 미지원** — 1:1 / 16:9 / 9:16만. 본 문서는 16:9 사용
 - Negative prompt 키워드 형식 미지원 — 자연 문장으로 표현 ("X 풍 절대 금지" 등)
 - 작가명 직접 호출은 저작권 리스크가 있어 본 문서는 의도적으로 회피
-- 일일 부스트 제한 (15장/일). 다 쓰면 생성 속도 5~10분/장으로 느려짐
+- ChatGPT Plus 한도 다 쓰면 다음 세션까지 3시간 대기. 4~6장/세션 권장
+- DALL-E 3 안전 필터로 폭력·잔혹 묘사 거부 가능 — "다크 판타지 RPG 적 일러" 컨텍스트 명시로 우회
+
+### ~~Microsoft Copilot Designer~~ — 1.21.0~1.51.0 사용, 1.53.0 폐기
+
+- 기존 frost·forest 일러 생성 도구. 멀티턴 보정 제어가 ChatGPT보다 약함
+- 부스트 소진 시 5~10분/장으로 느려짐 — PM 결정으로 ChatGPT 전환
 
 ### 제미나이 (Imagen) — 비권장
 - 디폴트 화풍이 TCG 카드 일러 톤으로 강하게 고정. 텍스트 프롬프트로 깨기 어려움
@@ -862,8 +873,8 @@ const combatSrc = `./enemies/${subdir}/${enemyKey}_combat.jpg`;
 - [x] 챕터 3 (봉인된 신전) 5종 + 보스 진입 풀컷 1종 — 1.17.0에 완료
 - [x] 챕터 4 (마계의 균열) 5종 + 보스 진입 풀컷 1종 — 1.20.0에 완료 (메인 스토리 일러 100%)
 - [ ] **챔피언십 전용 적 (5컨셉 × 16종 + 보스 진입 4종 = 100종) — 컨셉별 별도 문서로 분리**:
-  - [x] frost (서리·동토) — `enemy-illustration-prompts-championship-frost.md` 20장 완료 (1.21.0)
-  - [x] forest (부패·숲·광기) — `enemy-illustration-prompts-championship-forest.md` 20장 완료 (PM 일러 push + PR #94 head, 머지 대기)
-  - [x] sanctum (신전·골렘·봉인된 영혼) — `enemy-illustration-prompts-championship-sanctum.md` 20장 완료 (1.52.0, 새 스타일 — 단어형 + 1.52.0 헤더/구도), PM 생성 대기
-  - [ ] rift (마계·균열) — 미작성
+  - [x] frost (서리·동토) — `enemy-illustration-prompts-championship-frost.md` 20장 완료 (1.21.0, Copilot 사용분)
+  - [x] forest (부패·숲·광기) — `enemy-illustration-prompts-championship-forest.md` 20장 완료 (1.51.0, Copilot 사용분)
+  - [x] sanctum (신전·골렘·봉인된 영혼) — `enemy-illustration-prompts-championship-sanctum.md` 20장 완료 (1.52.0), PM ChatGPT 생성 대기
+  - [x] rift (마계·균열·핏빛) — `enemy-illustration-prompts-championship-rift.md` 20장 완료 (1.53.0), PM ChatGPT 생성 대기
   - [ ] dawn (천상·여명) — 미작성
