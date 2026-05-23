@@ -191,11 +191,7 @@
 
 —
 
-#던앤트와일라잇 #dawnandtwilight #방랑검사 #wanderer
-#로그라이크 #인디게임 #한국인디게임 #모바일게임 #PWA
-#다크판타지 #텍스트게임 #1인개발 #인디개발 #직업소개
-#roguelike #indiegame #darkfantasy #mobilegame
-#카운터빌드 #반격 #심안
+#던앤트와일라잇 #방랑검사 #로그라이크 #직업소개 #다크판타지
 ```
 
 ---
