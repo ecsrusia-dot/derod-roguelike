@@ -23,7 +23,7 @@ SOUL_GLOW = (255, 223, 130)
 INSIGHT_BLUE = (123, 163, 196)
 SAGE_PURPLE = (140, 110, 180)
 
-OUT_DIR = '/tmp/cards/wanderer'
+OUT_DIR = '/home/user/derod-roguelike/docs/marketing/cards/01-wanderer'
 os.makedirs(OUT_DIR, exist_ok=True)
 
 CARD_SIZE = 1080
@@ -132,8 +132,8 @@ def card_02_passive():
     draw.text((CARD_SIZE-180, box2_y+44), 'Lv. 2', font=font(F_BOLD, 32), fill=GOLD)
     draw.text((100, box2_y+90), '시야와 인지', font=font(F_REGULAR, 22), fill=TEXT_DIM)
     draw.text((100, box2_y+135), '· 회피율 +6%', font=font(F_MEDIUM, 28), fill=TEXT_WHITE)
-    draw.text((100, box2_y+175), '· Lv.3: 적 행동 감지 (공격/방어)', font=font(F_MEDIUM, 28), fill=TEXT_WHITE)
-    draw.text((100, box2_y+215), '· Lv.7: 약점 파악 (치명타 +50%)', font=font(F_MEDIUM, 28), fill=GOLD)
+    draw.text((100, box2_y+175), '· Lv.3: 적 행동 감지 (공격/방어)', font=font(F_MEDIUM, 26), fill=TEXT_WHITE)
+    draw.text((100, box2_y+215), '· Lv.7: 약점 파악 → 치명타 데미지 +50%', font=font(F_MEDIUM, 26), fill=GOLD)
 
     draw_handle_footer(draw, '방랑검사 2/5')
     img.save(os.path.join(OUT_DIR, '02_passive.jpg'), 'JPEG', quality=92, optimize=True)
@@ -155,9 +155,9 @@ def card_03_active():
 
     # 3개 박스 세로 배치 (한자 대신 번호 마크 사용)
     skills = [
-        ('참격', '01', '일반 공격', '안정적 데미지의 검술 기본기.', TEXT_WHITE),
+        ('참격', '01', '기본 검 공격', '안정적 데미지의 검술 기본기.', TEXT_WHITE),
         ('관통', '02', '방어 무시', '적의 갑주를 그대로 꿰뚫는다.', WANDERER),
-        ('방검', '03', '방어·받아치기', '검으로 막고 즉시 반격으로.', INSIGHT_BLUE),
+        ('방검', '03', '방어 +30', '검으로 막아 방어력을 끌어올린다.', INSIGHT_BLUE),
     ]
 
     box_h = 195

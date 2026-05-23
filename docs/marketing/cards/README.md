@@ -116,16 +116,38 @@ python3 docs/marketing/cards/make_cards.py
 ## 4. 발행 워크플로
 
 ```
+[0] 코드 기반 데이터 검증 (★ 필수 사전 단계 — 1편 학습 사례)
+    - src/data/passives.js: 시작 패시브 레벨별 효과
+    - src/data/skills.js: 액티브 스킬 cost·cd·desc
+    - src/data/classes.js: 시작 능력치 + 소울 스킬 ID
+    - src/data/passives.js (ultimate_skills): Lv.7 진화 효과
+    카드 텍스트에 들어가는 모든 수치·효과는 위 4개 파일 desc 그대로 인용. 추측 X.
 [1] 카드 5장 PM 채팅으로 확인 → OK
-[2] docs/marketing/cards/<NN>-<id>/ 폴더에 5장 JPG 보관
+[2] docs/marketing/cards/<NN>-<id>/ 폴더에 5장 JPG 보관 (make_cards.py가 자동 저장)
 [3] make_cards.py에 해당 직업 함수 추가 (재현성)
 [4] commit + push + PR (코드 변경 없음, docs only)
 [5] PM이 인스타에 5장 캐러셀 업로드
-    - 캡션: docs/marketing/instagram-profile.md "직업 소개 캐러셀" 섹션 템플릿 사용
-    - 해시태그: PM 결정 — #던앤트와일라잇 #한국어로그라이크 #모바일PWA 등
+    - 캡션·해시태그: docs/marketing/class-<NN>-<id>.md 의 인스타 섹션 그대로 복붙
+    - 해시태그: 5개 표준 (인스타 2025 정책)
 [6] 인스타 인사이트 (도달·저장·공유) 24~48시간 후 PM이 채팅으로 공유
 [7] 다음 직업 카드 제작
 ```
+
+### 4.1. 1편(방랑검사) 발견 오류 — 다음 편 작성 시 동일 실수 금지
+
+| 잘못된 표기 | 실제 코드 |
+|---|---|
+| 방검 = "방어·받아치기" / "검으로 막고 즉시 반격으로" | 방검 = **단순 "방어 +30"**. 반격 효과 없음 — 반격은 심안류 패시브 |
+| 심안 Lv.7 = "치명타 +50%" | 심안 Lv.7 = "치명타 **+10%**, 치명타 **데미지 +50%**" (2개) |
+| 무영검 = "그림자 누적" | 무영검 = "**데미지 누적**" (반격 실패 시 +50%씩, 발동 시 초기화) |
+| "첫 3턴 방검으로 반격 적립" | 방검은 반격 안 함. 반격은 심안류가 자동 처리 |
+
+**다음 편(술법사) 작성 시 체크리스트**:
+- [ ] 모든 액티브의 cost/cd/desc를 `src/data/skills.js`에서 그대로 가져왔는가?
+- [ ] 패시브 레벨별 효과를 `src/data/passives.js` desc 그대로 인용했는가?
+- [ ] Lv.7 궁극 진화 3종의 효과를 코드 그대로 옮겼는가?
+- [ ] 소울 스킬 효과를 `CLASS_ULTIMATES`/`classes.js` desc 그대로 옮겼는가?
+- [ ] **빌드 추천 이름**이 코드 effect와 의미가 일치하는가? (그림자 누적 → 데미지 누적 사례)
 
 ---
 
