@@ -536,6 +536,87 @@ export function aggregateEngravingEffects(classId, slots) {
   return result;
 }
 
+// ===== 각성도 보상 적용 (1.54.0~) =====
+// 데이터 정의: src/data/engravings.js ENGRAVING_AWAKENING_TABLE
+// reward.type → 적용 위치:
+//   - slotUnlock: storage.js getUnlockedSlotCount에서 별도 처리 (여기선 무시)
+//   - statBonus: App.jsx initializeRun adjustedStats에 가산
+//   - passiveBonus: App.jsx initializeRun baseSkills에 가산
+//   - statPctBonus: engravingFx에 머지 → damage.js / CombatScreen에서 자동 사용
+//   - composite: parts 재귀 처리
+
+// 데이터의 statPctBonus.key → engravingFx 키 매핑
+// (engravingFx 키는 슬롯 카드 effect와 동일 — damage.js/CombatScreen에서 이미 사용 중)
+const AWAKENING_PCT_KEY_MAP = {
+  counterRate: 'counterRatePct',    // 방랑검사 Lv.7 — CombatScreen 반격
+  igniteRate: 'igniteApplyPct',     // 술법사 Lv.7 — CombatScreen 화염 부여
+  physDmg: 'physDmgPct',            // 혼혈 마족 Lv.7 — damage.js 물리 데미지
+  dodge: 'dodgeRate',               // 정령사 Lv.7 — damage.js 회피
+  combatHeal: 'combatHealPct',      // 사제 Lv.7 — (사제 회복 시스템 추후 구현 시 사용)
+};
+
+// 활성화된 모든 각성 단계의 보상을 합산해 반환 (1.54.0~)
+// 반환: { skillDeltas, statDeltas, fxDeltas }
+//   - skillDeltas: { 심안류: 1, 심안: 1 } — baseSkills에 가산
+//   - statDeltas:  { 근력: 5 } — adjustedStats에 가산
+//   - fxDeltas:    { counterRatePct: 5, ... } — engravingFx와 같은 키로 머지
+export function aggregateAwakeningRewards(meta, classId) {
+  const result = { skillDeltas: {}, statDeltas: {}, fxDeltas: {} };
+  if (!classId) return result;
+  const lv = meta?.engravings?.[classId]?.lv ?? 1;
+  const table = ENGRAVING_AWAKENING_TABLE[classId] || [];
+  for (const step of table) {
+    if (step.lv > lv) continue;
+    if (!isAwakeningConditionMet(meta, classId, step.lv)) continue;
+    _applyAwakeningReward(result, step.reward);
+  }
+  return result;
+}
+
+function _applyAwakeningReward(out, reward) {
+  if (!reward) return;
+  switch (reward.type) {
+    case 'slotUnlock':
+      // storage.getUnlockedSlotCount에서 별도 처리
+      break;
+    case 'statBonus':
+      out.statDeltas[reward.stat] = (out.statDeltas[reward.stat] || 0) + reward.value;
+      break;
+    case 'passiveBonus':
+      out.skillDeltas[reward.skill] = (out.skillDeltas[reward.skill] || 0) + reward.delta;
+      break;
+    case 'statPctBonus': {
+      const fxKey = AWAKENING_PCT_KEY_MAP[reward.key] || reward.key;
+      out.fxDeltas[fxKey] = (out.fxDeltas[fxKey] || 0) + reward.pct;
+      break;
+    }
+    case 'composite':
+      for (const part of (reward.parts || [])) {
+        _applyAwakeningReward(out, part);
+      }
+      break;
+    default:
+      break;
+  }
+}
+
+// 슬롯 카드 effect + 각성도 statPctBonus 보상을 합쳐 단일 engravingFx 객체로 반환 (1.54.0~)
+// App.jsx의 5개 engravingFx prop 호출 자리에서 사용. damage.js·CombatScreen은 변경 없음.
+export function getCombinedClassFx(meta, classId) {
+  const slots = meta?.engravings?.[classId]?.slots || [];
+  const slotFx = aggregateEngravingEffects(classId, slots);
+  const { fxDeltas } = aggregateAwakeningRewards(meta, classId);
+  const combined = { ...slotFx };
+  for (const [k, v] of Object.entries(fxDeltas)) {
+    if (typeof v === 'number') {
+      combined[k] = (combined[k] || 0) + v;
+    } else if (typeof v === 'boolean') {
+      combined[k] = (combined[k] || false) || v;
+    }
+  }
+  return combined;
+}
+
 // ===== 각성도 조건 체크 (1.26.0~) =====
 
 // 조건 충족 여부. condition이 없으면 항상 true.

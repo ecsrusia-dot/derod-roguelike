@@ -7,6 +7,18 @@
 
 export const CHANGELOG = [
   {
+    version: '1.52.0',
+    date: '2026-05-24',
+    label: '각성도 보상 적용 버그 수정 — 시작 패시브 +Lv / 능력치 / statPct 보상 모두 실기 반영',
+    changes: [
+      { type: 'fix', text: '[큰 버그 수정] 각성도 Lv.3·4·6·7·9·10 보상이 실제 게임에 적용되지 않던 버그 수정. 1.44.0 보상 매트릭스 재설계 이후 슬롯 해금(Lv.2·5·8) 외 모든 보상(능력치·시작 패시브+1Lv·statPct%·복합)이 EngravingScreen에는 표시되지만 게임 시작 시 가산되지 않음. 방랑검사 Lv.4(심안류 +1)·Lv.7(반격율 +5%) / 술법사 Lv.4(이프리트 +1)·Lv.7(화염 부여+5%) / 5직업 × 6레벨 = 30개 보상 모두 영향. 별도 보상 환불 없이 다음 런부터 자동 적용' },
+      { type: 'system', text: '[helpers.js] aggregateAwakeningRewards(meta, classId) 신설 — 활성화된 모든 각성 단계 보상 누적해서 { skillDeltas, statDeltas, fxDeltas } 단일 객체로 반환. composite 타입은 parts 재귀. statPctBonus.key → engravingFx 키 매핑(counterRate→counterRatePct 등)' },
+      { type: 'system', text: '[helpers.js] getCombinedClassFx(meta, classId) 신설 — 슬롯 카드 effect + 각성도 statPctBonus 머지. App.jsx의 engravingFx prop 5곳(CombatScreen·RestScreen·PrepScreen·reselect·StatusPanel) 일괄 교체. damage.js·CombatScreen은 변경 0줄 (engravingFx 키 그대로)' },
+      { type: 'system', text: '[App.jsx initializeRun] 새 런 시작 시 skillDeltas는 baseSkills에 가산(maxLv 클램프), statDeltas는 adjustedStats에 가산. 결과적으로 PrepScreen·StatusPanel의 시작 패시브·능력치 표시도 정확해짐 — UI/게임 일치성 회복' },
+      { type: 'fix', text: '[알려진 잔여 항목] 사제 Lv.7/9 combatHealPct +10%는 헬퍼로 fxDeltas에 들어가지만 사제 회복 시스템이 아직 미구현 — 사제 패시브 구현 시 자동 활성화. 데이터 손실 없음' },
+    ],
+  },
+  {
     version: '1.51.0',
     date: '2026-05-20',
     label: '챔피언십 forest 적 일러스트 20장 적용 (4보스 + 보스 컷신 4종 + 일반/강적 12종)',
