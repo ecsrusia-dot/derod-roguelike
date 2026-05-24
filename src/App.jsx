@@ -31,6 +31,8 @@ import {
   getCharismaSoulGainBonus,
   getStrengthHpBonus,
   aggregateEngravingEffects,
+  aggregateAwakeningRewards,
+  getCombinedClassFx,
   computeDisplayPlayerStats,
   computeDerivedStats,
 } from './utils/helpers.js';
@@ -687,6 +689,13 @@ export default function App() {
           baseSkills[k] = Math.min(baseSkills[k] + totalSkillBonus, PASSIVE_SKILLS[k].maxLv);
         });
       }
+      // 1.54.0~ 각성도 보상 적용: passiveBonus(시작 패시브 +Lv) 가산
+      const _awak = aggregateAwakeningRewards(meta, classData.id);
+      for (const [skill, delta] of Object.entries(_awak.skillDeltas)) {
+        if (!PASSIVE_SKILLS[skill]) continue;
+        const cur = baseSkills[skill] || 0;
+        baseSkills[skill] = Math.min(cur + delta, PASSIVE_SKILLS[skill].maxLv);
+      }
       setSkills(baseSkills);
       // 1.27.0~ 각인 effect 통합: 직업 능력치 + HP 가산
       const _engSlots = meta?.engravings?.[classData.id]?.slots || [];
@@ -696,6 +705,10 @@ export default function App() {
       if (_engFx.dex) adjustedStats.민첩 = (adjustedStats.민첩 || 0) + _engFx.dex;
       if (_engFx.int) adjustedStats.지능 = (adjustedStats.지능 || 0) + _engFx.int;
       if (_engFx.cha) adjustedStats.매력 = (adjustedStats.매력 || 0) + _engFx.cha;
+      // 1.54.0~ 각성도 statBonus 가산
+      for (const [stat, val] of Object.entries(_awak.statDeltas)) {
+        adjustedStats[stat] = (adjustedStats[stat] || 0) + val;
+      }
       setStats(adjustedStats);
 
       // 시작 HP 계산
@@ -1711,13 +1724,13 @@ export default function App() {
             {screen === 'map' && chapter && mapData && <MapView chapter={chapter} classData={classData} mapData={mapData} hp={hp} maxHp={maxHp} gold={gold} gem={gem} relics={relics} activeRelicNames={activeRelicNames} expedition={currentExpedition} curses={currentCurses} chapterIdx={chapterIdx} onEnterNode={handleEnterNode} onOpenStatus={() => setScreen('status')} onOpenAchievements={() => { setPrevAchievementsBack('map'); setScreen('achievements'); }} onOpenCodex={() => setScreen('codex')} onBack={() => setScreen('title')} />}
             {screen === 'codex' && <CodexScreen meta={meta} onBack={() => setScreen('map')} />}
             {screen === 'bossIntro' && currentEnemy && <BossIntroScreen enemyKey={currentEnemy} onComplete={() => setScreen('combat')} />}
-            {screen === 'combat' && currentEnemy && <CombatScreen key={`${activeNodeId}-${currentEnemy}`} classData={classData} initialPlayer={{ hp, maxHp, ...classData.stats, ...stats }} initialSkills={skills} initialUltimates={ultimates} initialRelics={relics} activeSkills={activeSkills} activeRelicNames={activeRelicNames} enemyKey={currentEnemy} isBoss={isBossReward} expedition={currentExpedition} curses={currentCurses} meta={meta} engravingFx={aggregateEngravingEffects(classData?.id, meta?.engravings?.[classData?.id]?.slots)} onVictory={handleVictory} onDefeat={handleDefeat} />}
+            {screen === 'combat' && currentEnemy && <CombatScreen key={`${activeNodeId}-${currentEnemy}`} classData={classData} initialPlayer={{ hp, maxHp, ...classData.stats, ...stats }} initialSkills={skills} initialUltimates={ultimates} initialRelics={relics} activeSkills={activeSkills} activeRelicNames={activeRelicNames} enemyKey={currentEnemy} isBoss={isBossReward} expedition={currentExpedition} curses={currentCurses} meta={meta} engravingFx={getCombinedClassFx(meta, classData?.id)} onVictory={handleVictory} onDefeat={handleDefeat} />}
             {screen === 'reward' && <RewardSelect rewards={currentRewards} gem={gem} skills={skills} relics={relics} ultimates={ultimates} onPick={handlePickReward} onReroll={handleReroll} hasRerolled={hasRerolled} isElite={isEliteReward} classId={classData?.id} meta={meta} expedition={currentExpedition} />}
             {screen === 'victory' && <VictoryScreen classData={classData} enemy={currentEnemy ? ENEMIES[currentEnemy] : null} gains={victoryGains} onContinue={handleVictoryContinue} />}
             {screen === 'event' && currentEvent && <EventScreen event={currentEvent} classData={classData} stats={{ ...classData.stats, ...stats }} skills={skills} onResolve={handleEventResolve} />}
-            {screen === 'rest' && <RestScreen classData={classData} hp={hp} maxHp={maxHp} skills={skills} stats={{ ...classData?.stats, ...stats }} activeSkills={activeSkills} activeRelicNames={activeRelicNames} relics={relics} ultimates={ultimates} engravingFx={aggregateEngravingEffects(classData?.id, meta?.engravings?.[classData?.id]?.slots)} meta={meta} expedition={currentExpedition} onChoice={handleRestChoice} />}
-            {screen === 'prep' && <PrepScreen classData={classData} skills={skills} stats={{ ...classData?.stats, ...stats }} relics={relics} ultimates={ultimates} engravingFx={aggregateEngravingEffects(classData?.id, meta?.engravings?.[classData?.id]?.slots)} meta={meta} expedition={currentExpedition} mode="full" onConfirm={handlePrepConfirm} />}
-            {screen === 'reselect' && <PrepScreen classData={classData} skills={skills} stats={{ ...classData?.stats, ...stats }} relics={relics} ultimates={ultimates} engravingFx={aggregateEngravingEffects(classData?.id, meta?.engravings?.[classData?.id]?.slots)} meta={meta} expedition={currentExpedition} mode={reselectMode} currentActiveSkills={activeSkills} currentActiveRelicNames={activeRelicNames} onConfirm={handleReselectConfirm} />}
+            {screen === 'rest' && <RestScreen classData={classData} hp={hp} maxHp={maxHp} skills={skills} stats={{ ...classData?.stats, ...stats }} activeSkills={activeSkills} activeRelicNames={activeRelicNames} relics={relics} ultimates={ultimates} engravingFx={getCombinedClassFx(meta, classData?.id)} meta={meta} expedition={currentExpedition} onChoice={handleRestChoice} />}
+            {screen === 'prep' && <PrepScreen classData={classData} skills={skills} stats={{ ...classData?.stats, ...stats }} relics={relics} ultimates={ultimates} engravingFx={getCombinedClassFx(meta, classData?.id)} meta={meta} expedition={currentExpedition} mode="full" onConfirm={handlePrepConfirm} />}
+            {screen === 'reselect' && <PrepScreen classData={classData} skills={skills} stats={{ ...classData?.stats, ...stats }} relics={relics} ultimates={ultimates} engravingFx={getCombinedClassFx(meta, classData?.id)} meta={meta} expedition={currentExpedition} mode={reselectMode} currentActiveSkills={activeSkills} currentActiveRelicNames={activeRelicNames} onConfirm={handleReselectConfirm} />}
             {screen === 'shop' && <ShopScreen gold={gold} skills={skills} relics={relics} ultimates={ultimates} curses={currentCurses} onBuy={handleShopBuy} onLeave={handleShopLeave} classId={classData?.id} />}
             {screen === 'forge' && <ForgeScreen relics={relics} skills={skills} activeRelicNames={activeRelicNames} meta={meta} onCombine={handleForgeCombine} onLeave={handleForgeLeave} />}
             {screen === 'chapterClear' && chapter && <ChapterClearScreen chapter={chapter} isLastChapter={false} hp={hp} maxHp={maxHp} meta={meta} curses={currentCurses} onContinue={handleChapterContinue} />}
@@ -1737,7 +1750,7 @@ export default function App() {
                 dmgDealt: getActiveRelicStat(relics, activeRelicNames, 'dmgDealt'),
                 dmgTaken: getActiveRelicStat(relics, activeRelicNames, 'dmgTaken'),
               };
-              const _engFx = aggregateEngravingEffects(classData?.id, meta?.engravings?.[classData?.id]?.slots);
+              const _engFx = getCombinedClassFx(meta, classData?.id);
               const _derivedStats = computeDerivedStats(skills, ultimates, activeSkills, _relicStat, _engFx);
               return (
                 <StatusPanel classData={classData} hp={hp} maxHp={maxHp} skills={skills}
