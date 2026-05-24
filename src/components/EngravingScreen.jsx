@@ -286,7 +286,7 @@ export default function EngravingScreen({ meta, onMetaUpdate, onBack }) {
             <div className="space-y-2">
               {[0, 1, 2].map(slotIdx => {
                 const isUnlocked = slotIdx < unlockedSlotCount;
-                const unlockLv = slotIdx === 0 ? 2 : slotIdx === 1 ? 5 : 9;
+                const unlockLv = table.find(e => e.reward?.type === 'slotUnlock' && e.reward?.slot === slotIdx + 1)?.lv ?? [2, 5, 8][slotIdx];
                 const cardId = slots[slotIdx];
                 const card = getEngravingById(classId, cardId);
                 const tierInfo = card ? ENGRAVING_TIERS[card.tier] : null;
