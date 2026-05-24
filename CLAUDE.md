@@ -78,7 +78,7 @@ PM은 비개발자. 결정이 필요할 때:
 
 - **이름**: derod-roguelike (게임 내 표시: "Dawn and Twilight" / "던앤트와일라잇")
 - **장르**: 한국어 텍스트 기반 다크 판타지 모바일 PWA 로그라이크
-- **현재 게임 버전**: `src/data/version.js`의 `GAME_VERSION` 참조 (이 문서 갱신 시점 **1.50.0** — forest_3 보스 교체(witch 승격, minstrel 신규 일반) 완료. 광기의 악사 신규 직업 설계서 docs/class-minstrel-design.md **v1 작성 완료(PR #91 push) → PM 결정 v2 재작성 대기**)
+- **현재 게임 버전**: `src/data/version.js`의 `GAME_VERSION` 참조 (이 문서 갱신 시점 **1.52.0** — 각성도 보상 적용 버그 수정 완료. PR #101 머지. 1.44.0 이후 각성도 Lv.3·4·6·7·9·10 보상 30개가 데이터·UI는 정의돼 있지만 실제 게임 적용 코드가 없던 큰 버그를 `aggregateAwakeningRewards` + `getCombinedClassFx` 신설로 해결)
 - **배포**: GitHub Pages (`main` 브랜치 머지 시 `.github/workflows/deploy.yml`이 자동 빌드·배포)
 - **호스팅 경로**: `https://<owner>.github.io/derod-roguelike/` — `vite.config.js`의 `base: '/derod-roguelike/'`. ⚠️ 에셋 경로는 항상 **상대 경로(`./`)** 사용 (4.5절 참조)
 
@@ -566,9 +566,41 @@ export function rollDodge(skills, defender, activeSkills, relicStat, ultimates, 
 
 조건 체크: `utils/helpers.js`의 `isAwakeningConditionMet(meta, classId, lv)` / 진행도: `describeAwakeningConditionProgress`.
 
-#### 6.9.5. 다음 작업 (1.28.0~)
+#### 6.9.4b. 보상 적용 (1.52.0~) — 🔥 1.44.0 큰 버그 픽스
 
-- **4직업 풀 작성** (sage·demonblood·elf·priest 각 24장) — 코드 0줄, 데이터만. 1.28.0~1.31.0 분할 가능
+1.44.0에서 보상 매트릭스를 재설계했으나, **데이터·UI만 작성하고 실제 게임 적용 코드를 작성하지 않은 버그**가 1.52.0까지 존재. EngravingScreen에 보상 텍스트는 정확히 표시되어 사용자가 "적용된 줄" 알았지만 실제로는 `slotUnlock`(Lv.2·5·8)만 작동. 5직업 × 6레벨 = 30개 보상 무효였음.
+
+**1.52.0 픽스 (PR #101)** — 옵션 A (fx bag 패턴 1.27.0 동일):
+
+```js
+// src/utils/helpers.js
+// 1) 활성화된 모든 단계 보상 누적 → 3종 델타 객체
+aggregateAwakeningRewards(meta, classId) → { skillDeltas, statDeltas, fxDeltas }
+//   - skillDeltas: { 심안류: 1 } → App.jsx initializeRun baseSkills에 가산 (maxLv 클램프)
+//   - statDeltas:  { 근력: 5 }   → App.jsx initializeRun adjustedStats에 가산
+//   - fxDeltas:    { counterRatePct: 5 } → engravingFx와 같은 키로 머지
+//   - composite는 parts 재귀 처리
+
+// 2) 슬롯 effect + 각성도 fxDeltas 머지 헬퍼
+getCombinedClassFx(meta, classId) → engravingFx 단일 객체
+//   - App.jsx 5곳 engravingFx prop이 일괄 호출
+//   - damage.js / CombatScreen / RestScreen / PrepScreen / StatusPanel 모두 변경 0줄
+
+// 3) 데이터 statPctBonus.key → engravingFx 키 매핑 (AWAKENING_PCT_KEY_MAP)
+counterRate → counterRatePct  // 방랑검사 Lv.7 / Lv.9
+igniteRate  → igniteApplyPct  // 술법사 Lv.7 / Lv.9
+physDmg     → physDmgPct      // 혼혈 마족 Lv.7 / Lv.9
+dodge       → dodgeRate       // 정령사 Lv.7 / Lv.9
+combatHeal  → combatHealPct   // 사제 Lv.7 / Lv.9 — ⚠️ 사제 회복 시스템 미구현 (잔여)
+```
+
+**적용 결과**: 1.52.0 이후 첫 런부터 30개 보상 모두 자동 적용. PM 결정으로 별도 영혼 환불 X — changelog 고지만.
+
+**잔여**: 사제 `combatHealPct`는 fxDeltas에 정상 들어가지만 회복 시스템 미구현 → 효과 0. 사제 패시브 신규 구현 시 자동 활성화.
+
+#### 6.9.5. 다음 작업 (1.53.0~)
+
+- **4직업 풀 작성** (sage·demonblood·elf·priest 각 24장) — 코드 0줄, 데이터만. 1.53.0~1.56.0 분할 가능 (sage는 1.46.0에서 풀 완성, demonblood·elf·priest 남음)
 - **풀 작성 가이드**: lanthert 풀과 비례 — Common 5 / Rare 5 / Epic 5 / Legendary 2 / Flaw 4 / Curse 3 = 24장. effect 키는 21종 중 직업 컨셉에 맞는 것 사용
 - **PrepScreen 표시**: 능력치/HP 가산이 PrepScreen에도 보이도록 (1.27.0에서 처리됐는지 실기기 확인)
 - **각성도 진행 조회 UI** (선택): 다음 단계 카드 외에 전체 9단계 진행도를 한눈에
@@ -830,24 +862,26 @@ PM이 PNG를 푸시했다면 **JPG 변환 + 코드 헬퍼 연결 + 버전 갱신
 - **🔥 에셋 경로**: 4.5절 — 반드시 `./` 상대 경로. 절대 경로는 GH Pages 배포 후 404.
 - **📷 채팅 첨부 이미지**: 5.5절 — PM 채팅 첨부 PNG는 Claude 디스크에 저장 안 됨. PM이 직접 repo에 넣어야 함.
 
-## 11. 작업 로드맵 (1.41.0 기준)
+## 11. 작업 로드맵 (1.52.0 기준)
 
 ### ⭐ 진행 가능한 다음 작업 (우선순위 순)
 
-1. **4직업 각인 풀 24장씩 작성** (sage / demonblood / elf / priest) — 코드 인프라는 1.27.0에서 완성. wanderer만 24장 작성, 나머지 4직업은 `ENGRAVINGS[classId] = []` 빈 배열 상태. 데이터만 추가하면 자동 적용. **1.42.0~1.45.0 시리즈로 분할 가능** (1직업 = 1 PR). 풀 구성: Common 5 + Rare 5 + Epic 5 + Legendary 2 + Flaw 4 + Curse 3 = 24장. effect 키는 21종 중 직업 컨셉에 맞는 것 사용 (예: sage = magicDmgPct·ifritFlamePct·intMagicSoul, demonblood = physDmgPct·perTurnHpLoss·berserker, elf = dodgeRate·critRate·dodgeSoul, priest = startHp·heal계열·startSoul)
-2. **PrepScreen·RestScreen에 출처 모달 확산 (1.41.0 후속)** — 정보창에 도입한 ◇ 클릭 모달 패턴을 다른 화면에도 적용. `buildBreakdownInfo` 재사용. PM이 정보 일관성을 좋아함
-3. **모달 출처 라벨 한글화** — 현재 "각인 startSoul" / "유물 critRate" 영어 키 노출. PM 피드백 받으면 한글 풀명으로 (예: "각인: 시작 소울 보너스")
-4. **PR #94 머지** — forest 일러 헬퍼/버전/changelog 갱신 (PM 결정 대기, mergeable_state: clean)
-5. **챔피언십 sanctum + rift 일러 40장 (PM 생성)** — 1.52.0·1.53.0 프롬프트 완료. **sanctum 통일 컨셉**: 골렘 본체 + 봉인된 영혼 누설 / **rift 통일 컨셉**: 마족 종족 + 균열 차원 배경 + 핏빛 톤. PM이 **ChatGPT(DALL-E 3)**로 생성 + chapter1/2/3/4 서브폴더에 저장 → Claude가 변환·헬퍼 분기·PR (forest 사이클 그대로)
+1. **PM 실기 검증: 방랑검사 새 런 → 심안류 Lv.4 표시 확인 (1.52.0 픽스)** — PR #101 머지 완료. PM이 챔피언십 normal 5컨셉 클리어한 방랑검사로 새 런 시작 → 시작 패시브 심안류가 Lv.4로 표시되는지, 전투에서 Lv.4 누진 효과 작동하는지 검증. 다른 직업도 Lv.3+ 도달했으면 동일 검증
+2. **3직업 각인 풀 24장씩 작성** (demonblood / elf / priest) — 코드 인프라 1.27.0 완성, sage는 1.46.0에서 풀 24장 완성, **wanderer + sage 2직업만 풀 작성됨**. 나머지 3직업 `ENGRAVINGS[classId] = []` 빈 배열. 1직업 = 1 PR. 풀 구성: Common 5 + Rare 5 + Epic 5 + Legendary 2 + Flaw 4 + Curse 3 = 24장. effect 키 직업 컨셉별 (demonblood = physDmgPct·perTurnHpLoss·berserker / elf = dodgeRate·critRate·dodgeSoul / priest = startHp·heal계열·startSoul·combatHealPct)
+3. **PrepScreen·RestScreen에 출처 모달 확산 (1.41.0 후속)** — 정보창에 도입한 ◇ 클릭 모달 패턴을 다른 화면에도 적용. `buildBreakdownInfo` 재사용. PM이 정보 일관성을 좋아함
+4. **모달 출처 라벨 한글화** — 현재 "각인 startSoul" / "유물 critRate" 영어 키 노출. PM 피드백 받으면 한글 풀명으로
+5. **챔피언십 sanctum + rift 일러 40장 (PM 생성 대기)** — 프롬프트 완료. **sanctum 통일 컨셉**: 골렘 본체 + 봉인된 영혼 누설 / **rift 통일 컨셉**: 마족 종족 + 균열 차원 배경 + 핏빛 톤. PM이 **ChatGPT(DALL-E 3)**로 생성 + chapter1/2/3/4 서브폴더에 저장 → Claude가 변환·헬퍼 분기·PR
 6. **챔피언십 dawn 컨셉 프롬프트 20장 작성** — 천상·여명 (천사·빛·골든). 1.52.0 새 스타일 + ChatGPT 도구 적용
-8. **도감 일러 노출** — `CodexScreen.jsx`에 신규 일러 썸네일. 발견 못 한 적은 그레이스케일
-9. **타 직업(술법사·마족·엘프·사제) 전투 일러 개편** — 동일 파이프라인 (방랑검사 1.12.0 완료)
+7. **도감 일러 노출** — `CodexScreen.jsx`에 신규 일러 썸네일. 발견 못 한 적은 그레이스케일
+8. **타 직업(술법사·마족·엘프·사제) 전투 일러 개편** — 동일 파이프라인 (방랑검사 1.12.0 완료)
+9. **인스타 마케팅 카드뉴스 — 술법사 편** (PM 보류 상태 — 방랑검사 1편 완료 후 PM 우선순위 따라 재개)
 
 ### 시스템 미구현 (PM 결정 대기)
 - **Tier 3A** — 신규 클래스 6번째
 - **Tier 3B** — 신규 챕터 5번째 (컨셉 후보: 여명의 폐허 / 마왕의 심장 / 시간의 폐허)
 - **Tier 3C** — Mutator 시스템 (출정 직전 자가 선택 변형)
 - **3직업 소울 스킬** (demonblood/elf/priest) — 1.38.0~1.41.0에서 wanderer·sage만 정의. 나머지 3직업 `CLASS_ULTIMATES` 추가 필요. 정보창에 자동 노출됨
+- **사제 회복 시스템** — 1.52.0에서 `combatHealPct` 키가 fxDeltas로 흘러가지만 사제 패시브 미구현 상태. 사제 직업 전용 패시브(재생류) 신축 + 회복 효과 코드에서 combatHealPct 적용 시 자동 활성화
 
 ### 부분 진행 가능한 것
 - **이팩트 Phase 3** (보스 임팩트 프레임, 승리 골든 버스트, 사망 흑백 페이드)
@@ -882,128 +916,91 @@ PM이 PNG를 푸시했다면 **JPG 변환 + 코드 헬퍼 연결 + 버전 갱신
 
 ---
 
-**마지막 업데이트**: 1.53.0 시점 — **rift(마계의 균열) 일러스트 프롬프트 20장 작성 완료** (`docs/enemy-illustration-prompts-championship-rift.md`) + **PM 결정: 일러 생성 도구 코파일럿 → ChatGPT 전환** (CLAUDE.md 5절 + 메인 docs + sanctum docs + rift docs 일괄 갱신). **rift 통일 컨셉: 마족 종족 + 균열 차원 배경 + 핏빛 톤** (4보스: 마족 검사 균열 돌파 / 4족 3머리 마수 거대 갈기 / 공중 부유 마족 거대 날개 / 거대 마왕 균열에서 솟아남). 1.52.0 새 스타일(단어형·로우앵글·3D 빛반사) 동일 적용. 다음 작업: PM이 ChatGPT로 sanctum + rift 일러 생성 또는 dawn 프롬프트 작성.
+**마지막 업데이트**: 1.52.0 시점 — **🔥 각성도 보상 적용 큰 버그 픽스 (PR #101 머지 완료)**. PM 보고("방랑검사 Lv.4인데 심안류 +1 적용 안 된 것 같다") → 코드 검증 결과 **5직업 × 6레벨 = 30개 보상 모두 미적용 발견** (1.44.0 이후 데이터·UI만 작성, 적용 코드 누락). `aggregateAwakeningRewards` + `getCombinedClassFx` 헬퍼 신설 + App.jsx initializeRun(skillDeltas·statDeltas) + 5곳 engravingFx prop 교체로 해결. damage.js·CombatScreen 변경 0줄 (engravingFx 키 동일 매핑). PM 결정으로 영혼 환불 없이 changelog 고지만.
 
----
 
-## 🔥 다음 세션 즉시 작업 — 광기의 악사 설계서 v2 재작성
+## 🔥 다음 세션 즉시 작업 — PM 실기 검증 + 우선순위 따라
 
 ### 현재 상태 (브랜치 / commit)
+
 | 항목 | 값 |
 |---|---|
-| 브랜치 | `claude/review-guidelines-wait-J9Ov3` (working tree clean, origin과 동일) |
-| 최신 commit | `7b05808 docs(minstrel): design draft for new class (Mad Minstrel)` |
-| 문서 | `docs/class-minstrel-design.md` v1 (음표·코드 자원 시스템 옵션 A) — **재작성 대기** |
-| PR | 광기의 악사 설계 PR(번호 미확인) 진행 중. 같은 브랜치에 추가 commit으로 push 가능 |
+| 브랜치 | `claude/review-claude-docs-KE48o` (PR #101 머지 완료. main 동기화됨) |
+| 최신 머지 commit | `a34d3b5 Merge pull request #100 from ...` → PR #101도 머지된 후 main에 합쳐짐 |
+| 현재 게임 버전 | **1.52.0** (각성도 보상 적용 버그 픽스) |
+| **다음 세션 브랜치 전략** | 다음 PR은 **`git fetch origin main` + `git checkout -B <새브랜치> origin/main`**으로 최신 main에서 분기 |
 
-### PM 결정 사항 v2 (절대 잊지 말 것 — 4가지)
+### 이번 세션 결과 요약 — 1.52.0 (PR #101)
 
-PM이 v1을 보고 추상 피드백 + 명시적 결정 4가지를 줌. **v2 재작성 시 반드시 반영**:
-
-| # | 결정 | 의미 |
-|---|---|---|
-| 1 | **자원 시스템 신설 X** | 음표·코드 시스템 폐기. 5직업과 동일 패턴 — 액티브는 **에테르 (cost 0~3) + 쿨다운 (cd 0~3)**, 소울은 **소울 게이지 0~100** |
-| 2 | **차별화는 직업 전용 패시브로** | 시작 패시브 2종을 광기의 악사 전용으로 설계 (5직업과 겹치지 않게). 7Lv 강화 7종 풀도 전용 |
-| 3 | **메인 스탯은 매력** | 사제(시작 19)와 매력이 겹침. 악사 시작 매력값을 사제와 비교해 PM과 결정 필요 (동일 / 이상 / 이하) |
-| 4 | **sonic 데미지 타입 신설** | 기존 physical/magic/defense/buff에 **sonic 추가**. `damage.js`·`CombatEffects.jsx`·StatusPanel·각인 effect 키(`sonicDmgPct` 등) 모두 영향 |
-
-### PM 추가 검토 지시 (v2에 옵션 포함)
-
-| 항목 | PM 지시 | 옵션 검토 필요 |
-|---|---|---|
-| **매력 시그니처에 sonic 데미지 증가 로직 추가** | 신규 단계(3단계?) 또는 자동 가산 | 임계 14+ 누진 / 임계 없음 자동 가산 0.5%/p / 5단위 누진 등 옵션 표 |
-| **매력 증가 공통 패시브 추가 검토** | A 신규 공통 패시브 / B 악사 전용만 / C 사제·악사 한정 | 추천: B (악사 직업 전용만 — 5직업 시그 차별화 보존) |
-| **sonic 신설에 따른 패시브·유물·사건 추가 검토** | 신규 추가 항목 표 (sonic 강화 패시브 / sonic 결계 유물 / 광기 류트 사건 / sonic 약점 적 등) | docs 9절에 신규 추가 검토 항목 표 작성 |
-
-### v2 docs 재구성 가이드
-
-기존 v1 docs/class-minstrel-design.md를 다음 구조로 재작성:
-
-| 절 | 변경 |
+| 작업 | 결과 |
 |---|---|
-| 0. 배경 | **v1→v2 변경 사유** 명시 (음표 폐기 / 5직업 동일 패턴 채택) |
-| 1. 컨셉 개요 | 자원=소울 게이지(공통) / 액티브=에테르+쿨다운(공통) / 데미지=sonic 신규 / 메인=매력 |
-| 2. 5직업 vs 악사 동일·차별 | 동일 표 + 차별 표 분리 |
-| 3. 액티브 스킬 5종 (cost/cd) | 5직업 패턴 — `참격/관통/방검` 등과 같은 형식 |
-| 4. 직업 전용 패시브 7종 (차별화 핵심) | 광기 음파 / 광기 화음 / 매혹의 선율 / 광기의 영창 / 광인의 영감 / 광기 침투 / 광기 해방 등 7종 × Lv 1~7 |
-| 5. 직업 소울 스킬 「광기의 종말 교향곡」 | 소울 100 발동, `CLASS_ULTIMATES`에 추가될 데이터 |
-| 6. sonic 데미지 타입 신설 (영향 분석) | damage.js / CombatEffects.jsx / StatusPanel / 각인 effect 키 |
-| 7. 매력 시그니처 sonic 데미지 추가 단계 (PM 결정) | 옵션 2~3개 + 추천 |
-| 8. 매력 증가 공통 패시브 (PM 검토) | A/B/C 옵션 + 추천 |
-| 9. sonic 신설 영향 — 패시브·유물·사건 추가 검토 | 신규 추가 검토 항목 표 |
-| 10. 일러스트 가이드 | v1 그대로 |
-| 11. 챔피언십 해금 시스템 | v1 그대로 |
-| 12. 각인 풀 24장 가이드 | 음표 effect 키 폐기 → sonic·매력·광기 디버프 중심 effect 키 |
-| 13. 구현 로드맵 | 1.51.0~1.56.0 시리즈 — sonic 인프라부터 |
-| 14. PM 결정 필요 사항 | PM이 v2 보고 추가 결정할 항목 표 |
-| 15. 차별화 검증 — 6직업 매트릭스 | 메인 스탯 / 데미지 타입 / 자원 / 시작 패시브 / 소울 스킬 / 핵심 컨셉 6축 |
+| **각성도 보상 적용 큰 버그 발견** | PM 보고("심안류 +1 적용 안 됨")로 시작 → 5직업 × 6레벨 = 30개 보상 모두 미적용 확인 |
+| **헬퍼 2종 신설** | `aggregateAwakeningRewards(meta, classId)` / `getCombinedClassFx(meta, classId)` |
+| **AWAKENING_PCT_KEY_MAP** | 데이터 statPctBonus.key → engravingFx 키 매핑 (counterRate→counterRatePct 등 5종) |
+| **App.jsx 수정** | initializeRun에 skillDeltas·statDeltas 가산 14줄 + 5곳 engravingFx prop 교체 |
+| **damage.js·CombatScreen** | **변경 0줄** (engravingFx 키 매핑으로 statPct 보상 자동 흐름) |
+| **PM 결정** | 영혼 환불 X / changelog 고지만 (PR 본문에 명시) |
 
-### v2 작업 사이클
+### 다음 세션 우선순위 (PM 미지정 시 기본값)
 
-```
-[1] docs/class-minstrel-design.md v2 재작성 (Write — 전체 덮어쓰기)
-[2] npm run build 검증
-[3] git commit (브랜치 그대로 — 같은 PR에 추가 commit)
-[4] git push -u origin claude/review-guidelines-wait-J9Ov3
-[5] PR 본문 갱신 (ToolSearch로 mcp__github__update_pull_request 스키마 로드 후 호출)
-[6] PM에게 v2 차별화 검증 표 + 결정 필요 항목 정리해서 응답
-```
+| 우선순위 | 작업 | 메모 |
+|---|---|---|
+| **0** | **PM 실기 검증 결과 확인** | 방랑검사 Lv.4 도달 상태에서 새 런 시작 → 심안류 Lv.4 표시 확인. PM이 실기로 검증한 결과를 듣고 추가 픽스가 필요한지 결정 |
+| 1 | **3직업 각인 풀 24장씩** (demonblood / elf / priest) | 코드 인프라 완성 (1.27.0 + 1.52.0). wanderer + sage 풀만 완성. 1직업 = 1 PR. 1.53.0~1.55.0 시리즈. 6.9.5절 가이드 + sage(1.46.0)/wanderer(1.27.0) 풀을 참고 |
+| 2 | **PrepScreen·RestScreen 출처 모달 확산** | 정보창의 ◇ 클릭 모달 패턴을 다른 화면에도 적용. `buildBreakdownInfo` 재사용. PM이 정보 일관성을 좋아함 |
+| 3 | **모달 출처 라벨 한글화** | "각인 startSoul" / "유물 critRate" 영어 키 노출 → 한글 풀명. PM 피드백 받으면 시작 |
+| 4 | **챔피언십 sanctum + rift 일러 (PM 생성 대기)** | 프롬프트 완료. PM이 ChatGPT(DALL-E 3)로 생성 후 chapter1/2/3/4 서브폴더 푸시 → Claude가 JPG 변환 + 헬퍼 분기 + PR |
+| 5 | **챔피언십 dawn 컨셉 프롬프트 20장** | 천상·여명 (천사·빛·골든). 1.52.0 새 스타일 + ChatGPT 도구 적용 |
+| 6 | **3직업 소울 스킬 설계** (demonblood/elf/priest) | `CLASS_ULTIMATES` 데이터만 추가하면 정보창에 자동 노출. PM과 컨셉 결정 필요 |
+| 7 | **사제 회복 시스템** | 1.52.0에서 `combatHealPct` 키가 fxDeltas로 흘러가지만 미구현. 사제 패시브(재생류) 신축 + 회복 코드에서 combatHealPct 적용 시 자동 활성화 |
+| 8 | **인스타 카드뉴스 술법사 편** (PM 보류) | 방랑검사 1편 완료. PM 우선순위에 따라 재개 |
 
-### 이번 세션에서 학습한 패턴
+### 다음 세션 첫 응답 흐름
 
-| 패턴 | 적용 |
-|---|---|
-| **PM이 v1 보고 자원 시스템 폐기를 결정** | 큰 설계 변경은 v1 → v2 분기 + docs 재작성 (코드 미작성 단계라 비용 0) |
-| **deferred 도구 호출 시 InputValidationError** | GitHub MCP 도구(update_pull_request 등) 호출 전 **반드시 `ToolSearch`로 스키마 로드** (`query: "select:mcp__github__update_pull_request"`) |
-| **시스템 안내 메시지 ≠ 에러** | system-reminder에서 "deferred tools" 안내가 와도 작업 흐름은 유지. PM에게 "에러 아님 — 도구 사용 방식 안내"로 명확히 설명 |
+1. **CLAUDE.md 0절·7절 + "🔥 다음 세션 즉시 작업" 섹션 정독**
+2. PM 지시 확인 — 명시적이면 그것 우선
+3. 위 0순위(실기 검증 결과 확인)가 디폴트
+4. 결정 필요 시 `AskUserQuestion` (산문체 X)
 
 ---
 
-### 변경 핵심 (vs 이전 1.27.0)
+### 1.52.0 변경 핵심 (vs 이전 1.51.0)
 
-이 세션에서 진행한 큰 작업은 **정보창 가독성 풀스택 재설계** (1.38.0~1.41.0). 4개 PR + PM 추가 피드백 1 PR로 총 5개 PR 시리즈. 챔피언십 일러는 여전히 frost 이후 진행 없음 (PM 일러 생성 대기).
+이 세션의 큰 작업은 **각성도 보상 적용 버그 픽스** 1개 PR. 1.44.0 이후 5개월간 데이터·UI만 정의되고 실제 게임 적용 코드가 없던 큰 버그(슬롯 해금만 작동, 나머지 30개 보상 무효). PM의 단일 보고로 발견 → 옵션 A(fx bag 패턴 1.27.0 동일) + 별도 영혼 환불 X(changelog 고지만)로 처리.
 
 | 버전 | PR | 작업 |
 |---|---|---|
-| 1.38.0 | #67 | **용어 통일** — "액티브 궁극 → 소울 스킬", "영혼 게이지 → 소울 게이지" 63건 일괄 치환. 데이터 키 호환 유지 |
-| 1.39.0 | #68 | **소울 스킬 정보 카드** — StatusPanel 4번째 슬롯 + `buildClassUltimateInfo` 헬퍼. 이후 1.41.0에서 별도 섹션으로 재구성 |
-| 1.40.0 | #69 | **시그니처 합산 + 출처 모달 + 풀네임** — 합산 라인 4종(치명타 데미지 / 시작 소울 / 회피 시 소울 / 받는 데미지) + `buildBreakdownInfo` 헬퍼 + 19종 풀네임화 |
-| 1.41.0 | #70 | **모든 라인 클릭 모달 (35개) + 회복 합산 + 액티브/소울 별도 섹션 + 계산식 명확화** — PM 추가 피드백 4건 통합. `StatSignatureModal.formula(stats)` 추가. 회복은 곱셈 적용 정확 표시 |
+| 1.52.0 | #101 | **각성도 보상 적용 버그 픽스** — `aggregateAwakeningRewards` + `getCombinedClassFx` 헬퍼 신설. App.jsx initializeRun에 skillDeltas·statDeltas 가산. 5곳 engravingFx prop 일괄 교체. damage.js·CombatScreen 변경 0줄 |
 
 ### 새 코드 패턴 (이번 세션 학습)
 
 | 패턴 | 적용 |
 |---|---|
-| **출처 분해 모달 (`buildBreakdownInfo`)** | 합산 라인 ◇ 탭 → `sources` 배열 출처 분해. value 0 자동 필터. note에 "적용 포인트 N(=스탯-10) × 단위/p" 형식 통일. 신규 효과는 sources 1줄만 추가 |
-| **모든 라인 button 패턴 (1.41.0)** | StatusPanel 35개 라인 모두 `<button onClick={() => openLine({...})}>`. 헬퍼 `openLine` 하나로 일관. 정보 노출 일관성 + 새 라인 추가 작업 표준화 |
-| **곱셈 적용 효과 표시** | 회복량처럼 `(1+a/100)×(1+b/100)` 곱셈은 합산값 ≠ 실제값. `Math.round((mult - 1) * 1000) / 10`로 정확 % 표시 + 모달에 계산식 노출 |
-| **계산식 표기 통일 ("적용 포인트 N(=스탯-10) × 단위/p")** | 기존 "민첩 15 × 2%/p" = 30%로 오해 가능 → "적용 포인트 5(=민첩-10) × +2%/p"로 명확. 5단위 누진은 "17~21 +N / 22~26 +M (현재 +K)" |
-| **PR 3분할 + 추가 피드백 4번째 PR** | 큰 PM 요청은 3분할 (A/B/C) + 머지 후 PM 추가 피드백은 별도 4번째 PR(1.41.0). 시리즈가 5 PR로 늘어남. 각 PR 회귀 영역 독립 유지 |
-| **용어 통일은 일괄 치환 + 데이터 키 호환** | 1.38.0의 "영혼 게이지 → 소울 게이지" 등은 사용자에게 보이는 텍스트만 치환, 데이터 키(`soulGauge` / `ultimateId` / `CLASS_ULTIMATES`)는 코드 호환 유지. 마이그레이션 불필요 |
+| **데이터·UI 정의 + 적용 코드 누락은 큰 버그** | EngravingScreen.describeReward()가 보상 텍스트를 정확히 표시해서 PM이 "적용된 줄" 알게 됨. 다음 시스템 추가 시 항상 **데이터 정의 → UI 표시 → 적용 코드** 3축 체크리스트로 검증 |
+| **PM의 작은 보고가 큰 버그의 단서일 수 있음** | "방랑검사 Lv.4 심안류 +1 적용 안 됨" → 코드 검증으로 5직업 × 6레벨 = 30개 보상 모두 무효 발견. PM이 명시적으로 보고한 1개만 픽스하지 말고 **같은 코드 경로 모두 검증** |
+| **`aggregateAwakeningRewards` 패턴** | 메타 상태 → 단일 델타 객체 `{skillDeltas, statDeltas, fxDeltas}`. 외부 상태는 변경 X(순수 함수). composite 타입은 parts 재귀 처리. 새 reward.type 추가 시 switch 분기 1줄만 |
+| **`getCombinedClassFx` 패턴** | 두 출처 (슬롯 카드 + 각성도 statPctBonus) → 단일 engravingFx 객체. App.jsx의 5곳 prop 호출이 한 줄로 통합. damage.js·CombatScreen은 engravingFx 키만 알면 되니까 출처 분리 무관 |
+| **데이터 key → engravingFx 키 매핑 테이블** | 데이터의 짧은 key(`counterRate`, `igniteRate`)와 engravingFx의 풀 key(`counterRatePct`, `igniteApplyPct`)를 `AWAKENING_PCT_KEY_MAP` 상수로 매핑. 신규 statPctBonus 추가 시 매핑 1줄 + 데이터 1줄 = 끝 |
+| **damage.js·CombatScreen 변경 0줄 원칙** | 신규 보상이 engravingFx 키를 그대로 쓰도록 매핑 → 전투 시스템은 보상 출처를 몰라도 됨. 회귀 리스크 최소화 |
 | **fx bag 집계** (1.27.0 기존) | 장착물 → 단일 합산 effect 객체 → 전투에 prop 전달. 수치 합산 + 불린 OR. 새 키 추가 시 1~2곳만 수정. 미장착 시 빈 객체라 회귀 안전 |
 | **함수 시그니처 확장** (1.27.0 기존) | 기존 호출 호환 위해 새 인자는 **항상 마지막 + 기본값 `= {}`**. damage.js의 calculateDamage/rollDodge/rollCrit가 좋은 예 |
 
-### 브랜치
-- 시스템 메시지에 박힌 값 사용 (세션마다 다를 수 있음. 이 세션 동안 `claude/review-guidelines-wait-J9Ov3`)
-- 머지 후 새 PR은 **반드시 `git fetch origin main` + `git checkout -B <브랜치> origin/main`**으로 최신 main에서 분기
-- **이번 세션 종료 시점: 같은 브랜치에서 광기의 악사 docs v1만 push 완료, v2 재작성 대기. 다음 세션은 같은 브랜치 그대로 사용해서 v2 commit 추가**
+### PM 응대 학습 (1.52.0 시점)
 
-### 다음 세션이 시작될 때 (PM 메시지: "새세션에서 다음작업 진행")
+| 패턴 | 적용 |
+|---|---|
+| **PM의 "~ 적용 안 된 것 같다" 보고는 진단 표 먼저** | 산문체 변명 X. 1) 진단 표 (데이터·UI·적용 코드 3축) → 2) 영향 범위 표 (30개 보상) → 3) 옵션 표 (A/B 코드 구조) + (A/B 보상 환불) → 4) AskUserQuestion |
+| **큰 버그라도 PM 결정으로 영혼 환불 X 가능** | 영혼 환불은 마이그레이션 코드 + 사용자 안내 모달 필요. PM이 "changelog 고지만"으로 결정 → 비용 절감. PR 본문에 결정 사유 명시 |
+| **PR 본문 "PM이 결정/확인할 것" 섹션은 명시적 액션 체크리스트** | "[ ] PR 머지 / [ ] 실기 검증 / [ ] 사제 회복 시스템 우선순위" 등. PM이 한눈에 액션 항목을 알 수 있어야 함 |
 
-| 우선순위 | 작업 | 메모 |
+### 알려진 잔여 항목 (다음 세션 인계)
+
+| 항목 | 상태 | 다음 작업 |
 |---|---|---|
-| **0** | **🔥 광기의 악사 설계서 v2 재작성** | **이번 세션 미완 작업**. PM 결정 v2 4가지(자원 신설 X / 패시브 차별화 / 매력 메인 / sonic 신설) 반영해 docs/class-minstrel-design.md 전체 재작성. 위 "🔥 다음 세션 즉시 작업" 섹션 참조 |
-| 1 | **4직업 각인 풀 작성** (sage / demonblood / elf / priest 모두 빈 배열 상태. 1직업씩) | 코드 인프라 완성. 데이터만 추가. 1직업 = 1 PR. 6.9.5절 가이드 참조 |
-| 2 | **PrepScreen·RestScreen 출처 모달 확산** | 정보창에 도입한 패턴(buildBreakdownInfo + ◇ + openLine 헬퍼)을 다른 화면에도 적용. 1.41.0 시리즈 일관성 마무리 |
-| 3 | 챔피언십 forest 일러 (PM 생성 대기) | 프롬프트 완료. PM이 PNG 푸시하면 Claude가 JPG 변환 + 게임 통합 |
-| 4 | 챔피언십 sanctum 프롬프트 20장 작성 | forest와 다른 4보스 차별화 컨셉 (frost/forest 룰 적용) |
-| 5 | rift / dawn 프롬프트 | sanctum 작성 완료 후 |
-| 6 | 3직업 소울 스킬 설계 (demonblood/elf/priest) | `CLASS_ULTIMATES` 데이터만 추가하면 정보창에 자동 노출됨. PM과 컨셉 결정 필요 |
+| 사제 `combatHealPct` 매핑 | fxDeltas에는 들어감, 실효과 0 | 사제 직업 전용 패시브(재생류) 신축 + 회복 코드에서 combatHealPct 적용 |
+| 3직업 각인 풀 (demonblood/elf/priest) | 빈 배열 상태 | 1직업 = 1 PR (1.53.0~1.55.0 시리즈) |
+| 3직업 소울 스킬 (demonblood/elf/priest) | `CLASS_ULTIMATES` 빈 상태 | PM과 컨셉 결정 → 데이터 추가하면 정보창 자동 노출 |
+| 챔피언십 sanctum / rift 일러 | 프롬프트 완료, PM 일러 생성 대기 | PM ChatGPT 생성 → Claude JPG 변환 + 코드 연결 |
+| 챔피언십 dawn 프롬프트 | 미작성 | 1.52.0 새 스타일 + ChatGPT 도구 적용해 docs 작성 |
 
-**다음 세션 첫 응답 흐름**:
-1. CLAUDE.md 0절·7절 + "🔥 다음 세션 즉시 작업" 섹션 정독
-2. PM 결정 v2 4가지 확인 응답 (산문체 X — 표로)
-3. `docs/class-minstrel-design.md` 현재 v1 구조 빠르게 확인 (Read)
-4. v2 재작성 시작 (TodoWrite로 3+ 단계 추적)
-
-PM이 직접 다른 작업을 지시하면 그것을 우선 — 위 0순위는 미완 작업이라 기본값. **첫 응답은 0절 응답 템플릿 + 표 기반**, 산문체 X.
+PM이 직접 다른 작업을 지시하면 그것을 우선 — 위 0순위(실기 검증 결과 확인)는 1.52.0 픽스 PR을 다음 세션 시작 시점에 검증하는 것이 자연스러워서 디폴트. **첫 응답은 0절 응답 템플릿 + 표 기반**, 산문체 X.
