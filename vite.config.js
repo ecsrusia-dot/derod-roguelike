@@ -4,11 +4,16 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 // GitHub Pages에 배포할 때 저장소 이름을 base에 적어야 합니다.
 // 예: 저장소가 https://github.com/jongphil/derod-roguelike 면 base는 '/derod-roguelike/'
-//     커스텀 도메인을 쓴다면 '/'로 둡니다.
+//     Vercel 또는 커스텀 도메인을 쓴다면 '/'로 둡니다.
 const REPO_NAME = 'derod-roguelike';
 
+// Vercel은 빌드 시 VERCEL=1 환경변수를 자동으로 주입함
+const isVercel = !!process.env.VERCEL;
+const BASE = isVercel ? '/' : (process.env.NODE_ENV === 'production' ? `/${REPO_NAME}/` : '/');
+const SCOPE = isVercel ? '/' : `/${REPO_NAME}/`;
+
 export default defineConfig({
-  base: process.env.NODE_ENV === 'production' ? `/${REPO_NAME}/` : '/',
+  base: BASE,
   plugins: [
     react(),
     VitePWA({
@@ -22,8 +27,8 @@ export default defineConfig({
         background_color: '#050304',
         display: 'fullscreen',
         orientation: 'portrait',
-        scope: `/${REPO_NAME}/`,
-        start_url: `/${REPO_NAME}/`,
+        scope: SCOPE,
+        start_url: SCOPE,
         icons: [
           {
             src: 'icon-192.png',
