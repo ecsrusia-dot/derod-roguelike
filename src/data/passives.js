@@ -23,6 +23,18 @@ export const PASSIVE_SKILLS = {
       7: { text: '약점 자동 간파 (방어 무시)', trigger: 'passive', effect: 'pierceArmor' }
     }
   },
+  // 1.55.0~ 광폭 — forge 결과 패시브 (마왕의 송곳니 계열 3레시피). 신규 effect 키 없이 기존 키 융합.
+  // 마이너 효과(physDmg+4/Lv)는 강타(+3/Lv) 대비 강화 — 대장간 결과물 차별화.
+  광폭: {
+    axis: 'attack', maxLv: 7, color: '#7a1818',
+    desc: '광기에 사로잡힌 분노 — 출혈·관통·즉살의 융합',
+    minorEffect: { type: 'physDmg+', perLv: 4, desc: '물리 데미지 +4/Lv' },
+    tiers: {
+      3: { text: '공격 시 출혈 부여 (3턴, 5+α 데미지)', trigger: 'onAttack', effect: 'applyBleed' },
+      5: { text: '치명타 시 적 방어 50% 무시', trigger: 'passive', effect: 'critPierce' },
+      7: { text: 'HP 20% 이하 적 즉사 (15%)', trigger: 'onAttack', effect: 'execute' }
+    }
+  },
   잔혹: {
     axis: 'attack', maxLv: 7, color: '#8b1f1f',
     desc: '출혈·즉사 효과',
