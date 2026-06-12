@@ -3,6 +3,6 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.53.0';
+export const GAME_VERSION = '1.54.0';
 export const VERSION_DATE = '2026-06-12';
-export const VERSION_LABEL = '클라우드 데이터 소실 차단 — activeRun 직렬화 + 로컬 lastSavedAt 갱신';
+export const VERSION_LABEL = '전투 버그 2건 픽스 — 충격파 각인 기절 미발동 / 영겁지화 화염 복리 폭주';
