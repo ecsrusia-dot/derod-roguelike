@@ -510,6 +510,13 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           else if (hasPurgatoryFire) dmgMult = 0.3;
           const baseIgniteDmg = Math.floor(newPlayer.지능 * dmgMult);
 
+          // 1.46.0~ 각인 화염 데미지 +N% — 매 부여마다 base에만 적용.
+          // 1.54.0~ 픽스: 영겁지화 누적값에 곱하면 복리 폭주 (50→60→132→218…). base에만 곱한 후 누적해야 함.
+          let bonusedIgniteDmg = baseIgniteDmg;
+          if (engravingFx.igniteDmgPct) {
+            bonusedIgniteDmg = Math.floor(bonusedIgniteDmg * (1 + engravingFx.igniteDmgPct / 100));
+          }
+
           // 각인 지속: 영겁 영구 / 화신 3T / 연옥 4T / 패시브만 3T (1.33.0~ Lv.7 +1T 효과 제거)
           let newIgniteDmg;
           let newIgniteTurns;
@@ -518,23 +525,18 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           if (hasEternalFire) {
             // 영겁지화 — 스택 누적, 영구 지속
             const prevDmg = newEnemy.debuffs?.igniteDmg || 0;
-            newIgniteDmg = prevDmg + baseIgniteDmg;
+            newIgniteDmg = prevDmg + bonusedIgniteDmg;
             newIgniteTurns = 999;
             isEternal = true;
           } else if (hasPurgatoryFire) {
-            newIgniteDmg = baseIgniteDmg;
+            newIgniteDmg = bonusedIgniteDmg;
             newIgniteTurns = 4;
             isEternal = false;
           } else {
             // 화신강림 또는 패시브만
-            newIgniteDmg = baseIgniteDmg;
+            newIgniteDmg = bonusedIgniteDmg;
             newIgniteTurns = 3;
             isEternal = false;
-          }
-
-          // 1.46.0~ 각인: 화염 각인 데미지 +N% (술법사 풀)
-          if (engravingFx.igniteDmgPct) {
-            newIgniteDmg = Math.floor(newIgniteDmg * (1 + engravingFx.igniteDmgPct / 100));
           }
 
           newEnemy.debuffs = {
@@ -1202,7 +1204,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
               const cur = newEnemy.debuffs?.shockGauge || 0;
               const nextGauge = cur + shockAdd;
               if (nextGauge >= 100) {
-                newEnemy.debuffs = { ...newEnemy.debuffs, shockGauge: 0, stunnedTurns: 1 };
+                newEnemy.debuffs = { ...newEnemy.debuffs, shockGauge: 0, stunned: 1 };
                 newLog.push({ type: 'debuff', text: `💫 [충격파] 충격 100 — 다음 턴 기절` });
               } else {
                 newEnemy.debuffs = { ...newEnemy.debuffs, shockGauge: nextGauge };
