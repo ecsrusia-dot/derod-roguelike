@@ -368,13 +368,17 @@ export async function loadMeta() {
 }
 
 // 메타 데이터 저장 (로컬만 — 기본 동작)
+// 1.53.0~ lastSavedAt 갱신 — pickLatest 비교 시 로컬도 공정한 기준점을 갖도록.
+// 이전엔 saveCloudMeta만 lastSavedAt를 부여 → 부팅 시 항상 클라우드 승리 →
+// 클라우드 저장 실패 구간(오프라인·디바운스 윈도우 내 종료)의 로컬 진행이 silent rollback.
 export async function saveMeta(meta) {
   try {
     const db = await openDB();
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, 'readwrite');
       const store = tx.objectStore(STORE_NAME);
-      const request = store.put(meta, META_KEY);
+      const toStore = { ...meta, lastSavedAt: Date.now() };
+      const request = store.put(toStore, META_KEY);
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);
     });
