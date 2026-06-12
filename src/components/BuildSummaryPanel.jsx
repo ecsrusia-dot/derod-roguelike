@@ -26,6 +26,7 @@ import {
   getIfritIgniteRate,
   getStrengthHpBonus,
   getIntellectStartSoul,
+  getChampionshipMetaHp,
   hasEffect,
   hasUltimate,
   computeDerivedStats,
@@ -64,10 +65,14 @@ export default function BuildSummaryPanel({
     const strHp = getStrengthHpBonus(stats);
     const intellectStartSoul = getIntellectStartSoul(stats);
 
-    // 시작 HP — classData.startingHp(있으면) + base HP 시그 + 각인
+    // 시작 HP — 직업 기본 + 패시브 maxHp+ + 메타 + 챔피언십 + 시그니처 + 각인
+    // 1.55.0~ 픽스: 패시브·메타·챔피언십 출처 누락 → App.jsx initializeRun(721)과 일치
     const baseStartHp = classData?.startingHp || classData?.stats?.maxHp || 100;
+    const hpPassiveBonus = getMinorBonus(skills, 'maxHp+', activeSkills);
+    const metaHpBonus = getMetaBonus(meta, 'startHp+10') * 10;
+    const champHpBonus = getChampionshipMetaHp(meta);
     const engStartHp = engravingFx.startHp || 0;
-    const startHpTotal = baseStartHp + strHp + engStartHp;
+    const startHpTotal = baseStartHp + hpPassiveBonus + metaHpBonus + champHpBonus + strHp + engStartHp;
 
     // 물리 데미지 % (PrepScreen·RestScreen용 압축)
     const physDmgPct = engravingFx.physDmgPct || 0;
@@ -120,6 +125,7 @@ export default function BuildSummaryPanel({
       playerStr, playerInt,
       strSigPct, intSigPct, strHp, intellectStartSoul,
       baseStartHp, engStartHp, startHpTotal,
+      hpPassiveBonus, metaHpBonus, champHpBonus,
       physDmgPct, physPctTotal,
       magicMinor, magicRelic, magicEngPct, magicPctTotal, intMagic: intSigPct,
       dodgeTotal, dodgeMinor, dodgeLv5, dodgeIntent, dodgeRelic, dodgeEng,
@@ -159,10 +165,13 @@ export default function BuildSummaryPanel({
         <button onClick={() => openLine({
           title: '시작 HP',
           totalText: `${data.startHpTotal}`,
-          subtitle: '전투 시작 시 최대 HP. 직업 기본값 + 시그니처 + 각인의 합산.',
+          subtitle: '전투 시작 시 최대 HP. 직업 기본값 + 패시브 + 메타 + 챔피언십 + 시그니처 + 각인 합산.',
           color: PALETTE.green,
           sources: [
             { label: '직업 기본 HP', value: data.baseStartHp },
+            { label: '패시브 maxHp+', value: data.hpPassiveBonus },
+            { label: '영혼의 제단: 시작 HP +10', value: data.metaHpBonus },
+            { label: '챔피언십 강화: 시작 HP', value: data.champHpBonus },
             { label: '근력 시그니처 1단계', value: data.strHp, note: `적용 포인트 ${Math.max(0, data.playerStr - 10)}(=근력-10) × +5 HP/p` },
             { label: '각인: 시작 HP', value: data.engStartHp },
           ],

@@ -11,7 +11,10 @@ import { rollRewards } from '../utils/rewards.js';
 export default function RewardSelect({ rewards: initialRewards, gem, skills, relics, ultimates, activeSkills = null, onPick, onReroll, hasRerolled, isElite, classId = null, meta = null, expedition = null }) {
   const [rewards, setRewards] = useState(initialRewards);
   // 운명 Lv.3: 리롤 비용 -1
-  const rerollCost = hasEffect(skills, 'rerollDiscount', activeSkills) ? GAME_CONFIG.rerollDiscountCost : GAME_CONFIG.rerollCost;
+  const baseRerollCost = hasEffect(skills, 'rerollDiscount', activeSkills) ? GAME_CONFIG.rerollDiscountCost : GAME_CONFIG.rerollCost;
+  // 1.55.0~ 운명 Lv.7: 무료 1회 리롤 (fateReroll). hasRerolled와 같은 한 번만 작동하므로 우선 적용.
+  const isFateReroll = hasEffect(skills, 'fateReroll', activeSkills) && !hasRerolled;
+  const rerollCost = isFateReroll ? 0 : baseRerollCost;
 
   const handleReroll = () => {
     if (hasRerolled || gem < rerollCost) return;
@@ -128,8 +131,8 @@ export default function RewardSelect({ rewards: initialRewards, gem, skills, rel
               opacity: gem >= rerollCost ? 1 : 0.5,
             }}>
             <RefreshCw size={14} />
-            <span className="text-xs tracking-[0.2em]">선택지 재배치</span>
-            <span className="text-[10px]" style={{ color: PALETTE.ice }}>◆ {rerollCost}</span>
+            <span className="text-xs tracking-[0.2em]">{isFateReroll ? '★ 운명의 재선택 (무료)' : '선택지 재배치'}</span>
+            {!isFateReroll && <span className="text-[10px]" style={{ color: PALETTE.ice }}>◆ {rerollCost}</span>}
           </button>
         )}
       </div>
