@@ -7,6 +7,17 @@
 
 export const CHANGELOG = [
   {
+    version: '1.53.0',
+    date: '2026-06-12',
+    label: '클라우드 데이터 소실 차단 — activeRun 직렬화 + 로컬 lastSavedAt 갱신',
+    changes: [
+      { type: 'fix', text: '[치명] 게스트·구글 로그인 사용자의 런 진행 중 클라우드 백업이 항상 실패하던 버그 수정. activeRun 스냅샷에 포함된 mapData.edges가 Firestore가 거부하는 중첩 배열([[a,b], [b,c], ...]) 형태였으나 saveCloudMeta가 catch로 silent fail 처리해 인지 불가. 직렬화 변환(객체 배열 {a,b})·역직렬화 추가. 1.0.0 출시 이후 클라우드 모드 전 사용자 영향' },
+      { type: 'fix', text: '[치명] 로컬 saveMeta가 lastSavedAt를 갱신하지 않아 부팅 시 클라우드 sync 비교에서 항상 클라우드 승리하던 버그 수정. 이전엔 saveCloudMeta만 lastSavedAt 부여 → 클라우드 저장 실패 구간(오프라인·디바운스 2초 윈도우 내 종료)의 로컬 진행이 다음 부팅 시 silent rollback. 위 활성 런 직렬화 픽스와 한 쌍으로 동작' },
+      { type: 'system', text: '[sync.js] serializeForCloud / deserializeFromCloud 헬퍼 신설. saveCloudMeta는 저장 전 직렬화, loadCloudMeta는 로드 후 역직렬화 자동 적용. 이미 직렬화된 형태(객체)·이미 배열인 구버전 클라우드 데이터 모두 자동 인식하여 마이그레이션 무중단' },
+      { type: 'system', text: '[전면 검토 진행] PM 요청 "앱 전체 디버깅"에서 발견한 치명·높음 13건 중 PR 2번째. 남은 항목: 전투 #6·#7·#8 / 데이터 #9·#10·#11 / 에셋 #12·#13 (PR 3~5에서 처리)' },
+    ],
+  },
+  {
     version: '1.52.1',
     date: '2026-06-12',
     label: '치명 버그 3건 픽스 — 각인 가챠 영혼 미차감 / 수비 Lv.5 -20% 미적용 / 재생 Lv.5 회복 미발동',
