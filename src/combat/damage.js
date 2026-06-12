@@ -35,6 +35,12 @@ export function calculateDamage(skill, attacker, defender, skills, isCrit, ultim
       dmg += physBonus;
       breakdown.push(`강타 +${physBonus}`);
     }
+    // 1.55.1~ 광폭 Lv.7: 물리 데미지 +15% (분노 보너스)
+    if (hasEffect(skills, 'berserkRage', activeSkills)) {
+      const rageBonus = Math.floor(dmg * 0.15);
+      dmg += rageBonus;
+      if (rageBonus > 0) breakdown.push(`광폭 +${rageBonus}`);
+    }
   } else if (skill.type === 'magic') {
     // 1.44.1~ 지능 자동 가산: 절대값 → %로 변경. 포인트당 0.4%, 임계 없음.
     const intSigPct = (attacker.지능 || 0) * 0.4;
@@ -204,6 +210,8 @@ export function getDisplayDamage(skill, attacker, skills, ultimates, meta, curse
       const strSigPct = (attacker.근력 || 0) * 0.4;
       if (strSigPct > 0) dmg += Math.floor(dmg * strSigPct / 100);
       dmg += getMinorBonus(skills, 'physDmg+', activeSkills);
+      // 1.55.1~ 광폭 Lv.7: 물리 데미지 +15% (calculateDamage와 동일)
+      if (hasEffect(skills, 'berserkRage', activeSkills)) dmg += Math.floor(dmg * 0.15);
     } else if (skill.type === 'magic') {
       // 1.44.1~ 지능 자동 가산 % 변환
       const intSigPct = (attacker.지능 || 0) * 0.4;
@@ -255,6 +263,10 @@ export function rollCrit(skills, attacker, meta = null, activeSkills = null, rel
   // 4. ★ [심안] 7단계 효과 적용
   if (hasEffect(skills, 'weaknessPoint', activeSkills)) {
     critRate += 10;
+  }
+  // 1.55.1~ 광폭 Lv.5: 치명타율 +15%
+  if (hasEffect(skills, 'berserkCrit', activeSkills)) {
+    critRate += 15;
   }
   // 화신강림: 폭발 후 다음 1턴 치명타 +30% (1.33.0~ 상향, 이전 +20%)
   if (attacker.buffs?.ifritCritNext) {

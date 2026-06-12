@@ -1561,6 +1561,12 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         newPlayer.buffs = { ...newPlayer.buffs, guaranteedCrit: 1 };
         newLog.push({ type: 'passive', text: `◆ [신앙 Lv.3] 다음 공격 치명타 확정!` });
       }
+      // 1.55.1~ 광폭 Lv.3: 매 턴 시작 시 자해 -5 HP (분노 점화)
+      if (p.effect === 'berserkSelfHit') {
+        const selfDmg = 5;
+        newPlayer.hp = Math.max(1, newPlayer.hp - selfDmg);
+        newLog.push({ type: 'passive', text: `◆ [광폭 Lv.3] 자해 -${selfDmg} HP` });
+      }
     });
 
 

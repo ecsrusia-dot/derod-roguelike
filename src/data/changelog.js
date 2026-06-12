@@ -7,6 +7,17 @@
 
 export const CHANGELOG = [
   {
+    version: '1.55.1',
+    date: '2026-06-12',
+    label: '1.55.0 후속 픽스 3건 — 시작 HP 베이스 / 광폭 풀 누출 / 광폭 effect 충돌',
+    changes: [
+      { type: 'fix', text: '[치명] BuildSummaryPanel의 시작 HP 베이스가 classData.startingHp/stats.maxHp 폴백으로 100을 보여주던 버그 수정 (어느 직업도 해당 필드 미정의). GAME_CONFIG.startHp(300)로 직접 변경 → PrepScreen·RestScreen이 App.jsx initializeRun과 정확히 일치. 라벨 "직업 기본 HP" → "기본 시작 HP (전 직업 공통)"으로 명확화. 1.55.0의 핵심 표시 일치 픽스가 실제 작동하도록 보정' },
+      { type: 'fix', text: '[치명] 1.55.0에서 신설한 광폭 패시브가 classOnly 없어 일반 보상 풀에 weight 28로 누출되던 버그 수정. classOnly: "__forge_only__" 센티넬 추가 → buildRewardPool의 기존 필터(!sk.classOnly || sk.classOnly === currentClassId)가 자동 차단 (실제 직업 ID와 매칭 불가). 광폭은 이제 forge 결과로만 획득 가능 — 원래 의도 복원' },
+      { type: 'fix', text: '[치명] 1.55.0 광폭의 effect 키(applyBleed·critPierce·execute)가 잔혹·정밀과 충돌하여 동시 보유 시 onAttack 루프에서 중복 발동(bleedStack 활성 시 출혈 2/히트, 즉사 확률 ~28% 실효)하던 버그 수정. 광폭 tiers를 자해·반격 컨셉으로 재설계: Lv.3=매 턴 자해 -5 HP(berserkSelfHit) / Lv.5=치명타율 +15%(berserkCrit) / Lv.7=물리 데미지 +15%(berserkRage). 신규 effect 키 3종 + CombatScreen onTurnStart 핸들러 1줄 + damage.js rollCrit·calculateDamage·getDisplayDamage 핸들러 3줄. 자해는 Math.max(1, hp-5)로 광폭만으로는 죽지 않게 가드' },
+      { type: 'system', text: '[설계 교훈] 1.55.0의 3건은 모두 "기존 인프라 표면 활용"으로 단순화한 결과 실제 동작이 깨졌음. classOnly 누락(데이터 무결성)·키 재사용(중복 발동)·폴백 체인(존재하지 않는 필드)이 코드 리뷰에서 잡혀 1.55.1로 핵심 의도 복원' },
+    ],
+  },
+  {
     version: '1.55.0',
     date: '2026-06-12',
     label: '데이터·표시 3건 픽스 — 광폭 패시브 신설 / 운명 Lv.7 작동 / 시작 HP 표시 일치',
