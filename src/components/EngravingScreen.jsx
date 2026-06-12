@@ -87,7 +87,7 @@ export default function EngravingScreen({ meta, onMetaUpdate, onBack }) {
   // 가챠 결과 — 덮어쓰기
   const handleOverwrite = () => {
     if (!gachaResult) return;
-    const newMeta = applyEngravingSlot(meta, gachaResult.classId, gachaResult.slotIdx, gachaResult.newCardId, 0);
+    const newMeta = applyEngravingSlot(meta, gachaResult.classId, gachaResult.slotIdx, gachaResult.newCardId, gachaResult.cost);
     onMetaUpdate(newMeta);
     saveMeta(newMeta);
     setGachaResult(null);
