@@ -158,8 +158,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       newPlayer.defense += relicStat.shieldOnStart;
       initialLog.push({ type: 'passive', text: `◆ [수호의 방패] 시작 방어 +${relicStat.shieldOnStart}` });
     }
-    if (hasEffect(skills, 'heal20%', activeSkills)) {
-      const heal = Math.floor(newPlayer.maxHp * 0.2);
+    if (hasEffect(skills, 'heal30%', activeSkills)) {
+      const heal = Math.floor(newPlayer.maxHp * 0.3);
       newPlayer.hp = Math.min(newPlayer.maxHp, newPlayer.hp + heal);
       initialLog.push({ type: 'passive', text: `◆ [재생 Lv.5] HP ${heal} 회복` });
     }
@@ -868,8 +868,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
               setFxBarrierBreak(v => v + 1);
             }
           }
-          if (hasEffect(skills, 'dmgTaken-15', activeSkills) && dmg > 0) {
-            const reduced = Math.floor(dmg * 0.15);
+          if (hasEffect(skills, 'dmgTaken-20', activeSkills) && dmg > 0) {
+            const reduced = Math.floor(dmg * 0.20);
             dmg -= reduced;
             if (reduced > 0) takenBreakdown.push(`수비 Lv.5 -${reduced}`);
           }
