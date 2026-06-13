@@ -877,4 +877,4 @@ const combatSrc = `./enemies/${subdir}/${enemyKey}_combat.jpg`;
   - [x] forest (부패·숲·광기) — `enemy-illustration-prompts-championship-forest.md` 20장 완료 (1.51.0, Copilot 사용분)
   - [x] sanctum (신전·골렘·봉인된 영혼) — `enemy-illustration-prompts-championship-sanctum.md` 20장 완료 (1.52.0), PM ChatGPT 생성 대기
   - [x] rift (마계·균열·핏빛) — `enemy-illustration-prompts-championship-rift.md` 20장 완료 (1.53.0), PM ChatGPT 생성 대기
-  - [ ] dawn (천상·여명) — 미작성
+  - [x] dawn (천상·여명) — `enemy-illustration-prompts-championship-dawn.md` 20장 완료 (1.58.0, 1.52.0 새 스타일 적용), Pillow placeholder 24장 선배치, PM ChatGPT 생성 대기
