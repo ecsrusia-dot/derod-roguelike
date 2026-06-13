@@ -62,6 +62,18 @@ export default defineConfig({
               expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 },
             },
           },
+          // 1.56.0~ 게임 일러 (직업·적) — 매 세션 재다운로드 방지.
+          // precache에 넣지 않는 이유: 모든 일러 합산 시 수십 MB → 첫 설치 부담.
+          // CacheFirst: 첫 노출 시 네트워크 + 디스크 저장 → 이후 세션은 즉시 캐시 사용.
+          {
+            urlPattern: /\/(classes|enemies)\/.*\.(jpg|jpeg|png|webp)(\?.*)?$/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'game-illustrations-cache',
+              expiration: { maxEntries: 500, maxAgeSeconds: 60 * 60 * 24 * 365 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
         ],
       },
     }),
