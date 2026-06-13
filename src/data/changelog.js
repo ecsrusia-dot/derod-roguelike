@@ -7,6 +7,18 @@
 
 export const CHANGELOG = [
   {
+    version: '1.57.0',
+    date: '2026-06-13',
+    label: '혼혈 마족 각인 풀 24장 신설 — 물리·분노·자해·소울 컨셉',
+    changes: [
+      { type: 'feature', text: '[혼혈 마족 각인 풀] ENGRAVINGS[demonblood] 24장 신설 (이전 빈 배열). 구성: Common 5 / Rare 5 / Epic 5 / Legendary 2 / Flaw 4 / Curse 3. 컨셉: 물리·분노·자해·소울 (wanderer 반격/sage 화염과 차별화). 주요 effect 키: physDmgPct(분노) / critRate(송곳니) / startSoul·perTurnSoul(분노 게이지) / perTurnHpLoss(자해, Epic·Legendary·Curse에 보상 페어로 채택) / str·startHp(육체)' },
+      { type: 'feature', text: '[Legendary 2종] 마왕(魔王)의 권위 = 물리 +20% + 매 턴 -5 HP 자해 / 핏빛 분노 = 치명 +15% + 시작 소울 +20. 두 카드 모두 마족 정체성(피와 분노) 직접 반영' },
+      { type: 'feature', text: '[Flaw·Curse] 드러난 살갗·둔한 육체·떨리는 분노·불안정한 심장 (결함 4) + 마왕의 가호·피의 분노·광기의 송곳니 (저주 3). Curse는 강한 보상에 강한 대가 패턴 (마왕의 가호 = 물리 +30% / 받는 +25%)' },
+      { type: 'system', text: '[코드 변경 0줄] 모든 effect 키가 기존 21종 키 재사용 (1.27.0~ 인프라). aggregateEngravingEffects·CombatScreen·damage.js 변경 없음. 신규 키 추가 시 자동 호환' },
+      { type: 'system', text: '[남은 직업 풀] elf·priest 빈 배열 잔존 — 1.58.0~ 별도 PR로 진행 예정 (elf: dodgeRate·critRate·dodgeSoul·afterDodgeDmg / priest: startHp·perTurnSoul·매력 시그 + 회복 시스템 구현 후)' },
+    ],
+  },
+  {
     version: '1.56.1',
     date: '2026-06-13',
     label: '클라우드 견고성 2건 — 일반 serializer 가드 + 저장 실패 가시성',
