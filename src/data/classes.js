@@ -38,9 +38,10 @@ export const CLASSES = [
     id: 'demonblood', name: '혼혈 마족', sub: 'Demon Heritage',
     quote: '걱정마, 밤이되기전에 돌아올께!',
     desc: '마왕의 피가 흐르는 자. 분노가 곧 힘이 된다.',
-    startSkills: { 잔혹: 3, 강타: 1 },
+    startSkills: { 혈광: 3, 강타: 1 },
     stats: { 근력: 19, 민첩: 13, 지능: 13, 매력: 9 },
     combatSkills: ['광폭참격', '피의 일격', '광기'],
+    ultimateId: 'demonblood_bloodFury',  // 직업 소울 스킬 (소울 게이지 100 발동)
     color: '#8b1f1f',
     locked: false,
     image: './classes/demonblood.jpg',
@@ -112,6 +113,16 @@ export const CLASS_ULTIMATES = {
     color: '#ff4500',
     icon: '🔥',
     effect: 'classult_eternalFlame',
+  },
+  demonblood_bloodFury: {
+    id: 'demonblood_bloodFury',
+    classId: 'demonblood',
+    name: '혈마(血魔)의 격노',
+    quote: '내 피의 무게를 가져가라.',
+    desc: '적에게 (잃은 HP × 1.5, 최소 50) 데미지 (방어 무시). 다음 3턴 공격 시 50% 흡혈. ※ HP가 낮을수록 강력. HP 0이면 ~max HP × 1.5 데미지 폭발.',
+    color: '#7a1818',
+    icon: '✸',
+    effect: 'classult_bloodFury',
   },
 };
 

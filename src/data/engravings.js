@@ -96,11 +96,11 @@ const _SAGE_REWARDS = [
     { type: 'passiveBonus', skill: '마력', delta: 1 },
   ]}},
 ];
-// ※ demonblood/elf/priest는 전용 패시브 신규 구현 후 변동 예정 (1.44.0 임시).
+// 1.61.0~ demonblood 전용 패시브 혈광 신설 → Lv.4·Lv.10 보상에서 잔혹 → 혈광으로 교체.
 const _DEMONBLOOD_REWARDS = [
   { lv: 2,  cost: 500,   reward: { type: 'slotUnlock', slot: 1 } },
   { lv: 3,  cost: 1000,  reward: { type: 'statBonus', stat: '근력', value: 2 } },
-  { lv: 4,  cost: 2000,  reward: { type: 'passiveBonus', skill: '잔혹', delta: 1 } },
+  { lv: 4,  cost: 2000,  reward: { type: 'passiveBonus', skill: '혈광', delta: 1 } },
   { lv: 5,  cost: 4000,  reward: { type: 'slotUnlock', slot: 2 } },
   { lv: 6,  cost: 8000,  reward: { type: 'passiveBonus', skill: '강타', delta: 1 } },
   { lv: 7,  cost: 12000, reward: { type: 'statPctBonus', key: 'physDmg', pct: 5 } },
@@ -110,7 +110,7 @@ const _DEMONBLOOD_REWARDS = [
     { type: 'statPctBonus', key: 'physDmg', pct: 5 },
   ]}},
   { lv: 10, cost: 30000, reward: { type: 'composite', parts: [
-    { type: 'passiveBonus', skill: '잔혹', delta: 1 },
+    { type: 'passiveBonus', skill: '혈광', delta: 1 },
     { type: 'passiveBonus', skill: '강타', delta: 1 },
   ]}},
 ];

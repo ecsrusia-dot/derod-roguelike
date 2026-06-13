@@ -7,6 +7,17 @@
 
 export const CHANGELOG = [
   {
+    version: '1.61.0',
+    date: '2026-06-13',
+    label: '혼혈 마족 풀스택 — 혈광 패시브 + 혈마의 격노 소울 스킬',
+    changes: [
+      { type: 'feature', text: '[혈광(血光) 신설] 혼혈 마족 직업 전용 패시브 (classOnly: demonblood). minor: 잃은 HP 1%당 × Lv × 0.5% 물리 데미지 보너스 (만렙 HP 100% 잃었으면 +350%). Lv.3: 매 턴 시작 시 자해 -3 HP + 다음 공격 데미지 +15%(bloodRageNext buff). Lv.5: HP 50% 이하 시 치명타율 +30% (rollCrit에 hp% 체크 분기). Lv.7: HP 25% 이하 시 받는 데미지 -50% + 공격 시 30% 흡혈. 시작 패시브 변경: 잔혹 Lv.3 → 혈광 Lv.3 (강타 Lv.1 유지). 각성도 Lv.4·Lv.10 보상도 잔혹 → 혈광 동시 갱신' },
+      { type: 'feature', text: '[혈마(血魔)의 격노 신설] 혼혈 마족 직업 소울 스킬 (CLASS_ULTIMATES.demonblood_bloodFury). (잃은 HP × 1.5, 최소 50) 데미지 (방어 무시) + 다음 3턴 흡혈 50% (bloodLifesteal buff). HP가 낮을수록 폭발적. HP 0 직전이면 max HP × 1.5 데미지. classData.ultimateId 추가 → StatusPanel 소울 스킬 섹션 자동 노출' },
+      { type: 'system', text: '[흡혈 시스템] 혈광 Lv.7 + 혈마의 격노 후속이 공유하는 흡혈 처리 — 적 공격 명중 후 (actualDmg × lifestealPct/100) HP 회복. 둘 다 활성이면 더 큰 값 사용 (Math.max). 흡혈 한도는 maxHp. 매 턴 시작 시 bloodLifestealTurns 카운터 감소 (dodgeBuffTurns·dawnGuardTurns와 동일 패턴)' },
+      { type: 'system', text: '[코드 변경 범위] data/passives.js(혈광 추가) / data/classes.js(demonblood.startSkills + ultimateId + CLASS_ULTIMATES) / data/engravings.js(_DEMONBLOOD_REWARDS 잔혹 → 혈광) / combat/damage.js(혈광 minor 잃은 HP 가산 + bloodRageNext +15% + rollCrit Lv.5 hp50%) / CombatScreen.jsx(onTurnStart bloodRageTurn 자해 + 공격 후 bloodRageNext 1회 소비 + 흡혈 적용 + Lv.7 받는 데미지 -50% + classult_bloodFury + bloodLifestealTurns 카운터). 빌드 통과' },
+    ],
+  },
+  {
     version: '1.58.0',
     date: '2026-06-13',
     label: '챔피언십 dawn 컨셉 — 프롬프트 20장 + placeholder 24장',
