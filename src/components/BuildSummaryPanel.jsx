@@ -32,6 +32,7 @@ import {
   computeDerivedStats,
 } from '../utils/helpers.js';
 import { buildBreakdownInfo } from './CardInfoModal.jsx';
+import { GAME_CONFIG } from '../data.js';
 
 export default function BuildSummaryPanel({
   classData,
@@ -65,9 +66,11 @@ export default function BuildSummaryPanel({
     const strHp = getStrengthHpBonus(stats);
     const intellectStartSoul = getIntellectStartSoul(stats);
 
-    // 시작 HP — 직업 기본 + 패시브 maxHp+ + 메타 + 챔피언십 + 시그니처 + 각인
-    // 1.55.0~ 픽스: 패시브·메타·챔피언십 출처 누락 → App.jsx initializeRun(721)과 일치
-    const baseStartHp = classData?.startingHp || classData?.stats?.maxHp || 100;
+    // 시작 HP — GAME_CONFIG.startHp + 패시브 maxHp+ + 메타 + 챔피언십 + 시그니처 + 각인
+    // 1.55.0 픽스: 패시브·메타·챔피언십 출처 누락 추가
+    // 1.55.1 픽스: baseStartHp가 classData.startingHp/stats.maxHp 폴백으로 100 떨어지던 버그 수정
+    //              (어느 클래스도 해당 필드 미정의). App.jsx:721은 GAME_CONFIG.startHp = 300 사용.
+    const baseStartHp = GAME_CONFIG.startHp;
     const hpPassiveBonus = getMinorBonus(skills, 'maxHp+', activeSkills);
     const metaHpBonus = getMetaBonus(meta, 'startHp+10') * 10;
     const champHpBonus = getChampionshipMetaHp(meta);
@@ -168,7 +171,7 @@ export default function BuildSummaryPanel({
           subtitle: '전투 시작 시 최대 HP. 직업 기본값 + 패시브 + 메타 + 챔피언십 + 시그니처 + 각인 합산.',
           color: PALETTE.green,
           sources: [
-            { label: '직업 기본 HP', value: data.baseStartHp },
+            { label: '기본 시작 HP (전 직업 공통)', value: data.baseStartHp },
             { label: '패시브 maxHp+', value: data.hpPassiveBonus },
             { label: '영혼의 제단: 시작 HP +10', value: data.metaHpBonus },
             { label: '챔피언십 강화: 시작 HP', value: data.champHpBonus },
