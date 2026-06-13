@@ -7,6 +7,17 @@
 
 export const CHANGELOG = [
   {
+    version: '1.58.0',
+    date: '2026-06-13',
+    label: '챔피언십 dawn 컨셉 — 프롬프트 20장 + placeholder 24장',
+    changes: [
+      { type: 'feature', text: '[챔피언십 dawn 프롬프트 20장] 천상·여명·천사·골든 컨셉. docs/enemy-illustration-prompts-championship-dawn.md 신설. 4단계 환경 톤(천국 외곽 → 신적 여명) + 4보스 차별화(타락 견습 천사/거대 6날개 군주/여명의 마녀/신적 무수한 날개) + dawn_1~dawn_4 챕터별 5종(일반 3+강적 1+보스 1) = 16종 + 보스 intro 4종 = 총 20종 프롬프트. 1.52.0 새 스타일(단어형·5° 로우 앵글) + ChatGPT(DALL-E 3) 도구 적용. PM 일러 생성 대기' },
+      { type: 'feature', text: '[Pillow placeholder 24장] PM 명시 요청으로 절차적 placeholder 생성 (Pillow 그라데이션+광휘+한국어 이름 표시). public/enemies/championship/dawn/ 폴더에 combat 20장 + intro 4장 배치. 화풍은 placeholder 수준이지만 게임 폴백("[ 적 모습 미구현 ]")보다 정보성 우수. PM이 ChatGPT 일러 받아 동일 파일명 덮어쓰면 자동 대체 (코드 변경 X)' },
+      { type: 'system', text: '[기술적 한계 명시] Claude Code 환경에서 외부 이미지 생성 API(OpenAI·Stability·HuggingFace) 전부 403 차단 + 로컬 모델 미설치 → DALL-E 3급 일러 생성은 불가능. 유일한 직접 생성 경로가 Pillow 절차적 합성이며 placeholder 수준이 한계. 진짜 일러는 PM ChatGPT 워크플로 유지(CLAUDE.md 5절)' },
+      { type: 'system', text: '[데이터 통합 잔여] ENEMIES[champ_dawn_*] 20종 정의 + dawn 챔피언십 expedition 추가는 별도 PR. getEnemyImageSrc 헬퍼(1.21.0)는 chapter: dawn_<N> 문자열 자동 분기 → 데이터만 추가하면 코드 변경 0줄' },
+    ],
+  },
+  {
     version: '1.57.0',
     date: '2026-06-13',
     label: '혼혈 마족 각인 풀 24장 신설 — 물리·분노·자해·소울 컨셉',
