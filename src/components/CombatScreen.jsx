@@ -335,11 +335,33 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           if (newPlayer.buffs?.afterDodgeDmgNext) {
             newPlayer.buffs = { ...newPlayer.buffs, afterDodgeDmgNext: false };
           }
+          // 1.61.0~ 혈광 Lv.3 bloodRageNext buff 1회 소비 (calculateDamage에서 +15% 적용 완료)
+          if (newPlayer.buffs?.bloodRageNext) {
+            newPlayer.buffs = { ...newPlayer.buffs, bloodRageNext: false };
+          }
           if (newEnemy.defense > 0 && !skill.pierce) {
             newEnemy.defense = Math.max(0, newEnemy.defense - dmgResult.defenseMitigated);
           }
           newEnemy.currentHp = Math.max(0, newEnemy.currentHp - actualDmg);
           totalDmg += actualDmg;
+          // 1.61.0~ 혈광 Lv.7 흡혈 30% (HP 25% 이하 시) + 소울 스킬 bloodLifesteal buff 50% (3턴)
+          if (actualDmg > 0 && classData.id === 'demonblood') {
+            let lifestealPct = 0;
+            const hpPct = (newPlayer.hp / Math.max(1, newPlayer.maxHp)) * 100;
+            if (hasEffect(skills, 'bloodLow25Survive', activeSkills) && hpPct <= 25) {
+              lifestealPct = Math.max(lifestealPct, 30);
+            }
+            if (newPlayer.buffs?.bloodLifestealTurns > 0 && newPlayer.buffs?.bloodLifesteal > 0) {
+              lifestealPct = Math.max(lifestealPct, newPlayer.buffs.bloodLifesteal);
+            }
+            if (lifestealPct > 0) {
+              const heal = Math.floor(actualDmg * lifestealPct / 100);
+              if (heal > 0) {
+                newPlayer.hp = Math.min(newPlayer.maxHp, newPlayer.hp + heal);
+                newLog.push({ type: 'heal', text: `· 흡혈 +${heal} HP` });
+              }
+            }
+          }
           // 소울 게이지: 데미지 입힘 +dmg/5, 치명타 +10 보너스
           if (classData.ultimateId && actualDmg > 0) {
             let gain = Math.floor(actualDmg / 5);
@@ -696,6 +718,23 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         setFxEnemyShake(v => v + 1);
         setFxEnemyFlash(v => v + 1);
         pushFxLabel('enemy', 'crit', cut);
+      } else if (ult.effect === 'classult_bloodFury') {
+        // 1.61.0~ 혈마의 격노: (잃은 HP × 1.5, 최소 50) 데미지, 방어 무시 + 다음 3턴 흡혈 50%
+        const lostHp = Math.max(0, newPlayer.maxHp - newPlayer.hp);
+        const cut = Math.max(50, Math.floor(lostHp * 1.5));
+        newEnemy.currentHp = Math.max(0, newEnemy.currentHp - cut);
+        newPlayer.buffs = {
+          ...newPlayer.buffs,
+          bloodLifesteal: 50,
+          bloodLifestealTurns: 3,
+        };
+        newLog.push({ type: 'damage', text: `· ${enemy.name}에게 ${cut} 데미지 [잃은 HP×1.5, 방어 무시]` });
+        newLog.push({ type: 'passive', text: `★ [혈마의 격노] 3턴간 흡혈 50%` });
+
+        setFxScreenShake(v => v + 1);
+        setFxEnemyShake(v => v + 1);
+        setFxEnemyFlash(v => v + 1);
+        pushFxLabel('enemy', 'crit', cut);
       } else if (ult.effect === 'classult_eternalFlame') {
         // 50 화염 데미지(방어 무시) + 겁화 영구 부여(지능×0.4/턴) + 다음 2턴 마법 데미지 +50%
         // 1.42.0~ 겁화 무한 도트로 재설계: 영구 지속(9999T) + 각인폭발 대상 제외.
@@ -941,6 +980,16 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
               }
             }
 
+
+            // 1.61.0~ 혈광 Lv.7: HP 25% 이하 시 받는 데미지 -50%
+            if (dmg > 0 && hasEffect(skills, 'bloodLow25Survive', activeSkills)) {
+              const hpPct = (newPlayer.hp / Math.max(1, newPlayer.maxHp)) * 100;
+              if (hpPct <= 25) {
+                const blocked = Math.floor(dmg * 0.5);
+                dmg -= blocked;
+                newLog.push({ type: 'passive', text: `◆ [혈광 Lv.7] 위기 방어 -${blocked}` });
+              }
+            }
 
             // 최종 데미지 적용 (위의 조건들에서 dmg가 0이 되었다면 실행되지 않음)
             if (dmg > 0) {
@@ -1501,6 +1550,11 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       newPlayer.buffs.dodgeBuffTurns--;
       if (newPlayer.buffs.dodgeBuffTurns === 0) newPlayer.buffs.dodgeBuff = 0;
     }
+    // 1.61.0~ 혈마의 격노 흡혈 buff 3턴 카운터
+    if (newPlayer.buffs?.bloodLifestealTurns > 0) {
+      newPlayer.buffs.bloodLifestealTurns--;
+      if (newPlayer.buffs.bloodLifestealTurns === 0) newPlayer.buffs.bloodLifesteal = 0;
+    }
     // 심안류 궁극 1턴 버프 정리
     if (newPlayer.buffs?.mirrorDodgeNext > 0) {
       newPlayer.buffs = { ...newPlayer.buffs, mirrorDodgeNext: 0 };
@@ -1566,6 +1620,13 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         const selfDmg = 5;
         newPlayer.hp = Math.max(1, newPlayer.hp - selfDmg);
         newLog.push({ type: 'passive', text: `◆ [광폭 Lv.3] 자해 -${selfDmg} HP` });
+      }
+      // 1.61.0~ 혈광 Lv.3: 매 턴 시작 시 자해 -3 HP, 다음 공격 데미지 +15%
+      if (p.effect === 'bloodRageTurn') {
+        const selfDmg = 3;
+        newPlayer.hp = Math.max(1, newPlayer.hp - selfDmg);
+        newPlayer.buffs = { ...newPlayer.buffs, bloodRageNext: true };
+        newLog.push({ type: 'passive', text: `◆ [혈광 Lv.3] 자해 -${selfDmg} HP, 다음 공격 +15%` });
       }
     });
 

@@ -41,6 +41,27 @@ export function calculateDamage(skill, attacker, defender, skills, isCrit, ultim
       dmg += rageBonus;
       if (rageBonus > 0) breakdown.push(`광폭 +${rageBonus}`);
     }
+    // 1.61.0~ 혈광 minor: 잃은 HP% × Lv × 0.5% 물리 데미지 (만렙 Lv.7 = 잃은%×3.5%)
+    const bloodLv = (skills && skills['혈광']) || 0;
+    if (bloodLv > 0 && (!activeSkills || activeSkills.includes('혈광'))) {
+      const lostHpPct = Math.max(0, 100 - (attacker.hp / Math.max(1, attacker.maxHp)) * 100);
+      const bloodPct = lostHpPct * bloodLv * 0.5 / 100;
+      if (bloodPct > 0) {
+        const bloodBonus = Math.floor(dmg * bloodPct);
+        if (bloodBonus > 0) {
+          dmg += bloodBonus;
+          breakdown.push(`혈광 +${bloodBonus}`);
+        }
+      }
+    }
+    // 1.61.0~ 혈광 Lv.3 bloodRageNext buff: 다음 공격 데미지 +15% (자해 직후 1회 소비)
+    if (attacker.buffs?.bloodRageNext) {
+      const rageBonus = Math.floor(dmg * 0.15);
+      if (rageBonus > 0) {
+        dmg += rageBonus;
+        breakdown.push(`혈광 분노 +${rageBonus}`);
+      }
+    }
   } else if (skill.type === 'magic') {
     // 1.44.1~ 지능 자동 가산: 절대값 → %로 변경. 포인트당 0.4%, 임계 없음.
     const intSigPct = (attacker.지능 || 0) * 0.4;
@@ -267,6 +288,13 @@ export function rollCrit(skills, attacker, meta = null, activeSkills = null, rel
   // 1.55.1~ 광폭 Lv.5: 치명타율 +15%
   if (hasEffect(skills, 'berserkCrit', activeSkills)) {
     critRate += 15;
+  }
+  // 1.61.0~ 혈광 Lv.5: HP 50% 이하 시 치명타율 +30%
+  if (hasEffect(skills, 'bloodLow50Crit', activeSkills)) {
+    const hpPct = (attacker.hp / Math.max(1, attacker.maxHp)) * 100;
+    if (hpPct <= 50) {
+      critRate += 30;
+    }
   }
   // 화신강림: 폭발 후 다음 1턴 치명타 +30% (1.33.0~ 상향, 이전 +20%)
   if (attacker.buffs?.ifritCritNext) {

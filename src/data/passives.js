@@ -154,6 +154,17 @@ export const PASSIVE_SKILLS = {
       7: { text: '궁극 진화 게이트 (다음 보상부터 영겁지화·화신강림·연옥지화 등장)', trigger: 'passive', effect: 'ifritT7' }
     }
   },
+  혈광: {
+    axis: 'attack', maxLv: 7, color: '#7a1818',
+    desc: '마왕의 피. 잃은 HP만큼 강해지고, 위기에서 폭발한다',
+    classOnly: 'demonblood',
+    minorEffect: { type: 'bloodLostHpPhysDmg+', perLv: 0.5, desc: '잃은 HP 1%당 물리 데미지 +0.5%/Lv (만렙 잃은 100% 기준 +3.5%/% = HP 0이면 +350%)' },
+    tiers: {
+      3: { text: '매 턴 시작 시 자해 -3 HP, 다음 공격 데미지 +15%', trigger: 'onTurnStart', effect: 'bloodRageTurn' },
+      5: { text: 'HP 50% 이하 시 치명타율 +30%', trigger: 'passive', effect: 'bloodLow50Crit' },
+      7: { text: 'HP 25% 이하 시 받는 데미지 -50%, 공격 시 30% 흡혈', trigger: 'passive', effect: 'bloodLow25Survive' }
+    }
+  },
 };
 
 
