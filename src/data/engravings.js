@@ -248,7 +248,47 @@ export const ENGRAVINGS = {
     { id: 'eng_sage_curse_arcane',   tier: 'NEG_CURSE', name: '금단의 마법진',       desc: '화염 각인 부여 확률 +100% / 매 턴 HP -5',                effect: { igniteApplyPct: 100, perTurnHpLoss: 5 } },
     { id: 'eng_sage_curse_oblivion', tier: 'NEG_CURSE', name: '망각의 인장',         desc: '마법 시전 시 소울 게이지 +4 / 화염 각인 부여 0%로 고정', effect: { magicSoulBonus: 4, igniteSuppress: true } },
   ],
-  demonblood: [],
+  // 1.57.0~ 혼혈 마족 풀 24장 (물리·분노·자해·소울 컨셉 — wanderer 반격/sage 화염과 차별화)
+  // effect 키: str·startHp / physDmgPct·critRate / startSoul·perTurnSoul·dodgeSoul·soulGainMult /
+  //            perTurnHpLoss (자해·마이너 키) / counter 계열은 sub (wanderer가 메인이라 1~2장만)
+  //            -dmgTakenPct·-dodgeRate·-critRate·-startHp (결함·저주)
+  demonblood: [
+    // === Common (5) ===
+    { id: 'eng_dem_strength',    tier: 'C', name: '마족의 완력',  desc: '근력 +2',                       effect: { str: 2 } },
+    { id: 'eng_dem_skin',        tier: 'C', name: '마족의 가죽',  desc: '시작 HP +30',                   effect: { startHp: 30 } },
+    { id: 'eng_dem_anger',       tier: 'C', name: '작은 분노',    desc: '물리 데미지 +3%',               effect: { physDmgPct: 3 } },
+    { id: 'eng_dem_pulse',       tier: 'C', name: '분노의 맥박',  desc: '매 턴 시작 시 소울 게이지 +1',  effect: { perTurnSoul: 1 } },
+    { id: 'eng_dem_fang',        tier: 'C', name: '날카로운 송곳니', desc: '치명타율 +3%',               effect: { critRate: 3 } },
+
+    // === Rare (5) ===
+    { id: 'eng_dem_rage',        tier: 'R', name: '폭주의 시동',   desc: '물리 데미지 +8%',              effect: { physDmgPct: 8 } },
+    { id: 'eng_dem_bloodlust',   tier: 'R', name: '피의 갈망',     desc: '전투 시작 시 소울 게이지 +10', effect: { startSoul: 10 } },
+    { id: 'eng_dem_savage',      tier: 'R', name: '잔혹한 일격',   desc: '치명타율 +5%',                 effect: { critRate: 5 } },
+    { id: 'eng_dem_demon_blood', tier: 'R', name: '마왕의 핏줄',   desc: '근력 +4',                      effect: { str: 4 } },
+    { id: 'eng_dem_legacy',      tier: 'R', name: '마왕의 유산',   desc: '시작 HP +50',                  effect: { startHp: 50 } },
+
+    // === Epic (5) ===
+    { id: 'eng_dem_berserker',   tier: 'E', name: '광폭의 입문',   desc: '물리 데미지 +12% / 매 턴 HP -3 (자해)',  effect: { physDmgPct: 12, perTurnHpLoss: 3 } },
+    { id: 'eng_dem_fury',        tier: 'E', name: '분노의 폭발',   desc: '치명타율 +10%',                          effect: { critRate: 10 } },
+    { id: 'eng_dem_ramp',        tier: 'E', name: '분노의 가속',   desc: '매 턴 시작 시 소울 게이지 +3',           effect: { perTurnSoul: 3 } },
+    { id: 'eng_dem_ignition',    tier: 'E', name: '광기의 점화',   desc: '전투 시작 시 소울 게이지 +15',           effect: { startSoul: 15 } },
+    { id: 'eng_dem_shadow_rage', tier: 'E', name: '잔영의 분노',   desc: '회피 시 소울 게이지 +5',                 effect: { dodgeSoul: 5 } },
+
+    // === Legendary (2) ===
+    { id: 'eng_dem_demon_king',  tier: 'L', name: '마왕(魔王)의 권위', desc: '물리 데미지 +20% / 매 턴 HP -5 (자해)',  effect: { physDmgPct: 20, perTurnHpLoss: 5 } },
+    { id: 'eng_dem_blood_fury',  tier: 'L', name: '핏빛 분노',          desc: '치명타율 +15% / 전투 시작 시 소울 +20',  effect: { critRate: 15, startSoul: 20 } },
+
+    // === Flaw (결함, 4) ===
+    { id: 'eng_dem_flaw_brittle', tier: 'NEG_FLAW', name: '드러난 살갗',  desc: '받는 데미지 +10%',  effect: { dmgTakenPct: 10 } },
+    { id: 'eng_dem_flaw_slow',    tier: 'NEG_FLAW', name: '둔한 육체',    desc: '회피율 -8%',        effect: { dodgeRate: -8 } },
+    { id: 'eng_dem_flaw_tremor',  tier: 'NEG_FLAW', name: '떨리는 분노',  desc: '치명타율 -10%',     effect: { critRate: -10 } },
+    { id: 'eng_dem_flaw_heart',   tier: 'NEG_FLAW', name: '불안정한 심장', desc: '시작 HP -30',      effect: { startHp: -30 } },
+
+    // === Curse (저주, 3) ===
+    { id: 'eng_dem_curse_demon',     tier: 'NEG_CURSE', name: '마왕의 가호',   desc: '물리 데미지 +30% / 받는 데미지 +25%',        effect: { physDmgPct: 30, dmgTakenPct: 25 } },
+    { id: 'eng_dem_curse_bloodrage', tier: 'NEG_CURSE', name: '피의 분노',     desc: '전투 시작 시 소울 +30 / 매 턴 HP -8 (자해)', effect: { startSoul: 30, perTurnHpLoss: 8 } },
+    { id: 'eng_dem_curse_madness',   tier: 'NEG_CURSE', name: '광기의 송곳니', desc: '치명타율 +25% / 소울 게이지 획득 -25%',      effect: { critRate: 25, soulGainMult: -0.25 } },
+  ],
   elf: [],
   priest: [],
 };
