@@ -131,10 +131,12 @@ const _ELF_REWARDS = [
     { type: 'passiveBonus', skill: '정밀', delta: 1 },
   ]}},
 ];
+// 1.60.0~ priest 전용 패시브 수신 신설 → Lv.4·Lv.10 보상에서 신앙 → 수신으로 교체.
+// statPctBonus combatHeal → combatHealPct fxDeltas 매핑은 AWAKENING_PCT_KEY_MAP 기존 매핑 유지.
 const _PRIEST_REWARDS = [
   { lv: 2,  cost: 500,   reward: { type: 'slotUnlock', slot: 1 } },
   { lv: 3,  cost: 1000,  reward: { type: 'statBonus', stat: '매력', value: 2 } },
-  { lv: 4,  cost: 2000,  reward: { type: 'passiveBonus', skill: '신앙', delta: 1 } },
+  { lv: 4,  cost: 2000,  reward: { type: 'passiveBonus', skill: '수신', delta: 1 } },
   { lv: 5,  cost: 4000,  reward: { type: 'slotUnlock', slot: 2 } },
   { lv: 6,  cost: 8000,  reward: { type: 'passiveBonus', skill: '재생', delta: 1 } },
   { lv: 7,  cost: 12000, reward: { type: 'statPctBonus', key: 'combatHeal', pct: 10 } },
@@ -144,7 +146,7 @@ const _PRIEST_REWARDS = [
     { type: 'statPctBonus', key: 'combatHeal', pct: 10 },
   ]}},
   { lv: 10, cost: 30000, reward: { type: 'composite', parts: [
-    { type: 'passiveBonus', skill: '신앙', delta: 1 },
+    { type: 'passiveBonus', skill: '수신', delta: 1 },
     { type: 'passiveBonus', skill: '재생', delta: 1 },
   ]}},
 ];
@@ -290,5 +292,46 @@ export const ENGRAVINGS = {
     { id: 'eng_dem_curse_madness',   tier: 'NEG_CURSE', name: '광기의 송곳니', desc: '치명타율 +25% / 소울 게이지 획득 -25%',      effect: { critRate: 25, soulGainMult: -0.25 } },
   ],
   elf: [],
-  priest: [],
+  // 1.60.0~ 여명의 사제 풀 24장 (회복·신성·매력·HP·축복 컨셉 — 다른 4직업과 차별화)
+  // effect 키: cha·int·startHp / combatHealPct(신규)·dmgTakenPct(음수=피해 감소) /
+  //            startSoul·perTurnSoul·soulGainMult·dodgeSoul / critRate(약함, 보조) /
+  //            -dodgeRate·-critRate·-startHp·perTurnHpLoss (결함·저주)
+  // ※ combatHealPct는 1.52.0에서 fxDeltas로 흘러갔으나 미구현 상태였음. 1.60.0 수신 패시브 신축과 함께 회복 적용 코드 신축.
+  priest: [
+    // === Common (5) ===
+    { id: 'eng_pri_charm',     tier: 'C', name: '여명의 미소',  desc: '매력 +2',                       effect: { cha: 2 } },
+    { id: 'eng_pri_prayer',    tier: 'C', name: '기도의 호흡',  desc: '매 턴 시작 시 소울 게이지 +1',  effect: { perTurnSoul: 1 } },
+    { id: 'eng_pri_robe',      tier: 'C', name: '사제의 의복',  desc: '시작 HP +30',                   effect: { startHp: 30 } },
+    { id: 'eng_pri_wisdom',    tier: 'C', name: '신학의 지혜',  desc: '지능 +2',                       effect: { int: 2 } },
+    { id: 'eng_pri_blessing',  tier: 'C', name: '작은 축복',    desc: '회복량 +5%',                    effect: { combatHealPct: 5 } },
+
+    // === Rare (5) ===
+    { id: 'eng_pri_holy_light', tier: 'R', name: '신성한 빛',     desc: '회복량 +10%',                  effect: { combatHealPct: 10 } },
+    { id: 'eng_pri_dawn_grace', tier: 'R', name: '여명의 가호',   desc: '받는 데미지 -8%',              effect: { dmgTakenPct: -8 } },
+    { id: 'eng_pri_oracle',     tier: 'R', name: '신탁의 통찰',   desc: '매력 +4',                      effect: { cha: 4 } },
+    { id: 'eng_pri_devotion',   tier: 'R', name: '헌신의 마음',   desc: '회피 시 소울 게이지 +3',       effect: { dodgeSoul: 3 } },
+    { id: 'eng_pri_resilience', tier: 'R', name: '강건한 신앙',   desc: '시작 HP +50',                  effect: { startHp: 50 } },
+
+    // === Epic (5) ===
+    { id: 'eng_pri_dawn_oath',    tier: 'E', name: '여명의 서약',  desc: '회복량 +15% / 받는 데미지 -5%',                effect: { combatHealPct: 15, dmgTakenPct: -5 } },
+    { id: 'eng_pri_holy_guard',   tier: 'E', name: '성스러운 수호', desc: '받는 데미지 -12% / 매력 +3',                  effect: { dmgTakenPct: -12, cha: 3 } },
+    { id: 'eng_pri_devout_focus', tier: 'E', name: '경건의 집중',  desc: '매 턴 시작 시 소울 게이지 +3',                effect: { perTurnSoul: 3 } },
+    { id: 'eng_pri_dawn_seal',    tier: 'E', name: '여명의 인장',  desc: '전투 시작 시 소울 게이지 +15',                effect: { startSoul: 15 } },
+    { id: 'eng_pri_purify',       tier: 'E', name: '정화의 빛',    desc: '회복량 +25%',                                 effect: { combatHealPct: 25 } },
+
+    // === Legendary (2) ===
+    { id: 'eng_pri_dawn_authority', tier: 'L', name: '여명(黎明)의 권위', desc: '회복량 +30% / 받는 데미지 -10%',           effect: { combatHealPct: 30, dmgTakenPct: -10 } },
+    { id: 'eng_pri_holy_throne',    tier: 'L', name: '신성한 좌석',       desc: '매력 +5 / 회복량 +15% / 매 턴 소울 +2',    effect: { cha: 5, combatHealPct: 15, perTurnSoul: 2 } },
+
+    // === Flaw (결함, 4) ===
+    { id: 'eng_pri_flaw_doubt',   tier: 'NEG_FLAW', name: '의심의 그림자', desc: '치명타율 -10%',  effect: { critRate: -10 } },
+    { id: 'eng_pri_flaw_frail',   tier: 'NEG_FLAW', name: '연약한 육체',   desc: '시작 HP -30',    effect: { startHp: -30 } },
+    { id: 'eng_pri_flaw_clumsy',  tier: 'NEG_FLAW', name: '둔한 발걸음',   desc: '회피율 -8%',     effect: { dodgeRate: -8 } },
+    { id: 'eng_pri_flaw_silent',  tier: 'NEG_FLAW', name: '침묵의 기도',   desc: '회복량 -10%',    effect: { combatHealPct: -10 } },
+
+    // === Curse (저주, 3) ===
+    { id: 'eng_pri_curse_martyr',     tier: 'NEG_CURSE', name: '순교자의 길', desc: '회복량 +50% / 받는 데미지 +25%',           effect: { combatHealPct: 50, dmgTakenPct: 25 } },
+    { id: 'eng_pri_curse_oracle_burn',tier: 'NEG_CURSE', name: '신탁의 폭주', desc: '소울 게이지 획득 +50% / 매 턴 HP -5',     effect: { soulGainMult: 0.5, perTurnHpLoss: 5 } },
+    { id: 'eng_pri_curse_dawn_bind',  tier: 'NEG_CURSE', name: '여명의 속박', desc: '매력 +6 / 회피율 -15%',                   effect: { cha: 6, dodgeRate: -15 } },
+  ],
 };

@@ -115,6 +115,19 @@ export function getMinorBonus(skills, effectType, activeSkills = null) {
   return total;
 }
 
+// 1.60.0~ 회복량 보너스 합산 — 수신 패시브 + 각인 combatHealPct + 각성도 statPctBonus combatHeal
+// 모든 회복 시점(heal30% / regenPerTurn / dawnRegen / 소울 스킬 회복)에서 사용.
+// 부활(revive/dawnRevive)은 % HP 직접 지정이므로 보너스 미적용.
+export function getEffectiveHealPct(skills, engravingFx = {}, activeSkills = null) {
+  let pct = engravingFx.combatHealPct || 0;
+  const suLv = (skills && skills['수신']) || 0;
+  if (suLv > 0 && (!activeSkills || activeSkills.includes('수신'))) {
+    pct += suLv * 5;
+    if (suLv >= 5) pct += 25;
+  }
+  return pct;
+}
+
 // ===== 유물 헬퍼 =====
 
 // 활성 유물 보너스 합산

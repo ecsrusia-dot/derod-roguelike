@@ -7,6 +7,18 @@
 
 export const CHANGELOG = [
   {
+    version: '1.60.0',
+    date: '2026-06-13',
+    label: '여명의 사제 풀스택 — 수신 패시브 + 여명의 강림 + 각인 풀 24장 + 회복 시스템',
+    changes: [
+      { type: 'feature', text: '[수신(授神) 신설] 여명의 사제 직업 전용 패시브 (classOnly: priest). minor: 회복량 +5%/Lv (만렙 +35%). Lv.3: 전투 시작 시 가호 1회 (첫 피격 30% 차단, divineShield buff). Lv.5: 매 턴 시작 시 HP +5 + 회복량 +25% 추가 (누적 +60%). Lv.7: HP 0 도달 시 전투당 1회 30% HP로 부활 (재생 Lv.7 부활과 동일 카운터 공유, 둘 중 하나만 발동). 시작 패시브 변경: 신앙 Lv.3 → 수신 Lv.3 (재생 Lv.2 유지). 각성도 Lv.4·Lv.10 보상도 신앙 → 수신 동시 갱신' },
+      { type: 'feature', text: '[여명(黎明)의 강림 신설] 여명의 사제 직업 소울 스킬 (CLASS_ULTIMATES.priest_dawnDescent). HP 50% 회복 (회복량 보너스 적용) + 적에게 즉시 80 신성 데미지 (방어 무시) + 다음 2턴 받는 데미지 50% 차단 (dawnGuard buff). 발동 시 공용 골든 컷인 + 플레이어 회복 라벨 + 적 데미지 라벨. classData.ultimateId 추가 → StatusPanel 소울 스킬 섹션 자동 노출' },
+      { type: 'feature', text: '[여명의 사제 각인 풀 24장] ENGRAVINGS[priest] 24장 신설 (이전 빈 배열). 컨셉: 회복·신성·매력·HP·축복. 주요 effect 키: combatHealPct(회복 보너스, 신규 적용) / dmgTakenPct(음수=피해 감소) / cha·int·startHp / startSoul·perTurnSoul·dodgeSoul. Common 5 + Rare 5 + Epic 5 + Legendary 2 + Flaw 4 + Curse 3 = 24장. wanderer 반격/sage 화염/demonblood 자해/elf 회피와 차별화' },
+      { type: 'system', text: '[회복 시스템 신축] 1.52.0에서 fxDeltas로만 흘러갔던 combatHealPct 키가 실제 회복에 적용되도록 코드 신축. utils/helpers.js의 getEffectiveHealPct(skills, engravingFx, activeSkills) 헬퍼 신설 — 각인 combatHealPct + 수신 minor (+5%/Lv) + 수신 Lv.5 (+25%) 합산. 회복 시점 3곳에 적용: (1) 재생 Lv.5 heal30% onCombatStart / (2) 재생 Lv.3 regenPerTurn onTurnStart / (3) 수신 Lv.5 dawnRegen onTurnStart / (4) 여명의 강림 소울 스킬 HP 50%. 부활은 % HP 직접 지정이라 보너스 미적용' },
+      { type: 'system', text: '[divineShield + dawnGuard 신규 buff] divineShield(수신 Lv.3 가호, 1회 소비) + dawnGuard(여명의 강림 후속, 2턴 매 피격 차단) 두 buff 신축. 적 공격 dmg 적용 직전에 순차 적용 (divineShield 먼저 → dawnGuard). dawnGuard는 매 턴 시작 시 카운터 감소 (dodgeBuffTurns와 동일 패턴)' },
+    ],
+  },
+  {
     version: '1.58.0',
     date: '2026-06-13',
     label: '챔피언십 dawn 컨셉 — 프롬프트 20장 + placeholder 24장',

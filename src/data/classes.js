@@ -68,9 +68,10 @@ export const CLASSES = [
     id: 'priest', name: '여명의 사제', sub: 'Priest of Dawn',
     quote: '여명의 가호 아래... 반드시 돌아오겠습니다.',
     desc: '여명의 가호를 받은 자. 회복과 가호로 동료를 살린다.',
-    startSkills: { 신앙: 3, 재생: 2 },
+    startSkills: { 수신: 3, 재생: 2 },
     stats: { 근력: 9, 민첩: 11, 지능: 15, 매력: 19 },
     combatSkills: ['신성광선', '축복', '가호'],
+    ultimateId: 'priest_dawnDescent',  // 직업 소울 스킬 (소울 게이지 100 발동)
     color: '#d4a574',
     locked: false,
     image: './classes/priest.jpg',
@@ -112,6 +113,16 @@ export const CLASS_ULTIMATES = {
     color: '#ff4500',
     icon: '🔥',
     effect: 'classult_eternalFlame',
+  },
+  priest_dawnDescent: {
+    id: 'priest_dawnDescent',
+    classId: 'priest',
+    name: '여명(黎明)의 강림',
+    quote: '빛이여, 죽음을 거부하라.',
+    desc: 'HP 50% 회복 (회복량 보너스 적용) + 다음 2턴 받는 데미지 50% 차단 + 적에게 즉시 80 신성 데미지 (방어 무시).',
+    color: '#d4a574',
+    icon: '✦',
+    effect: 'classult_dawnDescent',
   },
 };
 
