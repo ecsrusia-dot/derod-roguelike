@@ -7,6 +7,16 @@
 
 export const CHANGELOG = [
   {
+    version: '1.56.0',
+    date: '2026-06-13',
+    label: 'PWA 일러 캐시 정책 추가 — 다음 세션부터 즉시 로딩',
+    changes: [
+      { type: 'feature', text: '[PWA 캐시] service-worker runtimeCaching에 게임 일러 정책 추가 — ./classes/·./enemies/ 경로의 jpg·jpeg·png·webp를 CacheFirst 전략으로 처리. 첫 노출 시 네트워크 + 디스크 저장 → 다음 세션부터 즉시 캐시 사용. maxEntries 500 (챔피언십 확장 여유), maxAgeSeconds 1년. 모바일에서 화면 전환 시 일러 깜빡임·로딩 지연 제거' },
+      { type: 'system', text: '[설계 결정] precache(globPatterns)에는 일러 미포함 유지 — 모든 일러 합산 시 수십 MB 규모라 첫 설치 시 모바일 데이터 부담. runtime CacheFirst가 점진 캐싱으로 더 적합. precache는 핵심 UI(js·css·html·png 아이콘·svg·woff2)만 유지 (13 entries / 1.27 MB)' },
+      { type: 'system', text: '[전면 검토 시리즈 마감] PR 5 완료. 검토 시리즈 총 5건 (cloud sync / combat / data·display / 1.55 후속 / PWA). 잔여: PR 3.5 (전투 중 모달 공식) + 견고성 2건 (코드 리뷰 잔여) — 별도 작업 예정' },
+    ],
+  },
+  {
     version: '1.55.1',
     date: '2026-06-12',
     label: '1.55.0 후속 픽스 3건 — 시작 HP 베이스 / 광폭 풀 누출 / 광폭 effect 충돌',
