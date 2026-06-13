@@ -7,6 +7,16 @@
 
 export const CHANGELOG = [
   {
+    version: '1.56.1',
+    date: '2026-06-13',
+    label: '클라우드 견고성 2건 — 일반 serializer 가드 + 저장 실패 가시성',
+    changes: [
+      { type: 'system', text: '[클라우드] safeSerializeForCloud 신설 — 1.53.0의 serializeForCloud는 activeRun.mapData.edges만 변환했으나, 미래 자료 구조에 또 다른 nested array가 들어가면 Firestore가 거부 → 저장 silent fail 재발 위험. 일반화된 deep-walk 가드가 (1) JSON 라운드트립으로 undefined·function·Symbol 자동 제거, (2) 남은 nested array 자동 검출·객체 변환, (3) console.warn으로 진단 로그를 남겨 향후 같은 함정 자동 차단' },
+      { type: 'system', text: '[클라우드] saveCloudMeta 실패 가시성 강화 — 기존엔 try/catch + console.error로 silent fail만 했고 App.jsx 자동저장이 결과를 무시해 사용자가 클라우드 백업 중단 사실을 인지 불가. 모듈 레벨 연속 실패 카운터(cloudConsecutiveFails) 추가, 임계치 3회 도달 시 1회 console.warn으로 가시화 (가능 원인: 토큰 만료 / 네트워크 / Firestore 할당량). 다음 성공 시 카운터 리셋 + console.info로 회복 로그. getCloudSaveFailCount() export로 향후 UI 인디케이터 연결 가능' },
+      { type: 'system', text: '[전면 검토 시리즈 종료] PR 5/5 + 1.55.0 후속 픽스 + 견고성 잔여 2건 모두 완료. 검토 시리즈 총 7건 (1.53 cloud / 1.54 combat / 1.55 data / 1.55.1 후속 / 1.56 PWA / 1.56.1 견고성). 다음은 정규 로드맵 복귀 (3직업 각인 풀 / 3직업 소울 스킬 / 챔피언십 dawn 등)' },
+    ],
+  },
+  {
     version: '1.56.0',
     date: '2026-06-13',
     label: 'PWA 일러 캐시 정책 추가 — 다음 세션부터 즉시 로딩',
