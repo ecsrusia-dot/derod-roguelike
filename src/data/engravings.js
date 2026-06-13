@@ -114,10 +114,11 @@ const _DEMONBLOOD_REWARDS = [
     { type: 'passiveBonus', skill: '강타', delta: 1 },
   ]}},
 ];
+// 1.59.0~ elf 전용 패시브 풍령 신설 → Lv.4·Lv.10 보상에서 회피 → 풍령으로 교체.
 const _ELF_REWARDS = [
   { lv: 2,  cost: 500,   reward: { type: 'slotUnlock', slot: 1 } },
   { lv: 3,  cost: 1000,  reward: { type: 'statBonus', stat: '민첩', value: 2 } },
-  { lv: 4,  cost: 2000,  reward: { type: 'passiveBonus', skill: '회피', delta: 1 } },
+  { lv: 4,  cost: 2000,  reward: { type: 'passiveBonus', skill: '풍령', delta: 1 } },
   { lv: 5,  cost: 4000,  reward: { type: 'slotUnlock', slot: 2 } },
   { lv: 6,  cost: 8000,  reward: { type: 'passiveBonus', skill: '정밀', delta: 1 } },
   { lv: 7,  cost: 12000, reward: { type: 'statPctBonus', key: 'dodge', pct: 5 } },
@@ -127,7 +128,7 @@ const _ELF_REWARDS = [
     { type: 'statPctBonus', key: 'dodge', pct: 5 },
   ]}},
   { lv: 10, cost: 30000, reward: { type: 'composite', parts: [
-    { type: 'passiveBonus', skill: '회피', delta: 1 },
+    { type: 'passiveBonus', skill: '풍령', delta: 1 },
     { type: 'passiveBonus', skill: '정밀', delta: 1 },
   ]}},
 ];
@@ -289,6 +290,46 @@ export const ENGRAVINGS = {
     { id: 'eng_dem_curse_bloodrage', tier: 'NEG_CURSE', name: '피의 분노',     desc: '전투 시작 시 소울 +30 / 매 턴 HP -8 (자해)', effect: { startSoul: 30, perTurnHpLoss: 8 } },
     { id: 'eng_dem_curse_madness',   tier: 'NEG_CURSE', name: '광기의 송곳니', desc: '치명타율 +25% / 소울 게이지 획득 -25%',      effect: { critRate: 25, soulGainMult: -0.25 } },
   ],
-  elf: [],
+  // 1.59.0~ 숲의 정령사 풀 24장 (회피·치명타·민첩·바람·정령 컨셉 — wanderer 반격 / sage 화염 / demonblood 자해와 차별화)
+  // effect 키: dex·cha·startHp / dodgeRate·critRate·physDmgPct·afterDodgeDmg /
+  //            startSoul·perTurnSoul·dodgeSoul·soulGainMult /
+  //            -dmgTakenPct·-dodgeRate·-critRate·-startHp·perTurnHpLoss (결함·저주)
+  elf: [
+    // === Common (5) ===
+    { id: 'eng_elf_sight',     tier: 'C', name: '정밀한 시야',  desc: '민첩 +2',                       effect: { dex: 2 } },
+    { id: 'eng_elf_breath',    tier: 'C', name: '정령의 호흡',  desc: '매 턴 시작 시 소울 게이지 +1',  effect: { perTurnSoul: 1 } },
+    { id: 'eng_elf_string',    tier: 'C', name: '가벼운 활시위', desc: '회피율 +2%',                   effect: { dodgeRate: 2 } },
+    { id: 'eng_elf_grace',     tier: 'C', name: '매혹의 기품',  desc: '매력 +2',                       effect: { cha: 2 } },
+    { id: 'eng_elf_forest',    tier: 'C', name: '숲의 가호',    desc: '시작 HP +30',                   effect: { startHp: 30 } },
+
+    // === Rare (5) ===
+    { id: 'eng_elf_wind_step', tier: 'R', name: '바람의 발걸음', desc: '회피율 +5%',                   effect: { dodgeRate: 5 } },
+    { id: 'eng_elf_arrow_flow',tier: 'R', name: '화살의 흐름',   desc: '물리 데미지 +8%',              effect: { physDmgPct: 8 } },
+    { id: 'eng_elf_whisper',   tier: 'R', name: '정령의 속삭임', desc: '치명타율 +5%',                 effect: { critRate: 5 } },
+    { id: 'eng_elf_kinship',   tier: 'R', name: '풍령의 친화',   desc: '회피 시 소울 게이지 +3',       effect: { dodgeSoul: 3 } },
+    { id: 'eng_elf_instinct',  tier: 'R', name: '사수의 직감',   desc: '민첩 +4',                      effect: { dex: 4 } },
+
+    // === Epic (5) ===
+    { id: 'eng_elf_gale_strike', tier: 'E', name: '풍속의 일격', desc: '회피율 +5% / 치명타율 +5%',                        effect: { dodgeRate: 5, critRate: 5 } },
+    { id: 'eng_elf_spirit_seal', tier: 'E', name: '정령각인',    desc: '물리 데미지 +12% / 치명타율 +5%',                  effect: { physDmgPct: 12, critRate: 5 } },
+    { id: 'eng_elf_accel',       tier: 'E', name: '정령가속',    desc: '매 턴 시작 시 소울 게이지 +3',                    effect: { perTurnSoul: 3 } },
+    { id: 'eng_elf_sky_seal',    tier: 'E', name: '천공의 인장', desc: '전투 시작 시 소울 게이지 +15',                    effect: { startSoul: 15 } },
+    { id: 'eng_elf_arrow_charm', tier: 'E', name: '화살 부적',   desc: '회피 후 다음 공격 데미지 +30%',                   effect: { afterDodgeDmg: 30 } },
+
+    // === Legendary (2) ===
+    { id: 'eng_elf_wind_god',     tier: 'L', name: '풍신(風神)의 가호', desc: '회피율 +12% / 회피 시 소울 게이지 +5',             effect: { dodgeRate: 12, dodgeSoul: 5 } },
+    { id: 'eng_elf_sky_authority',tier: 'L', name: '천공(天空)의 권위', desc: '치명타율 +15% / 물리 데미지 +15%',                effect: { critRate: 15, physDmgPct: 15 } },
+
+    // === Flaw (결함, 4) ===
+    { id: 'eng_elf_flaw_blunt',   tier: 'NEG_FLAW', name: '무딘 화살촉', desc: '물리 데미지 -10%',  effect: { physDmgPct: -10 } },
+    { id: 'eng_elf_flaw_bow',     tier: 'NEG_FLAW', name: '약한 활시위', desc: '시작 HP -30',       effect: { startHp: -30 } },
+    { id: 'eng_elf_flaw_tremor',  tier: 'NEG_FLAW', name: '떨리는 손끝', desc: '치명타율 -10%',     effect: { critRate: -10 } },
+    { id: 'eng_elf_flaw_dull',    tier: 'NEG_FLAW', name: '둔한 발걸음', desc: '회피율 -8%',        effect: { dodgeRate: -8 } },
+
+    // === Curse (저주, 3) ===
+    { id: 'eng_elf_curse_wind_madness', tier: 'NEG_CURSE', name: '풍령의 광기', desc: '회피율 +15% / 받는 데미지 +25%',          effect: { dodgeRate: 15, dmgTakenPct: 25 } },
+    { id: 'eng_elf_curse_sky',          tier: 'NEG_CURSE', name: '천공의 저주', desc: '치명타율 +25% / 회피율 -15%',             effect: { critRate: 25, dodgeRate: -15 } },
+    { id: 'eng_elf_curse_spirit_burn',  tier: 'NEG_CURSE', name: '정령의 폭주', desc: '소울 게이지 획득 +50% / 매 턴 HP -5',     effect: { soulGainMult: 0.5, perTurnHpLoss: 5 } },
+  ],
   priest: [],
 };

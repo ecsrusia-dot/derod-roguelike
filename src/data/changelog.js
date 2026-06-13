@@ -7,6 +7,17 @@
 
 export const CHANGELOG = [
   {
+    version: '1.59.0',
+    date: '2026-06-13',
+    label: '숲의 정령사 풀스택 — 풍령 패시브 + 천공의 화살비 + 각인 풀 24장',
+    changes: [
+      { type: 'feature', text: '[풍령(風靈) 신설] 숲의 정령사 직업 전용 패시브 신축 (classOnly: elf). minor: 회피율 +3%/Lv + 치명타율 +2%/Lv (만렙 +21%/+14%). Lv.3: 회피 시 다음 공격 데미지 +50% (windBoostNextDmg buff). Lv.5: 회피 시 다음 공격 방어 무시 (windPierceNext buff, Lv.3와 누적). Lv.7: 매 턴 시작 시 50% 확률로 정령 화살 1발 (민첩×1.5 데미지, 방어 무시). 시작 패시브 변경: 회피 Lv.3 → 풍령 Lv.3 (정밀 Lv.2 유지). 각성도 Lv.4·Lv.10 보상도 회피 → 풍령으로 동시 갱신' },
+      { type: 'feature', text: '[천공(天空)의 화살비 신설] 숲의 정령사 직업 소울 스킬 (CLASS_ULTIMATES.elf_skyArrows). 75 데미지 (방어·회피 무시) + 다음 2턴 회피율 +30% + 25% 확률 치명 화살(데미지 +50%). 발동 시 공용 골든 컷인 + 적 흔들림. classData.ultimateId 추가 → StatusPanel 소울 스킬 섹션 자동 노출' },
+      { type: 'feature', text: '[숲의 정령사 각인 풀 24장] ENGRAVINGS[elf] 24장 신설 (이전 빈 배열). 컨셉: 회피·치명타·민첩·바람·정령 (wanderer 반격/sage 화염/demonblood 자해와 차별화). 주요 effect 키: dodgeRate(바람·풍신) / critRate(속삭임·천공) / physDmgPct(화살) / dex·cha·startHp / dodgeSoul·startSoul·perTurnSoul(정령 게이지) / afterDodgeDmg(화살 부적). Common 5 + Rare 5 + Epic 5 + Legendary 2 + Flaw 4 + Curse 3 = 24장' },
+      { type: 'system', text: '[코드 변경 범위] data/passives.js(풍령 추가) / data/classes.js(elf.startSkills 변경 + ultimateId + CLASS_ULTIMATES) / data/engravings.js(elf 풀 + Lv.4·Lv.10 보상 풍령으로 갱신) / combat/damage.js(rollDodge·rollCrit에 풍령 minor 분기 + windPierceNext의 piercesArmor 통합 + windBoostNextDmg의 +50% 가산) / CombatScreen.jsx(회피 시 풍령 Lv.3/5 buff 세팅 + 공격 후 buff 1회 소비 + 풍령 Lv.7 onTurnStart 정령 화살 분기 + classult_skyArrows 분기). 빌드 검증 통과' },
+    ],
+  },
+  {
     version: '1.58.0',
     date: '2026-06-13',
     label: '챔피언십 dawn 컨셉 — 프롬프트 20장 + placeholder 24장',

@@ -154,6 +154,17 @@ export const PASSIVE_SKILLS = {
       7: { text: '궁극 진화 게이트 (다음 보상부터 영겁지화·화신강림·연옥지화 등장)', trigger: 'passive', effect: 'ifritT7' }
     }
   },
+  풍령: {
+    axis: 'utility', maxLv: 7, color: '#7a9a5e',
+    desc: '바람 정령과의 교감. 회피와 화살이 정령의 흐름을 따라 강해진다',
+    classOnly: 'elf',
+    minorEffect: { type: 'windDodgeCrit+', perLv: 3, desc: '회피율 +3%/Lv, 치명타율 +2%/Lv' },
+    tiers: {
+      3: { text: '회피 시 다음 공격 데미지 +50%', trigger: 'onDodge', effect: 'windBoostNext' },
+      5: { text: '회피 시 다음 공격 방어 무시 (windBoostNext와 누적)', trigger: 'onDodge', effect: 'windPierceNext' },
+      7: { text: '매 턴 시작 시 50% 확률로 정령 화살 1발 즉발 (민첩×1.5 데미지, 방어 무시)', trigger: 'onTurnStart', effect: 'windSpiritArrow' }
+    }
+  },
 };
 
 
