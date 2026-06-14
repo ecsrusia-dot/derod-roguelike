@@ -7,8 +7,8 @@
 // ============================================
 
 import React, { useState } from 'react';
-import { Skull, BookOpen, Sword, Hammer, Star } from 'lucide-react';
-import { PALETTE } from '../utils/helpers.js';
+import { Skull, BookOpen, Sword, Hammer, Star, Lock } from 'lucide-react';
+import { PALETTE, getEnemyImageSrc } from '../utils/helpers.js';
 import { ENEMIES, EVENTS, RELICS, PASSIVE_SKILLS, FORGE_RECIPES } from '../data.js';
 import CardInfoModal, { buildPassiveInfo, buildRelicInfo } from './CardInfoModal.jsx';
 
@@ -27,6 +27,7 @@ function getCategoryPool(catId) {
       id: key,
       name: e.name,
       color: e.color,
+      imageSrc: getEnemyImageSrc(key, e, 'combat'),
       data: e,
     }));
   }
@@ -85,7 +86,7 @@ function isDiscovered(meta, catId, item) {
 }
 
 // 적 상세 인포 빌더 (CardInfoModal 호환)
-function buildEnemyInfo(enemy) {
+function buildEnemyInfo(enemy, imageSrc = null) {
   if (!enemy) return null;
   const stats = [];
   if (typeof enemy.hp === 'number') stats.push(['HP', String(enemy.hp)]);
@@ -97,6 +98,7 @@ function buildEnemyInfo(enemy) {
     tag: '◆ 적',
     title: enemy.name,
     subtitle: enemy.desc || null,
+    imageSrc,
     stats,
     lines: Array.isArray(enemy.patterns) && enemy.patterns.length > 0
       ? [enemy.patterns.map(p => {
@@ -140,7 +142,7 @@ function buildRecipeInfo(recipe) {
 }
 
 function buildInfoFor(catId, item, meta) {
-  if (catId === 'enemies') return buildEnemyInfo(item.data);
+  if (catId === 'enemies') return buildEnemyInfo(item.data, item.imageSrc);
   if (catId === 'events') return buildEventInfo(item.data);
   if (catId === 'relics') return buildRelicInfo(item.data);
   if (catId === 'passives') {
@@ -149,6 +151,46 @@ function buildInfoFor(catId, item, meta) {
   }
   if (catId === 'recipes') return buildRecipeInfo(item.data);
   return null;
+}
+
+function CodexEnemyThumb({ src, alt, color, found }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) {
+    return (
+      <div
+        className="w-full flex items-center justify-center"
+        style={{
+          aspectRatio: '16/9',
+          background: `repeating-linear-gradient(135deg, ${PALETTE.bgDeep}, ${PALETTE.bgDeep} 6px, ${color}15 6px, ${color}15 10px)`,
+          borderBottom: `1px solid ${color}30`,
+          color: PALETTE.textDim,
+          fontSize: '8px',
+          letterSpacing: '0.15em',
+        }}
+      >
+        [ 미구현 ]
+      </div>
+    );
+  }
+  return (
+    <div className="w-full relative overflow-hidden" style={{ aspectRatio: '16/9', borderBottom: `1px solid ${color}40` }}>
+      <img
+        src={src}
+        alt={alt}
+        onError={() => setFailed(true)}
+        className="w-full h-full object-cover"
+        style={{
+          filter: found ? 'none' : 'grayscale(100%) brightness(0.45)',
+          display: 'block',
+        }}
+      />
+      {!found && (
+        <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.45)' }}>
+          <Lock size={18} style={{ color: PALETTE.textDim, opacity: 0.85 }} />
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function CodexScreen({ meta, onBack }) {
@@ -214,6 +256,7 @@ export default function CodexScreen({ meta, onBack }) {
       <div className="flex-1 overflow-y-auto px-3 py-3 grid grid-cols-2 gap-1.5">
         {sorted.map(item => {
           const found = isDiscovered(meta, tab, item);
+          const showHero = tab === 'enemies' && !!item.imageSrc;
           return (
             <button key={item.id}
               onClick={() => {
@@ -221,27 +264,33 @@ export default function CodexScreen({ meta, onBack }) {
                 setModalInfo(buildInfoFor(tab, item, meta));
               }}
               disabled={!found}
-              className="text-left px-2.5 py-2 transition-all"
+              className="text-left transition-all overflow-hidden"
               style={{
                 background: found ? `${item.color}10` : 'rgba(255,255,255,0.02)',
                 border: `1px solid ${found ? item.color : PALETTE.panelBorder}`,
-                opacity: found ? 1 : 0.5,
+                opacity: found ? 1 : 0.6,
                 cursor: found ? 'pointer' : 'default',
               }}>
-              <div className="text-[12px] font-bold" style={{ color: found ? PALETTE.text : PALETTE.textDim }}>
-                {found ? item.name : '???'}
-              </div>
-              {found && tab === 'enemies' && item.data.tier && (
-                <div className="text-[9px] mt-0.5" style={{ color: PALETTE.textDim }}>{item.data.tier}</div>
+              {/* 1.63.0~ 적 탭 16:9 일러 썸네일. 미발견은 그레이스케일 + 자물쇠 */}
+              {showHero && (
+                <CodexEnemyThumb src={item.imageSrc} alt={item.name} color={item.color} found={found} />
               )}
-              {found && tab === 'events' && item.data.chapter && (
-                <div className="text-[9px] mt-0.5" style={{ color: PALETTE.textDim }}>Ch.{Array.isArray(item.data.chapter) ? item.data.chapter.join(',') : item.data.chapter}</div>
-              )}
-              {found && tab === 'recipes' && (
-                <div className="text-[9px] mt-0.5 truncate" style={{ color: PALETTE.textDim }}>
-                  {item.data.ingredients[0]} + {item.data.ingredients[1]}
+              <div className="px-2.5 py-2">
+                <div className="text-[12px] font-bold" style={{ color: found ? PALETTE.text : PALETTE.textDim }}>
+                  {found ? item.name : '???'}
                 </div>
-              )}
+                {found && tab === 'enemies' && item.data.tier && (
+                  <div className="text-[9px] mt-0.5" style={{ color: PALETTE.textDim }}>{item.data.tier}</div>
+                )}
+                {found && tab === 'events' && item.data.chapter && (
+                  <div className="text-[9px] mt-0.5" style={{ color: PALETTE.textDim }}>Ch.{Array.isArray(item.data.chapter) ? item.data.chapter.join(',') : item.data.chapter}</div>
+                )}
+                {found && tab === 'recipes' && (
+                  <div className="text-[9px] mt-0.5 truncate" style={{ color: PALETTE.textDim }}>
+                    {item.data.ingredients[0]} + {item.data.ingredients[1]}
+                  </div>
+                )}
+              </div>
             </button>
           );
         })}

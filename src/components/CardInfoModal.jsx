@@ -111,6 +111,46 @@ export function buildBreakdownInfo({ title, totalText, subtitle = null, sources 
   };
 }
 
+function CodexHeroImage({ src, alt, accent }) {
+  const [failed, setFailed] = React.useState(false);
+  if (failed) {
+    return (
+      <div
+        className="w-full flex items-center justify-center"
+        style={{
+          aspectRatio: '16/9',
+          background: `repeating-linear-gradient(135deg, ${PALETTE.bgDeep}, ${PALETTE.bgDeep} 8px, ${accent}15 8px, ${accent}15 12px)`,
+          border: `1px solid ${accent}30`,
+          color: PALETTE.textDim,
+          fontSize: '10px',
+          letterSpacing: '0.2em',
+        }}
+      >
+        [ 일러 미구현 ]
+      </div>
+    );
+  }
+  return (
+    <div
+      className="w-full overflow-hidden"
+      style={{
+        aspectRatio: '16/9',
+        background: PALETTE.bgDeep,
+        border: `1px solid ${accent}40`,
+        boxShadow: `0 0 12px ${accent}25 inset`,
+      }}
+    >
+      <img
+        src={src}
+        alt={alt}
+        onError={() => setFailed(true)}
+        className="w-full h-full object-cover"
+        style={{ display: 'block' }}
+      />
+    </div>
+  );
+}
+
 export default function CardInfoModal({ info, action = null, onClose }) {
   if (!info) return null;
   const accent = info.color || PALETTE.dawn;
@@ -153,6 +193,11 @@ export default function CardInfoModal({ info, action = null, onClose }) {
 
         {/* 본문 */}
         <div className="px-4 py-4 space-y-3 max-h-[65vh] overflow-y-auto">
+          {/* 1.63.0~ 도감 일러 (적 카드 등) — 헤더 바로 아래 16:9 */}
+          {info.imageSrc && (
+            <CodexHeroImage src={info.imageSrc} alt={info.title} accent={accent} />
+          )}
+
           {info.subtitle && (
             <div className="text-[12px] leading-relaxed whitespace-pre-line" style={{ color: PALETTE.text }}>
               {info.subtitle}
