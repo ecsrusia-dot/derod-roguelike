@@ -131,7 +131,7 @@ export const CLASS_ULTIMATES = {
     classId: 'elf',
     name: '천공(天空)의 화살비',
     quote: '바람아, 그 길을 열어라.',
-    desc: '적에게 75 데미지 (방어·회피 무시). 다음 2턴 회피율 +30%. 각 화살 25% 확률로 치명타 (치명타 시 +50% 추가 데미지).',
+    desc: '적에게 75 데미지 (방어·회피 무시). 다음 2턴 회피율 +30%. 25% 확률로 치명 화살 (총 데미지 +50% = 112).',
     color: '#7a9a5e',
     icon: '🏹',
     effect: 'classult_skyArrows',

@@ -7,6 +7,26 @@
 
 export const CHANGELOG = [
   {
+    version: '1.62.0',
+    date: '2026-06-13',
+    label: 'elf + priest 풀스택 통합 + 코드 리뷰 픽스 10건 — 풍령·천공의 화살비 + 수신·여명의 강림 + 회복 시스템 + 픽스',
+    changes: [
+      { type: 'feature', text: '[elf + priest 풀스택 통합 머지] PR #114 (elf 풍령·천공의 화살비·각인 풀 24장) + PR #115 (priest 수신·여명의 강림·각인 풀 24장·회복 시스템) 통합. PR #116(demonblood) 머지 후 conflict 발생 → 한 번에 정리. 빌드 통과. 5직업 모두 직업 전용 패시브 + 소울 스킬 + 각인 풀 완성' },
+      { type: 'fix', text: '[#1 bloodLifesteal off-by-one] 혈마의 격노 bloodLifestealTurns 3→4로 변경. cast 턴 endTurn 즉시 감소 1회 + 3 attack 턴 보장. 이전엔 PR 명세 "3턴"이지만 실제 2 attack 턴만 적용' },
+      { type: 'fix', text: '[#2 selfHeal 회복량 누락] 신성광선·가호 skill.selfHeal 경로에 getEffectiveHealPct 호출 추가. 수신 minor (+5%/Lv) + 수신 Lv.5 (+25%) + 각인 combatHealPct가 priest의 가장 자주 쓰는 회복에도 적용. 1.52.0 안티패턴 재발 방지' },
+      { type: 'fix', text: '[#3 skyArrows desc 정확화] "각 화살 25% 확률로 치명타" 표현이 단일 roll과 mismatch → "25% 확률로 치명 화살 (총 데미지 +50% = 112)"으로 명확화' },
+      { type: 'fix', text: '[#4 isFatalDamage 순서] 혈광 Lv.7 / divineShield / dawnGuard mitigation을 isFatalDamage 위로 이동. mitigation으로 살 수 있으면 revive 손실 방지 (재생 Lv.7·수신 Lv.7 부활 보호)' },
+      { type: 'fix', text: '[#5 multi-hit buff 1회 소비 픽스] afterDodgeDmgNext / bloodRageNext / windBoostNextDmg / windPierceNext buff 클리어를 hitCount 루프 OUT으로 이동. 이전엔 hit 1만 boost 받고 hits 2-N은 효과 없었음. 연속화살·광폭참격 등 multi-hit 스킬에서 정상 동작' },
+      { type: 'fix', text: '[#6 풍령 setter activeSkills seal 가드] 회피 시 풍령 buff 세팅에 activeSkills.includes(\'풍령\') 가드 추가. 챔피언십 신전 봉인 존중. 이전엔 rollDodge/rollCrit minor는 봉인 존중했지만 buff setter는 raw skill lookup이라 봉인 우회' },
+      { type: 'fix', text: '[#7 divineShield chip damage burn] divineShield 소진을 blocked > 0일 때로 제한. 이전엔 dmg=2 chip 데미지에 Math.floor(0.6)=0 absorb로 shield만 0으로 소진되어 다음 큰 공격 무방어' },
+      { type: 'fix', text: '[#8 skyArrows dodgeBuff 키 충돌] 천공의 화살비 + 바람결계 같은 dodgeBuff 키 충돌 → Math.max로 머지. 둘 다 보유 시 더 큰 값 + 더 긴 턴 보존' },
+      { type: 'fix', text: '[#9 풍령 Lv.7 화살 소울 게이지] 정령 화살이 데미지 입혀도 player.soulGauge 충전 안 됐던 문제 픽스. 일반 공격과 동일한 floor(arrowDmg/5) × (1+soulGainMult) 충전 적용' },
+      { type: 'fix', text: '[#10 6 신규 buff 상태바] windBoostNextDmg / windPierceNext / divineShield / dawnGuard / bloodLifesteal / bloodRageNext 6 buff 모두 메인 헤더 + 모달 상태바 + hasAnyStatus 조건에 추가. 이전엔 새 buff만 활성일 때 상태바 영역 자체 숨겨짐. CLAUDE.md 1.52.0 "데이터+UI+적용 코드 3축" 안티패턴 재발 방지' },
+      { type: 'fix', text: '[#14 혈마의 격노 self-lifesteal] 소울 스킬 자체 데미지(잃은HP×1.5, 최대 maxHp×1.5)에도 흡혈 50% 적용. low HP comeback 컨셉 정상화. 이전엔 cast 턴 흡혈 0 → 큰 데미지 후 즉사 가능' },
+      { type: 'system', text: '[코드 리뷰 결과] 7-finder + 1-verifier + 1-sweep 16 agent 병렬 리뷰 → 10건 CONFIRMED + 5건 표시/프로세스. 본 PR에서 11건 적용 (top critical). 잔여: dawnRevive 사문화 (재생 Lv.7 dominance) / StatusPanel 표시 갭 / Codex classOnly leakage 등은 후속 PR 검토' },
+    ],
+  },
+  {
     version: '1.61.0',
     date: '2026-06-13',
     label: '혼혈 마족 풀스택 — 혈광 패시브 + 혈마의 격노 소울 스킬',

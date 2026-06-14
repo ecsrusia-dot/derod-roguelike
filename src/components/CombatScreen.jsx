@@ -340,21 +340,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           }
           const dmgResult = calculateDamage(skill, newPlayer, newEnemy, skills, isCrit, ultimates, meta, curses, activeSkills, relicStat, engravingFx);
           let actualDmg = dmgResult.finalDmg;
-          // 1.27.0~ 각인: afterDodgeDmgNext 1회 소비 (calculateDamage에서 보너스 적용 완료)
-          if (newPlayer.buffs?.afterDodgeDmgNext) {
-            newPlayer.buffs = { ...newPlayer.buffs, afterDodgeDmgNext: false };
-          }
-          // 1.61.0~ 혈광 Lv.3 bloodRageNext buff 1회 소비 (calculateDamage에서 +15% 적용 완료)
-          if (newPlayer.buffs?.bloodRageNext) {
-            newPlayer.buffs = { ...newPlayer.buffs, bloodRageNext: false };
-          }
-          // 1.59.0~ 풍령 Lv.3/5 회피 buff 1회 소비
-          if (newPlayer.buffs?.windBoostNextDmg) {
-            newPlayer.buffs = { ...newPlayer.buffs, windBoostNextDmg: false };
-          }
-          if (newPlayer.buffs?.windPierceNext) {
-            newPlayer.buffs = { ...newPlayer.buffs, windPierceNext: false };
-          }
+          // 1.62.0 픽스 #5: "다음 공격" buff 클리어는 hitCount 루프 OUT으로 이동
+          //   afterDodgeDmgNext / bloodRageNext / windBoostNextDmg / windPierceNext 모두 multi-hit 시 전 hit 적용
           if (newEnemy.defense > 0 && !skill.pierce) {
             newEnemy.defense = Math.max(0, newEnemy.defense - dmgResult.defenseMitigated);
           }
@@ -501,7 +488,20 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         }
         if (newEnemy.currentHp <= 0) break;
       }
-      
+      // 1.62.0 픽스 #5: 다음 공격 buff 한꺼번에 클리어 (multi-hit 모두 동일 buff 적용 받게)
+      if (newPlayer.buffs?.afterDodgeDmgNext) {
+        newPlayer.buffs = { ...newPlayer.buffs, afterDodgeDmgNext: false };
+      }
+      if (newPlayer.buffs?.bloodRageNext) {
+        newPlayer.buffs = { ...newPlayer.buffs, bloodRageNext: false };
+      }
+      if (newPlayer.buffs?.windBoostNextDmg) {
+        newPlayer.buffs = { ...newPlayer.buffs, windBoostNextDmg: false };
+      }
+      if (newPlayer.buffs?.windPierceNext) {
+        newPlayer.buffs = { ...newPlayer.buffs, windPierceNext: false };
+      }
+
       setAnimDmg({ player: null, enemy: totalDmg });
       setTimeout(() => setAnimDmg({ player: null, enemy: null }), 800);
 
@@ -606,6 +606,9 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         if (relicStat.heal > 0) heal = Math.floor(heal * (1 + relicStat.heal / 100));
         const charismaBonus = getCharismaHealBonus(newPlayer);
         if (charismaBonus > 0) heal = Math.floor(heal * (1 + charismaBonus / 100));
+        // 1.62.0 픽스 #2: 수신 minor (+5%/Lv) + 수신 Lv.5 (+25%) + 각인 combatHealPct 적용
+        const healPct = getEffectiveHealPct(skills, engravingFx, activeSkills);
+        if (healPct !== 0) heal = Math.floor(heal * (1 + healPct / 100));
         if (hasCurse(curses, 'curse_heal-50')) heal = Math.floor(heal * 0.5);
         newPlayer.hp = Math.min(newPlayer.maxHp, newPlayer.hp + heal);
         newLog.push({ type: 'passive', text: `◇ HP +${heal}` });
@@ -632,6 +635,9 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         if (relicStat.heal > 0) heal = Math.floor(heal * (1 + relicStat.heal / 100));
         const charismaBonus = getCharismaHealBonus(newPlayer);
         if (charismaBonus > 0) heal = Math.floor(heal * (1 + charismaBonus / 100));
+        // 1.62.0 픽스 #2: 수신 minor (+5%/Lv) + 수신 Lv.5 (+25%) + 각인 combatHealPct 적용
+        const healPct = getEffectiveHealPct(skills, engravingFx, activeSkills);
+        if (healPct !== 0) heal = Math.floor(heal * (1 + healPct / 100));
         if (hasCurse(curses, 'curse_heal-50')) heal = Math.floor(heal * 0.5);
         newPlayer.hp = Math.min(newPlayer.maxHp, newPlayer.hp + heal);
         newLog.push({ type: 'passive', text: `◇ HP +${heal}` });
@@ -736,13 +742,22 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         pushFxLabel('enemy', 'crit', cut);
       } else if (ult.effect === 'classult_bloodFury') {
         // 1.61.0~ 혈마의 격노: (잃은 HP × 1.5, 최소 50) 데미지, 방어 무시 + 다음 3턴 흡혈 50%
+        // 1.62.0 픽스 #1: bloodLifestealTurns=4로 시작 (cast 턴 endTurn 즉시 감소 1회 + 3 attack 턴 보장)
         const lostHp = Math.max(0, newPlayer.maxHp - newPlayer.hp);
         const cut = Math.max(50, Math.floor(lostHp * 1.5));
         newEnemy.currentHp = Math.max(0, newEnemy.currentHp - cut);
+        // 1.62.0 픽스 #14: 소울 스킬 자체 데미지도 흡혈 적용 (low HP comeback fantasy)
+        if (cut > 0) {
+          const selfHeal = Math.floor(cut * 0.5);
+          if (selfHeal > 0) {
+            newPlayer.hp = Math.min(newPlayer.maxHp, newPlayer.hp + selfHeal);
+            newLog.push({ type: 'heal', text: `· 혈마의 흡혈 +${selfHeal} HP` });
+          }
+        }
         newPlayer.buffs = {
           ...newPlayer.buffs,
           bloodLifesteal: 50,
-          bloodLifestealTurns: 3,
+          bloodLifestealTurns: 4,
         };
         newLog.push({ type: 'damage', text: `· ${enemy.name}에게 ${cut} 데미지 [잃은 HP×1.5, 방어 무시]` });
         newLog.push({ type: 'passive', text: `★ [혈마의 격노] 3턴간 흡혈 50%` });
@@ -759,10 +774,13 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           cut = Math.floor(cut * 1.5);
         }
         newEnemy.currentHp = Math.max(0, newEnemy.currentHp - cut);
+        // 1.62.0 픽스 #8: skyArrows dodgeBuff와 바람결계 같은 키 충돌 — Math.max로 머지
+        const _prevDodgeBuff = newPlayer.buffs?.dodgeBuff || 0;
+        const _prevDodgeBuffTurns = newPlayer.buffs?.dodgeBuffTurns || 0;
         newPlayer.buffs = {
           ...newPlayer.buffs,
-          dodgeBuff: 30,
-          dodgeBuffTurns: 2,
+          dodgeBuff: Math.max(30, _prevDodgeBuff),
+          dodgeBuffTurns: Math.max(2, _prevDodgeBuffTurns),
         };
         if (isCritArrow) {
           newLog.push({ type: 'crit', text: `· ${enemy.name}에게 ${cut} 데미지 [치명 화살! 방어·회피 무시]` });
@@ -896,12 +914,14 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           newPlayer.buffs = { ...newPlayer.buffs, afterDodgeDmgNext: true };
         }
         // 1.59.0~ 풍령 Lv.3+: 회피 시 다음 공격 데미지 +50% / Lv.5+: 회피 시 다음 공격 방어 무시
+        // 1.62.0 픽스 #6: activeSkills 가드 추가 (신전 봉인 존중)
         const _windLv = skills['풍령'] || 0;
-        if (_windLv >= 3) {
+        const _windActive = !activeSkills || activeSkills.includes('풍령');
+        if (_windLv >= 3 && _windActive) {
           newPlayer.buffs = { ...newPlayer.buffs, windBoostNextDmg: true };
           newLog.push({ type: 'passive', text: `★ [풍령 Lv.3] 다음 공격 데미지 +50%` });
         }
-        if (_windLv >= 5) {
+        if (_windLv >= 5 && _windActive) {
           newPlayer.buffs = { ...newPlayer.buffs, windPierceNext: true };
           newLog.push({ type: 'passive', text: `★ [풍령 Lv.5] 다음 공격 방어 무시` });
         }
@@ -1039,7 +1059,39 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
             takenBreakdown.push(`심연 +${inc}`);
           }
           if (dmg > 0) {
-            // [체크] 이번 공격을 맞으면 죽는가?
+            // 1.62.0 픽스 #4: mitigation을 isFatalDamage 위로 이동 (revive 손실 방지)
+            //   혈광 Lv.7 / divineShield / dawnGuard가 isFatalDamage 전에 적용 → 한 번에 막을 수 있으면 revive 안 씀
+
+            // 1.61.0~ 혈광 Lv.7: HP 25% 이하 시 받는 데미지 -50%
+            if (hasEffect(skills, 'bloodLow25Survive', activeSkills)) {
+              const hpPct = (newPlayer.hp / Math.max(1, newPlayer.maxHp)) * 100;
+              if (hpPct <= 25) {
+                const blocked = Math.floor(dmg * 0.5);
+                if (blocked > 0) {
+                  dmg -= blocked;
+                  newLog.push({ type: 'passive', text: `◆ [혈광 Lv.7] 위기 방어 -${blocked}` });
+                }
+              }
+            }
+            // 1.62.0 픽스 #7: divineShield는 blocked > 0일 때만 소진 (chip damage burn 방지)
+            if (newPlayer.divineShield > 0) {
+              const blocked = Math.floor(dmg * (newPlayer.divineShield / 100));
+              if (blocked > 0) {
+                dmg -= blocked;
+                newLog.push({ type: 'passive', text: `◆ [수신 Lv.3] 여명의 가호 -${blocked} (가호 소진)` });
+                newPlayer.divineShield = 0;
+              }
+            }
+            // 1.60.0~ 여명의 강림 후속 dawnGuard: 2턴간 받는 데미지 -50% (피격마다 적용, 턴 종료 시 카운터 감소)
+            if (newPlayer.buffs?.dawnGuardTurns > 0 && newPlayer.buffs?.dawnGuard > 0) {
+              const blocked = Math.floor(dmg * (newPlayer.buffs.dawnGuard / 100));
+              if (blocked > 0) {
+                dmg -= blocked;
+                newLog.push({ type: 'passive', text: `★ [여명의 가호] -${blocked} (${newPlayer.buffs.dawnGuardTurns}T)` });
+              }
+            }
+
+            // [체크] mitigation 후에도 이번 공격을 맞으면 죽는가?
             const isFatalDamage = newPlayer.hp - dmg <= 0;
 
             if (isFatalDamage) {
@@ -1062,32 +1114,6 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                 newLog.push({ type: 'passive', text: `◆ [수신 Lv.7] 여명의 부활! (HP 30%)` });
                 dmg = 0;
               }
-            }
-
-
-            // 1.61.0~ 혈광 Lv.7: HP 25% 이하 시 받는 데미지 -50%
-            if (dmg > 0 && hasEffect(skills, 'bloodLow25Survive', activeSkills)) {
-              const hpPct = (newPlayer.hp / Math.max(1, newPlayer.maxHp)) * 100;
-              if (hpPct <= 25) {
-                const blocked = Math.floor(dmg * 0.5);
-                dmg -= blocked;
-                newLog.push({ type: 'passive', text: `◆ [혈광 Lv.7] 위기 방어 -${blocked}` });
-              }
-            }
-            // 1.62.0~ 픽스 #7: divineShield는 blocked > 0일 때만 소진 (chip damage burn 방지)
-            if (dmg > 0 && newPlayer.divineShield > 0) {
-              const blocked = Math.floor(dmg * (newPlayer.divineShield / 100));
-              if (blocked > 0) {
-                dmg -= blocked;
-                newLog.push({ type: 'passive', text: `◆ [수신 Lv.3] 여명의 가호 -${blocked} (가호 소진)` });
-                newPlayer.divineShield = 0;
-              }
-            }
-            // 1.60.0~ 여명의 강림 후속 dawnGuard: 2턴간 받는 데미지 -50% (피격마다 적용, 턴 종료 시 카운터 감소)
-            if (dmg > 0 && newPlayer.buffs?.dawnGuardTurns > 0 && newPlayer.buffs?.dawnGuard > 0) {
-              const blocked = Math.floor(dmg * (newPlayer.buffs.dawnGuard / 100));
-              dmg -= blocked;
-              newLog.push({ type: 'passive', text: `★ [여명의 가호] -${blocked} (${newPlayer.buffs.dawnGuardTurns}T)` });
             }
 
             // 최종 데미지 적용 (위의 조건들에서 dmg가 0이 되었다면 실행되지 않음)
@@ -2116,6 +2142,13 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                 {player.buffs?.guaranteedCrit > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#c4453d50', color: '#fff', border: '1px solid #c4453d' }}>✦ 치명타 확정</span>)}
                 {player.buffs?.mirrorCounterDmgPending && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#88aacc50', color: '#fff', border: '1px solid #88aacc' }}>◇ 회피→반격 +100%</span>)}
                 {player.firstHitImmune && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.legendary}50`, color: '#fff', border: `1px solid ${PALETTE.legendary}` }}>✦ 무적 1회</span>)}
+                {/* 1.62.0 픽스 #10: 6 신규 buff 메인 헤더 상태 배지 */}
+                {player.divineShield > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#d4a57450', color: '#fff', border: '1px solid #d4a574' }}>🛡 여명의 가호 {player.divineShield}%</span>)}
+                {player.buffs?.dawnGuardTurns > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#d4a57450', color: '#fff', border: '1px solid #d4a574' }}>✦ 강림 가호 -{player.buffs.dawnGuard || 0}% ({player.buffs.dawnGuardTurns}T)</span>)}
+                {player.buffs?.bloodLifestealTurns > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#7a181850', color: '#fff', border: '1px solid #7a1818' }}>🩸 흡혈 {player.buffs.bloodLifesteal || 0}% ({player.buffs.bloodLifestealTurns}T)</span>)}
+                {player.buffs?.windBoostNextDmg && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#7a9a5e50', color: '#fff', border: '1px solid #7a9a5e' }}>🌪 풍령 다음 +50%</span>)}
+                {player.buffs?.windPierceNext && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#7a9a5e50', color: '#fff', border: '1px solid #7a9a5e' }}>🏹 풍령 방어 무시</span>)}
+                {player.buffs?.bloodRageNext && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#7a181850', color: '#fff', border: '1px solid #7a1818' }}>✸ 혈광 다음 +15%</span>)}
                 {player.debuffs?.frostbiteDmg > 0 && player.debuffs?.frostbiteTurns > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#7ba3c450', color: '#fff', border: '1px solid #7ba3c4' }}>❄️ 동상 {player.debuffs.frostbiteDmg} ({player.debuffs.frostbiteTurns}T)</span>)}
                 {player.debuffs?.sealedTurns > 0 && player.debuffs?.sealedSkills?.length > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#5c4a8c50', color: '#fff', border: '1px solid #5c4a8c' }}>🔒 봉인 {player.debuffs.sealedSkills.map(k => COMBAT_SKILLS[k]?.name || k).join(',')} ({player.debuffs.sealedTurns}T)</span>)}
                 {player.debuffs?.shockGauge > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#8b1f1f50', color: '#fff', border: '1px solid #8b1f1f' }}>⚡ 충격 {player.debuffs.shockGauge}/100</span>)}
@@ -2285,7 +2318,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
 
             {/* 활성 상태 — 메인 헤더의 buff/debuff 칩을 모달에서도 확인 가능 */}
             {(() => {
-              const hasAnyStatus = (player.buffs?.rage > 0) || (player.buffs?.shadowCounterTurns > 0) || (player.buffs?.flameBoostTurns > 0) || (player.buffs?.flameBarrierPending > 0) || (player.buffs?.guaranteedCrit > 0) || (player.buffs?.mirrorCounterDmgPending) || (player.buffs?.dodgeBuffTurns > 0) || player.firstHitImmune || (player.debuffs?.frostbiteDmg > 0 && player.debuffs?.frostbiteTurns > 0) || (player.debuffs?.sealedTurns > 0 && player.debuffs?.sealedSkills?.length > 0) || (player.debuffs?.shockGauge > 0) || (player.debuffs?.stunnedTurns > 0);
+              const hasAnyStatus = (player.buffs?.rage > 0) || (player.buffs?.shadowCounterTurns > 0) || (player.buffs?.flameBoostTurns > 0) || (player.buffs?.flameBarrierPending > 0) || (player.buffs?.guaranteedCrit > 0) || (player.buffs?.mirrorCounterDmgPending) || (player.buffs?.dodgeBuffTurns > 0) || player.firstHitImmune || (player.debuffs?.frostbiteDmg > 0 && player.debuffs?.frostbiteTurns > 0) || (player.debuffs?.sealedTurns > 0 && player.debuffs?.sealedSkills?.length > 0) || (player.debuffs?.shockGauge > 0) || (player.debuffs?.stunnedTurns > 0) || (player.divineShield > 0) || (player.buffs?.dawnGuardTurns > 0) || (player.buffs?.bloodLifestealTurns > 0) || (player.buffs?.windBoostNextDmg) || (player.buffs?.windPierceNext) || (player.buffs?.bloodRageNext);
               if (!hasAnyStatus) return null;
               return (
                 <>
@@ -2299,6 +2332,13 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                     {player.buffs?.mirrorCounterDmgPending && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#88aacc50', color: '#fff', border: '1px solid #88aacc' }}>◇ 회피→반격 +100%</span>)}
                     {player.buffs?.dodgeBuffTurns > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.green}50`, color: '#fff', border: `1px solid ${PALETTE.green}` }}>💨 회피 +{player.buffs.dodgeBuff || 0}% ({player.buffs.dodgeBuffTurns}T)</span>)}
                     {player.firstHitImmune && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.legendary}50`, color: '#fff', border: `1px solid ${PALETTE.legendary}` }}>✦ 무적 1회</span>)}
+                    {/* 1.62.0 픽스 #10: 6 신규 buff 상태 배지 */}
+                    {player.divineShield > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#d4a57450', color: '#fff', border: '1px solid #d4a574' }}>🛡 여명의 가호 {player.divineShield}%</span>)}
+                    {player.buffs?.dawnGuardTurns > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#d4a57450', color: '#fff', border: '1px solid #d4a574' }}>✦ 강림 가호 -{player.buffs.dawnGuard || 0}% ({player.buffs.dawnGuardTurns}T)</span>)}
+                    {player.buffs?.bloodLifestealTurns > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#7a181850', color: '#fff', border: '1px solid #7a1818' }}>🩸 흡혈 {player.buffs.bloodLifesteal || 0}% ({player.buffs.bloodLifestealTurns}T)</span>)}
+                    {player.buffs?.windBoostNextDmg && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#7a9a5e50', color: '#fff', border: '1px solid #7a9a5e' }}>🌪 풍령 다음 공격 +50%</span>)}
+                    {player.buffs?.windPierceNext && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#7a9a5e50', color: '#fff', border: '1px solid #7a9a5e' }}>🏹 풍령 다음 방어 무시</span>)}
+                    {player.buffs?.bloodRageNext && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#7a181850', color: '#fff', border: '1px solid #7a1818' }}>✸ 혈광 다음 공격 +15%</span>)}
                     {player.debuffs?.frostbiteDmg > 0 && player.debuffs?.frostbiteTurns > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#7ba3c450', color: '#fff', border: '1px solid #7ba3c4' }}>❄️ 동상 {player.debuffs.frostbiteDmg} ({player.debuffs.frostbiteTurns}T)</span>)}
                     {player.debuffs?.sealedTurns > 0 && player.debuffs?.sealedSkills?.length > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#5c4a8c50', color: '#fff', border: '1px solid #5c4a8c' }}>🔒 봉인 {player.debuffs.sealedSkills.map(k => COMBAT_SKILLS[k]?.name || k).join(',')} ({player.debuffs.sealedTurns}T)</span>)}
                     {player.debuffs?.shockGauge > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#8b1f1f50', color: '#fff', border: '1px solid #8b1f1f' }}>⚡ 충격 {player.debuffs.shockGauge}/100</span>)}
