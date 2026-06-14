@@ -7,7 +7,7 @@
 
 import React, { useState } from 'react';
 import { Heart, X } from 'lucide-react';
-import { PALETTE, getCharismaHealBonus, getCharismaDmgReduction, getCharismaSoulGainBonus, getIntellectStartSoul, getIntellectSoulPerMagic, getStrengthHpBonus, getStrengthSoulPerPhys, getAgilityCritDmgBonus, getAgilitySoulOnDodge, getIfritIgniteRate, getMinorBonus, getMagicEchoChance, getMetaBonus, hasEffect, hasUltimate, hasCurse } from '../utils/helpers.js';
+import { PALETTE, getCharismaHealBonus, getCharismaDmgReduction, getCharismaSoulGainBonus, getIntellectStartSoul, getIntellectSoulPerMagic, getStrengthHpBonus, getStrengthSoulPerPhys, getAgilityCritDmgBonus, getAgilitySoulOnDodge, getIfritIgniteRate, getMinorBonus, getMagicEchoChance, getMetaBonus, hasEffect, hasUltimate, hasCurse, getEffectiveHealPct } from '../utils/helpers.js';
 import { PASSIVE_SKILLS, COMBAT_SKILLS, ULTIMATE_SKILLS, CLASS_ULTIMATES } from '../data.js';
 import CardInfoModal, { buildPassiveInfo, buildRelicInfo, buildActiveSkillInfo, buildClassUltimateInfo, buildBreakdownInfo } from './CardInfoModal.jsx';
 import StatSignatureModal from './StatSignatureModal.jsx';
@@ -98,7 +98,12 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
             const critWeakness = hasEffect(skills, 'weaknessPoint', activeSkills) ? 10 : 0;
             const critShadowUlt = hasUltimate(ultimates, 'ult_counterShadow') ? 15 : 0;
             const critEng = engravingFx.critRate || 0;
-            const critRate = 5 + dexAutoCrit + critMinor + critMeta + critRelic + critWeakness + critShadowUlt + critEng;
+            // 1.62.1~ 픽스: critWind는 아래에서 계산 (windLv/windActive와 함께)
+            const critRate = 5 + dexAutoCrit + critMinor + critMeta + critRelic + critWeakness + critShadowUlt + critEng + (() => {
+              const _wL = (skills['풍령'] || 0);
+              const _wA = !activeSkills || activeSkills.includes('풍령');
+              return (_wL > 0 && _wA) ? _wL * 2 : 0;
+            })();
             // 치명타 데미지
             const critDmgBase = 50;
             const critDmgLv4 = hasEffect(skills, 'critDmg+30', activeSkills) ? 30 : 0;
@@ -119,7 +124,12 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
             // 1.44.2~ 메타 강화 「유연한 그림자」: 회피율 +2%/단계
             const dodgeMetaStacks = getMetaBonus(meta, 'dodgeRate+2%');
             const dodgeMeta = dodgeMetaStacks * 2;
-            const dodgeRate = dexAutoDodge + dodgeMinor + dodgeRelic + dodgeLv5 + dodgeDetailIntent + dodgeMirrorUlt + dodgeEng + dodgeMeta;
+            // 1.62.1~ 픽스: 풍령 minor (회피율 +3%/Lv, 치명타율 +2%/Lv) — 별도 타입(windDodgeCrit+)이라 getMinorBonus 누락 → 명시 가산
+            const windLv = (skills['풍령'] || 0);
+            const windActive = !activeSkills || activeSkills.includes('풍령');
+            const dodgeWind = (windLv > 0 && windActive) ? windLv * 3 : 0;
+            const critWind = (windLv > 0 && windActive) ? windLv * 2 : 0;
+            const dodgeRate = dexAutoDodge + dodgeMinor + dodgeRelic + dodgeLv5 + dodgeDetailIntent + dodgeMirrorUlt + dodgeEng + dodgeMeta + dodgeWind;
             // 방어 무시
             const ifritLv = skills['이프리트'] || 0;
             const ifritActive = !activeSkills || activeSkills.includes('이프리트');
@@ -162,6 +172,7 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                       { label: '약점 노출 (심안 Lv.7)', value: critWeakness, unit: '%' },
                       { label: '카운터 새도우 궁극', value: critShadowUlt, unit: '%' },
                       { label: '각인: 치명타 발동율', value: critEng, unit: '%' },
+                      { label: `풍령 Lv.${windLv} minor (+2%/Lv)`, value: critWind, unit: '%' },
                     ],
                   })} className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>치명타 발동율 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.legendary }}>{Math.round(critRate)}%</span></button>
                   <button onClick={() => openLine({
@@ -192,6 +203,7 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                       { label: '심안 Lv.5: 의도 카드 회피 (+10%)', value: dodgeDetailIntent, unit: '%' },
                       { label: '카운터 미러 궁극 (+10%)', value: dodgeMirrorUlt, unit: '%' },
                       { label: '각인: 회피 발동율', value: dodgeEng, unit: '%' },
+                      { label: `풍령 Lv.${windLv} minor (+3%/Lv)`, value: dodgeWind, unit: '%' },
                     ],
                   })} className="flex justify-between text-left" style={{ color: PALETTE.textDim }}><span>회피 발동율 ◇</span><span className="font-bold tabular-nums" style={{ color: PALETTE.green }}>{Math.round(dodgeRate)}%</span></button>
                   {armorIgnore > 0 && (
@@ -466,10 +478,16 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
             const dodgeSoulTotal = dexDodgeSoul + dodgeSoulEng;
             // 1.47.0~ 마법 시 소울 = 지능 시그니처 2단계 + 각인 magicSoulBonus (합산 통합)
             const magicSoulTotal = intellectMagicSoul + magicSoulEng;
-            // 회복량 보너스 — 유물 heal과 매력 시그가 곱셈(multiplicative)으로 적용
-            // 실제 적용: baseHeal × (1 + heal/100) × (1 + charismaHeal/100)
-            // 표시값: ((1+heal/100) × (1+charismaHeal/100) - 1) × 100  (소수 1자리)
-            const healMult = (1 + heal / 100) * (1 + charismaHeal / 100);
+            // 회복량 보너스 — 유물 heal × 매력 시그 × (수신 + 각인 combatHealPct) 모두 곱셈
+            // 1.62.1~ 픽스: getEffectiveHealPct 추가 — 수신 minor (+5%/Lv) + 수신 Lv.5 (+25%) + 각인 combatHealPct
+            //   실제 적용: baseHeal × (1 + heal/100) × (1 + charismaHeal/100) × (1 + getEffectiveHealPct/100)
+            const healEffectivePct = getEffectiveHealPct(skills, engravingFx, activeSkills);
+            const suLv = (skills['수신'] || 0);
+            const suActive = !activeSkills || activeSkills.includes('수신');
+            const healSuMinor = (suLv > 0 && suActive) ? suLv * 5 : 0;
+            const healSuLv5 = (suLv >= 5 && suActive) ? 25 : 0;
+            const healCombatEng = engravingFx.combatHealPct || 0;
+            const healMult = (1 + heal / 100) * (1 + charismaHeal / 100) * (1 + healEffectivePct / 100);
             const healTotalPct = Math.round((healMult - 1) * 1000) / 10;
             const showSoul = !!classData?.ultimateId;
             const hasAny = regenLv || lifesteal || reflect || heal || charismaHeal || charismaSoul
@@ -507,11 +525,14 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
             const openHealBreakdown = () => openLine({
               title: '회복량 보너스',
               totalText: `+${healTotalPct}%`,
-              subtitle: `유물 회복량과 매력 시그니처가 곱셈으로 누적 적용됩니다.\n계산: (1 + 유물 ${heal}/100) × (1 + 매력 ${charismaHeal}/100) = ${healMult.toFixed(3)}배`,
+              subtitle: `유물·매력·수신·각인 회복량이 곱셈으로 누적 적용됩니다.\n계산: (1 + 유물 ${heal}/100) × (1 + 매력 ${charismaHeal}/100) × (1 + 수신·각인 ${healEffectivePct}/100) = ${healMult.toFixed(3)}배`,
               color: PALETTE.green,
               sources: [
                 { label: '유물: 회복량', value: heal, unit: '%' },
                 { label: '매력 시그니처 1단계', value: charismaHeal, unit: '%', note: `적용 포인트 ${Math.max(0, (stats['매력'] || 10) - 10)}(=매력-10) × +0.5%/p` },
+                { label: `수신 Lv.${suLv} minor (+5%/Lv)`, value: healSuMinor, unit: '%' },
+                { label: '수신 Lv.5 마일스톤 (+25%)', value: healSuLv5, unit: '%' },
+                { label: '각인: combatHealPct', value: healCombatEng, unit: '%' },
               ],
             });
             // 단일 출처 라인 모달 (간단 desc 형태)

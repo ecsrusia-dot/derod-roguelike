@@ -1100,19 +1100,20 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                 newLog.push({ type: 'passive', text: `◆ [신앙 Lv.5] 신의 가호!` });
                 dmg = newPlayer.hp - 1; // 체력을 1로 만듦
               }
-              // 2순위: [부활] - 전투당 1회 체력 50% 회복
-              else if (hasEffect(skills, 'revive', activeSkills) && !newPlayer.revivedThisCombat) {
-                newPlayer.hp = Math.floor(newPlayer.maxHp * 0.5);
-                newPlayer.revivedThisCombat = true;
-                newLog.push({ type: 'passive', text: `◆ [재생 Lv.7] 부활!` });
-                dmg = 0; // 데미지 무효화
-              }
-              // 3순위 1.60.0~: [수신 Lv.7 부활] - 전투당 1회 체력 30% 회복 (재생 Lv.7와 같은 trigger, 재생 부활을 못 살린 경우만)
+              // 2순위 1.62.1~: [수신 Lv.7 부활] — priest 직업 정체성 강화. 재생 Lv.7보다 먼저 검사
+              //   이전(1.60.0~1.62.0): 재생 Lv.7가 먼저 검사돼 dawnRevive 사문화 (재생 Lv.7 픽한 priest 한정 발동 못함)
               else if (hasEffect(skills, 'dawnRevive', activeSkills) && !newPlayer.revivedThisCombat) {
                 newPlayer.hp = Math.floor(newPlayer.maxHp * 0.3);
                 newPlayer.revivedThisCombat = true;
                 newLog.push({ type: 'passive', text: `◆ [수신 Lv.7] 여명의 부활! (HP 30%)` });
                 dmg = 0;
+              }
+              // 3순위: [부활] - 전투당 1회 체력 50% 회복 (수신 Lv.7 미보유 직업)
+              else if (hasEffect(skills, 'revive', activeSkills) && !newPlayer.revivedThisCombat) {
+                newPlayer.hp = Math.floor(newPlayer.maxHp * 0.5);
+                newPlayer.revivedThisCombat = true;
+                newLog.push({ type: 'passive', text: `◆ [재생 Lv.7] 부활!` });
+                dmg = 0; // 데미지 무효화
               }
             }
 
