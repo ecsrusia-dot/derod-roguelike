@@ -54,9 +54,10 @@ export const CLASSES = [
     id: 'elf', name: '숲의 정령사', sub: 'Elf of Twilight',
     quote: '바람이 부르는 길로... 다녀올게요',
     desc: '엘프 종족. 숲의 정령과 교감하며 활을 다룬다.',
-    startSkills: { 회피: 3, 정밀: 2 },
+    startSkills: { 풍령: 3, 정밀: 2 },
     stats: { 근력: 11, 민첩: 20, 지능: 14, 매력: 15 },
     combatSkills: ['정밀사격', '연속화살', '바람결계'],
+    ultimateId: 'elf_skyArrows',  // 직업 소울 스킬 (소울 게이지 100 발동)
     color: '#7a9a5e',
     locked: false,
     image: './classes/elf.jpg',
@@ -123,6 +124,16 @@ export const CLASS_ULTIMATES = {
     color: '#7a1818',
     icon: '✸',
     effect: 'classult_bloodFury',
+  },
+  elf_skyArrows: {
+    id: 'elf_skyArrows',
+    classId: 'elf',
+    name: '천공(天空)의 화살비',
+    quote: '바람아, 그 길을 열어라.',
+    desc: '적에게 75 데미지 (방어·회피 무시). 다음 2턴 회피율 +30%. 각 화살 25% 확률로 치명타 (치명타 시 +50% 추가 데미지).',
+    color: '#7a9a5e',
+    icon: '🏹',
+    effect: 'classult_skyArrows',
   },
 };
 

@@ -339,6 +339,13 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           if (newPlayer.buffs?.bloodRageNext) {
             newPlayer.buffs = { ...newPlayer.buffs, bloodRageNext: false };
           }
+          // 1.59.0~ 풍령 Lv.3/5 회피 buff 1회 소비
+          if (newPlayer.buffs?.windBoostNextDmg) {
+            newPlayer.buffs = { ...newPlayer.buffs, windBoostNextDmg: false };
+          }
+          if (newPlayer.buffs?.windPierceNext) {
+            newPlayer.buffs = { ...newPlayer.buffs, windPierceNext: false };
+          }
           if (newEnemy.defense > 0 && !skill.pierce) {
             newEnemy.defense = Math.max(0, newEnemy.defense - dmgResult.defenseMitigated);
           }
@@ -735,6 +742,31 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         setFxEnemyShake(v => v + 1);
         setFxEnemyFlash(v => v + 1);
         pushFxLabel('enemy', 'crit', cut);
+      } else if (ult.effect === 'classult_skyArrows') {
+        // 1.59.0~ 천공의 화살비: 75 데미지 (방어·회피 무시) + 다음 2턴 회피율 +30% + 25% 확률 치명타 시 +50% 추가
+        let cut = 75;
+        const isCritArrow = Math.random() < 0.25;
+        if (isCritArrow) {
+          cut = Math.floor(cut * 1.5);
+        }
+        newEnemy.currentHp = Math.max(0, newEnemy.currentHp - cut);
+        newPlayer.buffs = {
+          ...newPlayer.buffs,
+          dodgeBuff: 30,
+          dodgeBuffTurns: 2,
+        };
+        if (isCritArrow) {
+          newLog.push({ type: 'crit', text: `· ${enemy.name}에게 ${cut} 데미지 [치명 화살! 방어·회피 무시]` });
+        } else {
+          newLog.push({ type: 'damage', text: `· ${enemy.name}에게 ${cut} 데미지 [방어·회피 무시]` });
+        }
+        newLog.push({ type: 'passive', text: `★ [천공의 가호] 2턴간 회피율 +30%` });
+
+        // FX — 공용 골든 컷인은 위에서 처리됨 + 적 흔들림 + 흰 플래시
+        setFxScreenShake(v => v + 1);
+        setFxEnemyShake(v => v + 1);
+        setFxEnemyFlash(v => v + 1);
+        pushFxLabel('enemy', isCritArrow ? 'crit' : 'damage', cut);
       } else if (ult.effect === 'classult_eternalFlame') {
         // 50 화염 데미지(방어 무시) + 겁화 영구 부여(지능×0.4/턴) + 다음 2턴 마법 데미지 +50%
         // 1.42.0~ 겁화 무한 도트로 재설계: 영구 지속(9999T) + 각인폭발 대상 제외.
@@ -827,6 +859,16 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         // 1.27.0~ 각인: 회피 후 다음 공격 데미지 +N% 버프 (다음 calculateDamage에서 소비)
         if (engravingFx.afterDodgeDmg) {
           newPlayer.buffs = { ...newPlayer.buffs, afterDodgeDmgNext: true };
+        }
+        // 1.59.0~ 풍령 Lv.3+: 회피 시 다음 공격 데미지 +50% / Lv.5+: 회피 시 다음 공격 방어 무시
+        const _windLv = skills['풍령'] || 0;
+        if (_windLv >= 3) {
+          newPlayer.buffs = { ...newPlayer.buffs, windBoostNextDmg: true };
+          newLog.push({ type: 'passive', text: `★ [풍령 Lv.3] 다음 공격 데미지 +50%` });
+        }
+        if (_windLv >= 5) {
+          newPlayer.buffs = { ...newPlayer.buffs, windPierceNext: true };
+          newLog.push({ type: 'passive', text: `★ [풍령 Lv.5] 다음 공격 방어 무시` });
         }
         if (hasEffect(skills, 'counterAttack', activeSkills) && Math.random() < 0.5) {
           const counterDmg = Math.floor(15 + Math.random() * 10);
@@ -1628,7 +1670,34 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         newPlayer.buffs = { ...newPlayer.buffs, bloodRageNext: true };
         newLog.push({ type: 'passive', text: `◆ [혈광 Lv.3] 자해 -${selfDmg} HP, 다음 공격 +15%` });
       }
+      // 1.59.0~ 풍령 Lv.7: 매 턴 시작 시 50% 확률 정령 화살 1발 (민첩×1.5, 방어 무시)
+      if (p.effect === 'windSpiritArrow') {
+        if (Math.random() < 0.5) {
+          const arrowDmg = Math.floor((newPlayer.민첩 || 0) * 1.5);
+          if (arrowDmg > 0 && newEnemy.currentHp > 0) {
+            newEnemy.currentHp = Math.max(0, newEnemy.currentHp - arrowDmg);
+            newLog.push({ type: 'damage', text: `🏹 [풍령 Lv.7] 정령 화살 ${arrowDmg} 데미지 [방어 무시]` });
+            pushFxLabel('enemy', 'damage', arrowDmg);
+            setFxEnemyShake(v => v + 1);
+            setFxEnemyFlash(v => v + 1);
+            // 1.62.0~ 픽스 #9: 정령 화살도 소울 게이지 충전 (일반 공격과 동일)
+            if (classData?.ultimateId) {
+              let arrowGain = Math.floor(arrowDmg / 5);
+              if (engravingFx.soulGainMult) arrowGain = Math.floor(arrowGain * (1 + engravingFx.soulGainMult));
+              newPlayer.soulGauge = Math.min(100, (newPlayer.soulGauge || 0) + arrowGain);
+            }
+          }
+        }
+      }
     });
+
+    // 풍령 정령 화살로 적이 죽었으면 즉시 승리
+    if (newEnemy.currentHp <= 0) {
+      setPlayer(newPlayer); setEnemy(newEnemy); setLog(newLog); setTurn(newTurn);
+      setTimeout(() => setPhase('victory'), 400);
+      actionLockRef.current = false;
+      return;
+    }
 
 
     const patterns = newEnemy.patterns;
