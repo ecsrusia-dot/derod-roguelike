@@ -7,6 +7,17 @@
 
 export const CHANGELOG = [
   {
+    version: '1.62.1',
+    date: '2026-06-14',
+    label: '코드 리뷰 잔여 픽스 4건 — dawnRevive 우선 / StatusPanel 표시 / getDisplayDamage / Codex',
+    changes: [
+      { type: 'fix', text: '[#1 dawnRevive 사문화 픽스] 수신 Lv.7 부활을 재생 Lv.7 부활보다 먼저 검사. 이전(1.60.0~1.62.0): 같은 trigger의 else if 분기 순서로 재생 Lv.7(50%)이 먼저 발동 → dawnRevive(30%) 영원히 안 닿음. 픽스 후: priest가 재생 Lv.7 픽해도 수신 Lv.7이 먼저 발동 (직업 정체성 보존). 트레이드오프: 재생 Lv.7만 보유했을 때만 재생 발동' },
+      { type: 'fix', text: '[#2 StatusPanel 풍령·수신 minor 표시 갭] 회피율·치명타율·회복량 합산 라인에 풍령(elf)·수신(priest) minor 출처 누락 → 추가. 풍령은 별도 minorEffect type(windDodgeCrit+)이라 getMinorBonus("dodge+"/"critRate+") 누락이었음. 수신 회복량은 곱셈으로 적용되지만 회복량 라인은 유물·매력만 표시 → getEffectiveHealPct(수신 minor + Lv.5 + 각인 combatHealPct) 곱셈 통합. 출처 모달에 풍령·수신·각인 출처 5종 추가' },
+      { type: 'fix', text: '[#3 getDisplayDamage 새 buff 미반영] 1.59.0~1.61.0 추가된 buff(windBoostNextDmg / bloodRageNext / afterDodgeDmgNext) + 혈광 minor(잃은 HP × 0.5%/Lv)가 calculateDamage에는 적용되지만 getDisplayDamage(UI 데미지 미리보기)에 누락 → 추가. 4 buff 모두 미리보기 시 정확한 예상 데미지 표시' },
+      { type: 'fix', text: '[#4 Codex classOnly leakage] 도감 패시브 탭에 직업 전용 패시브(심안류/이프리트/혈광/풍령/수신) 노출되던 문제 → CLASS_IDS 필터 제외. forge 결과 패시브(광폭, classOnly: __forge_only__)는 대장간으로 얻을 수 있어 노출 유지. 직업 정체성 강화' },
+    ],
+  },
+  {
     version: '1.62.0',
     date: '2026-06-13',
     label: 'elf + priest 풀스택 통합 + 코드 리뷰 픽스 10건 — 풍령·천공의 화살비 + 수신·여명의 강림 + 회복 시스템 + 픽스',

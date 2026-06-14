@@ -49,12 +49,17 @@ function getCategoryPool(catId) {
     }));
   }
   if (catId === 'passives') {
-    return Object.entries(PASSIVE_SKILLS).map(([key, p]) => ({
-      id: key,
-      name: key,
-      color: p.color,
-      data: p,
-    }));
+    // 1.62.1~ 픽스 #4: classOnly 직업 전용 패시브는 도감에서 제외 (직업 정체성 강화)
+    //   forge 결과 패시브('__forge_only__')는 노출 — 대장간으로 얻을 수 있어 사용자에게 정보 제공 필요
+    const CLASS_IDS = ['wanderer', 'sage', 'demonblood', 'elf', 'priest'];
+    return Object.entries(PASSIVE_SKILLS)
+      .filter(([_, p]) => !p.classOnly || !CLASS_IDS.includes(p.classOnly))
+      .map(([key, p]) => ({
+        id: key,
+        name: key,
+        color: p.color,
+        data: p,
+      }));
   }
   if (catId === 'recipes') {
     return FORGE_RECIPES.map((r, idx) => ({

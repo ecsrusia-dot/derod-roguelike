@@ -242,6 +242,19 @@ export function getDisplayDamage(skill, attacker, skills, ultimates, meta, curse
       dmg += getMinorBonus(skills, 'physDmg+', activeSkills);
       // 1.55.1~ 광폭 Lv.7: 물리 데미지 +15% (calculateDamage와 동일)
       if (hasEffect(skills, 'berserkRage', activeSkills)) dmg += Math.floor(dmg * 0.15);
+      // 1.62.1~ 픽스 #3: 혈광 minor — 잃은 HP × 0.5%/Lv × % 물리 데미지 보너스
+      if (hasEffect(skills, 'bloodLostHpPhysDmg+', activeSkills) || (skills['혈광'] && (!activeSkills || activeSkills.includes('혈광')))) {
+        const bloodLv = skills['혈광'] || 0;
+        if (bloodLv > 0) {
+          const lostHpPct = Math.max(0, ((attacker.maxHp || 0) - (attacker.hp || 0)) / Math.max(1, attacker.maxHp || 0) * 100);
+          const bloodBonus = Math.floor(dmg * (lostHpPct * 0.5 * bloodLv) / 100);
+          if (bloodBonus > 0) dmg += bloodBonus;
+        }
+      }
+      // 1.62.1~ 픽스 #3: 혈광 Lv.3 bloodRageNext buff: +15%
+      if (attacker.buffs?.bloodRageNext) {
+        dmg += Math.floor(dmg * 0.15);
+      }
     } else if (skill.type === 'magic') {
       // 1.44.1~ 지능 자동 가산 % 변환
       const intSigPct = (attacker.지능 || 0) * 0.4;
@@ -258,6 +271,13 @@ export function getDisplayDamage(skill, attacker, skills, ultimates, meta, curse
     // 1.28.0~ 시그니처 [영겁의 화염] 후속 버프
     if (skill.type === 'magic' && attacker.buffs?.flameBoostTurns > 0 && attacker.buffs?.flameBoostPct > 0) {
       dmg += Math.floor(dmg * (attacker.buffs.flameBoostPct / 100));
+    }
+    // 1.62.1~ 픽스 #3: afterDodgeDmgNext + windBoostNextDmg buff 미리보기 (calculateDamage와 동일)
+    if (engravingFx.afterDodgeDmg && attacker.buffs?.afterDodgeDmgNext) {
+      dmg += Math.floor(dmg * engravingFx.afterDodgeDmg / 100);
+    }
+    if (attacker.buffs?.windBoostNextDmg) {
+      dmg += Math.floor(dmg * 0.5);
     }
     const metaDmgBonus = getMetaBonus(meta, 'dmgDealt+2%') * 0.02;
     if (metaDmgBonus > 0) dmg += Math.floor(dmg * metaDmgBonus);
