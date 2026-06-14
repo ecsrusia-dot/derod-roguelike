@@ -26,6 +26,7 @@ import {
   getAgilityCritDmgBonus,
   getAgilitySoulOnDodge,
   getIfritIgniteRate,
+  getEffectiveHealPct,
 } from '../utils/helpers.js';
 import {
   PASSIVE_SKILLS,
@@ -159,13 +160,21 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       initialLog.push({ type: 'passive', text: `◆ [수호의 방패] 시작 방어 +${relicStat.shieldOnStart}` });
     }
     if (hasEffect(skills, 'heal30%', activeSkills)) {
-      const heal = Math.floor(newPlayer.maxHp * 0.3);
+      const baseHeal = Math.floor(newPlayer.maxHp * 0.3);
+      const healPct = getEffectiveHealPct(skills, engravingFx, activeSkills);
+      const heal = Math.floor(baseHeal * (1 + healPct / 100));
       newPlayer.hp = Math.min(newPlayer.maxHp, newPlayer.hp + heal);
-      initialLog.push({ type: 'passive', text: `◆ [재생 Lv.5] HP ${heal} 회복` });
+      const healLabel = healPct > 0 ? `${heal} (보너스 +${healPct}%)` : `${heal}`;
+      initialLog.push({ type: 'passive', text: `◆ [재생 Lv.5] HP ${healLabel} 회복` });
     }
     if (hasEffect(skills, 'firstHitImmune', activeSkills)) {
       newPlayer.firstHitImmune = true;
       initialLog.push({ type: 'passive', text: `◆ [회피 Lv.7] 첫 피격 무효 활성` });
+    }
+    // 1.60.0~ 수신 Lv.3: 전투 시작 시 가호 1회 (첫 피격 30% 차단). buff divineShield = 30 (%)
+    if (hasEffect(skills, 'divineShield30', activeSkills)) {
+      newPlayer.divineShield = 30;
+      initialLog.push({ type: 'passive', text: `◆ [수신 Lv.3] 여명의 가호 활성 (첫 피격 30% 차단)` });
     }
     
     // 저주: 시작 방어 0
@@ -767,6 +776,32 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         setFxEnemyShake(v => v + 1);
         setFxEnemyFlash(v => v + 1);
         pushFxLabel('enemy', isCritArrow ? 'crit' : 'damage', cut);
+      } else if (ult.effect === 'classult_dawnDescent') {
+        // 1.60.0~ 여명의 강림: HP 50% 회복 (회복량 보너스 적용) + 다음 2턴 받는 데미지 50% 차단 + 즉시 80 신성 데미지(방어 무시)
+        const baseHeal = Math.floor(newPlayer.maxHp * 0.5);
+        const healPct = getEffectiveHealPct(skills, engravingFx, activeSkills);
+        const heal = Math.floor(baseHeal * (1 + healPct / 100));
+        newPlayer.hp = Math.min(newPlayer.maxHp, newPlayer.hp + heal);
+
+        const cut = 80;
+        newEnemy.currentHp = Math.max(0, newEnemy.currentHp - cut);
+
+        newPlayer.buffs = {
+          ...newPlayer.buffs,
+          dawnGuard: 50,
+          dawnGuardTurns: 2,
+        };
+
+        const healLabel = healPct > 0 ? `${heal} (보너스 +${healPct}%)` : `${heal}`;
+        newLog.push({ type: 'heal', text: `· HP ${healLabel} 회복` });
+        newLog.push({ type: 'damage', text: `· ${enemy.name}에게 ${cut} 신성 데미지 [방어 무시]` });
+        newLog.push({ type: 'passive', text: `★ [여명의 가호] 2턴간 받는 데미지 -50%` });
+
+        setFxScreenShake(v => v + 1);
+        setFxEnemyShake(v => v + 1);
+        setFxEnemyFlash(v => v + 1);
+        pushFxLabel('enemy', 'damage', cut);
+        pushFxLabel('player', 'heal', heal);
       } else if (ult.effect === 'classult_eternalFlame') {
         // 50 화염 데미지(방어 무시) + 겁화 영구 부여(지능×0.4/턴) + 다음 2턴 마법 데미지 +50%
         // 1.42.0~ 겁화 무한 도트로 재설계: 영구 지속(9999T) + 각인폭발 대상 제외.
@@ -1020,6 +1055,13 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                 newLog.push({ type: 'passive', text: `◆ [재생 Lv.7] 부활!` });
                 dmg = 0; // 데미지 무효화
               }
+              // 3순위 1.60.0~: [수신 Lv.7 부활] - 전투당 1회 체력 30% 회복 (재생 Lv.7와 같은 trigger, 재생 부활을 못 살린 경우만)
+              else if (hasEffect(skills, 'dawnRevive', activeSkills) && !newPlayer.revivedThisCombat) {
+                newPlayer.hp = Math.floor(newPlayer.maxHp * 0.3);
+                newPlayer.revivedThisCombat = true;
+                newLog.push({ type: 'passive', text: `◆ [수신 Lv.7] 여명의 부활! (HP 30%)` });
+                dmg = 0;
+              }
             }
 
 
@@ -1031,6 +1073,21 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                 dmg -= blocked;
                 newLog.push({ type: 'passive', text: `◆ [혈광 Lv.7] 위기 방어 -${blocked}` });
               }
+            }
+            // 1.62.0~ 픽스 #7: divineShield는 blocked > 0일 때만 소진 (chip damage burn 방지)
+            if (dmg > 0 && newPlayer.divineShield > 0) {
+              const blocked = Math.floor(dmg * (newPlayer.divineShield / 100));
+              if (blocked > 0) {
+                dmg -= blocked;
+                newLog.push({ type: 'passive', text: `◆ [수신 Lv.3] 여명의 가호 -${blocked} (가호 소진)` });
+                newPlayer.divineShield = 0;
+              }
+            }
+            // 1.60.0~ 여명의 강림 후속 dawnGuard: 2턴간 받는 데미지 -50% (피격마다 적용, 턴 종료 시 카운터 감소)
+            if (dmg > 0 && newPlayer.buffs?.dawnGuardTurns > 0 && newPlayer.buffs?.dawnGuard > 0) {
+              const blocked = Math.floor(dmg * (newPlayer.buffs.dawnGuard / 100));
+              dmg -= blocked;
+              newLog.push({ type: 'passive', text: `★ [여명의 가호] -${blocked} (${newPlayer.buffs.dawnGuardTurns}T)` });
             }
 
             // 최종 데미지 적용 (위의 조건들에서 dmg가 0이 되었다면 실행되지 않음)
@@ -1597,6 +1654,11 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       newPlayer.buffs.bloodLifestealTurns--;
       if (newPlayer.buffs.bloodLifestealTurns === 0) newPlayer.buffs.bloodLifesteal = 0;
     }
+    // 1.60.0~ 여명의 가호(dawnGuard) 2턴 카운터
+    if (newPlayer.buffs?.dawnGuardTurns > 0) {
+      newPlayer.buffs.dawnGuardTurns--;
+      if (newPlayer.buffs.dawnGuardTurns === 0) newPlayer.buffs.dawnGuard = 0;
+    }
     // 심안류 궁극 1턴 버프 정리
     if (newPlayer.buffs?.mirrorDodgeNext > 0) {
       newPlayer.buffs = { ...newPlayer.buffs, mirrorDodgeNext: 0 };
@@ -1642,9 +1704,21 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     let guaranteedCrit = false;
     getActivePassives(skills, 'onTurnStart', activeSkills).forEach(p => {
       if (p.effect === 'regenPerTurn') {
-        const regen = 3;
+        const baseRegen = 3;
+        const healPct = getEffectiveHealPct(skills, engravingFx, activeSkills);
+        const regen = Math.floor(baseRegen * (1 + healPct / 100));
         newPlayer.hp = Math.min(newPlayer.maxHp, newPlayer.hp + regen);
-        newLog.push({ type: 'passive', text: `◆ [재생 Lv.3] HP +${regen}` });
+        const healLabel = healPct > 0 ? `+${regen} (보너스 +${healPct}%)` : `+${regen}`;
+        newLog.push({ type: 'passive', text: `◆ [재생 Lv.3] HP ${healLabel}` });
+      }
+      // 1.60.0~ 수신 Lv.5: 매 턴 시작 시 HP +5 (회복량 보너스 적용)
+      if (p.effect === 'dawnRegen') {
+        const baseRegen = 5;
+        const healPct = getEffectiveHealPct(skills, engravingFx, activeSkills);
+        const regen = Math.floor(baseRegen * (1 + healPct / 100));
+        newPlayer.hp = Math.min(newPlayer.maxHp, newPlayer.hp + regen);
+        const healLabel = healPct > 0 ? `+${regen} (보너스 +${healPct}%)` : `+${regen}`;
+        newLog.push({ type: 'passive', text: `◆ [수신 Lv.5] HP ${healLabel} 회복` });
       }
       if (p.effect === 'extraTurn' && p.interval && newTurn % p.interval === 0) {
         if (p.interval < bestExtraTurnInterval) {

@@ -176,6 +176,17 @@ export const PASSIVE_SKILLS = {
       7: { text: '매 턴 시작 시 50% 확률로 정령 화살 1발 즉발 (민첩×1.5 데미지, 방어 무시)', trigger: 'onTurnStart', effect: 'windSpiritArrow' }
     }
   },
+  수신: {
+    axis: 'utility', maxLv: 7, color: '#d4a574',
+    desc: '여명의 가호. 회복과 신성으로 동료를 살리고 죽음을 거부한다',
+    classOnly: 'priest',
+    minorEffect: { type: 'combatHealPct+', perLv: 5, desc: '회복량 +5%/Lv (만렙 +35%)' },
+    tiers: {
+      3: { text: '전투 시작 시 가호 1회 (첫 피격 30% 차단)', trigger: 'onCombatStart', effect: 'divineShield30' },
+      5: { text: '매 턴 시작 시 HP +5 (회복량 보너스 적용), 회복량 +25% (누적 +60%)', trigger: 'onTurnStart', effect: 'dawnRegen' },
+      7: { text: 'HP 0 도달 시 전투당 1회 30% HP로 부활', trigger: 'onLethal', effect: 'dawnRevive' }
+    }
+  },
 };
 
 
