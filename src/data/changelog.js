@@ -7,6 +7,16 @@
 
 export const CHANGELOG = [
   {
+    version: '1.63.0',
+    date: '2026-06-14',
+    label: '도감 적 일러 노출 — 16:9 썸네일 + 모달 큰 일러 + 미발견 그레이스케일',
+    changes: [
+      { type: 'feature', text: '[도감 적 카드 16:9 일러 썸네일] CodexScreen 적 탭 카드 상단에 전투 일러 16:9 썸네일 표시. 발견 시 컬러 / 미발견 시 그레이스케일 + 어둡게 + 자물쇠 아이콘. 도감의 시각적 완성도 향상. 일러 파일 없는 적은 사선 패턴 폴백("[ 미구현 ]") — 챔피언십 sanctum/rift/dawn은 아직 폴백 상태' },
+      { type: 'feature', text: '[CardInfoModal 큰 일러 헤더] 적 정보 모달 헤더 바로 아래 16:9 큰 일러 노출. info.imageSrc 필드 신설 (CodexHeroImage 컴포넌트). 향후 직업·유물·사건 등 다른 카드에도 재사용 가능' },
+      { type: 'system', text: '[헬퍼 재사용] getEnemyImageSrc(1.21.0)를 CodexScreen에서 import해 카드 풀 빌더에 imageSrc 미리 계산. 신규 챕터·컨셉 추가 시 코드 변경 0줄 — chapter 필드만 추가하면 도감에도 자동 노출' },
+    ],
+  },
+  {
     version: '1.62.1',
     date: '2026-06-14',
     label: '코드 리뷰 잔여 픽스 4건 — dawnRevive 우선 / StatusPanel 표시 / getDisplayDamage / Codex',
