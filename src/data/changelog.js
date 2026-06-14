@@ -7,6 +7,26 @@
 
 export const CHANGELOG = [
   {
+    version: '1.62.0',
+    date: '2026-06-13',
+    label: 'elf + priest 풀스택 통합 + 코드 리뷰 픽스 10건 — 풍령·천공의 화살비 + 수신·여명의 강림 + 회복 시스템 + 픽스',
+    changes: [
+      { type: 'feature', text: '[elf + priest 풀스택 통합 머지] PR #114 (elf 풍령·천공의 화살비·각인 풀 24장) + PR #115 (priest 수신·여명의 강림·각인 풀 24장·회복 시스템) 통합. PR #116(demonblood) 머지 후 conflict 발생 → 한 번에 정리. 빌드 통과. 5직업 모두 직업 전용 패시브 + 소울 스킬 + 각인 풀 완성' },
+      { type: 'fix', text: '[#1 bloodLifesteal off-by-one] 혈마의 격노 bloodLifestealTurns 3→4로 변경. cast 턴 endTurn 즉시 감소 1회 + 3 attack 턴 보장. 이전엔 PR 명세 "3턴"이지만 실제 2 attack 턴만 적용' },
+      { type: 'fix', text: '[#2 selfHeal 회복량 누락] 신성광선·가호 skill.selfHeal 경로에 getEffectiveHealPct 호출 추가. 수신 minor (+5%/Lv) + 수신 Lv.5 (+25%) + 각인 combatHealPct가 priest의 가장 자주 쓰는 회복에도 적용. 1.52.0 안티패턴 재발 방지' },
+      { type: 'fix', text: '[#3 skyArrows desc 정확화] "각 화살 25% 확률로 치명타" 표현이 단일 roll과 mismatch → "25% 확률로 치명 화살 (총 데미지 +50% = 112)"으로 명확화' },
+      { type: 'fix', text: '[#4 isFatalDamage 순서] 혈광 Lv.7 / divineShield / dawnGuard mitigation을 isFatalDamage 위로 이동. mitigation으로 살 수 있으면 revive 손실 방지 (재생 Lv.7·수신 Lv.7 부활 보호)' },
+      { type: 'fix', text: '[#5 multi-hit buff 1회 소비 픽스] afterDodgeDmgNext / bloodRageNext / windBoostNextDmg / windPierceNext buff 클리어를 hitCount 루프 OUT으로 이동. 이전엔 hit 1만 boost 받고 hits 2-N은 효과 없었음. 연속화살·광폭참격 등 multi-hit 스킬에서 정상 동작' },
+      { type: 'fix', text: '[#6 풍령 setter activeSkills seal 가드] 회피 시 풍령 buff 세팅에 activeSkills.includes(\'풍령\') 가드 추가. 챔피언십 신전 봉인 존중. 이전엔 rollDodge/rollCrit minor는 봉인 존중했지만 buff setter는 raw skill lookup이라 봉인 우회' },
+      { type: 'fix', text: '[#7 divineShield chip damage burn] divineShield 소진을 blocked > 0일 때로 제한. 이전엔 dmg=2 chip 데미지에 Math.floor(0.6)=0 absorb로 shield만 0으로 소진되어 다음 큰 공격 무방어' },
+      { type: 'fix', text: '[#8 skyArrows dodgeBuff 키 충돌] 천공의 화살비 + 바람결계 같은 dodgeBuff 키 충돌 → Math.max로 머지. 둘 다 보유 시 더 큰 값 + 더 긴 턴 보존' },
+      { type: 'fix', text: '[#9 풍령 Lv.7 화살 소울 게이지] 정령 화살이 데미지 입혀도 player.soulGauge 충전 안 됐던 문제 픽스. 일반 공격과 동일한 floor(arrowDmg/5) × (1+soulGainMult) 충전 적용' },
+      { type: 'fix', text: '[#10 6 신규 buff 상태바] windBoostNextDmg / windPierceNext / divineShield / dawnGuard / bloodLifesteal / bloodRageNext 6 buff 모두 메인 헤더 + 모달 상태바 + hasAnyStatus 조건에 추가. 이전엔 새 buff만 활성일 때 상태바 영역 자체 숨겨짐. CLAUDE.md 1.52.0 "데이터+UI+적용 코드 3축" 안티패턴 재발 방지' },
+      { type: 'fix', text: '[#14 혈마의 격노 self-lifesteal] 소울 스킬 자체 데미지(잃은HP×1.5, 최대 maxHp×1.5)에도 흡혈 50% 적용. low HP comeback 컨셉 정상화. 이전엔 cast 턴 흡혈 0 → 큰 데미지 후 즉사 가능' },
+      { type: 'system', text: '[코드 리뷰 결과] 7-finder + 1-verifier + 1-sweep 16 agent 병렬 리뷰 → 10건 CONFIRMED + 5건 표시/프로세스. 본 PR에서 11건 적용 (top critical). 잔여: dawnRevive 사문화 (재생 Lv.7 dominance) / StatusPanel 표시 갭 / Codex classOnly leakage 등은 후속 PR 검토' },
+    ],
+  },
+  {
     version: '1.61.0',
     date: '2026-06-13',
     label: '혼혈 마족 풀스택 — 혈광 패시브 + 혈마의 격노 소울 스킬',
@@ -15,6 +35,29 @@ export const CHANGELOG = [
       { type: 'feature', text: '[혈마(血魔)의 격노 신설] 혼혈 마족 직업 소울 스킬 (CLASS_ULTIMATES.demonblood_bloodFury). (잃은 HP × 1.5, 최소 50) 데미지 (방어 무시) + 다음 3턴 흡혈 50% (bloodLifesteal buff). HP가 낮을수록 폭발적. HP 0 직전이면 max HP × 1.5 데미지. classData.ultimateId 추가 → StatusPanel 소울 스킬 섹션 자동 노출' },
       { type: 'system', text: '[흡혈 시스템] 혈광 Lv.7 + 혈마의 격노 후속이 공유하는 흡혈 처리 — 적 공격 명중 후 (actualDmg × lifestealPct/100) HP 회복. 둘 다 활성이면 더 큰 값 사용 (Math.max). 흡혈 한도는 maxHp. 매 턴 시작 시 bloodLifestealTurns 카운터 감소 (dodgeBuffTurns·dawnGuardTurns와 동일 패턴)' },
       { type: 'system', text: '[코드 변경 범위] data/passives.js(혈광 추가) / data/classes.js(demonblood.startSkills + ultimateId + CLASS_ULTIMATES) / data/engravings.js(_DEMONBLOOD_REWARDS 잔혹 → 혈광) / combat/damage.js(혈광 minor 잃은 HP 가산 + bloodRageNext +15% + rollCrit Lv.5 hp50%) / CombatScreen.jsx(onTurnStart bloodRageTurn 자해 + 공격 후 bloodRageNext 1회 소비 + 흡혈 적용 + Lv.7 받는 데미지 -50% + classult_bloodFury + bloodLifestealTurns 카운터). 빌드 통과' },
+    ],
+  },
+  {
+    version: '1.59.0',
+    date: '2026-06-13',
+    label: '숲의 정령사 풀스택 — 풍령 패시브 + 천공의 화살비 + 각인 풀 24장',
+    changes: [
+      { type: 'feature', text: '[풍령(風靈) 신설] 숲의 정령사 직업 전용 패시브 신축 (classOnly: elf). minor: 회피율 +3%/Lv + 치명타율 +2%/Lv (만렙 +21%/+14%). Lv.3: 회피 시 다음 공격 데미지 +50% (windBoostNextDmg buff). Lv.5: 회피 시 다음 공격 방어 무시 (windPierceNext buff, Lv.3와 누적). Lv.7: 매 턴 시작 시 50% 확률로 정령 화살 1발 (민첩×1.5 데미지, 방어 무시). 시작 패시브 변경: 회피 Lv.3 → 풍령 Lv.3 (정밀 Lv.2 유지). 각성도 Lv.4·Lv.10 보상도 회피 → 풍령으로 동시 갱신' },
+      { type: 'feature', text: '[천공(天空)의 화살비 신설] 숲의 정령사 직업 소울 스킬 (CLASS_ULTIMATES.elf_skyArrows). 75 데미지 (방어·회피 무시) + 다음 2턴 회피율 +30% + 25% 확률 치명 화살(데미지 +50%). 발동 시 공용 골든 컷인 + 적 흔들림. classData.ultimateId 추가 → StatusPanel 소울 스킬 섹션 자동 노출' },
+      { type: 'feature', text: '[숲의 정령사 각인 풀 24장] ENGRAVINGS[elf] 24장 신설 (이전 빈 배열). 컨셉: 회피·치명타·민첩·바람·정령 (wanderer 반격/sage 화염/demonblood 자해와 차별화). 주요 effect 키: dodgeRate(바람·풍신) / critRate(속삭임·천공) / physDmgPct(화살) / dex·cha·startHp / dodgeSoul·startSoul·perTurnSoul(정령 게이지) / afterDodgeDmg(화살 부적). Common 5 + Rare 5 + Epic 5 + Legendary 2 + Flaw 4 + Curse 3 = 24장' },
+      { type: 'system', text: '[코드 변경 범위] data/passives.js(풍령 추가) / data/classes.js(elf.startSkills 변경 + ultimateId + CLASS_ULTIMATES) / data/engravings.js(elf 풀 + Lv.4·Lv.10 보상 풍령으로 갱신) / combat/damage.js(rollDodge·rollCrit에 풍령 minor 분기 + windPierceNext의 piercesArmor 통합 + windBoostNextDmg의 +50% 가산) / CombatScreen.jsx(회피 시 풍령 Lv.3/5 buff 세팅 + 공격 후 buff 1회 소비 + 풍령 Lv.7 onTurnStart 정령 화살 분기 + classult_skyArrows 분기). 빌드 검증 통과' },
+    ],
+  },
+  {
+    version: '1.60.0',
+    date: '2026-06-13',
+    label: '여명의 사제 풀스택 — 수신 패시브 + 여명의 강림 + 각인 풀 24장 + 회복 시스템',
+    changes: [
+      { type: 'feature', text: '[수신(授神) 신설] 여명의 사제 직업 전용 패시브 (classOnly: priest). minor: 회복량 +5%/Lv (만렙 +35%). Lv.3: 전투 시작 시 가호 1회 (첫 피격 30% 차단, divineShield buff). Lv.5: 매 턴 시작 시 HP +5 + 회복량 +25% 추가 (누적 +60%). Lv.7: HP 0 도달 시 전투당 1회 30% HP로 부활 (재생 Lv.7 부활과 동일 카운터 공유, 둘 중 하나만 발동). 시작 패시브 변경: 신앙 Lv.3 → 수신 Lv.3 (재생 Lv.2 유지). 각성도 Lv.4·Lv.10 보상도 신앙 → 수신 동시 갱신' },
+      { type: 'feature', text: '[여명(黎明)의 강림 신설] 여명의 사제 직업 소울 스킬 (CLASS_ULTIMATES.priest_dawnDescent). HP 50% 회복 (회복량 보너스 적용) + 적에게 즉시 80 신성 데미지 (방어 무시) + 다음 2턴 받는 데미지 50% 차단 (dawnGuard buff). 발동 시 공용 골든 컷인 + 플레이어 회복 라벨 + 적 데미지 라벨. classData.ultimateId 추가 → StatusPanel 소울 스킬 섹션 자동 노출' },
+      { type: 'feature', text: '[여명의 사제 각인 풀 24장] ENGRAVINGS[priest] 24장 신설 (이전 빈 배열). 컨셉: 회복·신성·매력·HP·축복. 주요 effect 키: combatHealPct(회복 보너스, 신규 적용) / dmgTakenPct(음수=피해 감소) / cha·int·startHp / startSoul·perTurnSoul·dodgeSoul. Common 5 + Rare 5 + Epic 5 + Legendary 2 + Flaw 4 + Curse 3 = 24장. wanderer 반격/sage 화염/demonblood 자해/elf 회피와 차별화' },
+      { type: 'system', text: '[회복 시스템 신축] 1.52.0에서 fxDeltas로만 흘러갔던 combatHealPct 키가 실제 회복에 적용되도록 코드 신축. utils/helpers.js의 getEffectiveHealPct(skills, engravingFx, activeSkills) 헬퍼 신설 — 각인 combatHealPct + 수신 minor (+5%/Lv) + 수신 Lv.5 (+25%) 합산. 회복 시점 3곳에 적용: (1) 재생 Lv.5 heal30% onCombatStart / (2) 재생 Lv.3 regenPerTurn onTurnStart / (3) 수신 Lv.5 dawnRegen onTurnStart / (4) 여명의 강림 소울 스킬 HP 50%. 부활은 % HP 직접 지정이라 보너스 미적용' },
+      { type: 'system', text: '[divineShield + dawnGuard 신규 buff] divineShield(수신 Lv.3 가호, 1회 소비) + dawnGuard(여명의 강림 후속, 2턴 매 피격 차단) 두 buff 신축. 적 공격 dmg 적용 직전에 순차 적용 (divineShield 먼저 → dawnGuard). dawnGuard는 매 턴 시작 시 카운터 감소 (dodgeBuffTurns와 동일 패턴)' },
     ],
   },
   {

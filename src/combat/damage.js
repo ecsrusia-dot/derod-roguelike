@@ -144,6 +144,14 @@ export function calculateDamage(skill, attacker, defender, skills, isCrit, ultim
       breakdown.push(`★잔영 +${dodgeBonus}`);
     }
   }
+  // 1.59.0~ 풍령 Lv.3+: 회피 후 다음 공격 데미지 +50%
+  if (attacker.buffs?.windBoostNextDmg) {
+    const windBonus = Math.floor(dmg * 0.5);
+    if (windBonus > 0) {
+      dmg += windBonus;
+      breakdown.push(`★풍령 +${windBonus}`);
+    }
+  }
 if (isCrit) {
   // 1. 기본 치명타 배율 설정 (1.5배)
   let critMult = 1.5;
@@ -191,7 +199,8 @@ if (isCrit) {
   let defenseMitigated = 0;
   // 정밀 Lv.3: 치명타 시 적 방어 50% 무시
   const critPierces = isCrit && hasEffect(skills, 'critPierce', activeSkills);
-  const piercesArmor = skill.pierce || hasEffect(skills, 'pierceArmor', activeSkills);
+  // 1.59.0~ 풍령 Lv.5+ windPierceNext buff도 방어 무시
+  const piercesArmor = skill.pierce || hasEffect(skills, 'pierceArmor', activeSkills) || !!attacker.buffs?.windPierceNext;
   // 이프리트 minor: 방어 무시 (Tier 누적) +5 (Lv.3) +10 (Lv.5)
   const ifritLv = (skills && skills['이프리트']) || 0;
   let ifritDefIgnore = 0;
@@ -277,6 +286,12 @@ export function rollCrit(skills, attacker, meta = null, activeSkills = null, rel
   // 2. 정밀 minor: 치명타율 +3%/Lv
   critRate += getMinorBonus(skills, 'critRate+', activeSkills);
 
+  // 2-b. 풍령 minor: 치명타율 +2%/Lv (1.59.0~)
+  const windLvCrit = (skills && skills['풍령']) || 0;
+  if (windLvCrit > 0 && (!activeSkills || activeSkills.includes('풍령'))) {
+    critRate += windLvCrit * 2;
+  }
+
   // 3. 메타 강화 및 유물 보너스 (1.44.2~ critRate +2%/단계)
   critRate += getMetaBonus(meta, 'critRate+2%') * 2;
   critRate += relicStat.critRate || 0;
@@ -321,6 +336,12 @@ export function rollDodge(skills, defender, activeSkills = null, relicStat = {},
 
   // 2. 회피 minor 스킬 보너스 (+3%/Lv)
   dodgeRate += getMinorBonus(skills, 'dodge+', activeSkills);
+
+  // 2-b. 풍령 minor: 회피율 +3%/Lv (1.59.0~)
+  const windLvDodge = (skills && skills['풍령']) || 0;
+  if (windLvDodge > 0 && (!activeSkills || activeSkills.includes('풍령'))) {
+    dodgeRate += windLvDodge * 3;
+  }
 
   // 3. 유물 보너스 + 메타 강화 「유연한 그림자」 (1.44.2~ +2%/단계)
   dodgeRate += relicStat.dodge || 0;
