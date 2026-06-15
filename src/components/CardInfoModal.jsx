@@ -144,6 +144,8 @@ function CodexHeroImage({ src, alt, accent }) {
         src={src}
         alt={alt}
         onError={() => setFailed(true)}
+        loading="eager"
+        decoding="async"
         className="w-full h-full object-cover"
         style={{ display: 'block' }}
       />
