@@ -161,14 +161,14 @@ function CodexEnemyThumb({ src, alt, color, found }) {
         className="w-full flex items-center justify-center"
         style={{
           aspectRatio: '16/9',
-          background: `repeating-linear-gradient(135deg, ${PALETTE.bgDeep}, ${PALETTE.bgDeep} 6px, ${color}15 6px, ${color}15 10px)`,
+          background: `repeating-linear-gradient(135deg, ${PALETTE.bgDeep}, ${PALETTE.bgDeep} 8px, ${color}15 8px, ${color}15 12px)`,
           borderBottom: `1px solid ${color}30`,
           color: PALETTE.textDim,
-          fontSize: '8px',
-          letterSpacing: '0.15em',
+          fontSize: '10px',
+          letterSpacing: '0.2em',
         }}
       >
-        [ 미구현 ]
+        [ 일러 미구현 ]
       </div>
     );
   }
@@ -178,15 +178,17 @@ function CodexEnemyThumb({ src, alt, color, found }) {
         src={src}
         alt={alt}
         onError={() => setFailed(true)}
+        loading="lazy"
+        decoding="async"
         className="w-full h-full object-cover"
         style={{
-          filter: found ? 'none' : 'grayscale(100%) brightness(0.45)',
+          filter: found ? 'none' : 'grayscale(100%) brightness(0.4)',
           display: 'block',
         }}
       />
       {!found && (
-        <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.45)' }}>
-          <Lock size={18} style={{ color: PALETTE.textDim, opacity: 0.85 }} />
+        <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.55)' }}>
+          <Lock size={32} style={{ color: PALETTE.textDim, opacity: 0.85 }} />
         </div>
       )}
     </div>
@@ -252,8 +254,10 @@ export default function CodexScreen({ meta, onBack }) {
         </span>
       </div>
 
-      {/* 항목 그리드 */}
-      <div className="flex-1 overflow-y-auto px-3 py-3 grid grid-cols-2 gap-1.5">
+      {/* 항목 그리드 — 적 탭은 1열 풀폭(16:9 일러), 그 외는 2열 텍스트 */}
+      <div
+        className={`flex-1 overflow-y-auto px-3 py-3 grid gap-1.5 ${tab === 'enemies' ? 'grid-cols-1' : 'grid-cols-2'}`}
+      >
         {sorted.map(item => {
           const found = isDiscovered(meta, tab, item);
           const showHero = tab === 'enemies' && !!item.imageSrc;
