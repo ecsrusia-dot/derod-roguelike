@@ -110,10 +110,13 @@ import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpediti
 
 
 
-function PhoneFrame({ children }) {
+function PhoneFrame({ children, screenKey }) {
   return (
     <div className="absolute inset-0" style={{ pointerEvents: 'auto' }}>
-      {children}
+      {/* screen 키 리마운트로 화면 진입 페이드+슬라이드 (1.64.0). reduced-motion 시 CSS에서 자동 무효 */}
+      <div key={screenKey} className="ui-screen-enter absolute inset-0">
+        {children}
+      </div>
     </div>
   );
 }
@@ -1672,8 +1675,8 @@ export default function App() {
         curses={currentCurses}
       />
     }>
-      <PhoneFrame>
-            {screen === 'title' && !authMode && <LoginScreen 
+      <PhoneFrame screenKey={screen}>
+            {screen === 'title' && !authMode && <LoginScreen
               onSelectLocal={handleSelectLocal} 
               onSelectGuest={handleSelectGuest} 
               onSelectGoogle={handleSelectGoogle} 
