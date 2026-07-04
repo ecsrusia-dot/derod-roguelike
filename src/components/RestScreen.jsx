@@ -51,8 +51,8 @@ export default function RestScreen({ classData, hp, maxHp, skills, stats = {}, a
         />
 
         <button onClick={() => onChoice({ type: 'heal', value: Math.floor(maxHp * 0.2) })}
-          className="w-full text-left px-4 py-3 transition-all hover:translate-x-1"
-          style={{ background: `${PALETTE.green}20`, border: `1px solid ${PALETTE.green}` }}>
+          className="ui-press w-full text-left px-4 py-3 transition-all"
+          style={{ borderRadius: 13, background: `${PALETTE.green}20`, border: `1px solid ${PALETTE.green}99`, boxShadow: `0 0 14px -6px ${PALETTE.green}66` }}>
           <div className="text-sm font-bold mb-0.5" style={{ color: PALETTE.green }}>◇ 휴식</div>
           <div className="text-[11px]" style={{ color: PALETTE.textDim }}>
             최대 체력의 20% 회복 (+{Math.floor(maxHp * 0.2)})
@@ -61,10 +61,11 @@ export default function RestScreen({ classData, hp, maxHp, skills, stats = {}, a
 
         <button onClick={() => onChoice({ type: 'reselect_skills' })}
           disabled={!canReselectSkills}
-          className="w-full text-left px-4 py-3 transition-all hover:translate-x-1"
+          className="ui-press w-full text-left px-4 py-3 transition-all"
           style={{
-            background: canReselectSkills ? `${PALETTE.dawn}20` : 'transparent',
-            border: `1px solid ${canReselectSkills ? PALETTE.dawn : PALETTE.panelBorder}`,
+            borderRadius: 13,
+            background: canReselectSkills ? `${PALETTE.dawn}20` : 'rgba(255,255,255,0.02)',
+            border: `1px solid ${canReselectSkills ? `${PALETTE.dawn}99` : 'var(--ui-line)'}`,
             opacity: canReselectSkills ? 1 : 0.5,
           }}>
           <div className="text-sm font-bold mb-0.5" style={{ color: PALETTE.dawn }}>◇ 패시브 재선택</div>
@@ -77,10 +78,11 @@ export default function RestScreen({ classData, hp, maxHp, skills, stats = {}, a
 
         <button onClick={() => onChoice({ type: 'reselect_relics' })}
           disabled={!canReselectRelics}
-          className="w-full text-left px-4 py-3 transition-all hover:translate-x-1"
+          className="ui-press w-full text-left px-4 py-3 transition-all"
           style={{
-            background: canReselectRelics ? `${PALETTE.legendary}20` : 'transparent',
-            border: `1px solid ${canReselectRelics ? PALETTE.legendary : PALETTE.panelBorder}`,
+            borderRadius: 13,
+            background: canReselectRelics ? `${PALETTE.legendary}20` : 'rgba(255,255,255,0.02)',
+            border: `1px solid ${canReselectRelics ? `${PALETTE.legendary}99` : 'var(--ui-line)'}`,
             opacity: canReselectRelics ? 1 : 0.5,
           }}>
           <div className="text-sm font-bold mb-0.5" style={{ color: PALETTE.legendary }}>◇ 유물 재선택</div>
@@ -107,10 +109,11 @@ export default function RestScreen({ classData, hp, maxHp, skills, stats = {}, a
                 const typeLabel = sk.type === 'physical' ? '물리' : sk.type === 'magic' ? '마법' : sk.type === 'defense' ? '방어' : '';
                 return (
                   <button key={name} onClick={() => setModalSkill(name)}
-                    className="text-left px-2 py-2 transition-all"
+                    className="ui-press text-left px-2 py-2 transition-all"
                     style={{
+                      borderRadius: 12,
                       background: `linear-gradient(135deg, ${classData.color}20, ${classData.color}05)`,
-                      border: `1px solid ${classData.color}80`,
+                      border: `1px solid ${classData.color}66`,
                     }}>
                     <div className="text-[12px] font-bold mb-0.5" style={{ color: PALETTE.text }}>
                       {sk.name || name}

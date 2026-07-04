@@ -97,31 +97,29 @@ export default function EngravingScreen({ meta, onMetaUpdate, onBack }) {
     <div className="absolute inset-0 overflow-y-auto" style={{
       background: `radial-gradient(ellipse at top, ${PALETTE.panel} 0%, ${PALETTE.bgDeep} 70%)`,
     }}>
-      {/* 헤더 */}
-      <div className="sticky top-0 z-10 px-4 py-3 flex items-center justify-between" style={{
-        background: `linear-gradient(180deg, ${PALETTE.bgDeep}, ${PALETTE.bgDeep}ee)`,
-        borderBottom: `1px solid ${PALETTE.panelBorder}`,
+      {/* 헤더 — 1.67.0 공통 헤더 패턴 정렬 (뒤로가기 40px 타깃 + 영혼 칩) */}
+      <div className="sticky top-0 z-10 px-3 py-2 flex items-center gap-2.5" style={{
+        background: 'rgba(10,6,8,0.85)',
+        backdropFilter: 'blur(14px)',
+        WebkitBackdropFilter: 'blur(14px)',
+        borderBottom: '1px solid var(--ui-line)',
       }}>
-        <button onClick={onBack} className="flex items-center gap-1 px-2 py-1" style={{
-          background: 'transparent', color: PALETTE.textDim, fontSize: '11px',
+        <button onClick={onBack} aria-label="뒤로가기" className="ui-press flex items-center justify-center flex-none" style={{
+          width: 40, height: 40, borderRadius: 'var(--r-btn)',
+          background: 'rgba(255,255,255,0.04)', border: '1px solid var(--ui-line)', color: PALETTE.dawn,
         }}>
-          <ArrowLeft size={14} />
-          <span>타이틀</span>
+          <ArrowLeft size={18} />
         </button>
-        <div className="text-xs tracking-[0.3em]" style={{ color: PALETTE.dawn, fontFamily: '"Cinzel", serif' }}>
-          ENGRAVING
-        </div>
-        <div className="flex items-center gap-1" style={{ minWidth: '60px', justifyContent: 'flex-end' }}>
-          <span style={{ color: PALETTE.twilight, fontSize: '13px' }}>✦</span>
-          <span className="text-xs font-bold" style={{ color: PALETTE.text }}>{meta?.souls || 0}</span>
-        </div>
+        <div className="flex-1 text-base font-semibold" style={{ color: PALETTE.text }}>직업 각인</div>
+        <span className="inline-flex items-center gap-1 flex-none" style={{
+          height: 22, padding: '0 9px', borderRadius: 999, fontSize: 11,
+          color: PALETTE.legendary, border: '1px solid rgba(232,176,74,0.35)', background: 'rgba(232,176,74,0.09)',
+        }}>✦ <span className="tabular-nums font-bold">{meta?.souls || 0}</span></span>
       </div>
 
-      {/* 제목 */}
+      {/* 설명 */}
       <div className="px-4 pt-3 pb-2">
-        <div className="text-[10px] tracking-[0.3em]" style={{ color: PALETTE.textDim }}>JOB AWAKENING</div>
-        <h2 className="text-lg font-bold mt-1" style={{ color: PALETTE.text }}>직업 각인</h2>
-        <div className="text-[10px] mt-1" style={{ color: PALETTE.textDim, lineHeight: 1.5 }}>
+        <div className="text-[11px]" style={{ color: PALETTE.textDim, lineHeight: 1.5 }}>
           영혼으로 직업의 각성도를 올려 능력치·시작 패시브를 강화하고, 슬롯 개방 시 랜덤 각인을 부여받습니다.
           가챠로 각인을 변경할 수 있습니다.
         </div>

@@ -39,19 +39,44 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
   }
 
   return (
-    <div className="absolute inset-0 flex flex-col" style={{ background: PALETTE.bgDeep }}>
-      <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: PALETTE.panelBorder, background: PALETTE.panel }}>
-        <span className="text-[11px] tracking-[0.3em]" style={{ color: PALETTE.textDim }}>◆ 캐릭터 정보 ◆</span>
-        <button onClick={onClose}><X size={16} style={{ color: PALETTE.textDim }} /></button>
-      </div>
-      <div className="flex-1 overflow-y-auto">
+    // 1.67.0 리디자인 — 바텀시트 쉘 (그래버 + 배경 탭 닫기). 내부 계산·◇ 출처 모달은 1.41.0 그대로
+    <div className="absolute inset-0 flex flex-col justify-end" style={{ background: 'rgba(0,0,0,0.55)' }} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div
+        className="flex flex-col min-h-0"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          maxHeight: '94%',
+          borderRadius: '22px 22px 0 0',
+          background: 'var(--ui-glass-strong)',
+          backdropFilter: 'blur(14px)',
+          WebkitBackdropFilter: 'blur(14px)',
+          borderTop: '1px solid var(--ui-line-strong)',
+          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05), 0 -18px 50px rgba(0,0,0,0.5)',
+          animation: 'ui-sheet-up 0.32s cubic-bezier(.16,.8,.3,1) backwards',
+        }}
+      >
+        <button
+          onClick={onClose}
+          aria-label="닫기"
+          className="flex-none pt-2.5 pb-1 flex justify-center w-full"
+          style={{ background: 'transparent', border: 'none' }}
+        >
+          <span style={{ width: 38, height: 4, borderRadius: 999, background: 'rgba(212,165,116,0.3)', display: 'block' }} />
+        </button>
+        <div className="flex-none flex items-center justify-between px-4 pb-1.5">
+          <span className="text-[12px] font-semibold tracking-[0.2em]" style={{ color: PALETTE.text }}>캐릭터 정보</span>
+          <button onClick={onClose} className="ui-press flex items-center justify-center" aria-label="닫기" style={{ width: 32, height: 32, borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--ui-line)' }}>
+            <X size={15} style={{ color: PALETTE.textDim }} />
+          </button>
+        </div>
+      <div className="flex-1 overflow-y-auto min-h-0">
         <div className="px-4 py-4 border-b" style={{
           background: `linear-gradient(180deg, ${classData.color}20, transparent)`,
           borderColor: PALETTE.panelBorder,
         }}>
           <div className="flex items-start gap-3">
             <div className="w-14 h-14 flex items-center justify-center text-2xl font-bold" style={{
-              background: classData.color, color: PALETTE.bgDeep, border: `1px solid ${PALETTE.dawn}`,
+              borderRadius: 14, background: `linear-gradient(160deg, ${classData.color}, ${PALETTE.bgDeep})`, color: PALETTE.bgDeep, border: '1px solid rgba(232,176,74,0.4)',
             }}>{classData.name[0]}</div>
             <div className="flex-1">
               <div className="text-[10px] tracking-[0.2em]" style={{ color: classData.color }}>{classData.sub}</div>
@@ -70,11 +95,12 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                 <button
                   key={k}
                   onClick={() => setStatSigStat(k)}
-                  className="text-center transition-all"
+                  className="ui-press text-center transition-all"
                   style={{
+                    borderRadius: 12,
                     background: `${classData.color}10`,
                     border: `1px solid ${classData.color}40`,
-                    padding: '6px 4px',
+                    padding: '8px 4px',
                   }}
                   title={`${k} 시그니처 설명`}
                 >
@@ -662,10 +688,11 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                 const typeLabel = sk.type === 'physical' ? '물리' : sk.type === 'magic' ? '마법' : sk.type === 'defense' ? '방어' : '';
                 return (
                   <button key={name} onClick={() => setModalState({ kind: 'active', name })}
-                    className="text-left px-2 py-2 transition-all"
+                    className="ui-press text-left px-2 py-2 transition-all"
                     style={{
+                      borderRadius: 12,
                       background: `linear-gradient(135deg, ${classData.color}20, ${classData.color}05)`,
-                      border: `1px solid ${classData.color}80`,
+                      border: `1px solid ${classData.color}66`,
                     }}>
                     <div className="text-[12px] font-bold mb-0.5" style={{ color: PALETTE.text }}>
                       {sk.name || name}
@@ -690,8 +717,9 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                 <span>★</span><span>직업 소울 스킬</span>
               </div>
               <button onClick={() => setModalState({ kind: 'classult', ultimateId: classData.ultimateId })}
-                className="w-full text-left px-3 py-3 transition-all"
+                className="ui-press w-full text-left px-3 py-3 transition-all"
                 style={{
+                  borderRadius: 13,
                   background: `linear-gradient(135deg, ${ult.color}25, ${ult.color}08)`,
                   border: `1px solid ${ult.color}`,
                   boxShadow: `0 0 8px ${ult.color}40`,
@@ -721,8 +749,9 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                     return (
                       <button key={sk.name}
                         onClick={() => setModalState({ kind: 'passive', name: sk.name })}
-                        className="w-full text-left px-3 py-2"
+                        className="ui-press w-full text-left px-3 py-2"
                         style={{
+                          borderRadius: 12,
                           background: `${sk.color}10`,
                           border: `1px solid ${sk.color}40`,
                           opacity: isSealed ? 0.5 : 1,
@@ -741,9 +770,9 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                             )}
                           </div>
                         </div>
-                        <div className="h-1" style={{ background: PALETTE.bgDeep }}>
+                        <div className="h-1 overflow-hidden" style={{ background: 'rgba(0,0,0,0.4)', borderRadius: 999 }}>
                           <div className="h-full transition-all" style={{
-                            width: `${(sk.lv / sk.maxLv) * 100}%`, background: sk.color,
+                            width: `${(sk.lv / sk.maxLv) * 100}%`, background: sk.color, borderRadius: 999,
                           }} />
                         </div>
                       </button>
@@ -771,6 +800,7 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                 if (!ultData) return null;
                 return (
                   <div key={i} className="px-3 py-2" style={{
+                    borderRadius: 12,
                     background: `${ultData.color}15`,
                     border: `1px solid ${ultData.color}`,
                     boxShadow: `0 0 8px ${ultData.color}40`,
@@ -801,8 +831,9 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                 return (
                   <button key={i}
                     onClick={() => setModalState({ kind: 'relic', rel: r })}
-                    className="w-full text-left px-3 py-2 flex items-center gap-2"
+                    className="ui-press w-full text-left px-3 py-2 flex items-center gap-2"
                     style={{
+                      borderRadius: 12,
                       background: `${r.color}10`,
                       border: `1px solid ${r.color}40`,
                       opacity: isSealed ? 0.5 : 1,
@@ -828,6 +859,7 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
             </div>
           </div>
         )}
+      </div>
       </div>
 
       {modalInfo && (
