@@ -947,8 +947,8 @@ PM이 PNG를 푸시했다면 **JPG 변환 + 코드 헬퍼 연결 + 버전 갱신
 
 | 항목 | 값 |
 |---|---|
-| 브랜치 | `claude/review-claude-docs-KE48o` (이 갱신 PR 머지 후 main 동기화) |
-| 현재 게임 버전 | **1.62.1** (코드 리뷰 잔여 픽스 4건 — dawnRevive 우선순위 / StatusPanel 풍령·수신 minor / getDisplayDamage 새 buff / Codex classOnly leakage) |
+| 브랜치 | `claude/game-ui-ux-redesign-a471kb` (UI 리디자인 시리즈 PR #122~#125) |
+| 현재 게임 버전 | **1.67.0** (UI 리디자인 4단계 완결 — 1.63.0 도감 일러 / 1.64.0 토큰·화면 전환 / 1.65.0 타이틀·원정·맵 / 1.66.0 전투 / 1.67.0 정보창 바텀시트·잔여 화면) |
 | **다음 세션 브랜치 전략** | 다음 PR은 **`git fetch origin main` + `git checkout -B <새브랜치> origin/main`**으로 최신 main에서 분기 |
 
 ### 이번 세션 결과 요약 — 문서 갱신 (코드 변경 0줄)
@@ -962,6 +962,17 @@ PM이 PNG를 푸시했다면 **JPG 변환 + 코드 헬퍼 연결 + 버전 갱신
 | **6.10.7절 (소울 스킬 게이트)** | 5직업 모두 ultimateId 보유로 사실상 항상 true 명시 |
 | **11절 (작업 로드맵)** | 1.52.0 → 1.62.1 기준 재정렬. 완성 항목 별도 섹션으로 outdated 재발 방지 |
 
+### 🎨 UI 디자인 시스템 (1.64.0~1.67.0 신설 — 신규 화면 작성 시 필수)
+
+| 규칙 | 내용 |
+|---|---|
+| **토큰** | `src/index.css` `:root`의 `--ui-*` 색 / `--r-chip(8)·--r-btn(13)·--r-panel(18)` 모서리. 하드코딩 헥스 신규 추가 금지 |
+| **공통 부품** | `src/components/ui/CommonUI.jsx` — ScreenHeader(뒤로가기 통일)·GlassPanel·Chip·UIButton(primary/ghost/gold)·BottomSheet |
+| **색 역할** | accent(와인)는 화면당 주 액션 1개에만. 재화·소울=gold, 보조=dawn |
+| **모션** | `.ui-screen-enter`(전환)·`.ui-stagger`(리스트)·`.ui-press`(프레스)·`.ui-sheen`(CTA). 전부 reduced-motion 가드됨 |
+| **타이포 하한** | 11px (기존 8~10px 신규 사용 금지) / 터치 타깃 40px+ |
+| **미적용 잔여** | 정보창 접이식 섹션(PM 검증 워크플로 보존 위해 의도적 미적용) / 전투 HP바 데미지 잔상 트레일 |
+
 ### 다음 세션 우선순위 (PM 미지정 시 기본값)
 
 | 우선순위 | 작업 | 메모 |
@@ -969,7 +980,7 @@ PM이 PNG를 푸시했다면 **JPG 변환 + 코드 헬퍼 연결 + 버전 갱신
 | **0** | **챔피언십 sanctum + rift + dawn 일러 (PM 생성 대기)** | 프롬프트 3컨셉 완료. dawn은 1.58.0 Pillow placeholder 24장 배치 완료. PM이 ChatGPT(DALL-E 3)로 생성 후 chapter1/2/3/4 서브폴더 푸시 → Claude가 JPG 변환 + 헬퍼 분기 + PR. PM 생성 없으면 대기 |
 | 1 | **챔피언십 sanctum / rift / dawn 적 데이터 통합** | `ENEMIES[champ_*_*]` 정의 + expedition 추가. 헬퍼 chapter 문자열 자동 분기로 코드 0줄. 일러 없어도 폴백("[ 적 모습 미구현 ]")으로 정상 작동 |
 | 2 | **모달 출처 라벨 한글화** | "각인 startSoul" / "유물 critRate" 영어 키 → 한글 풀명. PM 피드백 받으면 시작 |
-| 3 | **도감 일러 노출** | CodexScreen에 신규 일러 썸네일. 발견 못 한 적은 그레이스케일 |
+| 3 | ~~도감 일러 노출~~ | ✅ 1.63.0 완료 (PR #121) — 16:9 썸네일 + 미발견 그레이스케일 자물쇠 |
 | 4 | **이팩트 Phase 3** | 보스 임팩트 프레임, 승리 골든 버스트, 사망 흑백 페이드 |
 | 5 | **튜토리얼 5/6/7** | 보상 선택의 갈림길 / 전투의 흐름 / 영혼의 행로 |
 | 6 | **타 직업 전투 일러 개편** | 술법사·마족·엘프·사제 (방랑검사 1.12.0 완료) |
