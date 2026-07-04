@@ -7,6 +7,16 @@
 
 export const CHANGELOG = [
   {
+    version: '1.64.0',
+    date: '2026-07-04',
+    label: 'UI 리디자인 1단계 — 화면 전환 애니메이션 + 디자인 토큰 + 공통 UI 부품',
+    changes: [
+      { type: 'feature', text: '[화면 전환 애니메이션] 모든 화면 이동에 380ms 페이드+슬라이드 진입 모션 추가. 기존 즉시 교체 → 부드러운 전환. 시스템 "동작 줄이기(reduced motion)" 설정 시 자동 비활성. PM 승인 리디자인 시안(2026-07)의 PR 1/4' },
+      { type: 'system', text: '[디자인 토큰 신설] CSS 변수 기반 색(--ui-*)·모서리 3단계(칩 8 / 버튼 13 / 패널 18px)·글래스 표면 토큰 정의. 이후 리디자인 PR들이 공통 사용 — 하드코딩 헥스 색상 단계적 퇴출 예정' },
+      { type: 'system', text: '[공통 UI 부품 5종 신설] ScreenHeader(뒤로가기 3종 혼재 → 1종 통일)·GlassPanel·Chip·UIButton·BottomSheet (components/ui/CommonUI.jsx). PR 2부터 타이틀·원정 선택·맵 화면 순차 적용 — 이번 PR에서는 기존 화면 시각 변화 없음(전환 모션 제외)' },
+    ],
+  },
+  {
     version: '1.63.0',
     date: '2026-06-14',
     label: '도감 적 일러 노출 — 16:9 썸네일 + 모달 큰 일러 + 미발견 그레이스케일',
