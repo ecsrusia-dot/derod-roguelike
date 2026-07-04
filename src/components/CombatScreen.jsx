@@ -1929,10 +1929,12 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           </div>
         </div>
       )}
-      {/* 최상단 턴 정보 (높이 고정) */}
-      <div className="px-4 py-2 border-b flex items-center justify-between shrink-0" style={{ borderColor: PALETTE.panelBorder, background: PALETTE.panel }}>
-        <span className="text-[10px] tracking-[0.3em]" style={{ color: PALETTE.accent }}>━━ 전투 ━━</span>
-        <span className="text-[10px] tabular-nums" style={{ color: PALETTE.dawn }}>TURN {turn}</span>
+      {/* 최상단 턴 정보 (높이 고정) — 1.66.0 중앙 칩 스타일 */}
+      <div className="py-1.5 flex items-center justify-center shrink-0" style={{ background: 'rgba(0,0,0,0.35)' }}>
+        <span className="tabular-nums tracking-[0.18em] inline-flex items-center" style={{
+          fontSize: 10.5, color: PALETTE.dawn, height: 20, padding: '0 11px', borderRadius: 999,
+          background: 'rgba(212,165,116,0.09)', border: '1px solid var(--ui-line)',
+        }}>TURN {turn}{phase === 'playerTurn' ? ' · 나의 턴' : phase === 'enemyTurn' ? ' · 적의 턴' : ''}</span>
       </div>
 
       {/* 메인 컨테이너: 3분할 + 스킬 버튼 세로 배치 */}
@@ -1992,18 +1994,18 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                 <span className="text-[12px] font-bold drop-shadow-md" style={{ color: enemy.color }}>{enemy.name}</span>
                 <span className="text-[11px] tabular-nums drop-shadow-md" style={{ color: PALETTE.text }}>{animDmg.enemy && <span className="mr-1 animate-pulse" style={{ color: PALETTE.accent }}>-{animDmg.enemy}</span>}{enemy.currentHp}/{enemy.hp}</span>
               </div>
-              <div className="h-1.5 relative mb-1.5" style={{ background: 'rgba(0,0,0,0.7)' }}><div className="absolute inset-y-0 left-0" style={{ width: `${(enemy.currentHp/enemy.hp)*100}%`, background: `linear-gradient(90deg, ${PALETTE.blood}, ${enemy.color})`, transition: 'width 0.45s cubic-bezier(.4,0,.2,1)' }} /></div>
+              <div className="h-2 relative mb-1.5 overflow-hidden" style={{ background: 'rgba(0,0,0,0.6)', borderRadius: 999 }}><div className="absolute inset-y-0 left-0" style={{ width: `${(enemy.currentHp/enemy.hp)*100}%`, borderRadius: 999, background: `linear-gradient(90deg, ${PALETTE.blood}, ${enemy.color})`, boxShadow: `0 0 8px ${enemy.color}66`, transition: 'width 0.45s cubic-bezier(.4,0,.2,1)' }} /></div>
               {/* 2줄: 디버프 카드 (고정 높이) */}
               <div className="flex items-center gap-1.5 flex-wrap min-h-[18px] mb-1">
-                {enemy.defense > 0 && getSkillLevel(skills, '심안') >= 7 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.defense}40`, color: PALETTE.defense, border: `1px solid ${PALETTE.defense}80` }}>◈ 방어 {enemy.defense}</span>)}
-                {enemy.debuffs?.bleed > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.bleed}40`, color: PALETTE.bleed, border: `1px solid ${PALETTE.bleed}80` }}>◆ 출혈 {enemy.debuffs.bleed} ({enemy.debuffs.bleedTurns}T)</span>)}
-                {enemy.debuffs?.igniteDmg > 0 && enemy.debuffs?.igniteTurns > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#ff6b3540', color: '#ff6b35', border: '1px solid #ff6b3580' }}>🔥 화염 {enemy.debuffs.igniteDmg} ({enemy.debuffs.igniteEternal ? '∞' : enemy.debuffs.igniteTurns + 'T'})</span>)}
-                {enemy.debuffs?.eternalFireDmg > 0 && enemy.debuffs?.eternalFireTurns > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#8b1a1a40', color: '#ff8888', border: '1px solid #8b1a1a' }}>🌋 겁화 {enemy.debuffs.eternalFireDmg} ({enemy.debuffs.eternalFireEternal ? '∞' : `${enemy.debuffs.eternalFireTurns}T`})</span>)}
-                {enemy.berserkStacks > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#c4453d40', color: '#c4453d', border: '1px solid #c4453d80' }}>🩸 광폭 +{enemy.berserkStacks}</span>)}
-                {enemy.regen > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#9ad4a340', color: '#9ad4a3', border: '1px solid #9ad4a380' }}>✨ 회복 +{enemy.regen}/T</span>)}
-                {enemy.debuffs?.shockGauge > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.shock}40`, color: PALETTE.shock, border: `1px solid ${PALETTE.shock}80` }}>⚡ 충격 {enemy.debuffs.shockGauge}/100</span>)}
-                {enemy.debuffs?.stunned > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.legendary}40`, color: PALETTE.legendary, border: `1px solid ${PALETTE.legendary}` }}>✦ 기절</span>)}
-                {enemy.debuffs?.shockResist > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.textDim}40`, color: PALETTE.textDim, border: `1px solid ${PALETTE.textDim}80` }}>◇ 저항 ({enemy.debuffs.shockResistTurns}T)</span>)}
+                {enemy.defense > 0 && getSkillLevel(skills, '심안') >= 7 && (<span className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: `${PALETTE.defense}40`, color: PALETTE.defense, border: `1px solid ${PALETTE.defense}80` }}>◈ 방어 {enemy.defense}</span>)}
+                {enemy.debuffs?.bleed > 0 && (<span className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: `${PALETTE.bleed}40`, color: PALETTE.bleed, border: `1px solid ${PALETTE.bleed}80` }}>◆ 출혈 {enemy.debuffs.bleed} ({enemy.debuffs.bleedTurns}T)</span>)}
+                {enemy.debuffs?.igniteDmg > 0 && enemy.debuffs?.igniteTurns > 0 && (<span className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#ff6b3540', color: '#ff6b35', border: '1px solid #ff6b3580' }}>🔥 화염 {enemy.debuffs.igniteDmg} ({enemy.debuffs.igniteEternal ? '∞' : enemy.debuffs.igniteTurns + 'T'})</span>)}
+                {enemy.debuffs?.eternalFireDmg > 0 && enemy.debuffs?.eternalFireTurns > 0 && (<span className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#8b1a1a40', color: '#ff8888', border: '1px solid #8b1a1a' }}>🌋 겁화 {enemy.debuffs.eternalFireDmg} ({enemy.debuffs.eternalFireEternal ? '∞' : `${enemy.debuffs.eternalFireTurns}T`})</span>)}
+                {enemy.berserkStacks > 0 && (<span className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#c4453d40', color: '#c4453d', border: '1px solid #c4453d80' }}>🩸 광폭 +{enemy.berserkStacks}</span>)}
+                {enemy.regen > 0 && (<span className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#9ad4a340', color: '#9ad4a3', border: '1px solid #9ad4a380' }}>✨ 회복 +{enemy.regen}/T</span>)}
+                {enemy.debuffs?.shockGauge > 0 && (<span className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: `${PALETTE.shock}40`, color: PALETTE.shock, border: `1px solid ${PALETTE.shock}80` }}>⚡ 충격 {enemy.debuffs.shockGauge}/100</span>)}
+                {enemy.debuffs?.stunned > 0 && (<span className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: `${PALETTE.legendary}40`, color: PALETTE.legendary, border: `1px solid ${PALETTE.legendary}` }}>✦ 기절</span>)}
+                {enemy.debuffs?.shockResist > 0 && (<span className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: `${PALETTE.textDim}40`, color: PALETTE.textDim, border: `1px solid ${PALETTE.textDim}80` }}>◇ 저항 ({enemy.debuffs.shockResistTurns}T)</span>)}
               </div>
               {/* 3줄: 심안 의도 카드 (고정 높이) */}
               <div className="min-h-[22px]">
@@ -2012,14 +2014,14 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                   const isAttack = enemy.nextIntent.type === 'attack';
                   if (lv < 5) {
                     return (
-                      <div className="px-2 py-1 flex items-center gap-1.5" style={{ background: 'rgba(0,0,0,0.7)', border: `1px dashed ${enemy.color}80` }}>
+                      <div className="px-2 py-1 flex items-center gap-1.5" style={{ background: 'rgba(0,0,0,0.7)', border: `1px dashed ${enemy.color}80`, borderRadius: 10 }}>
                         <AlertTriangle size={11} style={{ color: enemy.color }} />
                         <span className="text-[10px] italic" style={{ color: PALETTE.text }}>{isAttack ? '공격할 것 같다' : '방어할 거 같다'}</span>
                       </div>
                     );
                   }
                   return (
-                    <div className="px-2 py-1 flex items-center gap-1.5" style={{ background: 'rgba(0,0,0,0.7)', border: `1px dashed ${enemy.color}80` }}>
+                    <div className="px-2 py-1 flex items-center gap-1.5" style={{ background: 'rgba(0,0,0,0.7)', border: `1px dashed ${enemy.color}80`, borderRadius: 10 }}>
                       <AlertTriangle size={11} style={{ color: enemy.color }} />
                       <span className="text-[10px] px-1" style={{ background: isAttack ? `${PALETTE.accent}30` : `${PALETTE.defense}30`, color: isAttack ? PALETTE.accent : PALETTE.defense, border: `1px solid ${isAttack ? PALETTE.accent : PALETTE.defense}60` }}>{isAttack ? '공격' : '방어'}</span>
                       <span className="text-[11px] font-bold" style={{ color: PALETTE.text }}>{enemy.nextIntent.name}</span>
@@ -2050,18 +2052,23 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           </div>
         </div>
 
-        {/* === 2/3: 전투 로그 (5줄 분량 = 약 110px 고정, 확장 버튼 제공) === */}
-        <div className="shrink-0 relative border-b" style={{ borderColor: PALETTE.panelBorder }}>
+        {/* === 2/3: 전투 로그 — 1.66.0 글래스 스트립 (110px → 84px, 일러 영역 확대. 전체는 확장 모달) === */}
+        <div className="shrink-0 relative px-2 py-1" style={{ background: 'rgba(0,0,0,0.35)' }}>
           <button
             onClick={() => setLogExpanded(true)}
-            className="absolute top-1 right-1 z-10 p-1 rounded"
-            style={{ background: 'rgba(0,0,0,0.55)', border: `1px solid ${PALETTE.panelBorder}` }}
+            className="ui-press absolute top-2 right-3 z-10 inline-flex items-center gap-1"
+            style={{
+              background: 'rgba(0,0,0,0.55)', border: '1px solid var(--ui-line)', borderRadius: 999,
+              padding: '3px 9px', fontSize: 10, color: PALETTE.textDim,
+            }}
             title="전투 로그 확장"
             aria-label="전투 로그 확장"
           >
-            <Maximize2 size={11} style={{ color: PALETTE.textDim }} />
+            <Maximize2 size={10} style={{ color: PALETTE.textDim }} /> 기록
           </button>
-          <div className="h-[110px] overflow-y-auto px-3 py-2 space-y-1" style={{ background: `linear-gradient(180deg, ${PALETTE.bgDeep}, #060306)` }}>
+          <div className="h-[84px] overflow-y-auto px-3 py-1.5 space-y-1" style={{
+            background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(212,165,116,0.08)', borderRadius: 12,
+          }}>
             {log.map((l, i) => {
               if (l.type === 'turnDivider') {
                 return (
@@ -2127,61 +2134,75 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
               <div className="flex justify-between items-center mb-1">
                 <div className="flex items-center gap-1.5">
                   <span className="text-[12px] font-bold drop-shadow-md" style={{ color: classData.color }}>{classData.name}</span>
-                  <button onClick={() => setStatusModalOpen(true)} className="text-[10px] px-1.5 py-0.5 leading-none" style={{ background: `${classData.color}30`, border: `1px solid ${classData.color}80`, color: '#fff' }} title="스테이터스 보기">≡</button>
+                  <button onClick={() => setStatusModalOpen(true)} className="ui-press text-[11px] px-2 py-1 leading-none" style={{ borderRadius: 8, background: `${classData.color}30`, border: `1px solid ${classData.color}80`, color: '#fff' }} title="스테이터스 보기" aria-label="스테이터스 보기">≡</button>
                 </div>
                 <span className="text-[11px] tabular-nums font-bold drop-shadow-md" style={{ color: PALETTE.text }}>{animDmg.player && <span className="mr-1 animate-pulse" style={{ color: PALETTE.accent }}>-{animDmg.player}</span>}{player.hp}/{player.maxHp}</span>
               </div>
-              <div className="h-1.5 relative mb-1.5" style={{ background: 'rgba(0,0,0,0.7)' }}><div className="absolute inset-y-0 left-0" style={{ width: `${(player.hp/player.maxHp)*100}%`, background: `linear-gradient(90deg, ${PALETTE.blood}, ${PALETTE.green})`, transition: 'width 0.45s cubic-bezier(.4,0,.2,1)' }} /></div>
-              {/* 2줄: 버프/상태 카드 (고정 높이) */}
-              <div className="flex items-center gap-1.5 flex-wrap min-h-[18px]">
-                <span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.twilight}50`, color: '#fff', border: `1px solid ${PALETTE.twilight}` }}>✦ 에테르 {player.ether}/{player.maxEther}</span>
-                {player.defense > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.defense}50`, color: '#fff', border: `1px solid ${PALETTE.defense}` }}>◈ 방어 {player.defense}</span>)}
-                {player.buffs?.rage > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.accent}50`, color: '#fff', border: `1px solid ${PALETTE.accent}` }}>☩ 분노 ({player.buffs.rage}T)</span>)}
-                {player.buffs?.shadowCounterTurns > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#1a0f0a90', color: '#ffd86b', border: '1px solid #ffd86b', boxShadow: '0 0 6px rgba(255,216,107,0.5)' }}>☄ 무영의 잔영 반격 100% ({player.buffs.shadowCounterTurns}T)</span>)}
-                {player.buffs?.flameBoostTurns > 0 && player.buffs?.flameBoostPct > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#ff450050', color: '#ffd1a3', border: '1px solid #ff4500', boxShadow: '0 0 6px rgba(255,69,0,0.5)' }}>🔥 영겁의 정념 +{player.buffs.flameBoostPct}% ({player.buffs.flameBoostTurns}T)</span>)}
-                {player.buffs?.flameBarrierPending > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#ff6b3550', color: '#fff', border: '1px solid #ff6b35' }}>🔥 화염장막 ({player.buffs.flameBarrierPending}%)</span>)}
-                {player.buffs?.guaranteedCrit > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#c4453d50', color: '#fff', border: '1px solid #c4453d' }}>✦ 치명타 확정</span>)}
-                {player.buffs?.mirrorCounterDmgPending && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#88aacc50', color: '#fff', border: '1px solid #88aacc' }}>◇ 회피→반격 +100%</span>)}
-                {player.firstHitImmune && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.legendary}50`, color: '#fff', border: `1px solid ${PALETTE.legendary}` }}>✦ 무적 1회</span>)}
-                {/* 1.62.0 픽스 #10: 6 신규 buff 메인 헤더 상태 배지 */}
-                {player.divineShield > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#d4a57450', color: '#fff', border: '1px solid #d4a574' }}>🛡 여명의 가호 {player.divineShield}%</span>)}
-                {player.buffs?.dawnGuardTurns > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#d4a57450', color: '#fff', border: '1px solid #d4a574' }}>✦ 강림 가호 -{player.buffs.dawnGuard || 0}% ({player.buffs.dawnGuardTurns}T)</span>)}
-                {player.buffs?.bloodLifestealTurns > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#7a181850', color: '#fff', border: '1px solid #7a1818' }}>🩸 흡혈 {player.buffs.bloodLifesteal || 0}% ({player.buffs.bloodLifestealTurns}T)</span>)}
-                {player.buffs?.windBoostNextDmg && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#7a9a5e50', color: '#fff', border: '1px solid #7a9a5e' }}>🌪 풍령 다음 +50%</span>)}
-                {player.buffs?.windPierceNext && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#7a9a5e50', color: '#fff', border: '1px solid #7a9a5e' }}>🏹 풍령 방어 무시</span>)}
-                {player.buffs?.bloodRageNext && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#7a181850', color: '#fff', border: '1px solid #7a1818' }}>✸ 혈광 다음 +15%</span>)}
-                {player.debuffs?.frostbiteDmg > 0 && player.debuffs?.frostbiteTurns > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#7ba3c450', color: '#fff', border: '1px solid #7ba3c4' }}>❄️ 동상 {player.debuffs.frostbiteDmg} ({player.debuffs.frostbiteTurns}T)</span>)}
-                {player.debuffs?.sealedTurns > 0 && player.debuffs?.sealedSkills?.length > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#5c4a8c50', color: '#fff', border: '1px solid #5c4a8c' }}>🔒 봉인 {player.debuffs.sealedSkills.map(k => COMBAT_SKILLS[k]?.name || k).join(',')} ({player.debuffs.sealedTurns}T)</span>)}
-                {player.debuffs?.shockGauge > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#8b1f1f50', color: '#fff', border: '1px solid #8b1f1f' }}>⚡ 충격 {player.debuffs.shockGauge}/100</span>)}
-                {player.debuffs?.stunnedTurns > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#a52a2a50', color: '#fff', border: '1px solid #a52a2a' }}>💫 기절 ({player.debuffs.stunnedTurns}T)</span>)}
-              </div>
+              <div className="h-2 relative mb-1.5 overflow-hidden" style={{ background: 'rgba(0,0,0,0.6)', borderRadius: 999 }}><div className="absolute inset-y-0 left-0" style={{ width: `${(player.hp/player.maxHp)*100}%`, borderRadius: 999, background: `linear-gradient(90deg, ${PALETTE.blood}, ${PALETTE.green})`, boxShadow: `0 0 8px ${PALETTE.green}55`, transition: 'width 0.45s cubic-bezier(.4,0,.2,1)' }} /></div>
+              {/* 2줄: 상태 칩 — 1.66.0 그룹핑: 리소스(에테르·방어)+디버프는 항상, 버프는 2개+"+N ▾"(탭 시 ≡ 상태 모달 전체 목록) */}
+              {(() => {
+                const buffChips = [];
+                if (player.buffs?.rage > 0) buffChips.push(<span key="rage" className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: `${PALETTE.accent}50`, color: '#fff', border: `1px solid ${PALETTE.accent}` }}>☩ 분노 ({player.buffs.rage}T)</span>);
+                if (player.buffs?.shadowCounterTurns > 0) buffChips.push(<span key="shadow" className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#1a0f0a90', color: '#ffd86b', border: '1px solid #ffd86b', boxShadow: '0 0 6px rgba(255,216,107,0.5)' }}>☄ 무영의 잔영 반격 100% ({player.buffs.shadowCounterTurns}T)</span>);
+                if (player.buffs?.flameBoostTurns > 0 && player.buffs?.flameBoostPct > 0) buffChips.push(<span key="flameBoost" className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#ff450050', color: '#ffd1a3', border: '1px solid #ff4500', boxShadow: '0 0 6px rgba(255,69,0,0.5)' }}>🔥 영겁의 정념 +{player.buffs.flameBoostPct}% ({player.buffs.flameBoostTurns}T)</span>);
+                if (player.buffs?.flameBarrierPending > 0) buffChips.push(<span key="flameBarrier" className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#ff6b3550', color: '#fff', border: '1px solid #ff6b35' }}>🔥 화염장막 ({player.buffs.flameBarrierPending}%)</span>);
+                if (player.buffs?.guaranteedCrit > 0) buffChips.push(<span key="gCrit" className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#c4453d50', color: '#fff', border: '1px solid #c4453d' }}>✦ 치명타 확정</span>);
+                if (player.buffs?.mirrorCounterDmgPending) buffChips.push(<span key="mirror" className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#88aacc50', color: '#fff', border: '1px solid #88aacc' }}>◇ 회피→반격 +100%</span>);
+                if (player.firstHitImmune) buffChips.push(<span key="immune" className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: `${PALETTE.legendary}50`, color: '#fff', border: `1px solid ${PALETTE.legendary}` }}>✦ 무적 1회</span>);
+                if (player.divineShield > 0) buffChips.push(<span key="divine" className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#d4a57450', color: '#fff', border: '1px solid #d4a574' }}>🛡 여명의 가호 {player.divineShield}%</span>);
+                if (player.buffs?.dawnGuardTurns > 0) buffChips.push(<span key="dawnGuard" className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#d4a57450', color: '#fff', border: '1px solid #d4a574' }}>✦ 강림 가호 -{player.buffs.dawnGuard || 0}% ({player.buffs.dawnGuardTurns}T)</span>);
+                if (player.buffs?.bloodLifestealTurns > 0) buffChips.push(<span key="bloodLs" className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#7a181850', color: '#fff', border: '1px solid #7a1818' }}>🩸 흡혈 {player.buffs.bloodLifesteal || 0}% ({player.buffs.bloodLifestealTurns}T)</span>);
+                if (player.buffs?.windBoostNextDmg) buffChips.push(<span key="windBoost" className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#7a9a5e50', color: '#fff', border: '1px solid #7a9a5e' }}>🌪 풍령 다음 +50%</span>);
+                if (player.buffs?.windPierceNext) buffChips.push(<span key="windPierce" className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#7a9a5e50', color: '#fff', border: '1px solid #7a9a5e' }}>🏹 풍령 방어 무시</span>);
+                if (player.buffs?.bloodRageNext) buffChips.push(<span key="bloodRage" className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#7a181850', color: '#fff', border: '1px solid #7a1818' }}>✸ 혈광 다음 +15%</span>);
+                // 디버프는 그룹핑에서 제외 — 위험 정보라 항상 노출
+                const debuffChips = [];
+                if (player.debuffs?.frostbiteDmg > 0 && player.debuffs?.frostbiteTurns > 0) debuffChips.push(<span key="frostbite" className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#7ba3c450', color: '#fff', border: '1px solid #7ba3c4' }}>❄️ 동상 {player.debuffs.frostbiteDmg} ({player.debuffs.frostbiteTurns}T)</span>);
+                if (player.debuffs?.sealedTurns > 0 && player.debuffs?.sealedSkills?.length > 0) debuffChips.push(<span key="sealed" className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#5c4a8c50', color: '#fff', border: '1px solid #5c4a8c' }}>🔒 봉인 {player.debuffs.sealedSkills.map(k => COMBAT_SKILLS[k]?.name || k).join(',')} ({player.debuffs.sealedTurns}T)</span>);
+                if (player.debuffs?.shockGauge > 0) debuffChips.push(<span key="shock" className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#8b1f1f50', color: '#fff', border: '1px solid #8b1f1f' }}>⚡ 충격 {player.debuffs.shockGauge}/100</span>);
+                if (player.debuffs?.stunnedTurns > 0) debuffChips.push(<span key="stunned" className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#a52a2a50', color: '#fff', border: '1px solid #a52a2a' }}>💫 기절 ({player.debuffs.stunnedTurns}T)</span>);
+                const visibleBuffs = buffChips.slice(0, 2);
+                const hiddenCount = buffChips.length - visibleBuffs.length;
+                return (
+                  <div className="flex items-center gap-1.5 flex-wrap min-h-[20px]">
+                    <span className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: `${PALETTE.twilight}50`, color: '#fff', border: `1px solid ${PALETTE.twilight}` }}>✦ 에테르 {player.ether}/{player.maxEther}</span>
+                    {player.defense > 0 && (<span className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: `${PALETTE.defense}50`, color: '#fff', border: `1px solid ${PALETTE.defense}` }}>◈ 방어 {player.defense}</span>)}
+                    {debuffChips}
+                    {visibleBuffs}
+                    {hiddenCount > 0 && (
+                      <button onClick={() => setStatusModalOpen(true)} className="ui-press text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.3)', color: PALETTE.text }} aria-label="모든 상태 보기">+{hiddenCount} ▾</button>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
 
-        {/* 스킬 버튼 — 고정 높이 (소울 게이지 + 4번째 궁극 슬롯이 있으면 +12px) */}
+        {/* 스킬 버튼 — 고정 높이. 1.66.0 카드형으로 키움 (소울 게이지 + 4번째 궁극 슬롯이 있으면 +22px) */}
         <div className="shrink-0 border-t px-2.5 flex flex-col justify-center" style={{
-          borderColor: PALETTE.panelBorder,
+          borderColor: 'var(--ui-line)',
           background: PALETTE.bgDeep,
-          height: classData.ultimateId ? 104 : 88,
+          height: classData.ultimateId ? 118 : 96,
         }}>
-          {/* 소울 게이지 바 (직업 소울 스킬 보유 시) */}
-          {classData.ultimateId && phase === 'playerTurn' && (() => {
+          {/* 소울 게이지 바 (직업 소울 스킬 보유 시) — 1.66.0 전용 골드 바 승격, 적 턴에도 유지 */}
+          {classData.ultimateId && (phase === 'playerTurn' || phase === 'enemyTurn') && (() => {
             const gauge = player.soulGauge || 0;
             const ready = gauge >= 100;
             return (
               <div className="w-full mb-1.5 flex items-center gap-2">
-                <span className="text-[9px] tracking-[0.2em]" style={{ color: ready ? '#ffd86b' : PALETTE.textDim }}>소울</span>
-                <div className="flex-1 h-1.5 relative" style={{ background: 'rgba(0,0,0,0.55)', border: `1px solid ${ready ? '#ffd86b' : PALETTE.panelBorder}` }}>
+                <span className="tracking-[0.2em]" style={{ fontSize: 9, fontFamily: '"Cinzel", serif', color: ready ? '#ffd86b' : PALETTE.textDim }}>SOUL</span>
+                <div className="flex-1 h-1.5 relative overflow-hidden" style={{ background: 'rgba(232,176,74,0.12)', borderRadius: 999 }}>
                   <div className="absolute inset-y-0 left-0 transition-all" style={{
                     width: `${gauge}%`,
+                    borderRadius: 999,
                     background: ready
                       ? `linear-gradient(90deg, #ffd86b, #fff4b8, #ffd86b)`
-                      : `linear-gradient(90deg, ${PALETTE.legendary}, #ffd86b)`,
-                    boxShadow: ready ? '0 0 8px rgba(255,216,107,0.8)' : 'none',
+                      : `linear-gradient(90deg, #8a6a3e, ${PALETTE.legendary})`,
+                    boxShadow: ready ? '0 0 10px rgba(255,216,107,0.9)' : '0 0 6px rgba(232,176,74,0.4)',
                   }} />
                 </div>
-                <span className="text-[9px] tabular-nums" style={{ color: ready ? '#ffd86b' : PALETTE.textDim }}>{gauge}/100</span>
+                <span className="tabular-nums" style={{ fontSize: 9.5, color: ready ? '#ffd86b' : PALETTE.textDim }}>{gauge}/100</span>
               </div>
             );
           })()}
@@ -2199,21 +2220,23 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                 // 1.49.0~ 신전 액티브 스킬 봉인
                 const isSealed = (player.debuffs?.sealedSkills || []).includes(skillKey);
                 const disabled = onCd || noEther || buffUsedThisTurn || isSealed;
+                // 1.66.0 카드형 버튼 — 상단 타입 컬러 엣지 + 타입 글리프
+                const typeColor = skill.type === 'physical' ? PALETTE.accent : skill.type === 'magic' ? PALETTE.twilight : skill.type === 'defense' ? PALETTE.ice : PALETTE.dawn;
+                const typeGlyph = skill.type === 'physical' ? '⚔' : skill.type === 'magic' ? '✦' : skill.type === 'defense' ? '🛡' : '◈';
                 return (
                   <button key={skillKey} onClick={() => handlePlayerAction(skillKey)} disabled={disabled}
-                    className="py-2 transition-all flex flex-col items-center gap-0.5 relative"
+                    className="ui-press py-1.5 transition-all flex flex-col items-center gap-0.5 relative overflow-hidden"
                     style={{
+                      borderRadius: 'var(--r-btn)',
                       background: isSealed ? 'rgba(92,74,140,0.45)'
                         : disabled ? 'rgba(0,0,0,0.5)'
-                        : skill.type === 'physical' ? `${PALETTE.accent}30`
-                        : skill.type === 'magic' ? `${PALETTE.twilight}30`
-                        : skill.type === 'defense' ? `${PALETTE.ice}30`
-                        : `${PALETTE.dawn}30`,
-                      border: `1px solid ${isSealed ? '#5c4a8c' : disabled ? PALETTE.panelBorder : skill.type === 'physical' ? PALETTE.accent : skill.type === 'magic' ? PALETTE.twilight : skill.type === 'defense' ? PALETTE.ice : PALETTE.dawn}`,
+                        : 'rgba(255,255,255,0.045)',
+                      border: `1px solid ${isSealed ? '#5c4a8c' : disabled ? PALETTE.panelBorder : `${typeColor}66`}`,
                       color: disabled ? PALETTE.textDim : '#fff',
                       opacity: disabled ? 0.5 : 1,
                     }}>
-                    <span className="text-[11px] font-bold">{skill.name}</span>
+                    <span className="absolute top-0" style={{ left: '18%', right: '18%', height: 2, borderRadius: '0 0 3px 3px', background: typeColor, opacity: disabled ? 0.3 : 0.9 }} />
+                    <span className="text-[11px] font-bold flex items-center gap-1"><span style={{ color: disabled ? PALETTE.textDim : typeColor, fontSize: 10 }}>{typeGlyph}</span>{skill.name}</span>
                     <span className="text-[9px]" style={{ color: disabled ? PALETTE.textDim : '#ddd' }}>
                       {skill.type === 'defense' ? `+${skill.defense}`
                         : skill.type === 'buff' ? '버프 · 즉시'
@@ -2239,15 +2262,17 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                     onClick={() => handleUltimate()}
                     disabled={!ready}
                     title={`${ult.name}\n${ult.desc}`}
-                    className={`py-2 transition-all flex flex-col items-center gap-0.5 ${ready ? 'fx-hit-shake' : ''}`}
+                    className={`ui-press py-1.5 transition-all flex flex-col items-center gap-0.5 relative overflow-hidden ${ready ? 'fx-hit-shake' : ''}`}
                     style={{
+                      borderRadius: 'var(--r-btn)',
                       background: ready ? `linear-gradient(180deg, ${ult.color}60, ${ult.color}25)` : 'rgba(0,0,0,0.55)',
                       border: `1px solid ${ready ? '#ffd86b' : PALETTE.panelBorder}`,
                       color: ready ? '#fff' : PALETTE.textDim,
                       opacity: ready ? 1 : 0.55,
-                      boxShadow: ready ? '0 0 10px rgba(255,216,107,0.55)' : 'none',
+                      boxShadow: ready ? '0 0 12px rgba(255,216,107,0.6)' : 'none',
                     }}
                   >
+                    <span className="absolute top-0" style={{ left: '18%', right: '18%', height: 2, borderRadius: '0 0 3px 3px', background: '#ffd86b', opacity: ready ? 0.95 : 0.3 }} />
                     <span className="text-[11px] font-bold flex items-center gap-0.5">
                       <span style={{ color: ready ? '#ffd86b' : PALETTE.textDim }}>★</span>
                       {ult.name}
@@ -2277,15 +2302,18 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
               }
               onVictory(finalHp, enemy.drop);
             }}
-              className="w-full py-2.5 text-xs tracking-[0.3em] font-bold" style={{
-                background: `linear-gradient(180deg, ${PALETTE.legendary}60, ${PALETTE.legendary}30)`,
-                border: `1px solid ${PALETTE.legendary}`, color: '#fff',
+              className="ui-press w-full py-3 text-xs tracking-[0.3em] font-bold" style={{
+                borderRadius: 'var(--r-btn)',
+                background: `linear-gradient(160deg, ${PALETTE.legendary}66, ${PALETTE.legendary}28)`,
+                border: '1px solid rgba(232,176,74,0.6)', color: '#ffe9d2',
+                boxShadow: '0 4px 18px -6px rgba(232,176,74,0.5)',
               }}>▸ 보상 획득</button>
           )}
           {phase === 'defeat' && (
-            <button onClick={() => onDefeat()} className="w-full py-2.5 text-xs tracking-[0.3em] font-bold" style={{
-              background: `linear-gradient(180deg, ${PALETTE.accent}60, ${PALETTE.accent}30)`,
-              border: `1px solid ${PALETTE.accent}`, color: '#fff',
+            <button onClick={() => onDefeat()} className="ui-press w-full py-3 text-xs tracking-[0.3em] font-bold" style={{
+              borderRadius: 'var(--r-btn)',
+              background: `linear-gradient(160deg, ${PALETTE.accent}66, ${PALETTE.accent}28)`,
+              border: `1px solid ${PALETTE.accent}`, color: '#ffe9d2',
             }}>▸ 메인 메뉴로</button>
           )}
         </div>
@@ -2295,7 +2323,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       {/* 스테이터스 전체 모달 (직업명 옆 ≡ 클릭 시) */}
       {statusModalOpen && (
         <div onClick={() => setStatusModalOpen(false)} className="absolute inset-0 flex items-center justify-center z-40 px-4" style={{ background: 'rgba(0,0,0,0.8)' }}>
-          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm max-h-[85%] overflow-y-auto px-4 py-4" style={{ background: PALETTE.bgDeep, border: `1px solid ${classData.color}` }}>
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm max-h-[85%] overflow-y-auto px-4 py-4" style={{ borderRadius: 18, background: 'var(--ui-glass-strong)', backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', border: `1px solid ${classData.color}66`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}>
             <div className="flex justify-between items-center mb-3">
               <span className="text-[12px] tracking-[0.3em] font-bold" style={{ color: classData.color }}>━ {classData.name} 스테이터스 ━</span>
               <button onClick={() => setStatusModalOpen(false)} className="text-[14px] px-2" style={{ color: PALETTE.textDim }}>✕</button>
@@ -2325,25 +2353,25 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                 <>
                   <div className="text-[10px] mb-1.5" style={{ color: PALETTE.textDim }}>━ 활성 상태 ━</div>
                   <div className="flex items-center gap-1.5 flex-wrap mb-3">
-                    {player.buffs?.rage > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.accent}50`, color: '#fff', border: `1px solid ${PALETTE.accent}` }}>☩ 분노 ({player.buffs.rage}T)</span>)}
-                    {player.buffs?.shadowCounterTurns > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#1a0f0a90', color: '#ffd86b', border: '1px solid #ffd86b', boxShadow: '0 0 6px rgba(255,216,107,0.5)' }}>☄ 무영의 잔영 반격 100% ({player.buffs.shadowCounterTurns}T)</span>)}
-                    {player.buffs?.flameBoostTurns > 0 && player.buffs?.flameBoostPct > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#ff450050', color: '#ffd1a3', border: '1px solid #ff4500', boxShadow: '0 0 6px rgba(255,69,0,0.5)' }}>🔥 영겁의 정념 +{player.buffs.flameBoostPct}% ({player.buffs.flameBoostTurns}T)</span>)}
-                    {player.buffs?.flameBarrierPending > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#ff6b3550', color: '#fff', border: '1px solid #ff6b35' }}>🔥 화염장막 ({player.buffs.flameBarrierPending}%)</span>)}
-                    {player.buffs?.guaranteedCrit > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#c4453d50', color: '#fff', border: '1px solid #c4453d' }}>✦ 치명타 확정</span>)}
-                    {player.buffs?.mirrorCounterDmgPending && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#88aacc50', color: '#fff', border: '1px solid #88aacc' }}>◇ 회피→반격 +100%</span>)}
-                    {player.buffs?.dodgeBuffTurns > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.green}50`, color: '#fff', border: `1px solid ${PALETTE.green}` }}>💨 회피 +{player.buffs.dodgeBuff || 0}% ({player.buffs.dodgeBuffTurns}T)</span>)}
-                    {player.firstHitImmune && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: `${PALETTE.legendary}50`, color: '#fff', border: `1px solid ${PALETTE.legendary}` }}>✦ 무적 1회</span>)}
+                    {player.buffs?.rage > 0 && (<span className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: `${PALETTE.accent}50`, color: '#fff', border: `1px solid ${PALETTE.accent}` }}>☩ 분노 ({player.buffs.rage}T)</span>)}
+                    {player.buffs?.shadowCounterTurns > 0 && (<span className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#1a0f0a90', color: '#ffd86b', border: '1px solid #ffd86b', boxShadow: '0 0 6px rgba(255,216,107,0.5)' }}>☄ 무영의 잔영 반격 100% ({player.buffs.shadowCounterTurns}T)</span>)}
+                    {player.buffs?.flameBoostTurns > 0 && player.buffs?.flameBoostPct > 0 && (<span className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#ff450050', color: '#ffd1a3', border: '1px solid #ff4500', boxShadow: '0 0 6px rgba(255,69,0,0.5)' }}>🔥 영겁의 정념 +{player.buffs.flameBoostPct}% ({player.buffs.flameBoostTurns}T)</span>)}
+                    {player.buffs?.flameBarrierPending > 0 && (<span className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#ff6b3550', color: '#fff', border: '1px solid #ff6b35' }}>🔥 화염장막 ({player.buffs.flameBarrierPending}%)</span>)}
+                    {player.buffs?.guaranteedCrit > 0 && (<span className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#c4453d50', color: '#fff', border: '1px solid #c4453d' }}>✦ 치명타 확정</span>)}
+                    {player.buffs?.mirrorCounterDmgPending && (<span className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#88aacc50', color: '#fff', border: '1px solid #88aacc' }}>◇ 회피→반격 +100%</span>)}
+                    {player.buffs?.dodgeBuffTurns > 0 && (<span className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: `${PALETTE.green}50`, color: '#fff', border: `1px solid ${PALETTE.green}` }}>💨 회피 +{player.buffs.dodgeBuff || 0}% ({player.buffs.dodgeBuffTurns}T)</span>)}
+                    {player.firstHitImmune && (<span className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: `${PALETTE.legendary}50`, color: '#fff', border: `1px solid ${PALETTE.legendary}` }}>✦ 무적 1회</span>)}
                     {/* 1.62.0 픽스 #10: 6 신규 buff 상태 배지 */}
-                    {player.divineShield > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#d4a57450', color: '#fff', border: '1px solid #d4a574' }}>🛡 여명의 가호 {player.divineShield}%</span>)}
-                    {player.buffs?.dawnGuardTurns > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#d4a57450', color: '#fff', border: '1px solid #d4a574' }}>✦ 강림 가호 -{player.buffs.dawnGuard || 0}% ({player.buffs.dawnGuardTurns}T)</span>)}
-                    {player.buffs?.bloodLifestealTurns > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#7a181850', color: '#fff', border: '1px solid #7a1818' }}>🩸 흡혈 {player.buffs.bloodLifesteal || 0}% ({player.buffs.bloodLifestealTurns}T)</span>)}
-                    {player.buffs?.windBoostNextDmg && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#7a9a5e50', color: '#fff', border: '1px solid #7a9a5e' }}>🌪 풍령 다음 공격 +50%</span>)}
-                    {player.buffs?.windPierceNext && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#7a9a5e50', color: '#fff', border: '1px solid #7a9a5e' }}>🏹 풍령 다음 방어 무시</span>)}
-                    {player.buffs?.bloodRageNext && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#7a181850', color: '#fff', border: '1px solid #7a1818' }}>✸ 혈광 다음 공격 +15%</span>)}
-                    {player.debuffs?.frostbiteDmg > 0 && player.debuffs?.frostbiteTurns > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#7ba3c450', color: '#fff', border: '1px solid #7ba3c4' }}>❄️ 동상 {player.debuffs.frostbiteDmg} ({player.debuffs.frostbiteTurns}T)</span>)}
-                    {player.debuffs?.sealedTurns > 0 && player.debuffs?.sealedSkills?.length > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#5c4a8c50', color: '#fff', border: '1px solid #5c4a8c' }}>🔒 봉인 {player.debuffs.sealedSkills.map(k => COMBAT_SKILLS[k]?.name || k).join(',')} ({player.debuffs.sealedTurns}T)</span>)}
-                    {player.debuffs?.shockGauge > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#8b1f1f50', color: '#fff', border: '1px solid #8b1f1f' }}>⚡ 충격 {player.debuffs.shockGauge}/100</span>)}
-                    {player.debuffs?.stunnedTurns > 0 && (<span className="text-[10px] px-1.5 py-0.5" style={{ background: '#a52a2a50', color: '#fff', border: '1px solid #a52a2a' }}>💫 기절 ({player.debuffs.stunnedTurns}T)</span>)}
+                    {player.divineShield > 0 && (<span className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#d4a57450', color: '#fff', border: '1px solid #d4a574' }}>🛡 여명의 가호 {player.divineShield}%</span>)}
+                    {player.buffs?.dawnGuardTurns > 0 && (<span className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#d4a57450', color: '#fff', border: '1px solid #d4a574' }}>✦ 강림 가호 -{player.buffs.dawnGuard || 0}% ({player.buffs.dawnGuardTurns}T)</span>)}
+                    {player.buffs?.bloodLifestealTurns > 0 && (<span className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#7a181850', color: '#fff', border: '1px solid #7a1818' }}>🩸 흡혈 {player.buffs.bloodLifesteal || 0}% ({player.buffs.bloodLifestealTurns}T)</span>)}
+                    {player.buffs?.windBoostNextDmg && (<span className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#7a9a5e50', color: '#fff', border: '1px solid #7a9a5e' }}>🌪 풍령 다음 공격 +50%</span>)}
+                    {player.buffs?.windPierceNext && (<span className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#7a9a5e50', color: '#fff', border: '1px solid #7a9a5e' }}>🏹 풍령 다음 방어 무시</span>)}
+                    {player.buffs?.bloodRageNext && (<span className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#7a181850', color: '#fff', border: '1px solid #7a1818' }}>✸ 혈광 다음 공격 +15%</span>)}
+                    {player.debuffs?.frostbiteDmg > 0 && player.debuffs?.frostbiteTurns > 0 && (<span className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#7ba3c450', color: '#fff', border: '1px solid #7ba3c4' }}>❄️ 동상 {player.debuffs.frostbiteDmg} ({player.debuffs.frostbiteTurns}T)</span>)}
+                    {player.debuffs?.sealedTurns > 0 && player.debuffs?.sealedSkills?.length > 0 && (<span className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#5c4a8c50', color: '#fff', border: '1px solid #5c4a8c' }}>🔒 봉인 {player.debuffs.sealedSkills.map(k => COMBAT_SKILLS[k]?.name || k).join(',')} ({player.debuffs.sealedTurns}T)</span>)}
+                    {player.debuffs?.shockGauge > 0 && (<span className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#8b1f1f50', color: '#fff', border: '1px solid #8b1f1f' }}>⚡ 충격 {player.debuffs.shockGauge}/100</span>)}
+                    {player.debuffs?.stunnedTurns > 0 && (<span className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#a52a2a50', color: '#fff', border: '1px solid #a52a2a' }}>💫 기절 ({player.debuffs.stunnedTurns}T)</span>)}
                   </div>
                 </>
               );
