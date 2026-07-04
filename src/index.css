@@ -527,10 +527,35 @@ body {
 .ui-press { transition: transform 0.12s cubic-bezier(.34, 1.56, .64, 1); }
 .ui-press:active { transform: scale(0.96); }
 
+/* 주 액션 CTA 셔츠광 순환 — UIButton 등에 className으로 부착 */
+@keyframes ui-sheen {
+  0%, 55% { transform: translateX(-120%); }
+  75%, 100% { transform: translateX(120%); }
+}
+.ui-sheen { position: relative; overflow: hidden; }
+.ui-sheen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.16) 50%, transparent 70%);
+  transform: translateX(-120%);
+  animation: ui-sheen 3.6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* 타이틀 로고 미세 부유 */
+@keyframes ui-floaty {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+.ui-floaty { animation: ui-floaty 5s ease-in-out infinite; }
+
 /* 시스템 "동작 줄이기" 설정 존중 */
 @media (prefers-reduced-motion: reduce) {
   .ui-screen-enter,
-  .ui-stagger > * { animation: none; }
+  .ui-stagger > *,
+  .ui-sheen::after,
+  .ui-floaty { animation: none; }
   .ui-press { transition: none; }
   .ui-press:active { transform: none; }
 }

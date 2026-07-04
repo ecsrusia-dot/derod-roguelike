@@ -73,7 +73,7 @@ export function Chip({ icon, children, color = PALETTE.dawn, style }) {
         height: 22,
         padding: '0 9px',
         borderRadius: 999,
-        fontSize: 10.5,
+        fontSize: 11,
         color,
         border: `1px solid ${color}55`,
         background: `${color}18`,

@@ -1,10 +1,36 @@
 // ============================================
 // components/TitleScreen.jsx — 메인 타이틀 화면
 // ============================================
+// 1.65.0 리디자인 (승인 시안 03절):
+//   - accent(와인 그라디언트)는 "여정 시작" 1개에만 — 시선 3단계 정리
+//   - 이어하기는 골드 하이라이트 행, 제단·각인·업적은 글래스 리스트로
+//   - 로고 부유 모션 + 골드 그라디언트 타이틀 + CTA 셔츠광
+// ============================================
 import React from 'react';
-import { PlayCircle } from 'lucide-react';
+import { PlayCircle, Sparkles, Gem, Trophy, ChevronRight } from 'lucide-react';
 import { PALETTE } from '../utils/helpers.js';
-import { GAME_VERSION, VERSION_DATE, VERSION_LABEL, CLASSES } from '../data.js';
+import { GAME_VERSION, CLASSES } from '../data.js';
+import { GlassPanel, Chip, UIButton } from './ui/CommonUI.jsx';
+
+// 글래스 리스트 행 — 타이틀 화면 보조 메뉴 전용
+function MenuRow({ icon: Icon, label, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className="ui-press flex items-center gap-2.5 w-full text-left"
+      style={{ height: 44, padding: '0 12px', background: 'transparent', border: 'none', color: PALETTE.text, fontSize: 13 }}
+    >
+      <span
+        className="flex items-center justify-center flex-none"
+        style={{ width: 26, height: 26, borderRadius: 'var(--r-chip)', background: 'rgba(212,165,116,0.12)', color: PALETTE.dawn }}
+      >
+        <Icon size={14} />
+      </span>
+      {label}
+      <ChevronRight size={14} className="ml-auto" style={{ color: PALETTE.textDim, opacity: 0.7 }} />
+    </button>
+  );
+}
 
 export default function TitleScreen({ meta, onStart, onResume, onAltar, onEngravings, onAchievements, onChangelog, onAccount }) {
   // 진행 중인 런이 있는지 — 이어하기 버튼 노출 여부 결정
@@ -18,116 +44,85 @@ export default function TitleScreen({ meta, onStart, onResume, onAltar, onEngrav
         : `Ch.${(activeRun.chapterIdx || 0) + 1}`)
     : '';
   return (
-    <div className="absolute inset-0 flex flex-col items-center justify-between py-12 px-8" style={{
-      background: `radial-gradient(ellipse at center, ${PALETTE.panel} 0%, ${PALETTE.bgDeep} 70%)`,
+    <div className="absolute inset-0 flex flex-col items-center justify-between pt-12 pb-4 px-5" style={{
+      background: `radial-gradient(140% 60% at 50% -12%, ${PALETTE.dawn}24, transparent 60%), radial-gradient(90% 40% at 50% 115%, ${PALETTE.twilight}29, transparent 65%), ${PALETTE.bg}`,
     }}>
-      <div className="text-center mt-8">
-        <div className="text-xs tracking-[0.4em] mb-4" style={{ color: PALETTE.dawn, opacity: 0.7 }}>
+      <div className="text-center mt-6 ui-floaty">
+        <div className="text-[10px] tracking-[0.55em]" style={{ color: PALETTE.dawn }}>
           DAWN &amp; TWILIGHT
         </div>
-        <h1 className="text-4xl font-bold leading-tight mb-3" style={{
-          color: PALETTE.text,
-          fontFamily: '"Cinzel", serif',
+        <h1 className="text-4xl font-semibold leading-tight mt-3" style={{
+          fontFamily: '"Cinzel", "Noto Serif KR", serif',
           letterSpacing: '0.05em',
-          textShadow: `0 0 30px ${PALETTE.accent}40`,
+          background: 'linear-gradient(115deg, #f3e2c2, #e8b04a 60%, #b47f3a)',
+          WebkitBackgroundClip: 'text',
+          backgroundClip: 'text',
+          color: 'transparent',
         }}>
           던앤<br/>트와일라잇
         </h1>
-        <div className="text-xs tracking-widest mt-4" style={{ color: PALETTE.textDim }}>
-          ━━━ 텍스트 로그라이크 ━━━
+        <div className="mx-auto mt-4" style={{
+          width: 70, height: 1,
+          background: `linear-gradient(90deg, transparent, ${PALETTE.legendary}b0, transparent)`,
+        }} />
+        <div className="flex justify-center mt-3">
+          <Chip color={PALETTE.legendary} icon={<span>✦</span>}>
+            <span className="font-bold tracking-wider tabular-nums" style={{ fontSize: 11 }}>{meta?.souls || 0}</span>
+            <span style={{ fontSize: 9, letterSpacing: '0.2em', opacity: 0.8 }}>SOULS</span>
+          </Chip>
         </div>
       </div>
-      
-      {/* 영혼 카운터 */}
-      <div className="px-6 py-2 flex items-center gap-2" style={{
-        background: `${PALETTE.twilight}20`,
-        border: `1px solid ${PALETTE.twilight}80`,
-      }}>
-        <span style={{ color: PALETTE.twilight, fontSize: '20px' }}>✦</span>
-        <span className="text-base font-bold tracking-wider" style={{ color: PALETTE.text, fontFamily: '"Cinzel", serif' }}>
-          {meta?.souls || 0}
-        </span>
-        <span className="text-[10px] tracking-[0.2em]" style={{ color: PALETTE.textDim }}>SOULS</span>
-      </div>
-      
-      <div className="w-full flex flex-col gap-2.5">
+
+      <div className="w-full flex flex-col gap-2">
+        <UIButton onClick={onStart} className="ui-sheen" style={{ fontFamily: '"Cinzel", "Noto Serif KR", serif', letterSpacing: '0.3em' }}>
+          {canResume ? '새 여정 시작' : '여정 시작'}
+        </UIButton>
+
         {canResume && onResume && (
-          <button onClick={onResume} className="w-full py-3 transition-all hover:scale-[1.02]" style={{
-            background: `linear-gradient(180deg, ${PALETTE.dawn}50, ${PALETTE.dawn}20)`,
-            color: PALETTE.text,
-            border: `1.5px solid ${PALETTE.dawn}`,
-            boxShadow: `0 0 20px ${PALETTE.dawn}40`,
-          }}>
-            <div className="flex items-center justify-center gap-2">
-              <PlayCircle size={16} style={{ color: PALETTE.dawn }} />
-              <span style={{ fontFamily: '"Cinzel", serif', letterSpacing: '0.25em', fontSize: '13px' }}>이어하기</span>
-            </div>
-            <div className="text-[10px] mt-1" style={{ color: PALETTE.textDim }}>
-              {resumeClassName} · {resumeExpName} · {resumeChapterDepth}
-            </div>
+          <button
+            onClick={onResume}
+            className="ui-press flex items-center gap-2.5 w-full text-left"
+            style={{
+              minHeight: 48, padding: '6px 14px',
+              borderRadius: 'var(--r-btn)',
+              background: 'rgba(232,176,74,0.06)',
+              border: '1px solid rgba(232,176,74,0.3)',
+              color: PALETTE.text, fontSize: 13,
+            }}
+          >
+            <PlayCircle size={17} className="flex-none" style={{ color: PALETTE.legendary }} />
+            <span className="min-w-0">
+              이어하기
+              <span className="block truncate" style={{ fontSize: 10.5, color: PALETTE.textDim }}>
+                {resumeClassName} · {resumeExpName} · {resumeChapterDepth}
+              </span>
+            </span>
+            <ChevronRight size={14} className="ml-auto flex-none" style={{ color: PALETTE.legendary, opacity: 0.7 }} />
           </button>
         )}
-        <button onClick={onStart} className="w-full py-3 transition-all hover:scale-[1.02]" style={{
-          background: `linear-gradient(180deg, ${PALETTE.accent}, ${PALETTE.accentDim})`,
-          color: PALETTE.text,
-          border: `1px solid ${PALETTE.dawn}40`,
-          fontFamily: '"Cinzel", serif',
-          letterSpacing: '0.3em',
-          fontSize: '14px',
-          boxShadow: `0 0 20px ${PALETTE.accent}40`,
-        }}>{canResume ? '새 여정 시작' : '여정 시작'}</button>
-        
-        <button onClick={onAltar} className="w-full py-2.5 transition-all hover:scale-[1.02]" style={{
-          background: `linear-gradient(180deg, ${PALETTE.twilight}40, ${PALETTE.twilight}20)`,
-          color: PALETTE.text,
-          border: `1px solid ${PALETTE.twilight}`,
-          fontFamily: '"Cinzel", serif',
-          letterSpacing: '0.25em',
-          fontSize: '12px',
-        }}>★ 영혼의 제단</button>
 
-        {onEngravings && (
-          <button onClick={onEngravings} className="w-full py-2.5 transition-all hover:scale-[1.02]" style={{
-            background: `linear-gradient(180deg, ${PALETTE.dawn}40, ${PALETTE.dawn}20)`,
-            color: PALETTE.text,
-            border: `1px solid ${PALETTE.dawn}`,
-            fontFamily: '"Cinzel", serif',
-            letterSpacing: '0.25em',
-            fontSize: '12px',
-          }}>◆ 직업 각인</button>
-        )}
+        <GlassPanel style={{ borderRadius: 14, padding: 4 }} className="flex flex-col">
+          <MenuRow icon={Sparkles} label="영혼의 제단" onClick={onAltar} />
+          {onEngravings && <MenuRow icon={Gem} label="직업 각인" onClick={onEngravings} />}
+          <MenuRow icon={Trophy} label="업적" onClick={onAchievements} />
+        </GlassPanel>
 
-        <button onClick={onAchievements} className="w-full py-2.5 transition-all hover:scale-[1.02]" style={{
-          background: `linear-gradient(180deg, ${PALETTE.legendary}40, ${PALETTE.legendary}20)`,
-          color: PALETTE.text,
-          border: `1px solid ${PALETTE.legendary}`,
-          fontFamily: '"Cinzel", serif',
-          letterSpacing: '0.25em',
-          fontSize: '12px',
-        }}>✦ 업적</button>
-        
-        {onAccount && (
-          <button onClick={onAccount} className="w-full py-2 transition-all" style={{
-            background: 'transparent',
-            color: PALETTE.textDim,
-            border: `1px solid ${PALETTE.panelBorder}`,
-            letterSpacing: '0.2em',
-            fontSize: '10px',
-            marginTop: '4px',
-          }}>◆ 계정 관리</button>
-        )}
-      </div>
-      
-      {/* 버전 정보 (하단 작은 텍스트, 클릭 시 업데이트 로그) */}
-      <button 
-        onClick={onChangelog}
-        className="absolute bottom-2 left-0 right-0 text-center transition-opacity hover:opacity-100" 
-        style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}
-      >
-        <div className="text-[9px] tracking-[0.3em]" style={{ color: PALETTE.textDim, opacity: 0.6 }}>
-          v{GAME_VERSION} · {VERSION_LABEL} · {VERSION_DATE} <span style={{ color: PALETTE.dawn }}>📋</span>
+        <div className="flex items-center justify-between px-1 mt-1">
+          {onAccount ? (
+            <button onClick={onAccount} className="ui-press" style={{
+              background: 'transparent', border: 'none', color: PALETTE.textDim,
+              fontSize: 10.5, letterSpacing: '0.12em', padding: '8px 4px',
+            }}>계정 관리</button>
+          ) : <span />}
+          {/* 버전 정보 — 클릭 시 업데이트 로그 */}
+          <button onClick={onChangelog} className="ui-press" style={{
+            background: 'transparent', border: 'none', color: PALETTE.textDim,
+            fontSize: 10.5, letterSpacing: '0.1em', padding: '8px 4px',
+          }}>
+            v{GAME_VERSION} <span style={{ color: PALETTE.dawn }}>📋</span>
+          </button>
         </div>
-      </button>
+      </div>
     </div>
   );
 }
