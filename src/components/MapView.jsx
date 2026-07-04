@@ -1,12 +1,18 @@
 // ============================================
 // components/MapView.jsx — 노드 맵 (챕터 진행)
 // ============================================
+// 1.65.0 리디자인 (승인 시안 05절):
+//   - 글래스 HUD 헤더 카드 — HP바 7px 라운드 + 재화 칩 분리 (기존 8px 압축 텍스트 제거)
+//   - 지나온 길 실선(green) / 남은 길 점선 — 선만으로 진행 방향 읽힘
+//   - 하단 탭바: 텍스트 5개 → 아이콘+라벨 4개 (미구현 "설정" 제거), 44px 터치 타깃
+// ============================================
 
 import React from 'react';
-import { BookOpen, ChevronRight, Coins, Crown, Flame, Hammer, HelpCircle, Skull, Sword, X } from 'lucide-react';
+import { BookOpen, Coins, Crown, Flame, Hammer, HelpCircle, LogOut, Skull, Sword, Trophy, User, X } from 'lucide-react';
 import { PALETTE } from '../utils/helpers.js';
+import { GlassPanel, Chip } from './ui/CommonUI.jsx';
 
-// 노드 종류별 아이콘/색상/라벨
+// 노드 종류별 아이콘/색상/라벨 — 색 값은 디자인 토큰(--ui-*)과 동일 계열
 const NODE_TYPES = {
   battle: { icon: Skull, color: '#c4453d', label: '전투' },
   elite: { icon: Crown, color: '#e8b04a', label: '강적' },
@@ -19,75 +25,80 @@ const NODE_TYPES = {
   boss: { icon: Crown, color: '#8b1f1f', label: '보스' },
 };
 
+// 하단 탭바 버튼 — 아이콘 + 라벨, 44px 터치 타깃
+function NavTab({ icon: Icon, label, onClick }) {
+  return (
+    <button onClick={onClick} className="ui-press text-center" style={{
+      background: 'transparent', border: 'none', padding: '7px 0 6px', borderRadius: 12,
+    }}>
+      <Icon size={17} className="mx-auto" style={{ color: PALETTE.dawn }} />
+      <div style={{ fontSize: 10, color: PALETTE.textDim, marginTop: 2 }}>{label}</div>
+    </button>
+  );
+}
+
 export default function MapView({ chapter, classData, mapData, hp, maxHp, gold, gem, relics = [], activeRelicNames = null, expedition, curses = [], chapterIdx, onEnterNode, onOpenStatus, onOpenAchievements, onOpenCodex, onBack }) {
   // 천리안 유물 보유 (활성 상태) 시 모든 노드 공개
-  const hasMapReveal = relics && relics.some(r => 
+  const hasMapReveal = relics && relics.some(r =>
     r.statBonus?.mapReveal > 0 && (!activeRelicNames || activeRelicNames.includes(r.name))
   );
+  const completedCount = mapData.nodes.filter(n => n.completed).length;
+  const chapterLabel = expedition?.endless
+    ? `DEPTH ${(chapterIdx || 0) + 1}`
+    : (expedition ? `CH.${(chapterIdx || 0) + 1}/${expedition.chapters.length}` : chapter.sub);
   return (
-    <div className="absolute inset-0 flex flex-col" style={{ background: PALETTE.bgDeep }}>
-      <div className="flex items-center gap-2 px-3 py-2.5" style={{
-        background: `linear-gradient(180deg, ${PALETTE.panel} 0%, ${PALETTE.bgDeep} 100%)`,
-        borderBottom: `1px solid ${PALETTE.panelBorder}`,
-      }}>
-        <button onClick={onOpenStatus} className="w-9 h-9 flex items-center justify-center text-base font-bold" style={{
-          background: classData.color, color: PALETTE.bgDeep, border: `1px solid ${PALETTE.dawn}`,
-        }}>{classData.name[0]}</button>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1 mb-0.5">
-            <span className="text-[10px]" style={{ color: PALETTE.textDim }}>HP</span>
-            <div className="flex-1 h-1.5 relative" style={{ background: PALETTE.bgDeep, border: `1px solid ${PALETTE.panelBorder}` }}>
+    <div className="absolute inset-0 flex flex-col" style={{
+      background: `radial-gradient(110% 45% at 50% -10%, ${chapter.color}20, transparent), ${PALETTE.bg}`,
+    }}>
+      {/* ===== 글래스 HUD 헤더 ===== */}
+      <div className="px-3 pt-3 flex-none">
+        <GlassPanel className="flex items-center gap-2.5" style={{ padding: '9px 12px', borderRadius: 15 }}>
+          <button onClick={onOpenStatus} className="ui-press flex items-center justify-center flex-none text-base font-bold" style={{
+            width: 38, height: 38, borderRadius: 12,
+            background: `linear-gradient(160deg, ${classData.color}, ${PALETTE.bgDeep})`,
+            border: '1px solid rgba(232,176,74,0.4)',
+            color: PALETTE.bgDeep,
+          }}>{classData.name[0]}</button>
+          <div className="flex-1 min-w-0">
+            <div className="flex justify-between items-baseline">
+              <span className="font-semibold truncate" style={{ fontSize: 12.5, color: PALETTE.text }}>{classData.name}</span>
+              <span className="tabular-nums flex-none" style={{ fontSize: 11, color: PALETTE.textDim }}>
+                <span style={{ color: PALETTE.text }}>{hp}</span>/{maxHp}
+              </span>
+            </div>
+            <div className="mt-1.5 relative overflow-hidden" style={{ height: 7, borderRadius: 999, background: 'rgba(255,255,255,0.07)' }}>
               <div className="absolute inset-y-0 left-0 transition-all" style={{
-                width: `${(hp/maxHp)*100}%`,
-                background: `linear-gradient(90deg, ${PALETTE.blood}, ${PALETTE.accent})`,
+                width: `${(hp / maxHp) * 100}%`,
+                borderRadius: 999,
+                background: 'linear-gradient(90deg, #8f2c24, #d05248)',
+                boxShadow: '0 0 10px rgba(208,82,72,0.5)',
               }} />
             </div>
-            <span className="text-[10px] tabular-nums" style={{ color: PALETTE.text }}>{hp}/{maxHp}</span>
           </div>
-          <div className="flex items-center gap-1">
-            <span className="text-[10px]" style={{ color: chapter.color }}>CH.{chapter.id}</span>
-            <span className="text-[10px] flex-1" style={{ color: PALETTE.text }}>{chapter.name}</span>
-          </div>
+        </GlassPanel>
+
+        {/* 재화 칩 + 챕터 라벨 */}
+        <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+          <Chip color={PALETTE.dawn} style={{ height: 20 }}>◉ <span className="tabular-nums">{gold}</span></Chip>
+          <Chip color={PALETTE.ice} style={{ height: 20 }}>◆ <span className="tabular-nums">{gem}</span></Chip>
+          {expedition && <Chip color={expedition.color} style={{ height: 20 }}>{expedition.name}</Chip>}
+          <span className="ml-auto tracking-[0.14em] truncate" style={{ fontSize: 10.5, color: chapter.color }}>
+            {chapterLabel} {chapter.name} · <span className="tabular-nums">{completedCount}/{mapData.nodes.length}</span>
+          </span>
         </div>
-        <div className="flex flex-col items-end text-[10px] gap-0.5">
-          <div className="flex items-center gap-1"><span style={{ color: PALETTE.ice }}>◆</span><span className="tabular-nums" style={{ color: PALETTE.text }}>{gem}</span></div>
-          <div className="flex items-center gap-1"><span style={{ color: PALETTE.dawn }}>◉</span><span className="tabular-nums" style={{ color: PALETTE.text }}>{gold}</span></div>
-        </div>
-      </div>
-      <div className="text-center py-2 border-b" style={{ borderColor: PALETTE.panelBorder }}>
-        <div className="flex items-center justify-center gap-2">
-          {expedition && (
-            <span className="text-[9px] tracking-[0.3em] px-1.5 py-0.5" style={{ 
-              color: expedition.color, 
-              background: `${expedition.color}20`,
-              border: `1px solid ${expedition.color}80`,
-            }}>{expedition.name}</span>
-          )}
-          <div className="text-[9px] tracking-[0.4em]" style={{ color: chapter.color }}>
-            {expedition?.endless
-              ? `Depth ${(chapterIdx || 0) + 1}`
-              : (expedition ? `Ch.${(chapterIdx || 0) + 1}/${expedition.chapters.length}` : chapter.sub)}
-          </div>
-        </div>
-        <div className="text-sm font-bold tracking-[0.2em] mt-0.5" style={{
-          color: PALETTE.text, textShadow: `0 0 10px ${chapter.color}50`,
-        }}>{chapter.name}</div>
-        {/* 저주 뱃지 */}
+
+        {/* 저주 칩 */}
         {curses && curses.length > 0 && (
-          <div className="flex items-center justify-center gap-1 mt-1.5 flex-wrap px-2">
+          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
             {curses.map((c, i) => (
-              <span key={i} className="text-[9px] px-1.5 py-0.5" style={{
-                color: c.color,
-                background: `${c.color}15`,
-                border: `1px solid ${c.color}50`,
-              }} title={c.desc}>✦ {c.name}</span>
+              <Chip key={i} color={c.color} style={{ height: 20 }}>✦ {c.name}</Chip>
             ))}
           </div>
         )}
       </div>
-      <div className="flex-1 relative overflow-hidden" style={{
-        background: `radial-gradient(ellipse at center top, ${chapter.color}15 0%, ${PALETTE.bgDeep} 70%)`,
-      }}>
+
+      {/* ===== 노드 맵 ===== */}
+      <div className="flex-1 relative overflow-hidden">
         <svg className="absolute inset-0 w-full h-full" preserveAspectRatio="none" viewBox="0 0 100 100">
           {mapData.edges.map(([a, b], i) => {
             const na = mapData.nodes.find(n => n.id === a);
@@ -95,17 +106,19 @@ export default function MapView({ chapter, classData, mapData, hp, maxHp, gold, 
             if (!na || !nb) return null;
             const reachable = na.completed || na.current;
             const eitherLocked = na.locked || nb.locked;
+            const bothCompleted = na.completed && nb.completed;
             return (
               <line key={i} x1={na.x} y1={na.y} x2={nb.x} y2={nb.y}
                 stroke={
                   eitherLocked ? '#2a1515'
-                  : na.completed && nb.completed ? PALETTE.dawn 
-                  : reachable ? chapter.color 
-                  : PALETTE.panelBorder
+                  : bothCompleted ? PALETTE.green
+                  : reachable ? chapter.color
+                  : PALETTE.dawn
                 }
-                strokeWidth="0.3"
-                strokeDasharray={na.completed && nb.completed ? "0" : "1.5 1"}
-                opacity={eitherLocked ? 0.2 : reachable ? 0.6 : 0.3} />
+                strokeWidth={bothCompleted ? 0.45 : 0.3}
+                strokeLinecap="round"
+                strokeDasharray={bothCompleted ? '0' : '1.5 1'}
+                opacity={eitherLocked ? 0.2 : bothCompleted ? 0.65 : reachable ? 0.55 : 0.22} />
             );
           })}
         </svg>
@@ -116,7 +129,7 @@ export default function MapView({ chapter, classData, mapData, hp, maxHp, gold, 
           const isCompleted = n.completed;
           const isLocked = n.locked;  // 선택 안 한 형제 노드
           const isBoss = n.type === 'boss';
-          const size = isBoss ? 48 : isCurrent ? 38 : 30;
+          const size = isBoss ? 48 : isCurrent ? 40 : 30;
           return (
             <button key={n.id} onClick={() => isCurrent && onEnterNode(n)} disabled={!isCurrent}
               className="absolute -translate-x-1/2 -translate-y-1/2 transition-all"
@@ -127,10 +140,10 @@ export default function MapView({ chapter, classData, mapData, hp, maxHp, gold, 
               {/* 상점/대장간 노드는 항상 강조 (방문 전) — 펄스 + 외곽 링 */}
               {(n.type === 'shop' || n.type === 'forge') && !isCompleted && !isCurrent && (
                 <>
-                  <div className="absolute rounded-full animate-ping" style={{ 
+                  <div className="absolute rounded-full animate-ping" style={{
                     inset: '-4px', background: cfg.color, opacity: 0.5,
                   }} />
-                  <div className="absolute rounded-full animate-pulse" style={{ 
+                  <div className="absolute rounded-full animate-pulse" style={{
                     inset: '-2px', background: cfg.color, opacity: 0.6,
                     border: `2px solid ${cfg.color}`,
                   }} />
@@ -138,16 +151,16 @@ export default function MapView({ chapter, classData, mapData, hp, maxHp, gold, 
               )}
               <div className="relative w-full h-full rounded-full flex items-center justify-center" style={{
                 background: isCompleted
-                  ? `radial-gradient(circle, ${PALETTE.dawn}30, ${PALETTE.bgDeep})`
+                  ? `radial-gradient(circle, ${PALETTE.green}26, ${PALETTE.bgDeep})`
                   : isCurrent
                     ? `radial-gradient(circle, ${cfg.color}40, ${PALETTE.bgDeep})`
                     : isLocked
                       ? `radial-gradient(circle, ${PALETTE.bgDeep}, #1a0a0a)`
                       : `radial-gradient(circle, ${PALETTE.panel}, ${PALETTE.bgDeep})`,
                 border: `${isBoss ? 2 : 1.5}px solid ${
-                  isCompleted ? PALETTE.dawn 
-                  : isCurrent ? cfg.color 
-                  : isLocked ? '#3a1f1f' 
+                  isCompleted ? `${PALETTE.green}99`
+                  : isCurrent ? cfg.color
+                  : isLocked ? '#3a1f1f'
                   : PALETTE.panelBorder
                 }`,
                 boxShadow: isCurrent ? `0 0 24px ${cfg.color}80` : isBoss ? `0 0 16px ${PALETTE.accent}60` : 'none',
@@ -156,24 +169,25 @@ export default function MapView({ chapter, classData, mapData, hp, maxHp, gold, 
                 {isLocked
                   ? <X size={isBoss ? 18 : 14} style={{ color: '#5a3030' }} />
                   : (n.type === 'shop' || n.type === 'forge' || hasMapReveal)
-                    ? <Icon size={isBoss ? 22 : isCurrent ? 18 : 14} style={{ color: isCompleted ? PALETTE.dawn : cfg.color }} />
+                    ? <Icon size={isBoss ? 22 : isCurrent ? 18 : 14} style={{ color: isCompleted ? PALETTE.green : cfg.color }} />
                     : !isCurrent && !isCompleted && !isBoss
                       ? <span className="text-base" style={{ color: PALETTE.textDim }}>?</span>
-                      : <Icon size={isBoss ? 22 : isCurrent ? 18 : 14} style={{ color: isCompleted ? PALETTE.dawn : cfg.color }} />}
+                      : <Icon size={isBoss ? 22 : isCurrent ? 18 : 14} style={{ color: isCompleted ? PALETTE.green : cfg.color }} />}
               </div>
             </button>
           );
         })}
       </div>
-      <div className="grid grid-cols-5 border-t" style={{ borderColor: PALETTE.panelBorder, background: PALETTE.bgDeep }}>
-        <button onClick={onBack} className="py-2.5 text-[10px]" style={{ color: PALETTE.textDim }}>나가기</button>
-        <button onClick={onOpenCodex} className="py-2.5 text-[10px]" style={{ color: '#c46535' }}>도감</button>
-        <button onClick={onOpenStatus} className="py-2.5 text-[10px]" style={{ color: PALETTE.dawn }}>정보</button>
-        <button onClick={onOpenAchievements} className="py-2.5 text-[10px]" style={{ color: PALETTE.legendary }}>업적</button>
-        <button className="py-2.5 text-[10px]" style={{ color: PALETTE.textDim }}>설정</button>
+
+      {/* ===== 하단 탭바 — 아이콘 + 라벨 4종 ===== */}
+      <div className="px-3 pb-3 pt-1 flex-none">
+        <GlassPanel className="grid grid-cols-4" style={{ borderRadius: 16, padding: 5 }}>
+          <NavTab icon={LogOut} label="나가기" onClick={onBack} />
+          <NavTab icon={BookOpen} label="도감" onClick={onOpenCodex} />
+          <NavTab icon={User} label="정보" onClick={onOpenStatus} />
+          <NavTab icon={Trophy} label="업적" onClick={onOpenAchievements} />
+        </GlassPanel>
       </div>
     </div>
   );
 }
-
-// =========== 전투 화면 ===========
