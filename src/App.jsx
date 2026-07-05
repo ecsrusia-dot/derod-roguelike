@@ -456,6 +456,7 @@ export default function App() {
       skills, stats, relics, ultimates,
       activeSkills, activeRelicNames,
       isEliteReward, isBossReward, hasRerolled,
+      pendingChainEvents,
     };
     setMeta(prev => saveActiveRun(prev, snapshot));
     // 의도적으로 좁은 deps — 맵 진입·노드 완료 트리거에서만 스냅샷 갱신
@@ -465,6 +466,8 @@ export default function App() {
   const [currentRewards, setCurrentRewards] = useState([]);
   const [hasRerolled, setHasRerolled] = useState(false);
   const [activeNodeId, setActiveNodeId] = useState(null);
+  // 1.70.0~ 연쇄 이벤트 — 이전 선택이 예약한 후속 사건 id 큐 (런 단위, 스냅샷 포함)
+  const [pendingChainEvents, setPendingChainEvents] = useState([]);
   const [activeNodeType, setActiveNodeType] = useState(null);
   const [currentEnemy, setCurrentEnemy] = useState(null);
   const [currentEvent, setCurrentEvent] = useState(null);
@@ -567,6 +570,7 @@ export default function App() {
     setSelectedClass(s.selectedClass);
     setCurrentExpedition(s.expedition);
     setCurrentCurses(s.curses || []);
+    setPendingChainEvents(s.pendingChainEvents || []);
     setChapter(ch);
     setChapterIdx(s.chapterIdx || 0);
     setEndlessDepth(s.endlessDepth || 0);
@@ -600,6 +604,7 @@ export default function App() {
       ? [...expedition.fixedCurses]
       : rollCurses(expedition.curseCount);
     setCurrentCurses(curses);
+    setPendingChainEvents([]);
     setRunSouls(0);
     
     // === 업적 트래킹: 원정 시도 ===
@@ -652,6 +657,7 @@ export default function App() {
     setCurrentExpedition(champExpedition);
     const curses = rollCurses(difficulty.curseCount);
     setCurrentCurses(curses);
+    setPendingChainEvents([]);
     setRunSouls(0);
     
     // 업적 트래킹
@@ -902,12 +908,22 @@ export default function App() {
       if (meta?.forceEventId) {
         ev = EVENTS.find(e => e.id === meta.forceEventId);
       }
+      // 1.70.0~ 연쇄 이벤트 — 예약된 후속 사건이 있으면 랜덤보다 최우선 발동
+      if (!ev && pendingChainEvents.length > 0) {
+        const chainEv = EVENTS.find(e => e.id === pendingChainEvents[0]);
+        if (chainEv) {
+          ev = chainEv;
+          setPendingChainEvents(prev => prev.slice(1));
+        }
+      }
       if (!ev) {
         // tutorialGift는 강제 트리거 전용 (랜덤 풀 제외)
+        // chainOnly는 연쇄 예약으로만 등장 (랜덤 풀 제외)
         // classOnly가 지정된 사건은 현재 직업 ID가 포함된 경우만 풀에 남김
         const myClassId = classData?.id;
         const pool = EVENTS.filter(e => {
           if (e.tutorialGift) return false;
+          if (e.chainOnly) return false;
           if (Array.isArray(e.classOnly) && e.classOnly.length > 0) {
             if (!myClassId || !e.classOnly.includes(myClassId)) return false;
           }
@@ -1351,6 +1367,10 @@ export default function App() {
     if (resultData.penalty?.gem) {
       setGem(prev => Math.max(0, prev + resultData.penalty.gem));
     }
+    // 1.70.0~ 연쇄 이벤트 예약 — 다음 event 노드에서 후속 사건 발동
+    if (resultData.chain) {
+      setPendingChainEvents(prev => [...prev, resultData.chain]);
+    }
     if (resultData.combat) {
       setCurrentEnemy(resultData.combat);
       setIsEliteReward(false); setIsBossReward(false);
@@ -1639,6 +1659,7 @@ export default function App() {
   const handleExpeditionClearContinue = () => {
     setCurrentExpedition(null);
     setCurrentCurses([]);
+    setPendingChainEvents([]);
     setRunSouls(0);
     setSelectedChampionship(null);
     setSelectedDifficulty(null);
@@ -1650,6 +1671,7 @@ export default function App() {
   const handleDefeatContinue = () => {
     setCurrentExpedition(null);
     setCurrentCurses([]);
+    setPendingChainEvents([]);
     setRunSouls(0);
     setSelectedChampionship(null);
     setSelectedDifficulty(null);
@@ -1730,7 +1752,7 @@ export default function App() {
             {screen === 'combat' && currentEnemy && <CombatScreen key={`${activeNodeId}-${currentEnemy}`} classData={classData} initialPlayer={{ hp, maxHp, ...classData.stats, ...stats }} initialSkills={skills} initialUltimates={ultimates} initialRelics={relics} activeSkills={activeSkills} activeRelicNames={activeRelicNames} enemyKey={currentEnemy} isBoss={isBossReward} expedition={currentExpedition} curses={currentCurses} meta={meta} engravingFx={getCombinedClassFx(meta, classData?.id)} onVictory={handleVictory} onDefeat={handleDefeat} />}
             {screen === 'reward' && <RewardSelect rewards={currentRewards} gem={gem} skills={skills} relics={relics} ultimates={ultimates} onPick={handlePickReward} onReroll={handleReroll} hasRerolled={hasRerolled} isElite={isEliteReward} classId={classData?.id} meta={meta} expedition={currentExpedition} />}
             {screen === 'victory' && <VictoryScreen classData={classData} enemy={currentEnemy ? ENEMIES[currentEnemy] : null} gains={victoryGains} onContinue={handleVictoryContinue} />}
-            {screen === 'event' && currentEvent && <EventScreen event={currentEvent} classData={classData} stats={{ ...classData.stats, ...stats }} skills={skills} onResolve={handleEventResolve} />}
+            {screen === 'event' && currentEvent && <EventScreen event={currentEvent} classData={classData} stats={{ ...classData.stats, ...stats }} skills={skills} gold={gold} gem={gem} onResolve={handleEventResolve} />}
             {screen === 'rest' && <RestScreen classData={classData} hp={hp} maxHp={maxHp} skills={skills} stats={{ ...classData?.stats, ...stats }} activeSkills={activeSkills} activeRelicNames={activeRelicNames} relics={relics} ultimates={ultimates} engravingFx={getCombinedClassFx(meta, classData?.id)} meta={meta} expedition={currentExpedition} onChoice={handleRestChoice} />}
             {screen === 'prep' && <PrepScreen classData={classData} skills={skills} stats={{ ...classData?.stats, ...stats }} relics={relics} ultimates={ultimates} engravingFx={getCombinedClassFx(meta, classData?.id)} meta={meta} expedition={currentExpedition} mode="full" onConfirm={handlePrepConfirm} />}
             {screen === 'reselect' && <PrepScreen classData={classData} skills={skills} stats={{ ...classData?.stats, ...stats }} relics={relics} ultimates={ultimates} engravingFx={getCombinedClassFx(meta, classData?.id)} meta={meta} expedition={currentExpedition} mode={reselectMode} currentActiveSkills={activeSkills} currentActiveRelicNames={activeRelicNames} onConfirm={handleReselectConfirm} />}

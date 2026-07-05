@@ -6,15 +6,22 @@ import React, { useState } from 'react';
 import { PALETTE } from '../utils/helpers.js';
 import { ENEMIES, GAME_CONFIG } from '../data.js';
 
-export default function EventScreen({ event, classData, stats, skills = {}, onResolve }) {
+export default function EventScreen({ event, classData, stats, skills = {}, gold = 0, gem = 0, onResolve }) {
   const [stage, setStage] = useState('intro'); // intro | result
   const [resultData, setResultData] = useState(null);
 
   const handleChoice = (choice) => {
     let result = { text: '', reward: null, penalty: null };
     if (choice.cost) {
-      result.text = `${choice.text} 선택...`;
+      result.text = choice.result || `${choice.text} 선택...`;
       result.reward = choice.reward;
+      // 1.70.0 픽스 — cost가 실제로 차감되지 않던 버그: penalty로 변환해 정산
+      const costPenalty = {};
+      if (choice.cost.gold) costPenalty.gold = -choice.cost.gold;
+      if (choice.cost.gem) costPenalty.gem = -choice.cost.gem;
+      if (choice.cost.hp) costPenalty.hp = -choice.cost.hp;
+      if (Object.keys(costPenalty).length > 0) result.penalty = costPenalty;
+      result.chain = choice.chain || null;
     } else if (choice.stat) {
       const statValue = stats[choice.stat] || 10;
       const diceMin = GAME_CONFIG.diceRoll.min;
@@ -26,14 +33,18 @@ export default function EventScreen({ event, classData, stats, skills = {}, onRe
       if (success) {
         result.text = `${rollText} ... 성공!\n${choice.success.text}`;
         result.reward = choice.success.reward;
+        result.chain = choice.success.chain || null;
       } else {
         result.text = `${rollText} ... 실패\n${choice.fail.text}`;
         result.penalty = choice.fail.penalty;
         result.combat = choice.fail.combat;
+        result.chain = choice.fail.chain || null;
       }
     } else {
       result.text = choice.result || choice.text;
       result.reward = choice.reward;
+      result.penalty = choice.penalty || null;
+      result.chain = choice.chain || null;
     }
     
     // === skill_random_lv: 어느 패시브가 오를지 미리 결정 (표시용) ===
@@ -118,7 +129,14 @@ export default function EventScreen({ event, classData, stats, skills = {}, onRe
                   {ENEMIES[resultData.combat]?.name || '적'}이(가) 나타난다!
                 </div>
               </div>
-            )} 
+            )}
+            {/* 1.70.0 연쇄 이벤트 예고 */}
+            {resultData.chain && (
+              <div className="mt-4 p-3" style={{ borderRadius: 12, border: `1px solid ${PALETTE.twilight}80`, background: `${PALETTE.twilight}12` }}>
+                <div className="text-[10px] tracking-[0.3em] mb-1" style={{ color: '#8a76c9' }}>◆ 인연</div>
+                <div className="text-xs italic" style={{ color: PALETTE.text }}>이 선택은 언젠가 그대에게 되돌아온다...</div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -127,20 +145,27 @@ export default function EventScreen({ event, classData, stats, skills = {}, onRe
       }}>
         {stage === 'intro' && (
           <div className="space-y-1.5">
-            {event.choices.map((c, i) => (
-              <button key={i} onClick={() => handleChoice(c)}
-                className="w-full text-left px-3 py-2 text-xs transition-all hover:translate-x-1"
-                style={{
-                  background: c.stat ? `${PALETTE.ice}10` : c.cost ? `${PALETTE.dawn}10` : 'transparent',
-                  border: `1px solid ${c.stat ? PALETTE.ice : c.cost ? PALETTE.dawn : PALETTE.panelBorder}40`,
-                  color: PALETTE.text,
-                }}>
-                <div className="flex items-center justify-between">
-                  <span>▸ {c.text}</span>
-                  {c.stat && <span className="text-[10px]" style={{ color: PALETTE.ice }}>[{c.stat} DC{c.dc}]</span>}
-                </div>
-              </button>
-            ))}
+            {event.choices.map((c, i) => {
+              // 1.70.0 — 비용 선택지: 잔액 부족 시 비활성 (cost 실차감 픽스와 세트)
+              const unaffordable = !!(c.cost && (((c.cost.gold || 0) > gold) || ((c.cost.gem || 0) > gem)));
+              return (
+                <button key={i} onClick={() => handleChoice(c)} disabled={unaffordable}
+                  className="w-full text-left px-3 py-2 text-xs transition-all hover:translate-x-1"
+                  style={{
+                    background: c.stat ? `${PALETTE.ice}10` : c.cost ? `${PALETTE.dawn}10` : 'transparent',
+                    border: `1px solid ${c.stat ? PALETTE.ice : c.cost ? PALETTE.dawn : PALETTE.panelBorder}40`,
+                    color: PALETTE.text,
+                    opacity: unaffordable ? 0.45 : 1,
+                  }}>
+                  <div className="flex items-center justify-between">
+                    <span>▸ {c.text}</span>
+                    {c.stat && <span className="text-[10px]" style={{ color: PALETTE.ice }}>[{c.stat} DC{c.dc}]</span>}
+                    {c.cost?.gold > 0 && <span className="text-[10px] tabular-nums" style={{ color: unaffordable ? PALETTE.accent : PALETTE.dawn }}>◉ {c.cost.gold}</span>}
+                    {c.cost?.gem > 0 && <span className="text-[10px] tabular-nums" style={{ color: unaffordable ? PALETTE.accent : PALETTE.ice }}>◆ {c.cost.gem}</span>}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         )}
         {stage === 'result' && (
