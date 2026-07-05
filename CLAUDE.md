@@ -948,7 +948,7 @@ PM이 PNG를 푸시했다면 **JPG 변환 + 코드 헬퍼 연결 + 버전 갱신
 | 항목 | 값 |
 |---|---|
 | 브랜치 | `claude/game-ui-ux-redesign-a471kb` (UI 리디자인 시리즈 PR #122~#125) |
-| 현재 게임 버전 | **1.67.0** (UI 리디자인 4단계 완결 — 1.63.0 도감 일러 / 1.64.0 토큰·화면 전환 / 1.65.0 타이틀·원정·맵 / 1.66.0 전투 / 1.67.0 정보창 바텀시트·잔여 화면) |
+| 현재 게임 버전 | **1.71.0** (UI 리디자인 1.63~1.67 완결 → 콘텐츠 개편 1.68~1.71: 전투 A 격노·간파 / B AP 턴 / C 콤보 연계 / 이벤트 연쇄 시스템 / 챕터 기믹 4종) |
 | **다음 세션 브랜치 전략** | 다음 PR은 **`git fetch origin main` + `git checkout -B <새브랜치> origin/main`**으로 최신 main에서 분기 |
 
 ### 이번 세션 결과 요약 — 문서 갱신 (코드 변경 0줄)
@@ -972,6 +972,18 @@ PM이 PNG를 푸시했다면 **JPG 변환 + 코드 헬퍼 연결 + 버전 갱신
 | **모션** | `.ui-screen-enter`(전환)·`.ui-stagger`(리스트)·`.ui-press`(프레스)·`.ui-sheen`(CTA). 전부 reduced-motion 가드됨 |
 | **타이포 하한** | 11px (기존 8~10px 신규 사용 금지) / 터치 타깃 40px+ |
 | **미적용 잔여** | 정보창 접이식 섹션(PM 검증 워크플로 보존 위해 의도적 미적용) / 전투 HP바 데미지 잔상 트레일 |
+
+### ⚔️ 콘텐츠 개편 시스템 (1.68.0~1.71.0 신설 — 전투·이벤트 확장 시 필수)
+
+| 시스템 | 위치 | 확장 방법 |
+|---|---|---|
+| **적 의도 가중치** | `initCombat.js` rollEnemyIntent/assignNextIntent | 적 pattern에 `weight: N` (기본 1). 보스 HP 50% 격노 자동 (isBoss 공통 규칙) |
+| **대공격 간파** | 적 pattern `heavy: true` | 전 직업 예고 칩 + 방어/회피/기절 카운터 보상 자동 |
+| **AP 턴** | `initCombat.js` AP_PER_TURN=3, getSkillApCost | 스킬에 `ap: N` 명시 (기본: 기본기1/주력2/방어·버프1). **밸런스는 AP_TUNING {enemyHpMult 1.6, enemyDmgMult 1.25} 한 곳** |
+| **콤보 연계** | skills.js `comboAfter/comboBonusPct/comboLabel/comboHealMult` | 데이터만 추가 — 같은 턴 선행 스킬 사용 시 발동 |
+| **연쇄 이벤트** | events.js `chain: '<id>'` / `chainOnly: true` | 예약 큐(pendingChainEvents)는 스냅샷 포함. 판정 success/fail별 chain 가능 |
+| **챕터 기믹** | chapters.js `gimmick: {id,name,desc}` | id: frost/decay/sealEcho/surge 구현됨. 신규 id는 CombatScreen 분기 추가 |
+| **이벤트 비용/페널티** | 1.70.0 실적용 픽스 | cost는 penalty로 정산 + 잔액 부족 비활성. 일반 선택지 penalty도 적용됨 |
 
 ### 다음 세션 우선순위 (PM 미지정 시 기본값)
 
