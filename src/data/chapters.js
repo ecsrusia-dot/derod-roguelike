@@ -138,29 +138,36 @@ export const CHAPTERS = [
   },
 
   // === 기존 클래식 챕터 (수련의 길에서 사용) ===
+  // 1.71.0~ gimmick: 챕터 고유 환경 규칙 (전투 적용은 CombatScreen chapterGimmick prop)
+  //   frost: 3턴마다 양측 HP -5 / decay: 4턴째부터 양측 부패 누적 (속전 유도)
+  //   sealEcho: 전투 시작 시 액티브 1개 1턴 봉인 / surge: 양측 데미지 +10%
   {
     id: 1, name: '북부 극지대', sub: 'The Northern Wastes',
     desc: '눈보라가 멈추지 않는 변경. 한기에 미친 약탈자들이 길을 막는다.',
     nodeCount: 20, biome: 'ice', color: '#7ba3c4',
     enemies: { normal: ['goblin', 'iceWolf', 'tundraRaider'], elite: ['frostGiant', 'wraith'], boss: 'iceMage' },
+    gimmick: { id: 'frost', name: '혹한', desc: '3턴마다 한파 — 양측 HP -5' },
   },
   {
     id: 2, name: '죽은 자의 숲', sub: 'Forest of the Fallen',
     desc: '엘프의 옛 영토. 망자화된 황혼의 자녀들이 떠돈다.',
     nodeCount: 24, biome: 'forest', color: '#7a9a5e',
     enemies: { normal: ['fallenElf', 'shadowWolf', 'corruptSpider'], elite: ['forestSpirit', 'forestTyrant'], boss: 'twilightChild' },
+    gimmick: { id: 'decay', name: '부패의 안개', desc: '4턴째부터 매 턴 양측 부패 데미지 (갈수록 증가)' },
   },
   {
     id: 3, name: '봉인된 신전', sub: 'The Sealed Sanctum',
     desc: '여명의 봉인이 깨어나는 곳. 시간이 뒤틀린다.',
     nodeCount: 28, biome: 'ruin', color: '#5c4a8c',
     enemies: { normal: ['timeKeeper', 'brokenGolem', 'sealMage'], elite: ['ancientPriest'], boss: 'oblivionSealer' },
+    gimmick: { id: 'sealEcho', name: '봉인의 잔향', desc: '전투 시작 시 액티브 스킬 1개가 1턴 봉인' },
   },
   {
     id: 4, name: '마계의 균열', sub: 'The Demon Rift',
     desc: '마왕의 군세가 쏟아지는 차원의 틈.',
     nodeCount: 32, biome: 'demon', color: '#8b1f1f',
     enemies: { normal: ['demonScout', 'wrathDemon', 'riftBreach'], elite: ['demonApostle'], boss: 'nakzelionShadow' },
+    gimmick: { id: 'surge', name: '마기 폭주', desc: '양측 모든 데미지 +10%' },
   },
 ];
 

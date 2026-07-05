@@ -47,7 +47,7 @@ import {
 } from '../combat/initCombat.js';
 import { FloatingLabel, DamageVignette, WhiteFlash, SlashFx, MagicImpactFx, MagicParticles, BarrierRing, BarrierBreakFx, ThrustFx, BladeGuardFx, ShadowStrikeFx, StatusOverlay, UltimateCutin, EternalFlameCutin, FireballFx, ExplosionFx, IgniteGlowAura, IgniteExplodeFx, FlameBarrierFx, FlameReflectFx, CritScreenFx } from './CombatEffects.jsx';
 
-export default function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimates = [], initialRelics = [], activeSkills = null, activeRelicNames = null, enemyKey, isBoss, expedition, curses = [], meta, engravingFx = {}, onVictory, onDefeat }) {
+export default function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimates = [], initialRelics = [], activeSkills = null, activeRelicNames = null, enemyKey, isBoss, expedition, curses = [], meta, engravingFx = {}, chapterGimmick = null, onVictory, onDefeat }) {
   const [player, setPlayer] = useState(() => buildInitialPlayer({
     initialPlayer, initialSkills, initialUltimates, activeSkills, meta, curses,
   }));
@@ -212,7 +212,23 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       oracleDebuffs = { bleed: 2, bleedTurns: 3, shockGauge: 101 };
       initialLog.push({ type: 'passive', text: `◆ [신앙 Lv.7] 수신사의 신탁! 적에게 출혈 3턴 + 기절 1턴` });
     }
-    
+
+    // 1.71.0~ 챕터 기믹 — 전투 시작 안내 + 봉인의 잔향(ch3)은 즉시 적용
+    if (chapterGimmick) {
+      initialLog.push({ type: 'debuff', text: `◈ [${chapterGimmick.name}] ${chapterGimmick.desc}` });
+      if (chapterGimmick.id === 'sealEcho') {
+        const sealable = (classData?.combatSkills || []).filter(key => {
+          const sk = COMBAT_SKILLS[key];
+          return sk && ((sk.cost || 0) > 0 || (sk.cd || 0) > 0);
+        });
+        if (sealable.length > 0) {
+          const pick = sealable[Math.floor(Math.random() * sealable.length)];
+          newPlayer.debuffs = { ...newPlayer.debuffs, sealedSkills: [pick], sealedTurns: 1 };
+          initialLog.push({ type: 'debuff', text: `🔒 [봉인의 잔향] ${COMBAT_SKILLS[pick]?.name || pick} 1턴 봉인` });
+        }
+      }
+    }
+
     setPlayer(newPlayer);
     if (oracleDebuffs) {
       setEnemy(e => ({ ...e, debuffs: { ...e.debuffs, ...oracleDebuffs } }));
@@ -359,6 +375,10 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           // 1.69.0 콤보 연계 보너스 (multi-hit이면 전 히트 적용)
           if (comboActive && actualDmg > 0) {
             actualDmg += Math.floor(actualDmg * (skill.comboBonusPct || 0) / 100);
+          }
+          // 1.71.0 챕터 기믹 — 마기 폭주(ch4): 양측 데미지 +10% (플레이어 측)
+          if (chapterGimmick?.id === 'surge' && actualDmg > 0) {
+            actualDmg += Math.floor(actualDmg * 0.1);
           }
           // 1.62.0 픽스 #5: "다음 공격" buff 클리어는 hitCount 루프 OUT으로 이동
           //   afterDodgeDmgNext / bloodRageNext / windBoostNextDmg / windPierceNext 모두 multi-hit 시 전 hit 적용
@@ -1006,6 +1026,14 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
             if (enrageBonus > 0) {
               dmg += enrageBonus;
               takenBreakdown.push(`격노 +${enrageBonus}`);
+            }
+          }
+          // 1.71.0 챕터 기믹 — 마기 폭주(ch4): 양측 데미지 +10% (적 측)
+          if (chapterGimmick?.id === 'surge') {
+            const surgeBonus = Math.floor(dmg * 0.1);
+            if (surgeBonus > 0) {
+              dmg += surgeBonus;
+              takenBreakdown.push(`마기 +${surgeBonus}`);
             }
           }
           
@@ -1870,6 +1898,27 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     });
 
     // 풍령 정령 화살로 적이 죽었으면 즉시 승리
+    if (newEnemy.currentHp <= 0) {
+      setPlayer(newPlayer); setEnemy(newEnemy); setLog(newLog); setTurn(newTurn);
+      setTimeout(() => setPhase('victory'), 400);
+      actionLockRef.current = false;
+      return;
+    }
+
+    // 1.71.0~ 챕터 기믹 틱 — 혹한(ch1) 3턴마다 / 부패의 안개(ch2) 4턴째부터 누적
+    // 플레이어는 기믹으로 죽지 않음 (최소 1 HP 보장) — 적은 죽을 수 있음
+    if (chapterGimmick?.id === 'frost' && newTurn % 3 === 0) {
+      const chill = 5;
+      newPlayer.hp = Math.max(1, newPlayer.hp - chill);
+      newEnemy.currentHp = Math.max(0, newEnemy.currentHp - chill);
+      newLog.push({ type: 'debuff', text: `❄️ [혹한] 한파가 몰아친다 — 양측 HP -${chill}` });
+    }
+    if (chapterGimmick?.id === 'decay' && newTurn >= 4) {
+      const rot = (newTurn - 3) * 3;
+      newPlayer.hp = Math.max(1, newPlayer.hp - rot);
+      newEnemy.currentHp = Math.max(0, newEnemy.currentHp - rot);
+      newLog.push({ type: 'debuff', text: `☠ [부패의 안개] 부패가 스며든다 — 양측 HP -${rot}` });
+    }
     if (newEnemy.currentHp <= 0) {
       setPlayer(newPlayer); setEnemy(newEnemy); setLog(newLog); setTurn(newTurn);
       setTimeout(() => setPhase('victory'), 400);
