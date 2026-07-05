@@ -113,11 +113,11 @@ export default function PrepScreen({ classData, skills, stats = {}, relics, ulti
 
   return (
     <div className="absolute inset-0 flex flex-col" style={{ background: PALETTE.bgDeep }}>
-      <div className="px-4 pt-5 pb-2 border-b" style={{ borderColor: PALETTE.panelBorder }}>
-        <p className="text-center text-[11px] tracking-[0.4em]" style={{ color: PALETTE.dawn }}>
-          ◆ {titleText} ◆
+      <div className="px-4 pt-5 pb-3">
+        <p className="text-center font-semibold tracking-[0.2em]" style={{ fontSize: 16, color: PALETTE.text }}>
+          {titleText}
         </p>
-        <p className="text-center text-[10px] mt-1" style={{ color: PALETTE.textDim }}>
+        <p className="text-center mt-1" style={{ fontSize: 11, color: PALETTE.textDim }}>
           {subText}
         </p>
       </div>
@@ -163,14 +163,16 @@ export default function PrepScreen({ classData, skills, stats = {}, relics, ulti
                 const isSelected = selectedSkills.has(name);
                 return (
                   <button key={name} onClick={() => toggleSkill(name)}
-                    className="text-left px-2.5 py-2 transition-all"
+                    className="ui-press text-left px-2.5 py-2 transition-all"
                     style={{
+                      borderRadius: 12,
                       background: isSelected
                         ? `linear-gradient(135deg, ${sk.color}30, ${sk.color}10)`
                         : 'rgba(255,255,255,0.02)',
                       border: isSelected
                         ? `1.5px solid ${sk.color}`
-                        : `1px solid ${PALETTE.panelBorder}`,
+                        : '1px solid var(--ui-line)',
+                      boxShadow: isSelected ? `0 0 12px -4px ${sk.color}66` : 'none',
                     }}>
                     <div className="flex items-center justify-between">
                       <span className="text-[12px] font-bold" style={{ color: isSelected ? sk.color : PALETTE.text }}>
@@ -217,14 +219,16 @@ export default function PrepScreen({ classData, skills, stats = {}, relics, ulti
                 const isSelected = selectedRelics.has(rel.name);
                 return (
                   <button key={i} onClick={() => setModalState({ kind: 'relic', rel })}
-                    className="w-full text-left px-3 py-2 transition-all"
+                    className="ui-press w-full text-left px-3 py-2 transition-all"
                     style={{
+                      borderRadius: 12,
                       background: isSelected
                         ? `linear-gradient(135deg, ${rel.color}30, ${rel.color}10)`
                         : 'rgba(255,255,255,0.02)',
                       border: isSelected
                         ? `1.5px solid ${rel.color}`
-                        : `1px solid ${PALETTE.panelBorder}`,
+                        : '1px solid var(--ui-line)',
+                      boxShadow: isSelected ? `0 0 12px -4px ${rel.color}66` : 'none',
                     }}>
                     <div className="flex items-center justify-between">
                       <span className="text-[12px] font-bold" style={{ color: isSelected ? rel.color : PALETTE.text }}>
@@ -264,10 +268,11 @@ export default function PrepScreen({ classData, skills, stats = {}, relics, ulti
               const typeLabel = sk.type === 'physical' ? '물리' : sk.type === 'magic' ? '마법' : sk.type === 'defense' ? '방어' : '';
               return (
                 <button key={name} onClick={() => setModalState({ kind: 'active', name })}
-                  className="text-left px-2 py-2 transition-all"
+                  className="ui-press text-left px-2 py-2 transition-all"
                   style={{
+                    borderRadius: 12,
                     background: `linear-gradient(135deg, ${classData.color}20, ${classData.color}05)`,
-                    border: `1px solid ${classData.color}80`,
+                    border: `1px solid ${classData.color}66`,
                   }}>
                   <div className="text-[12px] font-bold mb-0.5" style={{ color: PALETTE.text }}>
                     {sk.name || name}
@@ -284,16 +289,19 @@ export default function PrepScreen({ classData, skills, stats = {}, relics, ulti
         )}
       </div>
 
-      <div className="p-3 border-t" style={{ borderColor: PALETTE.panelBorder }}>
+      <div className="p-3 border-t" style={{ borderColor: 'var(--ui-line)' }}>
         <button onClick={() => onConfirm(Array.from(selectedSkills), Array.from(selectedRelics))}
           disabled={!canConfirm}
-          className="w-full py-3 text-[12px] tracking-[0.3em]" style={{
+          className="ui-press w-full text-[13px] font-semibold tracking-[0.25em]" style={{
+            height: 48,
+            borderRadius: 'var(--r-btn)',
             background: canConfirm
-              ? `linear-gradient(180deg, ${PALETTE.dawn}40, ${PALETTE.dawn}20)`
-              : 'transparent',
-            border: `1px solid ${canConfirm ? PALETTE.dawn : PALETTE.panelBorder}`,
-            color: canConfirm ? PALETTE.text : PALETTE.textDim,
-            opacity: canConfirm ? 1 : 0.5,
+              ? 'linear-gradient(160deg, #d05248, #8a2d24)'
+              : 'rgba(255,255,255,0.03)',
+            border: canConfirm ? '1px solid rgba(232,176,74,0.35)' : '1px solid var(--ui-line)',
+            color: canConfirm ? '#ffe9d2' : PALETTE.textDim,
+            boxShadow: canConfirm ? '0 6px 24px -6px rgba(196,69,61,0.55), inset 0 1px 0 rgba(255,255,255,0.22)' : 'none',
+            opacity: canConfirm ? 1 : 0.6,
           }}>
           {canConfirm
             ? (mode === 'full' ? '여정 시작 ▸' : '확정 ▸')

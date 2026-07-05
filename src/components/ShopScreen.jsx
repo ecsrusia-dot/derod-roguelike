@@ -50,10 +50,11 @@ export default function ShopScreen({ gold, skills, relics, ultimates, curses = [
     return (
       <button key={idx} disabled={!canAfford || isBought || isMaxed}
         onClick={() => { onBuy(r, price); setBought(prev => new Set([...prev, idx])); }}
-        className="w-full text-left px-3 py-2.5 transition-all"
+        className="ui-press w-full text-left px-3 py-2.5 transition-all"
         style={{
-          background: isBought ? PALETTE.bgDeep : `${color}15`,
-          border: `1px solid ${isBought ? PALETTE.panelBorder : color}`,
+          borderRadius: 13,
+          background: isBought ? 'rgba(255,255,255,0.02)' : `${color}15`,
+          border: `1px solid ${isBought ? 'var(--ui-line)' : `${color}88`}`,
           opacity: isBought ? 0.4 : (canAfford && !isMaxed ? 1 : 0.6),
         }}>
         <div className="flex items-center justify-between">
@@ -61,8 +62,8 @@ export default function ShopScreen({ gold, skills, relics, ultimates, curses = [
             <div className="flex items-center gap-2 mb-1">
               <span className="text-xs font-bold" style={{ color: PALETTE.text }}>{title}</span>
               {r.type === 'skill' && (
-                <span className="text-[10px] px-1.5 py-0.5" style={{
-                  background: `${color}30`, color, border: `1px solid ${color}80`,
+                <span className="text-[10px] px-2 py-0.5" style={{
+                  borderRadius: 999, background: `${color}30`, color, border: `1px solid ${color}80`,
                 }}>{isMaxed ? 'MAX' : `Lv.${currentLv} → Lv.${nextLv}`}</span>
               )}
             </div>
@@ -93,9 +94,10 @@ export default function ShopScreen({ gold, skills, relics, ultimates, curses = [
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
         {stock.map((r, i) => renderItem(r, i))}
       </div>
-      <div className="border-t p-3" style={{ borderColor: PALETTE.panelBorder, background: PALETTE.bgDeep }}>
-        <button onClick={onLeave} className="w-full py-2.5 text-xs tracking-[0.3em]" style={{
-          background: 'transparent', border: `1px solid ${PALETTE.panelBorder}`, color: PALETTE.textDim,
+      <div className="border-t p-3" style={{ borderColor: 'var(--ui-line)', background: PALETTE.bgDeep }}>
+        <button onClick={onLeave} className="ui-press w-full text-xs tracking-[0.3em]" style={{
+          height: 44, borderRadius: 'var(--r-btn)',
+          background: 'rgba(255,255,255,0.03)', border: '1px solid var(--ui-line)', color: PALETTE.text,
         }}>▸ 떠난다</button>
       </div>
     </div>
