@@ -42,6 +42,8 @@ import {
   buildEffectivePassives,
   buildRelicStatBag,
   assignNextIntent,
+  getSkillApCost,
+  AP_PER_TURN,
 } from '../combat/initCombat.js';
 import { FloatingLabel, DamageVignette, WhiteFlash, SlashFx, MagicImpactFx, MagicParticles, BarrierRing, BarrierBreakFx, ThrustFx, BladeGuardFx, ShadowStrikeFx, StatusOverlay, UltimateCutin, EternalFlameCutin, FireballFx, ExplosionFx, IgniteGlowAura, IgniteExplodeFx, FlameBarrierFx, FlameReflectFx, CritScreenFx } from './CombatEffects.jsx';
 
@@ -242,15 +244,21 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     // 1.45.3: 마력 Lv5 etherCost-20 효과 폐기 (재시전 +10%로 변경됨)
     let etherCost = skill.cost || 0;
     if (etherCost > player.ether) return;
+    // 1.69.0 전투 개편 B — AP(행동력) 검증
+    const apCost = getSkillApCost(skill);
+    const curAp = player.ap ?? AP_PER_TURN;
+    if (apCost > curAp) return;
 
     // 모든 검증 통과 → 락 획득
     actionLockRef.current = true;
 
+    // 턴의 첫 행동에만 턴 구분선 삽입 (AP 시스템: 한 턴에 복수 행동)
+    const isFirstActionOfTurn = curAp >= AP_PER_TURN;
     const newLog = [...log,
-      { type: 'turnDivider', turn },
+      ...(isFirstActionOfTurn ? [{ type: 'turnDivider', turn }] : []),
       { type: 'player', text: `▸ ${skill.name}` },
     ];
-    let newPlayer = { ...player, ether: player.ether - etherCost };
+    let newPlayer = { ...player, ether: player.ether - etherCost, ap: curAp - apCost };
     let newEnemy = { ...enemy };
 
     if (skill.selfDmg) {
@@ -311,6 +319,13 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       const hitCount = skill.hitCount || 1;
       let totalDmg = 0;
       let usedGuaranteedCrit = false;
+
+      // 1.69.0 전투 개편 C — 콤보 연계: 이번 턴에 comboAfter 스킬을 먼저 썼으면 데미지 보너스
+      const comboActive = !!(skill.comboAfter && player._lastSkillThisTurn === skill.comboAfter);
+      if (comboActive) {
+        newLog.push({ type: 'passive', text: `★ [연계] ${skill.comboLabel || '콤보'}! 데미지 +${skill.comboBonusPct || 0}%` });
+        pushFxLabel('enemy', 'crit', null, `${skill.comboLabel || '연계'}!`);
+      }
       
       for (let echo = 0; echo < echoTimes; echo++) {
         if (echo > 0) {
@@ -341,6 +356,10 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           }
           const dmgResult = calculateDamage(skill, newPlayer, newEnemy, skills, isCrit, ultimates, meta, curses, activeSkills, relicStat, engravingFx);
           let actualDmg = dmgResult.finalDmg;
+          // 1.69.0 콤보 연계 보너스 (multi-hit이면 전 히트 적용)
+          if (comboActive && actualDmg > 0) {
+            actualDmg += Math.floor(actualDmg * (skill.comboBonusPct || 0) / 100);
+          }
           // 1.62.0 픽스 #5: "다음 공격" buff 클리어는 hitCount 루프 OUT으로 이동
           //   afterDodgeDmgNext / bloodRageNext / windBoostNextDmg / windPierceNext 모두 multi-hit 시 전 hit 적용
           if (newEnemy.defense > 0 && !skill.pierce) {
@@ -604,6 +623,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       // 자가 회복 (사제 - 신성광선)
       if (skill.selfHeal) {
         let heal = skill.selfHeal;
+        // 1.69.0 콤보 연계 — 축복받은 빛: 연계 시 자가 회복 배수
+        if (comboActive && skill.comboHealMult) heal = heal * skill.comboHealMult;
         if (relicStat.heal > 0) heal = Math.floor(heal * (1 + relicStat.heal / 100));
         const charismaBonus = getCharismaHealBonus(newPlayer);
         if (charismaBonus > 0) heal = Math.floor(heal * (1 + charismaBonus / 100));
@@ -612,7 +633,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         if (healPct !== 0) heal = Math.floor(heal * (1 + healPct / 100));
         if (hasCurse(curses, 'curse_heal-50')) heal = Math.floor(heal * 0.5);
         newPlayer.hp = Math.min(newPlayer.maxHp, newPlayer.hp + heal);
-        newLog.push({ type: 'passive', text: `◇ HP +${heal}` });
+        newLog.push({ type: 'passive', text: `◇ HP +${heal}${comboActive && skill.comboHealMult ? ' (연계 ×' + skill.comboHealMult + ')' : ''}` });
       }
     }
 
@@ -658,6 +679,9 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       if (finalCd > 0) newPlayer.cooldowns = { ...newPlayer.cooldowns, [skillKey]: finalCd };
     }
 
+    // 1.69.0 콤보 연계 — 이번 턴 마지막으로 쓴 스킬 추적 (다음 행동의 comboAfter 판정용)
+    newPlayer._lastSkillThisTurn = skillKey;
+
     setPlayer(newPlayer);
     setEnemy(newEnemy);
     setLog(newLog);
@@ -677,14 +701,28 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       return;
     }
 
-    // 단독 버프 스킬은 적 턴 진입 X — 시간 흐름 정지, 플레이어 입력 계속 받기
-    if (skill.type === 'buff') {
+    // 1.69.0 전투 개편 B — AP가 남아 있으면 턴 유지 (버프 포함 전 스킬 공통 규칙)
+    // 기존 "단독 버프 시간 정지" 규칙을 AP 규칙이 일반화: AP 0이 되는 순간에만 적 턴 진입
+    if ((newPlayer.ap || 0) > 0) {
       actionLockRef.current = false;
       return;
     }
 
     setPhase('enemyTurn');
     setTimeout(() => { executeEnemyTurn(newPlayer, newEnemy, newLog); }, 350);
+  };
+
+  // 1.69.0 전투 개편 B — 남은 AP를 버리고 턴 종료 (이월 없음)
+  const handleEndTurn = () => {
+    if (phase !== 'playerTurn') return;
+    if (actionLockRef.current) return;
+    actionLockRef.current = true;
+    const newPlayer = { ...player, ap: 0 };
+    const newEnemy = { ...enemy };
+    const newLog = [...log];
+    setPlayer(newPlayer);
+    setPhase('enemyTurn');
+    setTimeout(() => { executeEnemyTurn(newPlayer, newEnemy, newLog); }, 250);
   };
 
   // === 직업 소울 스킬 발동 ===
@@ -712,7 +750,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
 
     // 0.9초 컷인 후 효과 적용
     setTimeout(() => {
-      let newPlayer = { ...player, soulGauge: 0 };
+      // 1.69.0 AP 시스템 — 소울 스킬은 전체 턴 소모 (AP 0)
+      let newPlayer = { ...player, soulGauge: 0, ap: 0 };
       let newEnemy = { ...enemy };
       const newLog = [...log,
         { type: 'turnDivider', turn },
@@ -1517,6 +1556,9 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
 
     // 새 턴 시작: 단독 버프 스킬 사용 플래그 리셋
     newPlayer.usedBuffThisTurn = false;
+    // 1.69.0 전투 개편 B/C — AP 재충전 + 콤보 추적 리셋 (턴 경계에서 연계 초기화)
+    newPlayer.ap = AP_PER_TURN;
+    newPlayer._lastSkillThisTurn = null;
 
     // 소울 게이지 자연 충전 (매 턴 +5)
     if (classData.ultimateId) {
@@ -2235,26 +2277,49 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         <div className="shrink-0 border-t px-2.5 flex flex-col justify-center" style={{
           borderColor: 'var(--ui-line)',
           background: PALETTE.bgDeep,
-          height: classData.ultimateId ? 118 : 96,
+          height: classData.ultimateId ? 118 : 110,
         }}>
-          {/* 소울 게이지 바 (직업 소울 스킬 보유 시) — 1.66.0 전용 골드 바 승격, 적 턴에도 유지 */}
-          {classData.ultimateId && (phase === 'playerTurn' || phase === 'enemyTurn') && (() => {
+          {/* 1.69.0 AP 핍 + 소울 게이지 + 턴 종료 통합 행 — 적 턴에도 유지 표시 */}
+          {(phase === 'playerTurn' || phase === 'enemyTurn') && (() => {
             const gauge = player.soulGauge || 0;
             const ready = gauge >= 100;
+            const ap = player.ap ?? AP_PER_TURN;
             return (
               <div className="w-full mb-1.5 flex items-center gap-2">
-                <span className="tracking-[0.2em]" style={{ fontSize: 9, fontFamily: '"Cinzel", serif', color: ready ? '#ffd86b' : PALETTE.textDim }}>SOUL</span>
-                <div className="flex-1 h-1.5 relative overflow-hidden" style={{ background: 'rgba(232,176,74,0.12)', borderRadius: 999 }}>
-                  <div className="absolute inset-y-0 left-0 transition-all" style={{
-                    width: `${gauge}%`,
-                    borderRadius: 999,
-                    background: ready
-                      ? `linear-gradient(90deg, #ffd86b, #fff4b8, #ffd86b)`
-                      : `linear-gradient(90deg, #8a6a3e, ${PALETTE.legendary})`,
-                    boxShadow: ready ? '0 0 10px rgba(255,216,107,0.9)' : '0 0 6px rgba(232,176,74,0.4)',
-                  }} />
-                </div>
-                <span className="tabular-nums" style={{ fontSize: 9.5, color: ready ? '#ffd86b' : PALETTE.textDim }}>{gauge}/100</span>
+                <span className="tracking-[0.15em] flex-none" style={{ fontSize: 9, fontFamily: '"Cinzel", serif', color: PALETTE.dawn }}>AP</span>
+                <span className="flex gap-1.5 flex-none items-center">
+                  {Array.from({ length: AP_PER_TURN }, (_, i) => (
+                    <span key={i} style={{
+                      width: 7, height: 7, borderRadius: 2, transform: 'rotate(45deg)', display: 'block',
+                      background: i < ap ? PALETTE.dawn : 'rgba(255,255,255,0.12)',
+                      boxShadow: i < ap ? '0 0 6px rgba(212,165,116,0.6)' : 'none',
+                      transition: 'background 0.2s, box-shadow 0.2s',
+                    }} />
+                  ))}
+                </span>
+                {classData.ultimateId ? (
+                  <>
+                    <span className="tracking-[0.2em] flex-none ml-1" style={{ fontSize: 9, fontFamily: '"Cinzel", serif', color: ready ? '#ffd86b' : PALETTE.textDim }}>SOUL</span>
+                    <div className="flex-1 h-1.5 relative overflow-hidden" style={{ background: 'rgba(232,176,74,0.12)', borderRadius: 999 }}>
+                      <div className="absolute inset-y-0 left-0 transition-all" style={{
+                        width: `${gauge}%`,
+                        borderRadius: 999,
+                        background: ready
+                          ? `linear-gradient(90deg, #ffd86b, #fff4b8, #ffd86b)`
+                          : `linear-gradient(90deg, #8a6a3e, ${PALETTE.legendary})`,
+                        boxShadow: ready ? '0 0 10px rgba(255,216,107,0.9)' : '0 0 6px rgba(232,176,74,0.4)',
+                      }} />
+                    </div>
+                    <span className="tabular-nums flex-none" style={{ fontSize: 9.5, color: ready ? '#ffd86b' : PALETTE.textDim }}>{gauge}/100</span>
+                  </>
+                ) : <span className="flex-1" />}
+                {phase === 'playerTurn' && (
+                  <button onClick={handleEndTurn} className="ui-press flex-none" style={{
+                    fontSize: 10, letterSpacing: '0.08em', color: PALETTE.textDim,
+                    background: 'rgba(255,255,255,0.05)', border: '1px solid var(--ui-line)',
+                    borderRadius: 999, padding: '3px 10px',
+                  }}>턴 종료 ▸</button>
+                )}
               </div>
             );
           })()}
@@ -2271,7 +2336,12 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                 const buffUsedThisTurn = skill.type === 'buff' && player.usedBuffThisTurn;
                 // 1.49.0~ 신전 액티브 스킬 봉인
                 const isSealed = (player.debuffs?.sealedSkills || []).includes(skillKey);
-                const disabled = onCd || noEther || buffUsedThisTurn || isSealed;
+                // 1.69.0 AP 시스템 — 행동력 부족 시 비활성
+                const apCost = getSkillApCost(skill);
+                const noAp = apCost > (player.ap ?? AP_PER_TURN);
+                // 1.69.0 콤보 연계 예고 — 이번 턴 선행 스킬을 썼으면 이 스킬이 연계 대기 상태
+                const comboReady = !!(skill.comboAfter && player._lastSkillThisTurn === skill.comboAfter);
+                const disabled = onCd || noEther || buffUsedThisTurn || isSealed || noAp;
                 // 1.66.0 카드형 버튼 — 상단 타입 컬러 엣지 + 타입 글리프
                 const typeColor = skill.type === 'physical' ? PALETTE.accent : skill.type === 'magic' ? PALETTE.twilight : skill.type === 'defense' ? PALETTE.ice : PALETTE.dawn;
                 const typeGlyph = skill.type === 'physical' ? '⚔' : skill.type === 'magic' ? '✦' : skill.type === 'defense' ? '🛡' : '◈';
@@ -2283,12 +2353,15 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                       background: isSealed ? 'rgba(92,74,140,0.45)'
                         : disabled ? 'rgba(0,0,0,0.5)'
                         : 'rgba(255,255,255,0.045)',
-                      border: `1px solid ${isSealed ? '#5c4a8c' : disabled ? PALETTE.panelBorder : `${typeColor}66`}`,
+                      border: `1px solid ${isSealed ? '#5c4a8c' : disabled ? PALETTE.panelBorder : comboReady ? '#ffd86b' : `${typeColor}66`}`,
                       color: disabled ? PALETTE.textDim : '#fff',
                       opacity: disabled ? 0.5 : 1,
+                      boxShadow: comboReady && !disabled ? '0 0 10px rgba(255,216,107,0.5)' : 'none',
                     }}>
-                    <span className="absolute top-0" style={{ left: '18%', right: '18%', height: 2, borderRadius: '0 0 3px 3px', background: typeColor, opacity: disabled ? 0.3 : 0.9 }} />
-                    <span className="text-[11px] font-bold flex items-center gap-1"><span style={{ color: disabled ? PALETTE.textDim : typeColor, fontSize: 10 }}>{typeGlyph}</span>{skill.name}</span>
+                    <span className="absolute top-0" style={{ left: '18%', right: '18%', height: 2, borderRadius: '0 0 3px 3px', background: comboReady && !disabled ? '#ffd86b' : typeColor, opacity: disabled ? 0.3 : 0.9 }} />
+                    {/* 1.69.0 AP 비용 뱃지 */}
+                    <span className="absolute" style={{ top: 3, right: 5, fontSize: 8, color: noAp ? PALETTE.accent : PALETTE.textDim, letterSpacing: '0.05em' }}>{apCost}AP</span>
+                    <span className="text-[11px] font-bold flex items-center gap-1"><span style={{ color: disabled ? PALETTE.textDim : typeColor, fontSize: 10 }}>{typeGlyph}</span>{comboReady && !disabled ? '★' : ''}{skill.name}</span>
                     <span className="text-[9px]" style={{ color: disabled ? PALETTE.textDim : '#ddd' }}>
                       {skill.type === 'defense' ? `+${skill.defense}`
                         : skill.type === 'buff' ? '버프 · 즉시'

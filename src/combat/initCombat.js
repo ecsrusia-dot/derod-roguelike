@@ -22,13 +22,32 @@ const RELIC_STAT_KEYS = [
   'frostbiteResist', 'berserkResist', 'sealResist', 'shockResist', 'antiHeal',
 ];
 
+// ============================================
+// 1.69.0 전투 개편 B — AP(행동력) 턴 시스템
+// ============================================
+// 플레이어는 턴당 AP 3으로 복수 행동 조합 (기본기 1 / 주력기 2 / 방어·버프 1 / 소울 3=전체 턴).
+// AP 도입으로 플레이어 턴당 산출량이 약 ×1.9로 늘어 적 전체에 보정 배율 적용.
+export const AP_PER_TURN = 3;
+
+// 스킬 AP 비용 — 데이터 ap 필드 우선, 미지정 시 기본 규칙
+export function getSkillApCost(skill) {
+  if (!skill) return 1;
+  if (skill.ap) return skill.ap;
+  if (skill.type === 'defense' || skill.type === 'buff') return 1;
+  if ((skill.cost || 0) === 0 && (skill.cd || 0) === 0) return 1; // 기본기
+  return 2; // 주력기
+}
+
+// AP 시스템 밸런스 보정 — PM 실기기 확인 후 이 두 수치만 조정하면 전역 반영
+export const AP_TUNING = { enemyHpMult: 1.6, enemyDmgMult: 1.25 };
+
 // 플레이어 초기 상태 생성 — 메타·저주·이프리트 패시브 보너스 반영.
 // ※ 시작 소울 게이지 가산은 useEffect에서 별도 처리 (passive 로그 출력 때문)
 export function buildInitialPlayer({ initialPlayer, initialSkills, initialUltimates, activeSkills, meta, curses }) {
   let p = {
     ...initialPlayer, defense: 0, buffs: {}, debuffs: {}, cooldowns: {},
     ether: 3, maxEther: 3, firstHitImmune: false, revivedThisCombat: false,
-    soulGauge: 0,
+    soulGauge: 0, ap: AP_PER_TURN,
   };
   if (meta) {
     const etherBonus = getMetaBonus(meta, 'maxEther+1');
@@ -60,8 +79,9 @@ export function buildInitialPlayer({ initialPlayer, initialSkills, initialUltima
 // 적 초기 상태 생성 — 원정 배율 적용된 HP와 패턴 데미지 반영.
 export function buildInitialEnemy({ enemyKey, expedition }) {
   const e = ENEMIES[enemyKey];
-  const hpMult = expedition?.enemyHpMult || 1.0;
-  const dmgMult = expedition?.enemyDmgMult || 1.0;
+  // 1.69.0~ AP 시스템 보정 배율이 원정 배율에 곱연산으로 얹힘
+  const hpMult = (expedition?.enemyHpMult || 1.0) * AP_TUNING.enemyHpMult;
+  const dmgMult = (expedition?.enemyDmgMult || 1.0) * AP_TUNING.enemyDmgMult;
   const adjustedHp = Math.floor(e.hp * hpMult);
   const adjustedPatterns = (e.patterns || []).map(pat => ({
     ...pat,
