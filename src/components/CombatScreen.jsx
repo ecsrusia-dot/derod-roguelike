@@ -41,6 +41,7 @@ import {
   buildInitialEnemy,
   buildEffectivePassives,
   buildRelicStatBag,
+  assignNextIntent,
 } from '../combat/initCombat.js';
 import { FloatingLabel, DamageVignette, WhiteFlash, SlashFx, MagicImpactFx, MagicParticles, BarrierRing, BarrierBreakFx, ThrustFx, BladeGuardFx, ShadowStrikeFx, StatusOverlay, UltimateCutin, EternalFlameCutin, FireballFx, ExplosionFx, IgniteGlowAura, IgniteExplodeFx, FlameBarrierFx, FlameReflectFx, CritScreenFx } from './CombatEffects.jsx';
 
@@ -216,10 +217,10 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     }
     setLog(initialLog);
     setTimeout(() => {
-      const patterns = enemy.patterns;
-      const firstIntent = patterns[Math.floor(Math.random() * patterns.length)];
       setEnemy(e => {
-        const updated = { ...e, nextIntent: firstIntent };
+        const updated = { ...e };
+        // 1.68.0~ 지능형 의도 선택 (가중치·연속 방지)
+        const firstIntent = assignNextIntent(updated);
         // 첫 의도가 defend면 즉시 방어 적용 (그 턴만 유지)
         if (firstIntent?.type === 'defend' && firstIntent.defense) {
           updated.defense = firstIntent.defense;
@@ -881,6 +882,10 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
 
     if (newEnemy.debuffs?.stunned > 0) {
       newLog.push({ type: 'debuff', text: `◆ ${enemy.name}이(가) 기절 상태로 행동 못 함` });
+      // 1.68.0 전투 개편 A — 대공격 준비 중 기절시키면 대공격 저지 (충격 빌드의 능동 카운터)
+      if (newEnemy.nextIntent?.heavy) {
+        newLog.push({ type: 'passive', text: `◆ 준비하던 대공격이 저지되었다!` });
+      }
       // 기절 1턴 소모
       newEnemy.debuffs = { ...newEnemy.debuffs, stunned: 0 };
       setEnemy(newEnemy); setLog(newLog);
@@ -898,6 +903,11 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         newLog.push({ type: 'system', text: `· 회피 성공!` });
         // FX — 회피: 플레이어 위에 "회피!" 부유 라벨
         pushFxLabel('player', 'miss', null, '회피!');
+        // 1.68.0 전투 개편 A — 대공격 간파: ⚠ 예고된 대공격을 회피하면 소울 보너스
+        if (intent.heavy && classData?.ultimateId) {
+          newPlayer.soulGauge = Math.min(100, (newPlayer.soulGauge || 0) + 15);
+          newLog.push({ type: 'passive', text: `★ [간파] 대공격 회피 — 소울 +15` });
+        }
         // 1.27.0~ 각인: 회피 시 소울 게이지 +N
         if (engravingFx.dodgeSoul) {
           newPlayer.soulGauge = Math.min(100, (newPlayer.soulGauge || 0) + engravingFx.dodgeSoul);
@@ -951,6 +961,14 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           }
           const takenBreakdown = [`기본 ${baseDmg}`];
           if (berserkBonus > 0) takenBreakdown.push(`광폭 +${berserkBonus}`);
+          // 1.68.0 전투 개편 A — 격노한 보스: 데미지 +20%
+          if (newEnemy.enraged) {
+            const enrageBonus = Math.floor(dmg * 0.2);
+            if (enrageBonus > 0) {
+              dmg += enrageBonus;
+              takenBreakdown.push(`격노 +${enrageBonus}`);
+            }
+          }
           
           // 심안류 Lv.5: 반격 확률 사전 굴림 (성공 시 받는 데미지 30% 차단)
           // counterRollResult를 캐싱해서 나중에 같은 결과로 반격 처리
@@ -991,6 +1009,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
             dmg -= blocked;
             if (blocked > 0) takenBreakdown.push(`수비 Lv.7 -${blocked}`);
           }
+          let heavyGuarded = false;
           if (newPlayer.defense > 0) {
             const absorbed = Math.min(newPlayer.defense, dmg);
             newPlayer.defense -= absorbed;
@@ -1004,7 +1023,23 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
               });
               // 방어 소진 FX — 방어 > 0 이었던 시점에만 발동 (다음 턴 방어=0이면 발동 X)
               setFxBarrierBreak(v => v + 1);
+              // 1.68.0 전투 개편 A — ⚠ 예고된 대공격을 방어로 받아냄
+              if (intent.heavy) heavyGuarded = true;
             }
+          }
+          // 1.68.0 대공격 간파 — 방어를 세워 대공격을 받아내면 잔여 피해 -25% + 소울 보너스
+          if (heavyGuarded) {
+            if (dmg > 0) {
+              const cut = Math.floor(dmg * 0.25);
+              if (cut > 0) {
+                dmg -= cut;
+                takenBreakdown.push(`간파 -${cut}`);
+              }
+            }
+            if (classData?.ultimateId) {
+              newPlayer.soulGauge = Math.min(100, (newPlayer.soulGauge || 0) + 10);
+            }
+            newLog.push({ type: 'passive', text: `⚔ [간파] 대공격을 막아냈다! 잔여 피해 -25%${classData?.ultimateId ? ', 소울 +10' : ''}` });
           }
           if (hasEffect(skills, 'dmgTaken-20', activeSkills) && dmg > 0) {
             const reduced = Math.floor(dmg * 0.20);
@@ -1801,8 +1836,18 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     }
 
 
-    const patterns = newEnemy.patterns;
-    newEnemy.nextIntent = patterns[Math.floor(Math.random() * patterns.length)];
+    // 1.68.0 전투 개편 A — 보스 격노 페이즈 (HP 50% 이하, 전투당 1회 전환)
+    // 격노 후: 데미지 +20% (공격 처리부) + 공격 패턴 가중치 ×2 (rollEnemyIntent)
+    if (newEnemy.isBoss && !newEnemy.enraged && newEnemy.currentHp <= newEnemy.hp * 0.5) {
+      newEnemy.enraged = true;
+      newLog.push({ type: 'debuff', text: `💢 [격노] ${newEnemy.name}의 기세가 변했다! (데미지 +20%, 공격 빈도 증가)` });
+      pushFxLabel('enemy', 'crit', null, '격노!');
+      setFxScreenShake(v => v + 1);
+      setFxEnemyFlash(v => v + 1);
+    }
+
+    // 1.68.0~ 지능형 의도 선택 (가중치·격노 반영·연속 방지)
+    assignNextIntent(newEnemy);
     // 방어 리셋 — 내 방어와 적 방어 모두 그 턴만 유지 (다음 턴 시작 시 0으로)
     // 내 defense는 위에서 이미 0으로 리셋됨
     newEnemy.defense = 0;
@@ -1841,9 +1886,9 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       
       // 다음 적 턴 실행 — 적이 의도 결정 후 행동
       setTimeout(() => {
-        // 새 의도 결정 (적이 다시 행동하므로)
-        const newIntent = newEnemy.patterns[Math.floor(Math.random() * newEnemy.patterns.length)];
-        const enemyWithIntent = { ...newEnemy, nextIntent: newIntent };
+        // 새 의도 결정 (적이 다시 행동하므로) — 1.68.0~ 지능형 선택
+        const enemyWithIntent = { ...newEnemy };
+        assignNextIntent(enemyWithIntent);
         setEnemy(enemyWithIntent);
         // 적 턴 실행
         setTimeout(() => {
@@ -1997,6 +2042,13 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
               <div className="h-2 relative mb-1.5 overflow-hidden" style={{ background: 'rgba(0,0,0,0.6)', borderRadius: 999 }}><div className="absolute inset-y-0 left-0" style={{ width: `${(enemy.currentHp/enemy.hp)*100}%`, borderRadius: 999, background: `linear-gradient(90deg, ${PALETTE.blood}, ${enemy.color})`, boxShadow: `0 0 8px ${enemy.color}66`, transition: 'width 0.45s cubic-bezier(.4,0,.2,1)' }} /></div>
               {/* 2줄: 디버프 카드 (고정 높이) */}
               <div className="flex items-center gap-1.5 flex-wrap min-h-[18px] mb-1">
+                {/* 1.68.0 전투 개편 A — 대공격 예고 (심안 없이 전 직업 공개, 방어·회피·기절로 대응 유도) */}
+                {phase === 'playerTurn' && enemy.nextIntent?.heavy && enemy.nextIntent?.type === 'attack' && (
+                  <span className="text-[10px] px-2 py-0.5 animate-pulse font-bold" style={{ borderRadius: 999, background: 'rgba(196,69,61,0.35)', color: '#ffb3ac', border: '1px solid #c4453d', boxShadow: '0 0 8px rgba(196,69,61,0.6)' }}>⚠ 대공격 예고</span>
+                )}
+                {enemy.enraged && (
+                  <span className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: 'rgba(139,31,31,0.4)', color: '#ff8888', border: '1px solid #8b1f1f' }}>💢 격노</span>
+                )}
                 {enemy.defense > 0 && getSkillLevel(skills, '심안') >= 7 && (<span className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: `${PALETTE.defense}40`, color: PALETTE.defense, border: `1px solid ${PALETTE.defense}80` }}>◈ 방어 {enemy.defense}</span>)}
                 {enemy.debuffs?.bleed > 0 && (<span className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: `${PALETTE.bleed}40`, color: PALETTE.bleed, border: `1px solid ${PALETTE.bleed}80` }}>◆ 출혈 {enemy.debuffs.bleed} ({enemy.debuffs.bleedTurns}T)</span>)}
                 {enemy.debuffs?.igniteDmg > 0 && enemy.debuffs?.igniteTurns > 0 && (<span className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#ff6b3540', color: '#ff6b35', border: '1px solid #ff6b3580' }}>🔥 화염 {enemy.debuffs.igniteDmg} ({enemy.debuffs.igniteEternal ? '∞' : enemy.debuffs.igniteTurns + 'T'})</span>)}

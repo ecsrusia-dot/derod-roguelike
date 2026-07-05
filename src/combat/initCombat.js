@@ -76,6 +76,47 @@ export function buildInitialEnemy({ enemyKey, expedition }) {
   };
 }
 
+// ============================================
+// 1.68.0 전투 개편 A — 적 의도 선택 지능화
+// ============================================
+// - pattern.weight 지원 (기본 1 — 데이터에 없으면 기존 균등 추첨과 동일)
+// - 보스 격노(enraged) 시 공격 패턴 가중치 ×2 (방어로 시간 끄는 빈도 급감)
+// - 같은 패턴 3연속 방지: 직전 2연속과 동일한 패턴이 뽑히면 1회 리롤
+export function rollEnemyIntent(enemyState) {
+  const patterns = enemyState?.patterns || [];
+  if (patterns.length === 0) return null;
+  const pick = () => {
+    const weights = patterns.map(p => {
+      let w = p.weight || 1;
+      if (enemyState.enraged && p.type === 'attack') w *= 2;
+      return w;
+    });
+    const total = weights.reduce((a, b) => a + b, 0);
+    let r = Math.random() * total;
+    for (let i = 0; i < patterns.length; i++) {
+      r -= weights[i];
+      if (r < 0) return patterns[i];
+    }
+    return patterns[patterns.length - 1];
+  };
+  let intent = pick();
+  if (patterns.length > 1 && intent?.name === enemyState._lastIntentName && (enemyState._lastIntentRepeat || 0) >= 1) {
+    intent = pick();
+  }
+  return intent;
+}
+
+// 의도 확정 + 연속 추적 필드 갱신 (enemyState를 직접 변형하고 intent 반환)
+export function assignNextIntent(enemyState) {
+  const intent = rollEnemyIntent(enemyState);
+  enemyState._lastIntentRepeat = intent && intent.name === enemyState._lastIntentName
+    ? (enemyState._lastIntentRepeat || 0) + 1
+    : 0;
+  enemyState._lastIntentName = intent?.name || null;
+  enemyState.nextIntent = intent;
+  return intent;
+}
+
 // 패시브 스킬 계산 — 활성 유물 효과를 패시브에 반영.
 // 1.49.0~ 신전 봉인은 액티브 스킬을 봉인하도록 변경되어 패시브 봉인 시스템은 사용하지 않음.
 export function buildEffectivePassives({ initialSkills, initialRelics, activeRelicNames }) {
