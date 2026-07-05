@@ -20,6 +20,12 @@
 //   - 'skill_random_lv' (보유 패시브 中 랜덤 +1Lv)
 //   - 'skill_specific' (특정 패시브 +1Lv) — name 필요
 //   - 'stat' (능력치 +X) — name, value 필요
+//
+// === 1.70.0 연쇄 이벤트 (chain) ===
+//   - choice.chain / success.chain / fail.chain: '<eventId>' — 이 선택을 하면
+//     같은 런의 다음 event 노드에서 해당 후속 사건이 최우선 발동
+//   - chainOnly: true — 랜덤 풀 제외, chain 예약으로만 등장하는 후속 사건
+//   - 결과 화면에 "◆ 인연" 박스로 예고. 예약 목록은 이어하기 스냅샷에 포함
 export const EVENTS = [
   // === 튜토리얼 2 (황혼의 시장) 전용 사건 ===
   {
@@ -831,8 +837,9 @@ export const EVENTS = [
   // === 챕터 3 (봉인된 신전) 추가 사건 — 봉인·시간·고대 사제 ===
   // ============================================================
   {
-    id: 'sealedDoor',
-    title: '봉인된 문',
+    // 1.70.0 픽스 — 'sealedDoor' id 중복 정의 (도감 1개 취급 버그) → 별도 id로 분리
+    id: 'sealedGate',
+    title: '봉인된 석문',
     text: '룬으로 뒤덮인 거대한 문. 안에서 무언가가 깨어나려 한다.',
     chapter: [3],
     choices: [
@@ -1161,6 +1168,99 @@ export const EVENTS = [
         fail: { text: '의심이 너를 갉아먹는다.', penalty: { hp: -30 } } },
       { text: '맹세를 다시 한다', result: '신앙이 굳건해진다.', reward: { type: 'maxhp', value: 20 } },
       { text: '시험을 외면한다', result: '의심은 그림자로 남는다.', reward: null },
+    ],
+  },
+
+  // ============================================================
+  // === 1.70.0 연쇄 이벤트 — 선택이 런 후반에 되돌아온다 (챕터별 1쌍) ===
+  // ============================================================
+  // 챕터 1 — 선행: 희생 → 후속: 보답
+  {
+    id: 'frozenTraveler',
+    title: '얼어붙은 여행자',
+    text: '눈보라 속, 반쯤 얼어붙은 여행자가 쓰러져 있다.\n"부...탁이다... 온기를..."',
+    chapter: [1],
+    choices: [
+      { text: '외투를 벗어 덮어준다 (HP -15)', result: '여행자의 눈에 생기가 돌아온다.\n"이 은혜... 반드시 갚겠다."\n그는 눈보라 저편으로 사라진다.', reward: null, penalty: { hp: -15 }, chain: 'travelerReturn' },
+      { text: '소지품만 챙긴다', result: '차가운 손에서 은화 주머니를 빼낸다.\n등 뒤가 서늘하다.', reward: { type: 'gold', value: 60 } },
+      { text: '지나친다', result: '눈보라가 그의 흔적을 덮는다.', reward: null },
+    ],
+  },
+  {
+    id: 'travelerReturn',
+    title: '은혜 갚는 여행자',
+    chainOnly: true,
+    text: '낯익은 얼굴이 다가온다. 눈보라 속에서 구해준 그 여행자다.\n"살아서 다시 만났군! 약속대로 은혜를 갚지."',
+    choices: [
+      { text: '보답을 받는다', result: '그가 품에서 오래된 유물을 꺼내 건넨다.', reward: { type: 'random_relic' } },
+      { text: '마음만 받는다', result: '"겸손하군. 그럼 이거라도."\n그가 은화 주머니를 억지로 쥐여준다.', reward: { type: 'gold', value: 120 } },
+    ],
+  },
+  // 챕터 2 — 선행: 투자 → 후속: 개화
+  {
+    id: 'strangeSeed',
+    title: '기묘한 씨앗',
+    text: '죽은 나무 둥치에서 홀로 빛나는 씨앗을 발견했다.\n부패한 숲 한가운데서, 그것만이 살아 있다.',
+    chapter: [2],
+    choices: [
+      { text: '성수를 사서 심는다 (은화 -50)', cost: { gold: 50 }, result: '씨앗이 땅속 깊이 뿌리내린다.\n먼 곳에서 숲이 응답하는 소리가 들린다.', reward: null, chain: 'seedBloom' },
+      { text: '씨앗을 행상에게 판다', result: '"희귀한 물건이군!" 행상이 후하게 쳐준다.', reward: { type: 'gold', value: 40 } },
+      { text: '내버려 둔다', result: '씨앗은 어둠 속에서 조용히 빛난다.', reward: null },
+    ],
+  },
+  {
+    id: 'seedBloom',
+    title: '개화',
+    chainOnly: true,
+    text: '길이 환해진다. 그때 심은 씨앗이 어느새 거목이 되어 꽃을 피웠다.\n달콤한 향기가 상처를 어루만진다.',
+    choices: [
+      { text: '열매를 먹는다', result: '따스한 생명력이 온몸에 차오른다.', reward: { type: 'maxhp', value: 12 } },
+      { text: '가지 아래서 쉰다', result: '깊은 잠. 몸이 가벼워졌다.', reward: { type: 'heal', value: 60 } },
+    ],
+  },
+  // 챕터 3 — 선행: 서약 → 후속: 응답
+  {
+    id: 'dawnOath',
+    title: '여명의 서약',
+    text: '제단에 오래된 서약서가 놓여 있다.\n"봉인을 지키는 자, 여명이 답하리라."',
+    chapter: [3],
+    choices: [
+      { text: '피로 서명한다 (HP -10)', result: '서약서가 빛으로 타오르며 사라진다.\n어깨에 여명의 인장이 새겨졌다.', reward: null, penalty: { hp: -10 }, chain: 'oathAnswer' },
+      { text: '서약서를 판다', result: '수집가가 좋아할 물건이다.', reward: { type: 'gem', value: 1 } },
+      { text: '건드리지 않는다', result: '서약은 다음 순례자를 기다린다.', reward: null },
+    ],
+  },
+  {
+    id: 'oathAnswer',
+    title: '여명의 응답',
+    chainOnly: true,
+    text: '어깨의 인장이 뜨거워진다.\n빛무리가 내려와 그대의 기술을 축복한다.',
+    choices: [
+      { text: '축복을 받는다', result: '기술의 이치가 또렷해진다.', reward: { type: 'skill_random_lv' } },
+    ],
+  },
+  // 챕터 4 — 선행: 달콤한 선불 → 후속: 빚 독촉 (부정 연쇄)
+  {
+    id: 'demonContract',
+    title: '마족의 밀약',
+    text: '균열 사이로 마족 상인이 속삭인다.\n"선불이다. 대가는... 나중에 받으러 오지."',
+    chapter: [4],
+    choices: [
+      { text: '밀약을 맺는다 (보석 +3, 대가는 나중에)', result: '보석이 손에 쥐어진다.\n계약서가 그림자 속으로 사라진다.', reward: { type: 'gem', value: 3 }, chain: 'debtCollector' },
+      { text: '거절한다', result: '"현명하군... 아니면 겁쟁이거나."', reward: null },
+    ],
+  },
+  {
+    id: 'debtCollector',
+    title: '빚 독촉',
+    chainOnly: true,
+    text: '그림자가 길을 막는다. 마족 상인이 손을 내민다.\n"대가를 받으러 왔다."',
+    choices: [
+      { text: '피로 갚는다 (HP -30)', result: '"시원하게 갚는군. 마음에 들어."', reward: null, penalty: { hp: -30 } },
+      { text: '은화로 갚는다 (은화 -120)', result: '"다음에 또 거래하지."', reward: null, penalty: { gold: -120 } },
+      { text: '갚기를 거부한다 (매력 검정)', stat: '매력', dc: 18,
+        success: { text: '"...재미있는 놈이군. 이번만 봐주지."', reward: null },
+        fail: { text: '그림자 발톱이 살을 찢는다.', penalty: { hp: -45 } } },
     ],
   },
 ];
