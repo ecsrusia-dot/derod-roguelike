@@ -82,6 +82,7 @@ export default function MapView({ chapter, classData, mapData, hp, maxHp, gold, 
           <Chip color={PALETTE.dawn} style={{ height: 20 }}>◉ <span className="tabular-nums">{gold}</span></Chip>
           <Chip color={PALETTE.ice} style={{ height: 20 }}>◆ <span className="tabular-nums">{gem}</span></Chip>
           {expedition && <Chip color={expedition.color} style={{ height: 20 }}>{expedition.name}</Chip>}
+          {chapter.gimmick && <Chip color={chapter.color} style={{ height: 20 }}>◈ {chapter.gimmick.name}</Chip>}
           <span className="ml-auto tracking-[0.14em] truncate" style={{ fontSize: 10.5, color: chapter.color }}>
             {chapterLabel} {chapter.name} · <span className="tabular-nums">{completedCount}/{mapData.nodes.length}</span>
           </span>

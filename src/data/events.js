@@ -1250,6 +1250,49 @@ export const EVENTS = [
       { text: '거절한다', result: '"현명하군... 아니면 겁쟁이거나."', reward: null },
     ],
   },
+  // 전 챕터 — 선행: 먹이 주기 → 후속: 사냥개의 보은
+  {
+    id: 'strayHound',
+    title: '떠돌이 사냥개',
+    text: '갈비뼈가 드러난 사냥개가 멀찍이서 그대를 바라본다.\n적의는 없어 보인다. 다만... 배가 고플 뿐.',
+    chapter: [1, 2, 3, 4],
+    choices: [
+      { text: '육포를 사서 나눠준다 (은화 -30)', cost: { gold: 30 }, result: '사냥개가 꼬리를 흔들며 육포를 삼킨다.\n한참을 따라오다, 이내 어둠 속으로 사라진다.', reward: null, chain: 'houndAlly' },
+      { text: '쫓아낸다', result: '사냥개가 힘없이 물러난다.', reward: null },
+    ],
+  },
+  {
+    id: 'houndAlly',
+    title: '사냥개의 보은',
+    chainOnly: true,
+    text: '익숙한 울음소리. 그 사냥개가 무언가를 물고 달려온다.\n입에 문 것은... 반짝이는 보석과 약초 꾸러미다.',
+    choices: [
+      { text: '보석을 받는다', result: '사냥개가 자랑스럽게 보석을 내려놓는다.', reward: { type: 'gem', value: 2 } },
+      { text: '약초를 받는다', result: '약초가 상처에 스며든다.', reward: { type: 'heal', value: 50 } },
+    ],
+  },
+  // 챕터 2~4 — 도박형 연쇄: 성공해야 잭팟이 예약된다
+  {
+    id: 'gamblerGhost',
+    title: '도박귀신',
+    text: '허공에 뜬 해골이 주사위를 굴리고 있다.\n"한 판 하겠나? 이기면... 나중에 크게 돌려주지. 지면 은화 100닢."',
+    chapter: [2, 3, 4],
+    choices: [
+      { text: '영혼의 주사위를 받는다 (매력 검정)', stat: '매력', dc: 17,
+        success: { text: '"...허, 이 주사위를 이겨? 좋다. 빚은 꼭 갚는 성미거든."\n해골이 낄낄대며 사라진다.', reward: null, chain: 'ghostJackpot' },
+        fail: { text: '"아쉽군! 은화는 두고 가라."', penalty: { gold: -100 } } },
+      { text: '도박은 사양한다', result: '"쯧, 겁쟁이."', reward: null },
+    ],
+  },
+  {
+    id: 'ghostJackpot',
+    title: '귀신의 빚 갚기',
+    chainOnly: true,
+    text: '허공에서 은화 주머니가 툭 떨어진다.\n"약속은 약속이니까." 낄낄대는 웃음소리가 멀어진다.',
+    choices: [
+      { text: '주머니를 줍는다', result: '묵직하다. 귀신치고는 손이 크다.', reward: { type: 'gold', value: 250 } },
+    ],
+  },
   {
     id: 'debtCollector',
     title: '빚 독촉',
