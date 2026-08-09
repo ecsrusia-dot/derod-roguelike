@@ -909,7 +909,9 @@ PM이 AskUserQuestion으로 확정한 설계. **던전앤파이터 모티브, "�
 | 던전 구조 | 파밍 던전(장비 드랍) → 장비 갖추고 상위 레이드 보스 (던파 루프) |
 | 보상 | 레이드 전용 재화 + 장비 — 본편과 분리된 성장 축 |
 
-**MVP 1차 범위**: 레이드 탭 + 파밍 던전 1종 + 레이드 보스 1종(페이즈·전멸기) + 직업별 레이드 스킬 + 장비 3부위×5직업 드랍/장착 + 레이드 인벤토리(`meta.raidGear`)
+**✅ MVP 1차 구현 완료 (1.74.0)**: `src/data/raid.js`(RAID_CLASSES·RAID_SKILLS·RAID_DUNGEONS 2종·rollRaidDrop) + `RaidScreen.jsx`(로비·장비 관리·일괄 장착) + `RaidBattleScreen.jsx`(라운드제 풀오토·배속·전멸기·격노) + `meta.raid`(inventory/equipped/clears + addRaidDrops·equipRaidItem·autoEquipRaidBest). 해금: `tutorial_curse_clear`. 타이틀 메뉴 진입.
+
+**2차 확장 후보 (PM 결정 대기)**: 던전 추가(3~5종 티어) / 세트 효과 / 장비 분해·강화 재화 / 레이드 주간 보상 / 보스 기믹 다양화(속성·쫄페이즈)
 
 ### 완성 항목 (1.62.x 기준 — outdated 정보 재발 방지)
 - **5직업 풀스택** — 각인 풀 5×24 = 120장 + 5직업 전용 패시브 + 5직업 소울 스킬 모두 완성
