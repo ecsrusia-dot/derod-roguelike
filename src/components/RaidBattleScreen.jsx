@@ -16,26 +16,29 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { PALETTE } from '../utils/helpers.js';
-import { RAID_CLASSES, RAID_RARITIES, RAID_TUNING, RAID_STONE, RAID_ESSENCE, RAID_SECRET_SKILLS, RAID_SECRET_CHANCE, getRaidMemberStats, rollRaidDrop, CLASSES } from '../data.js';
+import { RAID_CLASSES, RAID_RARITIES, RAID_TUNING, RAID_STONE, RAID_ESSENCE, RAID_SECRET_SKILLS, RAID_SECRET_CHANCE, getDungeonSecret, getRaidMemberStats, rollRaidDrop, CLASSES } from '../data.js';
 import { FloatingLabel, DamageVignette } from './CombatEffects.jsx';
 
 const ROLE_COLORS = { tank: '#7ba3c4', dealer: '#c4453d', healer: '#9ad4a3' };
 const ROOM_KIND_LABELS = { mobs: '쫄', named: '네임드', boss: '보스' };
 const ROOM_KIND_GLYPHS = { mobs: '☠', named: '♜', boss: '♛' };
 
-function buildParty(raidMeta) {
+// 1.78.0~ 활성 비전(기연) fx는 파티 단위로 적용 — atkPct/hpPct는 여기서 스탯에 반영
+function buildParty(raidMeta, secretFx = {}) {
   return Object.keys(RAID_CLASSES).map(classId => {
     const stats = getRaidMemberStats(classId, raidMeta?.equipped?.[classId]);
     const cls = CLASSES.find(c => c.id === classId);
     // 1.77.0~ 에픽 고유 옵션 — 해당 직업 에픽 장비 1개 이상 장착 시 발동
     const equipped = raidMeta?.equipped?.[classId] || {};
     const epic = Object.values(equipped).some(it => it && it.rarity === 'EP');
-    // 1.77.0~ 기연 비전 스킬 보유 여부 (계정 영구)
-    const secret = (raidMeta?.secretSkills || []).includes(classId);
+    let atk = stats.atk;
+    let hp = stats.hp;
+    if (secretFx.atkPct) atk = Math.round(atk * (1 + secretFx.atkPct / 100));
+    if (secretFx.hpPct) hp = Math.round(hp * (1 + secretFx.hpPct / 100));
     return {
       classId, name: cls?.name || classId, role: stats.role, image: cls?.image || null,
-      hp: stats.hp, maxHp: stats.hp, atk: stats.atk, heal: stats.heal || 0,
-      alive: true, epic, secret,
+      hp, maxHp: hp, atk, heal: stats.heal || 0,
+      alive: true, epic,
       // 기여도 추적 (종료 팝업용)
       dealt: 0, healed: 0, taken: 0,
     };
@@ -86,9 +89,11 @@ function PartyChip({ member, flash }) {
   );
 }
 
-export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, onRetreat }) {
+export default function RaidBattleScreen({ meta, dungeon, repeat = false, onToggleRepeat = null, onVictory, onDefeat, onRetreat }) {
   const rooms = dungeon.rooms || [];
-  const [party, setParty] = useState(() => buildParty(meta?.raid));
+  // 1.78.0~ 활성 비전 fx (파티 단위)
+  const secretFx = RAID_SECRET_SKILLS[meta?.raid?.secretSkill]?.fx || {};
+  const [party, setParty] = useState(() => buildParty(meta?.raid, secretFx));
   const [roomIdx, setRoomIdx] = useState(0);
   const [enemy, setEnemy] = useState(() => buildRoomEnemy(rooms[0]));
   const [round, setRound] = useState(0); // 방마다 리셋 (패턴 주기 기준)
@@ -108,10 +113,10 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
   const fxIdRef = useRef(0);
   const timersRef = useRef([]);
   const logEndRef = useRef(null);
-  // 1.77.0~ 사제 [소생] — 던전당 1회 (비전 '기적의 손길' 보유 시 2회)
+  // 1.77.0~ 사제 [소생] — 던전당 1회
   const reviveCountRef = useRef(0);
-  // 1.77.0~ 방랑검사 비전 [불괴의 몸] — 던전당 1회 치명상 무시
-  const guardRef = useRef(false);
+  // 1.78.0~ 기연 유지/변경 선택 (활성 비전 보유 중 새 기연 조우 시)
+  const [secretChoice, setSecretChoice] = useState(null); // null | 'keep' | 'swap'
 
   useEffect(() => {
     if (logExpanded) logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -119,6 +124,16 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
 
   // 언마운트 시 스태거 타이머 정리
   useEffect(() => () => { timersRef.current.forEach(clearTimeout); }, []);
+
+  // 1.78.0~ 반복 모드 — 승리 시 자동 수령 후 재입장 (기연 선택 대기 중엔 정지)
+  useEffect(() => {
+    if (phase !== 'victory' || !repeat) return;
+    const activeId = meta?.raid?.secretSkill || null;
+    const needChoice = !!(loot.secret && activeId && activeId !== loot.secret && !secretChoice);
+    if (needChoice) return;
+    const t = setTimeout(() => onVictory(dungeon, { ...loot, secretSwap: secretChoice === 'swap' }), 1600);
+    return () => clearTimeout(t);
+  }, [phase, repeat, secretChoice]);
 
   const pushEnemyLabel = (kind, value, delay = 0) => {
     const t = setTimeout(() => {
@@ -159,14 +174,8 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
         m.taken += amount;
         m.hp = Math.max(0, m.hp - amount);
         if (m.hp <= 0) {
-          if (m.classId === 'wanderer' && m.secret && !guardRef.current) {
-            guardRef.current = true;
-            m.hp = 1;
-            lines.push({ t: 'heal', text: `🛡 방랑검사 — 비전 [불괴의 몸]! 치명상을 버텨냄 (HP 1)` });
-          } else {
-            m.alive = false;
-            lines.push({ t: 'boss', text: `✖ ${m.name} 전투 불능` });
-          }
+          m.alive = false;
+          lines.push({ t: 'boss', text: `✖ ${m.name} 전투 불능` });
         }
       };
 
@@ -182,7 +191,7 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
         if (wipeRound) {
           shield = true;
           lines.push({ t: 'heal', text: `✚ 사제 — 여명의 방벽! 전멸기 피해 -70%` });
-        } else if (dead && reviveCountRef.current < (priest.secret ? 2 : 1)) {
+        } else if (dead && reviveCountRef.current < 1) {
           // 1.77.0 [소생] — 전투불능 아군 부활 (에픽 '여명의 인도': 40%→70% / 비전 '기적의 손길': 2회)
           reviveCountRef.current += 1;
           const revivePct = priest.epic ? 0.7 : 0.4;
@@ -195,7 +204,9 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
           const hurt = alive().reduce((a, m) => (m.hp / m.maxHp < a.hp / a.maxHp ? m : a));
           if (hurt && hurt.hp < hurt.maxHp) {
             const healCut = (e.healCutLeft || 0) > 0;
-            const healAmount = healCut ? Math.floor(priest.heal * 0.5) : priest.heal;
+            // 1.78.0 비전 healPct (봉인된 축복 등)
+            const baseHeal = Math.round(priest.heal * (1 + (secretFx.healPct || 0) / 100));
+            const healAmount = healCut ? Math.floor(baseHeal * 0.5) : baseHeal;
             const healed = Math.min(hurt.maxHp - hurt.hp, healAmount);
             hurt.hp += healed;
             priest.healed += healed;
@@ -226,8 +237,7 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
         let crit = false;
         if (m.classId === 'demonblood') {
           const lost = m.maxHp - m.hp;
-          // 비전 [혈신 강림]: 혈폭 배율 40% → 55%
-          dmg += lost * (m.secret ? 0.55 : 0.4);
+          dmg += lost * 0.4;
           if (lost > 0) label = ' [혈폭]';
           // 1.77.0 [광란] — HP 40% 이하 시 공격 +30%
           if (m.hp / m.maxHp <= 0.4) { dmg *= 1.3; label += ' [광란]'; }
@@ -236,8 +246,9 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
         if (isMeteor) { dmg *= 1.5; label = ' [메테오]'; crit = true; }
         // 1.77.0 [과부하] — 격노한 적에게 +15%
         if (m.classId === 'sage' && e.enraged) { dmg *= 1.15; label += ' [과부하]'; }
-        // 비전 [심안]: 치명타 확률 25% → 35%
-        if (m.classId === 'elf' && Math.random() < (m.secret ? 0.35 : 0.25)) { dmg *= 1.5; label = ' [치명]'; crit = true; }
+        if (m.classId === 'elf' && Math.random() < 0.25) { dmg *= 1.5; label = ' [치명]'; crit = true; }
+        // 1.78.0 비전 critPct (검투사의 본능) — 전 파티원 추가 치명 확률
+        if (!crit && (secretFx.critPct || 0) > 0 && Math.random() < secretFx.critPct / 100) { dmg *= 1.5; label += ' [비전 치명]'; crit = true; }
         dmg = Math.round(dmg);
         totalDmg += dmg;
         m.dealt += dmg;
@@ -255,8 +266,7 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
         // 1.77.0 [잔염] 부여 — 메테오 명중 시 (에픽 '꺼지지 않는 불': 지속 3라운드)
         if (isMeteor && e.hp > 0) {
           e.burnLeft = m.epic ? 3 : 2;
-          // 비전 [겁화]: 화상 데미지 30% → 50%
-          e.burnDmg = Math.round(m.atk * (m.secret ? 0.5 : 0.3));
+          e.burnDmg = Math.round(m.atk * 0.3);
           lines.push({ t: 'atk', text: `· 잔염 부여 — ${e.burnLeft}라운드간 ${e.burnDmg}/라운드` });
         }
         // 1.77.0 [관통 화살] — 치명타 시 40%(에픽 '폭풍의 눈' 60%) 추가 사격 (50%)
@@ -289,16 +299,15 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
         const roomItems = isLastRoom ? Array.from({ length: e.drops || 0 }, () => rollRaidDrop(dungeon)) : [];
         const roomStones = e.stones || 0;
         const roomEssence = isLastRoom ? (dungeon.essenceDrop || 0) : 0;
-        // 1.77.0 기연(奇緣) — 방 클리어 시 극악 확률로 미보유 직업 1명이 비전 각성 (계정 영구)
+        // 1.78.0 기연(奇緣) — 던전별 고유 비전, 이력에 있으면 영원히 재발생 안 함
         let secretLearn = loot.secret || null;
         if (!secretLearn) {
-          const candidates = p.filter(m => !m.secret);
-          if (candidates.length > 0 && Math.random() < RAID_SECRET_CHANCE) {
-            const lucky = candidates[Math.floor(Math.random() * candidates.length)];
-            lucky.secret = true;
-            secretLearn = lucky.classId;
-            const sk = RAID_SECRET_SKILLS[lucky.classId];
-            lines.push({ t: 'win', text: `✦✦ 기연(奇緣)! ${lucky.name}이(가) 비전 [${sk.name}]을 깨달았다! ✦✦` });
+          const dungeonSecret = getDungeonSecret(dungeon.id);
+          const history = meta?.raid?.secretHistory || [];
+          if (dungeonSecret && !history.includes(dungeonSecret) && Math.random() < RAID_SECRET_CHANCE) {
+            secretLearn = dungeonSecret;
+            const sk = RAID_SECRET_SKILLS[dungeonSecret];
+            lines.push({ t: 'win', text: `✦✦ 기연(奇緣)! 비전 [${sk.name}] 조우 — ${sk.desc} ✦✦` });
           }
         }
         const newLoot = {
@@ -364,6 +373,8 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
       const tankAlive = p.find(m => m.classId === 'wanderer' && m.alive);
       const ironWall = !!(tankAlive && r % 4 === 0);
       if (ironWall) lines.push({ t: 'heal', text: `🛡 방랑검사 — [철벽 방세] 이번 라운드 받는 피해 -60%` });
+      // 1.78.0 비전 aoeTakenPct (서리의 인내·별의 가호) — 광역·전멸기 피해 감소
+      const aoeGuard = 1 - (secretFx.aoeTakenPct || 0) / 100;
       const takenMultOf = (m) => {
         let mult = 1;
         if (m.classId === 'wanderer') {
@@ -382,7 +393,7 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
             lines.push({ t: 'heal', text: `· 정령사 — [바람의 가호] 회피!` });
             return;
           }
-          const taken = Math.round(enemyAtk * 2 * mult * takenMultOf(m));
+          const taken = Math.round(enemyAtk * 2 * mult * takenMultOf(m) * aoeGuard);
           totalTaken += taken;
           applyHit(m, taken);
         });
@@ -396,7 +407,7 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
             lines.push({ t: 'heal', text: `· 정령사 — [바람의 가호] 회피!` });
             return;
           }
-          const taken = Math.round(enemyAtk * 0.7 * takenMultOf(m));
+          const taken = Math.round(enemyAtk * 0.7 * takenMultOf(m) * aoeGuard);
           totalTaken += taken;
           applyHit(m, taken);
         });
@@ -487,22 +498,46 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
   const renderLoot = () => (
     (lootCount > 0 || loot.secret) && (
       <div className="flex flex-col gap-1.5 mb-2.5">
-        {/* 기연 비전 각성 배너 */}
-        {loot.secret && RAID_SECRET_SKILLS[loot.secret] && (
-          <div className="text-center px-3 py-2.5" style={{
-            borderRadius: 12, background: 'rgba(232,176,74,0.14)', border: `1.5px solid ${PALETTE.legendary}`,
-            boxShadow: '0 0 18px rgba(232,176,74,0.5)',
-          }}>
-            <div className="tracking-[0.3em] font-bold" style={{ fontSize: 10, color: PALETTE.legendary }}>✦ 기연(奇緣) ✦</div>
-            <div className="mt-1" style={{ fontSize: 11.5, color: PALETTE.text }}>
-              <span style={{ fontWeight: 700, color: PALETTE.legendary }}>
-                {CLASSES.find(c => c.id === loot.secret)?.name}
-              </span>
-              {' — 비전 ['}{RAID_SECRET_SKILLS[loot.secret].name}{'] 각성! (영구)'}
+        {/* 기연 비전 배너 — 활성 비전 보유 시 [기존 유지 / 변경] 선택 (1개만 유지 가능) */}
+        {loot.secret && RAID_SECRET_SKILLS[loot.secret] && (() => {
+          const sk = RAID_SECRET_SKILLS[loot.secret];
+          const activeId = meta?.raid?.secretSkill || null;
+          const activeSk = activeId ? RAID_SECRET_SKILLS[activeId] : null;
+          const needChoice = !!(activeSk && activeId !== loot.secret);
+          return (
+            <div className="text-center px-3 py-2.5" style={{
+              borderRadius: 12, background: 'rgba(232,176,74,0.14)', border: `1.5px solid ${PALETTE.legendary}`,
+              boxShadow: '0 0 18px rgba(232,176,74,0.5)',
+            }}>
+              <div className="tracking-[0.3em] font-bold" style={{ fontSize: 10, color: PALETTE.legendary }}>✦ 기연(奇緣) ✦</div>
+              <div className="mt-1" style={{ fontSize: 11.5, color: PALETTE.text }}>
+                비전 [<span style={{ fontWeight: 700, color: PALETTE.legendary }}>{sk.name}</span>] 조우
+              </div>
+              <div style={{ fontSize: 9.5, color: PALETTE.textDim, marginTop: 2 }}>{sk.desc}</div>
+              {!needChoice ? (
+                <div className="mt-1" style={{ fontSize: 10, color: PALETTE.green, fontWeight: 700 }}>즉시 각성! (영구 적용)</div>
+              ) : (
+                <div className="mt-2">
+                  <div style={{ fontSize: 9.5, color: PALETTE.textDim }}>비전은 1개만 유지할 수 있습니다 — 선택하세요 (버린 비전은 다시 만날 수 없음)</div>
+                  <div className="flex gap-2 mt-1.5">
+                    <button onClick={() => setSecretChoice('keep')} className="ui-press flex-1" style={{
+                      padding: '7px 4px', borderRadius: 10, fontSize: 10, fontWeight: 700,
+                      background: secretChoice === 'keep' ? 'rgba(154,212,163,0.2)' : 'rgba(255,255,255,0.04)',
+                      border: `1.5px solid ${secretChoice === 'keep' ? PALETTE.green : 'var(--ui-line)'}`,
+                      color: secretChoice === 'keep' ? PALETTE.green : PALETTE.text,
+                    }}>기존 유지 — {activeSk.name}</button>
+                    <button onClick={() => setSecretChoice('swap')} className="ui-press flex-1" style={{
+                      padding: '7px 4px', borderRadius: 10, fontSize: 10, fontWeight: 700,
+                      background: secretChoice === 'swap' ? 'rgba(232,176,74,0.2)' : 'rgba(255,255,255,0.04)',
+                      border: `1.5px solid ${secretChoice === 'swap' ? PALETTE.legendary : 'var(--ui-line)'}`,
+                      color: secretChoice === 'swap' ? PALETTE.legendary : PALETTE.text,
+                    }}>변경 — {sk.name}</button>
+                  </div>
+                </div>
+              )}
             </div>
-            <div style={{ fontSize: 9.5, color: PALETTE.textDim, marginTop: 2 }}>{RAID_SECRET_SKILLS[loot.secret].desc}</div>
-          </div>
-        )}
+          );
+        })()}
         {(loot.stones > 0 || loot.essence > 0) && (
           <div className="flex items-center gap-2 px-3 py-2" style={{
             borderRadius: 10, background: 'rgba(123,163,196,0.12)', border: `1px solid ${PALETTE.ice}66`,
@@ -647,31 +682,46 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
       <div className="p-3 flex-none" style={{ borderTop: '1px solid var(--ui-line)', background: PALETTE.bgDeep }}>
         {phase === 'running' && (
           <div className="flex gap-2">
+            {onToggleRepeat && (
+              <button onClick={onToggleRepeat} className="ui-press flex-1" style={{
+                height: 42, borderRadius: 'var(--r-btn)', fontSize: 11.5, fontWeight: 700,
+                background: repeat ? 'rgba(154,212,163,0.16)' : 'rgba(255,255,255,0.04)',
+                border: `1px solid ${repeat ? PALETTE.green : 'var(--ui-line)'}`,
+                color: repeat ? PALETTE.green : PALETTE.textDim,
+                boxShadow: repeat ? '0 0 8px rgba(154,212,163,0.4)' : 'none',
+              }}>⟳ 반복 {repeat ? 'ON' : 'OFF'}</button>
+            )}
             <button onClick={() => setSpeed(s => (s === 2 ? 4 : s === 4 ? 1 : 2))} className="ui-press flex-1" style={{
               height: 42, borderRadius: 'var(--r-btn)', fontSize: 11.5, fontWeight: 700,
               background: 'rgba(232,176,74,0.1)', border: '1px solid rgba(232,176,74,0.4)', color: PALETTE.legendary,
             }}>배속 ×{speed} {speed === 2 ? '→ ×4' : speed === 4 ? '→ ×1' : '→ ×2'}</button>
-            <button onClick={() => onRetreat(loot)} className="ui-press flex-1" style={{
+            <button onClick={() => onRetreat({ ...loot, secretSwap: false })} className="ui-press flex-1" style={{
               height: 42, borderRadius: 'var(--r-btn)', fontSize: 11.5,
               background: 'rgba(255,255,255,0.04)', border: '1px solid var(--ui-line)', color: PALETTE.textDim,
             }}>후퇴{loot.stones > 0 ? ` (${RAID_STONE.icon}${loot.stones} 보존)` : ''}</button>
           </div>
         )}
-        {phase === 'victory' && (
+        {phase === 'victory' && (() => {
+          const activeId = meta?.raid?.secretSkill || null;
+          const needChoice = !!(loot.secret && activeId && activeId !== loot.secret && !secretChoice);
+          const lootOut = { ...loot, secretSwap: secretChoice === 'swap' };
+          return (
           <div>
             <div className="text-center tracking-[0.3em] font-bold mb-2" style={{
               fontSize: 12, color: PALETTE.legendary, textShadow: '0 0 16px rgba(232,176,74,0.8)',
             }}>━ 던전 클리어 ━</div>
             {renderContribution()}
             {renderLoot()}
-            <button onClick={() => onVictory(dungeon, loot)} className="ui-press ui-sheen w-full" style={{
+            <button onClick={() => onVictory(dungeon, lootOut)} disabled={needChoice} className="ui-press ui-sheen w-full" style={{
               height: 44, borderRadius: 'var(--r-btn)', fontSize: 12, fontWeight: 700, letterSpacing: '0.25em',
               background: 'linear-gradient(160deg, rgba(232,176,74,0.4), rgba(232,176,74,0.16))',
               border: '1px solid rgba(232,176,74,0.6)', color: '#ffe9d2',
               boxShadow: '0 4px 20px -6px rgba(232,176,74,0.6)',
-            }}>▸ 전리품 획득</button>
+              opacity: needChoice ? 0.5 : 1,
+            }}>{needChoice ? '▸ 기연 선택 후 계속' : repeat ? '⟳ 전리품 획득 — 곧 재입장' : '▸ 전리품 획득'}</button>
           </div>
-        )}
+          );
+        })()}
         {phase === 'defeat' && (
           <div>
             {lootCount > 0 && (
@@ -681,7 +731,7 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
             )}
             {renderContribution()}
             {renderLoot()}
-            <button onClick={() => onDefeat(loot)} className="ui-press w-full" style={{
+            <button onClick={() => onDefeat({ ...loot, secretSwap: secretChoice === 'swap' })} className="ui-press w-full" style={{
               height: 44, borderRadius: 'var(--r-btn)', fontSize: 12, letterSpacing: '0.25em',
               background: `linear-gradient(160deg, ${PALETTE.accent}55, ${PALETTE.accent}22)`,
               border: `1px solid ${PALETTE.accent}`, color: '#ffe9d2',

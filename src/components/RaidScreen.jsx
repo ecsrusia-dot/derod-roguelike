@@ -14,7 +14,7 @@ import {
   RAID_CLASSES, RAID_SKILLS, RAID_SLOTS, RAID_SLOT_NAMES, RAID_RARITIES,
   RAID_DUNGEONS, RAID_REGIONS, getRaidMemberStats, getRaidPartyPower, CLASSES,
   RAID_STONE, RAID_ENHANCE, RAID_DISMANTLE_VALUES, getRaidItemEffective, getKstWeekKey,
-  RAID_ESSENCE, RAID_CRAFT_RECIPES, RAID_GACHA, RAID_EPIC_UNIQUES, RAID_SECRET_SKILLS,
+  RAID_ESSENCE, RAID_CRAFT_RECIPES, RAID_GACHA, RAID_EPIC_UNIQUES, RAID_SECRET_SKILLS, getDungeonSecret,
 } from '../data.js';
 import { hasRaidWeeklyClaimed } from '../storage.js';
 import { ScreenHeader, GlassPanel, Chip, UIButton } from './ui/CommonUI.jsx';
@@ -120,6 +120,28 @@ export default function RaidScreen({ meta, onEnterDungeon, onEquipItem, onAutoEq
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 pb-4">
+        {/* ===== 활성 비전 (기연) — 1개만 유지 가능 ===== */}
+        {(() => {
+          const activeSk = RAID_SECRET_SKILLS[raid.secretSkill] || null;
+          return (
+            <div className="mt-1 px-3 py-2 flex items-center gap-2" style={{
+              borderRadius: 12,
+              background: activeSk ? 'rgba(232,176,74,0.1)' : 'rgba(255,255,255,0.025)',
+              border: `1px solid ${activeSk ? 'rgba(232,176,74,0.5)' : 'var(--ui-line)'}`,
+            }}>
+              <span style={{ fontSize: 14 }}>✦</span>
+              {activeSk ? (
+                <span style={{ fontSize: 10.5, color: PALETTE.text }}>
+                  <span style={{ fontWeight: 700, color: PALETTE.legendary }}>활성 비전 — {activeSk.name}</span>
+                  <span style={{ color: PALETTE.textDim }}> · {activeSk.desc}</span>
+                </span>
+              ) : (
+                <span style={{ fontSize: 10.5, color: PALETTE.textDim }}>활성 비전 없음 — 던전마다 다른 기연(奇緣)이 0.5% 확률로 기다립니다 (1개만 유지 가능)</span>
+              )}
+            </div>
+          );
+        })()}
+
         {/* ===== 파티 (5직업 고정) ===== */}
         <div className="mt-1 mb-2 flex items-center gap-2.5">
           <span className="tracking-[0.25em] flex-none" style={{ fontSize: 11, color: PALETTE.dawn }}>원정대 — 5인 파티</span>
@@ -191,24 +213,6 @@ export default function RaidScreen({ meta, onEnterDungeon, onEquipItem, onAutoEq
                           <div style={{ fontSize: 9.5, color: PALETTE.textDim, marginTop: 1 }}>{sk.desc}</div>
                         </div>
                       ))}
-                      {/* 기연 비전 스킬 — 던전에서 극악 확률로 각성 (계정 영구) */}
-                      {(() => {
-                        const secret = RAID_SECRET_SKILLS[classId];
-                        const learned = (raid.secretSkills || []).includes(classId);
-                        if (!secret) return null;
-                        return (
-                          <div className="mt-1.5 pt-1.5" style={{ borderTop: '1px dashed rgba(232,176,74,0.25)', opacity: learned ? 1 : 0.45 }}>
-                            {learned ? (
-                              <>
-                                <span style={{ fontSize: 10, fontWeight: 700, color: '#ffd86b', textShadow: '0 0 8px rgba(255,216,107,0.5)' }}>✦ 비전: {secret.name} (각성)</span>
-                                <div style={{ fontSize: 9.5, color: PALETTE.textDim, marginTop: 1 }}>{secret.desc}</div>
-                              </>
-                            ) : (
-                              <span style={{ fontSize: 10, color: PALETTE.textDim }}>✦ 비전: ??? — 던전에서 극악의 확률로 기연(奇緣)을 만나면 각성</span>
-                            )}
-                          </div>
-                        );
-                      })()}
                       {/* 에픽 고유 옵션 — 에픽 장비 1개 이상 장착 시 발동 */}
                       {(() => {
                         const uniq = RAID_EPIC_UNIQUES[classId];
@@ -429,6 +433,15 @@ export default function RaidScreen({ meta, onEnterDungeon, onEquipItem, onAutoEq
                   {hasRaidWeeklyClaimed(meta, d.id, weekKey)
                     ? <Chip color={PALETTE.green} style={{ height: 19 }}>주간 보상 ✓</Chip>
                     : <Chip color={PALETTE.ice} style={{ height: 19 }}>주간 첫 클리어 {RAID_STONE.icon}{d.weeklyStones}{d.kind === 'raid' ? ' + 유니크↑ 확정' : ''}</Chip>}
+                  {(() => {
+                    const sid = getDungeonSecret(d.id);
+                    if (!sid) return null;
+                    const sk = RAID_SECRET_SKILLS[sid];
+                    const met = (raid.secretHistory || []).includes(sid);
+                    return met
+                      ? <Chip color={PALETTE.textDim} style={{ height: 19 }}>기연 조우 완료</Chip>
+                      : <Chip color={PALETTE.legendary} style={{ height: 19 }}>✦ 기연: {sk.name}</Chip>;
+                  })()}
                 </div>
                 <UIButton onClick={() => onEnterDungeon(d)} className="mt-2.5" style={{ height: 40, fontSize: 12, letterSpacing: '0.2em' }}>
                   ▸ 입장 {under ? '(전투력 부족 — 위험)' : ''}

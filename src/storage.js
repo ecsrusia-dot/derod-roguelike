@@ -69,8 +69,9 @@ const DEFAULT_META = {
     weekly: null, // { week: 'YYYYMMDD'(월요일 키), claimed: [dungeonId] }
     // 1.76.0~ 군주의 정수 — 상위 막보 전용 희귀 재료 (에픽·레전더리 제작)
     essence: 0,
-    // 1.77.0~ 기연 비전 스킬 — 각성한 직업 ID 목록 (계정 영구)
-    secretSkills: [],
+    // 1.78.0~ 기연 비전 재설계 — 활성 비전 1슬롯 + 조우 이력 (재발생 방지, 던전당 평생 1회)
+    secretSkill: null,   // 활성 비전 ID | null
+    secretHistory: [],   // 만난 적 있는 비전 ID 목록 (유지/변경과 무관하게 기록)
   },
   // 진행 중인 런 스냅샷 (맵 화면 진입 시 자동 저장 — 앱 종료/새로고침 후 이어하기 용)
   // null = 진행 중 런 없음. 객체 = 재개 가능한 런 상태.
@@ -568,7 +569,7 @@ export function useEndlessSkip(meta, dateKey, souls) {
 // ============================================
 // 1.74.0~ 레이드 장비/클리어 헬퍼
 // ============================================
-const EMPTY_RAID = { inventory: [], equipped: { wanderer: {}, sage: {}, demonblood: {}, elf: {}, priest: {} }, clears: {}, stones: 0, weekly: null, essence: 0, secretSkills: [] };
+const EMPTY_RAID = { inventory: [], equipped: { wanderer: {}, sage: {}, demonblood: {}, elf: {}, priest: {} }, clears: {}, stones: 0, weekly: null, essence: 0, secretSkill: null, secretHistory: [] };
 
 function getRaid(meta) {
   const raid = meta?.raid || EMPTY_RAID;
@@ -696,13 +697,16 @@ export function enhanceRaidItem(meta, classId, slot, cost, maxLevel) {
   };
 }
 
-// 1.77.0~ 기연 비전 스킬 각성 (계정 영구, 중복 없음)
-export function learnRaidSecretSkill(meta, classId) {
-  if (!classId) return meta;
+// 1.78.0~ 기연 조우 처리 — 이력 기록(재발생 방지) + 활성 결정
+// swap: 활성 비전이 없으면 무조건 활성화, 있으면 swap=true일 때만 교체 (기존 비전은 소멸)
+export function resolveRaidSecret(meta, secretId, swap) {
+  if (!secretId) return meta;
   const raid = getRaid(meta);
-  const learned = raid.secretSkills || [];
-  if (learned.includes(classId)) return meta;
-  return { ...meta, raid: { ...raid, secretSkills: [...learned, classId] } };
+  const history = raid.secretHistory || [];
+  const newHistory = history.includes(secretId) ? history : [...history, secretId];
+  const active = raid.secretSkill || null;
+  const newActive = !active ? secretId : (swap ? secretId : active);
+  return { ...meta, raid: { ...raid, secretHistory: newHistory, secretSkill: newActive } };
 }
 
 // 1.76.0~ 레이드 자원 획득 (전투 전리품 — 심연석·정수)
