@@ -5,4 +5,4 @@
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
 export const GAME_VERSION = '1.79.1';
 export const VERSION_DATE = '2026-08-09';
-export const VERSION_LABEL = '레이드 세트 효과 픽스 — 레거시 장비 복원 + 여명·종막 세트 신설';
+export const VERSION_LABEL = '레이드 픽스 — 세트 효과 복원·신설 + 보상 화면 레이아웃';
