@@ -58,6 +58,13 @@ const DEFAULT_META = {
   codexCompletionClaimed: [],
   // 1.73.0~ 무한던전 스킵 — { date: 'YYYYMMDD', used: N } (KST 자정 리셋, 하루 5회)
   endlessSkip: null,
+  // 1.74.0~ 레이드 (본편과 분리된 성장 축)
+  // inventory: 미장착 장비 배열 / equipped[classId][slot] = item / clears[dungeonId] = 클리어 횟수
+  raid: {
+    inventory: [],
+    equipped: { wanderer: {}, sage: {}, demonblood: {}, elf: {}, priest: {} },
+    clears: {},
+  },
   // 진행 중인 런 스냅샷 (맵 화면 진입 시 자동 저장 — 앱 종료/새로고침 후 이어하기 용)
   // null = 진행 중 런 없음. 객체 = 재개 가능한 런 상태.
   activeRun: null,
@@ -135,6 +142,12 @@ export async function loadMeta() {
         safe.codex = { ...DEFAULT_META.codex, ...(data.codex || {}) };
         // engravings는 직업별 중첩이라 누락 직업 보강 (신규 직업 추가 대비)
         safe.engravings = { ...DEFAULT_META.engravings, ...(data.engravings || {}) };
+        // 1.74.0 레이드 중첩 객체 보강
+        safe.raid = {
+          ...DEFAULT_META.raid,
+          ...(data.raid || {}),
+          equipped: { ...DEFAULT_META.raid.equipped, ...(data.raid?.equipped || {}) },
+        };
         // 1.26.0 직업별 추적 데이터 보강
         safe.ultimatesPickedByClass = { ...DEFAULT_META.ultimatesPickedByClass, ...(data.ultimatesPickedByClass || {}) };
         safe.championshipClearsByClass = { ...DEFAULT_META.championshipClearsByClass, ...(data.championshipClearsByClass || {}) };
@@ -543,6 +556,76 @@ export function useEndlessSkip(meta, dateKey, souls) {
     endlessSkip: { date: dateKey, used: used + 1 },
     souls: (meta.souls || 0) + Math.max(0, souls || 0),
   };
+}
+
+// ============================================
+// 1.74.0~ 레이드 장비/클리어 헬퍼
+// ============================================
+const EMPTY_RAID = { inventory: [], equipped: { wanderer: {}, sage: {}, demonblood: {}, elf: {}, priest: {} }, clears: {} };
+
+function getRaid(meta) {
+  const raid = meta?.raid || EMPTY_RAID;
+  return { ...EMPTY_RAID, ...raid, equipped: { ...EMPTY_RAID.equipped, ...(raid.equipped || {}) } };
+}
+
+// 드랍 장비를 인벤토리에 추가
+export function addRaidDrops(meta, items) {
+  if (!items || items.length === 0) return meta;
+  const raid = getRaid(meta);
+  return { ...meta, raid: { ...raid, inventory: [...raid.inventory, ...items] } };
+}
+
+// 장비 1개 장착 — 기존 장착품은 인벤토리로 복귀
+export function equipRaidItem(meta, itemId) {
+  const raid = getRaid(meta);
+  const item = raid.inventory.find(i => i.id === itemId);
+  if (!item) return meta;
+  const prev = raid.equipped?.[item.classId]?.[item.slot] || null;
+  const newInventory = raid.inventory.filter(i => i.id !== itemId).concat(prev ? [prev] : []);
+  return {
+    ...meta,
+    raid: {
+      ...raid,
+      inventory: newInventory,
+      equipped: {
+        ...raid.equipped,
+        [item.classId]: { ...(raid.equipped?.[item.classId] || {}), [item.slot]: item },
+      },
+    },
+  };
+}
+
+// 일괄 장착 — 직업×슬롯마다 (장착품 + 인벤토리) 중 power 최고 장비 자동 장착
+export function autoEquipRaidBest(meta) {
+  const raid = getRaid(meta);
+  const pool = [...raid.inventory];
+  const equipped = {};
+  Object.keys(EMPTY_RAID.equipped).forEach(classId => {
+    equipped[classId] = { ...(raid.equipped?.[classId] || {}) };
+  });
+  Object.keys(equipped).forEach(classId => {
+    ['weapon', 'armor', 'accessory'].forEach(slot => {
+      const current = equipped[classId][slot] || null;
+      const candidates = pool.filter(i => i.classId === classId && i.slot === slot);
+      if (candidates.length === 0) return;
+      const best = candidates.reduce((a, b) => ((b.power || 0) > (a.power || 0) ? b : a));
+      if (!current || (best.power || 0) > (current.power || 0)) {
+        const idx = pool.findIndex(i => i.id === best.id);
+        pool.splice(idx, 1);
+        if (current) pool.push(current);
+        equipped[classId][slot] = best;
+      }
+    });
+  });
+  return { ...meta, raid: { ...raid, inventory: pool, equipped } };
+}
+
+// 던전 클리어 횟수 기록
+export function recordRaidClear(meta, dungeonId) {
+  const raid = getRaid(meta);
+  const clears = { ...(raid.clears || {}) };
+  clears[dungeonId] = (clears[dungeonId] || 0) + 1;
+  return { ...meta, raid: { ...raid, clears } };
 }
 
 // 1.72.0~ 일일 임무 진행 트래킹

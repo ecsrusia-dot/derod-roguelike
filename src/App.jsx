@@ -63,6 +63,8 @@ import SoulAltar from './components/SoulAltar.jsx';
 import EngravingScreen, { EngravingMigrationModal, AwakeningConditionNoticeModal, WandererRenameNoticeModal, SoulAltarRedesignModal } from './components/EngravingScreen.jsx';
 import MapView from './components/MapView.jsx';
 import CombatScreen from './components/CombatScreen.jsx';
+import RaidScreen from './components/RaidScreen.jsx';
+import RaidBattleScreen from './components/RaidBattleScreen.jsx';
 import NodeInfoModal from './components/NodeInfoModal.jsx';
 import BossIntroScreen from './components/BossIntroScreen.jsx';
 import PCSidebar from './components/PCSidebar.jsx';
@@ -109,7 +111,7 @@ import {
 } from './data.js';
 import { getKstDateKey } from './utils/dailyChallenge.js';
 import { simulateBestEndlessRun } from './utils/endlessSkipSim.js';
-import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, trackDailyMission, getEndlessSkipUsed, useEndlessSkip } from './storage.js';
+import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear } from './storage.js';
 
 
 
@@ -267,6 +269,8 @@ export default function App() {
   // 1.72.0~ 자동 사냥 모드 — 노드 선택·스킬 선택·보상 선택 모두 자동
   // 허용 범위: 수련의 길(training) + 무한모드(endless)만. 사망/원정 클리어 시 자동 해제.
   const [autoHunt, setAutoHunt] = useState(false);
+  // 1.74.0~ 레이드 — 입장 중인 던전 (raidBattle 화면용)
+  const [raidDungeon, setRaidDungeon] = useState(null);
   
   // === 인증/저장 모드 (Phase 1) ===
   // null = 미선택 (LoginScreen 표시), 'local' | 'guest' | 'google'
@@ -1711,6 +1715,52 @@ export default function App() {
   };
 
   // ============================================
+  // 1.74.0~ 레이드 핸들러 (본편과 분리된 성장 축)
+  // ============================================
+  // 해금: 튜토리얼 4 클리어 (수련의 길과 동일 시점)
+  const raidUnlocked = isUnlocked(meta, 'tutorial_curse_clear');
+
+  const handleRaidVictory = (dungeon, drops) => {
+    setMeta(prev => {
+      let next = addRaidDrops(prev, drops);
+      next = recordRaidClear(next, dungeon.id);
+      saveMeta(next);
+      return next;
+    });
+    setRaidDungeon(null);
+    setScreen('raid');
+  };
+
+  // 중도 전멸·후퇴 — 클리어 기록 없이 돌파한 방의 전리품만 보존
+  const handleRaidPartial = (loot) => {
+    if (loot && loot.length > 0) {
+      setMeta(prev => {
+        const next = addRaidDrops(prev, loot);
+        saveMeta(next);
+        return next;
+      });
+    }
+    setRaidDungeon(null);
+    setScreen('raid');
+  };
+
+  const handleRaidEquip = (itemId) => {
+    setMeta(prev => {
+      const next = equipRaidItem(prev, itemId);
+      saveMeta(next);
+      return next;
+    });
+  };
+
+  const handleRaidAutoEquip = () => {
+    setMeta(prev => {
+      const next = autoEquipRaidBest(prev);
+      saveMeta(next);
+      return next;
+    });
+  };
+
+  // ============================================
   // 1.72.0~ 자동 사냥 드라이버 (App 레벨 화면 자동 진행)
   // ============================================
   // 전투(CombatScreen)·사건(EventScreen)·상점(ShopScreen 자동 구매)은
@@ -1831,7 +1881,9 @@ export default function App() {
               onSelectGuest={handleSelectGuest} 
               onSelectGoogle={handleSelectGoogle} 
             />}
-            {screen === 'title' && authMode && <TitleScreen meta={meta} onStart={() => setScreen('expeditionSelect')} onResume={resumeActiveRun} onAltar={enterAltar} onEngravings={() => setScreen('engraving')} onAchievements={() => { setPrevAchievementsBack('title'); setScreen('achievements'); }} onChangelog={() => setShowChangelog({ firstSeen: false })} onAccount={() => setScreen('account')} />}
+            {screen === 'title' && authMode && <TitleScreen meta={meta} onStart={() => setScreen('expeditionSelect')} onResume={resumeActiveRun} onAltar={enterAltar} onEngravings={() => setScreen('engraving')} onRaid={raidUnlocked ? () => setScreen('raid') : null} onAchievements={() => { setPrevAchievementsBack('title'); setScreen('achievements'); }} onChangelog={() => setShowChangelog({ firstSeen: false })} onAccount={() => setScreen('account')} />}
+            {screen === 'raid' && <RaidScreen meta={meta} onEnterDungeon={(d) => { setRaidDungeon(d); setScreen('raidBattle'); }} onEquipItem={handleRaidEquip} onAutoEquip={handleRaidAutoEquip} onBack={() => setScreen('title')} />}
+            {screen === 'raidBattle' && raidDungeon && <RaidBattleScreen key={raidDungeon.id + '-' + (meta?.raid?.clears?.[raidDungeon.id] || 0)} meta={meta} dungeon={raidDungeon} onVictory={handleRaidVictory} onDefeat={handleRaidPartial} onRetreat={handleRaidPartial} />}
             {screen === 'account' && <AccountScreen 
               authMode={authMode} 
               firebaseUser={firebaseUser} 

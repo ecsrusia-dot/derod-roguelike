@@ -34,3 +34,4 @@ export * from './data/expeditions.js';
 export * from './data/curses.js';
 export * from './data/meta.js';
 export * from './data/engravings.js';
+export * from './data/raid.js';
