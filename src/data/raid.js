@@ -48,6 +48,15 @@ export const RAID_SKILLS = {
   ],
 };
 
+// 1.79.0~ 전후방 배치 (PM 제안) — 전술 요소
+// 전열: 공격 +10%, 단일기·광역·소환수의 주 타겟 / 후열: 광역 피해 -30%, 단일기로부터 보호
+// 전멸기는 배치 무관 전체 타격 (사제 방벽이 유일한 해답 — 기존 유지)
+export const RAID_FORMATION = {
+  frontAtkPct: 10,
+  backAoeReducePct: 30,
+  default: { wanderer: 'front', demonblood: 'front', elf: 'back', sage: 'back', priest: 'back' },
+};
+
 // 1.78.0~ 기연(奇緣) 비전 스킬 재설계 (PM 피드백):
 //   - 던전별 고유 비전 1종 — 상위 던전일수록 강력 (낮은 던전 회전으로 상위 비전 불가)
 //   - 한 번 만난 기연은 영원히 재발생 안 함 (meta.raid.secretHistory — 던전당 평생 1회)

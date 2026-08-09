@@ -119,7 +119,7 @@ import {
 } from './data.js';
 import { getKstDateKey } from './utils/dailyChallenge.js';
 import { simulateBestEndlessRun } from './utils/endlessSkipSim.js';
-import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear, dismantleRaidItem, dismantleRaidJunk, enhanceRaidItem, claimRaidWeekly, addRaidResources, spendRaidResourcesForItem, resolveRaidSecret } from './storage.js';
+import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear, dismantleRaidItem, dismantleRaidJunk, enhanceRaidItem, claimRaidWeekly, addRaidResources, spendRaidResourcesForItem, resolveRaidSecret, toggleRaidFormation } from './storage.js';
 
 
 
@@ -1842,6 +1842,15 @@ export default function App() {
     });
   };
 
+  // 1.79.0~ 전후방 배치 토글
+  const handleRaidFormation = (classId) => {
+    setMeta(prev => {
+      const next = toggleRaidFormation(prev, classId);
+      saveMeta(next);
+      return next;
+    });
+  };
+
   // ============================================
   // 1.72.0~ 자동 사냥 드라이버 (App 레벨 화면 자동 진행)
   // ============================================
@@ -1964,7 +1973,7 @@ export default function App() {
               onSelectGoogle={handleSelectGoogle} 
             />}
             {screen === 'title' && authMode && <TitleScreen meta={meta} onStart={() => setScreen('expeditionSelect')} onResume={resumeActiveRun} onAltar={enterAltar} onEngravings={() => setScreen('engraving')} onRaid={raidUnlocked ? () => setScreen('raid') : null} onAchievements={() => { setPrevAchievementsBack('title'); setScreen('achievements'); }} onChangelog={() => setShowChangelog({ firstSeen: false })} onAccount={() => setScreen('account')} />}
-            {screen === 'raid' && <RaidScreen meta={meta} onEnterDungeon={(d) => { setRaidDungeon(d); setScreen('raidBattle'); }} onEquipItem={handleRaidEquip} onAutoEquip={handleRaidAutoEquip} onDismantle={handleRaidDismantle} onDismantleJunk={handleRaidDismantleJunk} onEnhance={handleRaidEnhance} onCraft={handleRaidCraft} onGacha={handleRaidGacha} onBack={() => setScreen('title')} />}
+            {screen === 'raid' && <RaidScreen meta={meta} onEnterDungeon={(d) => { setRaidDungeon(d); setScreen('raidBattle'); }} onEquipItem={handleRaidEquip} onAutoEquip={handleRaidAutoEquip} onDismantle={handleRaidDismantle} onDismantleJunk={handleRaidDismantleJunk} onEnhance={handleRaidEnhance} onCraft={handleRaidCraft} onGacha={handleRaidGacha} onToggleFormation={handleRaidFormation} onBack={() => setScreen('title')} />}
             {screen === 'raidBattle' && raidDungeon && <RaidBattleScreen key={raidDungeon.id + '-' + (meta?.raid?.clears?.[raidDungeon.id] || 0)} meta={meta} dungeon={raidDungeon} repeat={raidRepeat} onToggleRepeat={() => setRaidRepeat(v => !v)} onVictory={handleRaidVictory} onDefeat={handleRaidPartial} onRetreat={handleRaidPartial} />}
             {screen === 'account' && <AccountScreen 
               authMode={authMode} 
