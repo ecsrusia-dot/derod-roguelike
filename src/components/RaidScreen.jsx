@@ -14,7 +14,7 @@ import {
   RAID_CLASSES, RAID_SKILLS, RAID_SLOTS, RAID_SLOT_NAMES, RAID_RARITIES,
   RAID_DUNGEONS, RAID_REGIONS, getRaidMemberStats, getRaidPartyPower, CLASSES,
   RAID_STONE, RAID_ENHANCE, RAID_DISMANTLE_VALUES, getRaidItemEffective, getKstWeekKey,
-  RAID_ESSENCE, RAID_CRAFT_RECIPES, RAID_GACHA, RAID_EPIC_UNIQUES, RAID_SECRET_SKILLS, getDungeonSecret,
+  RAID_ESSENCE, RAID_CRAFT_RECIPES, RAID_GACHA, RAID_EPIC_UNIQUES, RAID_SECRET_SKILLS, getDungeonSecret, RAID_SET_BONUSES,
 } from '../data.js';
 import { hasRaidWeeklyClaimed } from '../storage.js';
 import { ScreenHeader, GlassPanel, Chip, UIButton } from './ui/CommonUI.jsx';
@@ -23,6 +23,12 @@ const ROLE_ICONS = { tank: Shield, dealer: Swords, healer: Heart };
 const ROLE_COLORS = { tank: '#7ba3c4', dealer: '#c4453d', healer: '#9ad4a3' };
 const SLOT_GLYPHS = { weapon: '⚔', armor: '🛡', accessory: '◆' };
 const ROOM_KIND_GLYPHS = { mobs: '☠', named: '♜', boss: '♛' };
+
+// 세트 보너스 수치 → "공+12% · HP+12%" 표기
+function setBonusText(b) {
+  if (!b) return '';
+  return [b.atkPct ? `공격 +${b.atkPct}%` : null, b.hpPct ? `HP +${b.hpPct}%` : null].filter(Boolean).join(' · ');
+}
 
 // 직업 일러 초상 — 이미지 실패 시 이니셜 폴백
 function ClassPortrait({ cls, roleColor, size = 42 }) {
@@ -67,8 +73,15 @@ function GearChip({ item, onEquip, onDismantle }) {
           {eff.atk > 0 && `공격 +${eff.atk}`}{eff.atk > 0 && eff.hp > 0 && ' · '}{eff.hp > 0 && `HP +${eff.hp}`}
           {' · '}전투력 {eff.power}
         </div>
+        {item.series && RAID_SET_BONUSES[item.series] && (
+          <div style={{ fontSize: 9, color: PALETTE.textDim, marginTop: 1 }}>
+            ◈ {item.series} 세트 (3부위 장착 시): {setBonusText(RAID_SET_BONUSES[item.series])}
+          </div>
+        )}
         {item.rarity === 'EP' && RAID_EPIC_UNIQUES[item.classId] && (
-          <div style={{ fontSize: 9, color: rar.color, marginTop: 1 }}>◆ 고유: {RAID_EPIC_UNIQUES[item.classId].name}</div>
+          <div style={{ fontSize: 9, color: rar.color, marginTop: 1 }}>
+            ◆ 고유: {RAID_EPIC_UNIQUES[item.classId].name} — {RAID_EPIC_UNIQUES[item.classId].desc}
+          </div>
         )}
       </div>
       <div className="flex flex-none gap-1 ml-2">
@@ -259,6 +272,33 @@ export default function RaidScreen({ meta, onEnterDungeon, onEquipItem, onAutoEq
                         );
                       })}
                     </div>
+                    {/* 1.78.1~ 세트 효과 현황 — PM 피드백: 세트 설명 부재 */}
+                    {(() => {
+                      const eq = raid.equipped?.[classId] || {};
+                      const counts = {};
+                      RAID_SLOTS.forEach(slot => {
+                        const it = eq[slot];
+                        if (it?.series) counts[it.series] = (counts[it.series] || 0) + 1;
+                      });
+                      const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+                      return (
+                        <div className="mt-2 px-2.5 py-2" style={{ borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--ui-line)' }}>
+                          <div style={{ fontSize: 9.5, fontWeight: 700, color: PALETTE.dawn }}>◈ 세트 효과 — 같은 시리즈(접두어) 3부위 장착 시 발동</div>
+                          {entries.length === 0 ? (
+                            <div style={{ fontSize: 9.5, color: PALETTE.textDim, marginTop: 2 }}>장착 장비 없음 — 던전 시리즈 장비를 모아보세요</div>
+                          ) : entries.map(([series, n]) => {
+                            const b = RAID_SET_BONUSES[series];
+                            if (!b) return null;
+                            const done = n >= 3;
+                            return (
+                              <div key={series} className="tabular-nums" style={{ fontSize: 9.5, marginTop: 2, color: done ? PALETTE.green : PALETTE.textDim }}>
+                                {done ? '✓' : '·'} {series} {n}/3 — {done ? '발동 중: ' : '완성 시: '}{setBonusText(b)}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
                     {invForClass.length > 0 && (
                       <div className="mt-2.5">
                         <div style={{ fontSize: 9.5, color: PALETTE.textDim, marginBottom: 3 }}>보유 장비 ({invForClass.length})</div>
