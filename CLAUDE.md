@@ -925,6 +925,10 @@ PM이 AskUserQuestion으로 확정한 설계. **던전앤파이터 모티브, "�
 
 **✅ 1.78.1~1.79.0**: 에픽 고유·세트 효과 설명 UI(장비 카드 desc + 직업 카드 세트 현황 N/3) / **전후방 배치**(PM 제안 — `RAID_FORMATION`: 전열 공+10%·단일기/광역 주 타겟, 후열 광역 -30%·단일기 보호, 전멸기 배치 무관. `meta.raid.formation` + 로비 토글 + 전투 2줄 배치).
 
+**✅ 1.79.1**: 세트 픽스 — 레거시 장비 `series` 백필(`backfillRaidSeries`, loadMeta+클라우드 병합 양쪽) + 여명의 15/15·종막의 18/18 세트 신설 + 승리·전멸 보상 패널 스크롤화(36vh).
+
+**✅ 1.80.0 백그라운드 파밍**: RaidBattleScreen을 `PhoneFrame`의 **persistent 레이어**(키 리마운트 제외)에 상시 마운트 — `raidDungeon` 있으면 화면을 떠나도 전투·반복 파밍 계속. `background` prop(승리·전멸 자동 정산, 기연 선택만 대기) + `onMinimize`(▾ 버튼) + `onStatus` → App 플로팅 필(탭하여 복귀). handleRaidVictory/Partial은 `screen === 'raidBattle'`일 때만 화면 전환 (싱글모드 방해 금지). ⚠️ 주의: PhoneFrame 자식은 `key={screenKey}`로 화면 전환마다 리마운트 — 영속이 필요한 컴포넌트는 반드시 persistent로.
+
 **5차 확장 후보 (PM 결정 대기)**: 레이드 보스 일러스트 프롬프트(ChatGPT 파이프라인) / 레이드 랭킹·기록
 
 ### 완성 항목 (1.62.x 기준 — outdated 정보 재발 방지)
@@ -1018,7 +1022,7 @@ PM이 AskUserQuestion으로 확정한 설계. **던전앤파이터 모티브, "�
 | **이벤트 비용/페널티** | 1.70.0 실적용 픽스 | cost는 penalty로 정산 + 잔액 부족 비활성. 일반 선택지 penalty도 적용됨 |
 | **일일 임무** (1.72.0) | `data/meta.js` DAILY_MISSIONS + `storage.js` trackDailyMission | 임무 추가는 DAILY_MISSIONS 배열 + App.jsx 트래킹 지점 1곳. KST 날짜 키 자동 리셋, 완료 즉시 영혼 자동 지급. TitleScreen 진행도 패널 |
 | **도감 발견 보너스** (1.72.0) | `storage.js` recordCodex 내장 | 신규 발견 ✦5 / 카테고리 완성 ✦100 (codexCompletionClaimed 1회 기록). 소급 지급 없음 |
-| **자동 사냥** (1.72.0) | App 드라이버 useEffect + CombatScreen `chooseAutoAction` + EventScreen autoPlay | 허용: training + endless만 (`autoHuntAllowed`). 전투 AI 우선순위: 소울100 → heavy·저체력 방어 → 버프 → 콤보 셋업 → AP당 기대 데미지 최대. usable() 가드는 handlePlayerAction과 반드시 일치 유지 |
+| **자동 사냥** (1.72.0, 1.80.0 확장) | App 드라이버 useEffect + CombatScreen `chooseAutoAction` + EventScreen autoPlay | 1.80.0~ **전 원정 허용** (`autoHuntAllowed = !!currentExpedition`, 미클리어 포함) + **배속 ×1/×5/×10** (`autoSpeed` state → CombatScreen `dly()` 헬퍼로 자동 중에만 딜레이 압축). 전투 AI 우선순위: 소울100 → heavy·저체력 방어 → **회복 방어 선제(사제 가호, HP<50%)** → 버프 → 콤보 셋업 → **마지막 AP 방어 전환(적 공격 의도+HP<65%)** → AP당 기대 데미지 최대. **자해 스킬은 잔여 HP<15면 금지**. usable() 가드는 handlePlayerAction과 반드시 일치 유지 |
 
 ### 다음 세션 우선순위 (PM 미지정 시 기본값)
 

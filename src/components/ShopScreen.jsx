@@ -7,7 +7,7 @@ import { PALETTE, hasCurse, AUTO_STAT_PREF } from '../utils/helpers.js';
 import { SHOP_PRICES, PASSIVE_SKILLS } from '../data.js';
 import { getRewardPool, rollRewards } from '../utils/rewards.js';
 
-export default function ShopScreen({ gold, skills, relics, ultimates, curses = [], autoPlay = false, onBuy, onLeave, classId = null }) {
+export default function ShopScreen({ gold, skills, relics, ultimates, curses = [], autoPlay = false, autoSpeed = 1, onBuy, onLeave, classId = null }) {
   const priceMultiplier = hasCurse(curses, 'curse_shopPrice+50') ? 1.5 : 1.0;
   // 상점 재고: 유물·궁극·재화는 제외하고 다양한 카테고리로
   const [stock] = useState(() => {
@@ -62,7 +62,7 @@ export default function ShopScreen({ gold, skills, relics, ultimates, curses = [
       } else {
         onLeave();
       }
-    }, 800);
+    }, autoSpeed > 1 ? Math.max(60, Math.round(800 / autoSpeed)) : 800);
     return () => clearTimeout(t);
   }, [autoPlay, gold, bought]);
 

@@ -127,13 +127,15 @@ import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpediti
 
 
 
-function PhoneFrame({ children, screenKey }) {
+function PhoneFrame({ children, screenKey, persistent = null }) {
   return (
     <div className="absolute inset-0" style={{ pointerEvents: 'auto' }}>
       {/* screen 키 리마운트로 화면 진입 페이드+슬라이드 (1.64.0). reduced-motion 시 CSS에서 자동 무효 */}
       <div key={screenKey} className="ui-screen-enter absolute inset-0">
         {children}
       </div>
+      {/* 1.80.0~ 영속 레이어 — 화면 전환 리마운트에서 제외 (백그라운드 레이드 전투가 여기 산다) */}
+      {persistent}
     </div>
   );
 }
@@ -278,8 +280,13 @@ export default function App() {
   // 1.72.0~ 자동 사냥 모드 — 노드 선택·스킬 선택·보상 선택 모두 자동
   // 허용 범위: 수련의 길(training) + 무한모드(endless)만. 사망/원정 클리어 시 자동 해제.
   const [autoHunt, setAutoHunt] = useState(false);
+  // 1.80.0~ 자동 사냥 배속 (×1 / ×5 / ×10) — 자동 사냥 중에만 연출·진행 딜레이 압축
+  const [autoSpeed, setAutoSpeed] = useState(1);
+  const cycleAutoSpeed = () => setAutoSpeed(s => (s === 1 ? 5 : s === 5 ? 10 : 1));
   // 1.74.0~ 레이드 — 입장 중인 던전 (raidBattle 화면용)
   const [raidDungeon, setRaidDungeon] = useState(null);
+  // 1.80.0~ 레이드 백그라운드 진행 상태 (플로팅 필 표시용): running | victory | choice | defeat
+  const [raidBgStatus, setRaidBgStatus] = useState('running');
   // 1.78.0~ 던전 반복 모드 — 승리 시 자동 재입장, 전멸·후퇴·로비 복귀 시 해제
   const [raidRepeat, setRaidRepeat] = useState(false);
   
@@ -1753,7 +1760,8 @@ export default function App() {
     // 1.78.0 반복 모드 — 같은 던전 자동 재입장 (clears 증가로 battle key가 바뀌어 리마운트)
     if (raidRepeat) return;
     setRaidDungeon(null);
-    setScreen('raid');
+    // 1.80.0~ 백그라운드 진행 중이면 현재 화면 유지 (싱글모드 방해 금지)
+    if (screen === 'raidBattle') setScreen('raid');
   };
 
   // 1.76.0~ 제작 (정수+심연석 → 에픽·레전더리 확정, 부위·직업 랜덤 — PM 제안) — 결과 반환
@@ -1827,7 +1835,8 @@ export default function App() {
     });
     setRaidRepeat(false);
     setRaidDungeon(null);
-    setScreen('raid');
+    // 1.80.0~ 백그라운드 진행 중이면 현재 화면 유지 (싱글모드 방해 금지)
+    if (screen === 'raidBattle') setScreen('raid');
   };
 
   const handleRaidEquip = (itemId) => {
@@ -1861,7 +1870,8 @@ export default function App() {
   // 전투(CombatScreen)·사건(EventScreen)·상점(ShopScreen 자동 구매)은
   // 각 컴포넌트 내부 autoPlay가 처리. 여기서는 맵 노드 선택 / 승리·보상 /
   // 챕터 클리어 / 대장간 스킵 / 정비 자동 휴식 / 준비 자동 확정을 담당.
-  const autoHuntAllowed = !!currentExpedition && (currentExpedition.category === 'training' || !!currentExpedition.endless);
+  // 1.80.0~ 전 원정 허용 (PM 결정: 미클리어 던전 포함 — 튜토리얼·클래식·챌린지·챔피언십·무한 전부)
+  const autoHuntAllowed = !!currentExpedition;
   useEffect(() => {
     if (!autoHunt) return;
     // 원정 종료·이탈·비허용 모드 → 자동 해제
@@ -1870,7 +1880,8 @@ export default function App() {
       return;
     }
     let t = null;
-    const later = (fn, ms) => { t = setTimeout(fn, ms); };
+    // 1.80.0~ 배속 반영 (최소 60ms — 상태 반영 여유)
+    const later = (fn, ms) => { t = setTimeout(fn, Math.max(60, Math.round(ms / autoSpeed))); };
     if (screen === 'map' && mapData) {
       const candidates = mapData.nodes.filter(n => n.current && !n.locked);
       if (candidates.length > 0) {
@@ -1970,15 +1981,35 @@ export default function App() {
         curses={currentCurses}
       />
     }>
-      <PhoneFrame screenKey={screen}>
+      <PhoneFrame screenKey={screen} persistent={
+        <>
+          {/* 1.80.0~ 레이드 백그라운드 진행 — raidDungeon이 있으면 화면을 떠나도 마운트 유지 (전투·반복 파밍 계속) */}
+          {raidDungeon && (
+            <div style={{ display: screen === 'raidBattle' ? 'contents' : 'none' }}>
+              <RaidBattleScreen key={raidDungeon.id + '-' + (meta?.raid?.clears?.[raidDungeon.id] || 0)} meta={meta} dungeon={raidDungeon} repeat={raidRepeat} background={screen !== 'raidBattle'} onToggleRepeat={() => setRaidRepeat(v => !v)} onMinimize={() => setScreen('raid')} onStatus={setRaidBgStatus} onVictory={handleRaidVictory} onDefeat={handleRaidPartial} onRetreat={handleRaidPartial} />
+            </div>
+          )}
+          {/* 1.80.0~ 레이드 백그라운드 플로팅 필 — 탭 시 전투 화면 복귀 */}
+          {raidDungeon && screen !== 'raidBattle' && (
+            <button onClick={() => setScreen('raidBattle')} className="ui-press" style={{
+              position: 'absolute', top: 6, left: '50%', transform: 'translateX(-50%)', zIndex: 80,
+              display: 'flex', alignItems: 'center', gap: 5, padding: '4px 12px', borderRadius: 999,
+              background: 'rgba(15,10,12,0.92)', border: `1px solid ${PALETTE.legendary}88`,
+              color: PALETTE.legendary, fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap',
+              boxShadow: '0 4px 14px rgba(0,0,0,0.55)',
+            }}>
+              ⚔ {raidDungeon.name} — {raidBgStatus === 'defeat' ? '전멸 · 탭하여 전리품 확인' : raidBgStatus === 'choice' ? '✦ 기연 선택 대기' : raidBgStatus === 'victory' ? '클리어 · 탭하여 확인' : raidRepeat ? '⟳ 반복 파밍 중' : '자동 진행 중'}
+            </button>
+          )}
+        </>
+      }>
             {screen === 'title' && !authMode && <LoginScreen
               onSelectLocal={handleSelectLocal} 
               onSelectGuest={handleSelectGuest} 
               onSelectGoogle={handleSelectGoogle} 
             />}
             {screen === 'title' && authMode && <TitleScreen meta={meta} onStart={() => setScreen('expeditionSelect')} onResume={resumeActiveRun} onAltar={enterAltar} onEngravings={() => setScreen('engraving')} onRaid={raidUnlocked ? () => setScreen('raid') : null} onAchievements={() => { setPrevAchievementsBack('title'); setScreen('achievements'); }} onChangelog={() => setShowChangelog({ firstSeen: false })} onAccount={() => setScreen('account')} />}
-            {screen === 'raid' && <RaidScreen meta={meta} onEnterDungeon={(d) => { setRaidDungeon(d); setScreen('raidBattle'); }} onEquipItem={handleRaidEquip} onAutoEquip={handleRaidAutoEquip} onDismantle={handleRaidDismantle} onDismantleJunk={handleRaidDismantleJunk} onEnhance={handleRaidEnhance} onCraft={handleRaidCraft} onGacha={handleRaidGacha} onToggleFormation={handleRaidFormation} onBack={() => setScreen('title')} />}
-            {screen === 'raidBattle' && raidDungeon && <RaidBattleScreen key={raidDungeon.id + '-' + (meta?.raid?.clears?.[raidDungeon.id] || 0)} meta={meta} dungeon={raidDungeon} repeat={raidRepeat} onToggleRepeat={() => setRaidRepeat(v => !v)} onVictory={handleRaidVictory} onDefeat={handleRaidPartial} onRetreat={handleRaidPartial} />}
+            {screen === 'raid' && <RaidScreen meta={meta} onEnterDungeon={(d) => { if (raidDungeon) { setScreen('raidBattle'); return; } setRaidDungeon(d); setScreen('raidBattle'); }} onEquipItem={handleRaidEquip} onAutoEquip={handleRaidAutoEquip} onDismantle={handleRaidDismantle} onDismantleJunk={handleRaidDismantleJunk} onEnhance={handleRaidEnhance} onCraft={handleRaidCraft} onGacha={handleRaidGacha} onToggleFormation={handleRaidFormation} onBack={() => setScreen('title')} />}
             {screen === 'account' && <AccountScreen 
               authMode={authMode} 
               firebaseUser={firebaseUser} 
@@ -2022,17 +2053,17 @@ export default function App() {
             {screen === 'altar' && <SoulAltar meta={meta} slots={altarSlots} onPurchase={purchaseUpgrade} onReroll={rerollAltar} onBack={() => setScreen('title')} />}
             {screen === 'engraving' && <EngravingScreen meta={meta} onMetaUpdate={setMeta} onBack={() => setScreen('title')} />}
             {screen === 'achievements' && <AchievementScreen meta={meta} onClaim={handleClaimAchievement} onClose={() => setScreen(prevAchievementsBack)} />}
-            {screen === 'map' && chapter && mapData && <MapView chapter={chapter} classData={classData} mapData={mapData} hp={hp} maxHp={maxHp} gold={gold} gem={gem} relics={relics} activeRelicNames={activeRelicNames} expedition={currentExpedition} curses={currentCurses} chapterIdx={chapterIdx} autoHunt={autoHunt} autoHuntAllowed={autoHuntAllowed} onToggleAutoHunt={() => setAutoHunt(v => !v)} onEnterNode={handleEnterNode} onOpenStatus={() => setScreen('status')} onOpenAchievements={() => { setPrevAchievementsBack('map'); setScreen('achievements'); }} onOpenCodex={() => setScreen('codex')} onBack={() => setScreen('title')} />}
+            {screen === 'map' && chapter && mapData && <MapView chapter={chapter} classData={classData} mapData={mapData} hp={hp} maxHp={maxHp} gold={gold} gem={gem} relics={relics} activeRelicNames={activeRelicNames} expedition={currentExpedition} curses={currentCurses} chapterIdx={chapterIdx} autoHunt={autoHunt} autoHuntAllowed={autoHuntAllowed} onToggleAutoHunt={() => setAutoHunt(v => !v)} autoSpeed={autoSpeed} onCycleAutoSpeed={cycleAutoSpeed} onEnterNode={handleEnterNode} onOpenStatus={() => setScreen('status')} onOpenAchievements={() => { setPrevAchievementsBack('map'); setScreen('achievements'); }} onOpenCodex={() => setScreen('codex')} onBack={() => setScreen('title')} />}
             {screen === 'codex' && <CodexScreen meta={meta} onBack={() => setScreen('map')} />}
             {screen === 'bossIntro' && currentEnemy && <BossIntroScreen enemyKey={currentEnemy} onComplete={() => setScreen('combat')} />}
-            {screen === 'combat' && currentEnemy && <CombatScreen key={`${activeNodeId}-${currentEnemy}`} classData={classData} initialPlayer={{ hp, maxHp, ...classData.stats, ...stats }} initialSkills={skills} initialUltimates={ultimates} initialRelics={relics} activeSkills={activeSkills} activeRelicNames={activeRelicNames} enemyKey={currentEnemy} isBoss={isBossReward} expedition={currentExpedition} curses={currentCurses} meta={meta} engravingFx={getCombinedClassFx(meta, classData?.id)} chapterGimmick={chapter?.gimmick || null} autoPlay={autoHunt} onToggleAuto={() => setAutoHunt(v => !v)} onVictory={handleVictory} onDefeat={handleDefeat} />}
+            {screen === 'combat' && currentEnemy && <CombatScreen key={`${activeNodeId}-${currentEnemy}`} classData={classData} initialPlayer={{ hp, maxHp, ...classData.stats, ...stats }} initialSkills={skills} initialUltimates={ultimates} initialRelics={relics} activeSkills={activeSkills} activeRelicNames={activeRelicNames} enemyKey={currentEnemy} isBoss={isBossReward} expedition={currentExpedition} curses={currentCurses} meta={meta} engravingFx={getCombinedClassFx(meta, classData?.id)} chapterGimmick={chapter?.gimmick || null} autoPlay={autoHunt} autoSpeed={autoSpeed} onCycleAutoSpeed={cycleAutoSpeed} onToggleAuto={() => setAutoHunt(v => !v)} onVictory={handleVictory} onDefeat={handleDefeat} />}
             {screen === 'reward' && <RewardSelect rewards={currentRewards} gem={gem} skills={skills} relics={relics} ultimates={ultimates} onPick={handlePickReward} onReroll={handleReroll} hasRerolled={hasRerolled} isElite={isEliteReward} classId={classData?.id} meta={meta} expedition={currentExpedition} />}
             {screen === 'victory' && <VictoryScreen classData={classData} enemy={currentEnemy ? ENEMIES[currentEnemy] : null} gains={victoryGains} onContinue={handleVictoryContinue} />}
-            {screen === 'event' && currentEvent && <EventScreen event={currentEvent} classData={classData} stats={{ ...classData.stats, ...stats }} skills={skills} gold={gold} gem={gem} autoPlay={autoHunt} onResolve={handleEventResolve} />}
+            {screen === 'event' && currentEvent && <EventScreen event={currentEvent} classData={classData} stats={{ ...classData.stats, ...stats }} skills={skills} gold={gold} gem={gem} autoPlay={autoHunt} autoSpeed={autoSpeed} onResolve={handleEventResolve} />}
             {screen === 'rest' && <RestScreen classData={classData} hp={hp} maxHp={maxHp} skills={skills} stats={{ ...classData?.stats, ...stats }} activeSkills={activeSkills} activeRelicNames={activeRelicNames} relics={relics} ultimates={ultimates} engravingFx={getCombinedClassFx(meta, classData?.id)} meta={meta} expedition={currentExpedition} onChoice={handleRestChoice} />}
             {screen === 'prep' && <PrepScreen classData={classData} skills={skills} stats={{ ...classData?.stats, ...stats }} relics={relics} ultimates={ultimates} engravingFx={getCombinedClassFx(meta, classData?.id)} meta={meta} expedition={currentExpedition} mode="full" onConfirm={handlePrepConfirm} />}
             {screen === 'reselect' && <PrepScreen classData={classData} skills={skills} stats={{ ...classData?.stats, ...stats }} relics={relics} ultimates={ultimates} engravingFx={getCombinedClassFx(meta, classData?.id)} meta={meta} expedition={currentExpedition} mode={reselectMode} currentActiveSkills={activeSkills} currentActiveRelicNames={activeRelicNames} onConfirm={handleReselectConfirm} />}
-            {screen === 'shop' && <ShopScreen gold={gold} skills={skills} relics={relics} ultimates={ultimates} curses={currentCurses} autoPlay={autoHunt} onBuy={handleShopBuy} onLeave={handleShopLeave} classId={classData?.id} />}
+            {screen === 'shop' && <ShopScreen gold={gold} skills={skills} relics={relics} ultimates={ultimates} curses={currentCurses} autoPlay={autoHunt} autoSpeed={autoSpeed} onBuy={handleShopBuy} onLeave={handleShopLeave} classId={classData?.id} />}
             {screen === 'forge' && <ForgeScreen relics={relics} skills={skills} activeRelicNames={activeRelicNames} meta={meta} onCombine={handleForgeCombine} onLeave={handleForgeLeave} />}
             {screen === 'chapterClear' && chapter && <ChapterClearScreen chapter={chapter} isLastChapter={false} hp={hp} maxHp={maxHp} meta={meta} curses={currentCurses} onContinue={handleChapterContinue} />}
             {screen === 'expeditionClear' && currentExpedition && <ExpeditionClearScreen expedition={currentExpedition} soulsGained={runSouls} firstClear={runFirstChampClear} onContinue={handleExpeditionClearContinue} />}

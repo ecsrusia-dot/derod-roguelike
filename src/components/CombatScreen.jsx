@@ -47,7 +47,9 @@ import {
 } from '../combat/initCombat.js';
 import { FloatingLabel, DamageVignette, WhiteFlash, SlashFx, MagicImpactFx, MagicParticles, BarrierRing, BarrierBreakFx, ThrustFx, BladeGuardFx, ShadowStrikeFx, StatusOverlay, UltimateCutin, EternalFlameCutin, FireballFx, ExplosionFx, IgniteGlowAura, IgniteExplodeFx, FlameBarrierFx, FlameReflectFx, CritScreenFx } from './CombatEffects.jsx';
 
-export default function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimates = [], initialRelics = [], activeSkills = null, activeRelicNames = null, enemyKey, isBoss, expedition, curses = [], meta, engravingFx = {}, chapterGimmick = null, autoPlay = false, onToggleAuto = null, onVictory, onDefeat }) {
+export default function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimates = [], initialRelics = [], activeSkills = null, activeRelicNames = null, enemyKey, isBoss, expedition, curses = [], meta, engravingFx = {}, chapterGimmick = null, autoPlay = false, autoSpeed = 1, onCycleAutoSpeed = null, onToggleAuto = null, onVictory, onDefeat }) {
+  // 1.80.0~ 자동 사냥 배속 — 자동 중에만 내부 진행·연출 딜레이 압축 (수동 플레이는 원속도)
+  const dly = (ms) => (autoPlay && autoSpeed > 1 ? Math.max(40, Math.round(ms / autoSpeed)) : ms);
   const [player, setPlayer] = useState(() => buildInitialPlayer({
     initialPlayer, initialSkills, initialUltimates, activeSkills, meta, curses,
   }));
@@ -717,7 +719,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         setLog(prev => [...prev, { type: 'victory', text: `━━ ${enemy.name} 처치 ━━` }]);
         setPhase('victory');
         actionLockRef.current = false;
-      }, 800);
+      }, dly(800));
       return;
     }
 
@@ -729,7 +731,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     }
 
     setPhase('enemyTurn');
-    setTimeout(() => { executeEnemyTurn(newPlayer, newEnemy, newLog); }, 350);
+    setTimeout(() => { executeEnemyTurn(newPlayer, newEnemy, newLog); }, dly(350));
   };
 
   // 1.69.0 전투 개편 B — 남은 AP를 버리고 턴 종료 (이월 없음)
@@ -742,7 +744,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     const newLog = [...log];
     setPlayer(newPlayer);
     setPhase('enemyTurn');
-    setTimeout(() => { executeEnemyTurn(newPlayer, newEnemy, newLog); }, 250);
+    setTimeout(() => { executeEnemyTurn(newPlayer, newEnemy, newLog); }, dly(250));
   };
 
   // ============================================
@@ -751,9 +753,14 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
   // 우선순위 (최대 데미지 + 방어 최적화):
   //   ① 소울 게이지 100 → 소울 스킬 (턴 시작 시)
   //   ② 대공격(heavy) 예고 or HP 35% 미만 → 방어 스킬 (아직 방어 없을 때)
+  //   ②b 회복 방어 유지 — HP 50% 미만이면 회복 붙은 방어(사제 가호) 우선 (1.80.0~)
   //   ③ 버프(분노) 선점 — 공격 여력(AP 2+) 있을 때 턴 초반에
   //   ④ 콤보 셋업 — 선행기+연계기 세트가 이번 턴 안에 가능하면 선행기부터
+  //   ④b 마지막 AP 방어 전환 — 적 공격 의도 + HP 65% 미만이면 기본기 대신 방어 (1.80.0~,
+  //      방어 30~50 > 기본기 평균 14 데미지. 방랑검사는 심안류 반격 기회도 추가 가치)
   //   ⑤ AP당 기대 데미지 최대 스킬 (연계 보너스·다중 히트 반영)
+  // 1.80.0~ 직업 안전장치: 자해(selfDmg) 스킬은 잔여 HP가 15 미만으로 떨어지면 금지
+  //   (혼혈 마족 '피의 일격' — 혈광은 저HP일수록 강하지만 자멸은 런 종료라 하한선 필수)
   const chooseAutoAction = () => {
     const ap = player.ap ?? AP_PER_TURN;
     if (ap <= 0) return 'END';
@@ -766,6 +773,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       if (s.type === 'buff' && player.usedBuffThisTurn) return false;
       if ((player.debuffs?.sealedSkills || []).includes(key)) return false;
       if (getSkillApCost(s) > ap) return false;
+      // 자해 스킬 하한선 (자동 전용 — 수동 사용은 플레이어 판단)
+      if ((s.selfDmg || 0) > 0 && player.hp - s.selfDmg < 15) return false;
       return true;
     };
     const keys = classData.combatSkills.filter(usable);
@@ -777,6 +786,11 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     const defenseKey = keys.find(k => COMBAT_SKILLS[k].type === 'defense');
     // ② 대공격 간파 / 저체력 → 방어 우선
     if (danger && defenseKey && (player.defense || 0) <= 0) return defenseKey;
+    // ②b 회복 방어 유지 — 사제 가호(방어 50 + HP 15)처럼 selfHeal 붙은 방어는 저체력에서 선제 사용
+    if (hpRatio < 0.5 && (player.defense || 0) <= 0) {
+      const healDefKey = keys.find(k => COMBAT_SKILLS[k].type === 'defense' && (COMBAT_SKILLS[k].selfHeal || 0) > 0);
+      if (healDefKey) return healDefKey;
+    }
     // ③ 버프 선점 (분노 미보유 + 이후 공격할 AP 여유가 있을 때)
     const buffKey = keys.find(k => COMBAT_SKILLS[k].type === 'buff');
     if (buffKey && ap >= 2 && !(player.buffs?.rage > 0)) return buffKey;
@@ -796,6 +810,11 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       const setAp = getSkillApCost(enabler) + getSkillApCost(s);
       const setEther = (enabler.cost || 0) + (s.cost || 0);
       if (setAp <= ap && setEther <= player.ether) return s.comboAfter;
+    }
+    // ④b 마지막 AP 방어 전환 — 적이 공격 의도이고 체력 여유가 없으면 기본기(평균 ~14)보다
+    //    방어(30~50)가 기대값 우위. 방랑검사는 심안류 반격, 정령사는 회피 버프 추가 가치.
+    if (ap === 1 && intent?.type === 'attack' && hpRatio < 0.65 && defenseKey && (player.defense || 0) <= 0) {
+      return defenseKey;
     }
     // ⑤ AP당 기대 데미지 최대 스킬
     let best = attackKeys[0];
@@ -834,11 +853,11 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
   useEffect(() => {
     if (!autoPlay) return;
     if (phase === 'victory') {
-      const t = setTimeout(() => handleVictoryClaim(), 900);
+      const t = setTimeout(() => handleVictoryClaim(), dly(900));
       return () => clearTimeout(t);
     }
     if (phase === 'defeat') {
-      const t = setTimeout(() => onDefeat(), 1400);
+      const t = setTimeout(() => onDefeat(), dly(1400));
       return () => clearTimeout(t);
     }
     if (phase !== 'playerTurn') return;
@@ -848,7 +867,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       if (action === 'ULT') handleUltimate();
       else if (action === 'END') handleEndTurn();
       else if (action) handlePlayerAction(action);
-    }, 550);
+    }, dly(550));
     return () => clearTimeout(t);
   }, [autoPlay, phase, player]);
 
@@ -1031,14 +1050,14 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       // 적이 죽었으면 승리 처리
       if (newEnemy.currentHp <= 0) {
         actionLockRef.current = false;
-        setTimeout(() => setPhase('victory'), 400);
+        setTimeout(() => setPhase('victory'), dly(400));
         return;
       }
 
       // 적 턴으로 진행
       setPhase('enemyTurn');
-      setTimeout(() => { executeEnemyTurn(newPlayer, newEnemy, newLog); }, 350);
-    }, 900);
+      setTimeout(() => { executeEnemyTurn(newPlayer, newEnemy, newLog); }, dly(350));
+    }, dly(900));
   };
 
   const executeEnemyTurn = (curPlayer, curEnemy, curLog) => {
@@ -1055,12 +1074,12 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       // 기절 1턴 소모
       newEnemy.debuffs = { ...newEnemy.debuffs, stunned: 0 };
       setEnemy(newEnemy); setLog(newLog);
-      setTimeout(() => endTurn(newPlayer, newEnemy, newLog), 400);
+      setTimeout(() => endTurn(newPlayer, newEnemy, newLog), dly(400));
       return;
     }
 
     const intent = curEnemy.nextIntent;
-    if (!intent) { setTimeout(() => endTurn(newPlayer, newEnemy, newLog), 300); return; }
+    if (!intent) { setTimeout(() => endTurn(newPlayer, newEnemy, newLog), dly(300)); return; }
     newLog.push({ type: 'enemy', text: `◂ ${enemy.name}: ${intent.name}` });
 
     if (intent.type === 'attack') {
@@ -1668,19 +1687,19 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         setLog(prev => [...prev, { type: 'victory', text: `━━ ${enemy.name} 처치 (반격) ━━` }]);
         setPhase('victory');
         actionLockRef.current = false;
-      }, 800);
+      }, dly(800));
       return;
     }
     
     if (newPlayer.hp <= 0) {
-      setTimeout(() => { 
-        setLog(prev => [...prev, { type: 'defeat', text: `━━ 패배 ━━` }]); 
-        setPhase('defeat'); 
+      setTimeout(() => {
+        setLog(prev => [...prev, { type: 'defeat', text: `━━ 패배 ━━` }]);
+        setPhase('defeat');
         actionLockRef.current = false;  // 전투 종료 - 락 해제
-      }, 800);
+      }, dly(800));
       return;
     }
-    setTimeout(() => endTurn(newPlayer, newEnemy, newLog), 400);
+    setTimeout(() => endTurn(newPlayer, newEnemy, newLog), dly(400));
   };
 
   const endTurn = (curPlayer, curEnemy, curLog) => {
@@ -2007,7 +2026,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     // 풍령 정령 화살로 적이 죽었으면 즉시 승리
     if (newEnemy.currentHp <= 0) {
       setPlayer(newPlayer); setEnemy(newEnemy); setLog(newLog); setTurn(newTurn);
-      setTimeout(() => setPhase('victory'), 400);
+      setTimeout(() => setPhase('victory'), dly(400));
       actionLockRef.current = false;
       return;
     }
@@ -2028,7 +2047,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     }
     if (newEnemy.currentHp <= 0) {
       setPlayer(newPlayer); setEnemy(newEnemy); setLog(newLog); setTurn(newTurn);
-      setTimeout(() => setPhase('victory'), 400);
+      setTimeout(() => setPhase('victory'), dly(400));
       actionLockRef.current = false;
       return;
     }
@@ -2091,8 +2110,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         // 적 턴 실행
         setTimeout(() => {
           executeEnemyTurn(skipPlayer, enemyWithIntent, skipLog);
-        }, 350);
-      }, 500);
+        }, dly(350));
+      }, dly(500));
       return;
     }
 
@@ -2101,12 +2120,12 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         setLog(prev => [...prev, { type: 'passive', text: `◆ [가속] 추가 턴!` }]);
         setPhase('playerTurn');
         actionLockRef.current = false;
-      }, 350);
+      }, dly(350));
     } else {
       setTimeout(() => {
         setPhase('playerTurn');
         actionLockRef.current = false;
-      }, 250);
+      }, dly(250));
     }
   };
 
@@ -2478,6 +2497,16 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                     borderRadius: 999, padding: '3px 10px',
                     boxShadow: '0 0 8px rgba(232,176,74,0.45)',
                   }}>AUTO ⏸</button>
+                )}
+                {/* 1.80.0~ 자동 사냥 배속 순환 (×1→×5→×10) */}
+                {autoPlay && onCycleAutoSpeed && (
+                  <button onClick={onCycleAutoSpeed} className="ui-press flex-none tabular-nums" style={{
+                    fontSize: 10, fontWeight: 700,
+                    color: autoSpeed > 1 ? PALETTE.ice : PALETTE.textDim,
+                    background: autoSpeed > 1 ? 'rgba(123,163,196,0.18)' : 'rgba(255,255,255,0.05)',
+                    border: `1px solid ${autoSpeed > 1 ? `${PALETTE.ice}aa` : 'var(--ui-line)'}`,
+                    borderRadius: 999, padding: '3px 8px',
+                  }}>⚡×{autoSpeed}</button>
                 )}
                 {phase === 'playerTurn' && !autoPlay && (
                   <button onClick={handleEndTurn} className="ui-press flex-none" style={{
