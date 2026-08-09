@@ -667,15 +667,16 @@ export default function RaidBattleScreen({ meta, dungeon, repeat = false, onTogg
       </div>
 
       {/* ===== 파티 초상 5인 + 회복/피해 라벨 ===== */}
-      <div className="relative px-4 py-2.5 flex-none" style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.25), transparent)' }}>
+      {/* 1.79.1 레이아웃 픽스 — 2줄 배치로 커진 만큼 패딩·행간 압축 (보상 패널 밀림 완화) */}
+      <div className="relative px-4 py-1.5 flex-none" style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.25), transparent)' }}>
         <div key={partyFlash} className={partyFlash > 0 ? 'fx-hit-shake' : ''}>
           {['front', 'back'].map(row => {
             const members = party.filter(m => m.row === row);
             if (members.length === 0) return null;
             return (
-              <div key={row} className="flex items-start gap-2 mb-1">
+              <div key={row} className="flex items-start gap-2 mb-0.5">
                 <span className="flex-none text-center" style={{
-                  width: 24, marginTop: 14, fontSize: 8.5, letterSpacing: '0.1em',
+                  width: 24, marginTop: 12, fontSize: 8.5, letterSpacing: '0.1em',
                   color: row === 'front' ? PALETTE.accent : PALETTE.ice,
                 }}>{row === 'front' ? '전열' : '후열'}</span>
                 <div className="flex gap-2.5">
@@ -739,8 +740,11 @@ export default function RaidBattleScreen({ meta, dungeon, repeat = false, onTogg
             <div className="text-center tracking-[0.3em] font-bold mb-2" style={{
               fontSize: 12, color: PALETTE.legendary, textShadow: '0 0 16px rgba(232,176,74,0.8)',
             }}>━ 던전 클리어 ━</div>
-            {renderContribution()}
-            {renderLoot()}
+            {/* 1.79.1 레이아웃 픽스 — 기여도+전리품은 스크롤 영역, CTA 버튼은 항상 화면 안 고정 */}
+            <div className="overflow-y-auto" style={{ maxHeight: '36vh' }}>
+              {renderContribution()}
+              {renderLoot()}
+            </div>
             <button onClick={() => onVictory(dungeon, lootOut)} disabled={needChoice} className="ui-press ui-sheen w-full" style={{
               height: 44, borderRadius: 'var(--r-btn)', fontSize: 12, fontWeight: 700, letterSpacing: '0.25em',
               background: 'linear-gradient(160deg, rgba(232,176,74,0.4), rgba(232,176,74,0.16))',
@@ -758,8 +762,10 @@ export default function RaidBattleScreen({ meta, dungeon, repeat = false, onTogg
                 전멸 — 하지만 돌파한 방의 전리품은 보존됩니다
               </div>
             )}
-            {renderContribution()}
-            {renderLoot()}
+            <div className="overflow-y-auto" style={{ maxHeight: '36vh' }}>
+              {renderContribution()}
+              {renderLoot()}
+            </div>
             <button onClick={() => onDefeat({ ...loot, secretSwap: secretChoice === 'swap' })} className="ui-press w-full" style={{
               height: 44, borderRadius: 'var(--r-btn)', fontSize: 12, letterSpacing: '0.25em',
               background: `linear-gradient(160deg, ${PALETTE.accent}55, ${PALETTE.accent}22)`,

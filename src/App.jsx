@@ -116,6 +116,7 @@ import {
   rollRaidDropHighTier,
   rollCraftedRaidItem,
   rollGachaRaidItem,
+  backfillRaidSeries,
 } from './data.js';
 import { getKstDateKey } from './utils/dailyChallenge.js';
 import { simulateBestEndlessRun } from './utils/endlessSkipSim.js';
@@ -421,6 +422,9 @@ export default function App() {
             const local = await loadMeta();
             const merged = pickLatest(local, cloud) || local;
             const safe = { ...getDefaultMeta(), ...merged };
+            // 1.79.1 클라우드 메타도 레이드 레거시 장비 series 백필 (loadMeta와 동일 픽스)
+            const raidBackfill = backfillRaidSeries(safe.raid);
+            if (raidBackfill.changed) safe.raid = raidBackfill.raid;
             setMeta(safe);
           } else {
             // 모드는 cloud인데 user 없음 → 다시 로그인 화면
