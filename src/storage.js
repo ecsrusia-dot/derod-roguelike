@@ -5,7 +5,7 @@
 // 저장되는 것: 영혼, 강화 단계, 해금 항목, 클리어 기록
 // ============================================
 
-import { ENGRAVINGS, ENGRAVING_TIERS, ENEMIES, EVENTS, RELICS, PASSIVE_SKILLS, CODEX_DISCOVERY_REWARD, CODEX_COMPLETE_REWARD } from './data.js';
+import { ENGRAVINGS, ENGRAVING_TIERS, ENEMIES, EVENTS, RELICS, PASSIVE_SKILLS, CODEX_DISCOVERY_REWARD, CODEX_COMPLETE_REWARD, backfillRaidSeries } from './data.js';
 
 const DB_NAME = 'derod_meta';
 const DB_VERSION = 1;
@@ -185,6 +185,12 @@ export async function loadMeta() {
         }
         // 1.26.0 조건 시스템 첫 마이그레이션이면 보강 후 저장 (안내 모달 재트리거 방지)
         if (!data.ultimatesPickedByClass) {
+          needsImmediateSave = true;
+        }
+        // 1.79.1 레이드 레거시 장비 series 백필 — 1.75.0 이전 드랍 장비의 세트 판정 누락 픽스
+        const raidBackfill = backfillRaidSeries(safe.raid);
+        if (raidBackfill.changed) {
+          safe.raid = raidBackfill.raid;
           needsImmediateSave = true;
         }
         // 1.35.0 lanthert → wanderer 내부 코드명 변경 마이그레이션

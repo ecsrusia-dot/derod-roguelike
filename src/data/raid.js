@@ -327,7 +327,43 @@ export const RAID_SET_BONUSES = {
   '핏빛':   { name: '핏빛 3세트',   hpPct: 0,  atkPct: 10 },
   '별빛':   { name: '별빛 3세트',   hpPct: 8,  atkPct: 8 },
   '심연의': { name: '심연의 3세트', hpPct: 12, atkPct: 12 },
+  '여명의': { name: '여명의 3세트', hpPct: 15, atkPct: 15 },
+  '종막의': { name: '종막의 3세트', hpPct: 18, atkPct: 18 },
 };
+
+// 1.79.1~ 레거시 장비 series 백필 — series 필드는 1.75.0 신설이라
+// 그 전에 드랍된 장비는 이름에 접두어가 있어도 세트 판정에서 빠진다.
+// 이름을 "접두어 + 직업×슬롯 장비명" 정확 일치로 재구성해 복원 (부분 일치 오판 방지).
+const RAID_SERIES_PREFIXES = RAID_DUNGEONS.map(d => d.gearPrefix).filter(Boolean);
+
+export function inferRaidSeries(item) {
+  const gearName = RAID_GEAR_NAMES[item?.classId]?.[item?.slot];
+  if (!gearName || !item?.name) return null;
+  return RAID_SERIES_PREFIXES.find(p => item.name === `${p} ${gearName}`) || null;
+}
+
+// 인벤토리 + 장착 전체를 순회하며 누락된 series 복원. 변경 없으면 원본 그대로 반환.
+export function backfillRaidSeries(raid) {
+  if (!raid) return { raid, changed: false };
+  let changed = false;
+  const fix = (item) => {
+    if (!item || item.series) return item;
+    const series = inferRaidSeries(item);
+    if (!series) return item;
+    changed = true;
+    return { ...item, series };
+  };
+  const inventory = (raid.inventory || []).map(fix);
+  const equipped = {};
+  Object.entries(raid.equipped || {}).forEach(([classId, slots]) => {
+    equipped[classId] = {};
+    Object.entries(slots || {}).forEach(([slot, item]) => {
+      equipped[classId][slot] = fix(item);
+    });
+  });
+  if (!changed) return { raid, changed: false };
+  return { raid: { ...raid, inventory, equipped }, changed: true };
+}
 
 // KST 기준 이번 주(월요일 시작) 키 — 주간 첫 클리어 보상 리셋용
 export function getKstWeekKey(now = new Date()) {
