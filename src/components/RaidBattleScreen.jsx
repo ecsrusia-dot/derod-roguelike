@@ -65,7 +65,7 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
       const wipeRound = !!(e.wipeEvery && r % e.wipeEvery === 0);
       let shield = false;
 
-      // 1. 사제
+      // 1. 사제 — 침묵의 저주(healCut) 중엔 치유 -50%
       const priest = p.find(m => m.classId === 'priest');
       if (priest?.alive) {
         if (wipeRound) {
@@ -74,9 +74,11 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
         } else {
           const hurt = alive().reduce((a, m) => (m.hp / m.maxHp < a.hp / a.maxHp ? m : a));
           if (hurt && hurt.hp < hurt.maxHp) {
-            const healed = Math.min(hurt.maxHp - hurt.hp, priest.heal);
+            const healCut = (e.healCutLeft || 0) > 0;
+            const healAmount = healCut ? Math.floor(priest.heal * 0.5) : priest.heal;
+            const healed = Math.min(hurt.maxHp - hurt.hp, healAmount);
             hurt.hp += healed;
-            lines.push({ t: 'heal', text: `✚ 사제 → ${hurt.name} +${healed}` });
+            lines.push({ t: 'heal', text: `✚ 사제 → ${hurt.name} +${healed}${healCut ? ' [침묵의 저주 -50%]' : ''}` });
           }
         }
       }
@@ -139,8 +141,33 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
         return;
       }
 
+      // 3.5. 소환된 쫄 공격 (지난 라운드 소환분 — 1회 타격 후 소멸)
+      if ((e.pendingAdds || 0) > 0) {
+        const addDmg = Math.round(e.atk * 0.25);
+        for (let i = 0; i < e.pendingAdds; i++) {
+          const targets = alive();
+          if (targets.length === 0) break;
+          const victim = targets[Math.floor(Math.random() * targets.length)];
+          victim.hp = Math.max(0, victim.hp - addDmg);
+          lines.push({ t: 'boss', text: `◂ 소환수 → ${victim.name} ${addDmg}` });
+          if (victim.hp <= 0) { victim.alive = false; lines.push({ t: 'boss', text: `✖ ${victim.name} 전투 불능` }); }
+        }
+        lines.push({ t: 'sys', text: `· 소환수 소멸` });
+        e.pendingAdds = 0;
+      }
+
       // 4. 적 행동
       const enemyAtk = e.atk * (e.enraged ? 1.3 : 1) * (0.9 + Math.random() * 0.2);
+      // 기믹: 쫄 소환 (summonEvery) — 다음 라운드에 소환수 2기가 일제 타격
+      if (e.summonEvery && r % e.summonEvery === 0) {
+        e.pendingAdds = 2;
+        lines.push({ t: 'boss', text: `☍ ${e.name} — 소환수 2기 소환! (다음 라운드 일제 공격)` });
+      }
+      // 기믹: 침묵의 저주 (healCutEvery) — 2라운드간 사제 치유 -50%
+      if (e.healCutEvery && r % e.healCutEvery === 0) {
+        e.healCutLeft = 3; // 이번 라운드 말 차감 포함 실효 2라운드
+        lines.push({ t: 'boss', text: `⌀ ${e.name} — 침묵의 저주! 2라운드간 치유 -50%` });
+      }
       if (wipeRound) {
         const mult = shield ? 0.3 : 1;
         lines.push({ t: 'boss', text: `☠ ${e.name} — 전멸기 발동!${shield ? ' (방벽으로 감쇄)' : ''}` });
@@ -162,16 +189,24 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
         });
       } else {
         const tank = p.find(m => m.classId === 'wanderer' && m.alive);
-        const target = tank || alive()[Math.floor(Math.random() * alive().length)];
+        // 기믹: 도발 무시 (pierceTankChance) — 일정 확률로 탱커가 아닌 아군을 노림
+        const nonTanks = alive().filter(m => m.classId !== 'wanderer');
+        const pierce = !!(e.pierceTankChance && tank && nonTanks.length > 0 && Math.random() < e.pierceTankChance);
+        const target = pierce
+          ? nonTanks[Math.floor(Math.random() * nonTanks.length)]
+          : (tank || alive()[Math.floor(Math.random() * alive().length)]);
         if (target) {
           let taken = enemyAtk;
           if (target.classId === 'wanderer') taken *= 0.7;
           taken = Math.round(taken);
           target.hp = Math.max(0, target.hp - taken);
-          lines.push({ t: 'boss', text: `◂ ${e.name} → ${target.name} ${taken}${tank ? ' [도발]' : ''}` });
+          lines.push({ t: 'boss', text: `◂ ${e.name} → ${target.name} ${taken}${pierce ? ' [도발 무시!]' : tank && !pierce ? ' [도발]' : ''}` });
           if (target.hp <= 0) { target.alive = false; lines.push({ t: 'boss', text: `✖ ${target.name} 전투 불능` }); }
         }
       }
+
+      // 침묵의 저주 지속 차감
+      if ((e.healCutLeft || 0) > 0) e.healCutLeft -= 1;
 
       setParty(p); setEnemy(e); setRound(r);
       setLog(prev => [...prev, ...lines].slice(-100));

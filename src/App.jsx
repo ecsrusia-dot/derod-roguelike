@@ -108,10 +108,14 @@ import {
   VERSION_LABEL,
   DAILY_MISSIONS,
   ENDLESS_SKIP_LIMIT,
+  RAID_DISMANTLE_VALUES,
+  RAID_ENHANCE,
+  getKstWeekKey,
+  rollRaidDropHighTier,
 } from './data.js';
 import { getKstDateKey } from './utils/dailyChallenge.js';
 import { simulateBestEndlessRun } from './utils/endlessSkipSim.js';
-import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear } from './storage.js';
+import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear, dismantleRaidItem, dismantleRaidJunk, enhanceRaidItem, claimRaidWeekly } from './storage.js';
 
 
 
@@ -1724,11 +1728,46 @@ export default function App() {
     setMeta(prev => {
       let next = addRaidDrops(prev, drops);
       next = recordRaidClear(next, dungeon.id);
+      // 1.75.0~ 주간 첫 클리어 보상: 심연석 + (심연 레이드는 유니크 이상 확정 장비 1개)
+      const weekly = claimRaidWeekly(next, dungeon.id, getKstWeekKey(), dungeon.weeklyStones || 0);
+      next = weekly.meta;
+      if (weekly.granted && dungeon.kind === 'raid') {
+        next = addRaidDrops(next, [rollRaidDropHighTier(dungeon)]);
+      }
       saveMeta(next);
       return next;
     });
     setRaidDungeon(null);
     setScreen('raid');
+  };
+
+  // 1.75.0~ 분해 (개별 / 하위 일괄) + 강화
+  const handleRaidDismantle = (itemId, rarity) => {
+    setMeta(prev => {
+      const next = dismantleRaidItem(prev, itemId, RAID_DISMANTLE_VALUES[rarity] || 0);
+      saveMeta(next);
+      return next;
+    });
+  };
+
+  const handleRaidDismantleJunk = () => {
+    setMeta(prev => {
+      const { meta: next } = dismantleRaidJunk(prev, (item) => RAID_DISMANTLE_VALUES[item.rarity] || 0);
+      saveMeta(next);
+      return next;
+    });
+  };
+
+  const handleRaidEnhance = (classId, slot) => {
+    setMeta(prev => {
+      const item = prev?.raid?.equipped?.[classId]?.[slot];
+      if (!item) return prev;
+      const cost = RAID_ENHANCE.costFor(item.enh || 0);
+      const next = enhanceRaidItem(prev, classId, slot, cost, RAID_ENHANCE.max);
+      if (next === prev) return prev;
+      saveMeta(next);
+      return next;
+    });
   };
 
   // 중도 전멸·후퇴 — 클리어 기록 없이 돌파한 방의 전리품만 보존
@@ -1882,7 +1921,7 @@ export default function App() {
               onSelectGoogle={handleSelectGoogle} 
             />}
             {screen === 'title' && authMode && <TitleScreen meta={meta} onStart={() => setScreen('expeditionSelect')} onResume={resumeActiveRun} onAltar={enterAltar} onEngravings={() => setScreen('engraving')} onRaid={raidUnlocked ? () => setScreen('raid') : null} onAchievements={() => { setPrevAchievementsBack('title'); setScreen('achievements'); }} onChangelog={() => setShowChangelog({ firstSeen: false })} onAccount={() => setScreen('account')} />}
-            {screen === 'raid' && <RaidScreen meta={meta} onEnterDungeon={(d) => { setRaidDungeon(d); setScreen('raidBattle'); }} onEquipItem={handleRaidEquip} onAutoEquip={handleRaidAutoEquip} onBack={() => setScreen('title')} />}
+            {screen === 'raid' && <RaidScreen meta={meta} onEnterDungeon={(d) => { setRaidDungeon(d); setScreen('raidBattle'); }} onEquipItem={handleRaidEquip} onAutoEquip={handleRaidAutoEquip} onDismantle={handleRaidDismantle} onDismantleJunk={handleRaidDismantleJunk} onEnhance={handleRaidEnhance} onBack={() => setScreen('title')} />}
             {screen === 'raidBattle' && raidDungeon && <RaidBattleScreen key={raidDungeon.id + '-' + (meta?.raid?.clears?.[raidDungeon.id] || 0)} meta={meta} dungeon={raidDungeon} onVictory={handleRaidVictory} onDefeat={handleRaidPartial} onRetreat={handleRaidPartial} />}
             {screen === 'account' && <AccountScreen 
               authMode={authMode} 

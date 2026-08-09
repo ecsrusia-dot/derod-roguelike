@@ -64,6 +64,9 @@ const DEFAULT_META = {
     inventory: [],
     equipped: { wanderer: {}, sage: {}, demonblood: {}, elf: {}, priest: {} },
     clears: {},
+    // 1.75.0~ 심연석 (분해로 획득, 강화에 소모) + 주간 첫 클리어 기록
+    stones: 0,
+    weekly: null, // { week: 'YYYYMMDD'(월요일 키), claimed: [dungeonId] }
   },
   // 진행 중인 런 스냅샷 (맵 화면 진입 시 자동 저장 — 앱 종료/새로고침 후 이어하기 용)
   // null = 진행 중 런 없음. 객체 = 재개 가능한 런 상태.
@@ -561,7 +564,7 @@ export function useEndlessSkip(meta, dateKey, souls) {
 // ============================================
 // 1.74.0~ 레이드 장비/클리어 헬퍼
 // ============================================
-const EMPTY_RAID = { inventory: [], equipped: { wanderer: {}, sage: {}, demonblood: {}, elf: {}, priest: {} }, clears: {} };
+const EMPTY_RAID = { inventory: [], equipped: { wanderer: {}, sage: {}, demonblood: {}, elf: {}, priest: {} }, clears: {}, stones: 0, weekly: null };
 
 function getRaid(meta) {
   const raid = meta?.raid || EMPTY_RAID;
@@ -626,6 +629,88 @@ export function recordRaidClear(meta, dungeonId) {
   const clears = { ...(raid.clears || {}) };
   clears[dungeonId] = (clears[dungeonId] || 0) + 1;
   return { ...meta, raid: { ...raid, clears } };
+}
+
+// ============================================
+// 1.75.0~ 레이드 2차: 분해·강화·주간 보상
+// ============================================
+
+// 장비 1개 분해 → 심연석 (인벤토리 전용 — 장착 장비는 해제 후 분해)
+export function dismantleRaidItem(meta, itemId, stoneValue) {
+  const raid = getRaid(meta);
+  const item = raid.inventory.find(i => i.id === itemId);
+  if (!item) return meta;
+  return {
+    ...meta,
+    raid: {
+      ...raid,
+      inventory: raid.inventory.filter(i => i.id !== itemId),
+      stones: (raid.stones || 0) + (stoneValue || 0),
+    },
+  };
+}
+
+// 하위 장비 일괄 분해 — 같은 직업·슬롯의 장착 장비보다 power가 낮은 인벤토리 장비 전부.
+// valueOf(item) → 심연석 값. 반환: { meta, count, stones }
+export function dismantleRaidJunk(meta, valueOf) {
+  const raid = getRaid(meta);
+  let gained = 0;
+  const keep = [];
+  const junk = [];
+  raid.inventory.forEach(item => {
+    const equippedItem = raid.equipped?.[item.classId]?.[item.slot] || null;
+    if (equippedItem && (item.power || 0) < (equippedItem.power || 0)) junk.push(item);
+    else keep.push(item);
+  });
+  junk.forEach(item => { gained += valueOf(item) || 0; });
+  if (junk.length === 0) return { meta, count: 0, stones: 0 };
+  return {
+    meta: { ...meta, raid: { ...raid, inventory: keep, stones: (raid.stones || 0) + gained } },
+    count: junk.length,
+    stones: gained,
+  };
+}
+
+// 장착 장비 강화 +1 — 비용 심연석 (검증은 여기서, 비용·최대치는 호출부가 전달)
+export function enhanceRaidItem(meta, classId, slot, cost, maxLevel) {
+  const raid = getRaid(meta);
+  const item = raid.equipped?.[classId]?.[slot];
+  if (!item) return meta;
+  if ((item.enh || 0) >= maxLevel) return meta;
+  if ((raid.stones || 0) < cost) return meta;
+  const upgraded = { ...item, enh: (item.enh || 0) + 1 };
+  return {
+    ...meta,
+    raid: {
+      ...raid,
+      stones: (raid.stones || 0) - cost,
+      equipped: {
+        ...raid.equipped,
+        [classId]: { ...(raid.equipped?.[classId] || {}), [slot]: upgraded },
+      },
+    },
+  };
+}
+
+// 주간 첫 클리어 보상 — 이번 주 미수령 던전이면 심연석 지급 + 기록. 반환: { meta, granted }
+export function claimRaidWeekly(meta, dungeonId, weekKey, stones) {
+  const raid = getRaid(meta);
+  let weekly = raid.weekly;
+  if (!weekly || weekly.week !== weekKey) weekly = { week: weekKey, claimed: [] };
+  if ((weekly.claimed || []).includes(dungeonId)) {
+    return { meta: weekly === raid.weekly ? meta : { ...meta, raid: { ...raid, weekly } }, granted: false };
+  }
+  weekly = { ...weekly, claimed: [...(weekly.claimed || []), dungeonId] };
+  return {
+    meta: { ...meta, raid: { ...raid, weekly, stones: (raid.stones || 0) + (stones || 0) } },
+    granted: true,
+  };
+}
+
+// 이번 주 수령 여부 조회
+export function hasRaidWeeklyClaimed(meta, dungeonId, weekKey) {
+  const weekly = meta?.raid?.weekly;
+  return !!(weekly && weekly.week === weekKey && (weekly.claimed || []).includes(dungeonId));
 }
 
 // 1.72.0~ 일일 임무 진행 트래킹

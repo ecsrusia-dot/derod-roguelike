@@ -911,7 +911,11 @@ PM이 AskUserQuestion으로 확정한 설계. **던전앤파이터 모티브, "�
 
 **✅ MVP 1차 구현 완료 (1.74.0)**: `src/data/raid.js`(RAID_CLASSES·RAID_SKILLS·RAID_DUNGEONS 2종·rollRaidDrop) + `RaidScreen.jsx`(로비·장비 관리·일괄 장착) + `RaidBattleScreen.jsx`(라운드제 풀오토·배속·전멸기·격노) + `meta.raid`(inventory/equipped/clears + addRaidDrops·equipRaidItem·autoEquipRaidBest). 해금: `tutorial_curse_clear`. 타이틀 메뉴 진입.
 
-**2차 확장 후보 (PM 결정 대기)**: 던전 추가(3~5종 티어) / 세트 효과 / 장비 분해·강화 재화 / 레이드 주간 보상 / 보스 기믹 다양화(속성·쫄페이즈)
+**✅ 1.74.0 확장 (PR #133)**: 방 진행형(쫄→네임드→보스, 방 사이 HP 10%만 회복) + 지역 3개 × 7던전(몹 26종) + 등급 6단계(일반~에픽, 드랍율 단조 감소 — PM 룰) + 던전 티어 장비(gearMult ×1.0~×2.2 + 시리즈 접두어). 던파 구조 참고·이름 100% 오리지널 (IP 리스크 0, PM 결정).
+
+**✅ 2차 완료 (1.75.0)**: 장비 분해→💠심연석→강화 +1~+10(단계당 +8%, `RAID_ENHANCE`) / 세트 효과(시리즈 3부위, `RAID_SET_BONUSES`) / 주간 첫 클리어 보상(`getKstWeekKey` 월요일 리셋, 심연 레이드는 유니크↑ 확정 추가) / 보스 기믹 3종(쫄 소환 summonEvery·힐컷 healCutEvery·도발 무시 pierceTankChance).
+
+**3차 확장 후보 (PM 결정 대기)**: 신규 지역(4번째) / 에픽 전용 옵션(고유 효과) / 레이드 일러스트 / 파티 편성 커스텀(직업 교체)
 
 ### 완성 항목 (1.62.x 기준 — outdated 정보 재발 방지)
 - **5직업 풀스택** — 각인 풀 5×24 = 120장 + 5직업 전용 패시브 + 5직업 소울 스킬 모두 완성
