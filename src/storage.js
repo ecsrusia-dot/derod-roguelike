@@ -69,6 +69,8 @@ const DEFAULT_META = {
     weekly: null, // { week: 'YYYYMMDD'(월요일 키), claimed: [dungeonId] }
     // 1.76.0~ 군주의 정수 — 상위 막보 전용 희귀 재료 (에픽·레전더리 제작)
     essence: 0,
+    // 1.77.0~ 기연 비전 스킬 — 각성한 직업 ID 목록 (계정 영구)
+    secretSkills: [],
   },
   // 진행 중인 런 스냅샷 (맵 화면 진입 시 자동 저장 — 앱 종료/새로고침 후 이어하기 용)
   // null = 진행 중 런 없음. 객체 = 재개 가능한 런 상태.
@@ -566,7 +568,7 @@ export function useEndlessSkip(meta, dateKey, souls) {
 // ============================================
 // 1.74.0~ 레이드 장비/클리어 헬퍼
 // ============================================
-const EMPTY_RAID = { inventory: [], equipped: { wanderer: {}, sage: {}, demonblood: {}, elf: {}, priest: {} }, clears: {}, stones: 0, weekly: null, essence: 0 };
+const EMPTY_RAID = { inventory: [], equipped: { wanderer: {}, sage: {}, demonblood: {}, elf: {}, priest: {} }, clears: {}, stones: 0, weekly: null, essence: 0, secretSkills: [] };
 
 function getRaid(meta) {
   const raid = meta?.raid || EMPTY_RAID;
@@ -692,6 +694,15 @@ export function enhanceRaidItem(meta, classId, slot, cost, maxLevel) {
       },
     },
   };
+}
+
+// 1.77.0~ 기연 비전 스킬 각성 (계정 영구, 중복 없음)
+export function learnRaidSecretSkill(meta, classId) {
+  if (!classId) return meta;
+  const raid = getRaid(meta);
+  const learned = raid.secretSkills || [];
+  if (learned.includes(classId)) return meta;
+  return { ...meta, raid: { ...raid, secretSkills: [...learned, classId] } };
 }
 
 // 1.76.0~ 레이드 자원 획득 (전투 전리품 — 심연석·정수)

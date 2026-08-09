@@ -16,7 +16,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { PALETTE } from '../utils/helpers.js';
-import { RAID_CLASSES, RAID_RARITIES, RAID_TUNING, RAID_STONE, RAID_ESSENCE, getRaidMemberStats, rollRaidDrop, CLASSES } from '../data.js';
+import { RAID_CLASSES, RAID_RARITIES, RAID_TUNING, RAID_STONE, RAID_ESSENCE, RAID_SECRET_SKILLS, RAID_SECRET_CHANCE, getRaidMemberStats, rollRaidDrop, CLASSES } from '../data.js';
 import { FloatingLabel, DamageVignette } from './CombatEffects.jsx';
 
 const ROLE_COLORS = { tank: '#7ba3c4', dealer: '#c4453d', healer: '#9ad4a3' };
@@ -27,10 +27,17 @@ function buildParty(raidMeta) {
   return Object.keys(RAID_CLASSES).map(classId => {
     const stats = getRaidMemberStats(classId, raidMeta?.equipped?.[classId]);
     const cls = CLASSES.find(c => c.id === classId);
+    // 1.77.0~ 에픽 고유 옵션 — 해당 직업 에픽 장비 1개 이상 장착 시 발동
+    const equipped = raidMeta?.equipped?.[classId] || {};
+    const epic = Object.values(equipped).some(it => it && it.rarity === 'EP');
+    // 1.77.0~ 기연 비전 스킬 보유 여부 (계정 영구)
+    const secret = (raidMeta?.secretSkills || []).includes(classId);
     return {
       classId, name: cls?.name || classId, role: stats.role, image: cls?.image || null,
       hp: stats.hp, maxHp: stats.hp, atk: stats.atk, heal: stats.heal || 0,
-      alive: true,
+      alive: true, epic, secret,
+      // 기여도 추적 (종료 팝업용)
+      dealt: 0, healed: 0, taken: 0,
     };
   });
 }
@@ -85,11 +92,12 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
   const [roomIdx, setRoomIdx] = useState(0);
   const [enemy, setEnemy] = useState(() => buildRoomEnemy(rooms[0]));
   const [round, setRound] = useState(0); // 방마다 리셋 (패턴 주기 기준)
-  const [loot, setLoot] = useState({ items: [], stones: 0, essence: 0 });
+  const [loot, setLoot] = useState({ items: [], stones: 0, essence: 0, secret: null });
   const [log, setLog] = useState([{ t: 'sys', text: `━━ ${dungeon.name} 입장 — 방 1/${rooms.length} · ${rooms[0].name} ━━` }]);
   const [logExpanded, setLogExpanded] = useState(false);
   const [phase, setPhase] = useState('running'); // running | victory | defeat
-  const [speed, setSpeed] = useState(1);
+  // 1.77.0~ PM 결정: 기본 전투 속도 ×2 (토글: ×2 → ×4 → ×1)
+  const [speed, setSpeed] = useState(2);
   // === 1.76.1 비주얼 스테이지 상태 ===
   const [fxLabels, setFxLabels] = useState([]);       // 적 위 부유 데미지 [{id, kind, value}]
   const [partyFxLabels, setPartyFxLabels] = useState([]); // 파티 위 회복/피해
@@ -100,6 +108,10 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
   const fxIdRef = useRef(0);
   const timersRef = useRef([]);
   const logEndRef = useRef(null);
+  // 1.77.0~ 사제 [소생] — 던전당 1회 (비전 '기적의 손길' 보유 시 2회)
+  const reviveCountRef = useRef(0);
+  // 1.77.0~ 방랑검사 비전 [불괴의 몸] — 던전당 1회 치명상 무시
+  const guardRef = useRef(false);
 
   useEffect(() => {
     if (logExpanded) logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -142,17 +154,43 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
       let healEvent = null;
       let partyHit = false;
 
+      // 피해 적용 공용 — 기여도(taken) 추적 + 방랑검사 비전 [불괴의 몸] 처리
+      const applyHit = (m, amount) => {
+        m.taken += amount;
+        m.hp = Math.max(0, m.hp - amount);
+        if (m.hp <= 0) {
+          if (m.classId === 'wanderer' && m.secret && !guardRef.current) {
+            guardRef.current = true;
+            m.hp = 1;
+            lines.push({ t: 'heal', text: `🛡 방랑검사 — 비전 [불괴의 몸]! 치명상을 버텨냄 (HP 1)` });
+          } else {
+            m.alive = false;
+            lines.push({ t: 'boss', text: `✖ ${m.name} 전투 불능` });
+          }
+        }
+      };
+
       setRoundBanner(v => v + 1);
 
       const wipeRound = !!(e.wipeEvery && r % e.wipeEvery === 0);
       let shield = false;
 
-      // 1. 사제 — 침묵의 저주(healCut) 중엔 치유 -50%
+      // 1. 사제 — 소생(던전당 1회) > 방벽 > 치유. 침묵의 저주 중엔 치유 -50%
       const priest = p.find(m => m.classId === 'priest');
       if (priest?.alive) {
+        const dead = p.find(m => !m.alive);
         if (wipeRound) {
           shield = true;
           lines.push({ t: 'heal', text: `✚ 사제 — 여명의 방벽! 전멸기 피해 -70%` });
+        } else if (dead && reviveCountRef.current < (priest.secret ? 2 : 1)) {
+          // 1.77.0 [소생] — 전투불능 아군 부활 (에픽 '여명의 인도': 40%→70% / 비전 '기적의 손길': 2회)
+          reviveCountRef.current += 1;
+          const revivePct = priest.epic ? 0.7 : 0.4;
+          dead.alive = true;
+          dead.hp = Math.round(dead.maxHp * revivePct);
+          priest.healed += dead.hp;
+          healEvent = dead.hp;
+          lines.push({ t: 'heal', text: `✚ 사제 — [소생]! ${dead.name} 부활 (HP ${Math.round(revivePct * 100)}%)${priest.epic ? ' [여명의 인도]' : ''}` });
         } else {
           const hurt = alive().reduce((a, m) => (m.hp / m.maxHp < a.hp / a.maxHp ? m : a));
           if (hurt && hurt.hp < hurt.maxHp) {
@@ -160,10 +198,24 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
             const healAmount = healCut ? Math.floor(priest.heal * 0.5) : priest.heal;
             const healed = Math.min(hurt.maxHp - hurt.hp, healAmount);
             hurt.hp += healed;
+            priest.healed += healed;
             healEvent = healed;
             lines.push({ t: 'heal', text: `✚ 사제 → ${hurt.name} +${healed}${healCut ? ' [침묵의 저주 -50%]' : ''}` });
           }
         }
+      }
+
+      // 1.5. 술법사 [잔염] 화상 도트 — 메테오 이후 2(에픽 3)라운드
+      if ((e.burnLeft || 0) > 0 && e.hp > 0) {
+        const burnDmg = e.burnDmg || 0;
+        if (burnDmg > 0) {
+          e.hp = Math.max(0, e.hp - burnDmg);
+          const sage = p.find(m => m.classId === 'sage');
+          if (sage) sage.dealt += burnDmg;
+          atkEvents.push({ dmg: burnDmg, crit: false });
+          lines.push({ t: 'atk', text: `🔥 잔염 ${burnDmg}` });
+        }
+        e.burnLeft -= 1;
       }
 
       // 2~3. 파티 공격
@@ -174,16 +226,48 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
         let crit = false;
         if (m.classId === 'demonblood') {
           const lost = m.maxHp - m.hp;
-          dmg += lost * 0.4;
+          // 비전 [혈신 강림]: 혈폭 배율 40% → 55%
+          dmg += lost * (m.secret ? 0.55 : 0.4);
           if (lost > 0) label = ' [혈폭]';
+          // 1.77.0 [광란] — HP 40% 이하 시 공격 +30%
+          if (m.hp / m.maxHp <= 0.4) { dmg *= 1.3; label += ' [광란]'; }
         }
-        if (m.classId === 'sage' && r % 3 === 0) { dmg *= 1.5; label = ' [메테오]'; crit = true; }
-        if (m.classId === 'elf' && Math.random() < 0.25) { dmg *= 1.5; label = ' [치명]'; crit = true; }
+        const isMeteor = m.classId === 'sage' && r % 3 === 0;
+        if (isMeteor) { dmg *= 1.5; label = ' [메테오]'; crit = true; }
+        // 1.77.0 [과부하] — 격노한 적에게 +15%
+        if (m.classId === 'sage' && e.enraged) { dmg *= 1.15; label += ' [과부하]'; }
+        // 비전 [심안]: 치명타 확률 25% → 35%
+        if (m.classId === 'elf' && Math.random() < (m.secret ? 0.35 : 0.25)) { dmg *= 1.5; label = ' [치명]'; crit = true; }
         dmg = Math.round(dmg);
         totalDmg += dmg;
+        m.dealt += dmg;
         e.hp = Math.max(0, e.hp - dmg);
         atkEvents.push({ dmg, crit });
         lines.push({ t: m.role === 'healer' ? 'sys' : 'atk', text: `▸ ${m.name} ${dmg}${label}` });
+        // 1.77.0 [흡혈] — 혈폭 발동 중 가한 피해의 20% (에픽 '갈증의 낙인': 35%) 자가 회복
+        if (m.classId === 'demonblood' && m.hp < m.maxHp) {
+          const lifesteal = Math.round(dmg * (m.epic ? 0.35 : 0.2));
+          if (lifesteal > 0) {
+            m.hp = Math.min(m.maxHp, m.hp + lifesteal);
+            lines.push({ t: 'heal', text: `· 흡혈 +${lifesteal}` });
+          }
+        }
+        // 1.77.0 [잔염] 부여 — 메테오 명중 시 (에픽 '꺼지지 않는 불': 지속 3라운드)
+        if (isMeteor && e.hp > 0) {
+          e.burnLeft = m.epic ? 3 : 2;
+          // 비전 [겁화]: 화상 데미지 30% → 50%
+          e.burnDmg = Math.round(m.atk * (m.secret ? 0.5 : 0.3));
+          lines.push({ t: 'atk', text: `· 잔염 부여 — ${e.burnLeft}라운드간 ${e.burnDmg}/라운드` });
+        }
+        // 1.77.0 [관통 화살] — 치명타 시 40%(에픽 '폭풍의 눈' 60%) 추가 사격 (50%)
+        if (m.classId === 'elf' && crit && e.hp > 0 && Math.random() < (m.epic ? 0.6 : 0.4)) {
+          const extra = Math.round(m.atk * 0.5);
+          totalDmg += extra;
+          m.dealt += extra;
+          e.hp = Math.max(0, e.hp - extra);
+          atkEvents.push({ dmg: extra, crit: false });
+          lines.push({ t: 'atk', text: `· 관통 화살 ${extra}` });
+        }
       });
       lines.push({ t: 'sys', text: `· 파티 합계 ${totalDmg} — ${e.name} HP ${e.hp}/${e.maxHp}` });
 
@@ -205,10 +289,23 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
         const roomItems = isLastRoom ? Array.from({ length: e.drops || 0 }, () => rollRaidDrop(dungeon)) : [];
         const roomStones = e.stones || 0;
         const roomEssence = isLastRoom ? (dungeon.essenceDrop || 0) : 0;
+        // 1.77.0 기연(奇緣) — 방 클리어 시 극악 확률로 미보유 직업 1명이 비전 각성 (계정 영구)
+        let secretLearn = loot.secret || null;
+        if (!secretLearn) {
+          const candidates = p.filter(m => !m.secret);
+          if (candidates.length > 0 && Math.random() < RAID_SECRET_CHANCE) {
+            const lucky = candidates[Math.floor(Math.random() * candidates.length)];
+            lucky.secret = true;
+            secretLearn = lucky.classId;
+            const sk = RAID_SECRET_SKILLS[lucky.classId];
+            lines.push({ t: 'win', text: `✦✦ 기연(奇緣)! ${lucky.name}이(가) 비전 [${sk.name}]을 깨달았다! ✦✦` });
+          }
+        }
         const newLoot = {
           items: [...loot.items, ...roomItems],
           stones: loot.stones + roomStones,
           essence: loot.essence + roomEssence,
+          secret: secretLearn,
         };
         roomItems.forEach(item => {
           const rar = RAID_RARITIES[item.rarity];
@@ -243,10 +340,9 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
           const targets = alive();
           if (targets.length === 0) break;
           const victim = targets[Math.floor(Math.random() * targets.length)];
-          victim.hp = Math.max(0, victim.hp - addDmg);
           partyHit = true;
           lines.push({ t: 'boss', text: `◂ 소환수 → ${victim.name} ${addDmg}` });
-          if (victim.hp <= 0) { victim.alive = false; lines.push({ t: 'boss', text: `✖ ${victim.name} 전투 불능` }); }
+          applyHit(victim, addDmg);
         }
         lines.push({ t: 'sys', text: `· 소환수 소멸` });
         e.pendingAdds = 0;
@@ -259,20 +355,36 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
         lines.push({ t: 'boss', text: `☍ ${e.name} — 소환수 2기 소환! (다음 라운드 일제 공격)` });
       }
       if (e.healCutEvery && r % e.healCutEvery === 0) {
-        e.healCutLeft = 3; // 이번 라운드 말 차감 포함 실효 2라운드
-        lines.push({ t: 'boss', text: `⌀ ${e.name} — 침묵의 저주! 2라운드간 치유 -50%` });
+        // 1.77.0 [정화] — 사제 생존 시 지속 1라운드 단축 (실효 2 → 1라운드)
+        const cleanse = !!priest?.alive;
+        e.healCutLeft = cleanse ? 2 : 3; // 이번 라운드 말 차감 포함
+        lines.push({ t: 'boss', text: `⌀ ${e.name} — 침묵의 저주! ${cleanse ? '1' : '2'}라운드간 치유 -50%${cleanse ? ' (사제 [정화]로 단축)' : ''}` });
       }
+      // 1.77.0 [철벽 방세] — 4라운드마다 탱커 받는 피해 -60% (도발 -30%와 중첩)
+      const tankAlive = p.find(m => m.classId === 'wanderer' && m.alive);
+      const ironWall = !!(tankAlive && r % 4 === 0);
+      if (ironWall) lines.push({ t: 'heal', text: `🛡 방랑검사 — [철벽 방세] 이번 라운드 받는 피해 -60%` });
+      const takenMultOf = (m) => {
+        let mult = 1;
+        if (m.classId === 'wanderer') {
+          mult *= 0.7;
+          if (ironWall) mult *= 0.4;
+        }
+        return mult;
+      };
       if (wipeRound) {
         const mult = shield ? 0.3 : 1;
         lines.push({ t: 'boss', text: `☠ ${e.name} — 전멸기 발동!${shield ? ' (방벽으로 감쇄)' : ''}` });
         let totalTaken = 0;
         alive().forEach(m => {
-          let taken = enemyAtk * 2 * mult;
-          if (m.classId === 'wanderer') taken *= 0.7;
-          taken = Math.round(taken);
+          // 1.77.0 [바람의 가호] — 정령사 광역·전멸기 20% 완전 회피
+          if (m.classId === 'elf' && Math.random() < 0.2) {
+            lines.push({ t: 'heal', text: `· 정령사 — [바람의 가호] 회피!` });
+            return;
+          }
+          const taken = Math.round(enemyAtk * 2 * mult * takenMultOf(m));
           totalTaken += taken;
-          m.hp = Math.max(0, m.hp - taken);
-          if (m.hp <= 0) { m.alive = false; lines.push({ t: 'boss', text: `✖ ${m.name} 전투 불능` }); }
+          applyHit(m, taken);
         });
         partyHit = true;
         pushPartyLabel('damage', totalTaken, 350 / speed);
@@ -280,31 +392,37 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
         lines.push({ t: 'boss', text: `◂ ${e.name} — 광역 공격` });
         let totalTaken = 0;
         alive().forEach(m => {
-          let taken = enemyAtk * 0.7;
-          if (m.classId === 'wanderer') taken *= 0.7;
-          taken = Math.round(taken);
+          if (m.classId === 'elf' && Math.random() < 0.2) {
+            lines.push({ t: 'heal', text: `· 정령사 — [바람의 가호] 회피!` });
+            return;
+          }
+          const taken = Math.round(enemyAtk * 0.7 * takenMultOf(m));
           totalTaken += taken;
-          m.hp = Math.max(0, m.hp - taken);
-          if (m.hp <= 0) { m.alive = false; lines.push({ t: 'boss', text: `✖ ${m.name} 전투 불능` }); }
+          applyHit(m, taken);
         });
         partyHit = true;
         pushPartyLabel('damage', totalTaken, 350 / speed);
       } else {
-        const tank = p.find(m => m.classId === 'wanderer' && m.alive);
+        const tank = tankAlive;
         const nonTanks = alive().filter(m => m.classId !== 'wanderer');
         const pierce = !!(e.pierceTankChance && tank && nonTanks.length > 0 && Math.random() < e.pierceTankChance);
         const target = pierce
           ? nonTanks[Math.floor(Math.random() * nonTanks.length)]
           : (tank || alive()[Math.floor(Math.random() * alive().length)]);
         if (target) {
-          let taken = enemyAtk;
-          if (target.classId === 'wanderer') taken *= 0.7;
-          taken = Math.round(taken);
-          target.hp = Math.max(0, target.hp - taken);
+          const taken = Math.round(enemyAtk * takenMultOf(target));
           partyHit = true;
           pushPartyLabel('damage', taken, 350 / speed);
           lines.push({ t: 'boss', text: `◂ ${e.name} → ${target.name} ${taken}${pierce ? ' [도발 무시!]' : tank && !pierce ? ' [도발]' : ''}` });
-          if (target.hp <= 0) { target.alive = false; lines.push({ t: 'boss', text: `✖ ${target.name} 전투 불능` }); }
+          applyHit(target, taken);
+          // 1.77.0 [응수] — 도발 피격 시 35%(에픽 '수호자의 맹세' 50%) 반격 (공격력 80%)
+          if (target.classId === 'wanderer' && target.alive && !pierce && Math.random() < (target.epic ? 0.5 : 0.35)) {
+            const counter = Math.round(target.atk * 0.8);
+            e.hp = Math.max(1, e.hp - counter); // 마무리는 파티의 손으로 (최소 1 보장)
+            target.dealt += counter;
+            atkEvents.push({ dmg: counter, crit: false });
+            lines.push({ t: 'atk', text: `⚔ 방랑검사 — [응수] 반격 ${counter}` });
+          }
         }
       }
 
@@ -332,9 +450,59 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
   const wipeIn = enemy.wipeEvery ? enemy.wipeEvery - (round % enemy.wipeEvery) : null;
   const wipeImminent = wipeIn !== null && wipeIn <= 1 && phase === 'running';
 
+  // 1.77.0~ 기여도 팝업 — 딜량 순위 바 + 역할별 보조 지표 (탱커 탱킹량 / 힐러 회복량)
+  const renderContribution = () => {
+    const maxDealt = Math.max(1, ...party.map(m => m.dealt || 0));
+    const sorted = [...party].sort((a, b) => (b.dealt || 0) - (a.dealt || 0));
+    const topId = sorted[0]?.classId;
+    return (
+      <div className="mb-2.5">
+        <div className="text-center tracking-[0.25em] font-bold mb-1.5" style={{ fontSize: 10.5, color: PALETTE.dawn }}>━ 기여도 ━</div>
+        <div className="flex flex-col gap-1">
+          {sorted.map(m => {
+            const roleColor = ROLE_COLORS[m.role];
+            const sub = m.role === 'tank' ? `탱킹 ${m.taken}` : m.role === 'healer' ? `회복 ${m.healed}` : null;
+            return (
+              <div key={m.classId} className="flex items-center gap-2">
+                <span className="flex-none truncate" style={{ width: 74, fontSize: 10, color: roleColor }}>
+                  {m.classId === topId ? '👑 ' : ''}{m.name}
+                </span>
+                <div className="flex-1 relative" style={{ height: 10, borderRadius: 999, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%', width: `${Math.max(3, ((m.dealt || 0) / maxDealt) * 100)}%`, borderRadius: 999,
+                    background: `linear-gradient(90deg, ${roleColor}88, ${roleColor})`,
+                  }} />
+                </div>
+                <span className="flex-none tabular-nums text-right" style={{ width: 86, fontSize: 9.5, color: PALETTE.textDim }}>
+                  딜 {m.dealt || 0}{sub ? ` · ${sub}` : ''}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   const renderLoot = () => (
-    lootCount > 0 && (
+    (lootCount > 0 || loot.secret) && (
       <div className="flex flex-col gap-1.5 mb-2.5">
+        {/* 기연 비전 각성 배너 */}
+        {loot.secret && RAID_SECRET_SKILLS[loot.secret] && (
+          <div className="text-center px-3 py-2.5" style={{
+            borderRadius: 12, background: 'rgba(232,176,74,0.14)', border: `1.5px solid ${PALETTE.legendary}`,
+            boxShadow: '0 0 18px rgba(232,176,74,0.5)',
+          }}>
+            <div className="tracking-[0.3em] font-bold" style={{ fontSize: 10, color: PALETTE.legendary }}>✦ 기연(奇緣) ✦</div>
+            <div className="mt-1" style={{ fontSize: 11.5, color: PALETTE.text }}>
+              <span style={{ fontWeight: 700, color: PALETTE.legendary }}>
+                {CLASSES.find(c => c.id === loot.secret)?.name}
+              </span>
+              {' — 비전 ['}{RAID_SECRET_SKILLS[loot.secret].name}{'] 각성! (영구)'}
+            </div>
+            <div style={{ fontSize: 9.5, color: PALETTE.textDim, marginTop: 2 }}>{RAID_SECRET_SKILLS[loot.secret].desc}</div>
+          </div>
+        )}
         {(loot.stones > 0 || loot.essence > 0) && (
           <div className="flex items-center gap-2 px-3 py-2" style={{
             borderRadius: 10, background: 'rgba(123,163,196,0.12)', border: `1px solid ${PALETTE.ice}66`,
@@ -479,10 +647,10 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
       <div className="p-3 flex-none" style={{ borderTop: '1px solid var(--ui-line)', background: PALETTE.bgDeep }}>
         {phase === 'running' && (
           <div className="flex gap-2">
-            <button onClick={() => setSpeed(s => (s === 1 ? 2 : 1))} className="ui-press flex-1" style={{
+            <button onClick={() => setSpeed(s => (s === 2 ? 4 : s === 4 ? 1 : 2))} className="ui-press flex-1" style={{
               height: 42, borderRadius: 'var(--r-btn)', fontSize: 11.5, fontWeight: 700,
               background: 'rgba(232,176,74,0.1)', border: '1px solid rgba(232,176,74,0.4)', color: PALETTE.legendary,
-            }}>배속 ×{speed} {speed === 1 ? '→ ×2' : '→ ×1'}</button>
+            }}>배속 ×{speed} {speed === 2 ? '→ ×4' : speed === 4 ? '→ ×1' : '→ ×2'}</button>
             <button onClick={() => onRetreat(loot)} className="ui-press flex-1" style={{
               height: 42, borderRadius: 'var(--r-btn)', fontSize: 11.5,
               background: 'rgba(255,255,255,0.04)', border: '1px solid var(--ui-line)', color: PALETTE.textDim,
@@ -493,7 +661,8 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
           <div>
             <div className="text-center tracking-[0.3em] font-bold mb-2" style={{
               fontSize: 12, color: PALETTE.legendary, textShadow: '0 0 16px rgba(232,176,74,0.8)',
-            }}>━ 던전 클리어 — 전리품 ━</div>
+            }}>━ 던전 클리어 ━</div>
+            {renderContribution()}
             {renderLoot()}
             <button onClick={() => onVictory(dungeon, loot)} className="ui-press ui-sheen w-full" style={{
               height: 44, borderRadius: 'var(--r-btn)', fontSize: 12, fontWeight: 700, letterSpacing: '0.25em',
@@ -510,6 +679,7 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
                 전멸 — 하지만 돌파한 방의 전리품은 보존됩니다
               </div>
             )}
+            {renderContribution()}
             {renderLoot()}
             <button onClick={() => onDefeat(loot)} className="ui-press w-full" style={{
               height: 44, borderRadius: 'var(--r-btn)', fontSize: 12, letterSpacing: '0.25em',
