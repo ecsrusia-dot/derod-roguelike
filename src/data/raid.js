@@ -31,11 +31,15 @@ export const RAID_SKILLS = {
 export const RAID_SLOTS = ['weapon', 'armor', 'accessory'];
 export const RAID_SLOT_NAMES = { weapon: '무기', armor: '방어구', accessory: '장신구' };
 
+// 등급 6단계 — 던파 사다리(커먼→언커먼→레어→유니크→레전더리→에픽) 구조 참고, 명칭 오리지널
+// PM 룰: 높은 등급일수록 드랍율은 반드시 낮게 (던전별 rarityWeights가 전부 단조 감소)
 export const RAID_RARITIES = {
-  C: { name: '일반', color: '#9b8975', mult: 1.0 },
-  R: { name: '희귀', color: '#7ba3c4', mult: 1.6 },
-  E: { name: '영웅', color: '#8a76c9', mult: 2.6 },
-  L: { name: '전설', color: '#e8b04a', mult: 4.0 },
+  C:  { name: '일반',     color: '#9b8975', mult: 1.0 },
+  UC: { name: '고급',     color: '#7a9a5e', mult: 1.35 },
+  R:  { name: '희귀',     color: '#7ba3c4', mult: 1.8 },
+  U:  { name: '유니크',   color: '#c46ba3', mult: 2.5 },
+  L:  { name: '레전더리', color: '#e8873a', mult: 3.5 },
+  EP: { name: '에픽',     color: '#e8b04a', mult: 5.0 },
 };
 
 // 슬롯별 기본 스탯 (등급 배율 곱 + ±20% 랜덤 롤)
@@ -54,36 +58,124 @@ export const RAID_GEAR_NAMES = {
   priest:     { weapon: '여명의 성장(聖杖)', armor: '축복의 법의',  accessory: '새벽의 성표' },
 };
 
-// =========== 던전 (던파 루프: 파밍 → 레이드) ===========
-// 방 진행형 (PM 확정) — rooms 배열을 순서대로 돌파. 파티 HP는 방 사이에 10%만 회복 (소모전).
+// =========== 던전 (던파 루프: 지역 → 던전 → 방 진행) ===========
+// 던파 구조 참고 (지역-던전 편성 / 일반몹→네임드→보스 / 상위 던전일수록 상위 등급 드랍 ↑),
+// 이름·세계관은 던앤트와일라잇 오리지널 (PM 결정 — IP 리스크 0).
+//
+// 방 진행형 — rooms 배열을 순서대로 돌파. 파티 HP는 방 사이에 10%만 회복 (소모전).
 // room.kind: 'mobs'(쫄) / 'named'(네임드) / 'boss'(보스)
-// room.drops: 이 방 클리어 시 즉시 획득하는 장비 수 — 중도 전멸·후퇴해도 이미 얻은 전리품은 보존
+// room.drops: 이 방 클리어 시 즉시 획득 — 중도 전멸·후퇴해도 이미 얻은 전리품은 보존
+//
+// gearMult: 이 던전에서 드랍되는 장비의 성능 배율 (상위 던전 장비가 더 강함 — 던파 티어 구조)
+// gearPrefix: 장비 이름 접두어 (던전 시리즈 장비)
+// rarityWeights: 등급별 드랍 가중치 — 반드시 단조 감소 (높은 등급 = 낮은 확률, PM 룰)
+export const RAID_REGIONS = [
+  { id: 'ash',    name: '잿빛 변경',   desc: '입문 파밍 지역 — 맨몸 파티도 돌파 가능' },
+  { id: 'sanct',  name: '침묵의 성역', desc: '중급 지역 — 잿빛 장비 없이는 버티기 어렵다' },
+  { id: 'abyss',  name: '심연',        desc: '레이드 — 최상위 장비의 무대' },
+];
+
 export const RAID_DUNGEONS = [
+  // ===== 지역 1: 잿빛 변경 (입문 파밍) =====
   {
-    id: 'raid_corridor', kind: 'farm',
-    name: '무너진 회랑', sub: 'FARMING DUNGEON',
-    desc: '방 4개를 돌파하는 파밍 던전. 네임드와 문지기가 장비를 떨군다.',
-    rarityWeights: { C: 55, R: 32, E: 11, L: 2 },
-    recommendedPower: 4800,
-    color: '#7ba3c4',
+    id: 'raid_corridor', region: 'ash', kind: 'farm',
+    name: '무너진 회랑', sub: 'FARM · T1',
+    desc: '방 4개를 돌파하는 입문 던전. 네임드와 문지기가 잿빛 장비를 떨군다.',
+    rarityWeights: { C: 45, UC: 28, R: 16, U: 8, L: 2.5, EP: 0.5 },
+    recommendedPower: 4800, gearMult: 1.0, gearPrefix: '잿빛',
+    color: '#9b8975',
     rooms: [
-      { kind: 'mobs',  name: '무너진 경비대',   hp: 900,   atk: 70,  drops: 0 },
-      { kind: 'mobs',  name: '회랑의 그림자들', hp: 1100,  atk: 85,  drops: 0 },
-      { kind: 'named', name: '이름 잃은 기사',  hp: 1800,  atk: 110, aoeEvery: 5, drops: 1 },
-      { kind: 'boss',  name: '회랑의 문지기',   hp: 3200,  atk: 130, aoeEvery: 4, enrageAt: 0.5, drops: 2 },
+      { kind: 'mobs',  name: '무너진 경비대',   hp: 900,  atk: 70,  drops: 0 },
+      { kind: 'mobs',  name: '회랑의 그림자들', hp: 1100, atk: 85,  drops: 0 },
+      { kind: 'named', name: '이름 잃은 기사',  hp: 1800, atk: 110, aoeEvery: 5, drops: 1 },
+      { kind: 'boss',  name: '회랑의 문지기',   hp: 3200, atk: 130, aoeEvery: 4, enrageAt: 0.5, drops: 2 },
     ],
   },
   {
-    id: 'raid_abyss', kind: 'raid',
-    name: '심연의 제단', sub: 'RAID — 3관문',
-    desc: '관문 3개의 레이드. 최종 관문의 군주는 8라운드마다 전멸기 — 사제의 방벽 없이는 파티가 무너진다. 회랑에서 장비를 갖추고 도전하라.',
-    rarityWeights: { C: 15, R: 45, E: 30, L: 10 },
-    recommendedPower: 6300,
+    id: 'raid_mine', region: 'ash', kind: 'farm',
+    name: '서리 잠식 갱도', sub: 'FARM · T2',
+    desc: '한기가 스민 폐광. 갱도 깊은 곳의 파괴자가 서리철 장비를 지킨다.',
+    rarityWeights: { C: 38, UC: 28, R: 19, U: 10, L: 4, EP: 1 },
+    recommendedPower: 5400, gearMult: 1.15, gearPrefix: '서리철',
+    color: '#9bc4e0',
+    rooms: [
+      { kind: 'mobs',  name: '갱도 냉기벌레 떼', hp: 1200, atk: 95,  drops: 0 },
+      { kind: 'mobs',  name: '얼어붙은 광부들',  hp: 1400, atk: 105, drops: 0 },
+      { kind: 'named', name: '서리핏줄 우두머리', hp: 2300, atk: 125, aoeEvery: 5, drops: 1 },
+      { kind: 'boss',  name: '갱도의 파괴자',    hp: 4000, atk: 145, aoeEvery: 4, enrageAt: 0.5, drops: 2 },
+    ],
+  },
+  {
+    id: 'raid_sewer', region: 'ash', kind: 'farm',
+    name: '부패한 지하수로', sub: 'FARM · T3',
+    desc: '오물이 흐르는 수로. 침식된 장비는 더럽지만 강하다.',
+    rarityWeights: { C: 38, UC: 28, R: 19, U: 10, L: 4, EP: 1 },
+    recommendedPower: 6000, gearMult: 1.3, gearPrefix: '침식된',
+    color: '#7a9a5e',
+    rooms: [
+      { kind: 'mobs',  name: '수로 쥐떼',      hp: 1500, atk: 115, drops: 0 },
+      { kind: 'mobs',  name: '부패 점액괴',    hp: 1800, atk: 125, drops: 0 },
+      { kind: 'named', name: '수로의 감시자',  hp: 2900, atk: 150, aoeEvery: 5, drops: 1 },
+      { kind: 'boss',  name: '오물의 군주',    hp: 5000, atk: 170, aoeEvery: 4, enrageAt: 0.5, drops: 2 },
+    ],
+  },
+
+  // ===== 지역 2: 침묵의 성역 (중급) =====
+  {
+    id: 'raid_abbey', region: 'sanct', kind: 'farm',
+    name: '봉인된 수도원', sub: 'DUNGEON · T4',
+    desc: '기도가 저주로 변한 수도원. 봉인된 장비 시리즈가 잠들어 있다.',
+    rarityWeights: { C: 30, UC: 26, R: 21, U: 14, L: 7, EP: 2 },
+    recommendedPower: 6800, gearMult: 1.5, gearPrefix: '봉인된',
+    color: '#8a76c9',
+    rooms: [
+      { kind: 'mobs',  name: '타락 수도승들',  hp: 2000, atk: 140, drops: 0 },
+      { kind: 'mobs',  name: '참회의 망령들',  hp: 2400, atk: 150, drops: 0 },
+      { kind: 'named', name: '고행자 무언(無言)', hp: 3800, atk: 180, aoeEvery: 4, drops: 1 },
+      { kind: 'boss',  name: '수도원장 침묵',  hp: 6500, atk: 205, aoeEvery: 4, enrageAt: 0.5, drops: 2 },
+    ],
+  },
+  {
+    id: 'raid_arena', region: 'sanct', kind: 'farm',
+    name: '핏빛 투기장', sub: 'DUNGEON · T5',
+    desc: '끝나지 않는 살육제. 혈권을 꺾으면 핏빛 장비가 쏟아진다.',
+    rarityWeights: { C: 30, UC: 26, R: 21, U: 14, L: 7, EP: 2 },
+    recommendedPower: 7600, gearMult: 1.7, gearPrefix: '핏빛',
+    color: '#c4453d',
+    rooms: [
+      { kind: 'mobs',  name: '투기장 검투노예', hp: 2600, atk: 165, drops: 0 },
+      { kind: 'mobs',  name: '사슬 맹수 우리',  hp: 3000, atk: 180, drops: 0 },
+      { kind: 'named', name: '백전의 검투사',   hp: 4800, atk: 215, aoeEvery: 3, drops: 1 },
+      { kind: 'boss',  name: '투기장주 혈권(血拳)', hp: 8000, atk: 245, aoeEvery: 4, enrageAt: 0.5, drops: 3 },
+    ],
+  },
+  {
+    id: 'raid_spire', region: 'sanct', kind: 'farm',
+    name: '별이 떨어진 첨탑', sub: 'DUNGEON · T6',
+    desc: '추락한 별의 힘이 깃든 첨탑. 대현자는 10라운드마다 별을 떨어뜨린다.',
+    rarityWeights: { C: 26, UC: 24, R: 21, U: 15, L: 10, EP: 4 },
+    recommendedPower: 8400, gearMult: 1.9, gearPrefix: '별빛',
+    color: '#d4a574',
+    rooms: [
+      { kind: 'mobs',  name: '별파편 정령들',  hp: 3200, atk: 195, drops: 0 },
+      { kind: 'mobs',  name: '첨탑 수호석상',  hp: 3600, atk: 210, drops: 0 },
+      { kind: 'named', name: '관측자 아득',    hp: 5800, atk: 250, aoeEvery: 3, enrageAt: 0.4, drops: 1 },
+      { kind: 'boss',  name: '첨탑의 대현자',  hp: 10000, atk: 285, aoeEvery: 3, wipeEvery: 10, enrageAt: 0.5, drops: 3 },
+    ],
+  },
+
+  // ===== 지역 3: 심연 (레이드) =====
+  {
+    id: 'raid_abyss', region: 'abyss', kind: 'raid',
+    name: '심연의 제단', sub: 'RAID · 3관문',
+    desc: '관문 3개의 최상위 레이드. 군주는 8라운드마다 전멸기 — 사제의 방벽 없이는 파티가 무너진다. 심연의 장비는 에픽 확률이 가장 높다.',
+    rarityWeights: { C: 24, UC: 22, R: 20, U: 16, L: 12, EP: 6 },
+    recommendedPower: 9500, gearMult: 2.2, gearPrefix: '심연의',
     color: '#8b1f1f',
     rooms: [
-      { kind: 'named', name: '심연의 파수꾼',  hp: 4500,  atk: 170, aoeEvery: 4, drops: 1 },
-      { kind: 'named', name: '공허의 쌍둥이',  hp: 6500,  atk: 200, aoeEvery: 3, enrageAt: 0.4, drops: 1 },
-      { kind: 'boss',  name: '심연의 군주',    hp: 13000, atk: 240, aoeEvery: 3, wipeEvery: 8, enrageAt: 0.5, drops: 3 },
+      { kind: 'named', name: '심연의 파수꾼',  hp: 7000,  atk: 240, aoeEvery: 4, drops: 1 },
+      { kind: 'named', name: '공허의 쌍둥이',  hp: 10000, atk: 280, aoeEvery: 3, enrageAt: 0.4, drops: 2 },
+      { kind: 'boss',  name: '심연의 군주',    hp: 18000, atk: 330, aoeEvery: 3, wipeEvery: 8, enrageAt: 0.5, drops: 3 },
     ],
   },
 ];
@@ -92,8 +184,9 @@ export const RAID_DUNGEONS = [
 let _raidItemSeq = 0;
 
 // 등급 가중치 추첨 → 장비 1개 생성 (직업·슬롯 랜덤)
+// 등급 배율(RAID_RARITIES.mult) × 던전 티어 배율(gearMult) × 품질 롤(±20%, 던파 품질 시스템 참고)
 export function rollRaidDrop(dungeon) {
-  const weights = dungeon.rarityWeights || { C: 60, R: 30, E: 9, L: 1 };
+  const weights = dungeon.rarityWeights || { C: 50, UC: 28, R: 14, U: 6, L: 1.7, EP: 0.3 };
   const total = Object.values(weights).reduce((a, b) => a + b, 0);
   let r = Math.random() * total;
   let rarity = 'C';
@@ -105,15 +198,15 @@ export function rollRaidDrop(dungeon) {
   const classId = classIds[Math.floor(Math.random() * classIds.length)];
   const slot = RAID_SLOTS[Math.floor(Math.random() * RAID_SLOTS.length)];
   const base = SLOT_BASE[slot];
-  const mult = RAID_RARITIES[rarity].mult;
-  const roll = 0.8 + Math.random() * 0.4; // ±20%
+  const mult = RAID_RARITIES[rarity].mult * (dungeon.gearMult || 1);
+  const roll = 0.8 + Math.random() * 0.4; // 품질 롤 ±20%
   const atk = Math.round(base.atk * mult * roll);
   const hp = Math.round(base.hp * mult * roll);
   _raidItemSeq += 1;
   return {
     id: `rg_${Date.now().toString(36)}_${_raidItemSeq}_${Math.floor(Math.random() * 1e4)}`,
     classId, slot, rarity,
-    name: RAID_GEAR_NAMES[classId][slot],
+    name: `${dungeon.gearPrefix ? dungeon.gearPrefix + ' ' : ''}${RAID_GEAR_NAMES[classId][slot]}`,
     atk, hp,
     power: atk * 4 + hp,
   };

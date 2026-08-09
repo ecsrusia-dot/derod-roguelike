@@ -12,7 +12,7 @@ import { Swords, Shield, Heart, ChevronRight } from 'lucide-react';
 import { PALETTE } from '../utils/helpers.js';
 import {
   RAID_CLASSES, RAID_SKILLS, RAID_SLOTS, RAID_SLOT_NAMES, RAID_RARITIES,
-  RAID_DUNGEONS, getRaidMemberStats, getRaidPartyPower, CLASSES,
+  RAID_DUNGEONS, RAID_REGIONS, getRaidMemberStats, getRaidPartyPower, CLASSES,
 } from '../data.js';
 import { ScreenHeader, GlassPanel, Chip, UIButton } from './ui/CommonUI.jsx';
 
@@ -151,13 +151,18 @@ export default function RaidScreen({ meta, onEnterDungeon, onEquipItem, onAutoEq
           }}>⚡ 일괄 장착 — 전투력 최고 장비 자동 착용</button>
         )}
 
-        {/* ===== 던전 ===== */}
-        <div className="mt-4 mb-2 flex items-center gap-2.5">
-          <span className="tracking-[0.25em] flex-none" style={{ fontSize: 11, color: PALETTE.dawn }}>던전</span>
-          <span className="flex-1 h-px" style={{ background: 'var(--ui-line)' }} />
+        {/* ===== 던전 — 지역별 그룹 (던파 지역-던전 편성 참고) ===== */}
+        {RAID_REGIONS.map(region => (
+        <React.Fragment key={region.id}>
+        <div className="mt-4 mb-2">
+          <div className="flex items-center gap-2.5">
+            <span className="tracking-[0.25em] flex-none" style={{ fontSize: 11, color: PALETTE.dawn }}>{region.name}</span>
+            <span className="flex-1 h-px" style={{ background: 'var(--ui-line)' }} />
+          </div>
+          <div className="mt-1" style={{ fontSize: 10.5, color: PALETTE.textDim, opacity: 0.75 }}>{region.desc}</div>
         </div>
         <div className="ui-stagger flex flex-col gap-2">
-          {RAID_DUNGEONS.map(d => {
+          {RAID_DUNGEONS.filter(d => d.region === region.id).map(d => {
             const clears = raid.clears?.[d.id] || 0;
             const under = partyPower < d.recommendedPower;
             const finalRoom = d.rooms[d.rooms.length - 1];
@@ -185,7 +190,8 @@ export default function RaidScreen({ meta, onEnterDungeon, onEquipItem, onAutoEq
                   <Chip color={d.color} style={{ height: 19 }}>방 {d.rooms.length}개</Chip>
                   <Chip color={d.color} style={{ height: 19 }}>최종 보스 HP {finalRoom.hp}</Chip>
                   <Chip color={under ? PALETTE.accent : PALETTE.green} style={{ height: 19 }}>권장 전투력 {d.recommendedPower}</Chip>
-                  <Chip color={PALETTE.legendary} style={{ height: 19 }}>장비 최대 {totalDrops}개</Chip>
+                  <Chip color={PALETTE.legendary} style={{ height: 19 }}>{d.gearPrefix} 장비 ×{d.gearMult} · 최대 {totalDrops}개</Chip>
+                  <Chip color={RAID_RARITIES.EP.color} style={{ height: 19 }}>에픽 {d.rarityWeights.EP}%</Chip>
                 </div>
                 <UIButton onClick={() => onEnterDungeon(d)} className="mt-2.5" style={{ height: 40, fontSize: 12, letterSpacing: '0.2em' }}>
                   ▸ 입장 {under ? '(전투력 부족 — 위험)' : ''}
@@ -194,6 +200,8 @@ export default function RaidScreen({ meta, onEnterDungeon, onEquipItem, onAutoEq
             );
           })}
         </div>
+        </React.Fragment>
+        ))}
 
         <div className="mt-3 text-center" style={{ fontSize: 9.5, color: PALETTE.textDim, opacity: 0.7 }}>
           레이드 장비·스킬은 본편(원정)과 완전히 분리된 별도 성장입니다
