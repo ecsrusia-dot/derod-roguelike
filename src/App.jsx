@@ -8,6 +8,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 // =========== 헬퍼 함수 (utils/helpers.js로 분리됨) ===========
 import {
   PALETTE,
+  AUTO_STAT_PREF,
   getSkillLevel,
   getActivePassives,
   hasEffect,
@@ -1694,9 +1695,9 @@ export default function App() {
   // ============================================
   // 1.72.0~ 자동 사냥 드라이버 (App 레벨 화면 자동 진행)
   // ============================================
-  // 전투(CombatScreen)·사건(EventScreen)은 각 컴포넌트 내부 autoPlay가 처리.
-  // 여기서는 맵 노드 선택 / 승리·보상 / 챕터 클리어 / 상점·대장간 스킵 /
-  // 정비 자동 휴식 / 준비 자동 확정을 담당.
+  // 전투(CombatScreen)·사건(EventScreen)·상점(ShopScreen 자동 구매)은
+  // 각 컴포넌트 내부 autoPlay가 처리. 여기서는 맵 노드 선택 / 승리·보상 /
+  // 챕터 클리어 / 대장간 스킵 / 정비 자동 휴식 / 준비 자동 확정을 담당.
   const autoHuntAllowed = !!currentExpedition && (currentExpedition.category === 'training' || !!currentExpedition.endless);
   useEffect(() => {
     if (!autoHunt) return;
@@ -1731,18 +1732,25 @@ export default function App() {
       later(handleVictoryContinue, 900);
     } else if (screen === 'reward' && currentRewards && currentRewards.length > 0) {
       const hpRatio = maxHp > 0 ? hp / maxHp : 1;
-      // 보상 우선순위: 저체력 회복 > 궁극 진화 > 패시브 > 유물 > 첫 번째
+      const classId = classData?.id;
+      // 1.72.1~ 직업 맞춤 보상 우선순위:
+      // 저체력 회복 > 궁극 진화 > 직업 전용 패시브(classOnly) >
+      // 보유 패시브 강화(Lv 높은 순 — 7Lv 궁극 진화 가속) > 직업 주력 스탯 >
+      // 새 패시브 > 유물 > 첫 번째
       const pick =
         (hpRatio < 0.5 && currentRewards.find(r => r.type === 'heal' || r.type === 'heal_full')) ||
         currentRewards.find(r => r.type === 'ultimate') ||
+        currentRewards.find(r => r.type === 'skill' && PASSIVE_SKILLS[r.name]?.classOnly === classId) ||
+        currentRewards
+          .filter(r => r.type === 'skill' && (skills[r.name] || 0) > 0)
+          .sort((a, b) => (skills[b.name] || 0) - (skills[a.name] || 0))[0] ||
+        currentRewards.find(r => r.type === 'stat' && r.name === AUTO_STAT_PREF[classId]) ||
         currentRewards.find(r => r.type === 'skill') ||
         currentRewards.find(r => r.type === 'relic') ||
         currentRewards[0];
       later(() => handlePickReward(pick), 900);
     } else if (screen === 'chapterClear') {
       later(handleChapterContinue, 1200);
-    } else if (screen === 'shop') {
-      later(handleShopLeave, 700);
     } else if (screen === 'forge') {
       later(handleForgeLeave, 700);
     } else if (screen === 'rest') {
@@ -1855,7 +1863,7 @@ export default function App() {
             {screen === 'rest' && <RestScreen classData={classData} hp={hp} maxHp={maxHp} skills={skills} stats={{ ...classData?.stats, ...stats }} activeSkills={activeSkills} activeRelicNames={activeRelicNames} relics={relics} ultimates={ultimates} engravingFx={getCombinedClassFx(meta, classData?.id)} meta={meta} expedition={currentExpedition} onChoice={handleRestChoice} />}
             {screen === 'prep' && <PrepScreen classData={classData} skills={skills} stats={{ ...classData?.stats, ...stats }} relics={relics} ultimates={ultimates} engravingFx={getCombinedClassFx(meta, classData?.id)} meta={meta} expedition={currentExpedition} mode="full" onConfirm={handlePrepConfirm} />}
             {screen === 'reselect' && <PrepScreen classData={classData} skills={skills} stats={{ ...classData?.stats, ...stats }} relics={relics} ultimates={ultimates} engravingFx={getCombinedClassFx(meta, classData?.id)} meta={meta} expedition={currentExpedition} mode={reselectMode} currentActiveSkills={activeSkills} currentActiveRelicNames={activeRelicNames} onConfirm={handleReselectConfirm} />}
-            {screen === 'shop' && <ShopScreen gold={gold} skills={skills} relics={relics} ultimates={ultimates} curses={currentCurses} onBuy={handleShopBuy} onLeave={handleShopLeave} classId={classData?.id} />}
+            {screen === 'shop' && <ShopScreen gold={gold} skills={skills} relics={relics} ultimates={ultimates} curses={currentCurses} autoPlay={autoHunt} onBuy={handleShopBuy} onLeave={handleShopLeave} classId={classData?.id} />}
             {screen === 'forge' && <ForgeScreen relics={relics} skills={skills} activeRelicNames={activeRelicNames} meta={meta} onCombine={handleForgeCombine} onLeave={handleForgeLeave} />}
             {screen === 'chapterClear' && chapter && <ChapterClearScreen chapter={chapter} isLastChapter={false} hp={hp} maxHp={maxHp} meta={meta} curses={currentCurses} onContinue={handleChapterContinue} />}
             {screen === 'expeditionClear' && currentExpedition && <ExpeditionClearScreen expedition={currentExpedition} soulsGained={runSouls} firstClear={runFirstChampClear} onContinue={handleExpeditionClearContinue} />}

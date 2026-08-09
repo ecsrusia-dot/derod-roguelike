@@ -18,6 +18,11 @@ import {
 } from '../data.js';
 
 // ===== 색상 팔레트 =====
+// 1.72.1~ 자동 사냥 직업 주력 스탯 — 보상·상점 자동 선택 시 능력치 선호
+export const AUTO_STAT_PREF = {
+  wanderer: '근력', sage: '지능', demonblood: '근력', elf: '민첩', priest: '매력',
+};
+
 export const PALETTE = {
   bg: '#0a0608', bgDeep: '#050304',
   panel: '#1a0e12', panelLight: '#241419', panelBorder: '#3d1f28',

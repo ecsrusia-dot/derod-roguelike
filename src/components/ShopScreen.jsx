@@ -2,12 +2,12 @@
 // components/ShopScreen.jsx — 상점 (패시브 강화 + 유물 구매)
 // ============================================
 
-import React, { useState } from 'react';
-import { PALETTE, hasCurse } from '../utils/helpers.js';
+import React, { useState, useEffect } from 'react';
+import { PALETTE, hasCurse, AUTO_STAT_PREF } from '../utils/helpers.js';
 import { SHOP_PRICES, PASSIVE_SKILLS } from '../data.js';
 import { getRewardPool, rollRewards } from '../utils/rewards.js';
 
-export default function ShopScreen({ gold, skills, relics, ultimates, curses = [], onBuy, onLeave, classId = null }) {
+export default function ShopScreen({ gold, skills, relics, ultimates, curses = [], autoPlay = false, onBuy, onLeave, classId = null }) {
   const priceMultiplier = hasCurse(curses, 'curse_shopPrice+50') ? 1.5 : 1.0;
   // 상점 재고: 유물·궁극·재화는 제외하고 다양한 카테고리로
   const [stock] = useState(() => {
@@ -29,6 +29,42 @@ export default function ShopScreen({ gold, skills, relics, ultimates, curses = [
     else base = SHOP_PRICES.default;
     return Math.ceil(base * priceMultiplier);
   };
+
+  // 1.72.1~ 자동 사냥 — 직업 맞춤 자동 구매 후 퇴장
+  // 우선순위: 직업 전용 패시브(classOnly) > 보유 패시브 강화(Lv 높은 순) > 새 패시브 > 직업 주력 스탯
+  // 예비 골드 100은 남김. 회복류는 정비 노드가 담당하므로 구매 안 함.
+  // 구매할 때마다 gold prop이 갱신돼 effect 재실행 → 다음 대상 구매 or 퇴장
+  useEffect(() => {
+    if (!autoPlay) return;
+    const t = setTimeout(() => {
+      const RESERVE_GOLD = 100;
+      const buyable = stock
+        .map((r, idx) => ({ r, idx, price: getPrice(r) }))
+        .filter(({ r, idx, price }) => {
+          if (bought.has(idx)) return false;
+          if (gold - price < RESERVE_GOLD) return false;
+          if (r.type === 'skill') {
+            return (skills[r.name] || 0) < (PASSIVE_SKILLS[r.name]?.maxLv || 7);
+          }
+          return r.type === 'stat';
+        });
+      const score = ({ r }) => {
+        if (r.type === 'skill' && PASSIVE_SKILLS[r.name]?.classOnly === classId) return 300;
+        if (r.type === 'skill' && (skills[r.name] || 0) > 0) return 200 + (skills[r.name] || 0);
+        if (r.type === 'skill') return 100;
+        if (r.type === 'stat' && r.name === AUTO_STAT_PREF[classId]) return 50;
+        return 10;
+      };
+      const target = [...buyable].sort((a, b) => score(b) - score(a))[0];
+      if (target) {
+        onBuy(target.r, target.price);
+        setBought(prev => new Set([...prev, target.idx]));
+      } else {
+        onLeave();
+      }
+    }, 800);
+    return () => clearTimeout(t);
+  }, [autoPlay, gold, bought]);
 
   const renderItem = (r, idx) => {
     const price = getPrice(r);
