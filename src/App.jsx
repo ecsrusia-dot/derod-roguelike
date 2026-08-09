@@ -119,7 +119,7 @@ import {
 } from './data.js';
 import { getKstDateKey } from './utils/dailyChallenge.js';
 import { simulateBestEndlessRun } from './utils/endlessSkipSim.js';
-import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear, dismantleRaidItem, dismantleRaidJunk, enhanceRaidItem, claimRaidWeekly, addRaidResources, spendRaidResourcesForItem, learnRaidSecretSkill } from './storage.js';
+import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear, dismantleRaidItem, dismantleRaidJunk, enhanceRaidItem, claimRaidWeekly, addRaidResources, spendRaidResourcesForItem, resolveRaidSecret } from './storage.js';
 
 
 
@@ -279,6 +279,8 @@ export default function App() {
   const [autoHunt, setAutoHunt] = useState(false);
   // 1.74.0~ 레이드 — 입장 중인 던전 (raidBattle 화면용)
   const [raidDungeon, setRaidDungeon] = useState(null);
+  // 1.78.0~ 던전 반복 모드 — 승리 시 자동 재입장, 전멸·후퇴·로비 복귀 시 해제
+  const [raidRepeat, setRaidRepeat] = useState(false);
   
   // === 인증/저장 모드 (Phase 1) ===
   // null = 미선택 (LoginScreen 표시), 'local' | 'guest' | 'google'
@@ -1733,7 +1735,7 @@ export default function App() {
     setMeta(prev => {
       let next = addRaidDrops(prev, loot?.items || []);
       next = addRaidResources(next, { stones: loot?.stones || 0, essence: loot?.essence || 0 });
-      if (loot?.secret) next = learnRaidSecretSkill(next, loot.secret); // 1.77.0 기연 비전 (영구)
+      if (loot?.secret) next = resolveRaidSecret(next, loot.secret, !!loot.secretSwap); // 1.78.0 기연 (이력+유지/변경)
       next = recordRaidClear(next, dungeon.id);
       // 1.75.0~ 주간 첫 클리어 보상: 심연석 + (심연 레이드는 유니크 이상 확정 장비 1개)
       const weekly = claimRaidWeekly(next, dungeon.id, getKstWeekKey(), dungeon.weeklyStones || 0);
@@ -1744,6 +1746,8 @@ export default function App() {
       saveMeta(next);
       return next;
     });
+    // 1.78.0 반복 모드 — 같은 던전 자동 재입장 (clears 증가로 battle key가 바뀌어 리마운트)
+    if (raidRepeat) return;
     setRaidDungeon(null);
     setScreen('raid');
   };
@@ -1812,11 +1816,12 @@ export default function App() {
     setMeta(prev => {
       let next = addRaidDrops(prev, loot?.items || []);
       next = addRaidResources(next, { stones: loot?.stones || 0, essence: loot?.essence || 0 });
-      if (loot?.secret) next = learnRaidSecretSkill(next, loot.secret); // 1.77.0 기연 비전 (영구)
+      if (loot?.secret) next = resolveRaidSecret(next, loot.secret, !!loot.secretSwap); // 1.78.0 기연
       if (next === prev) return prev;
       saveMeta(next);
       return next;
     });
+    setRaidRepeat(false);
     setRaidDungeon(null);
     setScreen('raid');
   };
@@ -1960,7 +1965,7 @@ export default function App() {
             />}
             {screen === 'title' && authMode && <TitleScreen meta={meta} onStart={() => setScreen('expeditionSelect')} onResume={resumeActiveRun} onAltar={enterAltar} onEngravings={() => setScreen('engraving')} onRaid={raidUnlocked ? () => setScreen('raid') : null} onAchievements={() => { setPrevAchievementsBack('title'); setScreen('achievements'); }} onChangelog={() => setShowChangelog({ firstSeen: false })} onAccount={() => setScreen('account')} />}
             {screen === 'raid' && <RaidScreen meta={meta} onEnterDungeon={(d) => { setRaidDungeon(d); setScreen('raidBattle'); }} onEquipItem={handleRaidEquip} onAutoEquip={handleRaidAutoEquip} onDismantle={handleRaidDismantle} onDismantleJunk={handleRaidDismantleJunk} onEnhance={handleRaidEnhance} onCraft={handleRaidCraft} onGacha={handleRaidGacha} onBack={() => setScreen('title')} />}
-            {screen === 'raidBattle' && raidDungeon && <RaidBattleScreen key={raidDungeon.id + '-' + (meta?.raid?.clears?.[raidDungeon.id] || 0)} meta={meta} dungeon={raidDungeon} onVictory={handleRaidVictory} onDefeat={handleRaidPartial} onRetreat={handleRaidPartial} />}
+            {screen === 'raidBattle' && raidDungeon && <RaidBattleScreen key={raidDungeon.id + '-' + (meta?.raid?.clears?.[raidDungeon.id] || 0)} meta={meta} dungeon={raidDungeon} repeat={raidRepeat} onToggleRepeat={() => setRaidRepeat(v => !v)} onVictory={handleRaidVictory} onDefeat={handleRaidPartial} onRetreat={handleRaidPartial} />}
             {screen === 'account' && <AccountScreen 
               authMode={authMode} 
               firebaseUser={firebaseUser} 

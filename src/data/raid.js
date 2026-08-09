@@ -48,16 +48,29 @@ export const RAID_SKILLS = {
   ],
 };
 
-// 1.77.0~ 기연(奇緣) 비전 스킬 — 방 클리어 시 극악 확률(0.5%)로 파티원 1명이 각성 (계정 영구)
-// 미보유 직업 중 랜덤 1명. 5직업 전부 모으는 장기 수집 목표.
-export const RAID_SECRET_CHANCE = 0.005;
+// 1.78.0~ 기연(奇緣) 비전 스킬 재설계 (PM 피드백):
+//   - 던전별 고유 비전 1종 — 상위 던전일수록 강력 (낮은 던전 회전으로 상위 비전 불가)
+//   - 한 번 만난 기연은 영원히 재발생 안 함 (meta.raid.secretHistory — 던전당 평생 1회)
+//   - 활성 비전은 1개만 — 새 기연 조우 시 [기존 유지 / 변경] 선택
+//   - fx는 파티 단위: atkPct(공격) / hpPct(최대 HP) / healPct(사제 치유) /
+//     critPct(전 파티원 추가 치명 확률) / aoeTakenPct(광역·전멸기 피해 감소)
+export const RAID_SECRET_CHANCE = 0.005; // 방 클리어당 0.5%
 export const RAID_SECRET_SKILLS = {
-  wanderer:   { name: '불괴(不壞)의 몸', desc: '던전당 1회, 치명상을 입어도 HP 1로 버텨낸다' },
-  demonblood: { name: '혈신(血神) 강림', desc: '혈폭 배율 40% → 55%' },
-  elf:        { name: '심안(心眼)',      desc: '치명타 확률 25% → 35%' },
-  sage:       { name: '겁화(劫火)',      desc: '잔염 화상 데미지 30% → 50%' },
-  priest:     { name: '기적의 손길',     desc: '소생 사용 횟수 1회 → 2회' },
+  secret_corridor: { dungeonId: 'raid_corridor', tier: 1, name: '잿빛 담금질',     desc: '파티 최대 HP +4%',                    fx: { hpPct: 4 } },
+  secret_mine:     { dungeonId: 'raid_mine',     tier: 2, name: '서리의 인내',     desc: '광역·전멸기 피해 -8%',                fx: { aoeTakenPct: 8 } },
+  secret_sewer:    { dungeonId: 'raid_sewer',    tier: 3, name: '침식의 맹독',     desc: '파티 공격 +4%',                       fx: { atkPct: 4 } },
+  secret_abbey:    { dungeonId: 'raid_abbey',    tier: 4, name: '봉인된 축복',     desc: '사제 치유 +20%',                      fx: { healPct: 20 } },
+  secret_arena:    { dungeonId: 'raid_arena',    tier: 5, name: '검투사의 본능',   desc: '전 파티원 추가 치명타 확률 +6%',      fx: { critPct: 6 } },
+  secret_spire:    { dungeonId: 'raid_spire',    tier: 6, name: '별의 가호',       desc: '광역·전멸기 피해 -15%',               fx: { aoeTakenPct: 15 } },
+  secret_abyss:    { dungeonId: 'raid_abyss',    tier: 7, name: '심연 동화',       desc: '파티 공격 +10%, 최대 HP +6%',         fx: { atkPct: 10, hpPct: 6 } },
+  secret_fallen:   { dungeonId: 'raid_fallen',   tier: 8, name: '여명의 잔광',     desc: '파티 공격 +8%, 사제 치유 +15%',       fx: { atkPct: 8, healPct: 15 } },
+  secret_throne:   { dungeonId: 'raid_throne',   tier: 9, name: '종막의 각인',     desc: '파티 공격 +14%, 최대 HP +10%',        fx: { atkPct: 14, hpPct: 10 } },
 };
+
+// 던전 ID → 그 던전의 기연 비전
+export function getDungeonSecret(dungeonId) {
+  return Object.entries(RAID_SECRET_SKILLS).find(([, sk]) => sk.dungeonId === dungeonId)?.[0] || null;
+}
 
 // 1.77.0~ 에픽 고유 옵션 — 해당 직업의 에픽 장비를 1개 이상 장착하면 발동 (스킬 강화 직결)
 export const RAID_EPIC_UNIQUES = {
