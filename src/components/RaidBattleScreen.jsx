@@ -27,10 +27,13 @@ function buildParty(raidMeta) {
   return Object.keys(RAID_CLASSES).map(classId => {
     const stats = getRaidMemberStats(classId, raidMeta?.equipped?.[classId]);
     const cls = CLASSES.find(c => c.id === classId);
+    // 1.77.0~ 에픽 고유 옵션 — 해당 직업 에픽 장비 1개 이상 장착 시 발동
+    const equipped = raidMeta?.equipped?.[classId] || {};
+    const epic = Object.values(equipped).some(it => it && it.rarity === 'EP');
     return {
       classId, name: cls?.name || classId, role: stats.role, image: cls?.image || null,
       hp: stats.hp, maxHp: stats.hp, atk: stats.atk, heal: stats.heal || 0,
-      alive: true,
+      alive: true, epic,
     };
   });
 }
@@ -100,6 +103,8 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
   const fxIdRef = useRef(0);
   const timersRef = useRef([]);
   const logEndRef = useRef(null);
+  // 1.77.0~ 사제 [소생] — 던전당 1회
+  const reviveUsedRef = useRef(false);
 
   useEffect(() => {
     if (logExpanded) logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -147,12 +152,21 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
       const wipeRound = !!(e.wipeEvery && r % e.wipeEvery === 0);
       let shield = false;
 
-      // 1. 사제 — 침묵의 저주(healCut) 중엔 치유 -50%
+      // 1. 사제 — 소생(던전당 1회) > 방벽 > 치유. 침묵의 저주 중엔 치유 -50%
       const priest = p.find(m => m.classId === 'priest');
       if (priest?.alive) {
+        const dead = p.find(m => !m.alive);
         if (wipeRound) {
           shield = true;
           lines.push({ t: 'heal', text: `✚ 사제 — 여명의 방벽! 전멸기 피해 -70%` });
+        } else if (dead && !reviveUsedRef.current) {
+          // 1.77.0 [소생] — 전투불능 아군 부활 (에픽 고유 '여명의 인도': 40% → 70%)
+          reviveUsedRef.current = true;
+          const revivePct = priest.epic ? 0.7 : 0.4;
+          dead.alive = true;
+          dead.hp = Math.round(dead.maxHp * revivePct);
+          healEvent = dead.hp;
+          lines.push({ t: 'heal', text: `✚ 사제 — [소생]! ${dead.name} 부활 (HP ${Math.round(revivePct * 100)}%)${priest.epic ? ' [여명의 인도]' : ''}` });
         } else {
           const hurt = alive().reduce((a, m) => (m.hp / m.maxHp < a.hp / a.maxHp ? m : a));
           if (hurt && hurt.hp < hurt.maxHp) {
@@ -166,6 +180,17 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
         }
       }
 
+      // 1.5. 술법사 [잔염] 화상 도트 — 메테오 이후 2(에픽 3)라운드
+      if ((e.burnLeft || 0) > 0 && e.hp > 0) {
+        const burnDmg = e.burnDmg || 0;
+        if (burnDmg > 0) {
+          e.hp = Math.max(0, e.hp - burnDmg);
+          atkEvents.push({ dmg: burnDmg, crit: false });
+          lines.push({ t: 'atk', text: `🔥 잔염 ${burnDmg}` });
+        }
+        e.burnLeft -= 1;
+      }
+
       // 2~3. 파티 공격
       let totalDmg = 0;
       alive().forEach(m => {
@@ -176,14 +201,41 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
           const lost = m.maxHp - m.hp;
           dmg += lost * 0.4;
           if (lost > 0) label = ' [혈폭]';
+          // 1.77.0 [광란] — HP 40% 이하 시 공격 +30%
+          if (m.hp / m.maxHp <= 0.4) { dmg *= 1.3; label += ' [광란]'; }
         }
-        if (m.classId === 'sage' && r % 3 === 0) { dmg *= 1.5; label = ' [메테오]'; crit = true; }
+        const isMeteor = m.classId === 'sage' && r % 3 === 0;
+        if (isMeteor) { dmg *= 1.5; label = ' [메테오]'; crit = true; }
+        // 1.77.0 [과부하] — 격노한 적에게 +15%
+        if (m.classId === 'sage' && e.enraged) { dmg *= 1.15; label += ' [과부하]'; }
         if (m.classId === 'elf' && Math.random() < 0.25) { dmg *= 1.5; label = ' [치명]'; crit = true; }
         dmg = Math.round(dmg);
         totalDmg += dmg;
         e.hp = Math.max(0, e.hp - dmg);
         atkEvents.push({ dmg, crit });
         lines.push({ t: m.role === 'healer' ? 'sys' : 'atk', text: `▸ ${m.name} ${dmg}${label}` });
+        // 1.77.0 [흡혈] — 혈폭 발동 중 가한 피해의 20% (에픽 '갈증의 낙인': 35%) 자가 회복
+        if (m.classId === 'demonblood' && m.hp < m.maxHp) {
+          const lifesteal = Math.round(dmg * (m.epic ? 0.35 : 0.2));
+          if (lifesteal > 0) {
+            m.hp = Math.min(m.maxHp, m.hp + lifesteal);
+            lines.push({ t: 'heal', text: `· 흡혈 +${lifesteal}` });
+          }
+        }
+        // 1.77.0 [잔염] 부여 — 메테오 명중 시 (에픽 '꺼지지 않는 불': 지속 3라운드)
+        if (isMeteor && e.hp > 0) {
+          e.burnLeft = m.epic ? 3 : 2;
+          e.burnDmg = Math.round(m.atk * 0.3);
+          lines.push({ t: 'atk', text: `· 잔염 부여 — ${e.burnLeft}라운드간 ${e.burnDmg}/라운드` });
+        }
+        // 1.77.0 [관통 화살] — 치명타 시 40%(에픽 '폭풍의 눈' 60%) 추가 사격 (50%)
+        if (m.classId === 'elf' && crit && e.hp > 0 && Math.random() < (m.epic ? 0.6 : 0.4)) {
+          const extra = Math.round(m.atk * 0.5);
+          totalDmg += extra;
+          e.hp = Math.max(0, e.hp - extra);
+          atkEvents.push({ dmg: extra, crit: false });
+          lines.push({ t: 'atk', text: `· 관통 화살 ${extra}` });
+        }
       });
       lines.push({ t: 'sys', text: `· 파티 합계 ${totalDmg} — ${e.name} HP ${e.hp}/${e.maxHp}` });
 
@@ -259,17 +311,34 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
         lines.push({ t: 'boss', text: `☍ ${e.name} — 소환수 2기 소환! (다음 라운드 일제 공격)` });
       }
       if (e.healCutEvery && r % e.healCutEvery === 0) {
-        e.healCutLeft = 3; // 이번 라운드 말 차감 포함 실효 2라운드
-        lines.push({ t: 'boss', text: `⌀ ${e.name} — 침묵의 저주! 2라운드간 치유 -50%` });
+        // 1.77.0 [정화] — 사제 생존 시 지속 1라운드 단축 (실효 2 → 1라운드)
+        const cleanse = !!priest?.alive;
+        e.healCutLeft = cleanse ? 2 : 3; // 이번 라운드 말 차감 포함
+        lines.push({ t: 'boss', text: `⌀ ${e.name} — 침묵의 저주! ${cleanse ? '1' : '2'}라운드간 치유 -50%${cleanse ? ' (사제 [정화]로 단축)' : ''}` });
       }
+      // 1.77.0 [철벽 방세] — 4라운드마다 탱커 받는 피해 -60% (도발 -30%와 중첩)
+      const tankAlive = p.find(m => m.classId === 'wanderer' && m.alive);
+      const ironWall = !!(tankAlive && r % 4 === 0);
+      if (ironWall) lines.push({ t: 'heal', text: `🛡 방랑검사 — [철벽 방세] 이번 라운드 받는 피해 -60%` });
+      const takenMultOf = (m) => {
+        let mult = 1;
+        if (m.classId === 'wanderer') {
+          mult *= 0.7;
+          if (ironWall) mult *= 0.4;
+        }
+        return mult;
+      };
       if (wipeRound) {
         const mult = shield ? 0.3 : 1;
         lines.push({ t: 'boss', text: `☠ ${e.name} — 전멸기 발동!${shield ? ' (방벽으로 감쇄)' : ''}` });
         let totalTaken = 0;
         alive().forEach(m => {
-          let taken = enemyAtk * 2 * mult;
-          if (m.classId === 'wanderer') taken *= 0.7;
-          taken = Math.round(taken);
+          // 1.77.0 [바람의 가호] — 정령사 광역·전멸기 20% 완전 회피
+          if (m.classId === 'elf' && Math.random() < 0.2) {
+            lines.push({ t: 'heal', text: `· 정령사 — [바람의 가호] 회피!` });
+            return;
+          }
+          const taken = Math.round(enemyAtk * 2 * mult * takenMultOf(m));
           totalTaken += taken;
           m.hp = Math.max(0, m.hp - taken);
           if (m.hp <= 0) { m.alive = false; lines.push({ t: 'boss', text: `✖ ${m.name} 전투 불능` }); }
@@ -280,9 +349,11 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
         lines.push({ t: 'boss', text: `◂ ${e.name} — 광역 공격` });
         let totalTaken = 0;
         alive().forEach(m => {
-          let taken = enemyAtk * 0.7;
-          if (m.classId === 'wanderer') taken *= 0.7;
-          taken = Math.round(taken);
+          if (m.classId === 'elf' && Math.random() < 0.2) {
+            lines.push({ t: 'heal', text: `· 정령사 — [바람의 가호] 회피!` });
+            return;
+          }
+          const taken = Math.round(enemyAtk * 0.7 * takenMultOf(m));
           totalTaken += taken;
           m.hp = Math.max(0, m.hp - taken);
           if (m.hp <= 0) { m.alive = false; lines.push({ t: 'boss', text: `✖ ${m.name} 전투 불능` }); }
@@ -290,21 +361,26 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
         partyHit = true;
         pushPartyLabel('damage', totalTaken, 350 / speed);
       } else {
-        const tank = p.find(m => m.classId === 'wanderer' && m.alive);
+        const tank = tankAlive;
         const nonTanks = alive().filter(m => m.classId !== 'wanderer');
         const pierce = !!(e.pierceTankChance && tank && nonTanks.length > 0 && Math.random() < e.pierceTankChance);
         const target = pierce
           ? nonTanks[Math.floor(Math.random() * nonTanks.length)]
           : (tank || alive()[Math.floor(Math.random() * alive().length)]);
         if (target) {
-          let taken = enemyAtk;
-          if (target.classId === 'wanderer') taken *= 0.7;
-          taken = Math.round(taken);
+          const taken = Math.round(enemyAtk * takenMultOf(target));
           target.hp = Math.max(0, target.hp - taken);
           partyHit = true;
           pushPartyLabel('damage', taken, 350 / speed);
           lines.push({ t: 'boss', text: `◂ ${e.name} → ${target.name} ${taken}${pierce ? ' [도발 무시!]' : tank && !pierce ? ' [도발]' : ''}` });
           if (target.hp <= 0) { target.alive = false; lines.push({ t: 'boss', text: `✖ ${target.name} 전투 불능` }); }
+          // 1.77.0 [응수] — 도발 피격 시 35%(에픽 '수호자의 맹세' 50%) 반격 (공격력 80%)
+          if (target.classId === 'wanderer' && target.alive && !pierce && Math.random() < (target.epic ? 0.5 : 0.35)) {
+            const counter = Math.round(target.atk * 0.8);
+            e.hp = Math.max(1, e.hp - counter); // 마무리는 파티의 손으로 (최소 1 보장)
+            atkEvents.push({ dmg: counter, crit: false });
+            lines.push({ t: 'atk', text: `⚔ 방랑검사 — [응수] 반격 ${counter}` });
+          }
         }
       }
 

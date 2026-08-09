@@ -14,7 +14,7 @@ import {
   RAID_CLASSES, RAID_SKILLS, RAID_SLOTS, RAID_SLOT_NAMES, RAID_RARITIES,
   RAID_DUNGEONS, RAID_REGIONS, getRaidMemberStats, getRaidPartyPower, CLASSES,
   RAID_STONE, RAID_ENHANCE, RAID_DISMANTLE_VALUES, getRaidItemEffective, getKstWeekKey,
-  RAID_ESSENCE, RAID_CRAFT_RECIPES, RAID_GACHA,
+  RAID_ESSENCE, RAID_CRAFT_RECIPES, RAID_GACHA, RAID_EPIC_UNIQUES,
 } from '../data.js';
 import { hasRaidWeeklyClaimed } from '../storage.js';
 import { ScreenHeader, GlassPanel, Chip, UIButton } from './ui/CommonUI.jsx';
@@ -67,6 +67,9 @@ function GearChip({ item, onEquip, onDismantle }) {
           {eff.atk > 0 && `공격 +${eff.atk}`}{eff.atk > 0 && eff.hp > 0 && ' · '}{eff.hp > 0 && `HP +${eff.hp}`}
           {' · '}전투력 {eff.power}
         </div>
+        {item.rarity === 'EP' && RAID_EPIC_UNIQUES[item.classId] && (
+          <div style={{ fontSize: 9, color: rar.color, marginTop: 1 }}>◆ 고유: {RAID_EPIC_UNIQUES[item.classId].name}</div>
+        )}
       </div>
       <div className="flex flex-none gap-1 ml-2">
         {onDismantle && (
@@ -182,8 +185,24 @@ export default function RaidScreen({ meta, onEnterDungeon, onEquipItem, onAutoEq
                 {open && (
                   <div className="mt-2.5 pt-2.5" style={{ borderTop: '1px solid var(--ui-line)' }}>
                     <div className="px-2.5 py-2 mb-2" style={{ borderRadius: 10, background: 'rgba(232,176,74,0.07)', border: '1px solid rgba(232,176,74,0.3)' }}>
-                      <span style={{ fontSize: 10, fontWeight: 700, color: PALETTE.legendary }}>★ {RAID_SKILLS[classId].name}</span>
-                      <div style={{ fontSize: 10, color: PALETTE.textDim, marginTop: 2 }}>{RAID_SKILLS[classId].desc}</div>
+                      {(RAID_SKILLS[classId] || []).map((sk, i) => (
+                        <div key={sk.name} style={{ marginTop: i > 0 ? 5 : 0 }}>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: PALETTE.legendary }}>★ {sk.name}</span>
+                          <div style={{ fontSize: 9.5, color: PALETTE.textDim, marginTop: 1 }}>{sk.desc}</div>
+                        </div>
+                      ))}
+                      {/* 에픽 고유 옵션 — 에픽 장비 1개 이상 장착 시 발동 */}
+                      {(() => {
+                        const uniq = RAID_EPIC_UNIQUES[classId];
+                        const active = RAID_SLOTS.some(slot => raid.equipped?.[classId]?.[slot]?.rarity === 'EP');
+                        if (!uniq) return null;
+                        return (
+                          <div className="mt-1.5 pt-1.5" style={{ borderTop: '1px dashed rgba(232,176,74,0.25)', opacity: active ? 1 : 0.45 }}>
+                            <span style={{ fontSize: 10, fontWeight: 700, color: RAID_RARITIES.EP.color }}>◆ {uniq.name} {active ? '(발동 중)' : '(에픽 장착 시)'}</span>
+                            <div style={{ fontSize: 9.5, color: PALETTE.textDim, marginTop: 1 }}>{uniq.desc}</div>
+                          </div>
+                        );
+                      })()}
                     </div>
                     <div className="flex flex-col gap-1.5">
                       {RAID_SLOTS.map(slot => {

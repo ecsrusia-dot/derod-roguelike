@@ -19,12 +19,42 @@ export const RAID_CLASSES = {
 };
 
 // =========== 레이드 전용 스킬 (본편 COMBAT_SKILLS와 분리) ===========
+// 1.77.0~ 직업당 3종 (기존 1 + 다양화 2) — 전부 자동 발동 (풀오토 유지, 직업 정체성 범위 안)
 export const RAID_SKILLS = {
-  wanderer:   { name: '수호 태세',  desc: '도발 — 보스의 단일 공격을 전부 자신이 받고, 받는 데미지 -30%' },
-  demonblood: { name: '혈폭(血爆)', desc: '공격 시 잃은 HP의 40%만큼 추가 데미지' },
-  elf:        { name: '폭풍 연사',  desc: '치명타 확률 25% (파티 최고) — 치명타 시 데미지 ×1.5' },
-  sage:       { name: '메테오',     desc: '3라운드마다 데미지 ×1.5 광역 낙하' },
-  priest:     { name: '집단 치유',  desc: '매 라운드 가장 아픈 아군 회복. 전멸기 예고 라운드엔 파티 방벽(피해 -70%)' },
+  wanderer: [
+    { name: '수호 태세',  desc: '도발 — 보스의 단일 공격을 전부 자신이 받고, 받는 데미지 -30%' },
+    { name: '철벽 방세',  desc: '4라운드마다 그 라운드 받는 피해 -60% (도발과 중첩)' },
+    { name: '응수',       desc: '도발로 피격 시 35% 확률로 반격 (공격력 80%)' },
+  ],
+  demonblood: [
+    { name: '혈폭(血爆)', desc: '공격 시 잃은 HP의 40%만큼 추가 데미지' },
+    { name: '광란',       desc: 'HP 40% 이하일 때 공격 +30%' },
+    { name: '흡혈',       desc: '혈폭 발동 중 가한 피해의 20% 자가 회복' },
+  ],
+  elf: [
+    { name: '폭풍 연사',  desc: '치명타 확률 25% (파티 최고) — 치명타 시 데미지 ×1.5' },
+    { name: '관통 화살',  desc: '치명타 시 40% 확률로 즉시 추가 사격 (공격력 50%)' },
+    { name: '바람의 가호', desc: '광역·전멸기 피해를 20% 확률로 완전 회피' },
+  ],
+  sage: [
+    { name: '메테오',     desc: '3라운드마다 데미지 ×1.5 광역 낙하' },
+    { name: '잔염',       desc: '메테오 명중 후 2라운드간 화상 (공격력 30%/라운드)' },
+    { name: '과부하',     desc: '격노한 적에게 주는 데미지 +15%' },
+  ],
+  priest: [
+    { name: '집단 치유',  desc: '매 라운드 가장 아픈 아군 회복. 전멸기 예고 라운드엔 파티 방벽(피해 -70%)' },
+    { name: '소생',       desc: '던전당 1회 — 전투불능 아군을 HP 40%로 부활 (치유 대신 발동)' },
+    { name: '정화',       desc: '침묵의 저주(치유 감소) 지속을 1라운드 단축' },
+  ],
+};
+
+// 1.77.0~ 에픽 고유 옵션 — 해당 직업의 에픽 장비를 1개 이상 장착하면 발동 (스킬 강화 직결)
+export const RAID_EPIC_UNIQUES = {
+  wanderer:   { name: '수호자의 맹세',   desc: '응수(반격) 확률 +15% (35% → 50%)' },
+  demonblood: { name: '갈증의 낙인',     desc: '흡혈 20% → 35%' },
+  elf:        { name: '폭풍의 눈',       desc: '관통 화살 확률 +20% (40% → 60%)' },
+  sage:       { name: '꺼지지 않는 불', desc: '잔염 지속 +1라운드 (2 → 3)' },
+  priest:     { name: '여명의 인도',     desc: '소생 부활 HP 40% → 70%' },
 };
 
 // =========== 장비 시스템 ===========
@@ -73,6 +103,7 @@ export const RAID_REGIONS = [
   { id: 'ash',    name: '잿빛 변경',   desc: '입문 파밍 지역 — 맨몸 파티도 돌파 가능' },
   { id: 'sanct',  name: '침묵의 성역', desc: '중급 지역 — 잿빛 장비 없이는 버티기 어렵다' },
   { id: 'abyss',  name: '심연',        desc: '레이드 — 최상위 장비의 무대' },
+  { id: 'fall',   name: '몰락한 여명', desc: '종막 — 에픽·고강화 세팅만이 닿는 끝' },
 ];
 
 export const RAID_DUNGEONS = [
@@ -178,7 +209,37 @@ export const RAID_DUNGEONS = [
       { kind: 'boss',  name: '심연의 군주',    hp: 18000, atk: 330, aoeEvery: 3, wipeEvery: 8, enrageAt: 0.5, drops: 5 },
     ],
   },
+
+  // ===== 지역 4: 몰락한 여명 (종막 — 1.77.0~) =====
+  {
+    id: 'raid_fallen', region: 'fall', kind: 'farm',
+    name: '몰락한 성소', sub: 'DUNGEON · T7',
+    desc: '여명이 저물어버린 성소. 배신자 대주교의 저주와 감시자의 전멸기가 기다린다.',
+    rarityWeights: { C: 22, UC: 21, R: 20, U: 18, L: 13, EP: 6 },
+    recommendedPower: 13500, gearMult: 2.6, gearPrefix: '여명의', weeklyStones: 20, essenceDrop: 1,
+    color: '#d4a574',
+    rooms: [
+      { kind: 'mobs',  name: '몰락한 위병들',  hp: 5200,  atk: 300, drops: 0 },
+      { kind: 'mobs',  name: '여명의 잔영',    hp: 5800,  atk: 320, drops: 0 },
+      { kind: 'named', name: '배신자 대주교',  hp: 9000,  atk: 380, aoeEvery: 4, healCutEvery: 4, drops: 0, stones: 12 },
+      { kind: 'boss',  name: '몰락의 감시자',  hp: 15000, atk: 430, aoeEvery: 3, wipeEvery: 9, enrageAt: 0.5, drops: 4 },
+    ],
+  },
+  {
+    id: 'raid_throne', region: 'fall', kind: 'raid',
+    name: '종막의 왕좌', sub: 'RAID · 3관문',
+    desc: '최후의 레이드. 종막의 군주는 전멸기·저주·격노를 모두 사용한다 — 에픽 확률 13%, 정수 3개 확정.',
+    rarityWeights: { C: 20, UC: 19, R: 18, U: 16, L: 14, EP: 13 },
+    recommendedPower: 16000, gearMult: 3.0, gearPrefix: '종막의', weeklyStones: 40, essenceDrop: 3,
+    color: '#8a2be2',
+    rooms: [
+      { kind: 'named', name: '왕좌의 수문장',  hp: 12000, atk: 400, aoeEvery: 4, summonEvery: 5, drops: 0, stones: 15 },
+      { kind: 'named', name: '쌍둥이 대검사',  hp: 16000, atk: 450, aoeEvery: 3, pierceTankChance: 0.3, enrageAt: 0.4, drops: 0, stones: 15 },
+      { kind: 'boss',  name: '종막의 군주',    hp: 28000, atk: 520, aoeEvery: 3, wipeEvery: 7, healCutEvery: 6, enrageAt: 0.5, drops: 6 },
+    ],
+  },
 ];
+
 
 // =========== 3차 난이도 튜닝 (1.76.0~) ===========
 // PM 피드백 "난이도 너무 낮음" — 전 던전 적 스탯 전역 배율.
