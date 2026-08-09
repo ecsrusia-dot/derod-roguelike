@@ -8,6 +8,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 // =========== 헬퍼 함수 (utils/helpers.js로 분리됨) ===========
 import {
   PALETTE,
+  AUTO_STAT_PREF,
+  scoreRelicForClass,
   getSkillLevel,
   getActivePassives,
   hasEffect,
@@ -103,9 +105,11 @@ import {
   VERSION_DATE,
   VERSION_LABEL,
   DAILY_MISSIONS,
+  ENDLESS_SKIP_LIMIT,
 } from './data.js';
 import { getKstDateKey } from './utils/dailyChallenge.js';
-import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, trackDailyMission } from './storage.js';
+import { simulateBestEndlessRun } from './utils/endlessSkipSim.js';
+import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, trackDailyMission, getEndlessSkipUsed, useEndlessSkip } from './storage.js';
 
 
 
@@ -1691,12 +1695,27 @@ export default function App() {
     setScreen('title');
   };
 
+  // 1.73.0~ 무한던전 스킵 — 하루 5회, 실전투 시뮬로 보상 계산 후 즉시 지급
+  // 5직업 전부 시뮬 → 최고 결과 채택. 기록·도감·업적·일일 임무 미반영 (보상 전용)
+  const handleEndlessSkip = () => {
+    const dateKey = getKstDateKey();
+    if (getEndlessSkipUsed(meta, dateKey) >= ENDLESS_SKIP_LIMIT) return null;
+    const result = simulateBestEndlessRun(meta);
+    if (!result) return null;
+    setMeta(prev => {
+      const next = useEndlessSkip(prev, dateKey, result.souls);
+      saveMeta(next);
+      return next;
+    });
+    return result;
+  };
+
   // ============================================
   // 1.72.0~ 자동 사냥 드라이버 (App 레벨 화면 자동 진행)
   // ============================================
-  // 전투(CombatScreen)·사건(EventScreen)은 각 컴포넌트 내부 autoPlay가 처리.
-  // 여기서는 맵 노드 선택 / 승리·보상 / 챕터 클리어 / 상점·대장간 스킵 /
-  // 정비 자동 휴식 / 준비 자동 확정을 담당.
+  // 전투(CombatScreen)·사건(EventScreen)·상점(ShopScreen 자동 구매)은
+  // 각 컴포넌트 내부 autoPlay가 처리. 여기서는 맵 노드 선택 / 승리·보상 /
+  // 챕터 클리어 / 대장간 스킵 / 정비 자동 휴식 / 준비 자동 확정을 담당.
   const autoHuntAllowed = !!currentExpedition && (currentExpedition.category === 'training' || !!currentExpedition.endless);
   useEffect(() => {
     if (!autoHunt) return;
@@ -1731,18 +1750,28 @@ export default function App() {
       later(handleVictoryContinue, 900);
     } else if (screen === 'reward' && currentRewards && currentRewards.length > 0) {
       const hpRatio = maxHp > 0 ? hp / maxHp : 1;
-      // 보상 우선순위: 저체력 회복 > 궁극 진화 > 패시브 > 유물 > 첫 번째
+      const classId = classData?.id;
+      // 1.72.1~ 직업 맞춤 보상 우선순위:
+      // 저체력 회복 > 궁극 진화 > 직업 전용 패시브(classOnly) >
+      // 보유 패시브 강화(Lv 높은 순 — 7Lv 궁극 진화 가속) > 직업 주력 스탯 >
+      // 새 패시브 > 유물 > 첫 번째
       const pick =
         (hpRatio < 0.5 && currentRewards.find(r => r.type === 'heal' || r.type === 'heal_full')) ||
         currentRewards.find(r => r.type === 'ultimate') ||
+        currentRewards.find(r => r.type === 'skill' && PASSIVE_SKILLS[r.name]?.classOnly === classId) ||
+        currentRewards
+          .filter(r => r.type === 'skill' && (skills[r.name] || 0) > 0)
+          .sort((a, b) => (skills[b.name] || 0) - (skills[a.name] || 0))[0] ||
+        currentRewards.find(r => r.type === 'stat' && r.name === AUTO_STAT_PREF[classId]) ||
         currentRewards.find(r => r.type === 'skill') ||
-        currentRewards.find(r => r.type === 'relic') ||
+        // 1.73.0~ 유물도 직업 선호 점수순 (물공 직업=물리 유물 / 마공 직업=마공 유물)
+        currentRewards
+          .filter(r => r.type === 'relic')
+          .sort((a, b) => scoreRelicForClass(b, classId) - scoreRelicForClass(a, classId))[0] ||
         currentRewards[0];
       later(() => handlePickReward(pick), 900);
     } else if (screen === 'chapterClear') {
       later(handleChapterContinue, 1200);
-    } else if (screen === 'shop') {
-      later(handleShopLeave, 700);
     } else if (screen === 'forge') {
       later(handleForgeLeave, 700);
     } else if (screen === 'rest') {
@@ -1829,6 +1858,7 @@ export default function App() {
                 }
               }} 
               onSelectChampionship={(champ) => { setSelectedChampionship(champ); setScreen('championshipDifficulty'); }}
+              onEndlessSkip={handleEndlessSkip}
               onBack={() => setScreen('title')} />}
             {screen === 'championshipDifficulty' && selectedChampionship && <ChampionshipDifficultySelect 
               championship={selectedChampionship} meta={meta}
@@ -1855,7 +1885,7 @@ export default function App() {
             {screen === 'rest' && <RestScreen classData={classData} hp={hp} maxHp={maxHp} skills={skills} stats={{ ...classData?.stats, ...stats }} activeSkills={activeSkills} activeRelicNames={activeRelicNames} relics={relics} ultimates={ultimates} engravingFx={getCombinedClassFx(meta, classData?.id)} meta={meta} expedition={currentExpedition} onChoice={handleRestChoice} />}
             {screen === 'prep' && <PrepScreen classData={classData} skills={skills} stats={{ ...classData?.stats, ...stats }} relics={relics} ultimates={ultimates} engravingFx={getCombinedClassFx(meta, classData?.id)} meta={meta} expedition={currentExpedition} mode="full" onConfirm={handlePrepConfirm} />}
             {screen === 'reselect' && <PrepScreen classData={classData} skills={skills} stats={{ ...classData?.stats, ...stats }} relics={relics} ultimates={ultimates} engravingFx={getCombinedClassFx(meta, classData?.id)} meta={meta} expedition={currentExpedition} mode={reselectMode} currentActiveSkills={activeSkills} currentActiveRelicNames={activeRelicNames} onConfirm={handleReselectConfirm} />}
-            {screen === 'shop' && <ShopScreen gold={gold} skills={skills} relics={relics} ultimates={ultimates} curses={currentCurses} onBuy={handleShopBuy} onLeave={handleShopLeave} classId={classData?.id} />}
+            {screen === 'shop' && <ShopScreen gold={gold} skills={skills} relics={relics} ultimates={ultimates} curses={currentCurses} autoPlay={autoHunt} onBuy={handleShopBuy} onLeave={handleShopLeave} classId={classData?.id} />}
             {screen === 'forge' && <ForgeScreen relics={relics} skills={skills} activeRelicNames={activeRelicNames} meta={meta} onCombine={handleForgeCombine} onLeave={handleForgeLeave} />}
             {screen === 'chapterClear' && chapter && <ChapterClearScreen chapter={chapter} isLastChapter={false} hp={hp} maxHp={maxHp} meta={meta} curses={currentCurses} onContinue={handleChapterContinue} />}
             {screen === 'expeditionClear' && currentExpedition && <ExpeditionClearScreen expedition={currentExpedition} soulsGained={runSouls} firstClear={runFirstChampClear} onContinue={handleExpeditionClearContinue} />}

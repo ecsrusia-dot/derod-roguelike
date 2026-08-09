@@ -16,8 +16,8 @@
 import React, { useState, useMemo } from 'react';
 import { ChevronRight, Lock, Calendar } from 'lucide-react';
 import { PALETTE, isUnlocked } from '../utils/helpers.js';
-import { EXPEDITIONS, CHAMPIONSHIPS, CHAMPIONSHIP_DIFFICULTIES, CLASSES, CURSES } from '../data.js';
-import { isChampionshipDifficultyUnlocked, getUnlockedChampionshipClasses, hasDailyCleared } from '../storage.js';
+import { EXPEDITIONS, CHAMPIONSHIPS, CHAMPIONSHIP_DIFFICULTIES, CLASSES, CURSES, ENDLESS_SKIP_LIMIT } from '../data.js';
+import { isChampionshipDifficultyUnlocked, getUnlockedChampionshipClasses, hasDailyCleared, getEndlessSkipUsed } from '../storage.js';
 import { buildDailyExpedition } from '../utils/dailyChallenge.js';
 import { ScreenHeader, Chip } from './ui/CommonUI.jsx';
 
@@ -93,8 +93,10 @@ function ExpCard({ eyebrow, eyebrowColor, title, desc, chips, locked, cleared, h
   );
 }
 
-export default function ExpeditionSelect({ meta, onSelect, onSelectChampionship, onBack }) {
+export default function ExpeditionSelect({ meta, onSelect, onSelectChampionship, onEndlessSkip = null, onBack }) {
   const [tab, setTab] = useState('classic');
+  // 1.73.0~ 무한던전 스킵 결과 모달
+  const [skipResult, setSkipResult] = useState(null);
 
   const tutorials = EXPEDITIONS.filter(e => e.category === 'tutorial')
     .sort((a, b) => (a.tutorialOrder || 0) - (b.tutorialOrder || 0));
@@ -208,7 +210,64 @@ export default function ExpeditionSelect({ meta, onSelect, onSelectChampionship,
                   );
                 })}
               </div>
+
+              {/* 1.73.0~ 무한던전 스킵 — 하루 5회, 실전투 시뮬 보상 */}
+              {onEndlessSkip && endlessExps.some(e => !(e.unlockId && !isUnlocked(meta, e.unlockId))) && (() => {
+                const skipUsed = getEndlessSkipUsed(meta, daily.dailyDateKey);
+                const skipLeft = Math.max(0, ENDLESS_SKIP_LIMIT - skipUsed);
+                const exhausted = skipLeft <= 0;
+                return (
+                  <button
+                    onClick={() => { const r = onEndlessSkip(); if (r) setSkipResult(r); }}
+                    disabled={exhausted}
+                    className="ui-press w-full mt-2 flex items-center justify-between px-3.5"
+                    style={{
+                      height: 44, borderRadius: 'var(--r-btn)',
+                      background: exhausted ? 'rgba(255,255,255,0.03)' : 'rgba(232,176,74,0.1)',
+                      border: `1px solid ${exhausted ? 'var(--ui-line)' : 'rgba(232,176,74,0.45)'}`,
+                      color: exhausted ? PALETTE.textDim : PALETTE.legendary,
+                      opacity: exhausted ? 0.55 : 1,
+                    }}>
+                    <span className="font-bold" style={{ fontSize: 12 }}>⚡ 전투 스킵 — 시뮬레이션 보상</span>
+                    <span className="tabular-nums" style={{ fontSize: 11, color: exhausted ? PALETTE.textDim : PALETTE.dawn }}>
+                      오늘 {skipLeft}/{ENDLESS_SKIP_LIMIT}
+                    </span>
+                  </button>
+                );
+              })()}
             </>
+          )}
+
+          {/* 스킵 결과 모달 */}
+          {skipResult && (
+            <div onClick={() => setSkipResult(null)} className="absolute inset-0 z-40 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.8)' }}>
+              <div onClick={(e) => e.stopPropagation()} className="w-full px-4 py-5 text-center" style={{
+                borderRadius: 18, background: 'var(--ui-glass-strong, rgba(20,14,12,0.95))',
+                border: `1px solid ${PALETTE.legendary}66`,
+              }}>
+                <div className="tracking-[0.3em] font-bold mb-3" style={{ fontSize: 11, color: PALETTE.legendary }}>⚡ 스킵 시뮬레이션 결과</div>
+                <div style={{ fontSize: 12, color: PALETTE.textDim }}>최고 결과 직업</div>
+                <div className="font-bold mb-3" style={{ fontSize: 15, color: PALETTE.text }}>{skipResult.className}</div>
+                <div className="grid grid-cols-3 gap-2 mb-3">
+                  {[
+                    ['도달 깊이', `${skipResult.depth}`],
+                    ['처치', `${skipResult.kills + skipResult.elites + skipResult.bosses}`],
+                    ['보스', `${skipResult.bosses}`],
+                  ].map(([label, value]) => (
+                    <div key={label} className="py-2" style={{ borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--ui-line)' }}>
+                      <div style={{ fontSize: 9, color: PALETTE.textDim }}>{label}</div>
+                      <div className="font-bold tabular-nums" style={{ fontSize: 14, color: PALETTE.text }}>{value}</div>
+                    </div>
+                  ))}
+                </div>
+                <div className="font-bold tabular-nums mb-4" style={{ fontSize: 20, color: PALETTE.legendary }}>✦ +{skipResult.souls}</div>
+                <button onClick={() => setSkipResult(null)} className="ui-press w-full" style={{
+                  height: 42, borderRadius: 'var(--r-btn)',
+                  background: 'rgba(232,176,74,0.15)', border: `1px solid ${PALETTE.legendary}`,
+                  color: PALETTE.text, fontSize: 12, letterSpacing: '0.2em',
+                }}>확인</button>
+              </div>
+            </div>
           )}
         </div>
       )}
