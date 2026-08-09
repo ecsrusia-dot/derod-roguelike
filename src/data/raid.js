@@ -55,26 +55,36 @@ export const RAID_GEAR_NAMES = {
 };
 
 // =========== 던전 (던파 루프: 파밍 → 레이드) ===========
+// 방 진행형 (PM 확정) — rooms 배열을 순서대로 돌파. 파티 HP는 방 사이에 10%만 회복 (소모전).
+// room.kind: 'mobs'(쫄) / 'named'(네임드) / 'boss'(보스)
+// room.drops: 이 방 클리어 시 즉시 획득하는 장비 수 — 중도 전멸·후퇴해도 이미 얻은 전리품은 보존
 export const RAID_DUNGEONS = [
   {
     id: 'raid_corridor', kind: 'farm',
     name: '무너진 회랑', sub: 'FARMING DUNGEON',
-    desc: '장비 파밍 던전. 문지기를 쓰러뜨리고 장비 2개를 챙긴다.',
-    boss: { name: '회랑의 문지기', hp: 3200, atk: 130, aoeEvery: 4, enrageAt: 0.5 },
-    drops: 2,
+    desc: '방 4개를 돌파하는 파밍 던전. 네임드와 문지기가 장비를 떨군다.',
     rarityWeights: { C: 55, R: 32, E: 11, L: 2 },
-    recommendedPower: 900,
+    recommendedPower: 4800,
     color: '#7ba3c4',
+    rooms: [
+      { kind: 'mobs',  name: '무너진 경비대',   hp: 900,   atk: 70,  drops: 0 },
+      { kind: 'mobs',  name: '회랑의 그림자들', hp: 1100,  atk: 85,  drops: 0 },
+      { kind: 'named', name: '이름 잃은 기사',  hp: 1800,  atk: 110, aoeEvery: 5, drops: 1 },
+      { kind: 'boss',  name: '회랑의 문지기',   hp: 3200,  atk: 130, aoeEvery: 4, enrageAt: 0.5, drops: 2 },
+    ],
   },
   {
     id: 'raid_abyss', kind: 'raid',
-    name: '심연의 제단', sub: 'RAID BOSS',
-    desc: '레이드 보스. 8라운드마다 전멸기 — 사제의 방벽 없이는 파티가 무너진다. 상위 장비를 갖추고 도전하라.',
-    boss: { name: '심연의 군주', hp: 13000, atk: 240, aoeEvery: 3, wipeEvery: 8, enrageAt: 0.5 },
-    drops: 3,
+    name: '심연의 제단', sub: 'RAID — 3관문',
+    desc: '관문 3개의 레이드. 최종 관문의 군주는 8라운드마다 전멸기 — 사제의 방벽 없이는 파티가 무너진다. 회랑에서 장비를 갖추고 도전하라.',
     rarityWeights: { C: 15, R: 45, E: 30, L: 10 },
-    recommendedPower: 1600,
+    recommendedPower: 6300,
     color: '#8b1f1f',
+    rooms: [
+      { kind: 'named', name: '심연의 파수꾼',  hp: 4500,  atk: 170, aoeEvery: 4, drops: 1 },
+      { kind: 'named', name: '공허의 쌍둥이',  hp: 6500,  atk: 200, aoeEvery: 3, enrageAt: 0.4, drops: 1 },
+      { kind: 'boss',  name: '심연의 군주',    hp: 13000, atk: 240, aoeEvery: 3, wipeEvery: 8, enrageAt: 0.5, drops: 3 },
+    ],
   },
 ];
 

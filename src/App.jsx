@@ -1731,6 +1731,19 @@ export default function App() {
     setScreen('raid');
   };
 
+  // 중도 전멸·후퇴 — 클리어 기록 없이 돌파한 방의 전리품만 보존
+  const handleRaidPartial = (loot) => {
+    if (loot && loot.length > 0) {
+      setMeta(prev => {
+        const next = addRaidDrops(prev, loot);
+        saveMeta(next);
+        return next;
+      });
+    }
+    setRaidDungeon(null);
+    setScreen('raid');
+  };
+
   const handleRaidEquip = (itemId) => {
     setMeta(prev => {
       const next = equipRaidItem(prev, itemId);
@@ -1870,7 +1883,7 @@ export default function App() {
             />}
             {screen === 'title' && authMode && <TitleScreen meta={meta} onStart={() => setScreen('expeditionSelect')} onResume={resumeActiveRun} onAltar={enterAltar} onEngravings={() => setScreen('engraving')} onRaid={raidUnlocked ? () => setScreen('raid') : null} onAchievements={() => { setPrevAchievementsBack('title'); setScreen('achievements'); }} onChangelog={() => setShowChangelog({ firstSeen: false })} onAccount={() => setScreen('account')} />}
             {screen === 'raid' && <RaidScreen meta={meta} onEnterDungeon={(d) => { setRaidDungeon(d); setScreen('raidBattle'); }} onEquipItem={handleRaidEquip} onAutoEquip={handleRaidAutoEquip} onBack={() => setScreen('title')} />}
-            {screen === 'raidBattle' && raidDungeon && <RaidBattleScreen key={raidDungeon.id + '-' + (meta?.raid?.clears?.[raidDungeon.id] || 0)} meta={meta} dungeon={raidDungeon} onVictory={handleRaidVictory} onDefeat={() => { setRaidDungeon(null); setScreen('raid'); }} onRetreat={() => { setRaidDungeon(null); setScreen('raid'); }} />}
+            {screen === 'raidBattle' && raidDungeon && <RaidBattleScreen key={raidDungeon.id + '-' + (meta?.raid?.clears?.[raidDungeon.id] || 0)} meta={meta} dungeon={raidDungeon} onVictory={handleRaidVictory} onDefeat={handleRaidPartial} onRetreat={handleRaidPartial} />}
             {screen === 'account' && <AccountScreen 
               authMode={authMode} 
               firebaseUser={firebaseUser} 

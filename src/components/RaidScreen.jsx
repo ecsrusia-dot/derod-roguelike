@@ -160,6 +160,8 @@ export default function RaidScreen({ meta, onEnterDungeon, onEquipItem, onAutoEq
           {RAID_DUNGEONS.map(d => {
             const clears = raid.clears?.[d.id] || 0;
             const under = partyPower < d.recommendedPower;
+            const finalRoom = d.rooms[d.rooms.length - 1];
+            const totalDrops = d.rooms.reduce((s, room) => s + (room.drops || 0), 0);
             return (
               <GlassPanel key={d.id} style={{ borderRadius: 14, padding: '11px 13px', ...(d.kind === 'raid' ? { borderColor: `${d.color}55` } : {}) }}>
                 <div className="tracking-[0.2em]" style={{ fontSize: 9.5, color: d.color }}>{d.sub}</div>
@@ -168,10 +170,22 @@ export default function RaidScreen({ meta, onEnterDungeon, onEquipItem, onAutoEq
                   {clears > 0 && <Chip color={PALETTE.green} style={{ height: 19 }}>클리어 ×{clears}</Chip>}
                 </div>
                 <div className="leading-relaxed mt-1" style={{ fontSize: 10.5, color: PALETTE.textDim }}>{d.desc}</div>
+                {/* 방 진행 미리보기 */}
+                <div className="flex items-center gap-1 mt-2 flex-wrap" style={{ fontSize: 9.5, color: PALETTE.textDim }}>
+                  {d.rooms.map((room, i) => (
+                    <React.Fragment key={i}>
+                      {i > 0 && <span style={{ opacity: 0.5 }}>▸</span>}
+                      <span style={{ color: room.kind === 'boss' ? d.color : room.kind === 'named' ? PALETTE.legendary : PALETTE.textDim }}>
+                        {room.name}
+                      </span>
+                    </React.Fragment>
+                  ))}
+                </div>
                 <div className="flex flex-wrap gap-1.5 mt-2">
-                  <Chip color={d.color} style={{ height: 19 }}>보스 HP {d.boss.hp}</Chip>
+                  <Chip color={d.color} style={{ height: 19 }}>방 {d.rooms.length}개</Chip>
+                  <Chip color={d.color} style={{ height: 19 }}>최종 보스 HP {finalRoom.hp}</Chip>
                   <Chip color={under ? PALETTE.accent : PALETTE.green} style={{ height: 19 }}>권장 전투력 {d.recommendedPower}</Chip>
-                  <Chip color={PALETTE.legendary} style={{ height: 19 }}>장비 {d.drops}개 드랍</Chip>
+                  <Chip color={PALETTE.legendary} style={{ height: 19 }}>장비 최대 {totalDrops}개</Chip>
                 </div>
                 <UIButton onClick={() => onEnterDungeon(d)} className="mt-2.5" style={{ height: 40, fontSize: 12, letterSpacing: '0.2em' }}>
                   ▸ 입장 {under ? '(전투력 부족 — 위험)' : ''}
