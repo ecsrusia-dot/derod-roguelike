@@ -48,6 +48,17 @@ export const RAID_SKILLS = {
   ],
 };
 
+// 1.77.0~ 기연(奇緣) 비전 스킬 — 방 클리어 시 극악 확률(0.5%)로 파티원 1명이 각성 (계정 영구)
+// 미보유 직업 중 랜덤 1명. 5직업 전부 모으는 장기 수집 목표.
+export const RAID_SECRET_CHANCE = 0.005;
+export const RAID_SECRET_SKILLS = {
+  wanderer:   { name: '불괴(不壞)의 몸', desc: '던전당 1회, 치명상을 입어도 HP 1로 버텨낸다' },
+  demonblood: { name: '혈신(血神) 강림', desc: '혈폭 배율 40% → 55%' },
+  elf:        { name: '심안(心眼)',      desc: '치명타 확률 25% → 35%' },
+  sage:       { name: '겁화(劫火)',      desc: '잔염 화상 데미지 30% → 50%' },
+  priest:     { name: '기적의 손길',     desc: '소생 사용 횟수 1회 → 2회' },
+};
+
 // 1.77.0~ 에픽 고유 옵션 — 해당 직업의 에픽 장비를 1개 이상 장착하면 발동 (스킬 강화 직결)
 export const RAID_EPIC_UNIQUES = {
   wanderer:   { name: '수호자의 맹세',   desc: '응수(반격) 확률 +15% (35% → 50%)' },

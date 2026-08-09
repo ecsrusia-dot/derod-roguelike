@@ -14,7 +14,7 @@ import {
   RAID_CLASSES, RAID_SKILLS, RAID_SLOTS, RAID_SLOT_NAMES, RAID_RARITIES,
   RAID_DUNGEONS, RAID_REGIONS, getRaidMemberStats, getRaidPartyPower, CLASSES,
   RAID_STONE, RAID_ENHANCE, RAID_DISMANTLE_VALUES, getRaidItemEffective, getKstWeekKey,
-  RAID_ESSENCE, RAID_CRAFT_RECIPES, RAID_GACHA, RAID_EPIC_UNIQUES,
+  RAID_ESSENCE, RAID_CRAFT_RECIPES, RAID_GACHA, RAID_EPIC_UNIQUES, RAID_SECRET_SKILLS,
 } from '../data.js';
 import { hasRaidWeeklyClaimed } from '../storage.js';
 import { ScreenHeader, GlassPanel, Chip, UIButton } from './ui/CommonUI.jsx';
@@ -191,6 +191,24 @@ export default function RaidScreen({ meta, onEnterDungeon, onEquipItem, onAutoEq
                           <div style={{ fontSize: 9.5, color: PALETTE.textDim, marginTop: 1 }}>{sk.desc}</div>
                         </div>
                       ))}
+                      {/* 기연 비전 스킬 — 던전에서 극악 확률로 각성 (계정 영구) */}
+                      {(() => {
+                        const secret = RAID_SECRET_SKILLS[classId];
+                        const learned = (raid.secretSkills || []).includes(classId);
+                        if (!secret) return null;
+                        return (
+                          <div className="mt-1.5 pt-1.5" style={{ borderTop: '1px dashed rgba(232,176,74,0.25)', opacity: learned ? 1 : 0.45 }}>
+                            {learned ? (
+                              <>
+                                <span style={{ fontSize: 10, fontWeight: 700, color: '#ffd86b', textShadow: '0 0 8px rgba(255,216,107,0.5)' }}>✦ 비전: {secret.name} (각성)</span>
+                                <div style={{ fontSize: 9.5, color: PALETTE.textDim, marginTop: 1 }}>{secret.desc}</div>
+                              </>
+                            ) : (
+                              <span style={{ fontSize: 10, color: PALETTE.textDim }}>✦ 비전: ??? — 던전에서 극악의 확률로 기연(奇緣)을 만나면 각성</span>
+                            )}
+                          </div>
+                        );
+                      })()}
                       {/* 에픽 고유 옵션 — 에픽 장비 1개 이상 장착 시 발동 */}
                       {(() => {
                         const uniq = RAID_EPIC_UNIQUES[classId];
