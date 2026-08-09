@@ -947,8 +947,8 @@ PM이 PNG를 푸시했다면 **JPG 변환 + 코드 헬퍼 연결 + 버전 갱신
 
 | 항목 | 값 |
 |---|---|
-| 브랜치 | `claude/game-ui-ux-redesign-a471kb` (UI 리디자인 시리즈 PR #122~#125) |
-| 현재 게임 버전 | **1.71.0** (UI 리디자인 1.63~1.67 완결 → 콘텐츠 개편 1.68~1.71: 전투 A 격노·간파 / B AP 턴 / C 콤보 연계 / 이벤트 연쇄 시스템 / 챕터 기믹 4종) |
+| 브랜치 | `claude/game-ui-ux-redesign-a471kb` (UI 리디자인 시리즈 PR #122~ / 1.72.0 PR #131) |
+| 현재 게임 버전 | **1.72.0** (1.63~1.67 UI 리디자인 → 1.68~1.71 콘텐츠 개편 → **1.72.0 자동 사냥 모드 + 영혼 수급 확장**: 일일 임무 3종 + 도감 발견 보너스 + 풀오토 사냥 AI) |
 | **다음 세션 브랜치 전략** | 다음 PR은 **`git fetch origin main` + `git checkout -B <새브랜치> origin/main`**으로 최신 main에서 분기 |
 
 ### 이번 세션 결과 요약 — 문서 갱신 (코드 변경 0줄)
@@ -984,6 +984,9 @@ PM이 PNG를 푸시했다면 **JPG 변환 + 코드 헬퍼 연결 + 버전 갱신
 | **연쇄 이벤트** | events.js `chain: '<id>'` / `chainOnly: true` | 예약 큐(pendingChainEvents)는 스냅샷 포함. 판정 success/fail별 chain 가능 |
 | **챕터 기믹** | chapters.js `gimmick: {id,name,desc}` | id: frost/decay/sealEcho/surge 구현됨. 신규 id는 CombatScreen 분기 추가 |
 | **이벤트 비용/페널티** | 1.70.0 실적용 픽스 | cost는 penalty로 정산 + 잔액 부족 비활성. 일반 선택지 penalty도 적용됨 |
+| **일일 임무** (1.72.0) | `data/meta.js` DAILY_MISSIONS + `storage.js` trackDailyMission | 임무 추가는 DAILY_MISSIONS 배열 + App.jsx 트래킹 지점 1곳. KST 날짜 키 자동 리셋, 완료 즉시 영혼 자동 지급. TitleScreen 진행도 패널 |
+| **도감 발견 보너스** (1.72.0) | `storage.js` recordCodex 내장 | 신규 발견 ✦5 / 카테고리 완성 ✦100 (codexCompletionClaimed 1회 기록). 소급 지급 없음 |
+| **자동 사냥** (1.72.0) | App 드라이버 useEffect + CombatScreen `chooseAutoAction` + EventScreen autoPlay | 허용: training + endless만 (`autoHuntAllowed`). 전투 AI 우선순위: 소울100 → heavy·저체력 방어 → 버프 → 콤보 셋업 → AP당 기대 데미지 최대. usable() 가드는 handlePlayerAction과 반드시 일치 유지 |
 
 ### 다음 세션 우선순위 (PM 미지정 시 기본값)
 

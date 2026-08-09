@@ -245,7 +245,7 @@ export default function CodexScreen({ meta, onBack }) {
       {/* 진행도 */}
       <div className="px-4 py-2 flex justify-between items-center" style={{ borderBottom: `1px solid ${PALETTE.panelBorder}` }}>
         <span className="text-[10px]" style={{ color: PALETTE.textDim }}>
-          {tabConfig.label} 발견
+          {tabConfig.label} 발견 <span style={{ color: PALETTE.legendary }}>· 신규 발견 ✦5 / 카테고리 완성 ✦100</span>
         </span>
         <span className="text-[12px] font-bold tabular-nums" style={{ color: tabConfig.color }}>
           {discoveredCount} / {pool.length} ({pool.length > 0 ? Math.floor((discoveredCount / pool.length) * 100) : 0}%)

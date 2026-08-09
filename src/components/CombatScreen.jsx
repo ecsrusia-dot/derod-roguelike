@@ -47,7 +47,7 @@ import {
 } from '../combat/initCombat.js';
 import { FloatingLabel, DamageVignette, WhiteFlash, SlashFx, MagicImpactFx, MagicParticles, BarrierRing, BarrierBreakFx, ThrustFx, BladeGuardFx, ShadowStrikeFx, StatusOverlay, UltimateCutin, EternalFlameCutin, FireballFx, ExplosionFx, IgniteGlowAura, IgniteExplodeFx, FlameBarrierFx, FlameReflectFx, CritScreenFx } from './CombatEffects.jsx';
 
-export default function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimates = [], initialRelics = [], activeSkills = null, activeRelicNames = null, enemyKey, isBoss, expedition, curses = [], meta, engravingFx = {}, chapterGimmick = null, onVictory, onDefeat }) {
+export default function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimates = [], initialRelics = [], activeSkills = null, activeRelicNames = null, enemyKey, isBoss, expedition, curses = [], meta, engravingFx = {}, chapterGimmick = null, autoPlay = false, onToggleAuto = null, onVictory, onDefeat }) {
   const [player, setPlayer] = useState(() => buildInitialPlayer({
     initialPlayer, initialSkills, initialUltimates, activeSkills, meta, curses,
   }));
@@ -744,6 +744,113 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     setPhase('enemyTurn');
     setTimeout(() => { executeEnemyTurn(newPlayer, newEnemy, newLog); }, 250);
   };
+
+  // ============================================
+  // 1.72.0~ 자동 사냥 — 스킬 선택 AI
+  // ============================================
+  // 우선순위 (최대 데미지 + 방어 최적화):
+  //   ① 소울 게이지 100 → 소울 스킬 (턴 시작 시)
+  //   ② 대공격(heavy) 예고 or HP 35% 미만 → 방어 스킬 (아직 방어 없을 때)
+  //   ③ 버프(분노) 선점 — 공격 여력(AP 2+) 있을 때 턴 초반에
+  //   ④ 콤보 셋업 — 선행기+연계기 세트가 이번 턴 안에 가능하면 선행기부터
+  //   ⑤ AP당 기대 데미지 최대 스킬 (연계 보너스·다중 히트 반영)
+  const chooseAutoAction = () => {
+    const ap = player.ap ?? AP_PER_TURN;
+    if (ap <= 0) return 'END';
+    // handlePlayerAction 가드와 동일 조건 (불일치 시 자동이 멈추므로 반드시 일치 유지)
+    const usable = (key) => {
+      const s = COMBAT_SKILLS[key];
+      if (!s) return false;
+      if ((player.cooldowns[key] || 0) > 0) return false;
+      if ((s.cost || 0) > player.ether) return false;
+      if (s.type === 'buff' && player.usedBuffThisTurn) return false;
+      if ((player.debuffs?.sealedSkills || []).includes(key)) return false;
+      if (getSkillApCost(s) > ap) return false;
+      return true;
+    };
+    const keys = classData.combatSkills.filter(usable);
+    // ① 소울 스킬 — 전체 턴 소모라 턴 시작(풀 AP)에만
+    if (classData.ultimateId && (player.soulGauge || 0) >= 100 && ap >= AP_PER_TURN) return 'ULT';
+    const hpRatio = player.maxHp > 0 ? player.hp / player.maxHp : 1;
+    const intent = enemy.nextIntent;
+    const danger = !!(intent && intent.type === 'attack' && (intent.heavy || hpRatio < 0.35));
+    const defenseKey = keys.find(k => COMBAT_SKILLS[k].type === 'defense');
+    // ② 대공격 간파 / 저체력 → 방어 우선
+    if (danger && defenseKey && (player.defense || 0) <= 0) return defenseKey;
+    // ③ 버프 선점 (분노 미보유 + 이후 공격할 AP 여유가 있을 때)
+    const buffKey = keys.find(k => COMBAT_SKILLS[k].type === 'buff');
+    if (buffKey && ap >= 2 && !(player.buffs?.rage > 0)) return buffKey;
+    const attackKeys = keys.filter(k => COMBAT_SKILLS[k].type === 'physical' || COMBAT_SKILLS[k].type === 'magic');
+    if (attackKeys.length === 0) {
+      // 공격 불가 — 남은 AP는 방어로 소진, 그것도 없으면 턴 종료
+      if (defenseKey && (player.defense || 0) <= 0) return defenseKey;
+      return 'END';
+    }
+    // ④ 콤보 셋업 — 연계기와 선행기 둘 다 이번 턴 AP·에테르 안에 들어가면 선행기부터
+    for (const k of attackKeys) {
+      const s = COMBAT_SKILLS[k];
+      if (!s.comboAfter) continue;
+      if (player._lastSkillThisTurn === s.comboAfter) continue; // 이미 셋업됨
+      const enabler = COMBAT_SKILLS[s.comboAfter];
+      if (!enabler || !usable(s.comboAfter)) continue;
+      const setAp = getSkillApCost(enabler) + getSkillApCost(s);
+      const setEther = (enabler.cost || 0) + (s.cost || 0);
+      if (setAp <= ap && setEther <= player.ether) return s.comboAfter;
+    }
+    // ⑤ AP당 기대 데미지 최대 스킬
+    let best = attackKeys[0];
+    let bestScore = -1;
+    for (const k of attackKeys) {
+      const s = COMBAT_SKILLS[k];
+      const range = getDisplayDamage(s, player, skills, ultimates, meta, curses, activeSkills, relicStat, engravingFx) || s.baseDmg;
+      let score = ((range[0] + range[1]) / 2) * (s.hitCount || 1);
+      if (s.comboAfter && player._lastSkillThisTurn === s.comboAfter) {
+        score *= 1 + (s.comboBonusPct || 0) / 100;
+      }
+      score /= getSkillApCost(s);
+      if (score > bestScore) { bestScore = score; best = k; }
+    }
+    return best;
+  };
+
+  // 승리 → 보상 획득 (수동 버튼 + 자동 사냥 공용)
+  // 연옥지화: 화염 각인 또는 겁화 보유 적 처치 시 즉시 HP +50
+  // 1.33.0~ 회복 유물(heal%)·매력 시그니처·저주 적용 (다른 회복 경로와 동일 처리)
+  const handleVictoryClaim = () => {
+    let finalHp = player.hp;
+    const hasIgnite = enemy.debuffs?.igniteDmg > 0 && enemy.debuffs?.igniteTurns > 0;
+    const hasEternalFire = enemy.debuffs?.eternalFireDmg > 0 && enemy.debuffs?.eternalFireTurns > 0;
+    if (hasUltimate(ultimates, 'ult_purgatoryFire') && (hasIgnite || hasEternalFire)) {
+      let heal = 50;
+      if (relicStat.heal > 0) heal = Math.floor(heal * (1 + relicStat.heal / 100));
+      const charismaBonus = getCharismaHealBonus(player);
+      if (charismaBonus > 0) heal = Math.floor(heal * (1 + charismaBonus / 100));
+      if (hasCurse(curses, 'curse_heal-50')) heal = Math.floor(heal * 0.5);
+      finalHp = Math.min(player.maxHp, player.hp + heal);
+    }
+    onVictory(finalHp, enemy.drop);
+  };
+
+  useEffect(() => {
+    if (!autoPlay) return;
+    if (phase === 'victory') {
+      const t = setTimeout(() => handleVictoryClaim(), 900);
+      return () => clearTimeout(t);
+    }
+    if (phase === 'defeat') {
+      const t = setTimeout(() => onDefeat(), 1400);
+      return () => clearTimeout(t);
+    }
+    if (phase !== 'playerTurn') return;
+    const t = setTimeout(() => {
+      if (actionLockRef.current) return;
+      const action = chooseAutoAction();
+      if (action === 'ULT') handleUltimate();
+      else if (action === 'END') handleEndTurn();
+      else if (action) handlePlayerAction(action);
+    }, 550);
+    return () => clearTimeout(t);
+  }, [autoPlay, phase, player]);
 
   // === 직업 소울 스킬 발동 ===
   // 소울 게이지 100에서만 호출됨. 발동 시 게이지 0으로 리셋, 컷인 0.9초 후
@@ -2362,7 +2469,17 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                     <span className="tabular-nums flex-none" style={{ fontSize: 9.5, color: ready ? '#ffd86b' : PALETTE.textDim }}>{gauge}/100</span>
                   </>
                 ) : <span className="flex-1" />}
-                {phase === 'playerTurn' && (
+                {/* 1.72.0~ 자동 사냥 인디케이터 — 탭 시 해제 */}
+                {autoPlay && onToggleAuto && (
+                  <button onClick={onToggleAuto} className="ui-press flex-none" style={{
+                    fontSize: 10, letterSpacing: '0.08em', fontWeight: 700,
+                    color: PALETTE.legendary,
+                    background: 'rgba(232,176,74,0.18)', border: `1px solid ${PALETTE.legendary}`,
+                    borderRadius: 999, padding: '3px 10px',
+                    boxShadow: '0 0 8px rgba(232,176,74,0.45)',
+                  }}>AUTO ⏸</button>
+                )}
+                {phase === 'playerTurn' && !autoPlay && (
                   <button onClick={handleEndTurn} className="ui-press flex-none" style={{
                     fontSize: 10, letterSpacing: '0.08em', color: PALETTE.textDim,
                     background: 'rgba(255,255,255,0.05)', border: '1px solid var(--ui-line)',
@@ -2460,22 +2577,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
             </div>
           )}
           {phase === 'victory' && (
-            <button onClick={() => {
-              // 연옥지화: 화염 각인 또는 겁화 보유 적 처치 시 즉시 HP +50
-              // 1.33.0~ 회복 유물(heal%)·매력 시그니처·저주 적용 (다른 회복 경로와 동일 처리)
-              let finalHp = player.hp;
-              const hasIgnite = enemy.debuffs?.igniteDmg > 0 && enemy.debuffs?.igniteTurns > 0;
-              const hasEternalFire = enemy.debuffs?.eternalFireDmg > 0 && enemy.debuffs?.eternalFireTurns > 0;
-              if (hasUltimate(ultimates, 'ult_purgatoryFire') && (hasIgnite || hasEternalFire)) {
-                let heal = 50;
-                if (relicStat.heal > 0) heal = Math.floor(heal * (1 + relicStat.heal / 100));
-                const charismaBonus = getCharismaHealBonus(player);
-                if (charismaBonus > 0) heal = Math.floor(heal * (1 + charismaBonus / 100));
-                if (hasCurse(curses, 'curse_heal-50')) heal = Math.floor(heal * 0.5);
-                finalHp = Math.min(player.maxHp, player.hp + heal);
-              }
-              onVictory(finalHp, enemy.drop);
-            }}
+            <button onClick={handleVictoryClaim}
               className="ui-press w-full py-3 text-xs tracking-[0.3em] font-bold" style={{
                 borderRadius: 'var(--r-btn)',
                 background: `linear-gradient(160deg, ${PALETTE.legendary}66, ${PALETTE.legendary}28)`,

@@ -212,6 +212,20 @@ export const SOUL_REWARDS = {
   dailyRerollLimit: 10,  // 일일 유료 리롤 횟수 제한 (KST 0시 리셋)
 };
 
+// =========== 일일 임무 (1.72.0~) ===========
+// 매일 KST 자정 리셋. 완료 즉시 영혼 자동 지급 (수령 버튼 없음).
+// 진행/완료 상태는 meta.dailyMissions = { date, progress, claimed } (storage.js)
+export const DAILY_MISSIONS = [
+  { id: 'dm_kill10', name: '사냥꾼의 하루', desc: '적 10마리 처치', target: 10, reward: 30 },
+  { id: 'dm_elite3', name: '강적 토벌', desc: '강적 3마리 처치', target: 3, reward: 40 },
+  { id: 'dm_clear1', name: '원정의 완수', desc: '원정 1회 클리어', target: 1, reward: 50 },
+];
+
+// =========== 도감 발견 보너스 (1.72.0~) ===========
+// 신규 발견 1건당 +5 영혼, 카테고리 전체 완성 시 +100 영혼 (1회)
+export const CODEX_DISCOVERY_REWARD = 5;
+export const CODEX_COMPLETE_REWARD = 100;
+
 // =========== 업적 시스템 ===========
 // 업적 카테고리:
 //   - clear: 직업/원정 클리어 진행 업적
