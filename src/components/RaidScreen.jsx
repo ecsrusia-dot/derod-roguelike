@@ -14,6 +14,7 @@ import {
   RAID_CLASSES, RAID_SKILLS, RAID_SLOTS, RAID_SLOT_NAMES, RAID_RARITIES,
   RAID_DUNGEONS, RAID_REGIONS, getRaidMemberStats, getRaidPartyPower, CLASSES,
   RAID_STONE, RAID_ENHANCE, RAID_DISMANTLE_VALUES, getRaidItemEffective, getKstWeekKey,
+  RAID_ESSENCE, RAID_CRAFT_RECIPES, RAID_GACHA,
 } from '../data.js';
 import { hasRaidWeeklyClaimed } from '../storage.js';
 import { ScreenHeader, GlassPanel, Chip, UIButton } from './ui/CommonUI.jsx';
@@ -61,11 +62,14 @@ function GearChip({ item, onEquip, onDismantle }) {
   );
 }
 
-export default function RaidScreen({ meta, onEnterDungeon, onEquipItem, onAutoEquip, onDismantle = null, onDismantleJunk = null, onEnhance = null, onBack }) {
-  const raid = meta?.raid || { inventory: [], equipped: {}, clears: {}, stones: 0 };
+export default function RaidScreen({ meta, onEnterDungeon, onEquipItem, onAutoEquip, onDismantle = null, onDismantleJunk = null, onEnhance = null, onCraft = null, onGacha = null, onBack }) {
+  const raid = meta?.raid || { inventory: [], equipped: {}, clears: {}, stones: 0, essence: 0 };
   const [gearClass, setGearClass] = useState(null); // 장비 관리 중인 직업 ID | null
+  // 1.76.0~ 제작·가챠 결과 배너
+  const [lastResult, setLastResult] = useState(null); // { source: '제작'|'가챠', item }
   const partyPower = getRaidPartyPower(raid);
   const stones = raid.stones || 0;
+  const essence = raid.essence || 0;
   const weekKey = getKstWeekKey();
 
   const classMeta = (classId) => CLASSES.find(c => c.id === classId);
@@ -81,6 +85,7 @@ export default function RaidScreen({ meta, onEnterDungeon, onEquipItem, onAutoEq
           right={
             <span className="flex gap-1.5">
               <Chip color={PALETTE.ice} icon={<span>{RAID_STONE.icon}</span>}><span className="tabular-nums">{stones}</span></Chip>
+              <Chip color={PALETTE.legendary} icon={<span>{RAID_ESSENCE.icon}</span>}><span className="tabular-nums">{essence}</span></Chip>
               <Chip color={PALETTE.legendary} icon={<span>⚔</span>}><span className="tabular-nums">{partyPower}</span></Chip>
             </span>
           }
@@ -207,6 +212,78 @@ export default function RaidScreen({ meta, onEnterDungeon, onEquipItem, onAutoEq
           </div>
         )}
 
+        {/* ===== 제작소 (1.76.0~) — 정수 제작 + 심연석 가챠 ===== */}
+        <div className="mt-4 mb-2 flex items-center gap-2.5">
+          <span className="tracking-[0.25em] flex-none" style={{ fontSize: 11, color: PALETTE.dawn }}>심연 제작소</span>
+          <span className="flex-1 h-px" style={{ background: 'var(--ui-line)' }} />
+          <span style={{ fontSize: 10, color: PALETTE.textDim }}>{RAID_ESSENCE.icon} 정수는 첨탑·심연 막보 전용 드랍</span>
+        </div>
+        {/* 제작·가챠 결과 배너 */}
+        {lastResult && (() => {
+          const rar = RAID_RARITIES[lastResult.item.rarity];
+          const cls = classMeta(lastResult.item.classId);
+          return (
+            <div className="flex items-center justify-between px-3 py-2.5 mb-2" style={{
+              borderRadius: 12, background: `${rar.color}18`, border: `1.5px solid ${rar.color}`,
+              boxShadow: `0 0 14px ${rar.color}55`,
+            }}>
+              <span style={{ fontSize: 11.5 }}>
+                <span style={{ color: PALETTE.textDim, fontSize: 10 }}>[{lastResult.source} 결과]</span>{' '}
+                <span style={{ color: rar.color, fontWeight: 700 }}>[{rar.name}]</span>{' '}
+                <span style={{ color: PALETTE.text }}>{lastResult.item.name}</span>{' '}
+                <span style={{ fontSize: 9.5, color: PALETTE.textDim }}>({cls?.name})</span>
+              </span>
+              <button onClick={() => setLastResult(null)} className="ui-press" style={{ fontSize: 11, color: PALETTE.textDim, background: 'transparent', border: 'none' }}>✕</button>
+            </div>
+          );
+        })()}
+        <div className="flex flex-col gap-1.5">
+          {onCraft && RAID_CRAFT_RECIPES.map(recipe => {
+            const rar = RAID_RARITIES[recipe.rarity];
+            const affordable = stones >= recipe.stones && essence >= recipe.essence;
+            return (
+              <div key={recipe.id} className="flex items-center justify-between px-3 py-2.5" style={{
+                borderRadius: 12, background: `${rar.color}10`, border: `1px solid ${rar.color}55`,
+              }}>
+                <div className="min-w-0">
+                  <div style={{ fontSize: 11.5, fontWeight: 700, color: rar.color }}>{recipe.name} — {rar.name} 확정</div>
+                  <div style={{ fontSize: 9.5, color: PALETTE.textDim }}>부위·직업 랜덤 · 심연의 시리즈 성능</div>
+                </div>
+                <button onClick={() => { const item = onCraft(recipe.id); if (item) setLastResult({ source: '제작', item }); }}
+                  disabled={!affordable}
+                  className="ui-press flex-none ml-2 tabular-nums" style={{
+                    fontSize: 10.5, fontWeight: 700, padding: '7px 11px', borderRadius: 10,
+                    background: affordable ? `${rar.color}22` : 'rgba(255,255,255,0.03)',
+                    border: `1px solid ${affordable ? rar.color : 'var(--ui-line)'}`,
+                    color: affordable ? rar.color : PALETTE.textDim,
+                  }}>
+                  {RAID_ESSENCE.icon}{recipe.essence} + {RAID_STONE.icon}{recipe.stones}
+                </button>
+              </div>
+            );
+          })}
+          {onGacha && (
+            <div className="flex items-center justify-between px-3 py-2.5" style={{
+              borderRadius: 12, background: 'rgba(123,163,196,0.08)', border: `1px solid ${PALETTE.ice}55`,
+            }}>
+              <div className="min-w-0">
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: PALETTE.ice }}>심연석 가챠 — 랜덤 장비 1개</div>
+                <div style={{ fontSize: 9.5, color: PALETTE.textDim }}>전 시리즈 랜덤 · 에픽 {RAID_GACHA.weights.EP}% (등급 높을수록 확률 급감)</div>
+              </div>
+              <button onClick={() => { const item = onGacha(); if (item) setLastResult({ source: '가챠', item }); }}
+                disabled={stones < RAID_GACHA.cost}
+                className="ui-press flex-none ml-2 tabular-nums" style={{
+                  fontSize: 10.5, fontWeight: 700, padding: '7px 11px', borderRadius: 10,
+                  background: stones >= RAID_GACHA.cost ? 'rgba(123,163,196,0.18)' : 'rgba(255,255,255,0.03)',
+                  border: `1px solid ${stones >= RAID_GACHA.cost ? PALETTE.ice : 'var(--ui-line)'}`,
+                  color: stones >= RAID_GACHA.cost ? PALETTE.ice : PALETTE.textDim,
+                }}>
+                {RAID_STONE.icon}{RAID_GACHA.cost}
+              </button>
+            </div>
+          )}
+        </div>
+
         {/* ===== 던전 — 지역별 그룹 (던파 지역-던전 편성 참고) ===== */}
         {RAID_REGIONS.map(region => (
         <React.Fragment key={region.id}>
@@ -223,6 +300,7 @@ export default function RaidScreen({ meta, onEnterDungeon, onEquipItem, onAutoEq
             const under = partyPower < d.recommendedPower;
             const finalRoom = d.rooms[d.rooms.length - 1];
             const totalDrops = d.rooms.reduce((s, room) => s + (room.drops || 0), 0);
+            const totalStones = d.rooms.reduce((s, room) => s + (room.stones || 0), 0);
             return (
               <GlassPanel key={d.id} style={{ borderRadius: 14, padding: '11px 13px', ...(d.kind === 'raid' ? { borderColor: `${d.color}55` } : {}) }}>
                 <div className="tracking-[0.2em]" style={{ fontSize: 9.5, color: d.color }}>{d.sub}</div>
@@ -246,8 +324,10 @@ export default function RaidScreen({ meta, onEnterDungeon, onEquipItem, onAutoEq
                   <Chip color={d.color} style={{ height: 19 }}>방 {d.rooms.length}개</Chip>
                   <Chip color={d.color} style={{ height: 19 }}>최종 보스 HP {finalRoom.hp}</Chip>
                   <Chip color={under ? PALETTE.accent : PALETTE.green} style={{ height: 19 }}>권장 전투력 {d.recommendedPower}</Chip>
-                  <Chip color={PALETTE.legendary} style={{ height: 19 }}>{d.gearPrefix} 장비 ×{d.gearMult} · 최대 {totalDrops}개</Chip>
+                  <Chip color={PALETTE.legendary} style={{ height: 19 }}>{d.gearPrefix} 장비 ×{d.gearMult} · 막보 {totalDrops}개</Chip>
                   <Chip color={RAID_RARITIES.EP.color} style={{ height: 19 }}>에픽 {d.rarityWeights.EP}%</Chip>
+                  {totalStones > 0 && <Chip color={PALETTE.ice} style={{ height: 19 }}>네임드 {RAID_STONE.icon}{totalStones}</Chip>}
+                  {(d.essenceDrop || 0) > 0 && <Chip color={PALETTE.legendary} style={{ height: 19 }}>막보 {RAID_ESSENCE.icon}{d.essenceDrop} 확정</Chip>}
                   {hasRaidWeeklyClaimed(meta, d.id, weekKey)
                     ? <Chip color={PALETTE.green} style={{ height: 19 }}>주간 보상 ✓</Chip>
                     : <Chip color={PALETTE.ice} style={{ height: 19 }}>주간 첫 클리어 {RAID_STONE.icon}{d.weeklyStones}{d.kind === 'raid' ? ' + 유니크↑ 확정' : ''}</Chip>}

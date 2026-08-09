@@ -67,6 +67,8 @@ const DEFAULT_META = {
     // 1.75.0~ 심연석 (분해로 획득, 강화에 소모) + 주간 첫 클리어 기록
     stones: 0,
     weekly: null, // { week: 'YYYYMMDD'(월요일 키), claimed: [dungeonId] }
+    // 1.76.0~ 군주의 정수 — 상위 막보 전용 희귀 재료 (에픽·레전더리 제작)
+    essence: 0,
   },
   // 진행 중인 런 스냅샷 (맵 화면 진입 시 자동 저장 — 앱 종료/새로고침 후 이어하기 용)
   // null = 진행 중 런 없음. 객체 = 재개 가능한 런 상태.
@@ -564,7 +566,7 @@ export function useEndlessSkip(meta, dateKey, souls) {
 // ============================================
 // 1.74.0~ 레이드 장비/클리어 헬퍼
 // ============================================
-const EMPTY_RAID = { inventory: [], equipped: { wanderer: {}, sage: {}, demonblood: {}, elf: {}, priest: {} }, clears: {}, stones: 0, weekly: null };
+const EMPTY_RAID = { inventory: [], equipped: { wanderer: {}, sage: {}, demonblood: {}, elf: {}, priest: {} }, clears: {}, stones: 0, weekly: null, essence: 0 };
 
 function getRaid(meta) {
   const raid = meta?.raid || EMPTY_RAID;
@@ -688,6 +690,35 @@ export function enhanceRaidItem(meta, classId, slot, cost, maxLevel) {
         ...raid.equipped,
         [classId]: { ...(raid.equipped?.[classId] || {}), [slot]: upgraded },
       },
+    },
+  };
+}
+
+// 1.76.0~ 레이드 자원 획득 (전투 전리품 — 심연석·정수)
+export function addRaidResources(meta, { stones = 0, essence = 0 } = {}) {
+  if (!stones && !essence) return meta;
+  const raid = getRaid(meta);
+  return {
+    ...meta,
+    raid: {
+      ...raid,
+      stones: (raid.stones || 0) + Math.max(0, stones),
+      essence: (raid.essence || 0) + Math.max(0, essence),
+    },
+  };
+}
+
+// 1.76.0~ 제작·가챠 결제 — 자원 차감 + 결과 장비 인벤토리 추가. 부족하면 meta 그대로 반환
+export function spendRaidResourcesForItem(meta, { stones = 0, essence = 0 } = {}, item) {
+  const raid = getRaid(meta);
+  if ((raid.stones || 0) < stones || (raid.essence || 0) < essence || !item) return meta;
+  return {
+    ...meta,
+    raid: {
+      ...raid,
+      stones: (raid.stones || 0) - stones,
+      essence: (raid.essence || 0) - essence,
+      inventory: [...raid.inventory, item],
     },
   };
 }
