@@ -23,6 +23,29 @@ export const AUTO_STAT_PREF = {
   wanderer: '근력', sage: '지능', demonblood: '근력', elf: '민첩', priest: '매력',
 };
 
+// 1.73.0~ 자동 사냥 직업 유물 선호 — statBonus 키별 가중치
+// 물공 직업(검사·마족·정령사)은 물리 계열, 마공 직업(술법사·사제)은 magicDmg 우선
+export const AUTO_RELIC_PREF = {
+  wanderer:   { dmgDealt: 3, critRate: 3, critDmg: 3, lifesteal: 2, dodge: 2, maxHp: 1, dmgTaken: 1 },
+  demonblood: { dmgDealt: 3, lifesteal: 3, critRate: 3, critDmg: 3, maxHp: 2, dmgTaken: 1 },
+  elf:        { dodge: 3, critRate: 3, critDmg: 3, dmgDealt: 3, lifesteal: 1 },
+  sage:       { magicDmg: 4, dmgDealt: 3, critRate: 2, critDmg: 2, cdReduceChance: 2 },
+  priest:     { magicDmg: 4, heal: 3, dmgDealt: 2, maxHp: 2, dmgTaken: 1 },
+};
+
+// 유물이 해당 직업에 얼마나 어울리는지 점수화 (자동 사냥 보상 선택용)
+// dmgTaken은 음수(받는 데미지 감소)일 때만 가산 — 광기의 가면(+10%) 같은 페널티는 제외
+export function scoreRelicForClass(relic, classId) {
+  const pref = AUTO_RELIC_PREF[classId];
+  if (!pref || !relic?.statBonus) return 0;
+  let score = 0;
+  Object.entries(relic.statBonus).forEach(([k, v]) => {
+    if (k === 'dmgTaken' && v > 0) return;
+    score += pref[k] || 0;
+  });
+  return score;
+}
+
 export const PALETTE = {
   bg: '#0a0608', bgDeep: '#050304',
   panel: '#1a0e12', panelLight: '#241419', panelBorder: '#3d1f28',

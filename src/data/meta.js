@@ -221,6 +221,10 @@ export const DAILY_MISSIONS = [
   { id: 'dm_clear1', name: '원정의 완수', desc: '원정 1회 클리어', target: 1, reward: 50 },
 ];
 
+// =========== 무한던전 스킵 (1.73.0~) ===========
+// 하루 5회, 실전투 시뮬레이션으로 보상 계산 (utils/endlessSkipSim.js)
+export const ENDLESS_SKIP_LIMIT = 5;
+
 // =========== 도감 발견 보너스 (1.72.0~) ===========
 // 신규 발견 1건당 +5 영혼, 카테고리 전체 완성 시 +100 영혼 (1회)
 export const CODEX_DISCOVERY_REWARD = 5;

@@ -56,6 +56,8 @@ const DEFAULT_META = {
   dailyMissions: null,
   // 1.72.0~ 도감 카테고리 완성 보너스 지급 기록 (카테고리당 1회)
   codexCompletionClaimed: [],
+  // 1.73.0~ 무한던전 스킵 — { date: 'YYYYMMDD', used: N } (KST 자정 리셋, 하루 5회)
+  endlessSkip: null,
   // 진행 중인 런 스냅샷 (맵 화면 진입 시 자동 저장 — 앱 종료/새로고침 후 이어하기 용)
   // null = 진행 중 런 없음. 객체 = 재개 가능한 런 상태.
   activeRun: null,
@@ -525,6 +527,22 @@ export function recordCodex(meta, category, id) {
     };
   }
   return next;
+}
+
+// 1.73.0~ 무한던전 스킵 — 오늘 사용 횟수 (날짜 다르면 0)
+export function getEndlessSkipUsed(meta, dateKey) {
+  const es = meta?.endlessSkip;
+  return es && es.date === dateKey ? es.used || 0 : 0;
+}
+
+// 1.73.0~ 무한던전 스킵 1회 소모 + 시뮬 보상 영혼 지급 (횟수 검증은 호출부)
+export function useEndlessSkip(meta, dateKey, souls) {
+  const used = getEndlessSkipUsed(meta, dateKey);
+  return {
+    ...meta,
+    endlessSkip: { date: dateKey, used: used + 1 },
+    souls: (meta.souls || 0) + Math.max(0, souls || 0),
+  };
 }
 
 // 1.72.0~ 일일 임무 진행 트래킹

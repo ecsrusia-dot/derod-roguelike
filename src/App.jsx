@@ -9,6 +9,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   PALETTE,
   AUTO_STAT_PREF,
+  scoreRelicForClass,
   getSkillLevel,
   getActivePassives,
   hasEffect,
@@ -104,9 +105,11 @@ import {
   VERSION_DATE,
   VERSION_LABEL,
   DAILY_MISSIONS,
+  ENDLESS_SKIP_LIMIT,
 } from './data.js';
 import { getKstDateKey } from './utils/dailyChallenge.js';
-import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, trackDailyMission } from './storage.js';
+import { simulateBestEndlessRun } from './utils/endlessSkipSim.js';
+import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, trackDailyMission, getEndlessSkipUsed, useEndlessSkip } from './storage.js';
 
 
 
@@ -1692,6 +1695,21 @@ export default function App() {
     setScreen('title');
   };
 
+  // 1.73.0~ 무한던전 스킵 — 하루 5회, 실전투 시뮬로 보상 계산 후 즉시 지급
+  // 5직업 전부 시뮬 → 최고 결과 채택. 기록·도감·업적·일일 임무 미반영 (보상 전용)
+  const handleEndlessSkip = () => {
+    const dateKey = getKstDateKey();
+    if (getEndlessSkipUsed(meta, dateKey) >= ENDLESS_SKIP_LIMIT) return null;
+    const result = simulateBestEndlessRun(meta);
+    if (!result) return null;
+    setMeta(prev => {
+      const next = useEndlessSkip(prev, dateKey, result.souls);
+      saveMeta(next);
+      return next;
+    });
+    return result;
+  };
+
   // ============================================
   // 1.72.0~ 자동 사냥 드라이버 (App 레벨 화면 자동 진행)
   // ============================================
@@ -1746,7 +1764,10 @@ export default function App() {
           .sort((a, b) => (skills[b.name] || 0) - (skills[a.name] || 0))[0] ||
         currentRewards.find(r => r.type === 'stat' && r.name === AUTO_STAT_PREF[classId]) ||
         currentRewards.find(r => r.type === 'skill') ||
-        currentRewards.find(r => r.type === 'relic') ||
+        // 1.73.0~ 유물도 직업 선호 점수순 (물공 직업=물리 유물 / 마공 직업=마공 유물)
+        currentRewards
+          .filter(r => r.type === 'relic')
+          .sort((a, b) => scoreRelicForClass(b, classId) - scoreRelicForClass(a, classId))[0] ||
         currentRewards[0];
       later(() => handlePickReward(pick), 900);
     } else if (screen === 'chapterClear') {
@@ -1837,6 +1858,7 @@ export default function App() {
                 }
               }} 
               onSelectChampionship={(champ) => { setSelectedChampionship(champ); setScreen('championshipDifficulty'); }}
+              onEndlessSkip={handleEndlessSkip}
               onBack={() => setScreen('title')} />}
             {screen === 'championshipDifficulty' && selectedChampionship && <ChampionshipDifficultySelect 
               championship={selectedChampionship} meta={meta}
