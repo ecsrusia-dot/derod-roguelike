@@ -14,7 +14,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { PALETTE } from '../utils/helpers.js';
-import { RAID_CLASSES, RAID_RARITIES, getRaidMemberStats, rollRaidDrop, CLASSES } from '../data.js';
+import { RAID_CLASSES, RAID_RARITIES, RAID_TUNING, RAID_STONE, RAID_ESSENCE, getRaidMemberStats, rollRaidDrop, CLASSES } from '../data.js';
 
 const ROLE_COLORS = { tank: '#7ba3c4', dealer: '#c4453d', healer: '#9ad4a3' };
 const ROOM_KIND_LABELS = { mobs: '쫄', named: '네임드', boss: '보스' };
@@ -31,8 +31,10 @@ function buildParty(raidMeta) {
   });
 }
 
+// 1.76.0~ 전역 난이도 배율(RAID_TUNING) 적용 — 실기기 체감 후 상수만 조정
 function buildRoomEnemy(room) {
-  return { ...room, maxHp: room.hp, enraged: false };
+  const hp = Math.round(room.hp * RAID_TUNING.enemyHpMult);
+  return { ...room, hp, maxHp: hp, atk: Math.round(room.atk * RAID_TUNING.enemyAtkMult), enraged: false };
 }
 
 export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, onRetreat }) {
@@ -41,7 +43,9 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
   const [roomIdx, setRoomIdx] = useState(0);
   const [enemy, setEnemy] = useState(() => buildRoomEnemy(rooms[0]));
   const [round, setRound] = useState(0); // 방마다 리셋 (패턴 주기 기준)
-  const [loot, setLoot] = useState([]);  // 방 클리어마다 누적 — 전멸해도 보존
+  // 1.76.0~ 전리품 = { items, stones, essence } — 방 클리어마다 누적, 전멸해도 보존.
+  // 장비(items)·정수(essence)는 막보 전용, 중간 네임드는 심연석(stones)만.
+  const [loot, setLoot] = useState({ items: [], stones: 0, essence: 0 });
   const [log, setLog] = useState([{ t: 'sys', text: `━━ ${dungeon.name} 입장 — 방 1/${rooms.length} · ${rooms[0].name} ━━` }]);
   const [phase, setPhase] = useState('running'); // running | victory | defeat
   const [speed, setSpeed] = useState(1);
@@ -65,7 +69,7 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
       const wipeRound = !!(e.wipeEvery && r % e.wipeEvery === 0);
       let shield = false;
 
-      // 1. 사제
+      // 1. 사제 — 침묵의 저주(healCut) 중엔 치유 -50%
       const priest = p.find(m => m.classId === 'priest');
       if (priest?.alive) {
         if (wipeRound) {
@@ -74,9 +78,11 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
         } else {
           const hurt = alive().reduce((a, m) => (m.hp / m.maxHp < a.hp / a.maxHp ? m : a));
           if (hurt && hurt.hp < hurt.maxHp) {
-            const healed = Math.min(hurt.maxHp - hurt.hp, priest.heal);
+            const healCut = (e.healCutLeft || 0) > 0;
+            const healAmount = healCut ? Math.floor(priest.heal * 0.5) : priest.heal;
+            const healed = Math.min(hurt.maxHp - hurt.hp, healAmount);
             hurt.hp += healed;
-            lines.push({ t: 'heal', text: `✚ 사제 → ${hurt.name} +${healed}` });
+            lines.push({ t: 'heal', text: `✚ 사제 → ${hurt.name} +${healed}${healCut ? ' [침묵의 저주 -50%]' : ''}` });
           }
         }
       }
@@ -109,15 +115,22 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
       // ===== 방 클리어 =====
       if (e.hp <= 0) {
         lines.push({ t: 'win', text: `━━ ${e.name} 격파! ━━` });
-        const roomDrops = Array.from({ length: e.drops || 0 }, () => rollRaidDrop(dungeon));
-        const newLoot = [...loot, ...roomDrops];
-        if (roomDrops.length > 0) {
-          roomDrops.forEach(item => {
-            const rar = RAID_RARITIES[item.rarity];
-            lines.push({ t: 'win', text: `◈ 전리품 — [${rar.name}] ${item.name}` });
-          });
-        }
         const isLastRoom = roomIdx >= rooms.length - 1;
+        // 장비·정수는 막보 전용 / 중간 네임드는 심연석 (1관문 반복 파밍 익스플로잇 차단)
+        const roomItems = isLastRoom ? Array.from({ length: e.drops || 0 }, () => rollRaidDrop(dungeon)) : [];
+        const roomStones = e.stones || 0;
+        const roomEssence = isLastRoom ? (dungeon.essenceDrop || 0) : 0;
+        const newLoot = {
+          items: [...loot.items, ...roomItems],
+          stones: loot.stones + roomStones,
+          essence: loot.essence + roomEssence,
+        };
+        roomItems.forEach(item => {
+          const rar = RAID_RARITIES[item.rarity];
+          lines.push({ t: 'win', text: `◈ 전리품 — [${rar.name}] ${item.name}` });
+        });
+        if (roomStones > 0) lines.push({ t: 'win', text: `${RAID_STONE.icon} 심연석 +${roomStones}` });
+        if (roomEssence > 0) lines.push({ t: 'win', text: `${RAID_ESSENCE.icon} 군주의 정수 +${roomEssence}` });
         if (isLastRoom) {
           setParty(p); setEnemy(e); setRound(r);
           setLog(prev => [...prev, ...lines]);
@@ -139,8 +152,33 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
         return;
       }
 
+      // 3.5. 소환된 쫄 공격 (지난 라운드 소환분 — 1회 타격 후 소멸)
+      if ((e.pendingAdds || 0) > 0) {
+        const addDmg = Math.round(e.atk * 0.25);
+        for (let i = 0; i < e.pendingAdds; i++) {
+          const targets = alive();
+          if (targets.length === 0) break;
+          const victim = targets[Math.floor(Math.random() * targets.length)];
+          victim.hp = Math.max(0, victim.hp - addDmg);
+          lines.push({ t: 'boss', text: `◂ 소환수 → ${victim.name} ${addDmg}` });
+          if (victim.hp <= 0) { victim.alive = false; lines.push({ t: 'boss', text: `✖ ${victim.name} 전투 불능` }); }
+        }
+        lines.push({ t: 'sys', text: `· 소환수 소멸` });
+        e.pendingAdds = 0;
+      }
+
       // 4. 적 행동
       const enemyAtk = e.atk * (e.enraged ? 1.3 : 1) * (0.9 + Math.random() * 0.2);
+      // 기믹: 쫄 소환 (summonEvery) — 다음 라운드에 소환수 2기가 일제 타격
+      if (e.summonEvery && r % e.summonEvery === 0) {
+        e.pendingAdds = 2;
+        lines.push({ t: 'boss', text: `☍ ${e.name} — 소환수 2기 소환! (다음 라운드 일제 공격)` });
+      }
+      // 기믹: 침묵의 저주 (healCutEvery) — 2라운드간 사제 치유 -50%
+      if (e.healCutEvery && r % e.healCutEvery === 0) {
+        e.healCutLeft = 3; // 이번 라운드 말 차감 포함 실효 2라운드
+        lines.push({ t: 'boss', text: `⌀ ${e.name} — 침묵의 저주! 2라운드간 치유 -50%` });
+      }
       if (wipeRound) {
         const mult = shield ? 0.3 : 1;
         lines.push({ t: 'boss', text: `☠ ${e.name} — 전멸기 발동!${shield ? ' (방벽으로 감쇄)' : ''}` });
@@ -162,16 +200,24 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
         });
       } else {
         const tank = p.find(m => m.classId === 'wanderer' && m.alive);
-        const target = tank || alive()[Math.floor(Math.random() * alive().length)];
+        // 기믹: 도발 무시 (pierceTankChance) — 일정 확률로 탱커가 아닌 아군을 노림
+        const nonTanks = alive().filter(m => m.classId !== 'wanderer');
+        const pierce = !!(e.pierceTankChance && tank && nonTanks.length > 0 && Math.random() < e.pierceTankChance);
+        const target = pierce
+          ? nonTanks[Math.floor(Math.random() * nonTanks.length)]
+          : (tank || alive()[Math.floor(Math.random() * alive().length)]);
         if (target) {
           let taken = enemyAtk;
           if (target.classId === 'wanderer') taken *= 0.7;
           taken = Math.round(taken);
           target.hp = Math.max(0, target.hp - taken);
-          lines.push({ t: 'boss', text: `◂ ${e.name} → ${target.name} ${taken}${tank ? ' [도발]' : ''}` });
+          lines.push({ t: 'boss', text: `◂ ${e.name} → ${target.name} ${taken}${pierce ? ' [도발 무시!]' : tank && !pierce ? ' [도발]' : ''}` });
           if (target.hp <= 0) { target.alive = false; lines.push({ t: 'boss', text: `✖ ${target.name} 전투 불능` }); }
         }
       }
+
+      // 침묵의 저주 지속 차감
+      if ((e.healCutLeft || 0) > 0) e.healCutLeft -= 1;
 
       setParty(p); setEnemy(e); setRound(r);
       setLog(prev => [...prev, ...lines].slice(-100));
@@ -186,11 +232,22 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
 
   const logColor = (t) => t === 'boss' ? PALETTE.accent : t === 'heal' ? PALETTE.green : t === 'win' ? PALETTE.legendary : t === 'round' ? PALETTE.dawn : t === 'atk' ? PALETTE.text : PALETTE.textDim;
 
-  // 전리품 목록 (승리/패배/후퇴 공용)
+  // 전리품 개수 (장비 + 자원)
+  const lootCount = loot.items.length + (loot.stones > 0 ? 1 : 0) + (loot.essence > 0 ? 1 : 0);
+
+  // 전리품 목록 (승리/패배/후퇴 공용) — 장비 + 심연석·정수
   const renderLoot = () => (
-    loot.length > 0 && (
+    lootCount > 0 && (
       <div className="flex flex-col gap-1.5 mb-2.5">
-        {loot.map(item => {
+        {(loot.stones > 0 || loot.essence > 0) && (
+          <div className="flex items-center gap-2 px-3 py-2" style={{
+            borderRadius: 10, background: 'rgba(123,163,196,0.12)', border: `1px solid ${PALETTE.ice}66`,
+          }}>
+            {loot.stones > 0 && <span className="tabular-nums" style={{ fontSize: 11, color: PALETTE.ice }}>{RAID_STONE.icon} 심연석 +{loot.stones}</span>}
+            {loot.essence > 0 && <span className="tabular-nums" style={{ fontSize: 11, color: PALETTE.legendary }}>{RAID_ESSENCE.icon} 군주의 정수 +{loot.essence}</span>}
+          </div>
+        )}
+        {loot.items.map(item => {
           const rar = RAID_RARITIES[item.rarity];
           const cls = CLASSES.find(c => c.id === item.classId);
           return (
@@ -283,7 +340,7 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
             <button onClick={() => onRetreat(loot)} className="ui-press flex-1" style={{
               height: 42, borderRadius: 'var(--r-btn)', fontSize: 11.5,
               background: 'rgba(255,255,255,0.04)', border: '1px solid var(--ui-line)', color: PALETTE.textDim,
-            }}>후퇴{loot.length > 0 ? ` (전리품 ${loot.length}개 보존)` : ''}</button>
+            }}>후퇴{loot.stones > 0 ? ` (${RAID_STONE.icon}${loot.stones} 보존)` : ''}</button>
           </div>
         )}
         {phase === 'victory' && (
@@ -299,9 +356,9 @@ export default function RaidBattleScreen({ meta, dungeon, onVictory, onDefeat, o
         )}
         {phase === 'defeat' && (
           <div>
-            {loot.length > 0 && (
+            {lootCount > 0 && (
               <div className="text-center tracking-[0.2em] font-bold mb-2" style={{ fontSize: 10.5, color: PALETTE.textDim }}>
-                전멸 — 하지만 돌파한 방의 전리품 {loot.length}개는 보존됩니다
+                전멸 — 하지만 돌파한 방의 전리품은 보존됩니다
               </div>
             )}
             {renderLoot()}

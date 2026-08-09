@@ -108,10 +108,18 @@ import {
   VERSION_LABEL,
   DAILY_MISSIONS,
   ENDLESS_SKIP_LIMIT,
+  RAID_DISMANTLE_VALUES,
+  RAID_ENHANCE,
+  RAID_CRAFT_RECIPES,
+  RAID_GACHA,
+  getKstWeekKey,
+  rollRaidDropHighTier,
+  rollCraftedRaidItem,
+  rollGachaRaidItem,
 } from './data.js';
 import { getKstDateKey } from './utils/dailyChallenge.js';
 import { simulateBestEndlessRun } from './utils/endlessSkipSim.js';
-import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear } from './storage.js';
+import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear, dismantleRaidItem, dismantleRaidJunk, enhanceRaidItem, claimRaidWeekly, addRaidResources, spendRaidResourcesForItem } from './storage.js';
 
 
 
@@ -1720,10 +1728,18 @@ export default function App() {
   // 해금: 튜토리얼 4 클리어 (수련의 길과 동일 시점)
   const raidUnlocked = isUnlocked(meta, 'tutorial_curse_clear');
 
-  const handleRaidVictory = (dungeon, drops) => {
+  // 1.76.0~ 전리품 = { items, stones, essence }
+  const handleRaidVictory = (dungeon, loot) => {
     setMeta(prev => {
-      let next = addRaidDrops(prev, drops);
+      let next = addRaidDrops(prev, loot?.items || []);
+      next = addRaidResources(next, { stones: loot?.stones || 0, essence: loot?.essence || 0 });
       next = recordRaidClear(next, dungeon.id);
+      // 1.75.0~ 주간 첫 클리어 보상: 심연석 + (심연 레이드는 유니크 이상 확정 장비 1개)
+      const weekly = claimRaidWeekly(next, dungeon.id, getKstWeekKey(), dungeon.weeklyStones || 0);
+      next = weekly.meta;
+      if (weekly.granted && dungeon.kind === 'raid') {
+        next = addRaidDrops(next, [rollRaidDropHighTier(dungeon)]);
+      }
       saveMeta(next);
       return next;
     });
@@ -1731,15 +1747,74 @@ export default function App() {
     setScreen('raid');
   };
 
-  // 중도 전멸·후퇴 — 클리어 기록 없이 돌파한 방의 전리품만 보존
+  // 1.76.0~ 제작 (정수+심연석 → 에픽·레전더리 확정, 부위·직업 랜덤 — PM 제안) — 결과 반환
+  const handleRaidCraft = (recipeId) => {
+    const recipe = RAID_CRAFT_RECIPES.find(r => r.id === recipeId);
+    if (!recipe) return null;
+    const raidNow = meta?.raid || {};
+    if ((raidNow.stones || 0) < recipe.stones || (raidNow.essence || 0) < recipe.essence) return null;
+    const item = rollCraftedRaidItem(recipe.rarity);
+    setMeta(prev => {
+      const next = spendRaidResourcesForItem(prev, { stones: recipe.stones, essence: recipe.essence }, item);
+      if (next === prev) return prev;
+      saveMeta(next);
+      return next;
+    });
+    return item;
+  };
+
+  // 1.76.0~ 심연석 가챠 (등급 급감 커브, 시리즈 랜덤) — 결과 반환
+  const handleRaidGacha = () => {
+    const raidNow = meta?.raid || {};
+    if ((raidNow.stones || 0) < RAID_GACHA.cost) return null;
+    const item = rollGachaRaidItem();
+    setMeta(prev => {
+      const next = spendRaidResourcesForItem(prev, { stones: RAID_GACHA.cost }, item);
+      if (next === prev) return prev;
+      saveMeta(next);
+      return next;
+    });
+    return item;
+  };
+
+  // 1.75.0~ 분해 (개별 / 하위 일괄) + 강화
+  const handleRaidDismantle = (itemId, rarity) => {
+    setMeta(prev => {
+      const next = dismantleRaidItem(prev, itemId, RAID_DISMANTLE_VALUES[rarity] || 0);
+      saveMeta(next);
+      return next;
+    });
+  };
+
+  const handleRaidDismantleJunk = () => {
+    setMeta(prev => {
+      const { meta: next } = dismantleRaidJunk(prev, (item) => RAID_DISMANTLE_VALUES[item.rarity] || 0);
+      saveMeta(next);
+      return next;
+    });
+  };
+
+  const handleRaidEnhance = (classId, slot) => {
+    setMeta(prev => {
+      const item = prev?.raid?.equipped?.[classId]?.[slot];
+      if (!item) return prev;
+      const cost = RAID_ENHANCE.costFor(item.enh || 0);
+      const next = enhanceRaidItem(prev, classId, slot, cost, RAID_ENHANCE.max);
+      if (next === prev) return prev;
+      saveMeta(next);
+      return next;
+    });
+  };
+
+  // 중도 전멸·후퇴 — 클리어 기록 없이 돌파한 방의 전리품(심연석 등)만 보존
   const handleRaidPartial = (loot) => {
-    if (loot && loot.length > 0) {
-      setMeta(prev => {
-        const next = addRaidDrops(prev, loot);
-        saveMeta(next);
-        return next;
-      });
-    }
+    setMeta(prev => {
+      let next = addRaidDrops(prev, loot?.items || []);
+      next = addRaidResources(next, { stones: loot?.stones || 0, essence: loot?.essence || 0 });
+      if (next === prev) return prev;
+      saveMeta(next);
+      return next;
+    });
     setRaidDungeon(null);
     setScreen('raid');
   };
@@ -1882,7 +1957,7 @@ export default function App() {
               onSelectGoogle={handleSelectGoogle} 
             />}
             {screen === 'title' && authMode && <TitleScreen meta={meta} onStart={() => setScreen('expeditionSelect')} onResume={resumeActiveRun} onAltar={enterAltar} onEngravings={() => setScreen('engraving')} onRaid={raidUnlocked ? () => setScreen('raid') : null} onAchievements={() => { setPrevAchievementsBack('title'); setScreen('achievements'); }} onChangelog={() => setShowChangelog({ firstSeen: false })} onAccount={() => setScreen('account')} />}
-            {screen === 'raid' && <RaidScreen meta={meta} onEnterDungeon={(d) => { setRaidDungeon(d); setScreen('raidBattle'); }} onEquipItem={handleRaidEquip} onAutoEquip={handleRaidAutoEquip} onBack={() => setScreen('title')} />}
+            {screen === 'raid' && <RaidScreen meta={meta} onEnterDungeon={(d) => { setRaidDungeon(d); setScreen('raidBattle'); }} onEquipItem={handleRaidEquip} onAutoEquip={handleRaidAutoEquip} onDismantle={handleRaidDismantle} onDismantleJunk={handleRaidDismantleJunk} onEnhance={handleRaidEnhance} onCraft={handleRaidCraft} onGacha={handleRaidGacha} onBack={() => setScreen('title')} />}
             {screen === 'raidBattle' && raidDungeon && <RaidBattleScreen key={raidDungeon.id + '-' + (meta?.raid?.clears?.[raidDungeon.id] || 0)} meta={meta} dungeon={raidDungeon} onVictory={handleRaidVictory} onDefeat={handleRaidPartial} onRetreat={handleRaidPartial} />}
             {screen === 'account' && <AccountScreen 
               authMode={authMode} 

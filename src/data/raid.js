@@ -82,13 +82,13 @@ export const RAID_DUNGEONS = [
     name: '무너진 회랑', sub: 'FARM · T1',
     desc: '방 4개를 돌파하는 입문 던전. 네임드와 문지기가 잿빛 장비를 떨군다.',
     rarityWeights: { C: 45, UC: 28, R: 16, U: 8, L: 2.5, EP: 0.5 },
-    recommendedPower: 4800, gearMult: 1.0, gearPrefix: '잿빛',
+    recommendedPower: 5200, gearMult: 1.0, gearPrefix: '잿빛', weeklyStones: 5,
     color: '#9b8975',
     rooms: [
       { kind: 'mobs',  name: '무너진 경비대',   hp: 900,  atk: 70,  drops: 0 },
       { kind: 'mobs',  name: '회랑의 그림자들', hp: 1100, atk: 85,  drops: 0 },
-      { kind: 'named', name: '이름 잃은 기사',  hp: 1800, atk: 110, aoeEvery: 5, drops: 1 },
-      { kind: 'boss',  name: '회랑의 문지기',   hp: 3200, atk: 130, aoeEvery: 4, enrageAt: 0.5, drops: 2 },
+      { kind: 'named', name: '이름 잃은 기사',  hp: 1800, atk: 110, aoeEvery: 5, drops: 0, stones: 3 },
+      { kind: 'boss',  name: '회랑의 문지기',   hp: 3200, atk: 130, aoeEvery: 4, enrageAt: 0.5, drops: 3 },
     ],
   },
   {
@@ -96,13 +96,13 @@ export const RAID_DUNGEONS = [
     name: '서리 잠식 갱도', sub: 'FARM · T2',
     desc: '한기가 스민 폐광. 갱도 깊은 곳의 파괴자가 서리철 장비를 지킨다.',
     rarityWeights: { C: 38, UC: 28, R: 19, U: 10, L: 4, EP: 1 },
-    recommendedPower: 5400, gearMult: 1.15, gearPrefix: '서리철',
+    recommendedPower: 6000, gearMult: 1.15, gearPrefix: '서리철', weeklyStones: 6,
     color: '#9bc4e0',
     rooms: [
       { kind: 'mobs',  name: '갱도 냉기벌레 떼', hp: 1200, atk: 95,  drops: 0 },
       { kind: 'mobs',  name: '얼어붙은 광부들',  hp: 1400, atk: 105, drops: 0 },
-      { kind: 'named', name: '서리핏줄 우두머리', hp: 2300, atk: 125, aoeEvery: 5, drops: 1 },
-      { kind: 'boss',  name: '갱도의 파괴자',    hp: 4000, atk: 145, aoeEvery: 4, enrageAt: 0.5, drops: 2 },
+      { kind: 'named', name: '서리핏줄 우두머리', hp: 2300, atk: 125, aoeEvery: 5, drops: 0, stones: 4 },
+      { kind: 'boss',  name: '갱도의 파괴자',    hp: 4000, atk: 145, aoeEvery: 4, enrageAt: 0.5, drops: 3 },
     ],
   },
   {
@@ -110,13 +110,13 @@ export const RAID_DUNGEONS = [
     name: '부패한 지하수로', sub: 'FARM · T3',
     desc: '오물이 흐르는 수로. 침식된 장비는 더럽지만 강하다.',
     rarityWeights: { C: 38, UC: 28, R: 19, U: 10, L: 4, EP: 1 },
-    recommendedPower: 6000, gearMult: 1.3, gearPrefix: '침식된',
+    recommendedPower: 6800, gearMult: 1.3, gearPrefix: '침식된', weeklyStones: 8,
     color: '#7a9a5e',
     rooms: [
       { kind: 'mobs',  name: '수로 쥐떼',      hp: 1500, atk: 115, drops: 0 },
       { kind: 'mobs',  name: '부패 점액괴',    hp: 1800, atk: 125, drops: 0 },
-      { kind: 'named', name: '수로의 감시자',  hp: 2900, atk: 150, aoeEvery: 5, drops: 1 },
-      { kind: 'boss',  name: '오물의 군주',    hp: 5000, atk: 170, aoeEvery: 4, enrageAt: 0.5, drops: 2 },
+      { kind: 'named', name: '수로의 감시자',  hp: 2900, atk: 150, aoeEvery: 5, summonEvery: 4, drops: 0, stones: 5 },
+      { kind: 'boss',  name: '오물의 군주',    hp: 5000, atk: 170, aoeEvery: 4, summonEvery: 4, enrageAt: 0.5, drops: 3 },
     ],
   },
 
@@ -126,13 +126,13 @@ export const RAID_DUNGEONS = [
     name: '봉인된 수도원', sub: 'DUNGEON · T4',
     desc: '기도가 저주로 변한 수도원. 봉인된 장비 시리즈가 잠들어 있다.',
     rarityWeights: { C: 30, UC: 26, R: 21, U: 14, L: 7, EP: 2 },
-    recommendedPower: 6800, gearMult: 1.5, gearPrefix: '봉인된',
+    recommendedPower: 7800, gearMult: 1.5, gearPrefix: '봉인된', weeklyStones: 10,
     color: '#8a76c9',
     rooms: [
       { kind: 'mobs',  name: '타락 수도승들',  hp: 2000, atk: 140, drops: 0 },
       { kind: 'mobs',  name: '참회의 망령들',  hp: 2400, atk: 150, drops: 0 },
-      { kind: 'named', name: '고행자 무언(無言)', hp: 3800, atk: 180, aoeEvery: 4, drops: 1 },
-      { kind: 'boss',  name: '수도원장 침묵',  hp: 6500, atk: 205, aoeEvery: 4, enrageAt: 0.5, drops: 2 },
+      { kind: 'named', name: '고행자 무언(無言)', hp: 3800, atk: 180, aoeEvery: 4, drops: 0, stones: 6 },
+      { kind: 'boss',  name: '수도원장 침묵',  hp: 6500, atk: 205, aoeEvery: 4, healCutEvery: 5, enrageAt: 0.5, drops: 3 },
     ],
   },
   {
@@ -140,13 +140,13 @@ export const RAID_DUNGEONS = [
     name: '핏빛 투기장', sub: 'DUNGEON · T5',
     desc: '끝나지 않는 살육제. 혈권을 꺾으면 핏빛 장비가 쏟아진다.',
     rarityWeights: { C: 30, UC: 26, R: 21, U: 14, L: 7, EP: 2 },
-    recommendedPower: 7600, gearMult: 1.7, gearPrefix: '핏빛',
+    recommendedPower: 8800, gearMult: 1.7, gearPrefix: '핏빛', weeklyStones: 12,
     color: '#c4453d',
     rooms: [
       { kind: 'mobs',  name: '투기장 검투노예', hp: 2600, atk: 165, drops: 0 },
       { kind: 'mobs',  name: '사슬 맹수 우리',  hp: 3000, atk: 180, drops: 0 },
-      { kind: 'named', name: '백전의 검투사',   hp: 4800, atk: 215, aoeEvery: 3, drops: 1 },
-      { kind: 'boss',  name: '투기장주 혈권(血拳)', hp: 8000, atk: 245, aoeEvery: 4, enrageAt: 0.5, drops: 3 },
+      { kind: 'named', name: '백전의 검투사',   hp: 4800, atk: 215, aoeEvery: 3, drops: 0, stones: 7 },
+      { kind: 'boss',  name: '투기장주 혈권(血拳)', hp: 8000, atk: 245, aoeEvery: 4, pierceTankChance: 0.3, enrageAt: 0.5, drops: 4 },
     ],
   },
   {
@@ -154,13 +154,13 @@ export const RAID_DUNGEONS = [
     name: '별이 떨어진 첨탑', sub: 'DUNGEON · T6',
     desc: '추락한 별의 힘이 깃든 첨탑. 대현자는 10라운드마다 별을 떨어뜨린다.',
     rarityWeights: { C: 26, UC: 24, R: 21, U: 15, L: 10, EP: 4 },
-    recommendedPower: 8400, gearMult: 1.9, gearPrefix: '별빛',
+    recommendedPower: 9800, gearMult: 1.9, gearPrefix: '별빛', weeklyStones: 15, essenceDrop: 1,
     color: '#d4a574',
     rooms: [
       { kind: 'mobs',  name: '별파편 정령들',  hp: 3200, atk: 195, drops: 0 },
       { kind: 'mobs',  name: '첨탑 수호석상',  hp: 3600, atk: 210, drops: 0 },
-      { kind: 'named', name: '관측자 아득',    hp: 5800, atk: 250, aoeEvery: 3, enrageAt: 0.4, drops: 1 },
-      { kind: 'boss',  name: '첨탑의 대현자',  hp: 10000, atk: 285, aoeEvery: 3, wipeEvery: 10, enrageAt: 0.5, drops: 3 },
+      { kind: 'named', name: '관측자 아득',    hp: 5800, atk: 250, aoeEvery: 3, enrageAt: 0.4, drops: 0, stones: 8 },
+      { kind: 'boss',  name: '첨탑의 대현자',  hp: 10000, atk: 285, aoeEvery: 3, wipeEvery: 10, enrageAt: 0.5, drops: 4 },
     ],
   },
 
@@ -170,15 +170,101 @@ export const RAID_DUNGEONS = [
     name: '심연의 제단', sub: 'RAID · 3관문',
     desc: '관문 3개의 최상위 레이드. 군주는 8라운드마다 전멸기 — 사제의 방벽 없이는 파티가 무너진다. 심연의 장비는 에픽 확률이 가장 높다.',
     rarityWeights: { C: 24, UC: 22, R: 20, U: 16, L: 12, EP: 6 },
-    recommendedPower: 9500, gearMult: 2.2, gearPrefix: '심연의',
+    recommendedPower: 11500, gearMult: 2.2, gearPrefix: '심연의', weeklyStones: 30, essenceDrop: 2,
     color: '#8b1f1f',
     rooms: [
-      { kind: 'named', name: '심연의 파수꾼',  hp: 7000,  atk: 240, aoeEvery: 4, drops: 1 },
-      { kind: 'named', name: '공허의 쌍둥이',  hp: 10000, atk: 280, aoeEvery: 3, enrageAt: 0.4, drops: 2 },
-      { kind: 'boss',  name: '심연의 군주',    hp: 18000, atk: 330, aoeEvery: 3, wipeEvery: 8, enrageAt: 0.5, drops: 3 },
+      { kind: 'named', name: '심연의 파수꾼',  hp: 7000,  atk: 240, aoeEvery: 4, summonEvery: 5, drops: 0, stones: 10 },
+      { kind: 'named', name: '공허의 쌍둥이',  hp: 10000, atk: 280, aoeEvery: 3, enrageAt: 0.4, drops: 0, stones: 10 },
+      { kind: 'boss',  name: '심연의 군주',    hp: 18000, atk: 330, aoeEvery: 3, wipeEvery: 8, enrageAt: 0.5, drops: 5 },
     ],
   },
 ];
+
+// =========== 3차 난이도 튜닝 (1.76.0~) ===========
+// PM 피드백 "난이도 너무 낮음" — 전 던전 적 스탯 전역 배율.
+// AP_TUNING 패턴: 실기기 체감 후 이 두 수치만 조정하면 전역 반영.
+export const RAID_TUNING = { enemyHpMult: 1.35, enemyAtkMult: 1.45 };
+
+// =========== 3차 재료·제작·가챠 (1.76.0~) ===========
+// 익스플로잇 픽스: 장비는 최종 보스(막보) 전용 — 중간 네임드는 심연석만 드랍.
+// 상위 등급 목표 파밍: 막보 희귀 재료 '군주의 정수'로 에픽·레전더리 확정 제작 (부위·직업 랜덤).
+export const RAID_ESSENCE = { name: '군주의 정수', icon: '◈' };
+
+export const RAID_CRAFT_RECIPES = [
+  {
+    id: 'craft_legendary', rarity: 'L', name: '레전더리 제작',
+    essence: 1, stones: 40,
+    desc: '군주의 정수 1 + 심연석 40 → 레전더리 확정 (부위·직업 랜덤, 심연의 시리즈)',
+  },
+  {
+    id: 'craft_epic', rarity: 'EP', name: '에픽 제작',
+    essence: 3, stones: 100,
+    desc: '군주의 정수 3 + 심연석 100 → 에픽 확정 (부위·직업 랜덤, 심연의 시리즈)',
+  },
+];
+
+// 심연석 가챠 — 등급은 높을수록 낮은 확률 (단조 감소, PM 룰)
+export const RAID_GACHA = {
+  cost: 30,
+  weights: { C: 40, UC: 27, R: 17, U: 10, L: 4.5, EP: 1.5 },
+};
+
+// =========== 2차 시스템 (1.75.0~): 분해·강화 / 세트 / 주간 보상 ===========
+
+// 레이드 전용 재화 — 장비 분해로 획득, 강화에 소모
+export const RAID_STONE = { name: '심연석', icon: '💠' };
+
+// 등급별 분해 값 (높은 등급 = 많은 심연석)
+export const RAID_DISMANTLE_VALUES = { C: 1, UC: 2, R: 4, U: 8, L: 15, EP: 30 };
+
+// 강화 — 장착 장비 대상, 실패·파괴 없음. 단계당 성능 +8%, 상위 단계일수록 비용 증가
+export const RAID_ENHANCE = {
+  max: 10,
+  bonusPerLv: 0.08,
+  costFor: (lv) => 5 * (lv + 1), // +1→5, +2→10 … +10→50 (총 275)
+};
+
+// 세트 효과 — 같은 시리즈(던전 접두어) 3부위 장착 시 발동
+export const RAID_SET_BONUSES = {
+  '잿빛':   { name: '잿빛 3세트',   hpPct: 6,  atkPct: 0 },
+  '서리철': { name: '서리철 3세트', hpPct: 0,  atkPct: 5 },
+  '침식된': { name: '침식된 3세트', hpPct: 8,  atkPct: 0 },
+  '봉인된': { name: '봉인된 3세트', hpPct: 0,  atkPct: 8 },
+  '핏빛':   { name: '핏빛 3세트',   hpPct: 0,  atkPct: 10 },
+  '별빛':   { name: '별빛 3세트',   hpPct: 8,  atkPct: 8 },
+  '심연의': { name: '심연의 3세트', hpPct: 12, atkPct: 12 },
+};
+
+// KST 기준 이번 주(월요일 시작) 키 — 주간 첫 클리어 보상 리셋용
+export function getKstWeekKey(now = new Date()) {
+  const kstMs = now.getTime() + 9 * 60 * 60 * 1000;
+  const kst = new Date(kstMs);
+  const day = kst.getUTCDay(); // 0=일
+  const diffToMonday = (day + 6) % 7;
+  const monday = new Date(kstMs - diffToMonday * 24 * 60 * 60 * 1000);
+  const y = monday.getUTCFullYear();
+  const m = String(monday.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(monday.getUTCDate()).padStart(2, '0');
+  return `${y}${m}${d}`;
+}
+
+// 강화 반영 실효 스탯 — 장비 1개 (atk/hp/power에 강화 배율 적용)
+export function getRaidItemEffective(item) {
+  if (!item) return null;
+  const mult = 1 + (item.enh || 0) * RAID_ENHANCE.bonusPerLv;
+  const atk = Math.round((item.atk || 0) * mult);
+  const hp = Math.round((item.hp || 0) * mult);
+  return { atk, hp, power: atk * 4 + hp };
+}
+
+// 장착 3부위가 같은 시리즈면 세트 보너스 반환 (아니면 null)
+export function getActiveSetBonus(equipped) {
+  const eq = equipped || {};
+  const series = RAID_SLOTS.map(slot => eq[slot]?.series).filter(Boolean);
+  if (series.length < RAID_SLOTS.length) return null;
+  if (!series.every(s => s === series[0])) return null;
+  return RAID_SET_BONUSES[series[0]] || null;
+}
 
 // =========== 장비 롤 / 스탯 계산 ===========
 let _raidItemSeq = 0;
@@ -206,13 +292,37 @@ export function rollRaidDrop(dungeon) {
   return {
     id: `rg_${Date.now().toString(36)}_${_raidItemSeq}_${Math.floor(Math.random() * 1e4)}`,
     classId, slot, rarity,
+    series: dungeon.gearPrefix || null, // 1.75.0~ 세트 판정 키
+    enh: 0,                             // 1.75.0~ 강화 단계
     name: `${dungeon.gearPrefix ? dungeon.gearPrefix + ' ' : ''}${RAID_GEAR_NAMES[classId][slot]}`,
     atk, hp,
     power: atk * 4 + hp,
   };
 }
 
-// 파티원 실스탯 = 베이스 + 장착 장비 3부위 합산
+// 1.76.0~ 제작 결과 롤 — 확정 등급, 부위·직업 랜덤 (PM 제안), 최상위 '심연의' 시리즈 성능
+export function rollCraftedRaidItem(rarity) {
+  const abyss = RAID_DUNGEONS.find(d => d.id === 'raid_abyss');
+  return rollRaidDrop({ ...abyss, rarityWeights: { [rarity]: 1 } });
+}
+
+// 1.76.0~ 심연석 가챠 롤 — 등급은 급감 커브, 시리즈는 7던전 중 랜덤 (전 시리즈 수집 경로)
+export function rollGachaRaidItem() {
+  const dungeon = RAID_DUNGEONS[Math.floor(Math.random() * RAID_DUNGEONS.length)];
+  return rollRaidDrop({ ...dungeon, rarityWeights: RAID_GACHA.weights });
+}
+
+// 유니크 이상 확정 드랍 (심연 레이드 주간 보상 전용)
+export function rollRaidDropHighTier(dungeon) {
+  for (let i = 0; i < 30; i++) {
+    const item = rollRaidDrop(dungeon);
+    if (item.rarity === 'U' || item.rarity === 'L' || item.rarity === 'EP') return item;
+  }
+  const item = rollRaidDrop(dungeon);
+  return { ...item, rarity: 'U' };
+}
+
+// 파티원 실스탯 = 베이스 + 장착 3부위(강화 반영) + 세트 보너스(3부위 동일 시리즈)
 export function getRaidMemberStats(classId, equipped) {
   const base = RAID_CLASSES[classId];
   if (!base) return null;
@@ -220,10 +330,15 @@ export function getRaidMemberStats(classId, equipped) {
   let hp = base.hp;
   const eq = equipped || {};
   RAID_SLOTS.forEach(slot => {
-    const item = eq[slot];
-    if (item) { atk += item.atk || 0; hp += item.hp || 0; }
+    const eff = getRaidItemEffective(eq[slot]);
+    if (eff) { atk += eff.atk; hp += eff.hp; }
   });
-  return { ...base, atk, hp, power: atk * 4 + hp + (base.heal || 0) * 3 };
+  const setBonus = getActiveSetBonus(eq);
+  if (setBonus) {
+    atk = Math.round(atk * (1 + (setBonus.atkPct || 0) / 100));
+    hp = Math.round(hp * (1 + (setBonus.hpPct || 0) / 100));
+  }
+  return { ...base, atk, hp, setBonus, power: atk * 4 + hp + (base.heal || 0) * 3 };
 }
 
 // 파티 전투력 합계 (레이드 로비·던전 권장 전투력 비교용)
