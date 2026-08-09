@@ -5,7 +5,7 @@
 // 저장되는 것: 영혼, 강화 단계, 해금 항목, 클리어 기록
 // ============================================
 
-import { ENGRAVINGS, ENGRAVING_TIERS } from './data.js';
+import { ENGRAVINGS, ENGRAVING_TIERS, ENEMIES, EVENTS, RELICS, PASSIVE_SKILLS, CODEX_DISCOVERY_REWARD, CODEX_COMPLETE_REWARD } from './data.js';
 
 const DB_NAME = 'derod_meta';
 const DB_VERSION = 1;
@@ -51,6 +51,11 @@ const DEFAULT_META = {
   },
   // 일일 챌린지 첫 클리어 기록 (KST 날짜 키 → true)
   dailyClears: {},
+  // 1.72.0~ 일일 임무 — { date: 'YYYYMMDD', progress: { [missionId]: N }, claimed: [missionId] }
+  // date가 오늘(KST)과 다르면 트래킹 시점에 자동 리셋. 완료 즉시 영혼 자동 지급.
+  dailyMissions: null,
+  // 1.72.0~ 도감 카테고리 완성 보너스 지급 기록 (카테고리당 1회)
+  codexCompletionClaimed: [],
   // 진행 중인 런 스냅샷 (맵 화면 진입 시 자동 저장 — 앱 종료/새로고침 후 이어하기 용)
   // null = 진행 중 런 없음. 객체 = 재개 가능한 런 상태.
   activeRun: null,
@@ -485,17 +490,61 @@ export function hasDailyCleared(meta, dateKey) {
   return !!(meta && meta.dailyClears && meta.dailyClears[dateKey]);
 }
 
+// 카테고리별 도감 전체 항목 수 (완성 보너스 판정용)
+function getCodexTotal(category) {
+  switch (category) {
+    case 'enemies': return Object.keys(ENEMIES).length;
+    case 'events': return EVENTS.length;
+    case 'relics': return RELICS.length;
+    case 'passives': return Object.keys(PASSIVE_SKILLS).length;
+    default: return 0;
+  }
+}
+
 // 도감 항목 추가 (이미 있으면 그대로)
 // category: 'enemies' | 'events' | 'relics' | 'passives'
+// 1.72.0~ 도감 발견 보너스: 신규 발견 +5 영혼, 카테고리 완성 시 +100 영혼 (1회)
 export function recordCodex(meta, category, id) {
   if (!id) return meta;
   const codex = meta.codex || { enemies: [], events: [], relics: [], passives: [] };
   const list = codex[category] || [];
   if (list.includes(id)) return meta;
-  return {
+  const newList = [...list, id];
+  let next = {
     ...meta,
-    codex: { ...codex, [category]: [...list, id] },
+    codex: { ...codex, [category]: newList },
+    souls: (meta.souls || 0) + CODEX_DISCOVERY_REWARD,
   };
+  const total = getCodexTotal(category);
+  const claimed = next.codexCompletionClaimed || [];
+  if (total > 0 && newList.length >= total && !claimed.includes(category)) {
+    next = {
+      ...next,
+      souls: next.souls + CODEX_COMPLETE_REWARD,
+      codexCompletionClaimed: [...claimed, category],
+    };
+  }
+  return next;
+}
+
+// 1.72.0~ 일일 임무 진행 트래킹
+// mission: DAILY_MISSIONS 항목 객체 (data/meta.js) — 순환 import 방지 위해 호출부에서 전달
+// dateKey: getKstDateKey() (utils/dailyChallenge.js). 날짜가 바뀌면 자동 리셋.
+// 완료 즉시 영혼 자동 지급 + claimed 기록 (중복 지급 없음)
+export function trackDailyMission(meta, mission, amount, dateKey) {
+  if (!mission || !dateKey) return meta;
+  let dm = meta.dailyMissions;
+  if (!dm || dm.date !== dateKey) dm = { date: dateKey, progress: {}, claimed: [] };
+  if ((dm.claimed || []).includes(mission.id)) {
+    return dm === meta.dailyMissions ? meta : { ...meta, dailyMissions: dm };
+  }
+  const cur = Math.min(mission.target, (dm.progress?.[mission.id] || 0) + amount);
+  dm = { ...dm, progress: { ...dm.progress, [mission.id]: cur } };
+  if (cur >= mission.target) {
+    dm = { ...dm, claimed: [...(dm.claimed || []), mission.id] };
+    return { ...meta, dailyMissions: dm, souls: (meta.souls || 0) + mission.reward };
+  }
+  return { ...meta, dailyMissions: dm };
 }
 
 export function recordExpeditionClear(meta, expeditionId) {

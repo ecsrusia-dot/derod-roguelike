@@ -9,7 +9,8 @@
 import React from 'react';
 import { PlayCircle, Sparkles, Gem, Trophy, ChevronRight } from 'lucide-react';
 import { PALETTE } from '../utils/helpers.js';
-import { GAME_VERSION, CLASSES } from '../data.js';
+import { GAME_VERSION, CLASSES, DAILY_MISSIONS } from '../data.js';
+import { getKstDateKey } from '../utils/dailyChallenge.js';
 import { GlassPanel, Chip, UIButton } from './ui/CommonUI.jsx';
 
 // 글래스 리스트 행 — 타이틀 화면 보조 메뉴 전용
@@ -106,6 +107,34 @@ export default function TitleScreen({ meta, onStart, onResume, onAltar, onEngrav
           {onEngravings && <MenuRow icon={Gem} label="직업 각인" onClick={onEngravings} />}
           <MenuRow icon={Trophy} label="업적" onClick={onAchievements} />
         </GlassPanel>
+
+        {/* 1.72.0~ 일일 임무 — 완료 즉시 영혼 자동 지급, KST 자정 리셋 */}
+        {(() => {
+          const todayKey = getKstDateKey();
+          const dm = meta?.dailyMissions?.date === todayKey ? meta.dailyMissions : null;
+          return (
+            <GlassPanel style={{ borderRadius: 14, padding: '8px 12px' }}>
+              <div className="flex justify-between items-center mb-1">
+                <span style={{ fontSize: 10, letterSpacing: '0.25em', color: PALETTE.dawn, fontWeight: 700 }}>일일 임무</span>
+                <span style={{ fontSize: 9, color: PALETTE.textDim }}>매일 자정(KST) 초기화</span>
+              </div>
+              {DAILY_MISSIONS.map(m => {
+                const prog = Math.min(m.target, dm?.progress?.[m.id] || 0);
+                const done = (dm?.claimed || []).includes(m.id);
+                return (
+                  <div key={m.id} className="flex justify-between items-center" style={{ padding: '2.5px 0' }}>
+                    <span style={{ fontSize: 11, color: done ? PALETTE.green : PALETTE.text }}>
+                      {done ? '✓ ' : '· '}{m.desc}
+                    </span>
+                    <span className="tabular-nums" style={{ fontSize: 10.5, color: done ? PALETTE.green : PALETTE.textDim }}>
+                      {prog}/{m.target} · <span style={{ color: done ? PALETTE.green : PALETTE.legendary }}>✦{m.reward}</span>
+                    </span>
+                  </div>
+                );
+              })}
+            </GlassPanel>
+          );
+        })()}
 
         <div className="flex items-center justify-between px-1 mt-1">
           {onAccount ? (

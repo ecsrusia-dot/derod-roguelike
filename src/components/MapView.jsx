@@ -37,7 +37,7 @@ function NavTab({ icon: Icon, label, onClick }) {
   );
 }
 
-export default function MapView({ chapter, classData, mapData, hp, maxHp, gold, gem, relics = [], activeRelicNames = null, expedition, curses = [], chapterIdx, onEnterNode, onOpenStatus, onOpenAchievements, onOpenCodex, onBack }) {
+export default function MapView({ chapter, classData, mapData, hp, maxHp, gold, gem, relics = [], activeRelicNames = null, expedition, curses = [], chapterIdx, autoHunt = false, autoHuntAllowed = false, onToggleAutoHunt = null, onEnterNode, onOpenStatus, onOpenAchievements, onOpenCodex, onBack }) {
   // 천리안 유물 보유 (활성 상태) 시 모든 노드 공개
   const hasMapReveal = relics && relics.some(r =>
     r.statBonus?.mapReveal > 0 && (!activeRelicNames || activeRelicNames.includes(r.name))
@@ -81,6 +81,19 @@ export default function MapView({ chapter, classData, mapData, hp, maxHp, gold, 
         <div className="flex items-center gap-1.5 mt-2 flex-wrap">
           <Chip color={PALETTE.dawn} style={{ height: 20 }}>◉ <span className="tabular-nums">{gold}</span></Chip>
           <Chip color={PALETTE.ice} style={{ height: 20 }}>◆ <span className="tabular-nums">{gem}</span></Chip>
+          {/* 1.72.0~ 자동 사냥 토글 (수련의 길 + 무한모드에서만 노출) */}
+          {autoHuntAllowed && onToggleAutoHunt && (
+            <button onClick={onToggleAutoHunt} className="ui-press flex items-center gap-1" style={{
+              height: 20, padding: '0 8px', borderRadius: 999, fontSize: 10, fontWeight: 700,
+              letterSpacing: '0.06em',
+              background: autoHunt ? 'rgba(232,176,74,0.22)' : 'rgba(255,255,255,0.05)',
+              border: `1px solid ${autoHunt ? PALETTE.legendary : 'rgba(255,255,255,0.15)'}`,
+              color: autoHunt ? PALETTE.legendary : PALETTE.textDim,
+              boxShadow: autoHunt ? '0 0 8px rgba(232,176,74,0.45)' : 'none',
+            }}>
+              {autoHunt ? '⏸ 자동 사냥 중' : '▶ 자동 사냥'}
+            </button>
+          )}
           {expedition && <Chip color={expedition.color} style={{ height: 20 }}>{expedition.name}</Chip>}
           {chapter.gimmick && <Chip color={chapter.color} style={{ height: 20 }}>◈ {chapter.gimmick.name}</Chip>}
           <span className="ml-auto tracking-[0.14em] truncate" style={{ fontSize: 10.5, color: chapter.color }}>

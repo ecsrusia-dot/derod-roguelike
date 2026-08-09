@@ -102,8 +102,10 @@ import {
   GAME_VERSION,
   VERSION_DATE,
   VERSION_LABEL,
+  DAILY_MISSIONS,
 } from './data.js';
-import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice } from './storage.js';
+import { getKstDateKey } from './utils/dailyChallenge.js';
+import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, trackDailyMission } from './storage.js';
 
 
 
@@ -258,6 +260,9 @@ export default function App() {
   const [showChangelog, setShowChangelog] = useState(null);  // null | { firstSeen: bool }
   // 노드 진입 설명 모달 (튜토리얼 챕터에서만 표시)
   const [pendingNode, setPendingNode] = useState(null);  // null | { node, resolvedType }
+  // 1.72.0~ 자동 사냥 모드 — 노드 선택·스킬 선택·보상 선택 모두 자동
+  // 허용 범위: 수련의 길(training) + 무한모드(endless)만. 사망/원정 클리어 시 자동 해제.
+  const [autoHunt, setAutoHunt] = useState(false);
   
   // === 인증/저장 모드 (Phase 1) ===
   // null = 미선택 (LoginScreen 표시), 'local' | 'guest' | 'google'
@@ -1039,6 +1044,12 @@ export default function App() {
     // 누적 처치 카운터
     trackedMeta = setAchievementProgress(trackedMeta, 'meta_kill_100', trackedMeta.totalKills, 100);
     trackedMeta = setAchievementProgress(trackedMeta, 'meta_kill_1000', trackedMeta.totalKills, 1000);
+    // 1.72.0~ 일일 임무: 처치 / 강적 처치
+    const dmKey = getKstDateKey();
+    trackedMeta = trackDailyMission(trackedMeta, DAILY_MISSIONS.find(m => m.id === 'dm_kill10'), 1, dmKey);
+    if (isEliteReward) {
+      trackedMeta = trackDailyMission(trackedMeta, DAILY_MISSIONS.find(m => m.id === 'dm_elite3'), 1, dmKey);
+    }
     setMeta(trackedMeta);
     
     // 드랍 적용 (저주: 획득 은화 -50%) + 획득량 추적
@@ -1508,6 +1519,8 @@ export default function App() {
       // 메타 저장
       let newMeta = { ...meta };
       newMeta = addSouls(newMeta, totalSouls);
+      // 1.72.0~ 일일 임무: 원정 1회 클리어
+      newMeta = trackDailyMission(newMeta, DAILY_MISSIONS.find(m => m.id === 'dm_clear1'), 1, getKstDateKey());
       
       // 챔피언십 vs 클래식 분기
       if (currentExpedition.isChampionship) {
@@ -1678,6 +1691,92 @@ export default function App() {
     setScreen('title');
   };
 
+  // ============================================
+  // 1.72.0~ 자동 사냥 드라이버 (App 레벨 화면 자동 진행)
+  // ============================================
+  // 전투(CombatScreen)·사건(EventScreen)은 각 컴포넌트 내부 autoPlay가 처리.
+  // 여기서는 맵 노드 선택 / 승리·보상 / 챕터 클리어 / 상점·대장간 스킵 /
+  // 정비 자동 휴식 / 준비 자동 확정을 담당.
+  const autoHuntAllowed = !!currentExpedition && (currentExpedition.category === 'training' || !!currentExpedition.endless);
+  useEffect(() => {
+    if (!autoHunt) return;
+    // 원정 종료·이탈·비허용 모드 → 자동 해제
+    if (!autoHuntAllowed || screen === 'defeat' || screen === 'expeditionClear' || screen === 'title') {
+      setAutoHunt(false);
+      return;
+    }
+    let t = null;
+    const later = (fn, ms) => { t = setTimeout(fn, ms); };
+    if (screen === 'map' && mapData) {
+      const candidates = mapData.nodes.filter(n => n.current && !n.locked);
+      if (candidates.length > 0) {
+        const hpRatio = maxHp > 0 ? hp / maxHp : 1;
+        // 노드 우선순위: 저체력이면 정비 최우선. 평시엔 강적(영혼 3) > 전투 > 보스 순
+        const prio = (n) => {
+          if (n.type === 'rest') return hpRatio < 0.45 ? 100 : 30;
+          if (n.type === 'elite') return 80;
+          if (n.type === 'battle') return 70;
+          if (n.type === 'boss') return 60;
+          if (n.type === 'unknown') return 50;
+          if (n.type === 'event') return 40;
+          if (n.type === 'prep') return 35;
+          if (n.type === 'shop') return 20;
+          if (n.type === 'forge') return 10;
+          return 0;
+        };
+        const target = [...candidates].sort((a, b) => prio(b) - prio(a))[0];
+        later(() => handleEnterNode(target), 700);
+      }
+    } else if (screen === 'victory') {
+      later(handleVictoryContinue, 900);
+    } else if (screen === 'reward' && currentRewards && currentRewards.length > 0) {
+      const hpRatio = maxHp > 0 ? hp / maxHp : 1;
+      // 보상 우선순위: 저체력 회복 > 궁극 진화 > 패시브 > 유물 > 첫 번째
+      const pick =
+        (hpRatio < 0.5 && currentRewards.find(r => r.type === 'heal' || r.type === 'heal_full')) ||
+        currentRewards.find(r => r.type === 'ultimate') ||
+        currentRewards.find(r => r.type === 'skill') ||
+        currentRewards.find(r => r.type === 'relic') ||
+        currentRewards[0];
+      later(() => handlePickReward(pick), 900);
+    } else if (screen === 'chapterClear') {
+      later(handleChapterContinue, 1200);
+    } else if (screen === 'shop') {
+      later(handleShopLeave, 700);
+    } else if (screen === 'forge') {
+      later(handleForgeLeave, 700);
+    } else if (screen === 'rest') {
+      // RestScreen 휴식 선택지와 동일 (최대 HP 20% 회복)
+      later(() => handleRestChoice({ type: 'heal', value: Math.floor(maxHp * 0.2) }), 800);
+    } else if (screen === 'prep' || screen === 'reselect') {
+      // PrepScreen과 동일 규칙으로 자동 선택 (제한 개수 우회 금지):
+      // 기존 활성 선택 유지 → 부족분은 레벨 높은 패시브 순으로 채움
+      const owned = Object.entries(skills).filter(([n, lv]) => lv > 0 && PASSIVE_SKILLS[n]).map(([n]) => n);
+      const maxSk = PREP_CONFIG.maxSkillSelect;
+      let selSkills;
+      if (owned.length <= maxSk) {
+        selSkills = owned;
+      } else {
+        const prevSk = (activeSkills || []).filter(n => owned.includes(n));
+        const restSk = owned.filter(n => !prevSk.includes(n)).sort((a, b) => (skills[b] || 0) - (skills[a] || 0));
+        selSkills = [...prevSk, ...restSk].slice(0, maxSk);
+      }
+      const maxRel = currentExpedition?.maxRelicSelect || 1;
+      const relNames = relics.map(r => r.name);
+      let selRelics;
+      if (relNames.length <= maxRel) {
+        selRelics = relNames;
+      } else {
+        const prevRel = (activeRelicNames || []).filter(n => relNames.includes(n));
+        const restRel = relNames.filter(n => !prevRel.includes(n));
+        selRelics = [...prevRel, ...restRel].slice(0, maxRel);
+      }
+      if (screen === 'prep') later(() => handlePrepConfirm(selSkills, selRelics), 800);
+      else later(() => handleReselectConfirm(selSkills, selRelics), 800);
+    }
+    return () => { if (t) clearTimeout(t); };
+  }, [screen, autoHunt, autoHuntAllowed, mapData, currentRewards, hp, maxHp]);
+
   return (
     <ResponsiveLayout sidebar={
       <PCSidebar 
@@ -1746,13 +1845,13 @@ export default function App() {
             {screen === 'altar' && <SoulAltar meta={meta} slots={altarSlots} onPurchase={purchaseUpgrade} onReroll={rerollAltar} onBack={() => setScreen('title')} />}
             {screen === 'engraving' && <EngravingScreen meta={meta} onMetaUpdate={setMeta} onBack={() => setScreen('title')} />}
             {screen === 'achievements' && <AchievementScreen meta={meta} onClaim={handleClaimAchievement} onClose={() => setScreen(prevAchievementsBack)} />}
-            {screen === 'map' && chapter && mapData && <MapView chapter={chapter} classData={classData} mapData={mapData} hp={hp} maxHp={maxHp} gold={gold} gem={gem} relics={relics} activeRelicNames={activeRelicNames} expedition={currentExpedition} curses={currentCurses} chapterIdx={chapterIdx} onEnterNode={handleEnterNode} onOpenStatus={() => setScreen('status')} onOpenAchievements={() => { setPrevAchievementsBack('map'); setScreen('achievements'); }} onOpenCodex={() => setScreen('codex')} onBack={() => setScreen('title')} />}
+            {screen === 'map' && chapter && mapData && <MapView chapter={chapter} classData={classData} mapData={mapData} hp={hp} maxHp={maxHp} gold={gold} gem={gem} relics={relics} activeRelicNames={activeRelicNames} expedition={currentExpedition} curses={currentCurses} chapterIdx={chapterIdx} autoHunt={autoHunt} autoHuntAllowed={autoHuntAllowed} onToggleAutoHunt={() => setAutoHunt(v => !v)} onEnterNode={handleEnterNode} onOpenStatus={() => setScreen('status')} onOpenAchievements={() => { setPrevAchievementsBack('map'); setScreen('achievements'); }} onOpenCodex={() => setScreen('codex')} onBack={() => setScreen('title')} />}
             {screen === 'codex' && <CodexScreen meta={meta} onBack={() => setScreen('map')} />}
             {screen === 'bossIntro' && currentEnemy && <BossIntroScreen enemyKey={currentEnemy} onComplete={() => setScreen('combat')} />}
-            {screen === 'combat' && currentEnemy && <CombatScreen key={`${activeNodeId}-${currentEnemy}`} classData={classData} initialPlayer={{ hp, maxHp, ...classData.stats, ...stats }} initialSkills={skills} initialUltimates={ultimates} initialRelics={relics} activeSkills={activeSkills} activeRelicNames={activeRelicNames} enemyKey={currentEnemy} isBoss={isBossReward} expedition={currentExpedition} curses={currentCurses} meta={meta} engravingFx={getCombinedClassFx(meta, classData?.id)} chapterGimmick={chapter?.gimmick || null} onVictory={handleVictory} onDefeat={handleDefeat} />}
+            {screen === 'combat' && currentEnemy && <CombatScreen key={`${activeNodeId}-${currentEnemy}`} classData={classData} initialPlayer={{ hp, maxHp, ...classData.stats, ...stats }} initialSkills={skills} initialUltimates={ultimates} initialRelics={relics} activeSkills={activeSkills} activeRelicNames={activeRelicNames} enemyKey={currentEnemy} isBoss={isBossReward} expedition={currentExpedition} curses={currentCurses} meta={meta} engravingFx={getCombinedClassFx(meta, classData?.id)} chapterGimmick={chapter?.gimmick || null} autoPlay={autoHunt} onToggleAuto={() => setAutoHunt(v => !v)} onVictory={handleVictory} onDefeat={handleDefeat} />}
             {screen === 'reward' && <RewardSelect rewards={currentRewards} gem={gem} skills={skills} relics={relics} ultimates={ultimates} onPick={handlePickReward} onReroll={handleReroll} hasRerolled={hasRerolled} isElite={isEliteReward} classId={classData?.id} meta={meta} expedition={currentExpedition} />}
             {screen === 'victory' && <VictoryScreen classData={classData} enemy={currentEnemy ? ENEMIES[currentEnemy] : null} gains={victoryGains} onContinue={handleVictoryContinue} />}
-            {screen === 'event' && currentEvent && <EventScreen event={currentEvent} classData={classData} stats={{ ...classData.stats, ...stats }} skills={skills} gold={gold} gem={gem} onResolve={handleEventResolve} />}
+            {screen === 'event' && currentEvent && <EventScreen event={currentEvent} classData={classData} stats={{ ...classData.stats, ...stats }} skills={skills} gold={gold} gem={gem} autoPlay={autoHunt} onResolve={handleEventResolve} />}
             {screen === 'rest' && <RestScreen classData={classData} hp={hp} maxHp={maxHp} skills={skills} stats={{ ...classData?.stats, ...stats }} activeSkills={activeSkills} activeRelicNames={activeRelicNames} relics={relics} ultimates={ultimates} engravingFx={getCombinedClassFx(meta, classData?.id)} meta={meta} expedition={currentExpedition} onChoice={handleRestChoice} />}
             {screen === 'prep' && <PrepScreen classData={classData} skills={skills} stats={{ ...classData?.stats, ...stats }} relics={relics} ultimates={ultimates} engravingFx={getCombinedClassFx(meta, classData?.id)} meta={meta} expedition={currentExpedition} mode="full" onConfirm={handlePrepConfirm} />}
             {screen === 'reselect' && <PrepScreen classData={classData} skills={skills} stats={{ ...classData?.stats, ...stats }} relics={relics} ultimates={ultimates} engravingFx={getCombinedClassFx(meta, classData?.id)} meta={meta} expedition={currentExpedition} mode={reselectMode} currentActiveSkills={activeSkills} currentActiveRelicNames={activeRelicNames} onConfirm={handleReselectConfirm} />}

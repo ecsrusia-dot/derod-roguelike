@@ -2,11 +2,11 @@
 // components/EventScreen.jsx — 사건 화면 (능력 검정 + 선택지)
 // ============================================
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PALETTE } from '../utils/helpers.js';
 import { ENEMIES, GAME_CONFIG } from '../data.js';
 
-export default function EventScreen({ event, classData, stats, skills = {}, gold = 0, gem = 0, onResolve }) {
+export default function EventScreen({ event, classData, stats, skills = {}, gold = 0, gem = 0, autoPlay = false, onResolve }) {
   const [stage, setStage] = useState('intro'); // intro | result
   const [resultData, setResultData] = useState(null);
 
@@ -59,6 +59,28 @@ export default function EventScreen({ event, classData, stats, skills = {}, gold
     setResultData(result);
     setStage('result');
   };
+
+  // 1.72.0~ 자동 사냥 — 안전 선택지 자동 선택 + 결과 자동 확인
+  // 안전 우선순위: 검정·전투·페널티·비용 없음 > 검정·전투 없음 > 첫 번째 (잔액 부족 선택지는 제외)
+  useEffect(() => {
+    if (!autoPlay) return;
+    if (stage === 'intro') {
+      const t = setTimeout(() => {
+        const affordable = event.choices.filter(c => !(c.cost && (((c.cost.gold || 0) > gold) || ((c.cost.gem || 0) > gem))));
+        const pool = affordable.length > 0 ? affordable : event.choices;
+        const safe =
+          pool.find(c => !c.stat && !c.combat && !c.penalty && !c.cost) ||
+          pool.find(c => !c.stat && !c.combat) ||
+          pool[0];
+        if (safe) handleChoice(safe);
+      }, 900);
+      return () => clearTimeout(t);
+    }
+    if (stage === 'result' && resultData) {
+      const t = setTimeout(() => onResolve(resultData), 1100);
+      return () => clearTimeout(t);
+    }
+  }, [autoPlay, stage]);
 
   return (
     <div className="absolute inset-0 flex flex-col" style={{ background: PALETTE.bgDeep }}>
