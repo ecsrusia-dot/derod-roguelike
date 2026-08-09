@@ -21,6 +21,30 @@ import { ScreenHeader, GlassPanel, Chip, UIButton } from './ui/CommonUI.jsx';
 
 const ROLE_ICONS = { tank: Shield, dealer: Swords, healer: Heart };
 const ROLE_COLORS = { tank: '#7ba3c4', dealer: '#c4453d', healer: '#9ad4a3' };
+const SLOT_GLYPHS = { weapon: '⚔', armor: '🛡', accessory: '◆' };
+const ROOM_KIND_GLYPHS = { mobs: '☠', named: '♜', boss: '♛' };
+
+// 직업 일러 초상 — 이미지 실패 시 이니셜 폴백
+function ClassPortrait({ cls, roleColor, size = 42 }) {
+  const [failed, setFailed] = useState(false);
+  return (
+    <span className="relative flex-none overflow-hidden" style={{
+      width: size, height: size, borderRadius: 13, display: 'block',
+      border: `2px solid ${roleColor}88`,
+      boxShadow: `0 0 10px ${roleColor}44`,
+      background: `linear-gradient(160deg, ${roleColor}30, rgba(0,0,0,0.4))`,
+    }}>
+      {cls?.image && !failed ? (
+        <img src={cls.image} alt={cls?.name} onError={() => setFailed(true)}
+          className="w-full h-full object-cover" style={{ objectPosition: 'center 18%' }} />
+      ) : (
+        <span className="w-full h-full flex items-center justify-center font-bold" style={{ fontSize: 15, color: roleColor }}>
+          {(cls?.name || '?')[0]}
+        </span>
+      )}
+    </span>
+  );
+}
 
 // 장비 1개 카드 — 강화 단계·실효 스탯 표시 + 장착/분해 버튼
 function GearChip({ item, onEquip, onDismantle }) {
@@ -112,9 +136,7 @@ export default function RaidScreen({ meta, onEnterDungeon, onEquipItem, onAutoEq
               <GlassPanel key={classId} style={{ borderRadius: 13, padding: '9px 12px' }}>
                 <button onClick={() => setGearClass(open ? null : classId)} className="ui-press w-full text-left" style={{ background: 'transparent', border: 'none', padding: 0 }}>
                   <div className="flex items-center gap-2.5">
-                    <span className="flex items-center justify-center flex-none" style={{
-                      width: 30, height: 30, borderRadius: 10, background: `${roleColor}1c`, border: `1px solid ${roleColor}55`, color: roleColor,
-                    }}><RoleIcon size={14} /></span>
+                    <ClassPortrait cls={cls} roleColor={roleColor} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
                         <span className="font-semibold" style={{ fontSize: 12.5, color: PALETTE.text }}>{cls?.name || classId}</span>
@@ -125,8 +147,27 @@ export default function RaidScreen({ meta, onEnterDungeon, onEquipItem, onAutoEq
                           </Chip>
                         )}
                       </div>
-                      <div className="tabular-nums" style={{ fontSize: 10, color: PALETTE.textDim }}>
-                        HP {stats.hp} · 공격 {stats.atk}{stats.heal ? ` · 치유 ${stats.heal}` : ''} · 장비 {equippedCount}/3
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="tabular-nums" style={{ fontSize: 10, color: PALETTE.textDim }}>
+                          HP {stats.hp} · 공격 {stats.atk}{stats.heal ? ` · 치유 ${stats.heal}` : ''}
+                        </span>
+                        {/* 장비 슬롯 한눈 타일 — 등급색 + 강화 표시 */}
+                        <span className="flex gap-1 ml-1">
+                          {RAID_SLOTS.map(slot => {
+                            const it = raid.equipped?.[classId]?.[slot];
+                            const rc = it ? RAID_RARITIES[it.rarity]?.color : null;
+                            return (
+                              <span key={slot} className="flex items-center justify-center" style={{
+                                width: 17, height: 17, borderRadius: 5, fontSize: 9,
+                                background: rc ? `${rc}28` : 'rgba(255,255,255,0.04)',
+                                border: `1px solid ${rc ? `${rc}aa` : 'var(--ui-line)'}`,
+                                color: rc || PALETTE.textDim,
+                                boxShadow: rc && (it.enh || 0) >= 5 ? `0 0 6px ${rc}88` : 'none',
+                                opacity: rc ? 1 : 0.5,
+                              }}>{SLOT_GLYPHS[slot]}</span>
+                            );
+                          })}
+                        </span>
                       </div>
                     </div>
                     <div className="text-right flex-none">
@@ -285,14 +326,22 @@ export default function RaidScreen({ meta, onEnterDungeon, onEquipItem, onAutoEq
         </div>
 
         {/* ===== 던전 — 지역별 그룹 (던파 지역-던전 편성 참고) ===== */}
-        {RAID_REGIONS.map(region => (
+        {RAID_REGIONS.map((region, regionIdx) => {
+          const regionColor = RAID_DUNGEONS.find(d => d.region === region.id)?.color || PALETTE.dawn;
+          return (
         <React.Fragment key={region.id}>
-        <div className="mt-4 mb-2">
-          <div className="flex items-center gap-2.5">
-            <span className="tracking-[0.25em] flex-none" style={{ fontSize: 11, color: PALETTE.dawn }}>{region.name}</span>
-            <span className="flex-1 h-px" style={{ background: 'var(--ui-line)' }} />
+        {/* 지역 배너 — 던전 색 그라디언트 스트립 */}
+        <div className="mt-4 mb-2 px-3 py-2 relative overflow-hidden" style={{
+          borderRadius: 12,
+          background: `linear-gradient(105deg, ${regionColor}2e, transparent 65%), rgba(255,255,255,0.025)`,
+          border: `1px solid ${regionColor}44`,
+        }}>
+          <span className="absolute left-0 top-0 bottom-0" style={{ width: 3, background: `linear-gradient(180deg, ${regionColor}, transparent)` }} />
+          <div className="flex items-baseline gap-2">
+            <span style={{ fontSize: 9, letterSpacing: '0.3em', color: regionColor, fontFamily: '"Cinzel", serif' }}>REGION {regionIdx + 1}</span>
+            <span className="tracking-[0.2em] font-bold" style={{ fontSize: 12, color: PALETTE.text }}>{region.name}</span>
           </div>
-          <div className="mt-1" style={{ fontSize: 10.5, color: PALETTE.textDim, opacity: 0.75 }}>{region.desc}</div>
+          <div className="mt-0.5" style={{ fontSize: 10, color: PALETTE.textDim, opacity: 0.85 }}>{region.desc}</div>
         </div>
         <div className="ui-stagger flex flex-col gap-2">
           {RAID_DUNGEONS.filter(d => d.region === region.id).map(d => {
@@ -302,23 +351,35 @@ export default function RaidScreen({ meta, onEnterDungeon, onEquipItem, onAutoEq
             const totalDrops = d.rooms.reduce((s, room) => s + (room.drops || 0), 0);
             const totalStones = d.rooms.reduce((s, room) => s + (room.stones || 0), 0);
             return (
-              <GlassPanel key={d.id} style={{ borderRadius: 14, padding: '11px 13px', ...(d.kind === 'raid' ? { borderColor: `${d.color}55` } : {}) }}>
+              <GlassPanel key={d.id} className="relative overflow-hidden" style={{ borderRadius: 14, padding: '11px 13px 11px 16px', ...(d.kind === 'raid' ? { borderColor: `${d.color}66`, boxShadow: `0 0 18px -8px ${d.color}88` } : {}) }}>
+                {/* 좌측 컬러 밴드 + 우측 보스 문장 워터마크 */}
+                <span className="absolute left-0 top-0 bottom-0" style={{ width: 3.5, background: `linear-gradient(180deg, ${d.color}, ${d.color}33)` }} />
+                <span className="absolute pointer-events-none" style={{
+                  right: -6, top: -10, fontSize: 74, color: d.color, opacity: 0.09, transform: 'rotate(12deg)',
+                }}>{ROOM_KIND_GLYPHS.boss}</span>
                 <div className="tracking-[0.2em]" style={{ fontSize: 9.5, color: d.color }}>{d.sub}</div>
                 <div className="flex items-center justify-between mt-0.5">
                   <span className="font-semibold" style={{ fontSize: 13.5, color: PALETTE.text }}>{d.name}</span>
                   {clears > 0 && <Chip color={PALETTE.green} style={{ height: 19 }}>클리어 ×{clears}</Chip>}
                 </div>
                 <div className="leading-relaxed mt-1" style={{ fontSize: 10.5, color: PALETTE.textDim }}>{d.desc}</div>
-                {/* 방 진행 미리보기 */}
-                <div className="flex items-center gap-1 mt-2 flex-wrap" style={{ fontSize: 9.5, color: PALETTE.textDim }}>
-                  {d.rooms.map((room, i) => (
-                    <React.Fragment key={i}>
-                      {i > 0 && <span style={{ opacity: 0.5 }}>▸</span>}
-                      <span style={{ color: room.kind === 'boss' ? d.color : room.kind === 'named' ? PALETTE.legendary : PALETTE.textDim }}>
-                        {room.name}
-                      </span>
-                    </React.Fragment>
-                  ))}
+                {/* 방 경로 — 아이콘 메달리온 체인 (☠쫄 → ♜네임드 → ♛보스) */}
+                <div className="flex items-center gap-1 mt-2 flex-wrap">
+                  {d.rooms.map((room, i) => {
+                    const kindColor = room.kind === 'boss' ? d.color : room.kind === 'named' ? PALETTE.legendary : PALETTE.textDim;
+                    return (
+                      <React.Fragment key={i}>
+                        {i > 0 && <span style={{ fontSize: 8, color: PALETTE.textDim, opacity: 0.5 }}>─</span>}
+                        <span className="flex items-center justify-center flex-none" style={{
+                          width: room.kind === 'boss' ? 24 : 20, height: room.kind === 'boss' ? 24 : 20,
+                          borderRadius: '50%', fontSize: room.kind === 'boss' ? 12 : 10,
+                          background: `${kindColor}1e`, border: `1px solid ${kindColor}77`, color: kindColor,
+                          boxShadow: room.kind === 'boss' ? `0 0 8px ${d.color}66` : 'none',
+                        }}>{ROOM_KIND_GLYPHS[room.kind]}</span>
+                      </React.Fragment>
+                    );
+                  })}
+                  <span className="ml-1 truncate" style={{ fontSize: 9.5, color: d.color }}>{finalRoom.name}</span>
                 </div>
                 <div className="flex flex-wrap gap-1.5 mt-2">
                   <Chip color={d.color} style={{ height: 19 }}>방 {d.rooms.length}개</Chip>
@@ -340,7 +401,8 @@ export default function RaidScreen({ meta, onEnterDungeon, onEquipItem, onAutoEq
           })}
         </div>
         </React.Fragment>
-        ))}
+          );
+        })}
 
         <div className="mt-3 text-center" style={{ fontSize: 9.5, color: PALETTE.textDim, opacity: 0.7 }}>
           레이드 장비·스킬은 본편(원정)과 완전히 분리된 별도 성장입니다
