@@ -72,6 +72,8 @@ const DEFAULT_META = {
     // 1.78.0~ 기연 비전 재설계 — 활성 비전 1슬롯 + 조우 이력 (재발생 방지, 던전당 평생 1회)
     secretSkill: null,   // 활성 비전 ID | null
     secretHistory: [],   // 만난 적 있는 비전 ID 목록 (유지/변경과 무관하게 기록)
+    // 1.79.0~ 전후방 배치 — { classId: 'front' | 'back' }
+    formation: { wanderer: 'front', demonblood: 'front', elf: 'back', sage: 'back', priest: 'back' },
   },
   // 진행 중인 런 스냅샷 (맵 화면 진입 시 자동 저장 — 앱 종료/새로고침 후 이어하기 용)
   // null = 진행 중 런 없음. 객체 = 재개 가능한 런 상태.
@@ -569,11 +571,16 @@ export function useEndlessSkip(meta, dateKey, souls) {
 // ============================================
 // 1.74.0~ 레이드 장비/클리어 헬퍼
 // ============================================
-const EMPTY_RAID = { inventory: [], equipped: { wanderer: {}, sage: {}, demonblood: {}, elf: {}, priest: {} }, clears: {}, stones: 0, weekly: null, essence: 0, secretSkill: null, secretHistory: [] };
+const EMPTY_RAID = { inventory: [], equipped: { wanderer: {}, sage: {}, demonblood: {}, elf: {}, priest: {} }, clears: {}, stones: 0, weekly: null, essence: 0, secretSkill: null, secretHistory: [], formation: { wanderer: 'front', demonblood: 'front', elf: 'back', sage: 'back', priest: 'back' } };
 
 function getRaid(meta) {
   const raid = meta?.raid || EMPTY_RAID;
-  return { ...EMPTY_RAID, ...raid, equipped: { ...EMPTY_RAID.equipped, ...(raid.equipped || {}) } };
+  return {
+    ...EMPTY_RAID,
+    ...raid,
+    equipped: { ...EMPTY_RAID.equipped, ...(raid.equipped || {}) },
+    formation: { ...EMPTY_RAID.formation, ...(raid.formation || {}) },
+  };
 }
 
 // 드랍 장비를 인벤토리에 추가
@@ -694,6 +701,17 @@ export function enhanceRaidItem(meta, classId, slot, cost, maxLevel) {
         [classId]: { ...(raid.equipped?.[classId] || {}), [slot]: upgraded },
       },
     },
+  };
+}
+
+// 1.79.0~ 전후방 배치 토글 (전열 ↔ 후열)
+export function toggleRaidFormation(meta, classId) {
+  if (!classId) return meta;
+  const raid = getRaid(meta);
+  const cur = raid.formation?.[classId] || 'back';
+  return {
+    ...meta,
+    raid: { ...raid, formation: { ...raid.formation, [classId]: cur === 'front' ? 'back' : 'front' } },
   };
 }
 

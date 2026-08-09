@@ -16,7 +16,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { PALETTE } from '../utils/helpers.js';
-import { RAID_CLASSES, RAID_RARITIES, RAID_TUNING, RAID_STONE, RAID_ESSENCE, RAID_SECRET_SKILLS, RAID_SECRET_CHANCE, getDungeonSecret, getRaidMemberStats, rollRaidDrop, CLASSES } from '../data.js';
+import { RAID_CLASSES, RAID_RARITIES, RAID_TUNING, RAID_STONE, RAID_ESSENCE, RAID_SECRET_SKILLS, RAID_SECRET_CHANCE, RAID_FORMATION, getDungeonSecret, getRaidMemberStats, rollRaidDrop, CLASSES } from '../data.js';
 import { FloatingLabel, DamageVignette } from './CombatEffects.jsx';
 
 const ROLE_COLORS = { tank: '#7ba3c4', dealer: '#c4453d', healer: '#9ad4a3' };
@@ -35,10 +35,13 @@ function buildParty(raidMeta, secretFx = {}) {
     let hp = stats.hp;
     if (secretFx.atkPct) atk = Math.round(atk * (1 + secretFx.atkPct / 100));
     if (secretFx.hpPct) hp = Math.round(hp * (1 + secretFx.hpPct / 100));
+    // 1.79.0~ 전후방 배치 — 전열은 공격 +10% (리스크 보상)
+    const row = raidMeta?.formation?.[classId] || RAID_FORMATION.default[classId] || 'back';
+    if (row === 'front') atk = Math.round(atk * (1 + RAID_FORMATION.frontAtkPct / 100));
     return {
       classId, name: cls?.name || classId, role: stats.role, image: cls?.image || null,
       hp, maxHp: hp, atk, heal: stats.heal || 0,
-      alive: true, epic,
+      alive: true, epic, row,
       // 기여도 추적 (종료 팝업용)
       dealt: 0, healed: 0, taken: 0,
     };
@@ -348,7 +351,10 @@ export default function RaidBattleScreen({ meta, dungeon, repeat = false, onTogg
         for (let i = 0; i < e.pendingAdds; i++) {
           const targets = alive();
           if (targets.length === 0) break;
-          const victim = targets[Math.floor(Math.random() * targets.length)];
+          // 1.79.0 전열 우선 타격
+          const frontTargets = targets.filter(m => m.row === 'front');
+          const pool = frontTargets.length > 0 ? frontTargets : targets;
+          const victim = pool[Math.floor(Math.random() * pool.length)];
           partyHit = true;
           lines.push({ t: 'boss', text: `◂ 소환수 → ${victim.name} ${addDmg}` });
           applyHit(victim, addDmg);
@@ -375,6 +381,8 @@ export default function RaidBattleScreen({ meta, dungeon, repeat = false, onTogg
       if (ironWall) lines.push({ t: 'heal', text: `🛡 방랑검사 — [철벽 방세] 이번 라운드 받는 피해 -60%` });
       // 1.78.0 비전 aoeTakenPct (서리의 인내·별의 가호) — 광역·전멸기 피해 감소
       const aoeGuard = 1 - (secretFx.aoeTakenPct || 0) / 100;
+      // 1.79.0 배치 — 후열은 광역 피해 -30% (전멸기는 배치 무관: rowGuard 미적용)
+      const rowGuard = (m) => (m.row === 'back' ? 1 - RAID_FORMATION.backAoeReducePct / 100 : 1);
       const takenMultOf = (m) => {
         let mult = 1;
         if (m.classId === 'wanderer') {
@@ -407,7 +415,7 @@ export default function RaidBattleScreen({ meta, dungeon, repeat = false, onTogg
             lines.push({ t: 'heal', text: `· 정령사 — [바람의 가호] 회피!` });
             return;
           }
-          const taken = Math.round(enemyAtk * 0.7 * takenMultOf(m) * aoeGuard);
+          const taken = Math.round(enemyAtk * 0.7 * takenMultOf(m) * aoeGuard * rowGuard(m));
           totalTaken += taken;
           applyHit(m, taken);
         });
@@ -417,9 +425,16 @@ export default function RaidBattleScreen({ meta, dungeon, repeat = false, onTogg
         const tank = tankAlive;
         const nonTanks = alive().filter(m => m.classId !== 'wanderer');
         const pierce = !!(e.pierceTankChance && tank && nonTanks.length > 0 && Math.random() < e.pierceTankChance);
+        // 1.79.0 배치 — 탱커 부재·도발 무시 시 전열에서만 타겟 (전열 전멸 시 후열 노출)
+        const pickByRow = (candidates) => {
+          if (candidates.length === 0) return null;
+          const front = candidates.filter(m => m.row === 'front');
+          const pool = front.length > 0 ? front : candidates;
+          return pool[Math.floor(Math.random() * pool.length)];
+        };
         const target = pierce
-          ? nonTanks[Math.floor(Math.random() * nonTanks.length)]
-          : (tank || alive()[Math.floor(Math.random() * alive().length)]);
+          ? pickByRow(nonTanks)
+          : (tank || pickByRow(alive()));
         if (target) {
           const taken = Math.round(enemyAtk * takenMultOf(target));
           partyHit = true;
@@ -653,8 +668,22 @@ export default function RaidBattleScreen({ meta, dungeon, repeat = false, onTogg
 
       {/* ===== 파티 초상 5인 + 회복/피해 라벨 ===== */}
       <div className="relative px-4 py-2.5 flex-none" style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.25), transparent)' }}>
-        <div key={partyFlash} className={`grid grid-cols-5 gap-1.5 ${partyFlash > 0 ? 'fx-hit-shake' : ''}`}>
-          {party.map(m => <PartyChip key={m.classId} member={m} flash={false} />)}
+        <div key={partyFlash} className={partyFlash > 0 ? 'fx-hit-shake' : ''}>
+          {['front', 'back'].map(row => {
+            const members = party.filter(m => m.row === row);
+            if (members.length === 0) return null;
+            return (
+              <div key={row} className="flex items-start gap-2 mb-1">
+                <span className="flex-none text-center" style={{
+                  width: 24, marginTop: 14, fontSize: 8.5, letterSpacing: '0.1em',
+                  color: row === 'front' ? PALETTE.accent : PALETTE.ice,
+                }}>{row === 'front' ? '전열' : '후열'}</span>
+                <div className="flex gap-2.5">
+                  {members.map(m => <PartyChip key={m.classId} member={m} flash={false} />)}
+                </div>
+              </div>
+            );
+          })}
         </div>
         <div className="absolute inset-x-0 top-0 pointer-events-none" style={{ height: 60 }}>
           {partyFxLabels.map(l => (

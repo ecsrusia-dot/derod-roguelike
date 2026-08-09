@@ -14,7 +14,7 @@ import {
   RAID_CLASSES, RAID_SKILLS, RAID_SLOTS, RAID_SLOT_NAMES, RAID_RARITIES,
   RAID_DUNGEONS, RAID_REGIONS, getRaidMemberStats, getRaidPartyPower, CLASSES,
   RAID_STONE, RAID_ENHANCE, RAID_DISMANTLE_VALUES, getRaidItemEffective, getKstWeekKey,
-  RAID_ESSENCE, RAID_CRAFT_RECIPES, RAID_GACHA, RAID_EPIC_UNIQUES, RAID_SECRET_SKILLS, getDungeonSecret,
+  RAID_ESSENCE, RAID_CRAFT_RECIPES, RAID_GACHA, RAID_EPIC_UNIQUES, RAID_SECRET_SKILLS, getDungeonSecret, RAID_SET_BONUSES, RAID_FORMATION,
 } from '../data.js';
 import { hasRaidWeeklyClaimed } from '../storage.js';
 import { ScreenHeader, GlassPanel, Chip, UIButton } from './ui/CommonUI.jsx';
@@ -23,6 +23,12 @@ const ROLE_ICONS = { tank: Shield, dealer: Swords, healer: Heart };
 const ROLE_COLORS = { tank: '#7ba3c4', dealer: '#c4453d', healer: '#9ad4a3' };
 const SLOT_GLYPHS = { weapon: '⚔', armor: '🛡', accessory: '◆' };
 const ROOM_KIND_GLYPHS = { mobs: '☠', named: '♜', boss: '♛' };
+
+// 세트 보너스 수치 → "공+12% · HP+12%" 표기
+function setBonusText(b) {
+  if (!b) return '';
+  return [b.atkPct ? `공격 +${b.atkPct}%` : null, b.hpPct ? `HP +${b.hpPct}%` : null].filter(Boolean).join(' · ');
+}
 
 // 직업 일러 초상 — 이미지 실패 시 이니셜 폴백
 function ClassPortrait({ cls, roleColor, size = 42 }) {
@@ -67,8 +73,15 @@ function GearChip({ item, onEquip, onDismantle }) {
           {eff.atk > 0 && `공격 +${eff.atk}`}{eff.atk > 0 && eff.hp > 0 && ' · '}{eff.hp > 0 && `HP +${eff.hp}`}
           {' · '}전투력 {eff.power}
         </div>
+        {item.series && RAID_SET_BONUSES[item.series] && (
+          <div style={{ fontSize: 9, color: PALETTE.textDim, marginTop: 1 }}>
+            ◈ {item.series} 세트 (3부위 장착 시): {setBonusText(RAID_SET_BONUSES[item.series])}
+          </div>
+        )}
         {item.rarity === 'EP' && RAID_EPIC_UNIQUES[item.classId] && (
-          <div style={{ fontSize: 9, color: rar.color, marginTop: 1 }}>◆ 고유: {RAID_EPIC_UNIQUES[item.classId].name}</div>
+          <div style={{ fontSize: 9, color: rar.color, marginTop: 1 }}>
+            ◆ 고유: {RAID_EPIC_UNIQUES[item.classId].name} — {RAID_EPIC_UNIQUES[item.classId].desc}
+          </div>
         )}
       </div>
       <div className="flex flex-none gap-1 ml-2">
@@ -89,7 +102,7 @@ function GearChip({ item, onEquip, onDismantle }) {
   );
 }
 
-export default function RaidScreen({ meta, onEnterDungeon, onEquipItem, onAutoEquip, onDismantle = null, onDismantleJunk = null, onEnhance = null, onCraft = null, onGacha = null, onBack }) {
+export default function RaidScreen({ meta, onEnterDungeon, onEquipItem, onAutoEquip, onDismantle = null, onDismantleJunk = null, onEnhance = null, onCraft = null, onGacha = null, onToggleFormation = null, onBack }) {
   const raid = meta?.raid || { inventory: [], equipped: {}, clears: {}, stones: 0, essence: 0 };
   const [gearClass, setGearClass] = useState(null); // 장비 관리 중인 직업 ID | null
   // 1.76.0~ 제작·가챠 결과 배너
@@ -143,10 +156,14 @@ export default function RaidScreen({ meta, onEnterDungeon, onEquipItem, onAutoEq
         })()}
 
         {/* ===== 파티 (5직업 고정) ===== */}
-        <div className="mt-1 mb-2 flex items-center gap-2.5">
+        <div className="mt-1 mb-1 flex items-center gap-2.5">
           <span className="tracking-[0.25em] flex-none" style={{ fontSize: 11, color: PALETTE.dawn }}>원정대 — 5인 파티</span>
           <span className="flex-1 h-px" style={{ background: 'var(--ui-line)' }} />
           <span style={{ fontSize: 10.5, color: PALETTE.textDim }}>전투력 <span className="tabular-nums" style={{ color: PALETTE.legendary }}>{partyPower}</span></span>
+        </div>
+        {/* 1.79.0~ 전후방 배치 범례 */}
+        <div className="mb-2" style={{ fontSize: 9.5, color: PALETTE.textDim, opacity: 0.8 }}>
+          <span style={{ color: PALETTE.accent }}>전열</span>: 공격 +{RAID_FORMATION.frontAtkPct}% · 단일기/광역 주 타겟 — <span style={{ color: PALETTE.ice }}>후열</span>: 광역 -{RAID_FORMATION.backAoeReducePct}% · 단일기 보호 (전멸기는 배치 무관)
         </div>
         <div className="ui-stagger flex flex-col gap-1.5">
           {Object.keys(RAID_CLASSES).map(classId => {
@@ -174,7 +191,10 @@ export default function RaidScreen({ meta, onEnterDungeon, onEquipItem, onAutoEq
                       </div>
                       <div className="flex items-center gap-1.5 mt-0.5">
                         <span className="tabular-nums" style={{ fontSize: 10, color: PALETTE.textDim }}>
-                          HP {stats.hp} · 공격 {stats.atk}{stats.heal ? ` · 치유 ${stats.heal}` : ''}
+                          <span style={{ color: (raid.formation?.[classId] || RAID_FORMATION.default[classId]) === 'front' ? '#e08a84' : PALETTE.ice }}>
+                            {(raid.formation?.[classId] || RAID_FORMATION.default[classId]) === 'front' ? '전열' : '후열'}
+                          </span>
+                          {' · '}HP {stats.hp} · 공격 {stats.atk}{stats.heal ? ` · 치유 ${stats.heal}` : ''}
                         </span>
                         {/* 장비 슬롯 한눈 타일 — 등급색 + 강화 표시 */}
                         <span className="flex gap-1 ml-1">
@@ -206,6 +226,31 @@ export default function RaidScreen({ meta, onEnterDungeon, onEquipItem, onAutoEq
                 {/* 펼침 — 레이드 스킬 + 장비 3부위 + 이 직업 인벤토리 */}
                 {open && (
                   <div className="mt-2.5 pt-2.5" style={{ borderTop: '1px solid var(--ui-line)' }}>
+                    {/* 1.79.0~ 전후방 배치 토글 */}
+                    {onToggleFormation && (() => {
+                      const row = raid.formation?.[classId] || RAID_FORMATION.default[classId] || 'back';
+                      return (
+                        <div className="flex items-center gap-2 mb-2">
+                          <span style={{ fontSize: 10, color: PALETTE.textDim }}>배치</span>
+                          <button onClick={() => onToggleFormation(classId)} className="ui-press flex-1 flex" style={{
+                            borderRadius: 10, padding: 3, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--ui-line)',
+                          }}>
+                            <span className="flex-1 text-center" style={{
+                              padding: '4px 0', borderRadius: 7, fontSize: 10, fontWeight: 700,
+                              background: row === 'front' ? 'rgba(196,69,61,0.25)' : 'transparent',
+                              color: row === 'front' ? '#e08a84' : PALETTE.textDim,
+                              border: row === 'front' ? '1px solid rgba(196,69,61,0.6)' : '1px solid transparent',
+                            }}>전열 (공격 +{RAID_FORMATION.frontAtkPct}%)</span>
+                            <span className="flex-1 text-center" style={{
+                              padding: '4px 0', borderRadius: 7, fontSize: 10, fontWeight: 700,
+                              background: row === 'back' ? 'rgba(123,163,196,0.22)' : 'transparent',
+                              color: row === 'back' ? PALETTE.ice : PALETTE.textDim,
+                              border: row === 'back' ? `1px solid ${PALETTE.ice}88` : '1px solid transparent',
+                            }}>후열 (광역 -{RAID_FORMATION.backAoeReducePct}%)</span>
+                          </button>
+                        </div>
+                      );
+                    })()}
                     <div className="px-2.5 py-2 mb-2" style={{ borderRadius: 10, background: 'rgba(232,176,74,0.07)', border: '1px solid rgba(232,176,74,0.3)' }}>
                       {(RAID_SKILLS[classId] || []).map((sk, i) => (
                         <div key={sk.name} style={{ marginTop: i > 0 ? 5 : 0 }}>
@@ -259,6 +304,33 @@ export default function RaidScreen({ meta, onEnterDungeon, onEquipItem, onAutoEq
                         );
                       })}
                     </div>
+                    {/* 1.78.1~ 세트 효과 현황 — PM 피드백: 세트 설명 부재 */}
+                    {(() => {
+                      const eq = raid.equipped?.[classId] || {};
+                      const counts = {};
+                      RAID_SLOTS.forEach(slot => {
+                        const it = eq[slot];
+                        if (it?.series) counts[it.series] = (counts[it.series] || 0) + 1;
+                      });
+                      const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+                      return (
+                        <div className="mt-2 px-2.5 py-2" style={{ borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--ui-line)' }}>
+                          <div style={{ fontSize: 9.5, fontWeight: 700, color: PALETTE.dawn }}>◈ 세트 효과 — 같은 시리즈(접두어) 3부위 장착 시 발동</div>
+                          {entries.length === 0 ? (
+                            <div style={{ fontSize: 9.5, color: PALETTE.textDim, marginTop: 2 }}>장착 장비 없음 — 던전 시리즈 장비를 모아보세요</div>
+                          ) : entries.map(([series, n]) => {
+                            const b = RAID_SET_BONUSES[series];
+                            if (!b) return null;
+                            const done = n >= 3;
+                            return (
+                              <div key={series} className="tabular-nums" style={{ fontSize: 9.5, marginTop: 2, color: done ? PALETTE.green : PALETTE.textDim }}>
+                                {done ? '✓' : '·'} {series} {n}/3 — {done ? '발동 중: ' : '완성 시: '}{setBonusText(b)}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
                     {invForClass.length > 0 && (
                       <div className="mt-2.5">
                         <div style={{ fontSize: 9.5, color: PALETTE.textDim, marginBottom: 3 }}>보유 장비 ({invForClass.length})</div>
