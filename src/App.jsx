@@ -122,10 +122,14 @@ import {
   backfillRaidSeries,
   GAMBLE_CONFIG,
   buildGambleExpedition,
+  RAID_DIFFICULTIES,
+  getRaidClearKey,
+  applyRaidDifficulty,
+  ENGRAVINGS,
 } from './data.js';
 import { getKstDateKey } from './utils/dailyChallenge.js';
 import { simulateBestEndlessRun } from './utils/endlessSkipSim.js';
-import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear, dismantleRaidItem, dismantleRaidJunk, enhanceRaidItem, claimRaidWeekly, addRaidResources, spendRaidResourcesForItem, resolveRaidSecret, toggleRaidFormation, appendAutoRunLog, getGambleUsed, useGambleEntry, addTwilightCoins, addFateShards, redeemFateShards, buyGambleShopItem } from './storage.js';
+import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, applyEngravingSlot, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear, dismantleRaidItem, dismantleRaidJunk, enhanceRaidItem, claimRaidWeekly, addRaidResources, spendRaidResourcesForItem, resolveRaidSecret, toggleRaidFormation, appendAutoRunLog, getGambleUsed, useGambleEntry, addTwilightCoins, addFateShards, redeemFateShards, buyGambleShopItem } from './storage.js';
 
 
 
@@ -317,6 +321,8 @@ export default function App() {
   }, [autoHunt]);
   // 1.74.0~ 레이드 — 입장 중인 던전 (raidBattle 화면용)
   const [raidDungeon, setRaidDungeon] = useState(null);
+  // 1.86.0~ 레이드 난이도 (RAID_DIFFICULTIES 객체 — null이면 일반)
+  const [raidDifficulty, setRaidDifficulty] = useState(null);
   // 1.80.0~ 레이드 백그라운드 진행 상태 (플로팅 필 표시용): running | victory | choice | defeat
   const [raidBgStatus, setRaidBgStatus] = useState('running');
   // 1.78.0~ 던전 반복 모드 — 승리 시 자동 재입장, 전멸·후퇴·로비 복귀 시 해제
@@ -1671,6 +1677,17 @@ export default function App() {
     });
   };
 
+  // 1.86.0~ 레전더리 각인 확정권 — 피커에서 굴린 카드(cardId)를 슬롯에 장착 + 주화 차감
+  const handleGambleLegendary = (item, classId, slotIdx, cardId) => {
+    setMeta(prev => {
+      if ((prev.twilightCoins || 0) < item.cost) return prev;
+      let m = { ...prev, twilightCoins: prev.twilightCoins - item.cost };
+      m = applyEngravingSlot(m, classId, slotIdx, cardId, 0);
+      saveMeta(m);
+      return m;
+    });
+  };
+
   const handleGambleRedeem = () => {
     setMeta(prev => {
       const next = redeemFateShards(prev, GAMBLE_CONFIG.shardPity, GAMBLE_CONFIG.shardPityCoins);
@@ -1955,7 +1972,8 @@ export default function App() {
       let next = addRaidDrops(prev, loot?.items || []);
       next = addRaidResources(next, { stones: loot?.stones || 0, essence: loot?.essence || 0 });
       if (loot?.secret) next = resolveRaidSecret(next, loot.secret, !!loot.secretSwap); // 1.78.0 기연 (이력+유지/변경)
-      next = recordRaidClear(next, dungeon.id);
+      // 1.86.0~ 난이도별 클리어 기록 (일반=기존 키, 영웅/종막=@접미 — 상위 난이도 해금 판정용)
+      next = recordRaidClear(next, getRaidClearKey(dungeon.id, raidDifficulty?.id));
       // 1.75.0~ 주간 첫 클리어 보상: 심연석 + (심연 레이드는 유니크 이상 확정 장비 1개)
       const weekly = claimRaidWeekly(next, dungeon.id, getKstWeekKey(), dungeon.weeklyStones || 0);
       next = weekly.meta;
@@ -1968,6 +1986,7 @@ export default function App() {
     // 1.78.0 반복 모드 — 같은 던전 자동 재입장 (clears 증가로 battle key가 바뀌어 리마운트)
     if (raidRepeat) return;
     setRaidDungeon(null);
+    setRaidDifficulty(null);
     // 1.80.0~ 백그라운드 진행 중이면 현재 화면 유지 (싱글모드 방해 금지)
     if (screen === 'raidBattle') setScreen('raid');
   };
@@ -2043,6 +2062,7 @@ export default function App() {
     });
     setRaidRepeat(false);
     setRaidDungeon(null);
+    setRaidDifficulty(null);
     // 1.80.0~ 백그라운드 진행 중이면 현재 화면 유지 (싱글모드 방해 금지)
     if (screen === 'raidBattle') setScreen('raid');
   };
@@ -2227,7 +2247,8 @@ export default function App() {
           {/* 1.80.0~ 레이드 백그라운드 진행 — raidDungeon이 있으면 화면을 떠나도 마운트 유지 (전투·반복 파밍 계속) */}
           {raidDungeon && (
             <div style={{ display: screen === 'raidBattle' ? 'contents' : 'none' }}>
-              <RaidBattleScreen key={raidDungeon.id + '-' + (meta?.raid?.clears?.[raidDungeon.id] || 0)} meta={meta} dungeon={raidDungeon} repeat={raidRepeat} background={screen !== 'raidBattle'} onToggleRepeat={() => setRaidRepeat(v => !v)} onMinimize={() => setScreen('raid')} onStatus={setRaidBgStatus} onVictory={handleRaidVictory} onDefeat={handleRaidPartial} onRetreat={handleRaidPartial} />
+              {/* 1.86.0~ 난이도 적용된 실효 던전을 전달 — 전투 코드는 난이도 무지 (applyRaidDifficulty가 전부 처리) */}
+              <RaidBattleScreen key={raidDungeon.id + '-' + (raidDifficulty?.id || 'normal') + '-' + (meta?.raid?.clears?.[getRaidClearKey(raidDungeon.id, raidDifficulty?.id)] || 0)} meta={meta} dungeon={applyRaidDifficulty(raidDungeon, raidDifficulty)} repeat={raidRepeat} background={screen !== 'raidBattle'} onToggleRepeat={() => setRaidRepeat(v => !v)} onMinimize={() => setScreen('raid')} onStatus={setRaidBgStatus} onVictory={handleRaidVictory} onDefeat={handleRaidPartial} onRetreat={handleRaidPartial} />
             </div>
           )}
           {/* 1.80.0~ 레이드 백그라운드 플로팅 필 — 탭 시 전투 화면 복귀 */}
@@ -2275,9 +2296,9 @@ export default function App() {
             />}
             {screen === 'title' && authMode && <TitleScreen meta={meta} onStart={() => setScreen('expeditionSelect')} onResume={resumeActiveRun} onAltar={enterAltar} onEngravings={() => setScreen('engraving')} onRaid={raidUnlocked ? () => setScreen('raid') : null} onAchievements={() => { setPrevAchievementsBack('title'); setScreen('achievements'); }} onAutoStats={() => setScreen('autoStats')} onGamble={raidUnlocked ? () => { setGambleResult(null); setScreen('gamble'); } : null} onChangelog={() => setShowChangelog({ firstSeen: false })} onAccount={() => setScreen('account')} />}
             {screen === 'autoStats' && <AutoStatsScreen meta={meta} onClose={() => setScreen('title')} />}
-            {screen === 'gamble' && <GambleLobbyScreen meta={meta} result={gambleResult} onEnter={handleGambleEnter} onBuy={handleGambleBuy} onRedeem={handleGambleRedeem} onBack={() => { setGambleResult(null); setScreen('title'); }} />}
+            {screen === 'gamble' && <GambleLobbyScreen meta={meta} result={gambleResult} onEnter={handleGambleEnter} onBuy={handleGambleBuy} onBuyLegendary={handleGambleLegendary} onRedeem={handleGambleRedeem} onBack={() => { setGambleResult(null); setScreen('title'); }} />}
             {screen === 'gambleChoice' && currentExpedition?.isGamble && <GambleChoiceScreen pot={gamblePot} jackpot={gambleJackpot} onContinue={() => setScreen('reward')} onBank={handleGambleBank} />}
-            {screen === 'raid' && <RaidScreen meta={meta} onEnterDungeon={(d) => { if (raidDungeon) { setScreen('raidBattle'); return; } setRaidDungeon(d); setScreen('raidBattle'); }} onEquipItem={handleRaidEquip} onAutoEquip={handleRaidAutoEquip} onDismantle={handleRaidDismantle} onDismantleJunk={handleRaidDismantleJunk} onEnhance={handleRaidEnhance} onCraft={handleRaidCraft} onGacha={handleRaidGacha} onToggleFormation={handleRaidFormation} onBack={() => setScreen('title')} />}
+            {screen === 'raid' && <RaidScreen meta={meta} onEnterDungeon={(d, diff) => { if (raidDungeon) { setScreen('raidBattle'); return; } setRaidDungeon(d); setRaidDifficulty(diff || null); setScreen('raidBattle'); }} onEquipItem={handleRaidEquip} onAutoEquip={handleRaidAutoEquip} onDismantle={handleRaidDismantle} onDismantleJunk={handleRaidDismantleJunk} onEnhance={handleRaidEnhance} onCraft={handleRaidCraft} onGacha={handleRaidGacha} onToggleFormation={handleRaidFormation} onBack={() => setScreen('title')} />}
             {screen === 'account' && <AccountScreen 
               authMode={authMode} 
               firebaseUser={firebaseUser} 

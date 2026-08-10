@@ -274,6 +274,47 @@ export const RAID_DUNGEONS = [
 ];
 
 
+// =========== 던전 난이도 단계제 (1.86.0~, PM 결정 — 엔드게임 확장) ===========
+// 전 던전 공통 3단계. 상위 단계는 하위 단계 클리어 시 해금 (던전별).
+// statMult는 RAID_TUNING 위에 곱연산. 보상: 심연석·정수 ×rewardMult, 에픽 가중치 +epicBonus.
+export const RAID_DIFFICULTIES = [
+  { id: 'normal', name: '일반', statMult: 1.0, rewardMult: 1, epicBonus: 0,  color: '#9b8975', desc: '기본 난이도' },
+  { id: 'heroic', name: '영웅', statMult: 2.2, rewardMult: 2, epicBonus: 6,  color: '#c46ba3', desc: '적 스탯 ×2.2 — 심연석·정수 2배, 에픽 확률 +6%p' },
+  { id: 'doom',   name: '종막', statMult: 4.0, rewardMult: 3, epicBonus: 12, color: '#8a2be2', desc: '적 스탯 ×4.0 — 심연석·정수 3배, 에픽 확률 +12%p' },
+];
+
+// 클리어 기록 키 — 일반은 기존 키 그대로(하위 호환), 상위 단계는 @접미
+export function getRaidClearKey(dungeonId, diffId) {
+  return diffId && diffId !== 'normal' ? `${dungeonId}@${diffId}` : dungeonId;
+}
+
+export function isRaidDifficultyUnlocked(raidMeta, dungeonId, diffId) {
+  if (!diffId || diffId === 'normal') return true;
+  const clears = raidMeta?.clears || {};
+  if (diffId === 'heroic') return (clears[dungeonId] || 0) > 0;
+  if (diffId === 'doom') return (clears[getRaidClearKey(dungeonId, 'heroic')] || 0) > 0;
+  return false;
+}
+
+// 던전 + 난이도 → 실효 던전 객체 (RaidBattleScreen은 이 결과만 소비 — 전투 코드 변경 0)
+export function applyRaidDifficulty(dungeon, diff) {
+  if (!dungeon || !diff || diff.id === 'normal') return dungeon;
+  return {
+    ...dungeon,
+    name: `${dungeon.name} [${diff.name}]`,
+    recommendedPower: Math.round((dungeon.recommendedPower || 0) * diff.statMult),
+    rarityWeights: { ...dungeon.rarityWeights, EP: (dungeon.rarityWeights?.EP || 0) + diff.epicBonus },
+    essenceDrop: (dungeon.essenceDrop || 0) * diff.rewardMult,
+    weeklyStones: (dungeon.weeklyStones || 0) * diff.rewardMult,
+    rooms: (dungeon.rooms || []).map(r => ({
+      ...r,
+      hp: Math.round(r.hp * diff.statMult),
+      atk: Math.round(r.atk * diff.statMult),
+      stones: r.stones ? r.stones * diff.rewardMult : r.stones,
+    })),
+  };
+}
+
 // =========== 3차 난이도 튜닝 (1.76.0~) ===========
 // PM 피드백 "난이도 너무 낮음" — 전 던전 적 스탯 전역 배율.
 // AP_TUNING 패턴: 실기기 체감 후 이 두 수치만 조정하면 전역 반영.

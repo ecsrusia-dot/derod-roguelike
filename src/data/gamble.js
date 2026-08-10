@@ -22,12 +22,14 @@ export const GAMBLE_CONFIG = {
   shardPityCoins: 500,  // 주화 500 확정 교환
 };
 
-// 전용 상점 — 황혼 주화로만 구매 (영혼 경제와 분리 + 레이드 재화 연결)
+// 전용 상점 — 황혼 주화로만 구매
+// 1.86.0 개편 (PM 결정): 레이드 엔드게임에서 포화된 심연석·정수 제거 →
+// 다른 수단으로 못 얻는 엔드게임 품목(기연 재조우권·레전더리 각인 확정권)으로 교체
 export const GAMBLE_SHOP = [
-  { id: 'gshop_souls_s',  name: '영혼 뭉치',     desc: '영혼 +300',                cost: 100, grant: { souls: 300 } },
-  { id: 'gshop_stones',   name: '심연석 상자',   desc: '심연석 +30 (레이드 강화)', cost: 80,  grant: { stones: 30 } },
-  { id: 'gshop_essence',  name: '군주의 정수',   desc: '정수 +1 (레이드 제작)',    cost: 150, grant: { essence: 1 } },
-  { id: 'gshop_souls_l',  name: '대영혼 금고',   desc: '영혼 +1000',               cost: 300, grant: { souls: 1000 } },
+  { id: 'gshop_souls_s',   name: '영혼 뭉치',            desc: '영혼 +300',  cost: 100, grant: { souls: 300 } },
+  { id: 'gshop_souls_l',   name: '대영혼 금고',          desc: '영혼 +1000', cost: 300, grant: { souls: 1000 } },
+  { id: 'gshop_secret',    name: '기연 재조우권',        desc: '레이드 기연 조우 이력 초기화 — 놓쳐서 영영 소멸된 비전을 다시 만날 수 있다 (활성 비전은 유지)', cost: 500, grant: { secretReset: true } },
+  { id: 'gshop_legendary', name: '레전더리 각인 확정권', desc: '직업·슬롯을 골라 전설(L) 등급 각인 랜덤 1장 확정 장착',                                        cost: 800, grant: { legendaryEngraving: true } },
 ];
 
 // 도박장 원정 객체 — startExpedition과 호환 (chapters.js의 gamble_arena 챕터 사용)

@@ -615,12 +615,19 @@ export function redeemFateShards(meta, shardCost, coins) {
 }
 
 // 전용 상점 구매 — 주화 부족 시 null (호출부에서 무시)
+// legendaryEngraving은 직업·슬롯 선택이 필요해 여기서 처리 안 함 (GambleScreen 피커 → App 핸들러)
 export function buyGambleShopItem(meta, item) {
   if (!item || (meta?.twilightCoins || 0) < item.cost) return null;
+  if (item.grant?.legendaryEngraving) return null;
   let m = { ...meta, twilightCoins: meta.twilightCoins - item.cost };
   if (item.grant?.souls) m = addSouls(m, item.grant.souls);
   if (item.grant?.stones || item.grant?.essence) {
     m = addRaidResources(m, { stones: item.grant.stones || 0, essence: item.grant.essence || 0 });
+  }
+  // 1.86.0~ 기연 재조우권 — 조우 이력 초기화 (활성 비전만 이력에 유지해 중복 조우 방지)
+  if (item.grant?.secretReset) {
+    const raid = m.raid || {};
+    m = { ...m, raid: { ...raid, secretHistory: raid.secretSkill ? [raid.secretSkill] : [] } };
   }
   return m;
 }

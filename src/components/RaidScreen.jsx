@@ -15,6 +15,7 @@ import {
   RAID_DUNGEONS, RAID_REGIONS, getRaidMemberStats, getRaidPartyPower, CLASSES,
   RAID_STONE, RAID_ENHANCE, RAID_DISMANTLE_VALUES, getRaidItemEffective, getKstWeekKey,
   RAID_ESSENCE, RAID_CRAFT_RECIPES, RAID_GACHA, RAID_EPIC_UNIQUES, RAID_SECRET_SKILLS, getDungeonSecret, RAID_SET_BONUSES, RAID_FORMATION,
+  RAID_DIFFICULTIES, isRaidDifficultyUnlocked, getRaidClearKey,
 } from '../data.js';
 import { hasRaidWeeklyClaimed } from '../storage.js';
 import { ScreenHeader, GlassPanel, Chip, UIButton } from './ui/CommonUI.jsx';
@@ -105,6 +106,8 @@ function GearChip({ item, onEquip, onDismantle }) {
 export default function RaidScreen({ meta, onEnterDungeon, onEquipItem, onAutoEquip, onDismantle = null, onDismantleJunk = null, onEnhance = null, onCraft = null, onGacha = null, onToggleFormation = null, onBack }) {
   const raid = meta?.raid || { inventory: [], equipped: {}, clears: {}, stones: 0, essence: 0 };
   const [gearClass, setGearClass] = useState(null); // 장비 관리 중인 직업 ID | null
+  // 1.86.0~ 던전별 선택된 난이도 (dungeonId → diffId, 기본 normal)
+  const [dungeonDiff, setDungeonDiff] = useState({});
   // 1.76.0~ 제작·가챠 결과 배너
   const [lastResult, setLastResult] = useState(null); // { source: '제작'|'가챠', item }
   const partyPower = getRaidPartyPower(raid);
@@ -180,15 +183,17 @@ export default function RaidScreen({ meta, onEnterDungeon, onEquipItem, onAutoEq
                   <div className="flex items-center gap-2.5">
                     <ClassPortrait cls={cls} roleColor={roleColor} />
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-semibold" style={{ fontSize: 12.5, color: PALETTE.text }}>{cls?.name || classId}</span>
-                        <Chip color={roleColor} style={{ height: 17 }}>{stats.roleName}</Chip>
-                        {stats.setBonus && (
-                          <Chip color={PALETTE.legendary} style={{ height: 17 }}>
-                            ◈ {stats.setBonus.name}{stats.setBonus.atkPct ? ` 공+${stats.setBonus.atkPct}%` : ''}{stats.setBonus.hpPct ? ` HP+${stats.setBonus.hpPct}%` : ''}
-                          </Chip>
-                        )}
+                      {/* 1.86.0 레이아웃 픽스: 이름 한 줄 고정(truncate) + 세트 표시는 별도 줄
+                          — 세트 칩이 이름·POWER를 밀어내 직업명이 세로로 꺾이던 문제 */}
+                      <div className="flex items-center gap-1.5 flex-nowrap min-w-0">
+                        <span className="font-semibold truncate" style={{ fontSize: 12.5, color: PALETTE.text, whiteSpace: 'nowrap' }}>{cls?.name || classId}</span>
+                        <Chip color={roleColor} style={{ height: 17, flexShrink: 0 }}>{stats.roleName}</Chip>
                       </div>
+                      {stats.setBonus && (
+                        <div className="truncate" style={{ fontSize: 9.5, color: PALETTE.legendary, marginTop: 1 }}>
+                          ◈ {stats.setBonus.name}{stats.setBonus.atkPct ? ` 공+${stats.setBonus.atkPct}%` : ''}{stats.setBonus.hpPct ? ` HP+${stats.setBonus.hpPct}%` : ''}
+                        </div>
+                      )}
                       <div className="flex items-center gap-1.5 mt-0.5">
                         <span className="tabular-nums" style={{ fontSize: 10, color: PALETTE.textDim }}>
                           <span style={{ color: (raid.formation?.[classId] || RAID_FORMATION.default[classId]) === 'front' ? '#e08a84' : PALETTE.ice }}>
@@ -458,8 +463,12 @@ export default function RaidScreen({ meta, onEnterDungeon, onEquipItem, onAutoEq
         </div>
         <div className="ui-stagger flex flex-col gap-2">
           {RAID_DUNGEONS.filter(d => d.region === region.id).map(d => {
-            const clears = raid.clears?.[d.id] || 0;
-            const under = partyPower < d.recommendedPower;
+            // 1.86.0~ 난이도 단계제 — 선택된 난이도 기준으로 권장 전투력·클리어 표시
+            const selDiffId = dungeonDiff[d.id] || 'normal';
+            const selDiff = RAID_DIFFICULTIES.find(x => x.id === selDiffId) || RAID_DIFFICULTIES[0];
+            const clears = raid.clears?.[getRaidClearKey(d.id, selDiffId)] || 0;
+            const effPower = Math.round(d.recommendedPower * selDiff.statMult);
+            const under = partyPower < effPower;
             const finalRoom = d.rooms[d.rooms.length - 1];
             const totalDrops = d.rooms.reduce((s, room) => s + (room.drops || 0), 0);
             const totalStones = d.rooms.reduce((s, room) => s + (room.stones || 0), 0);
@@ -497,7 +506,7 @@ export default function RaidScreen({ meta, onEnterDungeon, onEquipItem, onAutoEq
                 <div className="flex flex-wrap gap-1.5 mt-2">
                   <Chip color={d.color} style={{ height: 19 }}>방 {d.rooms.length}개</Chip>
                   <Chip color={d.color} style={{ height: 19 }}>최종 보스 HP {finalRoom.hp}</Chip>
-                  <Chip color={under ? PALETTE.accent : PALETTE.green} style={{ height: 19 }}>권장 전투력 {d.recommendedPower}</Chip>
+                  <Chip color={under ? PALETTE.accent : PALETTE.green} style={{ height: 19 }}>권장 전투력 {effPower}</Chip>
                   <Chip color={PALETTE.legendary} style={{ height: 19 }}>{d.gearPrefix} 장비 ×{d.gearMult} · 막보 {totalDrops}개</Chip>
                   <Chip color={RAID_RARITIES.EP.color} style={{ height: 19 }}>에픽 {d.rarityWeights.EP}%</Chip>
                   {totalStones > 0 && <Chip color={PALETTE.ice} style={{ height: 19 }}>네임드 {RAID_STONE.icon}{totalStones}</Chip>}
@@ -515,8 +524,33 @@ export default function RaidScreen({ meta, onEnterDungeon, onEquipItem, onAutoEq
                       : <Chip color={PALETTE.legendary} style={{ height: 19 }}>✦ 기연: {sk.name}</Chip>;
                   })()}
                 </div>
-                <UIButton onClick={() => onEnterDungeon(d)} className="mt-2.5" style={{ height: 40, fontSize: 12, letterSpacing: '0.2em' }}>
-                  ▸ 입장 {under ? '(전투력 부족 — 위험)' : ''}
+                {/* 1.86.0~ 난이도 선택 — 일반/영웅/종막 (상위는 하위 클리어 시 해금) */}
+                <div className="flex gap-1.5 mt-2">
+                  {RAID_DIFFICULTIES.map(diff => {
+                    const unlocked = isRaidDifficultyUnlocked(raid, d.id, diff.id);
+                    const diffCleared = (raid.clears?.[getRaidClearKey(d.id, diff.id)] || 0) > 0;
+                    const active = selDiffId === diff.id;
+                    return (
+                      <button key={diff.id} disabled={!unlocked}
+                        onClick={() => setDungeonDiff(prev => ({ ...prev, [d.id]: diff.id }))}
+                        className="ui-press flex-1" style={{
+                          padding: '5px 0', borderRadius: 9, fontSize: 10, fontWeight: 700,
+                          background: active ? `${diff.color}26` : 'rgba(255,255,255,0.03)',
+                          border: `1px solid ${active ? `${diff.color}cc` : 'var(--ui-line)'}`,
+                          color: !unlocked ? PALETTE.textDim : active ? diff.color : PALETTE.text,
+                          opacity: unlocked ? 1 : 0.45,
+                        }}>
+                        {unlocked ? (diffCleared ? '✓ ' : '') : '🔒 '}{diff.name}
+                        {diff.statMult > 1 && <span className="tabular-nums" style={{ fontSize: 8.5, opacity: 0.8 }}> ×{diff.statMult}</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+                {selDiff.id !== 'normal' && (
+                  <div style={{ fontSize: 9, color: selDiff.color, marginTop: 4 }}>{selDiff.desc}</div>
+                )}
+                <UIButton onClick={() => onEnterDungeon(d, selDiff)} className="mt-2.5" style={{ height: 40, fontSize: 12, letterSpacing: '0.2em' }}>
+                  ▸ {selDiff.id !== 'normal' ? `[${selDiff.name}] ` : ''}입장 {under ? '(전투력 부족 — 위험)' : ''}
                 </UIButton>
               </GlassPanel>
             );

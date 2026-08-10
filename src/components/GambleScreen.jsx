@@ -5,21 +5,38 @@
 // GambleChoiceScreen: 승리 후 [챙기기 vs 더블 업] 선택 (전멸 시 판돈 소멸)
 // ============================================
 
-import React from 'react';
+import React, { useState } from 'react';
 import { PALETTE } from '../utils/helpers.js';
-import { GAMBLE_CONFIG, GAMBLE_SHOP, TWILIGHT_COIN, FATE_SHARD, RAID_STONE, RAID_ESSENCE } from '../data.js';
-import { getGambleUsed } from '../storage.js';
+import { GAMBLE_CONFIG, GAMBLE_SHOP, TWILIGHT_COIN, FATE_SHARD, RAID_STONE, RAID_ESSENCE, CLASSES, ENGRAVINGS } from '../data.js';
+import { getGambleUsed, getUnlockedSlotCount } from '../storage.js';
 import { getKstDateKey } from '../utils/dailyChallenge.js';
 import { ScreenHeader, GlassPanel, Chip, UIButton } from './ui/CommonUI.jsx';
 
+// 각인 카드 id → 카드 객체
+function findEngravingCard(classId, cardId) {
+  return (ENGRAVINGS[classId] || []).find(c => c.id === cardId) || null;
+}
+
 const GOLD = '#e8b04a';
 
-export default function GambleLobbyScreen({ meta, result = null, onEnter, onBuy, onRedeem, onBack }) {
+export default function GambleLobbyScreen({ meta, result = null, onEnter, onBuy, onBuyLegendary = null, onRedeem, onBack }) {
   const coins = meta?.twilightCoins || 0;
   const shards = meta?.fateShards || 0;
   const used = getGambleUsed(meta, getKstDateKey());
   const remaining = Math.max(0, GAMBLE_CONFIG.dailyLimit - used);
   const canRedeem = shards >= GAMBLE_CONFIG.shardPity;
+  // 1.86.0~ 레전더리 각인 확정권 피커 — { item, step: 'class' } → { item, step: 'slot', classId }
+  const [legendaryPick, setLegendaryPick] = useState(null);
+  const [legendaryResult, setLegendaryResult] = useState(null); // { className, cardName }
+
+  const handleLegendaryConfirm = (classId, slotIdx) => {
+    const pool = (ENGRAVINGS[classId] || []).filter(c => c.tier === 'L');
+    if (pool.length === 0 || !legendaryPick) return;
+    const card = pool[Math.floor(Math.random() * pool.length)];
+    onBuyLegendary?.(legendaryPick.item, classId, slotIdx, card.id);
+    setLegendaryResult({ className: CLASSES.find(c => c.id === classId)?.name || classId, cardName: card.name });
+    setLegendaryPick(null);
+  };
 
   return (
     <div className="absolute inset-0 flex flex-col" style={{
@@ -94,17 +111,23 @@ export default function GambleLobbyScreen({ meta, result = null, onEnter, onBuy,
           <div className="flex flex-col gap-1.5">
             {GAMBLE_SHOP.map(item => {
               const afford = coins >= item.cost;
+              const isLegendary = !!item.grant?.legendaryEngraving;
+              const handleTap = () => {
+                if (!afford) return;
+                if (isLegendary) setLegendaryPick({ item, step: 'class' });
+                else onBuy(item);
+              };
               return (
                 <div key={item.id} className="flex items-center justify-between px-2.5 py-2" style={{
-                  borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--ui-line)',
+                  borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: `1px solid ${isLegendary ? `${GOLD}55` : 'var(--ui-line)'}`,
                 }}>
                   <div className="min-w-0">
-                    <div style={{ fontSize: 11.5, color: PALETTE.text }}>
-                      {item.grant?.stones ? RAID_STONE.icon : item.grant?.essence ? RAID_ESSENCE.icon : '✦'} {item.name}
+                    <div style={{ fontSize: 11.5, color: isLegendary ? GOLD : PALETTE.text }}>
+                      {item.grant?.secretReset ? '✦' : isLegendary ? '◈' : '✦'} {item.name}
                     </div>
                     <div style={{ fontSize: 9.5, color: PALETTE.textDim }}>{item.desc}</div>
                   </div>
-                  <button onClick={() => afford && onBuy(item)} disabled={!afford} className="ui-press flex-none ml-2 tabular-nums" style={{
+                  <button onClick={handleTap} disabled={!afford} className="ui-press flex-none ml-2 tabular-nums" style={{
                     fontSize: 10.5, fontWeight: 700, padding: '5px 10px', borderRadius: 999,
                     background: afford ? 'rgba(232,176,74,0.16)' : 'rgba(255,255,255,0.04)',
                     border: `1px solid ${afford ? `${GOLD}88` : 'var(--ui-line)'}`,
@@ -114,8 +137,82 @@ export default function GambleLobbyScreen({ meta, result = null, onEnter, onBuy,
               );
             })}
           </div>
+          {legendaryResult && (
+            <div className="mt-2 px-3 py-2 text-center" style={{
+              borderRadius: 10, background: 'rgba(232,176,74,0.14)', border: `1.5px solid ${GOLD}`,
+            }}>
+              <span style={{ fontSize: 10.5, color: GOLD, fontWeight: 700 }}>
+                ◈ [{legendaryResult.className}] 전설 각인 「{legendaryResult.cardName}」 장착 완료!
+              </span>
+            </div>
+          )}
         </GlassPanel>
       </div>
+
+      {/* 레전더리 확정권 — 직업 → 슬롯 2단 피커 */}
+      {legendaryPick && (
+        <div className="absolute inset-0 flex items-center justify-center px-5" style={{ zIndex: 60, background: 'rgba(0,0,0,0.85)' }} onClick={() => setLegendaryPick(null)}>
+          <div className="w-full max-w-sm px-4 py-4" onClick={(e) => e.stopPropagation()} style={{
+            background: PALETTE.panel, borderRadius: 16, border: `2px solid ${GOLD}`, boxShadow: `0 0 30px ${GOLD}50`,
+          }}>
+            <div className="text-center font-bold mb-1" style={{ fontSize: 13, color: GOLD }}>◈ 레전더리 각인 확정권</div>
+            {legendaryPick.step === 'class' ? (
+              <>
+                <div className="text-center mb-2.5" style={{ fontSize: 10, color: PALETTE.textDim }}>어느 직업의 각인에 사용할까요?</div>
+                <div className="flex flex-col gap-1.5">
+                  {CLASSES.map(cls => {
+                    const legendCount = (ENGRAVINGS[cls.id] || []).filter(c => c.tier === 'L').length;
+                    const slotsOpen = getUnlockedSlotCount(meta?.engravings?.[cls.id]?.lv || 1);
+                    const usable = legendCount > 0 && slotsOpen > 0;
+                    return (
+                      <button key={cls.id} disabled={!usable} onClick={() => setLegendaryPick({ ...legendaryPick, step: 'slot', classId: cls.id })}
+                        className="ui-press flex items-center justify-between px-3 py-2.5" style={{
+                          borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--ui-line)',
+                          color: PALETTE.text, opacity: usable ? 1 : 0.4, fontSize: 12,
+                        }}>
+                        <span>{cls.name}</span>
+                        <span style={{ fontSize: 9.5, color: PALETTE.textDim }}>
+                          {slotsOpen === 0 ? '슬롯 잠김 (각성도 Lv.2 필요)' : `전설 풀 ${legendCount}종 · 슬롯 ${slotsOpen}칸`}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="text-center mb-2.5" style={{ fontSize: 10, color: PALETTE.textDim }}>
+                  {CLASSES.find(c => c.id === legendaryPick.classId)?.name} — 어느 슬롯에 장착할까요? (기존 카드는 덮어씀)
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  {[0, 1, 2].map(slotIdx => {
+                    const slotsOpen = getUnlockedSlotCount(meta?.engravings?.[legendaryPick.classId]?.lv || 1);
+                    const locked = slotIdx >= slotsOpen;
+                    const curId = meta?.engravings?.[legendaryPick.classId]?.slots?.[slotIdx] || null;
+                    const cur = curId ? findEngravingCard(legendaryPick.classId, curId) : null;
+                    return (
+                      <button key={slotIdx} disabled={locked} onClick={() => handleLegendaryConfirm(legendaryPick.classId, slotIdx)}
+                        className="ui-press flex items-center justify-between px-3 py-2.5" style={{
+                          borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--ui-line)',
+                          color: PALETTE.text, opacity: locked ? 0.4 : 1, fontSize: 12,
+                        }}>
+                        <span>슬롯 {slotIdx + 1}</span>
+                        <span style={{ fontSize: 9.5, color: locked ? PALETTE.textDim : cur ? PALETTE.legendary : PALETTE.green }}>
+                          {locked ? '🔒 각성도 잠김' : cur ? `현재: ${cur.name} (덮어씀)` : '빈 슬롯'}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+            <button onClick={() => setLegendaryPick(null)} className="ui-press w-full mt-3" style={{
+              height: 38, borderRadius: 'var(--r-btn)', fontSize: 11,
+              background: 'rgba(255,255,255,0.05)', border: '1px solid var(--ui-line)', color: PALETTE.textDim,
+            }}>취소</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

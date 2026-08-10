@@ -929,6 +929,8 @@ PM이 AskUserQuestion으로 확정한 설계. **던전앤파이터 모티브, "�
 
 **✅ 1.80.0 백그라운드 파밍**: RaidBattleScreen을 `PhoneFrame`의 **persistent 레이어**(키 리마운트 제외)에 상시 마운트 — `raidDungeon` 있으면 화면을 떠나도 전투·반복 파밍 계속. `background` prop(승리·전멸 자동 정산, 기연 선택만 대기) + `onMinimize`(▾ 버튼) + `onStatus` → App 플로팅 필(탭하여 복귀). handleRaidVictory/Partial은 `screen === 'raidBattle'`일 때만 화면 전환 (싱글모드 방해 금지). ⚠️ 주의: PhoneFrame 자식은 `key={screenKey}`로 화면 전환마다 리마운트 — 영속이 필요한 컴포넌트는 반드시 persistent로.
 
+**✅ 1.86.0 난이도 단계제**: 전 던전 일반/영웅(×2.2)/종막(×4.0) — `RAID_DIFFICULTIES` + `applyRaidDifficulty(dungeon, diff)`가 실효 던전 객체 생성(방 hp/atk·보상·에픽 가중 조정), RaidBattleScreen은 난이도 무지. 클리어 키 `dungeonId@diffId`(일반은 기존 키 — 하위 호환), 해금은 하위 단계 클리어. 도박장 상점 1.86.0 개편: 심연석·정수 제거 → 기연 재조우권(secretHistory 초기화)·레전더리 각인 확정권(GambleScreen 2단 피커 → applyEngravingSlot).
+
 **5차 확장 후보 (PM 결정 대기)**: 레이드 보스 일러스트 프롬프트(ChatGPT 파이프라인) / 레이드 랭킹·기록
 
 ### 완성 항목 (1.62.x 기준 — outdated 정보 재발 방지)
