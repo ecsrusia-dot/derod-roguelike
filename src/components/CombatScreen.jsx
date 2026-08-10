@@ -128,6 +128,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
   const actionLockRef = useRef(false);
   // 1.81.0~ 전투 정산 — 출처별 가한 데미지 누적 (승리 시 onVictory 3번째 인자로 전달)
   const dmgStatsRef = useRef({ total: 0, bySource: {} });
+  // 1.90.0~ 이 전투의 회피 발동 횟수 (무결한 검사 업적 — 컴포넌트가 전투마다 리마운트라 자동 초기화)
+  const dodgeCountRef = useRef(0);
   const trackDmg = (source, amount) => {
     if (!amount || amount <= 0) return;
     const s = dmgStatsRef.current;
@@ -895,7 +897,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       finalHp = Math.min(player.maxHp, player.hp + heal);
     }
     // 1.81.0~ 전투 정산 데이터 전달 (출처별 가한 데미지)
-    onVictory(finalHp, enemy.drop, { total: dmgStatsRef.current.total, bySource: { ...dmgStatsRef.current.bySource } });
+    onVictory(finalHp, enemy.drop, { total: dmgStatsRef.current.total, bySource: { ...dmgStatsRef.current.bySource }, dodges: dodgeCountRef.current });
   };
 
   useEffect(() => {
@@ -1139,6 +1141,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       const dodged = rollDodge(skills, newPlayer, activeSkills, relicStat, ultimates, engravingFx, meta);
       if (dodged) {
         newLog.push({ type: 'system', text: `· 회피 성공!` });
+        dodgeCountRef.current += 1;
         // FX — 회피: 플레이어 위에 "회피!" 부유 라벨
         pushFxLabel('player', 'miss', null, '회피!');
         // 1.68.0 전투 개편 A — 대공격 간파: ⚠ 예고된 대공격을 회피하면 소울 보너스

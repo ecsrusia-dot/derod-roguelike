@@ -622,7 +622,13 @@ export function useGambleEntry(meta, dateKey) {
 
 export function addTwilightCoins(meta, n) {
   if (!n) return meta;
-  return { ...meta, twilightCoins: Math.max(0, (meta.twilightCoins || 0) + n) };
+  let m = { ...meta, twilightCoins: Math.max(0, (meta.twilightCoins || 0) + n) };
+  // 1.90.0~ 획득분만 평생 누적 (상점 차감은 제외) → 주화 부자 업적
+  if (n > 0) {
+    m.twilightCoinsEarned = (m.twilightCoinsEarned || 0) + n;
+    m = setAchievementProgress(m, 'gamble_coins_2000', m.twilightCoinsEarned, 2000);
+  }
+  return m;
 }
 
 export function addFateShards(meta, n) {
@@ -681,7 +687,12 @@ function getRaid(meta) {
 export function addRaidDrops(meta, items) {
   if (!items || items.length === 0) return meta;
   const raid = getRaid(meta);
-  return { ...meta, raid: { ...raid, inventory: [...raid.inventory, ...items] } };
+  let m = { ...meta, raid: { ...raid, inventory: [...raid.inventory, ...items] } };
+  // 1.90.0~ 에픽 획득 업적 — 드랍·제작·가챠 모든 경로가 이 함수를 지나감
+  if (items.some(i => i?.rarity === 'EP')) {
+    m = completeAchievement(m, 'raid_epic_drop', 1);
+  }
+  return m;
 }
 
 // 장비 1개 장착 — 기존 장착품은 인벤토리로 복귀
@@ -842,7 +853,7 @@ export function addRaidResources(meta, { stones = 0, essence = 0 } = {}) {
 export function spendRaidResourcesForItem(meta, { stones = 0, essence = 0 } = {}, item) {
   const raid = getRaid(meta);
   if ((raid.stones || 0) < stones || (raid.essence || 0) < essence || !item) return meta;
-  return {
+  let m = {
     ...meta,
     raid: {
       ...raid,
@@ -851,6 +862,9 @@ export function spendRaidResourcesForItem(meta, { stones = 0, essence = 0 } = {}
       inventory: [...raid.inventory, item],
     },
   };
+  // 1.90.0~ 제작·가챠로 얻은 에픽도 업적 인정
+  if (item.rarity === 'EP') m = completeAchievement(m, 'raid_epic_drop', 1);
+  return m;
 }
 
 // 주간 첫 클리어 보상 — 이번 주 미수령 던전이면 심연석 지급 + 기록. 반환: { meta, granted }
