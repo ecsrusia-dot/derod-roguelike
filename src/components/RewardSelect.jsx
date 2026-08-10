@@ -2,7 +2,7 @@
 // components/RewardSelect.jsx — 운명의 갈림길 (보상 카드 3종 선택)
 // ============================================
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChevronRight, RefreshCw } from 'lucide-react';
 import { PALETTE, hasEffect } from '../utils/helpers.js';
 import { PASSIVE_SKILLS, GAME_CONFIG } from '../data.js';
@@ -10,6 +10,8 @@ import { rollRewards } from '../utils/rewards.js';
 
 export default function RewardSelect({ rewards: initialRewards, gem, skills, relics, ultimates, activeSkills = null, onPick, onReroll, hasRerolled, isElite, classId = null, meta = null, expedition = null }) {
   const [rewards, setRewards] = useState(initialRewards);
+  // 1.91.0~ 자동 사냥 드라이버가 App 레벨에서 리롤하면 카드 표시도 동기화
+  useEffect(() => { setRewards(initialRewards); }, [initialRewards]);
   // 운명 Lv.3: 리롤 비용 -1
   const baseRerollCost = hasEffect(skills, 'rerollDiscount', activeSkills) ? GAME_CONFIG.rerollDiscountCost : GAME_CONFIG.rerollCost;
   // 1.55.0~ 운명 Lv.7: 무료 1회 리롤 (fateReroll). hasRerolled와 같은 한 번만 작동하므로 우선 적용.
