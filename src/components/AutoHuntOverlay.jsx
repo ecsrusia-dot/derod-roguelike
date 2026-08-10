@@ -35,6 +35,57 @@ function buildAwakeningInfo(skillName, ult) {
   };
 }
 
+// 1.83.0~ 자동 사냥 종료 요약 모달 — 세션(자동 ON~OFF) 동안 모든 런 합산
+export function AutoHuntSummaryModal({ summary, onClose }) {
+  if (!summary) return null;
+  const topSources = Object.entries(summary.bySource || {}).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  return (
+    <div className="absolute inset-0 flex items-center justify-center px-4" style={{ zIndex: 85, background: 'rgba(0,0,0,0.85)' }} onClick={onClose}>
+      <div className="w-full max-w-sm" onClick={(e) => e.stopPropagation()} style={{
+        background: PALETTE.panel, borderRadius: 16,
+        border: `2px solid ${PALETTE.legendary}`, boxShadow: `0 0 30px ${PALETTE.legendary}50`,
+      }}>
+        <div className="px-4 py-3 text-center" style={{ borderBottom: `1px solid ${PALETTE.legendary}40` }}>
+          <div className="tracking-[0.3em]" style={{ fontSize: 10, color: PALETTE.textDim }}>━ 자동 사냥 결과 ━</div>
+          <div className="font-bold mt-1" style={{ fontSize: 16, color: PALETTE.legendary, fontFamily: '"Cinzel", serif' }}>
+            총 {summary.runCount}런
+          </div>
+          <div className="tabular-nums mt-0.5" style={{ fontSize: 10.5, color: PALETTE.textDim }}>
+            클리어 <span style={{ color: PALETTE.green }}>{summary.clears}</span> · 전멸 <span style={{ color: '#e05248' }}>{summary.defeats}</span> · 전투 {summary.battles}회
+          </div>
+        </div>
+        <div className="px-4 py-3">
+          <div className="flex justify-between items-baseline mb-1.5">
+            <span style={{ fontSize: 10, color: PALETTE.textDim }}>총 데미지</span>
+            <span className="tabular-nums font-bold" style={{ fontSize: 13, color: PALETTE.legendary }}>{summary.totalDmg}</span>
+          </div>
+          {topSources.map(([src, dmg]) => (
+            <div key={src} className="flex items-center gap-2" style={{ marginTop: 3 }}>
+              <span className="flex-none truncate" style={{ width: 80, fontSize: 10, color: PALETTE.text }}>{src}</span>
+              <div className="flex-1" style={{ height: 6, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${Math.max(4, (dmg / Math.max(1, summary.totalDmg)) * 100)}%`, borderRadius: 999, background: `linear-gradient(90deg, ${PALETTE.legendary}77, ${PALETTE.legendary})` }} />
+              </div>
+              <span className="flex-none tabular-nums text-right" style={{ width: 44, fontSize: 9.5, color: PALETTE.textDim }}>{Math.round((dmg / Math.max(1, summary.totalDmg)) * 100)}%</span>
+            </div>
+          ))}
+          <div className="flex justify-center gap-4 mt-3 pt-2.5 tabular-nums" style={{ fontSize: 11.5, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+            <span style={{ color: PALETTE.dawn }}>● 은화 +{summary.gold}</span>
+            <span style={{ color: PALETTE.twilight }}>◆ 보석 +{summary.gem}</span>
+            <span style={{ color: PALETTE.legendary }}>✦ 영혼 +{summary.souls}</span>
+          </div>
+        </div>
+        <div className="px-4 pb-4">
+          <button onClick={onClose} className="ui-press ui-sheen w-full" style={{
+            height: 42, borderRadius: 'var(--r-btn)', fontSize: 12, fontWeight: 700, letterSpacing: '0.2em',
+            background: 'linear-gradient(160deg, rgba(232,176,74,0.4), rgba(232,176,74,0.16))',
+            border: '1px solid rgba(232,176,74,0.6)', color: '#ffe9d2',
+          }}>▸ 확인</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const SCREEN_LABELS = {
   map: '노드 이동 중', combat: '전투 중', victory: '전투 승리', reward: '보상 선택 중',
   event: '사건 진행 중', shop: '상점 이용 중', rest: '정비 중', forge: '대장간',
@@ -48,7 +99,7 @@ const STAT_COLORS = { 근력: '#c4453d', 민첩: '#7a9a5e', 지능: '#7ba3c4', �
 export default function AutoHuntOverlay({
   classData, hp, maxHp, stats = {}, skills = {}, activeSkills = null,
   relics = [], activeRelicNames = null, ultimates = [], gold = 0, gem = 0, runSouls = 0,
-  expedition, chapter, screen, runStats = null,
+  expedition, chapter, screen, runStats = null, autoRunCount = 0,
   autoSpeed = 1, onCycleSpeed, runRepeat = false, onToggleRepeat = null,
   onWatch, onStop,
 }) {
@@ -67,7 +118,7 @@ export default function AutoHuntOverlay({
       {/* 헤더 */}
       <div className="px-4 pt-4 pb-2 flex-none text-center">
         <div className="tracking-[0.35em] font-bold" style={{ fontSize: 11, color: PALETTE.legendary }}>
-          ⚙ 자동 사냥 진행 중
+          ⚙ 자동 사냥 진행 중{autoRunCount > 0 && <span className="tabular-nums" style={{ letterSpacing: '0.05em' }}> — {autoRunCount}번째 런</span>}
         </div>
         <div className="mt-1" style={{ fontSize: 10.5, color: PALETTE.textDim }}>
           {expedition?.name}{chapter ? ` · ${chapter.name}` : ''} — <span style={{ color: PALETTE.dawn }}>{SCREEN_LABELS[screen] || '진행 중'}</span>

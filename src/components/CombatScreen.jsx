@@ -47,7 +47,7 @@ import {
 } from '../combat/initCombat.js';
 import { FloatingLabel, DamageVignette, WhiteFlash, SlashFx, MagicImpactFx, MagicParticles, BarrierRing, BarrierBreakFx, ThrustFx, BladeGuardFx, ShadowStrikeFx, StatusOverlay, UltimateCutin, EternalFlameCutin, FireballFx, ExplosionFx, IgniteGlowAura, IgniteExplodeFx, FlameBarrierFx, FlameReflectFx, CritScreenFx } from './CombatEffects.jsx';
 
-export default function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimates = [], initialRelics = [], activeSkills = null, activeRelicNames = null, enemyKey, isBoss, expedition, curses = [], meta, engravingFx = {}, chapterGimmick = null, autoPlay = false, autoSpeed = 1, onCycleAutoSpeed = null, onToggleAuto = null, onVictory, onDefeat }) {
+export default function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimates = [], initialRelics = [], activeSkills = null, activeRelicNames = null, enemyKey, isBoss, expedition, curses = [], meta, engravingFx = {}, chapterGimmick = null, autoPlay = false, autoSpeed = 1, onCycleAutoSpeed = null, autoRunCount = 0, onToggleAuto = null, onVictory, onDefeat }) {
   // 1.80.0~ 자동 사냥 배속 — 자동 중에만 내부 진행·연출 딜레이 압축 (수동 플레이는 원속도)
   const dly = (ms) => (autoPlay && autoSpeed > 1 ? Math.max(40, Math.round(ms / autoSpeed)) : ms);
   const [player, setPlayer] = useState(() => buildInitialPlayer({
@@ -2605,6 +2605,14 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                     <span className="tabular-nums flex-none" style={{ fontSize: 9.5, color: ready ? '#ffd86b' : PALETTE.textDim }}>{gauge}/100</span>
                   </>
                 ) : <span className="flex-1" />}
+                {/* 1.83.0~ 자동 사냥 런 카운터 */}
+                {autoPlay && autoRunCount > 0 && (
+                  <span className="flex-none tabular-nums" style={{
+                    fontSize: 10, fontWeight: 700, color: PALETTE.legendary,
+                    background: 'rgba(232,176,74,0.1)', border: '1px solid rgba(232,176,74,0.4)',
+                    borderRadius: 999, padding: '3px 8px',
+                  }}>⟳ {autoRunCount}런</span>
+                )}
                 {/* 1.72.0~ 자동 사냥 인디케이터 — 탭 시 해제 */}
                 {autoPlay && onToggleAuto && (
                   <button onClick={onToggleAuto} className="ui-press flex-none" style={{

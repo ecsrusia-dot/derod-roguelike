@@ -37,7 +37,7 @@ function NavTab({ icon: Icon, label, onClick }) {
   );
 }
 
-export default function MapView({ chapter, classData, mapData, hp, maxHp, gold, gem, relics = [], activeRelicNames = null, expedition, curses = [], chapterIdx, autoHunt = false, autoHuntAllowed = false, onToggleAutoHunt = null, autoSpeed = 1, onCycleAutoSpeed = null, onEnterNode, onOpenStatus, onOpenAchievements, onOpenCodex, onBack }) {
+export default function MapView({ chapter, classData, mapData, hp, maxHp, gold, gem, relics = [], activeRelicNames = null, expedition, curses = [], chapterIdx, autoHunt = false, autoHuntAllowed = false, onToggleAutoHunt = null, autoSpeed = 1, onCycleAutoSpeed = null, autoRunCount = 0, onEnterNode, onOpenStatus, onOpenAchievements, onOpenCodex, onBack }) {
   // 천리안 유물 보유 (활성 상태) 시 모든 노드 공개
   const hasMapReveal = relics && relics.some(r =>
     r.statBonus?.mapReveal > 0 && (!activeRelicNames || activeRelicNames.includes(r.name))
@@ -102,6 +102,10 @@ export default function MapView({ chapter, classData, mapData, hp, maxHp, gold, 
               border: `1px solid ${autoSpeed > 1 ? `${PALETTE.ice}aa` : 'rgba(255,255,255,0.15)'}`,
               color: autoSpeed > 1 ? PALETTE.ice : PALETTE.textDim,
             }}>⚡ ×{autoSpeed}</button>
+          )}
+          {/* 1.83.0~ 자동 사냥 런 카운터 */}
+          {autoHunt && autoRunCount > 0 && (
+            <Chip color={PALETTE.legendary} style={{ height: 20 }}>⟳ <span className="tabular-nums">{autoRunCount}</span>번째 런</Chip>
           )}
           {expedition && <Chip color={expedition.color} style={{ height: 20 }}>{expedition.name}</Chip>}
           {chapter.gimmick && <Chip color={chapter.color} style={{ height: 20 }}>◈ {chapter.gimmick.name}</Chip>}
