@@ -2024,9 +2024,10 @@ export default function App() {
     } else if (screen === 'reward' && currentRewards && currentRewards.length > 0) {
       const hpRatio = maxHp > 0 ? hp / maxHp : 1;
       const classId = classData?.id;
-      // 1.84.1~ PM 결정: 출혈 스킬(forceBleed) 없는 직업은 잔혹 패시브 자동 픽 제외 (수동 픽은 가능)
-      const bleedCapable = !!classData?.combatSkills?.some(k => COMBAT_SKILLS[k]?.forceBleed);
-      const pool = currentRewards.filter(r => !(r.type === 'skill' && r.name === '잔혹' && !bleedCapable));
+      // 1.84.2 완화 (PM 결정): 잔혹은 Lv.3부터 자체 출혈 부여라 물리 직업군이면 자동 픽 허용
+      //   — 마법 전용 직업(술법사·사제)만 제외 (수동 픽은 항상 가능)
+      const physCapable = !!classData?.combatSkills?.some(k => COMBAT_SKILLS[k]?.type === 'physical');
+      const pool = currentRewards.filter(r => !(r.type === 'skill' && r.name === '잔혹' && !physCapable));
       const cand = pool.length > 0 ? pool : currentRewards;
       // 1.72.1~ 직업 맞춤 보상 우선순위:
       // 저체력 회복 > 궁극 진화 > 직업 전용 패시브(classOnly) >

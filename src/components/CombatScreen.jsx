@@ -172,8 +172,9 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       newPlayer.defense += relicStat.shieldOnStart;
       initialLog.push({ type: 'passive', text: `◆ [수호의 방패] 시작 방어 +${relicStat.shieldOnStart}` });
     }
-    if (hasEffect(skills, 'heal30%', activeSkills)) {
-      const baseHeal = Math.floor(newPlayer.maxHp * 0.3);
+    // 1.84.2 밸런스 (PM 결정): 재생 Lv.5 전투 시작 회복 30% → 5% (30%는 사실상 불사라 너프)
+    if (hasEffect(skills, 'heal5%', activeSkills)) {
+      const baseHeal = Math.floor(newPlayer.maxHp * 0.05);
       const healPct = getEffectiveHealPct(skills, engravingFx, activeSkills, ultimates);
       const heal = Math.floor(baseHeal * (1 + healPct / 100));
       newPlayer.hp = Math.min(newPlayer.maxHp, newPlayer.hp + heal);
