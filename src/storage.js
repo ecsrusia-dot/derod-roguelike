@@ -58,6 +58,9 @@ const DEFAULT_META = {
   codexCompletionClaimed: [],
   // 1.73.0~ 무한던전 스킵 — { date: 'YYYYMMDD', used: N } (KST 자정 리셋, 하루 5회)
   endlessSkip: null,
+  // 1.84.0~ 자동 사냥 전적 로그 — 런 종료(클리어/전멸)마다 조합·결과 기록 (최근 300건)
+  // entry: { t, cls, exp, diff, res: 'clear'|'defeat', bt, dmg, sk: [패시브], rl: [유물], ul: [각성 id] }
+  autoRunLog: [],
   // 1.74.0~ 레이드 (본편과 분리된 성장 축)
   // inventory: 미장착 장비 배열 / equipped[classId][slot] = item / clears[dungeonId] = 클리어 횟수
   raid: {
@@ -577,6 +580,17 @@ export function useEndlessSkip(meta, dateKey, souls) {
 // ============================================
 // 1.74.0~ 레이드 장비/클리어 헬퍼
 // ============================================
+// =============================================
+// 1.84.0~ 자동 사냥 전적 로그 (최적 조합 분석용)
+// =============================================
+const AUTO_RUN_LOG_CAP = 300;
+
+export function appendAutoRunLog(meta, entry) {
+  if (!entry) return meta;
+  const log = [...(meta.autoRunLog || []), entry].slice(-AUTO_RUN_LOG_CAP);
+  return { ...meta, autoRunLog: log };
+}
+
 const EMPTY_RAID = { inventory: [], equipped: { wanderer: {}, sage: {}, demonblood: {}, elf: {}, priest: {} }, clears: {}, stones: 0, weekly: null, essence: 0, secretSkill: null, secretHistory: [], formation: { wanderer: 'front', demonblood: 'front', elf: 'back', sage: 'back', priest: 'back' } };
 
 function getRaid(meta) {
