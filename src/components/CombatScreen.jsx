@@ -417,16 +417,18 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
               pushFxLabel('enemy', 'damage', stormDmg);
             }
           }
-          // 1.61.0~ 혈광 Lv.7 흡혈 30% (HP 25% 이하 시) + 소울 스킬 bloodLifesteal buff 50% (3턴)
+          // 1.86.0 너프 (PM 결정): 마족 흡혈 전면 하향 — "피를 소모해 강해진다" 컨셉 복원
+          //   상시·고배율 흡혈이 잃은 HP 리스크를 무효화해 자동 사냥 올클리어 OP였음
           if (actualDmg > 0 && classData.id === 'demonblood') {
             let lifestealPct = 0;
             const hpPct = (newPlayer.hp / Math.max(1, newPlayer.maxHp)) * 100;
+            // 혈광 Lv.7: HP 25% 이하 흡혈 30% → 15%
             if (hasEffect(skills, 'bloodLow25Survive', activeSkills) && hpPct <= 25) {
-              lifestealPct = Math.max(lifestealPct, 30);
+              lifestealPct = Math.max(lifestealPct, 15);
             }
-            // 1.82.0~ 각성 [불사혈맥]: 상시 흡혈 30% (HP 조건 없음)
-            if (hasUltimate(ultimates, 'ult_bloodImmortal')) {
-              lifestealPct = Math.max(lifestealPct, 30);
+            // 각성 [불사혈맥]: 상시 30% → HP 40% 이하일 때만 20% (위기 생존 아이덴티티로 재설계)
+            if (hasUltimate(ultimates, 'ult_bloodImmortal') && hpPct <= 40) {
+              lifestealPct = Math.max(lifestealPct, 20);
             }
             if (newPlayer.buffs?.bloodLifestealTurns > 0 && newPlayer.buffs?.bloodLifesteal > 0) {
               lifestealPct = Math.max(lifestealPct, newPlayer.buffs.bloodLifesteal);
@@ -981,11 +983,11 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         }
         newPlayer.buffs = {
           ...newPlayer.buffs,
-          bloodLifesteal: 50,
+          bloodLifesteal: 30, // 1.86.0 너프: 50 → 30
           bloodLifestealTurns: 4,
         };
         newLog.push({ type: 'damage', text: `· ${enemy.name}에게 ${cut} 데미지 [잃은 HP×1.5, 방어 무시]` });
-        newLog.push({ type: 'passive', text: `★ [혈마의 격노] 3턴간 흡혈 50%` });
+        newLog.push({ type: 'passive', text: `★ [혈마의 격노] 3턴간 흡혈 30%` });
 
         setFxScreenShake(v => v + 1);
         setFxEnemyShake(v => v + 1);
