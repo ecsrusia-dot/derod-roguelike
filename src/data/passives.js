@@ -85,7 +85,7 @@ export const PASSIVE_SKILLS = {
     minorEffect: { type: 'maxHp+', perLv: 10, desc: '최대 체력 +10/Lv (영구)' },
     tiers: {
       3: { text: '매 턴 종료 시 HP +3', trigger: 'onTurnStart', effect: 'regenPerTurn' },
-      5: { text: '전투 시작 시 HP 30% 회복', trigger: 'onCombatStart', effect: 'heal30%' },
+      5: { text: '전투 시작 시 HP 5% 회복', trigger: 'onCombatStart', effect: 'heal5%' },
       7: { text: 'HP 30% 이하 시 전투당 1회 부활', trigger: 'onLethal', effect: 'revive' }
     }
   },

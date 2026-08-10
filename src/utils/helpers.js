@@ -144,7 +144,7 @@ export function getMinorBonus(skills, effectType, activeSkills = null) {
 }
 
 // 1.60.0~ 회복량 보너스 합산 — 수신 패시브 + 각인 combatHealPct + 각성도 statPctBonus combatHeal
-// 모든 회복 시점(heal30% / regenPerTurn / dawnRegen / 소울 스킬 회복)에서 사용.
+// 모든 회복 시점(heal5% / regenPerTurn / dawnRegen / 소울 스킬 회복)에서 사용.
 // 부활(revive/dawnRevive)은 % HP 직접 지정이므로 보너스 미적용.
 export function getEffectiveHealPct(skills, engravingFx = {}, activeSkills = null, ultimates = null) {
   let pct = engravingFx.combatHealPct || 0;
