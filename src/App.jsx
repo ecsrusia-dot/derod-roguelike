@@ -2357,8 +2357,9 @@ export default function App() {
       const pool = currentRewards.filter(r => !(r.type === 'skill' && r.name === '잔혹' && !physCapable));
       const cand = pool.length > 0 ? pool : currentRewards;
       // 1.91.0~ 방랑검사 전용 (PM 지시): 패시브 획득 우선순위 고정 +
-      //   상위 5순위(심안류·심안·회피·재생·강타)가 하나도 없으면 보석 리롤 1회
-      const WANDERER_SKILL_PRIO = ['심안류', '심안', '회피', '재생', '강타', '잔혹', '신앙', '가속'];
+      //   상위 5순위가 하나도 없으면 보석 리롤 1회
+      // 1.91.2 변경 (PM 지시): 정밀을 5순위로 추가, 잔혹 6위·강타 7위로 조정
+      const WANDERER_SKILL_PRIO = ['심안류', '심안', '회피', '재생', '정밀', '잔혹', '강타', '신앙', '가속'];
       let autoRerolled = false;
       if (classId === 'wanderer') {
         const top5 = WANDERER_SKILL_PRIO.slice(0, 5);
