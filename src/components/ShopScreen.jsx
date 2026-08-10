@@ -38,14 +38,15 @@ export default function ShopScreen({ gold, skills, relics, ultimates, curses = [
     if (!autoPlay) return;
     const t = setTimeout(() => {
       const RESERVE_GOLD = 100;
-      // 1.84.1~ PM 결정: 출혈 스킬(forceBleed) 없는 직업은 잔혹 자동 구매 제외 (수동 구매는 가능)
-      const bleedCapable = !!CLASSES.find(c => c.id === classId)?.combatSkills?.some(k => COMBAT_SKILLS[k]?.forceBleed);
+      // 1.84.2 완화 (PM 결정): 잔혹은 자체 출혈 부여(Lv.3~)라 물리 직업군이면 자동 구매 허용
+      //   — 마법 전용 직업(술법사·사제)만 제외 (수동 구매는 항상 가능)
+      const physCapable = !!CLASSES.find(c => c.id === classId)?.combatSkills?.some(k => COMBAT_SKILLS[k]?.type === 'physical');
       const buyable = stock
         .map((r, idx) => ({ r, idx, price: getPrice(r) }))
         .filter(({ r, idx, price }) => {
           if (bought.has(idx)) return false;
           if (gold - price < RESERVE_GOLD) return false;
-          if (r.type === 'skill' && r.name === '잔혹' && !bleedCapable) return false;
+          if (r.type === 'skill' && r.name === '잔혹' && !physCapable) return false;
           if (r.type === 'skill') {
             return (skills[r.name] || 0) < (PASSIVE_SKILLS[r.name]?.maxLv || 7);
           }
