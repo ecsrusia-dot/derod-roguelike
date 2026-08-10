@@ -130,6 +130,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
   const dmgStatsRef = useRef({ total: 0, bySource: {} });
   // 1.90.0~ 이 전투의 회피 발동 횟수 (무결한 검사 업적 — 컴포넌트가 전투마다 리마운트라 자동 초기화)
   const dodgeCountRef = useRef(0);
+  // 1.91.1~ 방랑검사 자동: "턴 시작부터 소울 100" 커밋 플래그 (참격×2 후 무영의 일격 확정 발동용)
+  const autoUltCommitRef = useRef(false);
   const trackDmg = (source, amount) => {
     if (!amount || amount <= 0) return;
     const s = dmgStatsRef.current;
@@ -828,7 +830,9 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     };
     const keys = classData.combatSkills.filter(usable);
     // ① 소울 스킬 — 전체 턴 소모라 턴 시작(풀 AP)에만
-    if (classData.ultimateId && (player.soulGauge || 0) >= 100 && ap >= AP_PER_TURN) return 'ULT';
+    //   1.91.1~ 방랑검사는 아래 전용 플랜이 참격으로 AP를 깎은 뒤 마지막에 발동 (참격 봉인 예외만 여기서)
+    if (classData.ultimateId && (player.soulGauge || 0) >= 100 && ap >= AP_PER_TURN
+      && (classData.id !== 'wanderer' || !usable('참격'))) return 'ULT';
     const hpRatio = player.maxHp > 0 ? player.hp / player.maxHp : 1;
     const intent = enemy.nextIntent;
     const danger = !!(intent && intent.type === 'attack' && (intent.heavy || hpRatio < 0.35));
@@ -851,6 +855,25 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         else if (intent?.type === 'defend') plan = 'pierce';
       } else if (heavyTelegraph) {
         plan = 'guard';
+      }
+      // 1.91.1~ 소울 스킬 발동 순서 (PM 지시) — 무영의 일격은 잔여 AP 전부 소모라 참격 후 마지막 발동
+      //   룰 1: 턴 시작부터 소울 100 → 상황 무관 참격×2 + 무영의 일격 (커밋)
+      //   룰 2: 턴 중간 AP 1에 소울 100 도달 → 방어상황이면 방검 룰 우선, 공격상황이면 무영의 일격
+      //   룰 3: 턴 중간 AP 2에 소울 100 도달 → 방어상황이면 방검 룰 우선, 공격상황이면 관통 무시 참격 → 무영의 일격
+      const soul100 = !!classData.ultimateId && (player.soulGauge || 0) >= 100;
+      if (ap >= AP_PER_TURN) autoUltCommitRef.current = soul100; // 턴 시작 시점 커밋 판정
+      if (soul100) {
+        if (ap >= AP_PER_TURN) return '참격'; // 룰 1 시작 — 참격×2 후 아래에서 ULT
+        if (autoUltCommitRef.current) {
+          if (ap === 2) return '참격';
+          autoUltCommitRef.current = false;
+          return 'ULT'; // 룰 1 마무리
+        }
+        if (plan !== 'guard') {
+          if (ap === 2) return '참격'; // 룰 3 — 관통 무시
+          return 'ULT';                // 룰 2
+        }
+        // 방어상황(guard) — 방검 룰 우선, 소울은 다음 턴 시작(룰 1)에 사용
       }
       if (plan === 'guard') {
         // 참격 ×2 → 마지막 1AP에 방검 (조기 처치 시 방검 절약 — 방어 효과는 사용 시점 무관)
