@@ -319,6 +319,41 @@ export default function App() {
     if (autoSession.battles > 0 || autoSession.clears > 0) setAutoSummary(autoSession);
     setAutoSession(null);
   }, [autoHunt]);
+
+  // ============================================
+  // 1.88.0~ Wake Lock — 자동 진행 중 화면 자동 꺼짐 방지 (PM 요청)
+  // ============================================
+  // 자동 사냥 또는 레이드 전투가 살아있는 동안 navigator.wakeLock으로 화면 유지.
+  // ⚠️ 웹앱(PWA) 한계: 홈 키로 다른 앱에 가면 OS가 JS 실행을 동결하므로
+  //    백그라운드 "실시간" 진행은 원천 불가 — 화면 꺼짐 방지가 웹에서 가능한 최선.
+  //    (다른 앱 사용 중 진행은 "오프라인 정산" 방식으로만 가능 — PM 결정 대기)
+  const wakeLockRef = useRef(null);
+  useEffect(() => {
+    const active = autoHunt || !!raidDungeon;
+    if (!active || !('wakeLock' in navigator)) return undefined;
+    let cancelled = false;
+    const acquire = async () => {
+      try {
+        const lock = await navigator.wakeLock.request('screen');
+        if (cancelled) { lock.release(); return; }
+        wakeLockRef.current = lock;
+      } catch (e) {
+        // 저전력 모드·브라우저 정책으로 거부될 수 있음 — 조용히 무시
+      }
+    };
+    // 다른 앱에 다녀오면 wake lock이 자동 해제됨 → 복귀 시 재획득
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') acquire();
+    };
+    acquire();
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', onVisible);
+      try { wakeLockRef.current?.release?.(); } catch (e) { /* already released */ }
+      wakeLockRef.current = null;
+    };
+  }, [autoHunt, raidDungeon]);
   // 1.74.0~ 레이드 — 입장 중인 던전 (raidBattle 화면용)
   const [raidDungeon, setRaidDungeon] = useState(null);
   // 1.86.0~ 레이드 난이도 (RAID_DIFFICULTIES 객체 — null이면 일반)

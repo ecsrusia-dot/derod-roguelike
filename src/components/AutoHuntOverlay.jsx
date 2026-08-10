@@ -124,6 +124,13 @@ export default function AutoHuntOverlay({
           {expedition?.name}{chapter ? ` · ${chapter.name}` : ''} — <span style={{ color: PALETTE.dawn }}>{SCREEN_LABELS[screen] || '진행 중'}</span>
           <span style={{ marginLeft: 4, color: PALETTE.legendary }}>●</span>
         </div>
+        {/* 1.88.0~ Wake Lock 안내 — 화면 꺼짐 방지 (지원 브라우저에서만) */}
+        <div className="mt-1" style={{ fontSize: 9, color: PALETTE.textDim, opacity: 0.8 }}>
+          {('wakeLock' in navigator)
+            ? '🔆 화면 꺼짐 방지 활성 — 앱을 켜둔 채 두면 계속 진행됩니다'
+            : '⚠ 이 브라우저는 화면 유지 미지원 — 화면이 꺼지면 진행이 멈춥니다'}
+          {' '}(다른 앱으로 나가면 OS 정책상 일시 정지)
+        </div>
       </div>
 
       {/* 본문 (스크롤) */}
