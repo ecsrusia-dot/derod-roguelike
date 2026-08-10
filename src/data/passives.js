@@ -162,7 +162,7 @@ export const PASSIVE_SKILLS = {
     tiers: {
       3: { text: '매 턴 시작 시 자해 -3 HP, 다음 공격 데미지 +15%', trigger: 'onTurnStart', effect: 'bloodRageTurn' },
       5: { text: 'HP 50% 이하 시 치명타율 +30%', trigger: 'passive', effect: 'bloodLow50Crit' },
-      7: { text: 'HP 25% 이하 시 받는 데미지 -50%, 공격 시 30% 흡혈', trigger: 'passive', effect: 'bloodLow25Survive' }
+      7: { text: 'HP 25% 이하 시 받는 데미지 -50%, 공격 시 15% 흡혈', trigger: 'passive', effect: 'bloodLow25Survive' }
     }
   },
   풍령: {
@@ -267,7 +267,7 @@ export const ULTIMATE_SKILLS = {
     {
       id: '혈광_불사혈맥',
       name: '불사혈맥',
-      desc: '흡혈·생존의 지속전 빌드.\n모든 공격에 흡혈 30% (HP 조건 없음 — 상시).\nHP 0 도달 시 전투당 1회 HP 40%로 부활.',
+      desc: '흡혈·생존의 지속전 빌드.\nHP 40% 이하일 때 공격 흡혈 20% (위기 생존).\nHP 0 도달 시 전투당 1회 HP 40%로 부활.',
       effect: 'ult_bloodImmortal',
       color: '#c44536',
     },

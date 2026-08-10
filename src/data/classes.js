@@ -121,7 +121,7 @@ export const CLASS_ULTIMATES = {
     classId: 'demonblood',
     name: '혈마(血魔)의 격노',
     quote: '내 피의 무게를 가져가라.',
-    desc: '적에게 (잃은 HP × 1.5, 최소 50) 데미지 (방어 무시). 다음 3턴 공격 시 50% 흡혈. ※ HP가 낮을수록 강력. HP 0이면 ~max HP × 1.5 데미지 폭발.',
+    desc: '적에게 (잃은 HP × 1.5, 최소 50) 데미지 (방어 무시). 다음 3턴 공격 시 30% 흡혈. ※ HP가 낮을수록 강력. HP 0이면 ~max HP × 1.5 데미지 폭발.',
     color: '#7a1818',
     icon: '✸',
     effect: 'classult_bloodFury',
