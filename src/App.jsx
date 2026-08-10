@@ -291,9 +291,9 @@ export default function App() {
   // 1.72.0~ 자동 사냥 모드 — 노드 선택·스킬 선택·보상 선택 모두 자동
   // 허용 범위: 수련의 길(training) + 무한모드(endless)만. 사망/원정 클리어 시 자동 해제.
   const [autoHunt, setAutoHunt] = useState(false);
-  // 1.80.0~ 자동 사냥 배속 (×1 / ×5 / ×10) — 자동 사냥 중에만 연출·진행 딜레이 압축
+  // 1.80.0~ 자동 사냥 배속 (×1 / ×5 / ×10 / ×20) — 자동 사냥 중에만 연출·진행 딜레이 압축
   const [autoSpeed, setAutoSpeed] = useState(1);
-  const cycleAutoSpeed = () => setAutoSpeed(s => (s === 1 ? 5 : s === 5 ? 10 : 1));
+  const cycleAutoSpeed = () => setAutoSpeed(s => (s === 1 ? 5 : s === 5 ? 10 : s === 10 ? 20 : 1));
   // 1.81.0~ 자동 사냥 대기화면 — 자동 켤 때마다 표시, [관전]으로 숨김 가능
   const [autoOverlayHidden, setAutoOverlayHidden] = useState(false);
   // 1.83.0~ 자동 사냥 세션 — 자동 ON~OFF 동안 런 수·클리어·전멸·합산 획득 추적
