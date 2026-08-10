@@ -92,7 +92,7 @@ function PartyChip({ member, flash }) {
   );
 }
 
-export default function RaidBattleScreen({ meta, dungeon, repeat = false, onToggleRepeat = null, onVictory, onDefeat, onRetreat }) {
+export default function RaidBattleScreen({ meta, dungeon, repeat = false, onToggleRepeat = null, background = false, onMinimize = null, onStatus = null, onVictory, onDefeat, onRetreat }) {
   const rooms = dungeon.rooms || [];
   // 1.78.0~ 활성 비전 fx (파티 단위)
   const secretFx = RAID_SECRET_SKILLS[meta?.raid?.secretSkill]?.fx || {};
@@ -137,6 +137,31 @@ export default function RaidBattleScreen({ meta, dungeon, repeat = false, onTogg
     const t = setTimeout(() => onVictory(dungeon, { ...loot, secretSwap: secretChoice === 'swap' }), 1600);
     return () => clearTimeout(t);
   }, [phase, repeat, secretChoice]);
+
+  // 1.80.0~ 백그라운드 상태 보고 — App 플로팅 필 표시용 (running | victory | choice | defeat)
+  useEffect(() => {
+    if (!onStatus) return;
+    const activeId = meta?.raid?.secretSkill || null;
+    const needChoice = !!(loot.secret && activeId && activeId !== loot.secret && !secretChoice);
+    onStatus(phase === 'victory' ? (needChoice ? 'choice' : 'victory') : phase);
+  }, [phase, loot.secret, secretChoice]);
+
+  // 1.80.0~ 백그라운드 자동 정산 — 숨김 상태에서 승리(비반복)·전멸이 나면 전리품 자동 수령
+  // (기연 선택 대기는 유저 판단이라 자동 진행 X — 플로팅 필에 '기연 선택 대기' 표시)
+  useEffect(() => {
+    if (!background) return;
+    const activeId = meta?.raid?.secretSkill || null;
+    const needChoice = !!(loot.secret && activeId && activeId !== loot.secret && !secretChoice);
+    if (needChoice) return;
+    if (phase === 'victory' && !repeat) {
+      const t = setTimeout(() => onVictory(dungeon, { ...loot, secretSwap: secretChoice === 'swap' }), 1200);
+      return () => clearTimeout(t);
+    }
+    if (phase === 'defeat') {
+      const t = setTimeout(() => onDefeat({ ...loot, secretSwap: secretChoice === 'swap' }), 1200);
+      return () => clearTimeout(t);
+    }
+  }, [background, phase, repeat, secretChoice]);
 
   const pushEnemyLabel = (kind, value, delay = 0) => {
     const t = setTimeout(() => {
@@ -712,6 +737,13 @@ export default function RaidBattleScreen({ meta, dungeon, repeat = false, onTogg
       <div className="p-3 flex-none" style={{ borderTop: '1px solid var(--ui-line)', background: PALETTE.bgDeep }}>
         {phase === 'running' && (
           <div className="flex gap-2">
+            {/* 1.80.0~ 백그라운드 전환 — 전투는 계속 진행, 본편(싱글모드) 동시 플레이 가능 */}
+            {onMinimize && (
+              <button onClick={onMinimize} className="ui-press flex-none" style={{
+                width: 46, height: 42, borderRadius: 'var(--r-btn)', fontSize: 14, fontWeight: 700,
+                background: 'rgba(255,255,255,0.04)', border: '1px solid var(--ui-line)', color: PALETTE.textDim,
+              }} aria-label="백그라운드로 전환">▾</button>
+            )}
             {onToggleRepeat && (
               <button onClick={onToggleRepeat} className="ui-press flex-1" style={{
                 height: 42, borderRadius: 'var(--r-btn)', fontSize: 11.5, fontWeight: 700,

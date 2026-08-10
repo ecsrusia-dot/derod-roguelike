@@ -6,7 +6,9 @@ import React, { useState, useEffect } from 'react';
 import { PALETTE } from '../utils/helpers.js';
 import { ENEMIES, GAME_CONFIG } from '../data.js';
 
-export default function EventScreen({ event, classData, stats, skills = {}, gold = 0, gem = 0, autoPlay = false, onResolve }) {
+export default function EventScreen({ event, classData, stats, skills = {}, gold = 0, gem = 0, autoPlay = false, autoSpeed = 1, onResolve }) {
+  // 1.80.0~ 자동 사냥 배속 딜레이
+  const dly = (ms) => (autoSpeed > 1 ? Math.max(60, Math.round(ms / autoSpeed)) : ms);
   const [stage, setStage] = useState('intro'); // intro | result
   const [resultData, setResultData] = useState(null);
 
@@ -73,11 +75,11 @@ export default function EventScreen({ event, classData, stats, skills = {}, gold
           pool.find(c => !c.stat && !c.combat) ||
           pool[0];
         if (safe) handleChoice(safe);
-      }, 900);
+      }, dly(900));
       return () => clearTimeout(t);
     }
     if (stage === 'result' && resultData) {
-      const t = setTimeout(() => onResolve(resultData), 1100);
+      const t = setTimeout(() => onResolve(resultData), dly(1100));
       return () => clearTimeout(t);
     }
   }, [autoPlay, stage]);
