@@ -19,18 +19,20 @@ export function FloatingLabel({ kind, value, label }) {
   let weight = 'font-bold';
   let shadow = '0 2px 6px rgba(0,0,0,0.6)';
 
+  // 1.81.0 픽스: value 없이 label만 띄우는 호출(연계!/격노! 등)에서 "-null!" 표시되던 버그
+  //   — 수치가 없으면 label 텍스트를 그대로 표시
   if (kind === 'damage') {
     color = '#ff6a6a';
-    text = `-${value}`;
+    text = value == null ? (label || '') : `-${value}`;
   } else if (kind === 'crit') {
     color = '#ffd86b';
-    text = `-${value}!`;
+    text = value == null ? (label || '') : `-${value}!`;
     cls = 'fx-float-crit';
-    size = 'text-2xl';
+    size = value == null ? 'text-lg' : 'text-2xl';
     shadow = `0 0 12px rgba(255,216,107,0.7), 0 2px 6px rgba(0,0,0,0.7)`;
   } else if (kind === 'heal') {
     color = '#7ed99a';
-    text = `+${value}`;
+    text = value == null ? (label || '') : `+${value}`;
   } else if (kind === 'miss') {
     color = PALETTE.textDim || '#9b8975';
     text = label || '회피!';

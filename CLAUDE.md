@@ -1022,6 +1022,7 @@ PM이 AskUserQuestion으로 확정한 설계. **던전앤파이터 모티브, "�
 | **이벤트 비용/페널티** | 1.70.0 실적용 픽스 | cost는 penalty로 정산 + 잔액 부족 비활성. 일반 선택지 penalty도 적용됨 |
 | **일일 임무** (1.72.0) | `data/meta.js` DAILY_MISSIONS + `storage.js` trackDailyMission | 임무 추가는 DAILY_MISSIONS 배열 + App.jsx 트래킹 지점 1곳. KST 날짜 키 자동 리셋, 완료 즉시 영혼 자동 지급. TitleScreen 진행도 패널 |
 | **도감 발견 보너스** (1.72.0) | `storage.js` recordCodex 내장 | 신규 발견 ✦5 / 카테고리 완성 ✦100 (codexCompletionClaimed 1회 기록). 소급 지급 없음 |
+| **자동 사냥 대기화면·정산·반복** (1.81.0) | `AutoHuntOverlay.jsx`(persistent 레이어) + CombatScreen `dmgStatsRef/trackDmg` + App `runStats/victoryStats/runRepeat/runRestartRef` | 대기화면: 자동 ON 시 상태창 오버레이(관전 토글). 정산: onVictory 3번째 인자 `{total, bySource}` → VictoryScreen(전투)·ExpeditionClearScreen(런). 반복: 드라이버 expeditionClear 분기에서 `runRestartRef.current()` 재출정 (클래식 startExpedition / 챔피언십 startChampionship 클로저 보존, 전멸 시 해제). 새 데미지 경로 추가 시 **trackDmg 호출 잊지 말 것** |
 | **자동 사냥** (1.72.0, 1.80.0 확장) | App 드라이버 useEffect + CombatScreen `chooseAutoAction` + EventScreen autoPlay | 1.80.0~ **전 원정 허용** (`autoHuntAllowed = !!currentExpedition`, 미클리어 포함) + **배속 ×1/×5/×10** (`autoSpeed` state → CombatScreen `dly()` 헬퍼로 자동 중에만 딜레이 압축). 전투 AI 우선순위: 소울100 → heavy·저체력 방어 → **회복 방어 선제(사제 가호, HP<50%)** → 버프 → 콤보 셋업 → **마지막 AP 방어 전환(적 공격 의도+HP<65%)** → AP당 기대 데미지 최대. **자해 스킬은 잔여 HP<15면 금지**. usable() 가드는 handlePlayerAction과 반드시 일치 유지 |
 
 ### 다음 세션 우선순위 (PM 미지정 시 기본값)

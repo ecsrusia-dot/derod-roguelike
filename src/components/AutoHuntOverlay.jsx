@@ -1,0 +1,175 @@
+// ============================================
+// components/AutoHuntOverlay.jsx — 자동 사냥 대기화면 (1.81.0~)
+// ============================================
+// PM 요청: 자동 사냥 중엔 화면이 휙휙 넘어가는 대신 차분한 상태창만 표시.
+//   - 능력치 4종 / 활성 패시브(최대 5종) / 유물 / 재화·획득 현황 / 런 정산
+//   - 컨트롤: 배속 ×1/×5/×10 · 던전 반복 · 관전(대기화면 숨김) · 자동 해제
+// 오버레이는 화면 위에 덮일 뿐 — 실제 진행(전투·이벤트·보상)은 밑에서 계속 돈다.
+// PhoneFrame persistent 레이어에서 렌더 (화면 전환 리마운트 제외).
+// ============================================
+
+import React from 'react';
+import { PALETTE } from '../utils/helpers.js';
+import { PASSIVE_SKILLS } from '../data.js';
+import { GlassPanel, Chip } from './ui/CommonUI.jsx';
+
+const SCREEN_LABELS = {
+  map: '노드 이동 중', combat: '전투 중', victory: '전투 승리', reward: '보상 선택 중',
+  event: '사건 진행 중', shop: '상점 이용 중', rest: '정비 중', forge: '대장간',
+  prep: '전투 준비 중', reselect: '전투 준비 중', chapterClear: '챕터 클리어',
+  expeditionClear: '원정 클리어 — 곧 재출정', bossIntro: '보스 조우',
+};
+
+const STAT_KEYS = ['근력', '민첩', '지능', '매력'];
+const STAT_COLORS = { 근력: '#c4453d', 민첩: '#7a9a5e', 지능: '#7ba3c4', 매력: '#c46ba3' };
+
+export default function AutoHuntOverlay({
+  classData, hp, maxHp, stats = {}, skills = {}, activeSkills = null,
+  relics = [], activeRelicNames = null, gold = 0, gem = 0, runSouls = 0,
+  expedition, chapter, screen, runStats = null,
+  autoSpeed = 1, onCycleSpeed, runRepeat = false, onToggleRepeat = null,
+  onWatch, onStop,
+}) {
+  const hpRatio = maxHp > 0 ? hp / maxHp : 0;
+  // 활성 패시브 — prep 미확정(null)이면 보유 전체 표시
+  const owned = Object.entries(skills).filter(([n, lv]) => lv > 0 && PASSIVE_SKILLS[n]).map(([n]) => n);
+  const shownPassives = (activeSkills && activeSkills.length > 0 ? activeSkills : owned).slice(0, 8);
+  const isRelicActive = (name) => (activeRelicNames ? activeRelicNames.includes(name) : true);
+  const topSources = runStats ? Object.entries(runStats.bySource).sort((a, b) => b[1] - a[1]).slice(0, 3) : [];
+
+  return (
+    <div className="absolute inset-0 flex flex-col" style={{ zIndex: 70, background: `radial-gradient(120% 50% at 50% -10%, rgba(232,176,74,0.12), transparent), ${PALETTE.bgDeep}` }}>
+      {/* 헤더 */}
+      <div className="px-4 pt-4 pb-2 flex-none text-center">
+        <div className="tracking-[0.35em] font-bold" style={{ fontSize: 11, color: PALETTE.legendary }}>
+          ⚙ 자동 사냥 진행 중
+        </div>
+        <div className="mt-1" style={{ fontSize: 10.5, color: PALETTE.textDim }}>
+          {expedition?.name}{chapter ? ` · ${chapter.name}` : ''} — <span style={{ color: PALETTE.dawn }}>{SCREEN_LABELS[screen] || '진행 중'}</span>
+          <span style={{ marginLeft: 4, color: PALETTE.legendary }}>●</span>
+        </div>
+      </div>
+
+      {/* 본문 (스크롤) */}
+      <div className="flex-1 overflow-y-auto px-4 pb-2 flex flex-col gap-2" style={{ minHeight: 0 }}>
+        {/* 캐릭터 + HP + 재화 */}
+        <GlassPanel style={{ borderRadius: 13, padding: '10px 12px' }}>
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="font-semibold" style={{ fontSize: 12.5, color: PALETTE.text }}>{classData?.name}</span>
+            <span className="ml-auto tabular-nums" style={{ fontSize: 10.5, color: PALETTE.textDim }}>HP {hp}/{maxHp}</span>
+          </div>
+          <div style={{ height: 8, borderRadius: 999, background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+            <div className="transition-all" style={{
+              height: '100%', width: `${hpRatio * 100}%`, borderRadius: 999,
+              background: hpRatio > 0.35 ? 'linear-gradient(90deg, #6a8a4e, #9ad4a3)' : 'linear-gradient(90deg, #8f2c24, #e05248)',
+            }} />
+          </div>
+          <div className="flex gap-1.5 mt-2 flex-wrap">
+            <Chip color={PALETTE.dawn} style={{ height: 20 }}>● <span className="tabular-nums">{gold}</span></Chip>
+            <Chip color={PALETTE.ice} style={{ height: 20 }}>◆ <span className="tabular-nums">{gem}</span></Chip>
+            <Chip color={PALETTE.legendary} style={{ height: 20 }}>✦ 이번 런 <span className="tabular-nums">+{runSouls}</span></Chip>
+          </div>
+        </GlassPanel>
+
+        {/* 능력치 4종 */}
+        <GlassPanel style={{ borderRadius: 13, padding: '9px 12px' }}>
+          <div style={{ fontSize: 9.5, color: PALETTE.textDim, marginBottom: 5 }}>능력치</div>
+          <div className="grid grid-cols-4 gap-1.5 text-center">
+            {STAT_KEYS.map(k => (
+              <div key={k} style={{ borderRadius: 9, padding: '5px 0', background: `${STAT_COLORS[k]}14`, border: `1px solid ${STAT_COLORS[k]}55` }}>
+                <div style={{ fontSize: 9, color: STAT_COLORS[k] }}>{k}</div>
+                <div className="tabular-nums font-bold" style={{ fontSize: 13, color: PALETTE.text }}>{stats?.[k] ?? '-'}</div>
+              </div>
+            ))}
+          </div>
+        </GlassPanel>
+
+        {/* 활성 패시브 */}
+        <GlassPanel style={{ borderRadius: 13, padding: '9px 12px' }}>
+          <div style={{ fontSize: 9.5, color: PALETTE.textDim, marginBottom: 5 }}>
+            패시브 {activeSkills && activeSkills.length > 0 ? `(활성 ${shownPassives.length}종)` : '(보유 — 준비 노드에서 확정)'}
+          </div>
+          {shownPassives.length === 0 ? (
+            <div style={{ fontSize: 10.5, color: PALETTE.textDim }}>보유 패시브 없음</div>
+          ) : (
+            <div className="flex gap-1.5 flex-wrap">
+              {shownPassives.map(name => (
+                <Chip key={name} color={PASSIVE_SKILLS[name]?.color || PALETTE.dawn} style={{ height: 21 }}>
+                  {name} <span className="tabular-nums">Lv.{skills[name] || 0}</span>
+                </Chip>
+              ))}
+            </div>
+          )}
+        </GlassPanel>
+
+        {/* 유물 */}
+        <GlassPanel style={{ borderRadius: 13, padding: '9px 12px' }}>
+          <div style={{ fontSize: 9.5, color: PALETTE.textDim, marginBottom: 5 }}>유물 ({relics.length})</div>
+          {relics.length === 0 ? (
+            <div style={{ fontSize: 10.5, color: PALETTE.textDim }}>보유 유물 없음</div>
+          ) : (
+            <div className="flex gap-1.5 flex-wrap">
+              {relics.map((r, i) => (
+                <Chip key={`${r.name}-${i}`} color={r.color || PALETTE.dawn} style={{ height: 21, opacity: isRelicActive(r.name) ? 1 : 0.45 }}>
+                  {r.name}{!isRelicActive(r.name) && ' (비활성)'}
+                </Chip>
+              ))}
+            </div>
+          )}
+        </GlassPanel>
+
+        {/* 런 정산 (누적) */}
+        {runStats && runStats.battles > 0 && (
+          <GlassPanel style={{ borderRadius: 13, padding: '9px 12px' }}>
+            <div className="flex justify-between items-baseline" style={{ marginBottom: 5 }}>
+              <span style={{ fontSize: 9.5, color: PALETTE.textDim }}>이번 런 정산</span>
+              <span className="tabular-nums" style={{ fontSize: 10, color: PALETTE.text }}>
+                전투 {runStats.battles}회 · 총 <b style={{ color: PALETTE.legendary }}>{runStats.totalDmg}</b> 데미지
+              </span>
+            </div>
+            {topSources.map(([src, dmg]) => (
+              <div key={src} className="flex items-center gap-2" style={{ marginTop: 3 }}>
+                <span className="flex-none truncate" style={{ width: 76, fontSize: 9.5, color: PALETTE.text }}>{src}</span>
+                <div className="flex-1" style={{ height: 5, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${Math.max(4, (dmg / Math.max(1, runStats.totalDmg)) * 100)}%`, borderRadius: 999, background: `linear-gradient(90deg, ${PALETTE.legendary}77, ${PALETTE.legendary})` }} />
+                </div>
+                <span className="flex-none tabular-nums text-right" style={{ width: 40, fontSize: 9, color: PALETTE.textDim }}>{Math.round((dmg / Math.max(1, runStats.totalDmg)) * 100)}%</span>
+              </div>
+            ))}
+            <div className="flex gap-3 mt-2 pt-1.5 tabular-nums" style={{ fontSize: 9.5, color: PALETTE.textDim, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+              <span style={{ color: PALETTE.dawn }}>● +{runStats.gold}</span>
+              <span style={{ color: PALETTE.twilight }}>◆ +{runStats.gem}</span>
+              <span style={{ color: PALETTE.legendary }}>✦ +{runStats.souls}</span>
+            </div>
+          </GlassPanel>
+        )}
+      </div>
+
+      {/* 하단 컨트롤 */}
+      <div className="p-3 flex-none flex gap-2" style={{ borderTop: '1px solid var(--ui-line)', background: PALETTE.bgDeep }}>
+        <button onClick={onCycleSpeed} className="ui-press flex-1 tabular-nums" style={{
+          height: 42, borderRadius: 'var(--r-btn)', fontSize: 11.5, fontWeight: 700,
+          background: autoSpeed > 1 ? 'rgba(123,163,196,0.18)' : 'rgba(255,255,255,0.04)',
+          border: `1px solid ${autoSpeed > 1 ? `${PALETTE.ice}aa` : 'var(--ui-line)'}`,
+          color: autoSpeed > 1 ? PALETTE.ice : PALETTE.textDim,
+        }}>⚡ ×{autoSpeed}</button>
+        {onToggleRepeat && (
+          <button onClick={onToggleRepeat} className="ui-press flex-1" style={{
+            height: 42, borderRadius: 'var(--r-btn)', fontSize: 11.5, fontWeight: 700,
+            background: runRepeat ? 'rgba(154,212,163,0.16)' : 'rgba(255,255,255,0.04)',
+            border: `1px solid ${runRepeat ? PALETTE.green : 'var(--ui-line)'}`,
+            color: runRepeat ? PALETTE.green : PALETTE.textDim,
+          }}>⟳ 반복 {runRepeat ? 'ON' : 'OFF'}</button>
+        )}
+        <button onClick={onWatch} className="ui-press flex-1" style={{
+          height: 42, borderRadius: 'var(--r-btn)', fontSize: 11.5,
+          background: 'rgba(255,255,255,0.04)', border: '1px solid var(--ui-line)', color: PALETTE.textDim,
+        }}>👁 관전</button>
+        <button onClick={onStop} className="ui-press flex-1" style={{
+          height: 42, borderRadius: 'var(--r-btn)', fontSize: 11.5, fontWeight: 700,
+          background: 'rgba(232,176,74,0.14)', border: `1px solid ${PALETTE.legendary}88`, color: PALETTE.legendary,
+        }}>⏸ 자동 해제</button>
+      </div>
+    </div>
+  );
+}
