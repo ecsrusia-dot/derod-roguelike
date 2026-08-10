@@ -277,10 +277,12 @@ export const RAID_DUNGEONS = [
 // =========== 던전 난이도 단계제 (1.86.0~, PM 결정 — 엔드게임 확장) ===========
 // 전 던전 공통 3단계. 상위 단계는 하위 단계 클리어 시 해금 (던전별).
 // statMult는 RAID_TUNING 위에 곱연산. 보상: 심연석·정수 ×rewardMult, 에픽 가중치 +epicBonus.
+// 1.87.0~ gearBonus (성장 축 A): 상위 난이도 드랍 장비의 성능 배율 — 파밍 루프 복원
+//   영웅 파밍 → ×1.25 장비 → 종막 도전 → ×1.5 장비
 export const RAID_DIFFICULTIES = [
-  { id: 'normal', name: '일반', statMult: 1.0, rewardMult: 1, epicBonus: 0,  color: '#9b8975', desc: '기본 난이도' },
-  { id: 'heroic', name: '영웅', statMult: 2.2, rewardMult: 2, epicBonus: 6,  color: '#c46ba3', desc: '적 스탯 ×2.2 — 심연석·정수 2배, 에픽 확률 +6%p' },
-  { id: 'doom',   name: '종막', statMult: 4.0, rewardMult: 3, epicBonus: 12, color: '#8a2be2', desc: '적 스탯 ×4.0 — 심연석·정수 3배, 에픽 확률 +12%p' },
+  { id: 'normal', name: '일반', statMult: 1.0, rewardMult: 1, epicBonus: 0,  gearBonus: 1.0,  color: '#9b8975', desc: '기본 난이도' },
+  { id: 'heroic', name: '영웅', statMult: 2.2, rewardMult: 2, epicBonus: 6,  gearBonus: 1.25, color: '#c46ba3', desc: '적 스탯 ×2.2 — 장비 성능 ×1.25, 심연석·정수 2배, 에픽 +6%p' },
+  { id: 'doom',   name: '종막', statMult: 4.0, rewardMult: 3, epicBonus: 12, gearBonus: 1.5,  color: '#8a2be2', desc: '적 스탯 ×4.0 — 장비 성능 ×1.5, 심연석·정수 3배, 에픽 +12%p' },
 ];
 
 // 클리어 기록 키 — 일반은 기존 키 그대로(하위 호환), 상위 단계는 @접미
@@ -303,6 +305,9 @@ export function applyRaidDifficulty(dungeon, diff) {
     ...dungeon,
     name: `${dungeon.name} [${diff.name}]`,
     recommendedPower: Math.round((dungeon.recommendedPower || 0) * diff.statMult),
+    // 1.87.0~ 성장 축 A: 상위 난이도 드랍 장비 성능 배율 + 이름 태그
+    gearMult: (dungeon.gearMult || 1) * (diff.gearBonus || 1),
+    gearTierTag: diff.name,
     rarityWeights: { ...dungeon.rarityWeights, EP: (dungeon.rarityWeights?.EP || 0) + diff.epicBonus },
     essenceDrop: (dungeon.essenceDrop || 0) * diff.rewardMult,
     weeklyStones: (dungeon.weeklyStones || 0) * diff.rewardMult,
@@ -353,10 +358,15 @@ export const RAID_STONE = { name: '심연석', icon: '💠' };
 export const RAID_DISMANTLE_VALUES = { C: 1, UC: 2, R: 4, U: 8, L: 15, EP: 30 };
 
 // 강화 — 장착 장비 대상, 실패·파괴 없음. 단계당 성능 +8%, 상위 단계일수록 비용 증가
+// 1.87.0~ 초월 강화 (PM 결정 — 엔드게임 성장 축 B): +11~+20은 심연석 대신 군주의 정수 소모.
+//   부위당 정수 총 55개 (1+2+…+10). 풀초월 시 장비 성능 ×2.6 (기존 +10 = ×1.8)
 export const RAID_ENHANCE = {
-  max: 10,
+  max: 20,          // 초월 포함 최대
+  normalMax: 10,    // 심연석 강화 상한
   bonusPerLv: 0.08,
-  costFor: (lv) => 5 * (lv + 1), // +1→5, +2→10 … +10→50 (총 275)
+  costFor: (lv) => 5 * (lv + 1),         // 일반 강화: +1→💠5 … +10→💠50 (총 275)
+  essenceCostFor: (lv) => (lv + 1) - 10, // 초월: +11→◈1 … +20→◈10 (총 55)
+  isTranscend: (lv) => lv >= 10,         // 현재 +10 이상이면 다음 강화는 초월
 };
 
 // 세트 효과 — 같은 시리즈(던전 접두어) 3부위 장착 시 발동
@@ -465,7 +475,7 @@ export function rollRaidDrop(dungeon) {
     classId, slot, rarity,
     series: dungeon.gearPrefix || null, // 1.75.0~ 세트 판정 키
     enh: 0,                             // 1.75.0~ 강화 단계
-    name: `${dungeon.gearPrefix ? dungeon.gearPrefix + ' ' : ''}${RAID_GEAR_NAMES[classId][slot]}`,
+    name: `${dungeon.gearPrefix ? dungeon.gearPrefix + ' ' : ''}${RAID_GEAR_NAMES[classId][slot]}${dungeon.gearTierTag ? ` [${dungeon.gearTierTag}]` : ''}`,
     atk, hp,
     power: atk * 4 + hp,
   };
