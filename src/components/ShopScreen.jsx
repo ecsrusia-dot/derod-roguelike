@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { PALETTE, hasCurse, AUTO_STAT_PREF } from '../utils/helpers.js';
-import { SHOP_PRICES, PASSIVE_SKILLS } from '../data.js';
+import { SHOP_PRICES, PASSIVE_SKILLS, CLASSES, COMBAT_SKILLS } from '../data.js';
 import { getRewardPool, rollRewards } from '../utils/rewards.js';
 
 export default function ShopScreen({ gold, skills, relics, ultimates, curses = [], autoPlay = false, autoSpeed = 1, onBuy, onLeave, classId = null }) {
@@ -38,11 +38,14 @@ export default function ShopScreen({ gold, skills, relics, ultimates, curses = [
     if (!autoPlay) return;
     const t = setTimeout(() => {
       const RESERVE_GOLD = 100;
+      // 1.84.1~ PM 결정: 출혈 스킬(forceBleed) 없는 직업은 잔혹 자동 구매 제외 (수동 구매는 가능)
+      const bleedCapable = !!CLASSES.find(c => c.id === classId)?.combatSkills?.some(k => COMBAT_SKILLS[k]?.forceBleed);
       const buyable = stock
         .map((r, idx) => ({ r, idx, price: getPrice(r) }))
         .filter(({ r, idx, price }) => {
           if (bought.has(idx)) return false;
           if (gold - price < RESERVE_GOLD) return false;
+          if (r.type === 'skill' && r.name === '잔혹' && !bleedCapable) return false;
           if (r.type === 'skill') {
             return (skills[r.name] || 0) < (PASSIVE_SKILLS[r.name]?.maxLv || 7);
           }

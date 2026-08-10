@@ -1743,6 +1743,17 @@ export default function App() {
         }
       }
       
+      // 1.84.1~ 전문가/마스터/미답의 도전자 재매핑 (PM 결정) — 직업별 원정 클리어 횟수
+      //   기존 "망각의 원정"(미구현 expedition 4)은 카운트 코드가 없어 영구 달성 불가였음
+      //   모든 모드(튜토리얼·수련·일일·챔피언십) 클리어 시 +1. 무한모드는 클리어 개념이 없어 자연 제외
+      if (classData?.id) {
+        newMeta = incrementAchievement(newMeta, `expert_${classData.id}`, 1, 50);
+        newMeta = incrementAchievement(newMeta, `master_${classData.id}`, 1, 100);
+        const clsKeys = ['wanderer', 'sage', 'demonblood', 'elf', 'priest'];
+        const clearedClassCount = clsKeys.filter(c => (newMeta.achievements?.[`expert_${c}`]?.progress || 0) > 0).length;
+        newMeta = setAchievementProgress(newMeta, 'special_all_class_e4', clearedClassCount, 5);
+      }
+
       // 영혼 부자 (5000 누적 보유) — 영혼 추가 후 체크
       newMeta = setAchievementProgress(newMeta, 'special_souls_5000', newMeta.souls, 5000);
 
@@ -1994,13 +2005,14 @@ export default function App() {
         // 노드 우선순위: 저체력이면 정비 최우선. 평시엔 강적(영혼 3) > 전투 > 보스 순
         const prio = (n) => {
           if (n.type === 'rest') return hpRatio < 0.45 ? 100 : 30;
+          // 1.84.1~ PM 결정: 은화 250 이상이면 상점 노드 최우선 경유 (긴급 정비 100만 예외 — 생존 우선)
+          if (n.type === 'shop') return gold >= 250 ? 95 : 20;
           if (n.type === 'elite') return 80;
           if (n.type === 'battle') return 70;
           if (n.type === 'boss') return 60;
           if (n.type === 'unknown') return 50;
           if (n.type === 'event') return 40;
           if (n.type === 'prep') return 35;
-          if (n.type === 'shop') return 20;
           if (n.type === 'forge') return 10;
           return 0;
         };
@@ -2012,24 +2024,28 @@ export default function App() {
     } else if (screen === 'reward' && currentRewards && currentRewards.length > 0) {
       const hpRatio = maxHp > 0 ? hp / maxHp : 1;
       const classId = classData?.id;
+      // 1.84.1~ PM 결정: 출혈 스킬(forceBleed) 없는 직업은 잔혹 패시브 자동 픽 제외 (수동 픽은 가능)
+      const bleedCapable = !!classData?.combatSkills?.some(k => COMBAT_SKILLS[k]?.forceBleed);
+      const pool = currentRewards.filter(r => !(r.type === 'skill' && r.name === '잔혹' && !bleedCapable));
+      const cand = pool.length > 0 ? pool : currentRewards;
       // 1.72.1~ 직업 맞춤 보상 우선순위:
       // 저체력 회복 > 궁극 진화 > 직업 전용 패시브(classOnly) >
       // 보유 패시브 강화(Lv 높은 순 — 7Lv 궁극 진화 가속) > 직업 주력 스탯 >
       // 새 패시브 > 유물 > 첫 번째
       const pick =
-        (hpRatio < 0.5 && currentRewards.find(r => r.type === 'heal' || r.type === 'heal_full')) ||
-        currentRewards.find(r => r.type === 'ultimate') ||
-        currentRewards.find(r => r.type === 'skill' && PASSIVE_SKILLS[r.name]?.classOnly === classId) ||
-        currentRewards
+        (hpRatio < 0.5 && cand.find(r => r.type === 'heal' || r.type === 'heal_full')) ||
+        cand.find(r => r.type === 'ultimate') ||
+        cand.find(r => r.type === 'skill' && PASSIVE_SKILLS[r.name]?.classOnly === classId) ||
+        cand
           .filter(r => r.type === 'skill' && (skills[r.name] || 0) > 0)
           .sort((a, b) => (skills[b.name] || 0) - (skills[a.name] || 0))[0] ||
-        currentRewards.find(r => r.type === 'stat' && r.name === AUTO_STAT_PREF[classId]) ||
-        currentRewards.find(r => r.type === 'skill') ||
+        cand.find(r => r.type === 'stat' && r.name === AUTO_STAT_PREF[classId]) ||
+        cand.find(r => r.type === 'skill') ||
         // 1.73.0~ 유물도 직업 선호 점수순 (물공 직업=물리 유물 / 마공 직업=마공 유물)
-        currentRewards
+        cand
           .filter(r => r.type === 'relic')
           .sort((a, b) => scoreRelicForClass(b, classId) - scoreRelicForClass(a, classId))[0] ||
-        currentRewards[0];
+        cand[0];
       later(() => handlePickReward(pick), 900);
     } else if (screen === 'expeditionClear') {
       // 1.81.0~ 던전 반복 — 클리어 정산 후 같은 원정 자동 재출정. 반복 OFF면 자동 해제
@@ -2083,7 +2099,7 @@ export default function App() {
       else later(() => handleReselectConfirm(selSkills, selRelics), 800);
     }
     return () => { if (t) clearTimeout(t); };
-  }, [screen, autoHunt, autoHuntAllowed, mapData, currentRewards, hp, maxHp, runRepeat]);
+  }, [screen, autoHunt, autoHuntAllowed, mapData, currentRewards, hp, maxHp, runRepeat, gold]);
 
   return (
     <ResponsiveLayout sidebar={
