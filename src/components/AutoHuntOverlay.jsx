@@ -8,10 +8,32 @@
 // PhoneFrame persistent 레이어에서 렌더 (화면 전환 리마운트 제외).
 // ============================================
 
-import React from 'react';
+import React, { useState } from 'react';
 import { PALETTE } from '../utils/helpers.js';
-import { PASSIVE_SKILLS } from '../data.js';
+import { PASSIVE_SKILLS, ULTIMATE_SKILLS } from '../data.js';
 import { GlassPanel, Chip } from './ui/CommonUI.jsx';
+import CardInfoModal, { buildPassiveInfo, buildRelicInfo } from './CardInfoModal.jsx';
+
+// 픽한 각성 스킬 id → { skillName(소속 패시브), ult } 조회
+function findUltimate(ultId) {
+  for (const skillName in ULTIMATE_SKILLS) {
+    const ult = ULTIMATE_SKILLS[skillName].find(u => u.id === ultId);
+    if (ult) return { skillName, ult };
+  }
+  return null;
+}
+
+// 각성 스킬 정보 모달 데이터 (CardInfoModal 공용 포맷)
+function buildAwakeningInfo(skillName, ult) {
+  return {
+    kind: 'ultimate',
+    color: ult.color,
+    tag: '★ 각성 스킬',
+    title: ult.name,
+    badge: skillName,
+    subtitle: ult.desc,
+  };
+}
 
 const SCREEN_LABELS = {
   map: '노드 이동 중', combat: '전투 중', victory: '전투 승리', reward: '보상 선택 중',
@@ -25,11 +47,14 @@ const STAT_COLORS = { 근력: '#c4453d', 민첩: '#7a9a5e', 지능: '#7ba3c4', �
 
 export default function AutoHuntOverlay({
   classData, hp, maxHp, stats = {}, skills = {}, activeSkills = null,
-  relics = [], activeRelicNames = null, gold = 0, gem = 0, runSouls = 0,
+  relics = [], activeRelicNames = null, ultimates = [], gold = 0, gem = 0, runSouls = 0,
   expedition, chapter, screen, runStats = null,
   autoSpeed = 1, onCycleSpeed, runRepeat = false, onToggleRepeat = null,
   onWatch, onStop,
 }) {
+  // 1.82.0~ 스킬·유물·각성 탭 시 정보 모달 (PM 요청)
+  const [modalInfo, setModalInfo] = useState(null);
+  const pickedUltimates = (ultimates || []).map(findUltimate).filter(Boolean);
   const hpRatio = maxHp > 0 ? hp / maxHp : 0;
   // 활성 패시브 — prep 미확정(null)이면 보유 전체 표시
   const owned = Object.entries(skills).filter(([n, lv]) => lv > 0 && PASSIVE_SKILLS[n]).map(([n]) => n);
@@ -94,13 +119,31 @@ export default function AutoHuntOverlay({
           ) : (
             <div className="flex gap-1.5 flex-wrap">
               {shownPassives.map(name => (
-                <Chip key={name} color={PASSIVE_SKILLS[name]?.color || PALETTE.dawn} style={{ height: 21 }}>
-                  {name} <span className="tabular-nums">Lv.{skills[name] || 0}</span>
-                </Chip>
+                <button key={name} onClick={() => setModalInfo(buildPassiveInfo(name, skills[name] || 0))} className="ui-press" style={{ background: 'transparent', border: 'none', padding: 0 }}>
+                  <Chip color={PASSIVE_SKILLS[name]?.color || PALETTE.dawn} style={{ height: 21 }}>
+                    {name} <span className="tabular-nums">Lv.{skills[name] || 0}</span> ◇
+                  </Chip>
+                </button>
               ))}
             </div>
           )}
         </GlassPanel>
+
+        {/* 1.82.0~ 각성 스킬 (픽한 ULTIMATE_SKILLS) — 탭 시 정보 모달 */}
+        {pickedUltimates.length > 0 && (
+          <GlassPanel style={{ borderRadius: 13, padding: '9px 12px' }}>
+            <div style={{ fontSize: 9.5, color: PALETTE.textDim, marginBottom: 5 }}>★ 각성 스킬 ({pickedUltimates.length})</div>
+            <div className="flex gap-1.5 flex-wrap">
+              {pickedUltimates.map(({ skillName, ult }) => (
+                <button key={ult.id} onClick={() => setModalInfo(buildAwakeningInfo(skillName, ult))} className="ui-press" style={{ background: 'transparent', border: 'none', padding: 0 }}>
+                  <Chip color={ult.color || PALETTE.legendary} style={{ height: 21 }}>
+                    ★ {ult.name} ◇
+                  </Chip>
+                </button>
+              ))}
+            </div>
+          </GlassPanel>
+        )}
 
         {/* 유물 */}
         <GlassPanel style={{ borderRadius: 13, padding: '9px 12px' }}>
@@ -110,9 +153,11 @@ export default function AutoHuntOverlay({
           ) : (
             <div className="flex gap-1.5 flex-wrap">
               {relics.map((r, i) => (
-                <Chip key={`${r.name}-${i}`} color={r.color || PALETTE.dawn} style={{ height: 21, opacity: isRelicActive(r.name) ? 1 : 0.45 }}>
-                  {r.name}{!isRelicActive(r.name) && ' (비활성)'}
-                </Chip>
+                <button key={`${r.name}-${i}`} onClick={() => setModalInfo(buildRelicInfo(r))} className="ui-press" style={{ background: 'transparent', border: 'none', padding: 0 }}>
+                  <Chip color={r.color || PALETTE.dawn} style={{ height: 21, opacity: isRelicActive(r.name) ? 1 : 0.45 }}>
+                    {r.name}{!isRelicActive(r.name) && ' (비활성)'} ◇
+                  </Chip>
+                </button>
               ))}
             </div>
           )}
@@ -170,6 +215,9 @@ export default function AutoHuntOverlay({
           background: 'rgba(232,176,74,0.14)', border: `1px solid ${PALETTE.legendary}88`, color: PALETTE.legendary,
         }}>⏸ 자동 해제</button>
       </div>
+
+      {/* 스킬·유물·각성 정보 모달 */}
+      {modalInfo && <CardInfoModal info={modalInfo} onClose={() => setModalInfo(null)} />}
     </div>
   );
 }

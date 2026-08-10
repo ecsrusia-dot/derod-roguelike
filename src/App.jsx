@@ -2054,7 +2054,7 @@ export default function App() {
           {autoHunt && autoHuntAllowed && !autoOverlayHidden && screen !== 'raidBattle' && (
             <AutoHuntOverlay
               classData={classData} hp={hp} maxHp={maxHp} stats={{ ...classData?.stats, ...stats }}
-              skills={skills} activeSkills={activeSkills} relics={relics} activeRelicNames={activeRelicNames}
+              skills={skills} activeSkills={activeSkills} relics={relics} activeRelicNames={activeRelicNames} ultimates={ultimates}
               gold={gold} gem={gem} runSouls={runSouls}
               expedition={currentExpedition} chapter={chapter} screen={screen} runStats={runStats}
               autoSpeed={autoSpeed} onCycleSpeed={cycleAutoSpeed}
