@@ -26,8 +26,10 @@ export default function AchievementScreen({ meta, onClaim, onClose }) {
     return s.completed && !s.claimed;
   }).length;
   
-  // 필터된 목록
-  const filtered = filter === 'all' ? ACHIEVEMENTS : ACHIEVEMENTS.filter(a => a.cat === filter);
+  // 필터된 목록 — 1.90.0~ '클리어' 탭은 튜토리얼·수련 업적도 포함
+  const filtered = filter === 'all' ? ACHIEVEMENTS
+    : filter === 'clear' ? ACHIEVEMENTS.filter(a => ['clear', 'tutorial', 'training'].includes(a.cat))
+    : ACHIEVEMENTS.filter(a => a.cat === filter);
   
   // 정렬: 수령 가능 → 진행중 → 완료/수령 완료
   const sorted = [...filtered].sort((a, b) => {
@@ -57,8 +59,8 @@ export default function AchievementScreen({ meta, onClaim, onClose }) {
         </div>
       </div>
       
-      {/* 카테고리 필터 */}
-      <div className="grid grid-cols-6 border-b" style={{ borderColor: PALETTE.panelBorder }}>
+      {/* 카테고리 필터 — 1.90.0~ 도박장·마스터즈·레이드 추가 (2줄) */}
+      <div className="grid grid-cols-5 border-b" style={{ borderColor: PALETTE.panelBorder }}>
         {[
           { id: 'all', label: '전체' },
           { id: 'clear', label: `클리어` },
@@ -66,6 +68,9 @@ export default function AchievementScreen({ meta, onClaim, onClose }) {
           { id: 'meta', label: `누적` },
           { id: 'forge', label: `대장간` },
           { id: 'champ', label: `챔피언십` },
+          { id: 'gamble', label: `도박장` },
+          { id: 'masters', label: `마스터즈` },
+          { id: 'raid', label: `레이드` },
         ].map(f => (
           <button key={f.id} onClick={() => setFilter(f.id)} 
             className="py-2 text-[9px] tracking-[0.05em]" style={{
@@ -99,17 +104,25 @@ export default function AchievementScreen({ meta, onClaim, onClose }) {
               <div className="flex items-start justify-between gap-2 mb-1">
                 <div className="flex-1 min-w-0">
                   <div className="text-[10px] tracking-[0.2em]" style={{ 
-                    color: ach.cat === 'clear' ? PALETTE.dawn 
-                         : ach.cat === 'special' ? PALETTE.accent 
+                    color: ach.cat === 'clear' ? PALETTE.dawn
+                         : ach.cat === 'special' ? PALETTE.accent
                          : ach.cat === 'forge' ? '#c46535'
                          : ach.cat === 'champ' ? PALETTE.legendary
+                         : ach.cat === 'gamble' ? '#e8b04a'
+                         : ach.cat === 'masters' ? '#c46ba3'
+                         : ach.cat === 'raid' ? '#8a2be2'
                          : PALETTE.twilight,
                     opacity: 0.7,
                   }}>
-                    {ach.cat === 'clear' ? '클리어' 
-                     : ach.cat === 'special' ? '특수' 
-                     : ach.cat === 'forge' ? '대장간' 
-                     : ach.cat === 'champ' ? '챔피언십' 
+                    {ach.cat === 'clear' ? '클리어'
+                     : ach.cat === 'special' ? '특수'
+                     : ach.cat === 'forge' ? '대장간'
+                     : ach.cat === 'champ' ? '챔피언십'
+                     : ach.cat === 'gamble' ? '도박장'
+                     : ach.cat === 'masters' ? '마스터즈'
+                     : ach.cat === 'raid' ? '레이드'
+                     : ach.cat === 'tutorial' ? '튜토리얼'
+                     : ach.cat === 'training' ? '수련'
                      : '누적'}
                   </div>
                   <div className="text-sm font-bold" style={{ color: PALETTE.text }}>

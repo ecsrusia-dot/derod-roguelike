@@ -297,19 +297,21 @@ export const ACHIEVEMENTS = [
   { id: 'master_priest', cat: 'clear', class: 'priest', kind: 'count', target: 100, reward: 5000, name: '신앙의 마스터', desc: '여명의 사제로 원정 100회 클리어 (모든 모드, 무한 제외)' },
   
   // === 기발한 업적 (Achievement Hunter) ===
+  // 1.90.0 전면 리뉴얼 (PM 지시): 추적 코드가 없던 11개를 현실적 조건으로 재정의 + 전부 실제 배선
   { id: 'special_first_kill', cat: 'special', kind: 'event', target: 1, reward: 20, name: '첫걸음', desc: '처음으로 적을 처치' },
-  { id: 'special_dodge_only', cat: 'special', kind: 'event', target: 10, reward: 150, name: '무결한 검사', desc: '한 전투 중 회피만으로 적 10마리 처치' },
-  { id: 'special_low_hp_kill', cat: 'special', kind: 'event', target: 1, reward: 100, name: '핏빛 광기', desc: 'HP 1로 적 처치' },
+  { id: 'special_dodge_only', cat: 'special', kind: 'event', target: 1, reward: 150, name: '무결한 검사', desc: '한 전투에서 회피를 5회 이상 발동하고 승리' },
+  { id: 'special_low_hp_kill', cat: 'special', kind: 'event', target: 1, reward: 100, name: '핏빛 광기', desc: 'HP 10% 이하 상태로 전투 승리' },
   { id: 'special_souls_5000', cat: 'meta', kind: 'cumulative', target: 5000, reward: 200, name: '영혼 부자', desc: '영혼 5000 누적 보유' },
-  { id: 'special_no_relic', cat: 'special', kind: 'event', target: 1, reward: 300, name: '미니멀리스트', desc: '유물 없이 원정 클리어' },
-  { id: 'special_no_passive', cat: 'special', kind: 'event', target: 1, reward: 400, name: '공허한 승리', desc: '패시브 1Lv 강화 없이 원정 클리어' },
-  { id: 'special_no_death', cat: 'special', kind: 'event', target: 1, reward: 250, name: '신중한 자', desc: '단 한번도 사망하지 않고 원정 클리어' },
-  { id: 'special_kill_50', cat: 'special', kind: 'event', target: 50, reward: 150, name: '몰살자', desc: '한 챕터에서 적 50마리 처치' },
-  { id: 'special_speed_clear', cat: 'special', kind: 'event', target: 1, reward: 200, name: '광속 클리어', desc: '챕터를 5분 안에 클리어' },
-  { id: 'special_all_lv7', cat: 'special', kind: 'event', target: 1, reward: 350, name: '여명의 의지', desc: '한 런에서 패시브 5종 모두 Lv.7 보유' },
-  { id: 'special_three_curses', cat: 'special', kind: 'event', target: 1, reward: 500, name: '황혼의 손길', desc: '저주 3개 모두 받은 채 원정 클리어' },
-  { id: 'special_event_perfect', cat: 'special', kind: 'event', target: 1, reward: 200, name: '운명의 심판자', desc: '한 런에서 모든 사건 성공' },
-  { id: 'special_wanderer_3ult', cat: 'special', kind: 'event', target: 1, reward: 600, name: '검의 길', desc: '방랑검사 각성 3종 모두 1런에 진화' },
+  { id: 'special_no_relic', cat: 'special', kind: 'event', target: 1, reward: 300, name: '미니멀리스트', desc: '유물 없이 원정 클리어 (튜토리얼·도박장 제외)' },
+  { id: 'special_no_passive', cat: 'special', kind: 'event', target: 1, reward: 400, name: '공허한 승리', desc: '패시브 강화 없이 원정 클리어 (튜토리얼·도박장 제외)' },
+  { id: 'special_no_death', cat: 'special', kind: 'event', target: 1, reward: 250, name: '벼랑 끝의 생환', desc: 'HP 25% 이하 상태로 원정 클리어' },
+  { id: 'special_kill_50', cat: 'special', kind: 'event', target: 1, reward: 150, name: '몰살자', desc: '한 런에서 적 25마리 처치 (무한모드 가능)' },
+  { id: 'special_speed_clear', cat: 'special', kind: 'event', target: 1, reward: 300, name: '황혼의 심연', desc: '무한모드 깊이 5 도달' },
+  { id: 'endless_depth_10', cat: 'special', kind: 'event', target: 1, reward: 800, name: '끝없는 황혼', desc: '무한모드 깊이 10 도달' },
+  { id: 'special_all_lv7', cat: 'special', kind: 'event', target: 1, reward: 350, name: '여명의 의지', desc: '한 런에서 패시브 1종 Lv.7 도달' },
+  { id: 'special_three_curses', cat: 'special', kind: 'event', target: 1, reward: 500, name: '황혼의 손길', desc: '저주 3개 이상 받은 채 원정 클리어' },
+  { id: 'special_event_perfect', cat: 'special', kind: 'event', target: 1, reward: 200, name: '운명의 심판자', desc: '한 런에서 사건 판정 3회 이상 성공 + 실패 0회' },
+  { id: 'special_wanderer_3ult', cat: 'special', kind: 'event', target: 1, reward: 600, name: '검의 길', desc: '방랑검사 심안류 각성 3종을 한 런에 모두 보유하고 클리어' },
   { id: 'special_all_class_e4', cat: 'meta', kind: 'event', target: 5, reward: 3000, name: '미답의 도전자', desc: '5직업 전원으로 원정 클리어 (1.84.1 재매핑)' },
   { id: 'special_max_meta', cat: 'meta', kind: 'event', target: 1, reward: 1000, name: '영혼의 수호자', desc: '영혼 제단 모든 강화 최대 단계' },
   
@@ -373,5 +375,30 @@ export const ACHIEVEMENTS = [
   { id: 'champ_all_hard',    cat: 'champ', kind: 'cumulative', target: 5, reward: 2000, name: '챔피언십 도전자', desc: '모든 챔피언십 원정 하드 클리어' },
   { id: 'champ_all_hell',    cat: 'champ', kind: 'cumulative', target: 5, reward: 3500, name: '챔피언십 지옥자', desc: '모든 챔피언십 원정 지옥 클리어' },
   { id: 'champ_all_madness', cat: 'champ', kind: 'cumulative', target: 5, reward: 5000, name: '챔피언십 정복자', desc: '모든 챔피언십 원정 광기 클리어' },
+
+  // === 황혼의 도박장 (1.90.0 신설 — 1.85.0 콘텐츠) ===
+  { id: 'gamble_first',      cat: 'gamble', kind: 'event', target: 1, reward: 50,   name: '황혼의 도박꾼', desc: '황혼의 도박장 첫 입장' },
+  { id: 'gamble_sweep',      cat: 'gamble', kind: 'event', target: 1, reward: 200,  name: '올인의 승부사', desc: '도박장 3연전 완주 — 판돈 끝까지 배가' },
+  { id: 'gamble_jackpot',    cat: 'gamble', kind: 'event', target: 1, reward: 1000, name: '황혼의 대박', desc: '잭팟 ❂500 당첨 (0.5%)' },
+  { id: 'gamble_pity',       cat: 'gamble', kind: 'event', target: 1, reward: 300,  name: '운명 개척자', desc: '운명의 조각 100개 천장 교환' },
+  { id: 'gamble_coins_2000', cat: 'gamble', kind: 'cumulative', target: 2000, reward: 500, name: '주화 부자', desc: '황혼 주화 누적 2000 획득' },
+
+  // === 마스터즈 · 칭호 (1.90.0 신설 — 1.89.0 콘텐츠) ===
+  { id: 'masters_first_dual',   cat: 'masters', kind: 'event', target: 1, reward: 300,  name: '융합의 개척자', desc: '듀얼 융합 던전 첫 클리어' },
+  { id: 'masters_first_triple', cat: 'masters', kind: 'event', target: 1, reward: 800,  name: '삼중 융합의 정복자', desc: '트리플 융합 던전 첫 클리어' },
+  { id: 'masters_all_dual',     cat: 'masters', kind: 'cumulative', target: 10, reward: 2000,  name: '듀얼 마스터', desc: '듀얼 융합 던전 10종 모두 클리어' },
+  { id: 'masters_all_triple',   cat: 'masters', kind: 'cumulative', target: 10, reward: 4000,  name: '트리플 마스터', desc: '트리플 융합 던전 10종 모두 클리어' },
+  { id: 'title_first',          cat: 'masters', kind: 'event', target: 1, reward: 200,  name: '첫 칭호', desc: '마스터즈 칭호 첫 획득' },
+  { id: 'title_myth',           cat: 'masters', kind: 'event', target: 1, reward: 5000, name: '태초에 닿은 자', desc: '[태초] 등급 칭호 획득 (0.1%)' },
+  { id: 'title_collect_5',      cat: 'masters', kind: 'cumulative', target: 5,  reward: 1000,  name: '칭호 수집가', desc: '칭호 5종 수집 (전 직업 합산)' },
+  { id: 'title_collect_all',    cat: 'masters', kind: 'cumulative', target: 20, reward: 10000, name: '태초의 수집가', desc: '모든 칭호 20종 수집 (5직업 × 4등급)' },
+
+  // === 레이드 (1.90.0 신설 — 1.74.0~1.87.0 콘텐츠) ===
+  { id: 'raid_first_clear',  cat: 'raid', kind: 'event', target: 1, reward: 100,  name: '레이드 입문', desc: '레이드 던전 첫 클리어' },
+  { id: 'raid_clear_100',    cat: 'raid', kind: 'cumulative', target: 100, reward: 1000, name: '심연의 정복자', desc: '레이드 누적 100회 클리어' },
+  { id: 'raid_heroic_clear', cat: 'raid', kind: 'event', target: 1, reward: 300,  name: '영웅의 증명', desc: '영웅 난이도 레이드 첫 클리어' },
+  { id: 'raid_doom_clear',   cat: 'raid', kind: 'event', target: 1, reward: 800,  name: '종막의 정복자', desc: '종막 난이도 레이드 첫 클리어' },
+  { id: 'raid_epic_drop',    cat: 'raid', kind: 'event', target: 1, reward: 300,  name: '에픽의 주인', desc: '에픽 등급 레이드 장비 획득' },
+  { id: 'raid_transcend_20', cat: 'raid', kind: 'event', target: 1, reward: 1000, name: '초월의 끝', desc: '레이드 장비 +20 초월 강화 달성' },
 ];
 

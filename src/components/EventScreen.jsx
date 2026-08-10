@@ -42,6 +42,8 @@ export default function EventScreen({ event, classData, stats, skills = {}, gold
         result.combat = choice.fail.combat;
         result.chain = choice.fail.chain || null;
       }
+      // 1.90.0~ 판정 결과 표식 (운명의 심판자 업적 — App에서 런 단위 집계)
+      result.check = success ? 'ok' : 'fail';
     } else {
       result.text = choice.result || choice.text;
       result.reward = choice.reward;

@@ -124,6 +124,8 @@ import {
   buildGambleExpedition,
   buildMastersChapter,
   buildMastersExpedition,
+  MASTERS_DUALS,
+  MASTERS_TRIPLES,
   CLASS_TITLES,
   rollTitleDrop,
   RAID_DIFFICULTIES,
@@ -290,6 +292,10 @@ export default function App() {
   // 1.81.0~ 일반 던전 반복 — 클리어 시 같은 원정 자동 재출정 (재출정 함수는 ref로 보존)
   const [runRepeat, setRunRepeat] = useState(false);
   const runRestartRef = useRef(null);
+  // 1.90.0~ 런 조건 특수 업적용 카운터 (ref — 고배속 자동에서도 롤백 없음)
+  const runKillsRef = useRef(0);                       // 몰살자: 한 런 처치 수
+  const runEventsRef = useRef({ ok: 0, fail: 0 });     // 운명의 심판자: 사건 판정 성공/실패
+  const initialSkillTotalRef = useRef(null);           // 공허한 승리: 시작 패시브 레벨 합 (null=판정 불가)
   // 업적 화면에서 뒤로갈 때 어디로 갈지 기억 (title 또는 map)
   const [prevAchievementsBack, setPrevAchievementsBack] = useState('title');
   // 업데이트 로그 모달 (firstSeen=true: 자동 표시 / false: 수동 클릭)
@@ -698,6 +704,11 @@ export default function App() {
     setGem(s.gem);
     setRunSouls(s.runSouls || 0);
     setSkills(s.skills || {});
+    // 1.90.0~ 이어하기: 스냅샷 이전 기록을 모르므로 런 조건 업적 카운터는 보수적으로 리셋
+    // (몰살자·심판자는 언더카운트만 발생, 공허한 승리는 null로 판정 자체 스킵 — 오지급 방지)
+    runKillsRef.current = 0;
+    runEventsRef.current = { ok: 0, fail: 0 };
+    initialSkillTotalRef.current = null;
     setStats(s.stats || {});
     setRelics(s.relics || []);
     setUltimates(s.ultimates || []);
@@ -731,7 +742,7 @@ export default function App() {
     // 1.85.0~ 도박장: 입장권 소비 + 판돈·잭팟 초기화
     if (expedition.isGamble) {
       const gdk = getKstDateKey();
-      setMeta(prev => useGambleEntry(prev, gdk));
+      setMeta(prev => completeAchievement(useGambleEntry(prev, gdk), 'gamble_first', 1));
       setGamblePot(0);
       setGambleJackpot(false);
     }
@@ -843,6 +854,10 @@ export default function App() {
         baseSkills[skill] = Math.min(cur + delta, PASSIVE_SKILLS[skill].maxLv);
       }
       setSkills(baseSkills);
+      // 1.90.0~ 런 조건 업적 카운터 초기화 (새 런 시작 시점)
+      runKillsRef.current = 0;
+      runEventsRef.current = { ok: 0, fail: 0 };
+      initialSkillTotalRef.current = Object.values(baseSkills).reduce((s, v) => s + (v || 0), 0);
       // 1.27.0~ 각인 effect 통합: 직업 능력치 + HP 가산
       const _engSlots = meta?.engravings?.[classData.id]?.slots || [];
       const _engFx = aggregateEngravingEffects(classData.id, _engSlots);
@@ -1178,11 +1193,16 @@ export default function App() {
     setVictoryStats(combatStats);
     
     // === 업적 트래킹: 적 처치 === (1.84.0~ 함수형 — 고배속 자동 사냥에서도 롤백 없음)
+    runKillsRef.current += 1;
     setMeta(prev => {
       let m = { ...prev, totalKills: (prev.totalKills || 0) + 1 };
       m = completeAchievement(m, 'special_first_kill', 1);
       m = setAchievementProgress(m, 'meta_kill_100', m.totalKills, 100);
       m = setAchievementProgress(m, 'meta_kill_1000', m.totalKills, 1000);
+      // 1.90.0~ 전투 단위 특수 업적 (전부 리뉴얼 후 첫 배선)
+      if (runKillsRef.current >= 25) m = completeAchievement(m, 'special_kill_50', 1);
+      if (remainingHp <= Math.max(1, Math.floor(maxHp * 0.1))) m = completeAchievement(m, 'special_low_hp_kill', 1);
+      if ((combatStats?.dodges || 0) >= 5) m = completeAchievement(m, 'special_dodge_only', 1);
       const dmKey = getKstDateKey();
       m = trackDailyMission(m, DAILY_MISSIONS.find(x => x.id === 'dm_kill10'), 1, dmKey);
       if (isEliteReward) {
@@ -1245,7 +1265,7 @@ export default function App() {
       setGamblePot(prev => (prev <= 0 ? GAMBLE_CONFIG.potBase : prev * 2));
       if (Math.random() < GAMBLE_CONFIG.jackpotChance) {
         setGambleJackpot(true);
-        setMeta(prev => addTwilightCoins(prev, GAMBLE_CONFIG.jackpotCoins));
+        setMeta(prev => completeAchievement(addTwilightCoins(prev, GAMBLE_CONFIG.jackpotCoins), 'gamble_jackpot', 1));
       }
     }
 
@@ -1493,6 +1513,9 @@ export default function App() {
 
   // 사건 결과 처리
   const handleEventResolve = (resultData) => {
+    // 1.90.0~ 사건 판정 집계 (운명의 심판자 — 판정 없는 일반 선택지는 카운트 제외)
+    if (resultData.check === 'ok') runEventsRef.current.ok += 1;
+    else if (resultData.check === 'fail') runEventsRef.current.fail += 1;
     if (resultData.reward) {
       const reward = resultData.reward;
       if (reward.type === 'gold') setGold(prev => prev + reward.value);
@@ -1788,8 +1811,9 @@ export default function App() {
 
   const handleGambleRedeem = () => {
     setMeta(prev => {
-      const next = redeemFateShards(prev, GAMBLE_CONFIG.shardPity, GAMBLE_CONFIG.shardPityCoins);
+      let next = redeemFateShards(prev, GAMBLE_CONFIG.shardPity, GAMBLE_CONFIG.shardPityCoins);
       if (next === prev) return prev;
+      next = completeAchievement(next, 'gamble_pity', 1);
       saveMeta(next);
       return next;
     });
@@ -1859,6 +1883,12 @@ export default function App() {
             const owned = (newMeta.titles?.[classData.id] || []).includes(dropTitle.id);
             if (!owned) {
               newMeta = addClassTitle(newMeta, classData.id, dropTitle.id);
+              // 1.90.0~ 칭호 업적 (첫 획득 / 태초 / 수집 누적)
+              newMeta = completeAchievement(newMeta, 'title_first', 1);
+              if (dropTier === 'M') newMeta = completeAchievement(newMeta, 'title_myth', 1);
+              const titleCount = Object.values(newMeta.titles || {}).reduce((s, arr) => s + (arr?.length || 0), 0);
+              newMeta = setAchievementProgress(newMeta, 'title_collect_5', titleCount, 5);
+              newMeta = setAchievementProgress(newMeta, 'title_collect_all', titleCount, 20);
               setMastersDrop({ title: dropTitle, tier: dropTier });
             } else {
               mastersBonusSouls = { R: 200, E: 500, L: 1500, M: 5000 }[dropTier] || 0;
@@ -1876,6 +1906,7 @@ export default function App() {
         // 1.85.0~ 도박장 3연전 완주 — 최종 판돈 자동 지급 + 천장 조각
         newMeta = addTwilightCoins(newMeta, gamblePot);
         if (!gambleJackpot) newMeta = addFateShards(newMeta, 1);
+        newMeta = completeAchievement(newMeta, 'gamble_sweep', 1); // 1.90.0~ 3연전 완주
         setGambleResult({ kind: 'clear', coins: gamblePot, jackpot: gambleJackpot, shard: !gambleJackpot });
         setGamblePot(0);
       } else if (currentExpedition.isChampionship) {
@@ -1984,6 +2015,37 @@ export default function App() {
         newMeta = setAchievementProgress(newMeta, 'special_all_class_e4', clearedClassCount, 5);
       }
 
+      // 1.90.0~ 마스터즈 업적 (첫 듀얼·트리플 / 전체 정복 — clearedExpeditions에 fusion id 기록 후)
+      if (currentExpedition.isMasters) {
+        const mk = currentExpedition.mastersKind;
+        newMeta = completeAchievement(newMeta, mk === 'triple' ? 'masters_first_triple' : 'masters_first_dual', 1);
+        const clearedDuals = MASTERS_DUALS.filter(d => (newMeta.clearedExpeditions || []).includes(d.id)).length;
+        const clearedTriples = MASTERS_TRIPLES.filter(d => (newMeta.clearedExpeditions || []).includes(d.id)).length;
+        newMeta = setAchievementProgress(newMeta, 'masters_all_dual', clearedDuals, 10);
+        newMeta = setAchievementProgress(newMeta, 'masters_all_triple', clearedTriples, 10);
+      }
+
+      // 1.90.0~ 런 조건 특수 업적 (리뉴얼 후 첫 배선 — 도박장 3연전은 미니 콘텐츠라 제외)
+      if (!currentExpedition.isGamble) {
+        const isTut = !!currentExpedition.isTutorial;
+        if (!isTut && relics.length === 0) newMeta = completeAchievement(newMeta, 'special_no_relic', 1);
+        if (!isTut && initialSkillTotalRef.current != null) {
+          const curSkillTotal = Object.values(skills).reduce((s, v) => s + (v || 0), 0);
+          if (curSkillTotal <= initialSkillTotalRef.current) newMeta = completeAchievement(newMeta, 'special_no_passive', 1);
+        }
+        if (hp <= Math.max(1, Math.floor(maxHp * 0.25))) newMeta = completeAchievement(newMeta, 'special_no_death', 1);
+        if (Object.values(skills).some(lv => lv >= 7)) newMeta = completeAchievement(newMeta, 'special_all_lv7', 1);
+        if (currentCurses.length >= 3) newMeta = completeAchievement(newMeta, 'special_three_curses', 1);
+        const ev = runEventsRef.current || { ok: 0, fail: 0 };
+        if (ev.ok >= 3 && ev.fail === 0) newMeta = completeAchievement(newMeta, 'special_event_perfect', 1);
+        if (classData?.id === 'wanderer') {
+          const simIds = (ULTIMATE_SKILLS['심안류'] || []).map(u => u.id);
+          if (simIds.length > 0 && simIds.every(id => ultimates.includes(id))) {
+            newMeta = completeAchievement(newMeta, 'special_wanderer_3ult', 1);
+          }
+        }
+      }
+
       // 영혼 부자 (5000 누적 보유) — 영혼 추가 후 체크
       newMeta = setAchievementProgress(newMeta, 'special_souls_5000', newMeta.souls, 5000);
 
@@ -2019,6 +2081,14 @@ export default function App() {
         };
         setCurrentExpedition(scaledExp);
         setEndlessDepth(newDepth);
+        // 1.90.0~ 무한모드 깊이 업적 (황혼의 심연 5 / 끝없는 황혼 10)
+        if (newDepth >= 5) {
+          setMeta(prev => {
+            let m = completeAchievement(prev, 'special_speed_clear', 1);
+            if (newDepth >= 10) m = completeAchievement(m, 'endless_depth_10', 1);
+            return m;
+          });
+        }
         initializeRun(nextChapter, nextChapterIdx, scaledExp);
       } else if (currentExpedition.isChampionship) {
         // 챔피언십이면 ID로
@@ -2098,6 +2168,12 @@ export default function App() {
       if (loot?.secret) next = resolveRaidSecret(next, loot.secret, !!loot.secretSwap); // 1.78.0 기연 (이력+유지/변경)
       // 1.86.0~ 난이도별 클리어 기록 (일반=기존 키, 영웅/종막=@접미 — 상위 난이도 해금 판정용)
       next = recordRaidClear(next, getRaidClearKey(dungeon.id, raidDifficulty?.id));
+      // 1.90.0~ 레이드 업적 (첫 클리어 / 난이도 / 누적 100회)
+      next = completeAchievement(next, 'raid_first_clear', 1);
+      if (raidDifficulty?.id === 'heroic') next = completeAchievement(next, 'raid_heroic_clear', 1);
+      if (raidDifficulty?.id === 'doom') next = completeAchievement(next, 'raid_doom_clear', 1);
+      const totalRaidClears = Object.values(next.raid?.clears || {}).reduce((s, v) => s + (v || 0), 0);
+      next = setAchievementProgress(next, 'raid_clear_100', totalRaidClears, 100);
       // 1.75.0~ 주간 첫 클리어 보상: 심연석 + (심연 레이드는 유니크 이상 확정 장비 1개)
       const weekly = claimRaidWeekly(next, dungeon.id, getKstWeekKey(), dungeon.weeklyStones || 0);
       next = weekly.meta;
@@ -2171,8 +2247,11 @@ export default function App() {
       const cost = RAID_ENHANCE.isTranscend(enh)
         ? { essence: RAID_ENHANCE.essenceCostFor(enh) }
         : { stones: RAID_ENHANCE.costFor(enh) };
-      const next = enhanceRaidItem(prev, classId, slot, cost, RAID_ENHANCE.max);
+      let next = enhanceRaidItem(prev, classId, slot, cost, RAID_ENHANCE.max);
       if (next === prev) return prev;
+      // 1.90.0~ 초월의 끝 업적 — 강화 결과가 최대치(+20) 도달 시
+      const after = next?.raid?.equipped?.[classId]?.[slot];
+      if ((after?.enh || 0) >= RAID_ENHANCE.max) next = completeAchievement(next, 'raid_transcend_20', 1);
       saveMeta(next);
       return next;
     });

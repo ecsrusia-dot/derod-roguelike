@@ -986,9 +986,21 @@ PM이 AskUserQuestion으로 확정한 설계. **던전앤파이터 모티브, "�
 
 | 항목 | 값 |
 |---|---|
-| 브랜치 | `claude/game-ui-ux-redesign-a471kb` (UI 리디자인 시리즈 PR #122~ / 1.72.0 PR #131) |
-| 현재 게임 버전 | **1.72.0** (1.63~1.67 UI 리디자인 → 1.68~1.71 콘텐츠 개편 → **1.72.0 자동 사냥 모드 + 영혼 수급 확장**: 일일 임무 3종 + 도감 발견 보너스 + 풀오토 사냥 AI) |
+| 브랜치 | `claude/set-effect-not-applied-3m931u` (1.79.1~1.90.0 시리즈 — 매 PR 머지 후 `git checkout -B <브랜치> origin/main`으로 재분기) |
+| 현재 게임 버전 | **1.90.0** (1.79~1.81 레이드 백그라운드·자동 사냥 확장 → 1.82 각성 스킬 15종 → 1.83~1.84 자동 전적·업적 롤백 픽스 → 1.85 도박장 → 1.86~1.87 레이드 난이도·초월 → 1.88 Wake Lock → 1.89 마스터즈+칭호 → **1.90.0 업적 전면 개편**: 죽은 업적 11개 부활·리뉴얼 + 신규 콘텐츠 업적 20개) |
+| **PR 머지 정책** | PM 상시 승인 (1.90.0 세션): **PR 생성 후 자동 머지** — 별도 확인 없이 진행 |
 | **다음 세션 브랜치 전략** | 다음 PR은 **`git fetch origin main` + `git checkout -B <새브랜치> origin/main`**으로 최신 main에서 분기 |
+
+### 🏆 업적 시스템 (1.90.0 전면 개편 — 신규 콘텐츠 추가 시 필수 체크)
+
+| 규칙 | 내용 |
+|---|---|
+| **총 103개 / 카테고리 10종** | tutorial·training·clear·special·meta·forge·champ + **gamble·masters·raid** (1.90.0 신설). AchievementScreen 탭·뱃지도 같이 갱신할 것 |
+| **데이터 정의 = 배선 의무** | 1.90.0에서 special_* 11개가 정의만 있고 판정 코드 0으로 영구 미달성이던 버그 해소. **새 업적 추가 시 반드시 추적 코드까지 한 PR에** (데이터 정의 → UI 표시 → 적용 코드 3축 체크리스트와 동일 원칙) |
+| **런 조건 업적 훅** | App.jsx `runKillsRef`(몰살자)/`runEventsRef`(운명의 심판자)/`initialSkillTotalRef`(공허한 승리) — initializeRun idx===0에서 리셋, 이어하기(resume)에서는 보수적 리셋(initialSkillTotal=null → 판정 스킵, 오지급 방지). 클리어 판정은 handleChapterContinue 클리어 분기 |
+| **전투 단위 훅** | CombatScreen `dodgeCountRef` → onVictory 3번째 인자 `{..., dodges}` / EventScreen 판정 결과 `result.check = 'ok'|'fail'` |
+| **storage 내장 훅** | addTwilightCoins(획득분 `twilightCoinsEarned` 누적+주화 부자) / addRaidDrops·spendRaidResourcesForItem(에픽 EP 획득 판정) — 호출 경로 전체 자동 커버 |
+| **함수형 setMeta 필수** | 업적 트래킹은 반드시 `setMeta(prev => ...)` (1.84.0 롤백 사고 재발 방지) |
 
 ### 이번 세션 결과 요약 — 문서 갱신 (코드 변경 0줄)
 
