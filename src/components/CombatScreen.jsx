@@ -833,6 +833,38 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     const intent = enemy.nextIntent;
     const danger = !!(intent && intent.type === 'attack' && (intent.heavy || hpRatio < 0.35));
     const defenseKey = keys.find(k => COMBAT_SKILLS[k].type === 'defense');
+    // ①b 1.91.0~ 방랑검사 전용 3AP 플랜 (PM 지시 — 심안 의도 기반 스킬 순서 고정)
+    //   심안 Lv.5 미만(대략 의도): 공격 예상→참격2+방검 / 방어 예상→참격+관통 / 정보 없음→참격3
+    //   심안 Lv.5 이상(정밀 의도): 대공격 예고(또는 저체력 위험)→참격2+방검 / 방어 스킬→참격+관통 / 일반 공격→참격3
+    //   관통·방검이 CD·에테르 부족("CD에 걸릴때")이면 참격으로 대체 = 참격3
+    //   참격이 봉인(sealedSkills)된 예외 턴만 아래 공용 로직으로 폴백
+    if (classData.id === 'wanderer' && usable('참격')) {
+      const simanLv = getSkillLevel(skills, '심안');
+      const knowIntent = simanLv >= 3 && !engravingFx.disableInsightPredict; // 의도 카드와 동일 조건
+      const heavyTelegraph = !!intent?.heavy; // 대공격 예고는 심안 없이 전 직업 공개
+      let plan = 'slash3';
+      if (knowIntent && simanLv >= 5) {
+        if (heavyTelegraph || (intent?.type === 'attack' && hpRatio < 0.35)) plan = 'guard';
+        else if (intent?.type === 'defend') plan = 'pierce';
+      } else if (knowIntent) {
+        if (intent?.type === 'attack') plan = 'guard';
+        else if (intent?.type === 'defend') plan = 'pierce';
+      } else if (heavyTelegraph) {
+        plan = 'guard';
+      }
+      if (plan === 'guard') {
+        // 참격 ×2 → 마지막 1AP에 방검 (조기 처치 시 방검 절약 — 방어 효과는 사용 시점 무관)
+        if (ap === 1 && usable('방검') && (player.defense || 0) <= 0) return '방검';
+        return '참격';
+      }
+      if (plan === 'pierce') {
+        // 참격(1AP) 선행 → 관통(2AP) — 일섬 연계 +40% 보장. 관통 불가면 참격3 폴백
+        if (ap >= 3) return '참격';
+        if (usable('관통')) return '관통';
+        return '참격';
+      }
+      return '참격'; // slash3
+    }
     // ② 대공격 간파 / 저체력 → 방어 우선
     if (danger && defenseKey && (player.defense || 0) <= 0) return defenseKey;
     // ②b 회복 방어 유지 — 사제 가호(방어 50 + HP 15)처럼 selfHeal 붙은 방어는 저체력에서 선제 사용

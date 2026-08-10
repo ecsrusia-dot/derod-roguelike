@@ -2356,25 +2356,50 @@ export default function App() {
       const physCapable = !!classData?.combatSkills?.some(k => COMBAT_SKILLS[k]?.type === 'physical');
       const pool = currentRewards.filter(r => !(r.type === 'skill' && r.name === '잔혹' && !physCapable));
       const cand = pool.length > 0 ? pool : currentRewards;
-      // 1.72.1~ 직업 맞춤 보상 우선순위:
-      // 저체력 회복 > 궁극 진화 > 직업 전용 패시브(classOnly) >
-      // 보유 패시브 강화(Lv 높은 순 — 7Lv 궁극 진화 가속) > 직업 주력 스탯 >
-      // 새 패시브 > 유물 > 첫 번째
-      const pick =
-        (hpRatio < 0.5 && cand.find(r => r.type === 'heal' || r.type === 'heal_full')) ||
-        cand.find(r => r.type === 'ultimate') ||
-        cand.find(r => r.type === 'skill' && PASSIVE_SKILLS[r.name]?.classOnly === classId) ||
-        cand
-          .filter(r => r.type === 'skill' && (skills[r.name] || 0) > 0)
-          .sort((a, b) => (skills[b.name] || 0) - (skills[a.name] || 0))[0] ||
-        cand.find(r => r.type === 'stat' && r.name === AUTO_STAT_PREF[classId]) ||
-        cand.find(r => r.type === 'skill') ||
-        // 1.73.0~ 유물도 직업 선호 점수순 (물공 직업=물리 유물 / 마공 직업=마공 유물)
-        cand
-          .filter(r => r.type === 'relic')
-          .sort((a, b) => scoreRelicForClass(b, classId) - scoreRelicForClass(a, classId))[0] ||
-        cand[0];
-      later(() => handlePickReward(pick), 900);
+      // 1.91.0~ 방랑검사 전용 (PM 지시): 패시브 획득 우선순위 고정 +
+      //   상위 5순위(심안류·심안·회피·재생·강타)가 하나도 없으면 보석 리롤 1회
+      const WANDERER_SKILL_PRIO = ['심안류', '심안', '회피', '재생', '강타', '잔혹', '신앙', '가속'];
+      let autoRerolled = false;
+      if (classId === 'wanderer') {
+        const top5 = WANDERER_SKILL_PRIO.slice(0, 5);
+        const hasTop5 = cand.some(r => r.type === 'skill' && top5.includes(r.name));
+        // 회복(저체력)·궁극 진화가 있으면 그게 더 상위 픽이라 리롤하지 않음
+        const mustPick = (hpRatio < 0.5 && cand.some(r => r.type === 'heal' || r.type === 'heal_full'))
+          || cand.some(r => r.type === 'ultimate');
+        if (!hasTop5 && !mustPick && !hasRerolled) {
+          const free = hasEffect(skills, 'fateReroll', activeSkills);
+          const cost = free ? 0 : (hasEffect(skills, 'rerollDiscount', activeSkills) ? GAME_CONFIG.rerollDiscountCost : GAME_CONFIG.rerollCost);
+          if (gem >= cost) {
+            const count = hasEffect(skills, 'extraReward', activeSkills) ? 4 : 3;
+            later(() => handleReroll(rollRewards(count, isEliteReward, skills, relics, ultimates, classId, meta, currentExpedition), cost), 700);
+            autoRerolled = true; // 새 보상으로 currentRewards가 갱신되면 이 효과가 다시 돌아 픽 진행
+          }
+        }
+      }
+      if (!autoRerolled) {
+        // 1.72.1~ 직업 맞춤 보상 우선순위:
+        // 저체력 회복 > 궁극 진화 > [방랑검사: PM 지정 8순위] / [그 외: 직업 전용 패시브(classOnly) >
+        // 보유 패시브 강화(Lv 높은 순 — 7Lv 궁극 진화 가속)] > 직업 주력 스탯 >
+        // 새 패시브 > 유물 > 첫 번째
+        const skillPick = classId === 'wanderer'
+          ? WANDERER_SKILL_PRIO.map(name => cand.find(r => r.type === 'skill' && r.name === name)).find(Boolean)
+          : (cand.find(r => r.type === 'skill' && PASSIVE_SKILLS[r.name]?.classOnly === classId) ||
+             cand
+               .filter(r => r.type === 'skill' && (skills[r.name] || 0) > 0)
+               .sort((a, b) => (skills[b.name] || 0) - (skills[a.name] || 0))[0]);
+        const pick =
+          (hpRatio < 0.5 && cand.find(r => r.type === 'heal' || r.type === 'heal_full')) ||
+          cand.find(r => r.type === 'ultimate') ||
+          skillPick ||
+          cand.find(r => r.type === 'stat' && r.name === AUTO_STAT_PREF[classId]) ||
+          cand.find(r => r.type === 'skill') ||
+          // 1.73.0~ 유물도 직업 선호 점수순 (물공 직업=물리 유물 / 마공 직업=마공 유물)
+          cand
+            .filter(r => r.type === 'relic')
+            .sort((a, b) => scoreRelicForClass(b, classId) - scoreRelicForClass(a, classId))[0] ||
+          cand[0];
+        later(() => handlePickReward(pick), 900);
+      }
     } else if (screen === 'expeditionClear') {
       // 1.81.0~ 던전 반복 — 클리어 정산 후 같은 원정 자동 재출정. 반복 OFF면 자동 해제
       // 1.85.0~ 도박장은 반복 제외 (일일 입장권 소모 콘텐츠)
@@ -2429,7 +2454,7 @@ export default function App() {
       else later(() => handleReselectConfirm(selSkills, selRelics), 800);
     }
     return () => { if (t) clearTimeout(t); };
-  }, [screen, autoHunt, autoHuntAllowed, mapData, currentRewards, hp, maxHp, runRepeat, gold]);
+  }, [screen, autoHunt, autoHuntAllowed, mapData, currentRewards, hp, maxHp, runRepeat, gold, gem, hasRerolled]);
 
   return (
     <ResponsiveLayout sidebar={
