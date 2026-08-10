@@ -4,7 +4,7 @@
 import React, { useState } from 'react';
 import { PALETTE } from '../utils/helpers.js';
 
-export default function VictoryScreen({ classData, enemy, gains = { gold: 0, gem: 0, souls: 0 }, onContinue }) {
+export default function VictoryScreen({ classData, enemy, gains = { gold: 0, gem: 0, souls: 0 }, stats = null, onContinue }) {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
   
@@ -64,6 +64,28 @@ export default function VictoryScreen({ classData, enemy, gains = { gold: 0, gem
         }}>
           {enemy?.name ? `「${enemy.name}」을(를) 처치` : '적을 처치'}
         </p>
+        {/* 1.81.0~ 전투 정산 — 출처별 가한 데미지 (상위 4개) */}
+        {stats && stats.total > 0 && (
+          <div className="mx-auto mt-3 px-3 py-2 text-left" style={{
+            maxWidth: 300, background: 'rgba(0,0,0,0.55)', borderRadius: 10,
+            border: '1px solid rgba(255,255,255,0.14)',
+            animation: 'victorySubFade 1.3s ease-out 1.0s both',
+          }}>
+            <div className="flex justify-between items-baseline mb-1">
+              <span className="tracking-[0.2em]" style={{ fontSize: 9, color: PALETTE.dawn }}>전투 정산</span>
+              <span className="tabular-nums" style={{ fontSize: 10, color: PALETTE.text }}>총 <b style={{ color: PALETTE.legendary }}>{stats.total}</b> 데미지</span>
+            </div>
+            {Object.entries(stats.bySource).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([src, dmg]) => (
+              <div key={src} className="flex items-center gap-2" style={{ marginTop: 3 }}>
+                <span className="flex-none truncate" style={{ width: 76, fontSize: 9.5, color: PALETTE.text }}>{src}</span>
+                <div className="flex-1" style={{ height: 6, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${Math.max(4, (dmg / stats.total) * 100)}%`, borderRadius: 999, background: `linear-gradient(90deg, ${PALETTE.legendary}77, ${PALETTE.legendary})` }} />
+                </div>
+                <span className="flex-none tabular-nums text-right" style={{ width: 52, fontSize: 9.5, color: PALETTE.textDim }}>{dmg} ({Math.round((dmg / stats.total) * 100)}%)</span>
+              </div>
+            ))}
+          </div>
+        )}
         {/* 획득 재화 */}
         {(gains.gold > 0 || gains.gem > 0 || gains.souls > 0) && (
           <div className="flex justify-center items-center gap-3 mt-4 flex-wrap" style={{

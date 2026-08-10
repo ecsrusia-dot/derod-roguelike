@@ -123,6 +123,14 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
   // 동기적 액션 락: setPhase는 비동기라 빠른 연타 시 race condition 발생.
   // 이 ref로 클릭 즉시 잠그고, 적 턴 종료 후 해제한다.
   const actionLockRef = useRef(false);
+  // 1.81.0~ 전투 정산 — 출처별 가한 데미지 누적 (승리 시 onVictory 3번째 인자로 전달)
+  const dmgStatsRef = useRef({ total: 0, bySource: {} });
+  const trackDmg = (source, amount) => {
+    if (!amount || amount <= 0) return;
+    const s = dmgStatsRef.current;
+    s.total += amount;
+    s.bySource[source] = (s.bySource[source] || 0) + amount;
+  };
 
   useEffect(() => { logEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [log]);
 
@@ -389,6 +397,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           }
           newEnemy.currentHp = Math.max(0, newEnemy.currentHp - actualDmg);
           totalDmg += actualDmg;
+          trackDmg(skill.name, actualDmg);
           // 1.61.0~ 혈광 Lv.7 흡혈 30% (HP 25% 이하 시) + 소울 스킬 bloodLifesteal buff 50% (3턴)
           if (actualDmg > 0 && classData.id === 'demonblood') {
             let lifestealPct = 0;
@@ -847,7 +856,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       if (hasCurse(curses, 'curse_heal-50')) heal = Math.floor(heal * 0.5);
       finalHp = Math.min(player.maxHp, player.hp + heal);
     }
-    onVictory(finalHp, enemy.drop);
+    // 1.81.0~ 전투 정산 데이터 전달 (출처별 가한 데미지)
+    onVictory(finalHp, enemy.drop, { total: dmgStatsRef.current.total, bySource: { ...dmgStatsRef.current.bySource } });
   };
 
   useEffect(() => {
@@ -911,6 +921,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         // 1.15.0 → 1.15.1: 80 데미지가 일반 적을 한 방에 처치해 반격 버프 발동 기회를 없앤다는 PM 피드백 → 45로 너프
         const cut = 45;
         newEnemy.currentHp = Math.max(0, newEnemy.currentHp - cut);
+        trackDmg('소울 스킬', cut);
         newPlayer.buffs = {
           ...newPlayer.buffs,
           guaranteedCrit: 1,
@@ -932,6 +943,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         const lostHp = Math.max(0, newPlayer.maxHp - newPlayer.hp);
         const cut = Math.max(50, Math.floor(lostHp * 1.5));
         newEnemy.currentHp = Math.max(0, newEnemy.currentHp - cut);
+        trackDmg('소울 스킬', cut);
         // 1.62.0 픽스 #14: 소울 스킬 자체 데미지도 흡혈 적용 (low HP comeback fantasy)
         if (cut > 0) {
           const selfHeal = Math.floor(cut * 0.5);
@@ -960,6 +972,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           cut = Math.floor(cut * 1.5);
         }
         newEnemy.currentHp = Math.max(0, newEnemy.currentHp - cut);
+        trackDmg('소울 스킬', cut);
         // 1.62.0 픽스 #8: skyArrows dodgeBuff와 바람결계 같은 키 충돌 — Math.max로 머지
         const _prevDodgeBuff = newPlayer.buffs?.dodgeBuff || 0;
         const _prevDodgeBuffTurns = newPlayer.buffs?.dodgeBuffTurns || 0;
@@ -989,6 +1002,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
 
         const cut = 80;
         newEnemy.currentHp = Math.max(0, newEnemy.currentHp - cut);
+        trackDmg('소울 스킬', cut);
 
         newPlayer.buffs = {
           ...newPlayer.buffs,
@@ -1012,6 +1026,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         //   이전(1.29.0~1.41.0): 5T 한정 + 치명타 시 폭발 가능. 폭발이 정체성을 흐려 무한 도트로 통일.
         const cut = 50;
         newEnemy.currentHp = Math.max(0, newEnemy.currentHp - cut);
+        trackDmg('소울 스킬', cut);
 
         // 겁화 강제 부여 (영구 지속, 재발동 시 데미지만 갱신)
         const eternalDmg = Math.floor((newPlayer.지능 || 0) * 0.4);
@@ -1123,6 +1138,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         if (hasEffect(skills, 'counterAttack', activeSkills) && Math.random() < 0.5) {
           const counterDmg = Math.floor(15 + Math.random() * 10);
           newEnemy.currentHp = Math.max(0, newEnemy.currentHp - counterDmg);
+          trackDmg('반격', counterDmg);
           newLog.push({ type: 'damage', text: `◆ [회피 Lv.5] 반격 ${counterDmg} 데미지` });
           if (counterDmg > 0) {
             pushFxLabel('enemy', 'damage', counterDmg);
@@ -1588,6 +1604,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
             if (absorbed > 0) counterBreakdown.push(`적 방어 -${absorbed}`);
           }
           newEnemy.currentHp = Math.max(0, newEnemy.currentHp - actualDmg);
+          trackDmg('반격', actualDmg);
           const counterLabel = shadowStrikeBuff && simanLv === 0 && !hasAnyCounterUlt ? '무영의 잔영' : '심안류';
           newLog.push({ type: 'damage', text: `◆ [${counterLabel}] 반격! ${actualDmg} 데미지`, breakdown: counterBreakdown.join(' / ') });
           if (actualDmg > 0) {
@@ -1738,6 +1755,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       const bleedBonus = getMinorBonus(skills, 'bleedDmg+', activeSkills);
       const bleedDmg = newEnemy.debuffs.bleed * (GAME_CONFIG.bleedDmgPerStack + bleedBonus);
       newEnemy.currentHp = Math.max(0, newEnemy.currentHp - bleedDmg);
+      trackDmg('지속 피해', bleedDmg);
       newEnemy.debuffs = {
         ...newEnemy.debuffs,
         bleedTurns: newEnemy.debuffs.bleedTurns - 1,
@@ -1767,6 +1785,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       const igniteDmg = newEnemy.debuffs.igniteDmg;
       // 화염 각인은 항상 방어 무시
       newEnemy.currentHp = Math.max(0, newEnemy.currentHp - igniteDmg);
+      trackDmg('지속 피해', igniteDmg);
       
       // 영겁이 아니면 턴 감소
       const isEternal = newEnemy.debuffs.igniteEternal;
@@ -1795,6 +1814,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       const eternalDmg = newEnemy.debuffs.eternalFireDmg;
       // 겁화도 방어 무시
       newEnemy.currentHp = Math.max(0, newEnemy.currentHp - eternalDmg);
+      trackDmg('지속 피해', eternalDmg);
 
       const isEternal = newEnemy.debuffs.eternalFireEternal;
       if (!isEternal) {
@@ -2008,6 +2028,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           const arrowDmg = Math.floor((newPlayer.민첩 || 0) * 1.5);
           if (arrowDmg > 0 && newEnemy.currentHp > 0) {
             newEnemy.currentHp = Math.max(0, newEnemy.currentHp - arrowDmg);
+            trackDmg('정령 화살', arrowDmg);
             newLog.push({ type: 'damage', text: `🏹 [풍령 Lv.7] 정령 화살 ${arrowDmg} 데미지 [방어 무시]` });
             pushFxLabel('enemy', 'damage', arrowDmg);
             setFxEnemyShake(v => v + 1);

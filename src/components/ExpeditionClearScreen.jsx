@@ -5,7 +5,7 @@ import React from 'react';
 import { PALETTE } from '../utils/helpers.js';
 import { RELICS } from '../data.js';
 
-export default function ExpeditionClearScreen({ expedition, soulsGained, firstClear, onContinue }) {
+export default function ExpeditionClearScreen({ expedition, soulsGained, firstClear, runStats = null, onContinue }) {
   // 신규 해금 유물 정보 찾기
   const newRelic = firstClear?.newRelic ? RELICS.find(r => r.name === firstClear.newRelic) : null;
   const isTutorial = expedition.isTutorial === true;
@@ -47,6 +47,34 @@ export default function ExpeditionClearScreen({ expedition, soulsGained, firstCl
         </div>
       </div>
       
+      {/* 1.81.0~ 런 정산 — 전투 수·총 데미지·스킬 기여도·획득 자원 */}
+      {runStats && runStats.battles > 0 && (
+        <div className="mb-6 px-4 py-3 w-full max-w-sm" style={{
+          background: 'rgba(0,0,0,0.45)', borderRadius: 12,
+          border: '1px solid rgba(255,255,255,0.14)',
+        }}>
+          <div className="text-[9px] tracking-[0.3em] text-center mb-2" style={{ color: PALETTE.dawn }}>━ 원정 정산 ━</div>
+          <div className="flex justify-center gap-4 mb-2 tabular-nums" style={{ fontSize: 11, color: PALETTE.text }}>
+            <span>전투 <b>{runStats.battles}</b>회</span>
+            <span>총 데미지 <b style={{ color: PALETTE.legendary }}>{runStats.totalDmg}</b></span>
+          </div>
+          {Object.entries(runStats.bySource).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([src, dmg]) => (
+            <div key={src} className="flex items-center gap-2" style={{ marginTop: 3 }}>
+              <span className="flex-none truncate" style={{ width: 80, fontSize: 10, color: PALETTE.text }}>{src}</span>
+              <div className="flex-1" style={{ height: 6, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${Math.max(4, (dmg / Math.max(1, runStats.totalDmg)) * 100)}%`, borderRadius: 999, background: `linear-gradient(90deg, ${PALETTE.legendary}77, ${PALETTE.legendary})` }} />
+              </div>
+              <span className="flex-none tabular-nums text-right" style={{ width: 58, fontSize: 9.5, color: PALETTE.textDim }}>{Math.round((dmg / Math.max(1, runStats.totalDmg)) * 100)}%</span>
+            </div>
+          ))}
+          <div className="flex justify-center gap-3 mt-2 pt-2 tabular-nums" style={{ fontSize: 10.5, color: PALETTE.textDim, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+            <span style={{ color: PALETTE.dawn }}>● 은화 +{runStats.gold}</span>
+            <span style={{ color: PALETTE.twilight }}>◆ 보석 +{runStats.gem}</span>
+            <span style={{ color: PALETTE.legendary }}>✦ 영혼 +{runStats.souls}</span>
+          </div>
+        </div>
+      )}
+
       {/* 첫 클리어 시 신규 유물 안내 */}
       {newRelic && (
         <div className="mb-6 px-6 py-4 w-full max-w-sm" style={{
