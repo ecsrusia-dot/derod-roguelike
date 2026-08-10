@@ -1743,6 +1743,17 @@ export default function App() {
         }
       }
       
+      // 1.84.1~ 전문가/마스터/미답의 도전자 재매핑 (PM 결정) — 직업별 원정 클리어 횟수
+      //   기존 "망각의 원정"(미구현 expedition 4)은 카운트 코드가 없어 영구 달성 불가였음
+      //   모든 모드(튜토리얼·수련·일일·챔피언십) 클리어 시 +1. 무한모드는 클리어 개념이 없어 자연 제외
+      if (classData?.id) {
+        newMeta = incrementAchievement(newMeta, `expert_${classData.id}`, 1, 50);
+        newMeta = incrementAchievement(newMeta, `master_${classData.id}`, 1, 100);
+        const clsKeys = ['wanderer', 'sage', 'demonblood', 'elf', 'priest'];
+        const clearedClassCount = clsKeys.filter(c => (newMeta.achievements?.[`expert_${c}`]?.progress || 0) > 0).length;
+        newMeta = setAchievementProgress(newMeta, 'special_all_class_e4', clearedClassCount, 5);
+      }
+
       // 영혼 부자 (5000 누적 보유) — 영혼 추가 후 체크
       newMeta = setAchievementProgress(newMeta, 'special_souls_5000', newMeta.souls, 5000);
 

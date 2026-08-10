@@ -280,19 +280,21 @@ export const ACHIEVEMENTS = [
   { id: 'master10_training_priest', cat: 'training', class: 'priest', kind: 'count', target: 10, reward: 300, 
     name: '사제의 숙달자', desc: '사제의 수련 10회 클리어' },
   
-  // === 전문가 (50회) - 직업당 1개 (가장 어려운 원정 4 기준) ===
-  { id: 'expert_wanderer', cat: 'clear', class: 'wanderer', expedition: 4, kind: 'count', target: 50, reward: 2000, name: '검의 전문가', desc: '방랑검사로 망각의 원정 50회 클리어' },
-  { id: 'expert_sage', cat: 'clear', class: 'sage', expedition: 4, kind: 'count', target: 50, reward: 2000, name: '술법의 전문가', desc: '술법사로 망각의 원정 50회 클리어' },
-  { id: 'expert_demonblood', cat: 'clear', class: 'demonblood', expedition: 4, kind: 'count', target: 50, reward: 2000, name: '마혈의 전문가', desc: '혼혈 마족로 망각의 원정 50회 클리어' },
-  { id: 'expert_elf', cat: 'clear', class: 'elf', expedition: 4, kind: 'count', target: 50, reward: 2000, name: '숲의 전문가', desc: '숲의 정령사로 망각의 원정 50회 클리어' },
-  { id: 'expert_priest', cat: 'clear', class: 'priest', expedition: 4, kind: 'count', target: 50, reward: 2000, name: '신앙의 전문가', desc: '여명의 사제로 망각의 원정 50회 클리어' },
-  
-  // === 마스터 (100회) - 직업당 1개 ===
-  { id: 'master_wanderer', cat: 'clear', class: 'wanderer', expedition: 4, kind: 'count', target: 100, reward: 5000, name: '검의 마스터', desc: '방랑검사로 망각의 원정 100회 클리어' },
-  { id: 'master_sage', cat: 'clear', class: 'sage', expedition: 4, kind: 'count', target: 100, reward: 5000, name: '술법의 마스터', desc: '술법사로 망각의 원정 100회 클리어' },
-  { id: 'master_demonblood', cat: 'clear', class: 'demonblood', expedition: 4, kind: 'count', target: 100, reward: 5000, name: '마혈의 마스터', desc: '혼혈 마족로 망각의 원정 100회 클리어' },
-  { id: 'master_elf', cat: 'clear', class: 'elf', expedition: 4, kind: 'count', target: 100, reward: 5000, name: '숲의 마스터', desc: '숲의 정령사로 망각의 원정 100회 클리어' },
-  { id: 'master_priest', cat: 'clear', class: 'priest', expedition: 4, kind: 'count', target: 100, reward: 5000, name: '신앙의 마스터', desc: '여명의 사제로 망각의 원정 100회 클리어' },
+  // === 전문가 (50회) - 직업당 1개 ===
+  // 1.84.1 재매핑 (PM 결정): "망각의 원정"(미구현 expedition 4 참조 — 영구 달성 불가)에서
+  // "직업별 원정 클리어 횟수"(튜토리얼·수련·일일·챔피언십 전부, 무한 제외)로 변경. 카운트는 1.84.1부터.
+  { id: 'expert_wanderer', cat: 'clear', class: 'wanderer', kind: 'count', target: 50, reward: 2000, name: '검의 전문가', desc: '방랑검사로 원정 50회 클리어 (모든 모드, 무한 제외)' },
+  { id: 'expert_sage', cat: 'clear', class: 'sage', kind: 'count', target: 50, reward: 2000, name: '술법의 전문가', desc: '술법사로 원정 50회 클리어 (모든 모드, 무한 제외)' },
+  { id: 'expert_demonblood', cat: 'clear', class: 'demonblood', kind: 'count', target: 50, reward: 2000, name: '마혈의 전문가', desc: '혼혈 마족으로 원정 50회 클리어 (모든 모드, 무한 제외)' },
+  { id: 'expert_elf', cat: 'clear', class: 'elf', kind: 'count', target: 50, reward: 2000, name: '숲의 전문가', desc: '숲의 정령사로 원정 50회 클리어 (모든 모드, 무한 제외)' },
+  { id: 'expert_priest', cat: 'clear', class: 'priest', kind: 'count', target: 50, reward: 2000, name: '신앙의 전문가', desc: '여명의 사제로 원정 50회 클리어 (모든 모드, 무한 제외)' },
+
+  // === 마스터 (100회) - 직업당 1개 === (1.84.1 재매핑 — 위와 동일)
+  { id: 'master_wanderer', cat: 'clear', class: 'wanderer', kind: 'count', target: 100, reward: 5000, name: '검의 마스터', desc: '방랑검사로 원정 100회 클리어 (모든 모드, 무한 제외)' },
+  { id: 'master_sage', cat: 'clear', class: 'sage', kind: 'count', target: 100, reward: 5000, name: '술법의 마스터', desc: '술법사로 원정 100회 클리어 (모든 모드, 무한 제외)' },
+  { id: 'master_demonblood', cat: 'clear', class: 'demonblood', kind: 'count', target: 100, reward: 5000, name: '마혈의 마스터', desc: '혼혈 마족으로 원정 100회 클리어 (모든 모드, 무한 제외)' },
+  { id: 'master_elf', cat: 'clear', class: 'elf', kind: 'count', target: 100, reward: 5000, name: '숲의 마스터', desc: '숲의 정령사로 원정 100회 클리어 (모든 모드, 무한 제외)' },
+  { id: 'master_priest', cat: 'clear', class: 'priest', kind: 'count', target: 100, reward: 5000, name: '신앙의 마스터', desc: '여명의 사제로 원정 100회 클리어 (모든 모드, 무한 제외)' },
   
   // === 기발한 업적 (Achievement Hunter) ===
   { id: 'special_first_kill', cat: 'special', kind: 'event', target: 1, reward: 20, name: '첫걸음', desc: '처음으로 적을 처치' },
@@ -308,7 +310,7 @@ export const ACHIEVEMENTS = [
   { id: 'special_three_curses', cat: 'special', kind: 'event', target: 1, reward: 500, name: '황혼의 손길', desc: '저주 3개 모두 받은 채 원정 클리어' },
   { id: 'special_event_perfect', cat: 'special', kind: 'event', target: 1, reward: 200, name: '운명의 심판자', desc: '한 런에서 모든 사건 성공' },
   { id: 'special_wanderer_3ult', cat: 'special', kind: 'event', target: 1, reward: 600, name: '검의 길', desc: '방랑검사 각성 3종 모두 1런에 진화' },
-  { id: 'special_all_class_e4', cat: 'meta', kind: 'event', target: 5, reward: 3000, name: '미답의 도전자', desc: '모든 직업으로 망각 원정 클리어' },
+  { id: 'special_all_class_e4', cat: 'meta', kind: 'event', target: 5, reward: 3000, name: '미답의 도전자', desc: '5직업 전원으로 원정 클리어 (1.84.1 재매핑)' },
   { id: 'special_max_meta', cat: 'meta', kind: 'event', target: 1, reward: 1000, name: '영혼의 수호자', desc: '영혼 제단 모든 강화 최대 단계' },
   
   // === 누적 업적 ===
