@@ -169,5 +169,18 @@ export const CHAPTERS = [
     enemies: { normal: ['demonScout', 'wrathDemon', 'riftBreach'], elite: ['demonApostle'], boss: 'nakzelionShadow' },
     gimmick: { id: 'surge', name: '마기 폭주', desc: '양측 모든 데미지 +10%' },
   },
+  // 1.85.0~ 황혼의 도박장 — 기존 챕터 1·2 적 풀 재사용 3연전 (일반→강적→보스)
+  //   boss가 배열이면 노드 진입 시 랜덤 픽 (App handleEnterNode 1.85.0 확장)
+  {
+    id: 'gamble_arena', name: '황혼의 도박장', sub: 'Twilight Gamble',
+    desc: '판돈을 걸고 세 판 승부. 물러날 타이밍은 스스로 정한다.',
+    nodeCount: 3, biome: 'gamble', color: '#e8b04a',
+    linearSequence: ['battle', 'elite', 'boss'],
+    enemies: {
+      normal: ['goblin', 'iceWolf', 'tundraRaider', 'fallenElf', 'shadowWolf', 'corruptSpider'],
+      elite: ['frostGiant', 'wraith', 'forestSpirit', 'forestTyrant'],
+      boss: ['iceMage', 'twilightChild'],
+    },
+  },
 ];
 

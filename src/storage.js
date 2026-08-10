@@ -61,6 +61,10 @@ const DEFAULT_META = {
   // 1.84.0~ 자동 사냥 전적 로그 — 런 종료(클리어/전멸)마다 조합·결과 기록 (최근 300건)
   // entry: { t, cls, exp, diff, res: 'clear'|'defeat', bt, dmg, sk: [패시브], rl: [유물], ul: [각성 id] }
   autoRunLog: [],
+  // 1.85.0~ 황혼의 도박장 — 전용 재화 + 일일 입장 기록
+  twilightCoins: 0,   // 황혼 주화 (도박장 전용 재화)
+  fateShards: 0,      // 운명의 조각 (잭팟 천장 — 100개 = 주화 500)
+  gambleDaily: null,  // { date: 'YYYYMMDD', used: N } — KST 자정 리셋
   // 1.74.0~ 레이드 (본편과 분리된 성장 축)
   // inventory: 미장착 장비 배열 / equipped[classId][slot] = item / clears[dungeonId] = 클리어 횟수
   raid: {
@@ -580,6 +584,47 @@ export function useEndlessSkip(meta, dateKey, souls) {
 // ============================================
 // 1.74.0~ 레이드 장비/클리어 헬퍼
 // ============================================
+// =============================================
+// 1.85.0~ 황혼의 도박장 (재화·일일 제한)
+// =============================================
+
+export function getGambleUsed(meta, dateKey) {
+  const g = meta?.gambleDaily;
+  return g && g.date === dateKey ? (g.used || 0) : 0;
+}
+
+export function useGambleEntry(meta, dateKey) {
+  const used = getGambleUsed(meta, dateKey);
+  return { ...meta, gambleDaily: { date: dateKey, used: used + 1 } };
+}
+
+export function addTwilightCoins(meta, n) {
+  if (!n) return meta;
+  return { ...meta, twilightCoins: Math.max(0, (meta.twilightCoins || 0) + n) };
+}
+
+export function addFateShards(meta, n) {
+  if (!n) return meta;
+  return { ...meta, fateShards: Math.max(0, (meta.fateShards || 0) + n) };
+}
+
+// 천장 교환 — 조각 shardCost개 → 주화 coins. 부족하면 원본 반환
+export function redeemFateShards(meta, shardCost, coins) {
+  if ((meta?.fateShards || 0) < shardCost) return meta;
+  return { ...meta, fateShards: meta.fateShards - shardCost, twilightCoins: (meta.twilightCoins || 0) + coins };
+}
+
+// 전용 상점 구매 — 주화 부족 시 null (호출부에서 무시)
+export function buyGambleShopItem(meta, item) {
+  if (!item || (meta?.twilightCoins || 0) < item.cost) return null;
+  let m = { ...meta, twilightCoins: meta.twilightCoins - item.cost };
+  if (item.grant?.souls) m = addSouls(m, item.grant.souls);
+  if (item.grant?.stones || item.grant?.essence) {
+    m = addRaidResources(m, { stones: item.grant.stones || 0, essence: item.grant.essence || 0 });
+  }
+  return m;
+}
+
 // =============================================
 // 1.84.0~ 자동 사냥 전적 로그 (최적 조합 분석용)
 // =============================================

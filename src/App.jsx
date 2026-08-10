@@ -67,6 +67,7 @@ import RaidScreen from './components/RaidScreen.jsx';
 import RaidBattleScreen from './components/RaidBattleScreen.jsx';
 import AutoHuntOverlay, { AutoHuntSummaryModal } from './components/AutoHuntOverlay.jsx';
 import AutoStatsScreen from './components/AutoStatsScreen.jsx';
+import GambleLobbyScreen, { GambleChoiceScreen } from './components/GambleScreen.jsx';
 import NodeInfoModal from './components/NodeInfoModal.jsx';
 import BossIntroScreen from './components/BossIntroScreen.jsx';
 import PCSidebar from './components/PCSidebar.jsx';
@@ -119,10 +120,12 @@ import {
   rollCraftedRaidItem,
   rollGachaRaidItem,
   backfillRaidSeries,
+  GAMBLE_CONFIG,
+  buildGambleExpedition,
 } from './data.js';
 import { getKstDateKey } from './utils/dailyChallenge.js';
 import { simulateBestEndlessRun } from './utils/endlessSkipSim.js';
-import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear, dismantleRaidItem, dismantleRaidJunk, enhanceRaidItem, claimRaidWeekly, addRaidResources, spendRaidResourcesForItem, resolveRaidSecret, toggleRaidFormation, appendAutoRunLog } from './storage.js';
+import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear, dismantleRaidItem, dismantleRaidJunk, enhanceRaidItem, claimRaidWeekly, addRaidResources, spendRaidResourcesForItem, resolveRaidSecret, toggleRaidFormation, appendAutoRunLog, getGambleUsed, useGambleEntry, addTwilightCoins, addFateShards, redeemFateShards, buyGambleShopItem } from './storage.js';
 
 
 
@@ -288,9 +291,9 @@ export default function App() {
   // 1.72.0~ 자동 사냥 모드 — 노드 선택·스킬 선택·보상 선택 모두 자동
   // 허용 범위: 수련의 길(training) + 무한모드(endless)만. 사망/원정 클리어 시 자동 해제.
   const [autoHunt, setAutoHunt] = useState(false);
-  // 1.80.0~ 자동 사냥 배속 (×1 / ×5 / ×10) — 자동 사냥 중에만 연출·진행 딜레이 압축
+  // 1.80.0~ 자동 사냥 배속 (×1 / ×5 / ×10 / ×20) — 자동 사냥 중에만 연출·진행 딜레이 압축
   const [autoSpeed, setAutoSpeed] = useState(1);
-  const cycleAutoSpeed = () => setAutoSpeed(s => (s === 1 ? 5 : s === 5 ? 10 : 1));
+  const cycleAutoSpeed = () => setAutoSpeed(s => (s === 1 ? 5 : s === 5 ? 10 : s === 10 ? 20 : 1));
   // 1.81.0~ 자동 사냥 대기화면 — 자동 켤 때마다 표시, [관전]으로 숨김 가능
   const [autoOverlayHidden, setAutoOverlayHidden] = useState(false);
   // 1.83.0~ 자동 사냥 세션 — 자동 ON~OFF 동안 런 수·클리어·전멸·합산 획득 추적
@@ -505,6 +508,8 @@ export default function App() {
     if (!metaLoaded) return;
     if (screen !== 'map') return;
     if (!chapter || !mapData || !currentExpedition) return;
+    // 1.85.0~ 도박장 런은 이어하기 스냅샷 제외 (판돈·잭팟 상태가 스냅샷에 없어 복원 불가)
+    if (currentExpedition.isGamble) return;
     const snapshot = {
       v: 1,
       selectedClass,
@@ -675,6 +680,13 @@ export default function App() {
     // 1.84.0 픽스: 함수 클로저 대신 인자만 저장 — 이전엔 오래된 startExpedition 클로저가
     // 재출정 시 그 시점 메타 스냅샷으로 setMeta 해 직전 런의 업적·영혼·처치 기록을 롤백시켰음
     runRestartRef.current = { kind: 'expedition', expedition };
+    // 1.85.0~ 도박장: 입장권 소비 + 판돈·잭팟 초기화
+    if (expedition.isGamble) {
+      const gdk = getKstDateKey();
+      setMeta(prev => useGambleEntry(prev, gdk));
+      setGamblePot(0);
+      setGambleJackpot(false);
+    }
 
     // === 업적 트래킹: 원정 시도 === (1.84.0~ 함수형 — 오래된 클로저 메타 롤백 방지)
     setMeta(prev => {
@@ -972,7 +984,9 @@ export default function App() {
       setIsBossReward(false);
       setScreen('combat');
     } else if (nodeType === 'boss') {
-      const enemyKey = chapter.enemies.boss;
+      // 1.85.0~ 도박장: boss가 배열이면 랜덤 픽
+      const bossPool = chapter.enemies.boss;
+      const enemyKey = Array.isArray(bossPool) ? bossPool[Math.floor(Math.random() * bossPool.length)] : bossPool;
       setCurrentEnemy(enemyKey);
       setMeta(prev => recordCodex(prev, 'enemies', enemyKey));
       setIsBossReward(true);
@@ -1174,6 +1188,15 @@ export default function App() {
       souls: soulGain + chapterBonusSouls
     });
 
+    // 1.85.0~ 도박장: 승리마다 판돈 배가 (10 → 20 → 40) + 0.5% 잭팟 즉시 지급
+    if (currentExpedition?.isGamble) {
+      setGamblePot(prev => (prev <= 0 ? GAMBLE_CONFIG.potBase : prev * 2));
+      if (Math.random() < GAMBLE_CONFIG.jackpotChance) {
+        setGambleJackpot(true);
+        setMeta(prev => addTwilightCoins(prev, GAMBLE_CONFIG.jackpotCoins));
+      }
+    }
+
     // 1.83.0~ 자동 사냥 세션 합산 (자동 중에만 — 종료 요약 모달용)
     if (autoHunt) {
       setAutoSession(prev => {
@@ -1239,7 +1262,8 @@ export default function App() {
       // 원정 클리어 처리 (영혼 보너스 합산 등은 handleChapterContinue에서 처리)
       handleChapterContinue();
     } else {
-      setScreen('reward');
+      // 1.85.0~ 도박장: 일반/강적 승리 후 [챙기기 vs 더블 업] 선택 화면 (계속 시 보상 픽으로)
+      setScreen(currentExpedition?.isGamble ? 'gambleChoice' : 'reward');
     }
     setVictoryNextScreen(null);
   };
@@ -1265,6 +1289,12 @@ export default function App() {
     newMeta = clearActiveRun(newMeta);
     // 1.84.0~ 자동 사냥 전적 기록 (전멸)
     if (autoHunt) newMeta = appendAutoRunLog(newMeta, buildAutoRunEntry('defeat'));
+    // 1.85.0~ 도박장 전멸 — 판돈 소멸, 잭팟 없던 런은 천장 조각 +1
+    if (currentExpedition?.isGamble) {
+      if (!gambleJackpot) newMeta = addFateShards(newMeta, 1);
+      setGambleResult({ kind: 'defeat', coins: 0, jackpot: gambleJackpot, shard: !gambleJackpot });
+      setGamblePot(0);
+    }
     setMeta(newMeta);
     setRunSouls(recoveredSouls);  // 화면 표시용
     setScreen('defeat');
@@ -1614,6 +1644,62 @@ export default function App() {
   };
 
   // 챕터 클리어 → 다음 챕터 / 원정 클리어
+  // ============================================
+  // 1.85.0~ 황혼의 도박장
+  // ============================================
+  // 판돈 (승리마다 ×2: 10 → 20 → 40. 챙기거나 클리어해야 지급, 전멸 시 소멸)
+  const [gamblePot, setGamblePot] = useState(0);
+  // 이번 런 잭팟 발생 여부 (발생 시 조각 천장 미지급)
+  const [gambleJackpot, setGambleJackpot] = useState(false);
+  // 로비 결과 배너 { kind: 'bank'|'clear'|'defeat', coins, jackpot, shard }
+  const [gambleResult, setGambleResult] = useState(null);
+
+  const handleGambleEnter = () => {
+    const dk = getKstDateKey();
+    if (getGambleUsed(meta, dk) >= GAMBLE_CONFIG.dailyLimit) return;
+    setGambleResult(null);
+    setSelectedExpedition(buildGambleExpedition());
+    setScreen('classSelect');
+  };
+
+  const handleGambleBuy = (item) => {
+    setMeta(prev => {
+      const next = buyGambleShopItem(prev, item);
+      if (!next) return prev;
+      saveMeta(next);
+      return next;
+    });
+  };
+
+  const handleGambleRedeem = () => {
+    setMeta(prev => {
+      const next = redeemFateShards(prev, GAMBLE_CONFIG.shardPity, GAMBLE_CONFIG.shardPityCoins);
+      if (next === prev) return prev;
+      saveMeta(next);
+      return next;
+    });
+  };
+
+  // [챙기기] — 현재 판돈 확정 지급 후 런 종료 → 로비 복귀
+  const handleGambleBank = () => {
+    const pot = gamblePot;
+    const jackpot = gambleJackpot;
+    setMeta(prev => {
+      let m = addTwilightCoins(prev, pot);
+      if (!jackpot) m = addFateShards(m, 1); // 천장 — 잭팟 없던 런만 조각 +1
+      m = clearActiveRun(m);
+      saveMeta(m);
+      return m;
+    });
+    setGambleResult({ kind: 'bank', coins: pot, jackpot, shard: !jackpot });
+    setGamblePot(0);
+    setCurrentExpedition(null);
+    setCurrentCurses([]);
+    setPendingChainEvents([]);
+    setRunSouls(0);
+    setScreen('gamble');
+  };
+
   // 1.84.0~ 자동 사냥 전적 엔트리 — 런 종료 시점의 조합(패시브·유물·각성) + 결과 스냅샷
   const buildAutoRunEntry = (result) => ({
     t: Date.now(),
@@ -1649,7 +1735,13 @@ export default function App() {
       newMeta = trackDailyMission(newMeta, DAILY_MISSIONS.find(m => m.id === 'dm_clear1'), 1, getKstDateKey());
       
       // 챔피언십 vs 클래식 분기
-      if (currentExpedition.isChampionship) {
+      if (currentExpedition.isGamble) {
+        // 1.85.0~ 도박장 3연전 완주 — 최종 판돈 자동 지급 + 천장 조각
+        newMeta = addTwilightCoins(newMeta, gamblePot);
+        if (!gambleJackpot) newMeta = addFateShards(newMeta, 1);
+        setGambleResult({ kind: 'clear', coins: gamblePot, jackpot: gambleJackpot, shard: !gambleJackpot });
+        setGamblePot(0);
+      } else if (currentExpedition.isChampionship) {
         const champId = currentExpedition.championshipId;
         const diffId = currentExpedition.difficultyId;
         const wasFirstClear = !hasChampionshipClear(newMeta, champId, diffId);
@@ -1746,7 +1838,8 @@ export default function App() {
       // 1.84.1~ 전문가/마스터/미답의 도전자 재매핑 (PM 결정) — 직업별 원정 클리어 횟수
       //   기존 "망각의 원정"(미구현 expedition 4)은 카운트 코드가 없어 영구 달성 불가였음
       //   모든 모드(튜토리얼·수련·일일·챔피언십) 클리어 시 +1. 무한모드는 클리어 개념이 없어 자연 제외
-      if (classData?.id) {
+      // 도박장 3연전은 미니 콘텐츠라 전문가/마스터 카운트에서 제외
+      if (classData?.id && !currentExpedition.isGamble) {
         newMeta = incrementAchievement(newMeta, `expert_${classData.id}`, 1, 50);
         newMeta = incrementAchievement(newMeta, `master_${classData.id}`, 1, 100);
         const clsKeys = ['wanderer', 'sage', 'demonblood', 'elf', 'priest'];
@@ -1810,6 +1903,8 @@ export default function App() {
   
   // 원정 클리어 화면 → 메인 메뉴
   const handleExpeditionClearContinue = () => {
+    // 1.85.0~ 도박장 런이었으면 로비로 복귀 (결과 배너 표시)
+    const wasGamble = !!currentExpedition?.isGamble;
     setCurrentExpedition(null);
     setCurrentCurses([]);
     setPendingChainEvents([]);
@@ -1817,18 +1912,20 @@ export default function App() {
     setSelectedChampionship(null);
     setSelectedDifficulty(null);
     setMeta(prev => clearActiveRun(prev));
-    setScreen('title');
+    setScreen(wasGamble ? 'gamble' : 'title');
   };
   
   // 사망 화면 → 메인 메뉴
   const handleDefeatContinue = () => {
+    // 1.85.0~ 도박장 런이었으면 로비로 복귀 (결과 배너 표시)
+    const wasGamble = !!currentExpedition?.isGamble;
     setCurrentExpedition(null);
     setCurrentCurses([]);
     setPendingChainEvents([]);
     setRunSouls(0);
     setSelectedChampionship(null);
     setSelectedDifficulty(null);
-    setScreen('title');
+    setScreen(wasGamble ? 'gamble' : 'title');
   };
 
   // 1.73.0~ 무한던전 스킵 — 하루 5회, 실전투 시뮬로 보상 계산 후 즉시 지급
@@ -2021,6 +2118,9 @@ export default function App() {
       }
     } else if (screen === 'victory') {
       later(handleVictoryContinue, 900);
+    } else if (screen === 'gambleChoice') {
+      // 1.85.0~ 자동 사냥은 도박사 정신 — 항상 더블 업 (끝까지 간다)
+      later(() => setScreen('reward'), 1000);
     } else if (screen === 'reward' && currentRewards && currentRewards.length > 0) {
       const hpRatio = maxHp > 0 ? hp / maxHp : 1;
       const classId = classData?.id;
@@ -2050,7 +2150,8 @@ export default function App() {
       later(() => handlePickReward(pick), 900);
     } else if (screen === 'expeditionClear') {
       // 1.81.0~ 던전 반복 — 클리어 정산 후 같은 원정 자동 재출정. 반복 OFF면 자동 해제
-      if (runRepeat && runRestartRef.current) {
+      // 1.85.0~ 도박장은 반복 제외 (일일 입장권 소모 콘텐츠)
+      if (runRepeat && runRestartRef.current && !currentExpedition?.isGamble) {
         later(() => {
           // 1.84.0 픽스: ref에는 인자만 있고, 함수는 이 렌더의 최신 것을 사용
           //   (오래된 클로저의 startExpedition이 이전 메타 스냅샷으로 롤백하던 버그 방지)
@@ -2172,8 +2273,10 @@ export default function App() {
               onSelectGuest={handleSelectGuest} 
               onSelectGoogle={handleSelectGoogle} 
             />}
-            {screen === 'title' && authMode && <TitleScreen meta={meta} onStart={() => setScreen('expeditionSelect')} onResume={resumeActiveRun} onAltar={enterAltar} onEngravings={() => setScreen('engraving')} onRaid={raidUnlocked ? () => setScreen('raid') : null} onAchievements={() => { setPrevAchievementsBack('title'); setScreen('achievements'); }} onAutoStats={() => setScreen('autoStats')} onChangelog={() => setShowChangelog({ firstSeen: false })} onAccount={() => setScreen('account')} />}
+            {screen === 'title' && authMode && <TitleScreen meta={meta} onStart={() => setScreen('expeditionSelect')} onResume={resumeActiveRun} onAltar={enterAltar} onEngravings={() => setScreen('engraving')} onRaid={raidUnlocked ? () => setScreen('raid') : null} onAchievements={() => { setPrevAchievementsBack('title'); setScreen('achievements'); }} onAutoStats={() => setScreen('autoStats')} onGamble={raidUnlocked ? () => { setGambleResult(null); setScreen('gamble'); } : null} onChangelog={() => setShowChangelog({ firstSeen: false })} onAccount={() => setScreen('account')} />}
             {screen === 'autoStats' && <AutoStatsScreen meta={meta} onClose={() => setScreen('title')} />}
+            {screen === 'gamble' && <GambleLobbyScreen meta={meta} result={gambleResult} onEnter={handleGambleEnter} onBuy={handleGambleBuy} onRedeem={handleGambleRedeem} onBack={() => { setGambleResult(null); setScreen('title'); }} />}
+            {screen === 'gambleChoice' && currentExpedition?.isGamble && <GambleChoiceScreen pot={gamblePot} jackpot={gambleJackpot} onContinue={() => setScreen('reward')} onBank={handleGambleBank} />}
             {screen === 'raid' && <RaidScreen meta={meta} onEnterDungeon={(d) => { if (raidDungeon) { setScreen('raidBattle'); return; } setRaidDungeon(d); setScreen('raidBattle'); }} onEquipItem={handleRaidEquip} onAutoEquip={handleRaidAutoEquip} onDismantle={handleRaidDismantle} onDismantleJunk={handleRaidDismantleJunk} onEnhance={handleRaidEnhance} onCraft={handleRaidCraft} onGacha={handleRaidGacha} onToggleFormation={handleRaidFormation} onBack={() => setScreen('title')} />}
             {screen === 'account' && <AccountScreen 
               authMode={authMode} 
