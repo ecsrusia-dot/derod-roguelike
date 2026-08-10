@@ -66,6 +66,7 @@ import CombatScreen from './components/CombatScreen.jsx';
 import RaidScreen from './components/RaidScreen.jsx';
 import RaidBattleScreen from './components/RaidBattleScreen.jsx';
 import AutoHuntOverlay, { AutoHuntSummaryModal } from './components/AutoHuntOverlay.jsx';
+import AutoStatsScreen from './components/AutoStatsScreen.jsx';
 import NodeInfoModal from './components/NodeInfoModal.jsx';
 import BossIntroScreen from './components/BossIntroScreen.jsx';
 import PCSidebar from './components/PCSidebar.jsx';
@@ -121,7 +122,7 @@ import {
 } from './data.js';
 import { getKstDateKey } from './utils/dailyChallenge.js';
 import { simulateBestEndlessRun } from './utils/endlessSkipSim.js';
-import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear, dismantleRaidItem, dismantleRaidJunk, enhanceRaidItem, claimRaidWeekly, addRaidResources, spendRaidResourcesForItem, resolveRaidSecret, toggleRaidFormation } from './storage.js';
+import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear, dismantleRaidItem, dismantleRaidJunk, enhanceRaidItem, claimRaidWeekly, addRaidResources, spendRaidResourcesForItem, resolveRaidSecret, toggleRaidFormation, appendAutoRunLog } from './storage.js';
 
 
 
@@ -668,16 +669,20 @@ export default function App() {
     setCurrentCurses(curses);
     setPendingChainEvents([]);
     setRunSouls(0);
-    // 1.81.0~ 런 정산 초기화 + 반복 재출정 함수 보존
+    // 1.81.0~ 런 정산 초기화 + 반복 재출정 정보 보존
     setRunStats(null);
     setVictoryStats(null);
-    runRestartRef.current = () => startExpedition(expedition);
+    // 1.84.0 픽스: 함수 클로저 대신 인자만 저장 — 이전엔 오래된 startExpedition 클로저가
+    // 재출정 시 그 시점 메타 스냅샷으로 setMeta 해 직전 런의 업적·영혼·처치 기록을 롤백시켰음
+    runRestartRef.current = { kind: 'expedition', expedition };
 
-    // === 업적 트래킹: 원정 시도 ===
-    let trackedMeta = { ...meta, totalRuns: (meta.totalRuns || 0) + 1 };
-    trackedMeta = setAchievementProgress(trackedMeta, 'meta_runs_10', trackedMeta.totalRuns, 10);
-    trackedMeta = setAchievementProgress(trackedMeta, 'meta_runs_100', trackedMeta.totalRuns, 100);
-    setMeta(trackedMeta);
+    // === 업적 트래킹: 원정 시도 === (1.84.0~ 함수형 — 오래된 클로저 메타 롤백 방지)
+    setMeta(prev => {
+      let m = { ...prev, totalRuns: (prev.totalRuns || 0) + 1 };
+      m = setAchievementProgress(m, 'meta_runs_10', m.totalRuns, 10);
+      m = setAchievementProgress(m, 'meta_runs_100', m.totalRuns, 100);
+      return m;
+    });
     
     // 활성 패시브/유물 초기화 (prep 노드에서 결정될 때까지 null = 모두 비활성)
     setActiveSkills(null);
@@ -725,16 +730,18 @@ export default function App() {
     setCurrentCurses(curses);
     setPendingChainEvents([]);
     setRunSouls(0);
-    // 1.81.0~ 런 정산 초기화 + 반복 재출정 함수 보존
+    // 1.81.0~ 런 정산 초기화 + 반복 재출정 정보 보존 (1.84.0 픽스 — 인자만 저장)
     setRunStats(null);
     setVictoryStats(null);
-    runRestartRef.current = () => startChampionship(championship, difficulty);
+    runRestartRef.current = { kind: 'championship', championship, difficulty };
 
-    // 업적 트래킹
-    let trackedMeta = { ...meta, totalRuns: (meta.totalRuns || 0) + 1 };
-    trackedMeta = setAchievementProgress(trackedMeta, 'meta_runs_10', trackedMeta.totalRuns, 10);
-    trackedMeta = setAchievementProgress(trackedMeta, 'meta_runs_100', trackedMeta.totalRuns, 100);
-    setMeta(trackedMeta);
+    // 업적 트래킹 (1.84.0~ 함수형 — 오래된 클로저 메타 롤백 방지)
+    setMeta(prev => {
+      let m = { ...prev, totalRuns: (prev.totalRuns || 0) + 1 };
+      m = setAchievementProgress(m, 'meta_runs_10', m.totalRuns, 10);
+      m = setAchievementProgress(m, 'meta_runs_100', m.totalRuns, 100);
+      return m;
+    });
     
     setActiveSkills(null);
     setActiveRelicNames(null);
@@ -1104,20 +1111,19 @@ export default function App() {
     // 1.81.0~ 전투 정산 (VictoryScreen 표시용)
     setVictoryStats(combatStats);
     
-    // === 업적 트래킹: 적 처치 ===
-    let trackedMeta = { ...meta, totalKills: (meta.totalKills || 0) + 1 };
-    // 첫걸음 (첫 처치)
-    trackedMeta = completeAchievement(trackedMeta, 'special_first_kill', 1);
-    // 누적 처치 카운터
-    trackedMeta = setAchievementProgress(trackedMeta, 'meta_kill_100', trackedMeta.totalKills, 100);
-    trackedMeta = setAchievementProgress(trackedMeta, 'meta_kill_1000', trackedMeta.totalKills, 1000);
-    // 1.72.0~ 일일 임무: 처치 / 강적 처치
-    const dmKey = getKstDateKey();
-    trackedMeta = trackDailyMission(trackedMeta, DAILY_MISSIONS.find(m => m.id === 'dm_kill10'), 1, dmKey);
-    if (isEliteReward) {
-      trackedMeta = trackDailyMission(trackedMeta, DAILY_MISSIONS.find(m => m.id === 'dm_elite3'), 1, dmKey);
-    }
-    setMeta(trackedMeta);
+    // === 업적 트래킹: 적 처치 === (1.84.0~ 함수형 — 고배속 자동 사냥에서도 롤백 없음)
+    setMeta(prev => {
+      let m = { ...prev, totalKills: (prev.totalKills || 0) + 1 };
+      m = completeAchievement(m, 'special_first_kill', 1);
+      m = setAchievementProgress(m, 'meta_kill_100', m.totalKills, 100);
+      m = setAchievementProgress(m, 'meta_kill_1000', m.totalKills, 1000);
+      const dmKey = getKstDateKey();
+      m = trackDailyMission(m, DAILY_MISSIONS.find(x => x.id === 'dm_kill10'), 1, dmKey);
+      if (isEliteReward) {
+        m = trackDailyMission(m, DAILY_MISSIONS.find(x => x.id === 'dm_elite3'), 1, dmKey);
+      }
+      return m;
+    });
     
     // 드랍 적용 (저주: 획득 은화 -50%) + 획득량 추적
     let goldGained = 0;
@@ -1257,6 +1263,8 @@ export default function App() {
     // 런 종료 — 영혼 보상 적용 + 진행 중 스냅샷 정리
     let newMeta = recoveredSouls > 0 ? addSouls(meta, recoveredSouls) : meta;
     newMeta = clearActiveRun(newMeta);
+    // 1.84.0~ 자동 사냥 전적 기록 (전멸)
+    if (autoHunt) newMeta = appendAutoRunLog(newMeta, buildAutoRunEntry('defeat'));
     setMeta(newMeta);
     setRunSouls(recoveredSouls);  // 화면 표시용
     setScreen('defeat');
@@ -1606,6 +1614,20 @@ export default function App() {
   };
 
   // 챕터 클리어 → 다음 챕터 / 원정 클리어
+  // 1.84.0~ 자동 사냥 전적 엔트리 — 런 종료 시점의 조합(패시브·유물·각성) + 결과 스냅샷
+  const buildAutoRunEntry = (result) => ({
+    t: Date.now(),
+    cls: classData?.id || null,
+    exp: currentExpedition?.isChampionship ? currentExpedition.championshipId : (currentExpedition?.id || null),
+    diff: currentExpedition?.difficultyId || null,
+    res: result,
+    bt: runStats?.battles || 0,
+    dmg: runStats?.totalDmg || 0,
+    sk: (activeSkills && activeSkills.length > 0 ? activeSkills : Object.keys(skills || {}).filter(n => (skills[n] || 0) > 0)).slice(0, 8),
+    rl: (activeRelicNames || relics.map(r => r.name)).slice(0, 8),
+    ul: (ultimates || []).slice(0, 6),
+  });
+
   const handleChapterContinue = () => {
     if (!currentExpedition) {
       setScreen('title');
@@ -1723,7 +1745,10 @@ export default function App() {
       
       // 영혼 부자 (5000 누적 보유) — 영혼 추가 후 체크
       newMeta = setAchievementProgress(newMeta, 'special_souls_5000', newMeta.souls, 5000);
-      
+
+      // 1.84.0~ 자동 사냥 전적 기록 (클리어)
+      if (autoHunt) newMeta = appendAutoRunLog(newMeta, buildAutoRunEntry('clear'));
+
       setMeta(newMeta);
       
       setRunSouls(totalSouls);  // 화면에 표시용
@@ -2010,11 +2035,14 @@ export default function App() {
       // 1.81.0~ 던전 반복 — 클리어 정산 후 같은 원정 자동 재출정. 반복 OFF면 자동 해제
       if (runRepeat && runRestartRef.current) {
         later(() => {
-          const restart = runRestartRef.current;
+          // 1.84.0 픽스: ref에는 인자만 있고, 함수는 이 렌더의 최신 것을 사용
+          //   (오래된 클로저의 startExpedition이 이전 메타 스냅샷으로 롤백하던 버그 방지)
+          const r = runRestartRef.current;
           // 1.83.0~ 세션: 클리어 +1, 런 카운터 +1 (재출정)
           setAutoSession(prev => prev ? { ...prev, clears: prev.clears + 1, runCount: prev.runCount + 1 } : prev);
           handleExpeditionClearContinue();
-          restart();
+          if (r?.kind === 'championship') startChampionship(r.championship, r.difficulty);
+          else if (r?.kind === 'expedition') startExpedition(r.expedition);
         }, 1800);
       } else {
         // 1.83.0~ 세션: 마지막 런 클리어 기록 후 자동 해제 → 요약 모달
@@ -2127,7 +2155,8 @@ export default function App() {
               onSelectGuest={handleSelectGuest} 
               onSelectGoogle={handleSelectGoogle} 
             />}
-            {screen === 'title' && authMode && <TitleScreen meta={meta} onStart={() => setScreen('expeditionSelect')} onResume={resumeActiveRun} onAltar={enterAltar} onEngravings={() => setScreen('engraving')} onRaid={raidUnlocked ? () => setScreen('raid') : null} onAchievements={() => { setPrevAchievementsBack('title'); setScreen('achievements'); }} onChangelog={() => setShowChangelog({ firstSeen: false })} onAccount={() => setScreen('account')} />}
+            {screen === 'title' && authMode && <TitleScreen meta={meta} onStart={() => setScreen('expeditionSelect')} onResume={resumeActiveRun} onAltar={enterAltar} onEngravings={() => setScreen('engraving')} onRaid={raidUnlocked ? () => setScreen('raid') : null} onAchievements={() => { setPrevAchievementsBack('title'); setScreen('achievements'); }} onAutoStats={() => setScreen('autoStats')} onChangelog={() => setShowChangelog({ firstSeen: false })} onAccount={() => setScreen('account')} />}
+            {screen === 'autoStats' && <AutoStatsScreen meta={meta} onClose={() => setScreen('title')} />}
             {screen === 'raid' && <RaidScreen meta={meta} onEnterDungeon={(d) => { if (raidDungeon) { setScreen('raidBattle'); return; } setRaidDungeon(d); setScreen('raidBattle'); }} onEquipItem={handleRaidEquip} onAutoEquip={handleRaidAutoEquip} onDismantle={handleRaidDismantle} onDismantleJunk={handleRaidDismantleJunk} onEnhance={handleRaidEnhance} onCraft={handleRaidCraft} onGacha={handleRaidGacha} onToggleFormation={handleRaidFormation} onBack={() => setScreen('title')} />}
             {screen === 'account' && <AccountScreen 
               authMode={authMode} 
