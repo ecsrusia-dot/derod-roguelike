@@ -50,6 +50,9 @@ import { FloatingLabel, DamageVignette, WhiteFlash, SlashFx, MagicImpactFx, Magi
 export default function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimates = [], initialRelics = [], activeSkills = null, activeRelicNames = null, enemyKey, isBoss, expedition, curses = [], meta, engravingFx = {}, chapterGimmick = null, autoPlay = false, autoSpeed = 1, onCycleAutoSpeed = null, autoRunCount = 0, onToggleAuto = null, onVictory, onDefeat }) {
   // 1.80.0~ 자동 사냥 배속 — 자동 중에만 내부 진행·연출 딜레이 압축 (수동 플레이는 원속도)
   const dly = (ms) => (autoPlay && autoSpeed > 1 ? Math.max(40, Math.round(ms / autoSpeed)) : ms);
+  // 1.89.0~ 마스터즈 기믹 융합 — chapterGimmick이 배열이면 전부 동시 적용
+  const gimmicks = Array.isArray(chapterGimmick) ? chapterGimmick : (chapterGimmick ? [chapterGimmick] : []);
+  const hasGimmick = (id) => gimmicks.some(g => g?.id === id);
   const [player, setPlayer] = useState(() => buildInitialPlayer({
     initialPlayer, initialSkills, initialUltimates, activeSkills, meta, curses,
   }));
@@ -232,9 +235,12 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     }
 
     // 1.71.0~ 챕터 기믹 — 전투 시작 안내 + 봉인의 잔향(ch3)은 즉시 적용
-    if (chapterGimmick) {
-      initialLog.push({ type: 'debuff', text: `◈ [${chapterGimmick.name}] ${chapterGimmick.desc}` });
-      if (chapterGimmick.id === 'sealEcho') {
+    // 1.89.0~ 배열(기믹 융합)이면 전부 안내·적용
+    gimmicks.forEach(g => {
+      initialLog.push({ type: 'debuff', text: `◈ [${g.name}] ${g.desc}` });
+    });
+    if (gimmicks.length > 0) {
+      if (hasGimmick('sealEcho')) {
         const sealable = (classData?.combatSkills || []).filter(key => {
           const sk = COMBAT_SKILLS[key];
           return sk && ((sk.cost || 0) > 0 || (sk.cd || 0) > 0);
@@ -395,7 +401,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
             actualDmg += Math.floor(actualDmg * (skill.comboBonusPct || 0) / 100);
           }
           // 1.71.0 챕터 기믹 — 마기 폭주(ch4): 양측 데미지 +10% (플레이어 측)
-          if (chapterGimmick?.id === 'surge' && actualDmg > 0) {
+          if (hasGimmick('surge') && actualDmg > 0) {
             actualDmg += Math.floor(actualDmg * 0.1);
           }
           // 1.62.0 픽스 #5: "다음 공격" buff 클리어는 hitCount 루프 OUT으로 이동
@@ -1205,7 +1211,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
             }
           }
           // 1.71.0 챕터 기믹 — 마기 폭주(ch4): 양측 데미지 +10% (적 측)
-          if (chapterGimmick?.id === 'surge') {
+          if (hasGimmick('surge')) {
             const surgeBonus = Math.floor(dmg * 0.1);
             if (surgeBonus > 0) {
               dmg += surgeBonus;
@@ -2155,17 +2161,25 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
 
     // 1.71.0~ 챕터 기믹 틱 — 혹한(ch1) 3턴마다 / 부패의 안개(ch2) 4턴째부터 누적
     // 플레이어는 기믹으로 죽지 않음 (최소 1 HP 보장) — 적은 죽을 수 있음
-    if (chapterGimmick?.id === 'frost' && newTurn % 3 === 0) {
+    if (hasGimmick('frost') && newTurn % 3 === 0) {
       const chill = 5;
       newPlayer.hp = Math.max(1, newPlayer.hp - chill);
       newEnemy.currentHp = Math.max(0, newEnemy.currentHp - chill);
       newLog.push({ type: 'debuff', text: `❄️ [혹한] 한파가 몰아친다 — 양측 HP -${chill}` });
     }
-    if (chapterGimmick?.id === 'decay' && newTurn >= 4) {
+    if (hasGimmick('decay') && newTurn >= 4) {
       const rot = (newTurn - 3) * 3;
       newPlayer.hp = Math.max(1, newPlayer.hp - rot);
       newEnemy.currentHp = Math.max(0, newEnemy.currentHp - rot);
       newLog.push({ type: 'debuff', text: `☠ [부패의 안개] 부패가 스며든다 — 양측 HP -${rot}` });
+    }
+    // 1.89.0~ 마스터즈 dawn 기믹 — 여명의 재생: 적이 매 턴 최대 HP의 3% 자가 회복
+    if (hasGimmick('dawnheal') && newEnemy.currentHp > 0) {
+      const regen = Math.floor(newEnemy.hp * 0.03);
+      if (regen > 0 && newEnemy.currentHp < newEnemy.hp) {
+        newEnemy.currentHp = Math.min(newEnemy.hp, newEnemy.currentHp + regen);
+        newLog.push({ type: 'debuff', text: `✨ [여명의 재생] 적이 빛으로 회복 — HP +${regen}` });
+      }
     }
     if (newEnemy.currentHp <= 0) {
       setPlayer(newPlayer); setEnemy(newEnemy); setLog(newLog); setTurn(newTurn);

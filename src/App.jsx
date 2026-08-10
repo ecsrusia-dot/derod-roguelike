@@ -122,6 +122,10 @@ import {
   backfillRaidSeries,
   GAMBLE_CONFIG,
   buildGambleExpedition,
+  buildMastersChapter,
+  buildMastersExpedition,
+  CLASS_TITLES,
+  rollTitleDrop,
   RAID_DIFFICULTIES,
   getRaidClearKey,
   applyRaidDifficulty,
@@ -129,7 +133,7 @@ import {
 } from './data.js';
 import { getKstDateKey } from './utils/dailyChallenge.js';
 import { simulateBestEndlessRun } from './utils/endlessSkipSim.js';
-import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, applyEngravingSlot, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear, dismantleRaidItem, dismantleRaidJunk, enhanceRaidItem, claimRaidWeekly, addRaidResources, spendRaidResourcesForItem, resolveRaidSecret, toggleRaidFormation, appendAutoRunLog, getGambleUsed, useGambleEntry, addTwilightCoins, addFateShards, redeemFateShards, buyGambleShopItem } from './storage.js';
+import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, applyEngravingSlot, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear, dismantleRaidItem, dismantleRaidJunk, enhanceRaidItem, claimRaidWeekly, addRaidResources, spendRaidResourcesForItem, resolveRaidSecret, toggleRaidFormation, appendAutoRunLog, getGambleUsed, useGambleEntry, addTwilightCoins, addFateShards, redeemFateShards, buyGambleShopItem, addClassTitle, equipClassTitle } from './storage.js';
 
 
 
@@ -550,7 +554,8 @@ export default function App() {
     if (screen !== 'map') return;
     if (!chapter || !mapData || !currentExpedition) return;
     // 1.85.0~ 도박장 런은 이어하기 스냅샷 제외 (판돈·잭팟 상태가 스냅샷에 없어 복원 불가)
-    if (currentExpedition.isGamble) return;
+    // 1.89.0~ 마스터즈도 제외 (합성 챕터·보스 체인이 스냅샷에 없어 복원 불가)
+    if (currentExpedition.isGamble || currentExpedition.isMasters) return;
     const snapshot = {
       v: 1,
       selectedClass,
@@ -1028,6 +1033,10 @@ export default function App() {
       // 1.85.0~ 도박장: boss가 배열이면 랜덤 픽
       const bossPool = chapter.enemies.boss;
       const enemyKey = Array.isArray(bossPool) ? bossPool[Math.floor(Math.random() * bossPool.length)] : bossPool;
+      // 1.89.0~ 마스터즈: 보스 페이즈 체인 — 첫 보스 진입, 나머지는 연속 처치 큐
+      if (Array.isArray(chapter.bossChain) && chapter.bossChain.length > 1) {
+        setBossChain(chapter.bossChain.slice(1));
+      }
       setCurrentEnemy(enemyKey);
       setMeta(prev => recordCodex(prev, 'enemies', enemyKey));
       setIsBossReward(true);
@@ -1276,6 +1285,15 @@ export default function App() {
     });
 
     if (isBossReward) {
+      // 1.89.0~ 마스터즈 보스 페이즈 체인 — 다음 페이즈 즉시 진입 (회복·보상 화면 없음, HP 이월)
+      if (currentExpedition?.isMasters && bossChain.length > 0) {
+        const [nextBoss, ...restChain] = bossChain;
+        setBossChain(restChain);
+        setCurrentEnemy(nextBoss);
+        setMeta(prev => recordCodex(prev, 'enemies', nextBoss));
+        setScreen('bossIntro');
+        return;
+      }
       // 마지막 챕터 보스 처치 → 원정 클리어 화면, 그 외 → 챕터 클리어
       const isLastChapter = currentExpedition && chapterIdx >= currentExpedition.chapters.length - 1;
       setVictoryNextScreen(isLastChapter ? 'expeditionClear' : 'chapterClear');
@@ -1695,6 +1713,49 @@ export default function App() {
   // 로비 결과 배너 { kind: 'bank'|'clear'|'defeat', coins, jackpot, shard }
   const [gambleResult, setGambleResult] = useState(null);
 
+  // ============================================
+  // 1.89.0~ 마스터즈 퓨전 던전
+  // ============================================
+  const [selectedMasters, setSelectedMasters] = useState(null); // fusion 객체 | null
+  // 보스 페이즈 체인 — 남은 보스 키 (2/3페이즈 연속 처치)
+  const [bossChain, setBossChain] = useState([]);
+  // 클리어 시 칭호 드랍 결과 { title, tier, dup?, souls? } | null
+  const [mastersDrop, setMastersDrop] = useState(null);
+
+  const startMasters = (fusion) => {
+    setMeta(prev => clearActiveRun(prev));
+    const exp = buildMastersExpedition(fusion);
+    const chapterData = buildMastersChapter(fusion);
+    setCurrentExpedition(exp);
+    setCurrentCurses([]);
+    setPendingChainEvents([]);
+    setRunSouls(0);
+    setRunStats(null);
+    setVictoryStats(null);
+    setBossChain([]);
+    setMastersDrop(null);
+    runRestartRef.current = { kind: 'masters', fusion };
+    // 업적 트래킹 (함수형 — 롤백 방지)
+    setMeta(prev => {
+      let m = { ...prev, totalRuns: (prev.totalRuns || 0) + 1 };
+      m = setAchievementProgress(m, 'meta_runs_10', m.totalRuns, 10);
+      m = setAchievementProgress(m, 'meta_runs_100', m.totalRuns, 100);
+      return m;
+    });
+    setActiveSkills(null);
+    setActiveRelicNames(null);
+    initializeRun(chapterData, 0, exp, []);
+  };
+
+  const handleEquipTitle = (classId, titleId) => {
+    setMeta(prev => {
+      const next = equipClassTitle(prev, classId, titleId);
+      if (next === prev) return prev;
+      saveMeta(next);
+      return next;
+    });
+  };
+
   const handleGambleEnter = () => {
     const dk = getKstDateKey();
     if (getGambleUsed(meta, dk) >= GAMBLE_CONFIG.dailyLimit) return;
@@ -1786,6 +1847,28 @@ export default function App() {
       // 1.72.0~ 일일 임무: 원정 1회 클리어
       newMeta = trackDailyMission(newMeta, DAILY_MISSIONS.find(m => m.id === 'dm_clear1'), 1, getKstDateKey());
       
+      // 1.89.0~ 마스터즈 클리어 — 칭호 드랍 롤 (직업별 별도, 중복 시 영혼 보상)
+      let mastersBonusSouls = 0;
+      if (currentExpedition.isMasters && classData?.id) {
+        const dropTier = rollTitleDrop(currentExpedition.mastersKind);
+        if (dropTier) {
+          const dropTitle = (CLASS_TITLES[classData.id] || []).find(t => t.tier === dropTier);
+          if (dropTitle) {
+            const owned = (newMeta.titles?.[classData.id] || []).includes(dropTitle.id);
+            if (!owned) {
+              newMeta = addClassTitle(newMeta, classData.id, dropTitle.id);
+              setMastersDrop({ title: dropTitle, tier: dropTier });
+            } else {
+              mastersBonusSouls = { R: 200, E: 500, L: 1500, M: 5000 }[dropTier] || 0;
+              newMeta = addSouls(newMeta, mastersBonusSouls);
+              setMastersDrop({ title: dropTitle, tier: dropTier, dup: true, souls: mastersBonusSouls });
+            }
+          }
+        } else {
+          setMastersDrop(null);
+        }
+      }
+
       // 챔피언십 vs 클래식 분기
       if (currentExpedition.isGamble) {
         // 1.85.0~ 도박장 3연전 완주 — 최종 판돈 자동 지급 + 천장 조각
@@ -1906,8 +1989,8 @@ export default function App() {
       if (autoHunt) newMeta = appendAutoRunLog(newMeta, buildAutoRunEntry('clear'));
 
       setMeta(newMeta);
-      
-      setRunSouls(totalSouls);  // 화면에 표시용
+
+      setRunSouls(totalSouls + mastersBonusSouls);  // 화면에 표시용 (칭호 중복 보상 포함)
       setScreen('expeditionClear');
     } else {
       // 다음 챕터
@@ -1963,6 +2046,8 @@ export default function App() {
     setRunSouls(0);
     setSelectedChampionship(null);
     setSelectedDifficulty(null);
+    setSelectedMasters(null);
+    setBossChain([]);
     setMeta(prev => clearActiveRun(prev));
     setScreen(wasGamble ? 'gamble' : 'title');
   };
@@ -1977,6 +2062,8 @@ export default function App() {
     setRunSouls(0);
     setSelectedChampionship(null);
     setSelectedDifficulty(null);
+    setSelectedMasters(null);
+    setBossChain([]);
     setScreen(wasGamble ? 'gamble' : 'title');
   };
 
@@ -2219,6 +2306,7 @@ export default function App() {
           setAutoSession(prev => prev ? { ...prev, clears: prev.clears + 1, runCount: prev.runCount + 1 } : prev);
           handleExpeditionClearContinue();
           if (r?.kind === 'championship') startChampionship(r.championship, r.difficulty);
+          else if (r?.kind === 'masters') startMasters(r.fusion);
           else if (r?.kind === 'expedition') startExpedition(r.expedition);
         }, 1800);
       } else {
@@ -2346,14 +2434,16 @@ export default function App() {
               onLinkGoogle={handleLinkGoogle} 
               onClose={() => setScreen('title')} 
             />}
-            {screen === 'classSelect' && <ClassSelect meta={meta} selected={selectedClass} onSelect={setSelectedClass} onNext={() => setScreen('start')} onBack={() => { 
-              // 챔피언십 흐름이면 difficulty로, 일반은 expedition으로
-              if (selectedChampionship) setScreen('championshipDifficulty');
-              else setScreen('expeditionSelect'); 
+            {screen === 'classSelect' && <ClassSelect meta={meta} selected={selectedClass} onSelect={setSelectedClass} onNext={() => setScreen('start')} onBack={() => {
+              // 마스터즈/챔피언십 흐름 분기, 일반은 expedition으로
+              if (selectedMasters) { setSelectedMasters(null); setScreen('expeditionSelect'); }
+              else if (selectedChampionship) setScreen('championshipDifficulty');
+              else setScreen('expeditionSelect');
             }} isChampionship={!!selectedChampionship} />}
-            {screen === 'expeditionSelect' && <ExpeditionSelect meta={meta} 
-              onSelect={(exp) => { 
-                setSelectedExpedition(exp); 
+            {screen === 'expeditionSelect' && <ExpeditionSelect meta={meta}
+              onSelect={(exp) => {
+                setSelectedExpedition(exp);
+                setSelectedMasters(null);
                 // 튜토리얼/수련: 직업 강제. 직업 선택 화면 건너뛰고 바로 시작
                 if (typeof exp.forcedClassId === 'number') {
                   setSelectedClass(exp.forcedClassId);
@@ -2362,8 +2452,10 @@ export default function App() {
                   // 일반 원정: 직업 선택 (현재는 없음, 미래 대비)
                   setScreen('classSelect');
                 }
-              }} 
-              onSelectChampionship={(champ) => { setSelectedChampionship(champ); setScreen('championshipDifficulty'); }}
+              }}
+              onSelectChampionship={(champ) => { setSelectedChampionship(champ); setSelectedMasters(null); setScreen('championshipDifficulty'); }}
+              onSelectMasters={(fusion) => { setSelectedMasters(fusion); setSelectedChampionship(null); setSelectedDifficulty(null); setSelectedExpedition(null); setScreen('classSelect'); }}
+              onEquipTitle={handleEquipTitle}
               onEndlessSkip={handleEndlessSkip}
               onBack={() => setScreen('title')} />}
             {screen === 'championshipDifficulty' && selectedChampionship && <ChampionshipDifficultySelect 
@@ -2374,8 +2466,9 @@ export default function App() {
                 setScreen('classSelect');
               }}
               onBack={() => { setSelectedChampionship(null); setScreen('expeditionSelect'); }} />}
-            {screen === 'start' && <StartScreen classData={classData} onContinue={() => { 
-              if (selectedChampionship && selectedDifficulty) startChampionship(selectedChampionship, selectedDifficulty);
+            {screen === 'start' && <StartScreen classData={classData} onContinue={() => {
+              if (selectedMasters) startMasters(selectedMasters);
+              else if (selectedChampionship && selectedDifficulty) startChampionship(selectedChampionship, selectedDifficulty);
               else if (selectedExpedition) startExpedition(selectedExpedition);
             }} />}
             {screen === 'altar' && <SoulAltar meta={meta} slots={altarSlots} onPurchase={purchaseUpgrade} onReroll={rerollAltar} onBack={() => setScreen('title')} />}
@@ -2394,7 +2487,7 @@ export default function App() {
             {screen === 'shop' && <ShopScreen gold={gold} skills={skills} relics={relics} ultimates={ultimates} curses={currentCurses} autoPlay={autoHunt} autoSpeed={autoSpeed} onBuy={handleShopBuy} onLeave={handleShopLeave} classId={classData?.id} />}
             {screen === 'forge' && <ForgeScreen relics={relics} skills={skills} activeRelicNames={activeRelicNames} meta={meta} onCombine={handleForgeCombine} onLeave={handleForgeLeave} />}
             {screen === 'chapterClear' && chapter && <ChapterClearScreen chapter={chapter} isLastChapter={false} hp={hp} maxHp={maxHp} meta={meta} curses={currentCurses} onContinue={handleChapterContinue} />}
-            {screen === 'expeditionClear' && currentExpedition && <ExpeditionClearScreen expedition={currentExpedition} soulsGained={runSouls} firstClear={runFirstChampClear} runStats={runStats} onContinue={handleExpeditionClearContinue} />}
+            {screen === 'expeditionClear' && currentExpedition && <ExpeditionClearScreen expedition={currentExpedition} soulsGained={runSouls} firstClear={runFirstChampClear} runStats={runStats} titleDrop={currentExpedition.isMasters ? mastersDrop : null} onContinue={handleExpeditionClearContinue} />}
             {screen === 'defeat' && <DefeatScreen classData={classData} chapter={chapter} soulsGained={runSouls} onContinue={handleDefeatContinue} />}
             {screen === 'status' && (() => {
               const _baseStats = { ...classData.stats, ...stats };

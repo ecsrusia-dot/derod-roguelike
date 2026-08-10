@@ -3,9 +3,9 @@
 // ============================================
 import React from 'react';
 import { PALETTE } from '../utils/helpers.js';
-import { RELICS } from '../data.js';
+import { RELICS, TITLE_TIERS } from '../data.js';
 
-export default function ExpeditionClearScreen({ expedition, soulsGained, firstClear, runStats = null, onContinue }) {
+export default function ExpeditionClearScreen({ expedition, soulsGained, firstClear, runStats = null, titleDrop = null, onContinue }) {
   // 신규 해금 유물 정보 찾기
   const newRelic = firstClear?.newRelic ? RELICS.find(r => r.name === firstClear.newRelic) : null;
   const isTutorial = expedition.isTutorial === true;
@@ -47,6 +47,28 @@ export default function ExpeditionClearScreen({ expedition, soulsGained, firstCl
         </div>
       </div>
       
+      {/* 1.89.0~ 마스터즈 칭호 드랍 배너 */}
+      {titleDrop && (
+        <div className="mb-6 px-6 py-4 w-full max-w-sm text-center" style={{
+          background: 'rgba(232,176,74,0.12)', borderRadius: 12,
+          border: `2px solid ${TITLE_TIERS[titleDrop.tier]?.color || PALETTE.legendary}`,
+          boxShadow: `0 0 30px ${TITLE_TIERS[titleDrop.tier]?.color || PALETTE.legendary}60`,
+        }}>
+          <div className="text-[10px] tracking-[0.3em] mb-1" style={{ color: TITLE_TIERS[titleDrop.tier]?.color }}>
+            ◆ [{TITLE_TIERS[titleDrop.tier]?.name}] 칭호 {titleDrop.dup ? '중복' : '획득'} ◆
+          </div>
+          <div className="text-lg font-bold" style={{
+            color: TITLE_TIERS[titleDrop.tier]?.color, fontFamily: '"Cinzel", serif',
+            textShadow: `0 0 14px ${TITLE_TIERS[titleDrop.tier]?.color}88`,
+          }}>「{titleDrop.title.name}」</div>
+          <div className="text-[10.5px] mt-1.5" style={{ color: PALETTE.text }}>
+            {titleDrop.dup
+              ? `이미 보유 — 영혼 +${titleDrop.souls} 대체 지급`
+              : `${titleDrop.title.desc} · 원정 선택 → 마스터즈 탭에서 장착`}
+          </div>
+        </div>
+      )}
+
       {/* 1.81.0~ 런 정산 — 전투 수·총 데미지·스킬 기여도·획득 자원 */}
       {runStats && runStats.battles > 0 && (
         <div className="mb-6 px-4 py-3 w-full max-w-sm" style={{

@@ -15,6 +15,7 @@ import {
   ENGRAVING_AWAKENING_TABLE,
   CHAMPIONSHIP_EXP_IDS,
   CLASSES,
+  CLASS_TITLES,
 } from '../data.js';
 
 // ===== 색상 팔레트 =====
@@ -650,12 +651,21 @@ export function getCombinedClassFx(meta, classId) {
   const slotFx = aggregateEngravingEffects(classId, slots);
   const { fxDeltas } = aggregateAwakeningRewards(meta, classId);
   const combined = { ...slotFx };
-  for (const [k, v] of Object.entries(fxDeltas)) {
-    if (typeof v === 'number') {
-      combined[k] = (combined[k] || 0) + v;
-    } else if (typeof v === 'boolean') {
-      combined[k] = (combined[k] || false) || v;
+  const mergeFx = (fx) => {
+    for (const [k, v] of Object.entries(fx)) {
+      if (typeof v === 'number') {
+        combined[k] = (combined[k] || 0) + v;
+      } else if (typeof v === 'boolean') {
+        combined[k] = (combined[k] || false) || v;
+      }
     }
+  };
+  mergeFx(fxDeltas);
+  // 1.89.0~ 장착 칭호 fx — 각인과 같은 키 체계라 여기서 합치면 전 화면 자동 적용
+  const equippedTitleId = meta?.equippedTitle?.[classId];
+  if (equippedTitleId) {
+    const title = (CLASS_TITLES[classId] || []).find(t => t.id === equippedTitleId);
+    if (title?.fx) mergeFx(title.fx);
   }
   return combined;
 }
