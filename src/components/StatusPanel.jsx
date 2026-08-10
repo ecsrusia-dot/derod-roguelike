@@ -123,9 +123,12 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
             const critRelic = relicStat.critRate || 0;
             const critWeakness = hasEffect(skills, 'weaknessPoint', activeSkills) ? 10 : 0;
             const critShadowUlt = hasUltimate(ultimates, 'ult_counterShadow') ? 15 : 0;
+            // 1.82.0~ 각성 [질풍노도] +10 / [폭풍연격] +15 정적 치명타 (rollCrit과 일치)
+            const critTempestUlt = hasUltimate(ultimates, 'ult_windTempest') ? 10 : 0;
+            const critStormUlt = hasUltimate(ultimates, 'ult_windStorm') ? 15 : 0;
             const critEng = engravingFx.critRate || 0;
             // 1.62.1~ 픽스: critWind는 아래에서 계산 (windLv/windActive와 함께)
-            const critRate = 5 + dexAutoCrit + critMinor + critMeta + critRelic + critWeakness + critShadowUlt + critEng + (() => {
+            const critRate = 5 + dexAutoCrit + critMinor + critMeta + critRelic + critWeakness + critShadowUlt + critTempestUlt + critStormUlt + critEng + (() => {
               const _wL = (skills['풍령'] || 0);
               const _wA = !activeSkills || activeSkills.includes('풍령');
               return (_wL > 0 && _wA) ? _wL * 2 : 0;
@@ -146,6 +149,8 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
             const dodgeLv5 = hasEffect(skills, 'dodge+15', activeSkills) ? 15 : 0;
             const dodgeDetailIntent = hasEffect(skills, 'detailIntent', activeSkills) ? 10 : 0;
             const dodgeMirrorUlt = hasUltimate(ultimates, 'ult_counterMirror') ? 10 : 0;
+            // 1.82.0~ 각성 [질풍노도] +15 정적 회피 (rollDodge와 일치)
+            const dodgeTempestUlt = hasUltimate(ultimates, 'ult_windTempest') ? 15 : 0;
             const dodgeEng = engravingFx.dodgeRate || 0;
             // 1.44.2~ 메타 강화 「유연한 그림자」: 회피율 +2%/단계
             const dodgeMetaStacks = getMetaBonus(meta, 'dodgeRate+2%');
@@ -155,7 +160,7 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
             const windActive = !activeSkills || activeSkills.includes('풍령');
             const dodgeWind = (windLv > 0 && windActive) ? windLv * 3 : 0;
             const critWind = (windLv > 0 && windActive) ? windLv * 2 : 0;
-            const dodgeRate = dexAutoDodge + dodgeMinor + dodgeRelic + dodgeLv5 + dodgeDetailIntent + dodgeMirrorUlt + dodgeEng + dodgeMeta + dodgeWind;
+            const dodgeRate = dexAutoDodge + dodgeMinor + dodgeRelic + dodgeLv5 + dodgeDetailIntent + dodgeMirrorUlt + dodgeTempestUlt + dodgeEng + dodgeMeta + dodgeWind;
             // 방어 무시
             const ifritLv = skills['이프리트'] || 0;
             const ifritActive = !activeSkills || activeSkills.includes('이프리트');
@@ -197,6 +202,8 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                       { label: '유물: 치명타 발동율', value: critRelic, unit: '%' },
                       { label: '약점 노출 (심안 Lv.7)', value: critWeakness, unit: '%' },
                       { label: '카운터 새도우 궁극', value: critShadowUlt, unit: '%' },
+                      { label: '각성 [질풍노도] (+10%)', value: critTempestUlt, unit: '%' },
+                      { label: '각성 [폭풍연격] (+15%)', value: critStormUlt, unit: '%' },
                       { label: '각인: 치명타 발동율', value: critEng, unit: '%' },
                       { label: `풍령 Lv.${windLv} minor (+2%/Lv)`, value: critWind, unit: '%' },
                     ],
@@ -228,6 +235,7 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                       { label: '회피 Lv.5 (+15%)', value: dodgeLv5, unit: '%' },
                       { label: '심안 Lv.5: 의도 카드 회피 (+10%)', value: dodgeDetailIntent, unit: '%' },
                       { label: '카운터 미러 궁극 (+10%)', value: dodgeMirrorUlt, unit: '%' },
+                      { label: '각성 [질풍노도] (+15%)', value: dodgeTempestUlt, unit: '%' },
                       { label: '각인: 회피 발동율', value: dodgeEng, unit: '%' },
                       { label: `풍령 Lv.${windLv} minor (+3%/Lv)`, value: dodgeWind, unit: '%' },
                     ],
@@ -507,7 +515,7 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
             // 회복량 보너스 — 유물 heal × 매력 시그 × (수신 + 각인 combatHealPct) 모두 곱셈
             // 1.62.1~ 픽스: getEffectiveHealPct 추가 — 수신 minor (+5%/Lv) + 수신 Lv.5 (+25%) + 각인 combatHealPct
             //   실제 적용: baseHeal × (1 + heal/100) × (1 + charismaHeal/100) × (1 + getEffectiveHealPct/100)
-            const healEffectivePct = getEffectiveHealPct(skills, engravingFx, activeSkills);
+            const healEffectivePct = getEffectiveHealPct(skills, engravingFx, activeSkills, ultimates);
             const suLv = (skills['수신'] || 0);
             const suActive = !activeSkills || activeSkills.includes('수신');
             const healSuMinor = (suLv > 0 && suActive) ? suLv * 5 : 0;
@@ -559,6 +567,7 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                 { label: `수신 Lv.${suLv} minor (+5%/Lv)`, value: healSuMinor, unit: '%' },
                 { label: '수신 Lv.5 마일스톤 (+25%)', value: healSuLv5, unit: '%' },
                 { label: '각인: combatHealPct', value: healCombatEng, unit: '%' },
+                { label: '각성 [성수의 흐름] (+30%)', value: hasUltimate(ultimates, 'ult_waterFlow') ? 30 : 0, unit: '%' },
               ],
             });
             // 단일 출처 라인 모달 (간단 desc 형태)
