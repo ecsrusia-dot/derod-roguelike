@@ -434,10 +434,13 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
               lifestealPct = Math.max(lifestealPct, newPlayer.buffs.bloodLifesteal);
             }
             if (lifestealPct > 0) {
-              const heal = Math.floor(actualDmg * lifestealPct / 100);
+              // 1.87.0~ 흡혈 총량 상한: 타격당 최대 HP의 5%까지만 회복 (PM 재제보 픽스)
+              //   저체력일수록 데미지가 폭증(잃은 HP 보너스)해 흡혈%만 낮춰선 "불사 평형"이 유지됨
+              //   — 흡혈량 = min(데미지 × %, maxHp × 5%)로 스케일링 고리를 끊음
+              const heal = Math.min(Math.floor(actualDmg * lifestealPct / 100), Math.floor(newPlayer.maxHp * 0.05));
               if (heal > 0) {
                 newPlayer.hp = Math.min(newPlayer.maxHp, newPlayer.hp + heal);
-                newLog.push({ type: 'heal', text: `· 흡혈 +${heal} HP` });
+                newLog.push({ type: 'heal', text: `· 흡혈 +${heal} HP (상한 5%)` });
               }
             }
           }

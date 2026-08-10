@@ -281,8 +281,10 @@ export default function RaidScreen({ meta, onEnterDungeon, onEquipItem, onAutoEq
                         const item = raid.equipped?.[classId]?.[slot];
                         const enh = item?.enh || 0;
                         const maxed = enh >= RAID_ENHANCE.max;
-                        const cost = maxed ? 0 : RAID_ENHANCE.costFor(enh);
-                        const canEnhance = !maxed && stones >= cost;
+                        // 1.87.0~ 초월 (+11~+20): 심연석 대신 군주의 정수 소모
+                        const transcend = !maxed && RAID_ENHANCE.isTranscend(enh);
+                        const cost = maxed ? 0 : transcend ? RAID_ENHANCE.essenceCostFor(enh) : RAID_ENHANCE.costFor(enh);
+                        const canEnhance = !maxed && (transcend ? essence >= cost : stones >= cost);
                         return (
                           <div key={slot}>
                             <div style={{ fontSize: 9.5, color: PALETTE.textDim, marginBottom: 3 }}>{RAID_SLOT_NAMES[slot]}</div>
@@ -293,12 +295,16 @@ export default function RaidScreen({ meta, onEnterDungeon, onEquipItem, onAutoEq
                                   <button onClick={() => onEnhance(classId, slot)} disabled={!canEnhance}
                                     className="ui-press w-full mt-1 text-center" style={{
                                       padding: '4px 0', borderRadius: 8, fontSize: 9.5, fontWeight: 700,
-                                      background: canEnhance ? 'rgba(123,163,196,0.14)' : 'rgba(255,255,255,0.03)',
-                                      border: `1px solid ${canEnhance ? `${PALETTE.ice}77` : 'var(--ui-line)'}`,
-                                      color: maxed ? PALETTE.green : canEnhance ? PALETTE.ice : PALETTE.textDim,
+                                      background: canEnhance ? (transcend ? 'rgba(232,176,74,0.14)' : 'rgba(123,163,196,0.14)') : 'rgba(255,255,255,0.03)',
+                                      border: `1px solid ${canEnhance ? (transcend ? `${PALETTE.legendary}88` : `${PALETTE.ice}77`) : 'var(--ui-line)'}`,
+                                      color: maxed ? PALETTE.green : canEnhance ? (transcend ? PALETTE.legendary : PALETTE.ice) : PALETTE.textDim,
                                       opacity: maxed ? 0.8 : 1,
                                     }}>
-                                    {maxed ? '강화 MAX (+10)' : `강화 +${enh} → +${enh + 1} (성능 +8%) — ${RAID_STONE.icon}${cost}`}
+                                    {maxed
+                                      ? '초월 MAX (+20)'
+                                      : transcend
+                                        ? `◈ 초월 +${enh} → +${enh + 1} (성능 +8%) — ${RAID_ESSENCE.icon}${cost}`
+                                        : `강화 +${enh} → +${enh + 1} (성능 +8%) — ${RAID_STONE.icon}${cost}`}
                                   </button>
                                 )}
                               </div>

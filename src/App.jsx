@@ -2042,7 +2042,11 @@ export default function App() {
     setMeta(prev => {
       const item = prev?.raid?.equipped?.[classId]?.[slot];
       if (!item) return prev;
-      const cost = RAID_ENHANCE.costFor(item.enh || 0);
+      // 1.87.0~ 초월(+11~): 심연석 대신 군주의 정수 소모
+      const enh = item.enh || 0;
+      const cost = RAID_ENHANCE.isTranscend(enh)
+        ? { essence: RAID_ENHANCE.essenceCostFor(enh) }
+        : { stones: RAID_ENHANCE.costFor(enh) };
       const next = enhanceRaidItem(prev, classId, slot, cost, RAID_ENHANCE.max);
       if (next === prev) return prev;
       saveMeta(next);

@@ -756,18 +756,21 @@ export function dismantleRaidJunk(meta, valueOf) {
 }
 
 // 장착 장비 강화 +1 — 비용 심연석 (검증은 여기서, 비용·최대치는 호출부가 전달)
+// 1.87.0~ cost는 숫자(심연석 — 하위 호환) 또는 { stones, essence } (초월은 정수 소모)
 export function enhanceRaidItem(meta, classId, slot, cost, maxLevel) {
+  const { stones = 0, essence = 0 } = typeof cost === 'number' ? { stones: cost } : (cost || {});
   const raid = getRaid(meta);
   const item = raid.equipped?.[classId]?.[slot];
   if (!item) return meta;
   if ((item.enh || 0) >= maxLevel) return meta;
-  if ((raid.stones || 0) < cost) return meta;
+  if ((raid.stones || 0) < stones || (raid.essence || 0) < essence) return meta;
   const upgraded = { ...item, enh: (item.enh || 0) + 1 };
   return {
     ...meta,
     raid: {
       ...raid,
-      stones: (raid.stones || 0) - cost,
+      stones: (raid.stones || 0) - stones,
+      essence: (raid.essence || 0) - essence,
       equipped: {
         ...raid.equipped,
         [classId]: { ...(raid.equipped?.[classId] || {}), [slot]: upgraded },
