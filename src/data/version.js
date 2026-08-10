@@ -3,6 +3,6 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.89.0';
+export const GAME_VERSION = '1.89.1';
 export const VERSION_DATE = '2026-08-10';
-export const VERSION_LABEL = '마스터즈 — 퓨전 던전 20종 + 칭호 시스템';
+export const VERSION_LABEL = '긴급 픽스 — 접속 불가(화이트스크린) 해결';

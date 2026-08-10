@@ -324,13 +324,19 @@ export default function App() {
     setAutoSession(null);
   }, [autoHunt]);
 
+  // 1.74.0~ 레이드 — 입장 중인 던전 (raidBattle 화면용)
+  const [raidDungeon, setRaidDungeon] = useState(null);
+  // 1.86.0~ 레이드 난이도 (RAID_DIFFICULTIES 객체 — null이면 일반)
+  const [raidDifficulty, setRaidDifficulty] = useState(null);
+
   // ============================================
   // 1.88.0~ Wake Lock — 자동 진행 중 화면 자동 꺼짐 방지 (PM 요청)
   // ============================================
+  // ⚠️ 1.89.1 픽스: 이 블록이 raidDungeon 선언보다 위에 있어 TDZ 크래시(부팅 화이트스크린) —
+  //    반드시 autoHunt·raidDungeon 선언 아래에 위치해야 함
   // 자동 사냥 또는 레이드 전투가 살아있는 동안 navigator.wakeLock으로 화면 유지.
-  // ⚠️ 웹앱(PWA) 한계: 홈 키로 다른 앱에 가면 OS가 JS 실행을 동결하므로
-  //    백그라운드 "실시간" 진행은 원천 불가 — 화면 꺼짐 방지가 웹에서 가능한 최선.
-  //    (다른 앱 사용 중 진행은 "오프라인 정산" 방식으로만 가능 — PM 결정 대기)
+  // 웹앱(PWA) 한계: 홈 키로 다른 앱에 가면 OS가 JS 실행을 동결하므로
+  // 백그라운드 "실시간" 진행은 원천 불가 — 화면 꺼짐 방지가 웹에서 가능한 최선.
   const wakeLockRef = useRef(null);
   useEffect(() => {
     const active = autoHunt || !!raidDungeon;
@@ -358,10 +364,6 @@ export default function App() {
       wakeLockRef.current = null;
     };
   }, [autoHunt, raidDungeon]);
-  // 1.74.0~ 레이드 — 입장 중인 던전 (raidBattle 화면용)
-  const [raidDungeon, setRaidDungeon] = useState(null);
-  // 1.86.0~ 레이드 난이도 (RAID_DIFFICULTIES 객체 — null이면 일반)
-  const [raidDifficulty, setRaidDifficulty] = useState(null);
   // 1.80.0~ 레이드 백그라운드 진행 상태 (플로팅 필 표시용): running | victory | choice | defeat
   const [raidBgStatus, setRaidBgStatus] = useState('running');
   // 1.78.0~ 던전 반복 모드 — 승리 시 자동 재입장, 전멸·후퇴·로비 복귀 시 해제
