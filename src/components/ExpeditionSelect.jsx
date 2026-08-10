@@ -16,7 +16,7 @@
 import React, { useState, useMemo } from 'react';
 import { ChevronRight, Lock, Calendar } from 'lucide-react';
 import { PALETTE, isUnlocked } from '../utils/helpers.js';
-import { EXPEDITIONS, CHAMPIONSHIPS, CHAMPIONSHIP_DIFFICULTIES, CLASSES, CURSES, ENDLESS_SKIP_LIMIT } from '../data.js';
+import { EXPEDITIONS, CHAMPIONSHIPS, CHAMPIONSHIP_DIFFICULTIES, CLASSES, CURSES, ENDLESS_SKIP_LIMIT, MASTERS_DUALS, MASTERS_TRIPLES, MASTERS_GIMMICKS, MASTERS_TUNING, getMastersKind, isMastersFusionUnlocked, CLASS_TITLES, TITLE_TIERS, TITLE_DROP_RATES } from '../data.js';
 import { isChampionshipDifficultyUnlocked, getUnlockedChampionshipClasses, hasDailyCleared, getEndlessSkipUsed } from '../storage.js';
 import { buildDailyExpedition } from '../utils/dailyChallenge.js';
 import { ScreenHeader, Chip } from './ui/CommonUI.jsx';
@@ -93,8 +93,10 @@ function ExpCard({ eyebrow, eyebrowColor, title, desc, chips, locked, cleared, h
   );
 }
 
-export default function ExpeditionSelect({ meta, onSelect, onSelectChampionship, onEndlessSkip = null, onBack }) {
+export default function ExpeditionSelect({ meta, onSelect, onSelectChampionship, onSelectMasters = null, onEquipTitle = null, onEndlessSkip = null, onBack }) {
   const [tab, setTab] = useState('classic');
+  // 1.89.0~ 마스터즈 칭호 컬렉션 — 보고 있는 직업
+  const [titleClass, setTitleClass] = useState('wanderer');
   // 1.73.0~ 무한던전 스킵 결과 모달
   const [skipResult, setSkipResult] = useState(null);
 
@@ -125,6 +127,7 @@ export default function ExpeditionSelect({ meta, onSelect, onSelectChampionship,
     { id: 'classic', label: '클래식' },
     { id: 'challenge', label: '챌린지' },
     { id: 'championship', label: '챔피언십' },
+    { id: 'masters', label: '마스터즈' },
   ];
 
   return (
@@ -320,6 +323,108 @@ export default function ExpeditionSelect({ meta, onSelect, onSelectChampionship,
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* ====== 마스터즈 탭 (1.89.0~) — 챔피언십 퓨전 던전 + 칭호 ====== */}
+      {tab === 'masters' && (
+        <div className="flex-1 overflow-y-auto px-3 pb-4">
+          <SectionLabel hint="컨셉 기믹이 전부 동시 적용 · 보스는 한 방에서 연속 처치">퓨전 던전 — 듀얼 10 × 트리플 10</SectionLabel>
+
+          {/* 칭호 컬렉션 — 직업별 획득·장착 (1개만) */}
+          <div className="ui-glass mb-2.5" style={{ borderRadius: 14, padding: '10px 13px' }}>
+            <div className="flex items-baseline justify-between mb-1.5">
+              <span style={{ fontSize: 11.5, fontWeight: 700, color: PALETTE.legendary }}>◆ 칭호 컬렉션</span>
+              <span style={{ fontSize: 9, color: PALETTE.textDim }}>직업당 1개 장착 — 런에 자동 적용</span>
+            </div>
+            <div className="flex gap-1 flex-wrap mb-1.5">
+              {CLASSES.map(cls => (
+                <button key={cls.id} onClick={() => setTitleClass(cls.id)} className="ui-press" style={{
+                  height: 22, padding: '0 9px', borderRadius: 999, fontSize: 10, fontWeight: 700,
+                  background: titleClass === cls.id ? 'rgba(212,165,116,0.2)' : 'rgba(255,255,255,0.04)',
+                  border: `1px solid ${titleClass === cls.id ? PALETTE.dawn : 'var(--ui-line)'}`,
+                  color: titleClass === cls.id ? PALETTE.dawn : PALETTE.textDim,
+                }}>{cls.name}</button>
+              ))}
+            </div>
+            <div className="flex flex-col gap-1">
+              {(CLASS_TITLES[titleClass] || []).map(t => {
+                const tier = TITLE_TIERS[t.tier];
+                const owned = (meta.titles?.[titleClass] || []).includes(t.id);
+                const equipped = meta.equippedTitle?.[titleClass] === t.id;
+                return (
+                  <div key={t.id} className="flex items-center justify-between px-2.5 py-1.5" style={{
+                    borderRadius: 9, background: owned ? `${tier.color}12` : 'rgba(255,255,255,0.02)',
+                    border: `1px solid ${owned ? `${tier.color}77` : 'var(--ui-line)'}`, opacity: owned ? 1 : 0.55,
+                  }}>
+                    <div className="min-w-0">
+                      <div style={{ fontSize: 10.5 }}>
+                        <span style={{ color: tier.color, fontWeight: 700 }}>[{tier.name}]</span>{' '}
+                        <span style={{ color: owned ? PALETTE.text : PALETTE.textDim }}>{owned ? t.name : '???'}</span>
+                      </div>
+                      <div style={{ fontSize: 8.5, color: PALETTE.textDim }}>{owned ? t.desc : '마스터즈 던전 클리어 시 확률 획득'}</div>
+                    </div>
+                    {owned && onEquipTitle && (
+                      <button onClick={() => onEquipTitle(titleClass, equipped ? null : t.id)} className="ui-press flex-none ml-2" style={{
+                        fontSize: 9.5, fontWeight: 700, padding: '3px 9px', borderRadius: 999,
+                        background: equipped ? 'rgba(154,212,163,0.18)' : 'rgba(232,176,74,0.14)',
+                        border: `1px solid ${equipped ? PALETTE.green : `${PALETTE.legendary}77`}`,
+                        color: equipped ? PALETTE.green : PALETTE.legendary,
+                      }}>{equipped ? '✓ 장착 중' : '장착'}</button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {[['듀얼 퓨전 — 2컨셉 융합 · 보스 2연전', MASTERS_DUALS], ['트리플 퓨전 — 3컨셉 융합 · 보스 3연전 (최종)', MASTERS_TRIPLES]].map(([label, list]) => (
+            <React.Fragment key={label}>
+              <SectionLabel>{label}</SectionLabel>
+              <div className="ui-stagger flex flex-col gap-2 mb-3">
+                {list.map(fusion => {
+                  const kind = getMastersKind(fusion);
+                  const tune = MASTERS_TUNING[kind];
+                  const unlocked = isMastersFusionUnlocked(meta, fusion);
+                  const gimmicks = fusion.concepts.map(c => MASTERS_GIMMICKS[c]);
+                  const conceptNames = fusion.concepts.map(c => CHAMPIONSHIPS.find(x => x.id === c)?.name || c);
+                  const cleared = meta.clearedExpeditions?.includes(fusion.id);
+                  const rates = TITLE_DROP_RATES[kind];
+                  return (
+                    <button key={fusion.id} disabled={!unlocked} onClick={() => unlocked && onSelectMasters?.(fusion)}
+                      className="ui-press ui-glass text-left" style={{
+                        borderRadius: 14, padding: '11px 13px',
+                        borderColor: unlocked ? 'rgba(232,176,74,0.35)' : 'var(--ui-line)',
+                        opacity: unlocked ? 1 : 0.5,
+                      }}>
+                      <div className="flex items-center justify-between">
+                        <span className="tracking-[0.15em]" style={{ fontSize: 9, color: PALETTE.legendary }}>
+                          MASTERS · {kind === 'triple' ? 'TRIPLE' : 'DUAL'} FUSION
+                        </span>
+                        {cleared && <span style={{ fontSize: 9.5, color: PALETTE.green }}>✓ 클리어</span>}
+                      </div>
+                      <div className="font-semibold mt-0.5" style={{ fontSize: 13.5, color: PALETTE.text }}>{fusion.name}</div>
+                      <div style={{ fontSize: 9.5, color: PALETTE.textDim }}>{conceptNames.join(' × ')}</div>
+                      <div className="mt-1" style={{ fontSize: 10, color: PALETTE.dawn }}>
+                        ◆ {gimmicks.map(g => g.name).join(' + ')} — 전부 동시 적용
+                      </div>
+                      <div className="flex gap-1.5 mt-1.5 flex-wrap">
+                        <span className="tabular-nums" style={{ fontSize: 9, color: PALETTE.accent }}>적 HP ×{tune.enemyHpMult} · 공격 ×{tune.enemyDmgMult}</span>
+                        <span style={{ fontSize: 9, color: PALETTE.accent }}>보스 {fusion.concepts.length}연전 (회복 없음)</span>
+                        <span className="tabular-nums" style={{ fontSize: 9, color: PALETTE.legendary }}>✦ {tune.soulReward}</span>
+                        <span className="tabular-nums" style={{ fontSize: 9, color: PALETTE.legendary }}>칭호 태초 {Math.round(rates.M * 1000) / 10}%</span>
+                      </div>
+                      {!unlocked && (
+                        <div className="mt-1" style={{ fontSize: 9, color: PALETTE.accent }}>
+                          🔒 구성 컨셉({conceptNames.join('·')}) 챔피언십 지옥 이상 클리어 필요
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </React.Fragment>
+          ))}
         </div>
       )}
 

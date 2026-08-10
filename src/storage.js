@@ -65,6 +65,9 @@ const DEFAULT_META = {
   twilightCoins: 0,   // 황혼 주화 (도박장 전용 재화)
   fateShards: 0,      // 운명의 조각 (잭팟 천장 — 100개 = 주화 500)
   gambleDaily: null,  // { date: 'YYYYMMDD', used: N } — KST 자정 리셋
+  // 1.89.0~ 마스터즈 칭호 — 직업별 별도 획득 + 직업당 1개 장착
+  titles: { wanderer: [], sage: [], demonblood: [], elf: [], priest: [] },
+  equippedTitle: { wanderer: null, sage: null, demonblood: null, elf: null, priest: null },
   // 1.74.0~ 레이드 (본편과 분리된 성장 축)
   // inventory: 미장착 장비 배열 / equipped[classId][slot] = item / clears[dungeonId] = 클리어 횟수
   raid: {
@@ -159,6 +162,9 @@ export async function loadMeta() {
         safe.codex = { ...DEFAULT_META.codex, ...(data.codex || {}) };
         // engravings는 직업별 중첩이라 누락 직업 보강 (신규 직업 추가 대비)
         safe.engravings = { ...DEFAULT_META.engravings, ...(data.engravings || {}) };
+        // 1.89.0 칭호 중첩 객체 보강
+        safe.titles = { ...DEFAULT_META.titles, ...(data.titles || {}) };
+        safe.equippedTitle = { ...DEFAULT_META.equippedTitle, ...(data.equippedTitle || {}) };
         // 1.74.0 레이드 중첩 객체 보강
         safe.raid = {
           ...DEFAULT_META.raid,
@@ -584,6 +590,22 @@ export function useEndlessSkip(meta, dateKey, souls) {
 // ============================================
 // 1.74.0~ 레이드 장비/클리어 헬퍼
 // ============================================
+// =============================================
+// 1.89.0~ 마스터즈 칭호 (직업별 획득 + 1개 장착)
+// =============================================
+
+export function addClassTitle(meta, classId, titleId) {
+  const owned = meta?.titles?.[classId] || [];
+  if (owned.includes(titleId)) return meta;
+  return { ...meta, titles: { ...(meta.titles || {}), [classId]: [...owned, titleId] } };
+}
+
+// titleId=null이면 해제. 미보유 칭호는 장착 불가
+export function equipClassTitle(meta, classId, titleId) {
+  if (titleId && !(meta?.titles?.[classId] || []).includes(titleId)) return meta;
+  return { ...meta, equippedTitle: { ...(meta.equippedTitle || {}), [classId]: titleId } };
+}
+
 // =============================================
 // 1.85.0~ 황혼의 도박장 (재화·일일 제한)
 // =============================================

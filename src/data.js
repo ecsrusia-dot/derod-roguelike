@@ -36,3 +36,5 @@ export * from './data/meta.js';
 export * from './data/engravings.js';
 export * from './data/raid.js';
 export * from './data/gamble.js';
+export * from './data/masters.js';
+export * from './data/titles.js';

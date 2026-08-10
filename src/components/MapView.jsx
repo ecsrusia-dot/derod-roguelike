@@ -108,7 +108,10 @@ export default function MapView({ chapter, classData, mapData, hp, maxHp, gold, 
             <Chip color={PALETTE.legendary} style={{ height: 20 }}>⟳ <span className="tabular-nums">{autoRunCount}</span>번째 런</Chip>
           )}
           {expedition && <Chip color={expedition.color} style={{ height: 20 }}>{expedition.name}</Chip>}
-          {chapter.gimmick && <Chip color={chapter.color} style={{ height: 20 }}>◈ {chapter.gimmick.name}</Chip>}
+          {/* 1.89.0~ 마스터즈 기믹 융합 — 배열이면 전부 칩 표시 */}
+          {chapter.gimmick && (Array.isArray(chapter.gimmick) ? chapter.gimmick : [chapter.gimmick]).map((g, i) => (
+            <Chip key={`gim-${i}`} color={chapter.color} style={{ height: 20 }}>◈ {g.name}</Chip>
+          ))}
           <span className="ml-auto tracking-[0.14em] truncate" style={{ fontSize: 10.5, color: chapter.color }}>
             {chapterLabel} {chapter.name} · <span className="tabular-nums">{completedCount}/{mapData.nodes.length}</span>
           </span>
