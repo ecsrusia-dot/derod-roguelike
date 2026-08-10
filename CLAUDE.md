@@ -933,6 +933,7 @@ PM이 AskUserQuestion으로 확정한 설계. **던전앤파이터 모티브, "�
 
 ### 완성 항목 (1.62.x 기준 — outdated 정보 재발 방지)
 - **5직업 풀스택** — 각인 풀 5×24 = 120장 + 5직업 전용 패시브 + 5직업 소울 스킬 모두 완성
+- **5직업 각성 스킬 (1.82.0)** — ULTIMATE_SKILLS에 혈광·풍령·수신 3종씩 추가 (심안류·이프리트 포함 총 15종). 각성도 Lv.3·5·7·9·10 조건이 전 직업 개방. 새 각성 effect 추가 시: passives.js 정의 → damage.js(스탯형)/CombatScreen(트리거형) hasUltimate 분기 → StatusPanel 합산 라인·출처 모달 3축 체크
 - **각성도 보상 적용** — 1.52.0 `aggregateAwakeningRewards`로 30개 보상 모두 자동 적용
 - **PrepScreen·RestScreen ◇ 출처 모달** — 1.48.0 BuildSummaryPanel로 양쪽 적용 완료
 - **회복 시스템** — 1.60.0 `getEffectiveHealPct` + 1.62.0 selfHeal 픽스로 회복 보너스 4곳 정상 적용

@@ -62,6 +62,23 @@ export function calculateDamage(skill, attacker, defender, skills, isCrit, ultim
         breakdown.push(`혈광 분노 +${rageBonus}`);
       }
     }
+    // 1.82.0~ 각성 [혈신강림]: 잃은 HP 1%당 물리 데미지 +4% (혈광 패시브와 별도 가산)
+    if (hasUltimate(ultimates, 'ult_bloodAvatar')) {
+      const lostHpPct = Math.max(0, 100 - (attacker.hp / Math.max(1, attacker.maxHp)) * 100);
+      const avatarBonus = Math.floor(dmg * (lostHpPct * 4) / 100);
+      if (avatarBonus > 0) {
+        dmg += avatarBonus;
+        breakdown.push(`혈신강림 +${avatarBonus}`);
+      }
+    }
+    // 1.82.0~ 각성 [광혈폭주]: 자해 직후 다음 공격 데미지 +40% (1회 소비)
+    if (attacker.buffs?.bloodFrenzyNext) {
+      const frenzyBonus = Math.floor(dmg * 0.4);
+      if (frenzyBonus > 0) {
+        dmg += frenzyBonus;
+        breakdown.push(`광혈폭주 +${frenzyBonus}`);
+      }
+    }
   } else if (skill.type === 'magic') {
     // 1.44.1~ 지능 자동 가산: 절대값 → %로 변경. 포인트당 0.4%, 임계 없음.
     const intSigPct = (attacker.지능 || 0) * 0.4;
@@ -255,6 +272,14 @@ export function getDisplayDamage(skill, attacker, skills, ultimates, meta, curse
       if (attacker.buffs?.bloodRageNext) {
         dmg += Math.floor(dmg * 0.15);
       }
+      // 1.82.0~ 각성 [혈신강림] + [광혈폭주] 미리보기 (calculateDamage와 동일)
+      if (hasUltimate(ultimates, 'ult_bloodAvatar')) {
+        const lostHpPct = Math.max(0, ((attacker.maxHp || 0) - (attacker.hp || 0)) / Math.max(1, attacker.maxHp || 0) * 100);
+        dmg += Math.floor(dmg * (lostHpPct * 4) / 100);
+      }
+      if (attacker.buffs?.bloodFrenzyNext) {
+        dmg += Math.floor(dmg * 0.4);
+      }
     } else if (skill.type === 'magic') {
       // 1.44.1~ 지능 자동 가산 % 변환
       const intSigPct = (attacker.지능 || 0) * 0.4;
@@ -336,6 +361,15 @@ export function rollCrit(skills, attacker, meta = null, activeSkills = null, rel
     critRate += 30;
   }
 
+  // 1.82.0~ 각성 [혈신강림]: HP 50% 이하 시 치명타율 +30% (혈광 Lv.5와 동일 조건, 패시브 없이도)
+  if (hasUltimate(ultimates, 'ult_bloodAvatar')) {
+    const hpPctAvatar = (attacker.hp / Math.max(1, attacker.maxHp)) * 100;
+    if (hpPctAvatar <= 50) critRate += 30;
+  }
+  // 1.82.0~ 각성 [질풍노도] +10% / [폭풍연격] +15% 정적 치명타 보너스
+  if (hasUltimate(ultimates, 'ult_windTempest')) critRate += 10;
+  if (hasUltimate(ultimates, 'ult_windStorm')) critRate += 15;
+
   // 5. 무영검 궁극: 치명타 +15% 정적 보너스 (명세 일치)
   if (hasUltimate(ultimates, 'ult_counterShadow')) {
     critRate += 15;
@@ -389,6 +423,10 @@ export function rollDodge(skills, defender, activeSkills = null, relicStat = {},
   // 7. 명경지수 궁극: 회피율 +10% 정적 보너스 (명세 일치)
   if (hasUltimate(ultimates, 'ult_counterMirror')) {
     dodgeRate += 10;
+  }
+  // 1.82.0~ 각성 [질풍노도]: 회피율 +15% 정적 보너스
+  if (hasUltimate(ultimates, 'ult_windTempest')) {
+    dodgeRate += 15;
   }
 
   // 8. 1.27.0~ 각인: 회피율 +N% (음수 = 결함 페널티)
