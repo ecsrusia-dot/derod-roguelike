@@ -830,9 +830,11 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     };
     const keys = classData.combatSkills.filter(usable);
     // ① 소울 스킬 — 전체 턴 소모라 턴 시작(풀 AP)에만
-    //   1.91.1~ 방랑검사는 아래 전용 플랜이 참격으로 AP를 깎은 뒤 마지막에 발동 (참격 봉인 예외만 여기서)
-    if (classData.ultimateId && (player.soulGauge || 0) >= 100 && ap >= AP_PER_TURN
-      && (classData.id !== 'wanderer' || !usable('참격'))) return 'ULT';
+    //   1.91.1~ 방랑검사 / 1.92.0~ 술법사는 아래 전용 플랜이 기본기로 AP를 깎은 뒤 마지막에 발동
+    //   (기본기 봉인 예외 턴만 여기서 즉시 발동)
+    const hasOwnUltPlan = (classData.id === 'wanderer' && usable('참격'))
+      || (classData.id === 'sage' && usable('마법탄'));
+    if (classData.ultimateId && (player.soulGauge || 0) >= 100 && ap >= AP_PER_TURN && !hasOwnUltPlan) return 'ULT';
     const hpRatio = player.maxHp > 0 ? player.hp / player.maxHp : 1;
     const intent = enemy.nextIntent;
     const danger = !!(intent && intent.type === 'attack' && (intent.heavy || hpRatio < 0.35));
@@ -887,6 +889,44 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         return '참격';
       }
       return '참격'; // slash3
+    }
+    // ①c 1.92.0~ 술법사 전용 3AP 플랜 (PM 지시 — 심안 없음: 전 직업 공개인 대공격 예고만 방어 판단)
+    //   대공격 예고: 익스플로젼(가능 시) or 파이어볼×2 + 마지막 1AP 화염장막
+    //   일반 상황: 파이어볼 → 익스플로젼 (유폭 연계 +40% 셋업 순서)
+    //   익스플로젼 CD·에테르 부족: 파이어볼×2 + 화염장막
+    //   소울 룰: ① 턴 시작 소울 100 → 익스(CD면 파이어볼×2) 후 영겁의 화염
+    //           ② AP 1에 도달 → 대공격이면 화염장막 우선, 공격상황이면 영겁
+    //           ③ AP 2에 도달 → 대공격이면 방어룰 우선, 공격상황이면 파이어볼 → 영겁
+    //   (코드 키: 마법탄=파이어볼 / 정념폭발=익스플로젼 — 1.42.0 표시명만 변경된 호환 키)
+    if (classData.id === 'sage' && usable('마법탄')) {
+      const heavyTelegraph = !!intent?.heavy;
+      const soul100 = !!classData.ultimateId && (player.soulGauge || 0) >= 100;
+      if (ap >= AP_PER_TURN) autoUltCommitRef.current = soul100;
+      if (soul100) {
+        if (ap >= AP_PER_TURN) return usable('정념폭발') ? '정념폭발' : '마법탄'; // 소울 룰 1 시작
+        if (autoUltCommitRef.current) {
+          if (ap === 2) return '마법탄'; // 익스 CD 케이스 — 파이어볼×2 후 영겁
+          autoUltCommitRef.current = false;
+          return 'ULT'; // 소울 룰 1 마무리
+        }
+        if (!heavyTelegraph) {
+          if (ap === 2) return '마법탄'; // 소울 룰 3 — 파이어볼 후 영겁
+          return 'ULT';                  // 소울 룰 2
+        }
+        // 대공격 예고(방어상황) — 방어룰 우선, 소울은 다음 턴 시작(룰 1)에 사용
+      }
+      if (heavyTelegraph) {
+        if (ap === 1) return (usable('화염장막') && (player.defense || 0) <= 0) ? '화염장막' : '마법탄';
+        if (ap >= AP_PER_TURN && usable('정념폭발')) return '정념폭발';
+        return '마법탄';
+      }
+      if (usable('정념폭발')) {
+        if (ap >= AP_PER_TURN) return '마법탄'; // 유폭 셋업
+        return '정념폭발'; // ap 2 — 유폭 +40%
+      }
+      // 익스 CD — 파이어볼×2 + 마지막 1AP 화염장막
+      if (ap === 1 && usable('화염장막') && (player.defense || 0) <= 0) return '화염장막';
+      return '마법탄';
     }
     // ② 대공격 간파 / 저체력 → 방어 우선
     if (danger && defenseKey && (player.defense || 0) <= 0) return defenseKey;
