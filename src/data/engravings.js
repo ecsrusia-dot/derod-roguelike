@@ -201,6 +201,9 @@ export const ENGRAVINGS = {
     { id: 'eng_wan_shadow_step',   tier: 'L', name: '무영(無影)의 잔영', desc: '회피 후 다음 공격 데미지 +30%',           effect: { afterDodgeDmg: 30 } },
     { id: 'eng_wan_thousand_blade', tier: 'L', name: '천변(千變)의 검',  desc: '반격에 기본 치명률 적용 (반격 치명타 가능)', effect: { counterCanCrit: true } },
     { id: 'eng_wan_iron_will',     tier: 'L', name: '불괴(不壞)의 검신', desc: '받는 데미지 -10%',                        effect: { dmgTakenPct: -10 } },
+    // 1.99.0~ 레전더리 확충 (PM 지시: 등급별 최소 5종)
+    { id: 'eng_wan_mind_peak',     tier: 'L', name: '심안(心眼)의 극',   desc: '반격 확률 +15% / 반격 데미지 +30%',        effect: { counterRatePct: 15, counterDmgPct: 30 } },
+    { id: 'eng_wan_flash_step',    tier: 'L', name: '섬영(閃影)의 보법', desc: '회피율 +8% / 회피 시 소울 게이지 +8',      effect: { dodgeRate: 8, dodgeSoul: 8 } },
     // === Flaw (결함, 4) ===
     { id: 'eng_wan_flaw_feet',   tier: 'NEG_FLAW', name: '둔한 발',   desc: '회피 확률 -5%',                  effect: { dodgeRate: -5 } },
     { id: 'eng_wan_flaw_blade',  tier: 'NEG_FLAW', name: '무딘 검',   desc: '반격 데미지 -15%',               effect: { counterDmgPct: -15 } },
@@ -240,6 +243,10 @@ export const ENGRAVINGS = {
     // === Legendary (2) ===
     { id: 'eng_sage_inferno_seal', tier: 'L', name: '화신(火神)의 인장', desc: '마법 데미지 +10% / 화염 각인 데미지 +50%',                     effect: { magicDmgPct: 10, igniteDmgPct: 50 } },
     { id: 'eng_sage_arch_mage',    tier: 'L', name: '대마법사의 권위',    desc: '마법 시전 시 소울 게이지 +3 / 매 턴 소울 +2',                effect: { magicSoulBonus: 3, perTurnSoul: 2 } },
+    // 1.99.0~ 레전더리 확충 (PM 지시: 등급별 최소 5종)
+    { id: 'eng_sage_eternal_ember', tier: 'L', name: '영겁(永劫)의 불씨', desc: '화염 각인 부여 확률 +15% / 각인 데미지 +30%', effect: { igniteApplyPct: 15, igniteDmgPct: 30 } },
+    { id: 'eng_sage_flame_tyrant',  tier: 'L', name: '화염 폭군',          desc: '마법 데미지 +15% / 치명타율 +8%',            effect: { magicDmgPct: 15, critRate: 8 } },
+    { id: 'eng_sage_soul_furnace',  tier: 'L', name: '영혼의 화로',        desc: '소울 게이지 획득 +30% / 전투 시작 소울 +10', effect: { soulGainMult: 0.30, startSoul: 10 } },
 
     // === Flaw (결함, 4) ===
     { id: 'eng_sage_flaw_fatigue',  tier: 'NEG_FLAW', name: '주문의 피로',  desc: '매 턴 HP -3 (자가 피해)',         effect: { perTurnHpLoss: 3 } },
@@ -281,6 +288,10 @@ export const ENGRAVINGS = {
     // === Legendary (2) ===
     { id: 'eng_dem_demon_king',  tier: 'L', name: '마왕(魔王)의 권위', desc: '물리 데미지 +20% / 매 턴 HP -5 (자해)',  effect: { physDmgPct: 20, perTurnHpLoss: 5 } },
     { id: 'eng_dem_blood_fury',  tier: 'L', name: '핏빛 분노',          desc: '치명타율 +15% / 전투 시작 시 소울 +20',  effect: { critRate: 15, startSoul: 20 } },
+    // 1.99.0~ 레전더리 확충 (PM 지시: 등급별 최소 5종)
+    { id: 'eng_dem_immortal_pact', tier: 'L', name: '불멸(不滅)의 계약', desc: '받는 데미지 -10% / 물리 데미지 +10%',           effect: { dmgTakenPct: -10, physDmgPct: 10 } },
+    { id: 'eng_dem_blood_storm',   tier: 'L', name: '혈풍(血風)',        desc: '물리 데미지 +15% / 치명타율 +10% / 매 턴 HP -3', effect: { physDmgPct: 15, critRate: 10, perTurnHpLoss: 3 } },
+    { id: 'eng_dem_rage_engine',   tier: 'L', name: '분노 기관',          desc: '매 턴 소울 +4 / 소울 게이지 획득 +20%',          effect: { perTurnSoul: 4, soulGainMult: 0.20 } },
 
     // === Flaw (결함, 4) ===
     { id: 'eng_dem_flaw_brittle', tier: 'NEG_FLAW', name: '드러난 살갗',  desc: '받는 데미지 +10%',  effect: { dmgTakenPct: 10 } },
@@ -322,6 +333,10 @@ export const ENGRAVINGS = {
     // === Legendary (2) ===
     { id: 'eng_elf_wind_god',     tier: 'L', name: '풍신(風神)의 가호', desc: '회피율 +12% / 회피 시 소울 게이지 +5',             effect: { dodgeRate: 12, dodgeSoul: 5 } },
     { id: 'eng_elf_sky_authority',tier: 'L', name: '천공(天空)의 권위', desc: '치명타율 +15% / 물리 데미지 +15%',                effect: { critRate: 15, physDmgPct: 15 } },
+    // 1.99.0~ 레전더리 확충 (PM 지시: 등급별 최소 5종)
+    { id: 'eng_elf_storm_dance',  tier: 'L', name: '폭풍무(暴風舞)',    desc: '회피율 +8% / 회피 후 다음 공격 데미지 +40%',       effect: { dodgeRate: 8, afterDodgeDmg: 40 } },
+    { id: 'eng_elf_hawk_eye',     tier: 'L', name: '매의 눈',            desc: '치명타율 +12% / 회피 시 소울 게이지 +8',           effect: { critRate: 12, dodgeSoul: 8 } },
+    { id: 'eng_elf_forest_heart', tier: 'L', name: '숲의 심장',          desc: '민첩 +5 / 물리 데미지 +12%',                       effect: { dex: 5, physDmgPct: 12 } },
 
     // === Flaw (결함, 4) ===
     { id: 'eng_elf_flaw_blunt',   tier: 'NEG_FLAW', name: '무딘 화살촉', desc: '물리 데미지 -10%',  effect: { physDmgPct: -10 } },
@@ -364,6 +379,10 @@ export const ENGRAVINGS = {
     // === Legendary (2) ===
     { id: 'eng_pri_dawn_authority', tier: 'L', name: '여명(黎明)의 권위', desc: '회복량 +30% / 받는 데미지 -10%',           effect: { combatHealPct: 30, dmgTakenPct: -10 } },
     { id: 'eng_pri_holy_throne',    tier: 'L', name: '신성한 좌석',       desc: '매력 +5 / 회복량 +15% / 매 턴 소울 +2',    effect: { cha: 5, combatHealPct: 15, perTurnSoul: 2 } },
+    // 1.99.0~ 레전더리 확충 (PM 지시: 등급별 최소 5종)
+    { id: 'eng_pri_sanctuary',   tier: 'L', name: '성역(聖域)',    desc: '받는 데미지 -15%',                                  effect: { dmgTakenPct: -15 } },
+    { id: 'eng_pri_dawn_font',   tier: 'L', name: '여명의 샘',     desc: '회복량 +40%',                                       effect: { combatHealPct: 40 } },
+    { id: 'eng_pri_grace_flow',  tier: 'L', name: '은총의 흐름',   desc: '매 턴 소울 +3 / 전투 시작 소울 +15 / 매력 +3',       effect: { perTurnSoul: 3, startSoul: 15, cha: 3 } },
 
     // === Flaw (결함, 4) ===
     { id: 'eng_pri_flaw_doubt',   tier: 'NEG_FLAW', name: '의심의 그림자', desc: '치명타율 -10%',  effect: { critRate: -10 } },

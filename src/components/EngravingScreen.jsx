@@ -71,7 +71,44 @@ export default function EngravingScreen({ meta, onMetaUpdate, onBack }) {
     const currentCardId = slots[slotIdx];
     const newCard = rollEngravingCard(classId);
     if (!newCard) return;
-    setGachaResult({ classId, slotIdx, cost: ENGRAVING_GACHA_COST, currentCardId, newCardId: newCard.id });
+    setGachaResult({ classId, slotIdx, cost: ENGRAVING_GACHA_COST, currentCardId, newCardId: newCard.id, rolls: 1, autoNote: null });
+  };
+
+  // 1.99.0~ 결과 모달 내 재리롤 (PM 지시) — 비용 누적, 유지/덮어쓰기 결정 시 일괄 차감
+  const handleRerollInModal = () => {
+    if (!gachaResult) return;
+    if ((meta?.souls || 0) < gachaResult.cost + ENGRAVING_GACHA_COST) return;
+    const newCard = rollEngravingCard(gachaResult.classId);
+    if (!newCard) return;
+    setGachaResult(prev => ({ ...prev, newCardId: newCard.id, cost: prev.cost + ENGRAVING_GACHA_COST, rolls: prev.rolls + 1, autoNote: null }));
+  };
+
+  // 1.99.0~ 목표 등급 자동 리롤 (PM 지시) — 해당 등급 이상이 나올 때까지 반복 (영혼 한도 내, 안전 상한 300회)
+  const TIER_RANK = { C: 1, R: 2, E: 3, L: 4, NEG_FLAW: 0, NEG_CURSE: 0 };
+  const handleAutoReroll = (targetTier) => {
+    if (!gachaResult) return;
+    const targetRank = TIER_RANK[targetTier] || 0;
+    let cost = gachaResult.cost;
+    let rolls = gachaResult.rolls;
+    let cardId = gachaResult.newCardId;
+    let found = TIER_RANK[getEngravingById(gachaResult.classId, cardId)?.tier] >= targetRank;
+    let tries = 0;
+    while (!found && tries < 300 && (meta?.souls || 0) >= cost + ENGRAVING_GACHA_COST) {
+      const card = rollEngravingCard(gachaResult.classId);
+      if (!card) break;
+      cost += ENGRAVING_GACHA_COST;
+      rolls += 1;
+      tries += 1;
+      cardId = card.id;
+      if ((TIER_RANK[card.tier] || 0) >= targetRank) found = true;
+    }
+    const tierLabel = ENGRAVING_TIERS[targetTier]?.label || targetTier;
+    setGachaResult(prev => ({
+      ...prev, newCardId: cardId, cost, rolls,
+      autoNote: found
+        ? `${tierLabel} 등급 이상 등장 — ${rolls}번째 뽑기`
+        : `영혼 한도 내 ${tierLabel} 미등장 (${rolls}회 시도) — 마지막 결과 표시`,
+    }));
   };
 
   // 가챠 결과 — 유지
@@ -312,6 +349,12 @@ export default function EngravingScreen({ meta, onMetaUpdate, onBack }) {
           classId={gachaResult.classId}
           currentCardId={gachaResult.currentCardId}
           newCardId={gachaResult.newCardId}
+          cost={gachaResult.cost}
+          rolls={gachaResult.rolls}
+          autoNote={gachaResult.autoNote}
+          souls={meta?.souls || 0}
+          onReroll={handleRerollInModal}
+          onAutoReroll={handleAutoReroll}
           onKeep={handleKeepCurrent}
           onOverwrite={handleOverwrite}
         />
@@ -423,11 +466,13 @@ function SlotCard({ slotIdx, isUnlocked, unlockLv, card, tierInfo, canAfford, on
 }
 
 // === 가챠 결과 모달 ===
-function GachaResultModal({ classId, currentCardId, newCardId, onKeep, onOverwrite }) {
+function GachaResultModal({ classId, currentCardId, newCardId, cost = 0, rolls = 1, autoNote = null, souls = 0, onReroll = null, onAutoReroll = null, onKeep, onOverwrite }) {
   const current = getEngravingById(classId, currentCardId);
   const newCard = getEngravingById(classId, newCardId);
   const newTier = newCard ? ENGRAVING_TIERS[newCard.tier] : null;
   const curTier = current ? ENGRAVING_TIERS[current.tier] : null;
+  // 1.99.0~ 재리롤 — 비용은 누적, 결정(유지/덮어쓰기) 시 일괄 차감
+  const canRerollOnce = souls >= cost + 500;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{
@@ -505,6 +550,48 @@ function GachaResultModal({ classId, currentCardId, newCardId, onKeep, onOverwri
           </div>
         </div>
 
+        {/* 1.99.0~ 누적 비용 + 자동 리롤 결과 안내 */}
+        <div className="px-3 pb-1 flex items-center justify-between text-[10px] tabular-nums">
+          <span style={{ color: PALETTE.textDim }}>{rolls}회 뽑음 · 누적 비용 <b style={{ color: PALETTE.legendary }}>✦{cost}</b></span>
+          <span style={{ color: PALETTE.textDim }}>보유 ✦{souls}</span>
+        </div>
+        {autoNote && (
+          <div className="px-3 pb-1 text-[10px]" style={{ color: PALETTE.dawn }}>◈ {autoNote}</div>
+        )}
+
+        {/* 1.99.0~ 재리롤 + 목표 등급 자동 리롤 (PM 지시) */}
+        <div className="px-3 pb-2 space-y-1.5">
+          <button onClick={onReroll} disabled={!canRerollOnce} className="ui-press w-full py-2 text-[11px] tracking-[0.15em]" style={{
+            borderRadius: 10,
+            background: canRerollOnce ? `${PALETTE.twilight}35` : 'rgba(255,255,255,0.03)',
+            border: `1px solid ${canRerollOnce ? PALETTE.twilight : PALETTE.panelBorder}`,
+            color: canRerollOnce ? PALETTE.text : PALETTE.textDim,
+            opacity: canRerollOnce ? 1 : 0.55,
+          }}>
+            🎲 다시 뽑기 (+✦500)
+          </button>
+          <div className="flex gap-1.5">
+            {['R', 'E', 'L'].map(t => {
+              const ti = ENGRAVING_TIERS[t];
+              return (
+                <button key={t} onClick={() => onAutoReroll(t)} disabled={!canRerollOnce}
+                  className="ui-press flex-1 py-1.5 text-[10px]" style={{
+                    borderRadius: 10,
+                    background: canRerollOnce ? `${ti?.color || PALETTE.dawn}20` : 'rgba(255,255,255,0.03)',
+                    border: `1px solid ${canRerollOnce ? `${ti?.color || PALETTE.dawn}88` : PALETTE.panelBorder}`,
+                    color: canRerollOnce ? (ti?.color || PALETTE.dawn) : PALETTE.textDim,
+                    opacity: canRerollOnce ? 1 : 0.55,
+                  }}>
+                  {ti?.label || t}↑ 자동
+                </button>
+              );
+            })}
+          </div>
+          <div className="text-[8.5px] text-center" style={{ color: PALETTE.textDim }}>
+            자동 리롤은 해당 등급 이상이 나올 때까지 반복 (영혼 한도 내) — 비용은 유지/덮어쓰기 시 일괄 차감
+          </div>
+        </div>
+
         {/* 액션 버튼 */}
         <div className="grid grid-cols-2 gap-0">
           <button
@@ -520,7 +607,7 @@ function GachaResultModal({ classId, currentCardId, newCardId, onKeep, onOverwri
               letterSpacing: '0.2em',
             }}
           >
-            현재 유지
+            현재 유지 (✦{cost})
           </button>
           <button
             onClick={onOverwrite}
@@ -534,7 +621,7 @@ function GachaResultModal({ classId, currentCardId, newCardId, onKeep, onOverwri
               letterSpacing: '0.2em',
             }}
           >
-            덮어쓰기
+            덮어쓰기 (✦{cost})
           </button>
         </div>
       </div>
