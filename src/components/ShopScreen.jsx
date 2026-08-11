@@ -7,7 +7,7 @@ import { PALETTE, hasCurse, AUTO_STAT_PREF } from '../utils/helpers.js';
 import { SHOP_PRICES, PASSIVE_SKILLS, CLASSES, COMBAT_SKILLS } from '../data.js';
 import { getRewardPool, rollRewards } from '../utils/rewards.js';
 
-export default function ShopScreen({ gold, skills, relics, ultimates, curses = [], autoPlay = false, autoSpeed = 1, onBuy, onLeave, classId = null }) {
+export default function ShopScreen({ gold, skills, relics, ultimates, curses = [], autoPlay = false, autoSpeed = 1, onBuy, onLeave, classId = null, hp = null, maxHp = null }) {
   const priceMultiplier = hasCurse(curses, 'curse_shopPrice+50') ? 1.5 : 1.0;
   // 상점 재고: 유물·궁극·재화는 제외하고 다양한 카테고리로
   const [stock] = useState(() => {
@@ -41,6 +41,8 @@ export default function ShopScreen({ gold, skills, relics, ultimates, curses = [
       // 1.84.2 완화 (PM 결정): 잔혹은 자체 출혈 부여(Lv.3~)라 물리 직업군이면 자동 구매 허용
       //   — 마법 전용 직업(술법사·사제)만 제외 (수동 구매는 항상 가능)
       const physCapable = !!CLASSES.find(c => c.id === classId)?.combatSkills?.some(k => COMBAT_SKILLS[k]?.type === 'physical');
+      // 1.94.0~ 생존 보강 (PM 옵션 A): 저체력이면 회복 아이템도 자동 구매 대상
+      const hpRatio = hp != null && maxHp > 0 ? hp / maxHp : 1;
       const buyable = stock
         .map((r, idx) => ({ r, idx, price: getPrice(r) }))
         .filter(({ r, idx, price }) => {
@@ -50,9 +52,14 @@ export default function ShopScreen({ gold, skills, relics, ultimates, curses = [
           if (r.type === 'skill') {
             return (skills[r.name] || 0) < (PASSIVE_SKILLS[r.name]?.maxLv || 7);
           }
+          if ((r.type === 'heal' || r.type === 'heal_full') && hpRatio < 0.6) return true;
           return r.type === 'stat';
         });
       const score = ({ r }) => {
+        // 저체력 회복 최우선 — HP 40% 미만이면 완전 회복 > 부분 회복 > 나머지
+        if (r.type === 'heal_full' && hpRatio < 0.4) return 500;
+        if (r.type === 'heal' && hpRatio < 0.4) return 450;
+        if ((r.type === 'heal' || r.type === 'heal_full') && hpRatio < 0.6) return 250;
         if (r.type === 'skill' && PASSIVE_SKILLS[r.name]?.classOnly === classId) return 300;
         if (r.type === 'skill' && (skills[r.name] || 0) > 0) return 200 + (skills[r.name] || 0);
         if (r.type === 'skill') return 100;

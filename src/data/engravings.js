@@ -200,6 +200,7 @@ export const ENGRAVINGS = {
     // === Legendary (2) ===
     { id: 'eng_wan_shadow_step',   tier: 'L', name: '무영(無影)의 잔영', desc: '회피 후 다음 공격 데미지 +30%',           effect: { afterDodgeDmg: 30 } },
     { id: 'eng_wan_thousand_blade', tier: 'L', name: '천변(千變)의 검',  desc: '반격에 기본 치명률 적용 (반격 치명타 가능)', effect: { counterCanCrit: true } },
+    { id: 'eng_wan_iron_will',     tier: 'L', name: '불괴(不壞)의 검신', desc: '받는 데미지 -10%',                        effect: { dmgTakenPct: -10 } },
     // === Flaw (결함, 4) ===
     { id: 'eng_wan_flaw_feet',   tier: 'NEG_FLAW', name: '둔한 발',   desc: '회피 확률 -5%',                  effect: { dodgeRate: -5 } },
     { id: 'eng_wan_flaw_blade',  tier: 'NEG_FLAW', name: '무딘 검',   desc: '반격 데미지 -15%',               effect: { counterDmgPct: -15 } },
