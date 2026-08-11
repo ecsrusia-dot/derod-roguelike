@@ -284,6 +284,9 @@ export default function App() {
   const [reselectMode, setReselectMode] = useState(null);
   // 승리 화면 후 이동할 다음 화면
   const [victoryNextScreen, setVictoryNextScreen] = useState(null);
+  // 1.93.0~ 중간 보스 보상: 픽 후 챕터 클리어로 진행 / 무한 포기: 정산 화면 라벨 분기
+  const [bossRewardPending, setBossRewardPending] = useState(false);
+  const [runRetreat, setRunRetreat] = useState(false);
   // 승리 화면에 표시할 획득 재화 (gold/gem/souls)
   const [victoryGains, setVictoryGains] = useState({ gold: 0, gem: 0, souls: 0 });
   // 1.81.0~ 정산 — 직전 전투 (출처별 데미지) + 이번 런 누적 (전투 수·총 데미지·획득 자원)
@@ -858,6 +861,9 @@ export default function App() {
       runKillsRef.current = 0;
       runEventsRef.current = { ok: 0, fail: 0 };
       initialSkillTotalRef.current = Object.values(baseSkills).reduce((s, v) => s + (v || 0), 0);
+      // 1.93.0~ 보스 보상·포기 플래그 초기화
+      setBossRewardPending(false);
+      setRunRetreat(false);
       // 1.27.0~ 각인 effect 통합: 직업 능력치 + HP 가산
       const _engSlots = meta?.engravings?.[classData.id]?.slots || [];
       const _engFx = aggregateEngravingEffects(classData.id, _engSlots);
@@ -1318,7 +1324,18 @@ export default function App() {
       }
       // 마지막 챕터 보스 처치 → 원정 클리어 화면, 그 외 → 챕터 클리어
       const isLastChapter = currentExpedition && chapterIdx >= currentExpedition.chapters.length - 1;
-      setVictoryNextScreen(isLastChapter ? 'expeditionClear' : 'chapterClear');
+      const isFinalBoss = isLastChapter && !currentExpedition?.endless;
+      if (isFinalBoss) {
+        setVictoryNextScreen('expeditionClear');
+      } else {
+        // 1.93.0~ 중간 보스 보상 (PM 지시: 최종보스 제외 전 보스) — 엘리트급 풀에서 픽 후 챕터 클리어
+        let count = hasEffect(skills, 'extraReward', activeSkills) ? 4 : 3;
+        if (isUnlocked(meta, 'meta_extraReward')) count = Math.max(count, 4);
+        setCurrentRewards(rollRewards(count, true, skills, relics, ultimates, classData?.id, meta, currentExpedition));
+        setHasRerolled(false);
+        setBossRewardPending(true);
+        setVictoryNextScreen('reward');
+      }
       setScreen('victory');
       return;
     }
@@ -1347,6 +1364,27 @@ export default function App() {
       setScreen(currentExpedition?.isGamble ? 'gambleChoice' : 'reward');
     }
     setVictoryNextScreen(null);
+  };
+
+  // 1.93.0~ 무한모드 중간 포기 (PM 지시) — 누적 영혼 + 깊이 보너스 전액 정산 후 종료
+  const handleEndlessRetreat = () => {
+    if (!currentExpedition?.endless) return;
+    const charismaSoulPct = getCharismaSoulGainBonus(stats);
+    let depthBonus = endlessDepth * 15;
+    if (charismaSoulPct > 0) depthBonus = Math.floor(depthBonus * (1 + charismaSoulPct / 100));
+    const total = runSouls + depthBonus;
+    setMeta(prev => {
+      let m = total > 0 ? addSouls(prev, total) : prev;
+      m = clearActiveRun(m);
+      if (autoHunt) m = appendAutoRunLog(m, buildAutoRunEntry('retreat'));
+      saveMeta(m);
+      return m;
+    });
+    setRunRepeat(false);
+    setRunSouls(total);
+    setRunFirstChampClear(null);
+    setRunRetreat(true);
+    setScreen('expeditionClear');
   };
 
   // 전투 패배
@@ -1390,6 +1428,12 @@ export default function App() {
       setGem(prev => prev + extraGem);
     }
     completeCurrentNode();
+    // 1.93.0~ 중간 보스 보상 픽 후에는 맵이 아니라 챕터 클리어로
+    if (bossRewardPending) {
+      setBossRewardPending(false);
+      setScreen('chapterClear');
+      return;
+    }
     setScreen('map');
   };
 
@@ -2116,6 +2160,7 @@ export default function App() {
     setCurrentCurses([]);
     setPendingChainEvents([]);
     setRunSouls(0);
+    setRunRetreat(false);
     setSelectedChampionship(null);
     setSelectedDifficulty(null);
     setSelectedMasters(null);
@@ -2132,6 +2177,7 @@ export default function App() {
     setCurrentCurses([]);
     setPendingChainEvents([]);
     setRunSouls(0);
+    setRunRetreat(false);
     setSelectedChampionship(null);
     setSelectedDifficulty(null);
     setSelectedMasters(null);
@@ -2586,7 +2632,7 @@ export default function App() {
             {screen === 'altar' && <SoulAltar meta={meta} slots={altarSlots} onPurchase={purchaseUpgrade} onReroll={rerollAltar} onBack={() => setScreen('title')} />}
             {screen === 'engraving' && <EngravingScreen meta={meta} onMetaUpdate={setMeta} onBack={() => setScreen('title')} />}
             {screen === 'achievements' && <AchievementScreen meta={meta} onClaim={handleClaimAchievement} onClose={() => setScreen(prevAchievementsBack)} />}
-            {screen === 'map' && chapter && mapData && <MapView chapter={chapter} classData={classData} mapData={mapData} hp={hp} maxHp={maxHp} gold={gold} gem={gem} relics={relics} activeRelicNames={activeRelicNames} expedition={currentExpedition} curses={currentCurses} chapterIdx={chapterIdx} autoHunt={autoHunt} autoHuntAllowed={autoHuntAllowed} onToggleAutoHunt={toggleAutoHunt} autoSpeed={autoSpeed} onCycleAutoSpeed={cycleAutoSpeed} autoRunCount={autoSession?.runCount || 0} onEnterNode={handleEnterNode} onOpenStatus={() => setScreen('status')} onOpenAchievements={() => { setPrevAchievementsBack('map'); setScreen('achievements'); }} onOpenCodex={() => setScreen('codex')} onBack={() => setScreen('title')} />}
+            {screen === 'map' && chapter && mapData && <MapView chapter={chapter} classData={classData} mapData={mapData} hp={hp} maxHp={maxHp} gold={gold} gem={gem} relics={relics} activeRelicNames={activeRelicNames} expedition={currentExpedition} curses={currentCurses} chapterIdx={chapterIdx} autoHunt={autoHunt} autoHuntAllowed={autoHuntAllowed} onToggleAutoHunt={toggleAutoHunt} autoSpeed={autoSpeed} onCycleAutoSpeed={cycleAutoSpeed} autoRunCount={autoSession?.runCount || 0} onEnterNode={handleEnterNode} onOpenStatus={() => setScreen('status')} onOpenAchievements={() => { setPrevAchievementsBack('map'); setScreen('achievements'); }} onOpenCodex={() => setScreen('codex')} onBack={() => setScreen('title')} onRetreat={currentExpedition?.endless ? handleEndlessRetreat : null} />}
             {screen === 'codex' && <CodexScreen meta={meta} onBack={() => setScreen('map')} />}
             {screen === 'bossIntro' && currentEnemy && <BossIntroScreen enemyKey={currentEnemy} onComplete={() => setScreen('combat')} />}
             {screen === 'combat' && currentEnemy && <CombatScreen key={`${activeNodeId}-${currentEnemy}`} classData={classData} initialPlayer={{ hp, maxHp, ...classData.stats, ...stats }} initialSkills={skills} initialUltimates={ultimates} initialRelics={relics} activeSkills={activeSkills} activeRelicNames={activeRelicNames} enemyKey={currentEnemy} isBoss={isBossReward} expedition={currentExpedition} curses={currentCurses} meta={meta} engravingFx={getCombinedClassFx(meta, classData?.id)} chapterGimmick={chapter?.gimmick || null} autoPlay={autoHunt} autoSpeed={autoSpeed} onCycleAutoSpeed={cycleAutoSpeed} autoRunCount={autoSession?.runCount || 0} onToggleAuto={toggleAutoHunt} onVictory={handleVictory} onDefeat={handleDefeat} />}
@@ -2599,7 +2645,7 @@ export default function App() {
             {screen === 'shop' && <ShopScreen gold={gold} skills={skills} relics={relics} ultimates={ultimates} curses={currentCurses} autoPlay={autoHunt} autoSpeed={autoSpeed} onBuy={handleShopBuy} onLeave={handleShopLeave} classId={classData?.id} />}
             {screen === 'forge' && <ForgeScreen relics={relics} skills={skills} activeRelicNames={activeRelicNames} meta={meta} onCombine={handleForgeCombine} onLeave={handleForgeLeave} />}
             {screen === 'chapterClear' && chapter && <ChapterClearScreen chapter={chapter} isLastChapter={false} hp={hp} maxHp={maxHp} meta={meta} curses={currentCurses} onContinue={handleChapterContinue} />}
-            {screen === 'expeditionClear' && currentExpedition && <ExpeditionClearScreen expedition={currentExpedition} soulsGained={runSouls} firstClear={runFirstChampClear} runStats={runStats} titleDrop={currentExpedition.isMasters ? mastersDrop : null} onContinue={handleExpeditionClearContinue} />}
+            {screen === 'expeditionClear' && currentExpedition && <ExpeditionClearScreen expedition={currentExpedition} soulsGained={runSouls} firstClear={runFirstChampClear} runStats={runStats} titleDrop={currentExpedition.isMasters ? mastersDrop : null} retreat={runRetreat} onContinue={handleExpeditionClearContinue} />}
             {screen === 'defeat' && <DefeatScreen classData={classData} chapter={chapter} soulsGained={runSouls} onContinue={handleDefeatContinue} />}
             {screen === 'status' && (() => {
               const _baseStats = { ...classData.stats, ...stats };
