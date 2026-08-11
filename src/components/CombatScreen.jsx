@@ -34,6 +34,7 @@ import {
   COMBAT_SKILLS,
   GAME_CONFIG,
   CLASS_ULTIMATES,
+  POTIONS,
 } from '../data.js';
 import { calculateDamage, getDisplayDamage, rollCrit, rollDodge } from '../combat/damage.js';
 import {
@@ -47,7 +48,7 @@ import {
 } from '../combat/initCombat.js';
 import { FloatingLabel, DamageVignette, WhiteFlash, SlashFx, MagicImpactFx, MagicParticles, BarrierRing, BarrierBreakFx, ThrustFx, BladeGuardFx, ShadowStrikeFx, StatusOverlay, UltimateCutin, EternalFlameCutin, FireballFx, ExplosionFx, IgniteGlowAura, IgniteExplodeFx, FlameBarrierFx, FlameReflectFx, CritScreenFx } from './CombatEffects.jsx';
 
-export default function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimates = [], initialRelics = [], activeSkills = null, activeRelicNames = null, enemyKey, isBoss, expedition, curses = [], meta, engravingFx = {}, chapterGimmick = null, autoPlay = false, autoSpeed = 1, onCycleAutoSpeed = null, autoRunCount = 0, onToggleAuto = null, onVictory, onDefeat }) {
+export default function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimates = [], initialRelics = [], activeSkills = null, activeRelicNames = null, enemyKey, isBoss, expedition, curses = [], meta, engravingFx = {}, chapterGimmick = null, autoPlay = false, autoSpeed = 1, onCycleAutoSpeed = null, autoRunCount = 0, onToggleAuto = null, belt = [], onConsumePotion = null, onVictory, onDefeat }) {
   // 1.80.0~ 자동 사냥 배속 — 자동 중에만 내부 진행·연출 딜레이 압축 (수동 플레이는 원속도)
   const dly = (ms) => (autoPlay && autoSpeed > 1 ? Math.max(40, Math.round(ms / autoSpeed)) : ms);
   // 1.89.0~ 마스터즈 기믹 융합 — chapterGimmick이 배열이면 전부 동시 적용
@@ -820,6 +821,55 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
   };
 
   // ============================================
+  // 1.96.0~ 황혼의 벨트 — 포션 사용 (AP 소모 없음, 턴당 1회. 회복 보정 미적용 — 표기값 그대로)
+  // ============================================
+  const handleUsePotion = (idx) => {
+    if (phase !== 'playerTurn') return;
+    if (actionLockRef.current) return;
+    if (player.usedPotionThisTurn) return;
+    const potion = POTIONS[belt[idx]];
+    if (!potion || !onConsumePotion) return;
+    const newPlayer = { ...player, usedPotionThisTurn: true };
+    const newLog = [...log];
+    if (potion.healPct || potion.healFull) {
+      const heal = potion.healFull
+        ? newPlayer.maxHp - newPlayer.hp
+        : Math.floor(newPlayer.maxHp * (potion.healPct / 100));
+      const actual = Math.min(newPlayer.maxHp - newPlayer.hp, heal);
+      newPlayer.hp = Math.min(newPlayer.maxHp, newPlayer.hp + heal);
+      newLog.push({ type: 'heal', text: `${potion.icon} [${potion.name}] HP +${actual}` });
+      if (actual > 0) pushFxLabel('player', 'heal', actual);
+    } else if (potion.ether) {
+      newPlayer.ether = (newPlayer.ether || 0) + potion.ether;
+      newLog.push({ type: 'system', text: `${potion.icon} [${potion.name}] 에테르 +${potion.ether}` });
+    }
+    setPlayer(newPlayer);
+    setLog(newLog);
+    onConsumePotion(idx);
+  };
+
+  // 1.96.0~ 자동 사냥 물약 룰 (PM 결정): HP 50% 미만 → 부족분을 채우는 가장 작은 HP 물약
+  //   (없으면 가장 큰 것) / 에테르 0 → 에테르 물약. 사용해도 AP 미소모 — 같은 턴 행동 계속
+  const chooseAutoPotion = () => {
+    if (player.usedPotionThisTurn || belt.length === 0 || !onConsumePotion) return -1;
+    const hpRatio = player.maxHp > 0 ? player.hp / player.maxHp : 1;
+    if (hpRatio < 0.5) {
+      const missing = player.maxHp - player.hp;
+      const healVal = (pid) => POTIONS[pid]?.healFull ? Infinity : Math.floor(player.maxHp * ((POTIONS[pid]?.healPct || 0) / 100));
+      const hpPots = belt.map((pid, i) => ({ pid, i })).filter(x => POTIONS[x.pid]?.healPct || POTIONS[x.pid]?.healFull);
+      if (hpPots.length > 0) {
+        const covering = hpPots.filter(x => healVal(x.pid) >= missing).sort((a, b) => healVal(a.pid) - healVal(b.pid));
+        return (covering[0] || [...hpPots].sort((a, b) => healVal(b.pid) - healVal(a.pid))[0]).i;
+      }
+    }
+    if ((player.ether || 0) === 0) {
+      const eIdx = belt.findIndex(pid => POTIONS[pid]?.ether);
+      if (eIdx >= 0) return eIdx;
+    }
+    return -1;
+  };
+
+  // ============================================
   // 1.72.0~ 자동 사냥 — 스킬 선택 AI
   // ============================================
   // 우선순위 (최대 데미지 + 방어 최적화):
@@ -1034,13 +1084,16 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     if (phase !== 'playerTurn') return;
     const t = setTimeout(() => {
       if (actionLockRef.current) return;
+      // 1.96.0~ 벨트 물약 우선 (AP 미소모 — 사용 후 상태 갱신으로 이 효과가 다시 돌아 행동 계속)
+      const potionIdx = chooseAutoPotion();
+      if (potionIdx >= 0) { handleUsePotion(potionIdx); return; }
       const action = chooseAutoAction();
       if (action === 'ULT') handleUltimate();
       else if (action === 'END') handleEndTurn();
       else if (action) handlePlayerAction(action);
     }, dly(550));
     return () => clearTimeout(t);
-  }, [autoPlay, phase, player]);
+  }, [autoPlay, phase, player, belt]);
 
   // === 직업 소울 스킬 발동 ===
   // 소울 게이지 100에서만 호출됨. 발동 시 게이지 0으로 리셋, 컷인 0.9초 후
@@ -1923,6 +1976,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
 
     // 새 턴 시작: 단독 버프 스킬 사용 플래그 리셋
     newPlayer.usedBuffThisTurn = false;
+    // 1.96.0~ 벨트 포션 사용 플래그 리셋 (턴당 1회)
+    newPlayer.usedPotionThisTurn = false;
     // 1.69.0 전투 개편 B/C — AP 재충전 + 콤보 추적 리셋 (턴 경계에서 연계 초기화)
     newPlayer.ap = AP_PER_TURN;
     newPlayer._lastSkillThisTurn = null;
@@ -2818,6 +2873,30 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           })()}
           {phase === 'intro' && <div className="text-center text-[11px] font-bold w-full" style={{ color: PALETTE.textDim }}>전투 준비 중...</div>}
           {phase === 'enemyTurn' && <div className="text-center text-[11px] font-bold w-full" style={{ color: PALETTE.accent }}>◂ 적의 턴 ◂</div>}
+          {/* 1.96.0~ 황혼의 벨트 — 포션 슬롯 (AP 소모 없음, 턴당 1회) */}
+          {phase === 'playerTurn' && belt.length > 0 && (
+            <div className="flex gap-1.5 w-full mb-1.5 items-center">
+              <span className="text-[9px] flex-none" style={{ color: PALETTE.textDim, letterSpacing: '0.15em' }}>벨트</span>
+              {belt.map((pid, idx) => {
+                const potion = POTIONS[pid];
+                if (!potion) return null;
+                const disabled = !!player.usedPotionThisTurn;
+                return (
+                  <button key={`${pid}-${idx}`} disabled={disabled} onClick={() => handleUsePotion(idx)}
+                    className="ui-press flex items-center gap-1 px-2 py-1"
+                    style={{
+                      borderRadius: 999, background: disabled ? 'rgba(255,255,255,0.04)' : `${potion.color}22`,
+                      border: `1px solid ${disabled ? 'rgba(255,255,255,0.12)' : `${potion.color}88`}`,
+                      opacity: disabled ? 0.45 : 1,
+                    }}>
+                    <span style={{ fontSize: 13 }}>{potion.icon}</span>
+                    <span className="text-[10px]" style={{ color: PALETTE.text }}>{potion.name.replace('회복 물약 ', '').replace('에테르 물약', '에테르')}</span>
+                  </button>
+                );
+              })}
+              {player.usedPotionThisTurn && <span className="text-[9px] ml-auto flex-none" style={{ color: PALETTE.textDim }}>이번 턴 사용됨</span>}
+            </div>
+          )}
           {phase === 'playerTurn' && (
             <div className={`grid gap-1.5 w-full ${classData.ultimateId ? 'grid-cols-4' : 'grid-cols-3'}`}>
               {classData.combatSkills.map(skillKey => {

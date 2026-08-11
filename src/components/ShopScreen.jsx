@@ -4,19 +4,24 @@
 
 import React, { useState, useEffect } from 'react';
 import { PALETTE, hasCurse, AUTO_STAT_PREF } from '../utils/helpers.js';
-import { SHOP_PRICES, PASSIVE_SKILLS, CLASSES, COMBAT_SKILLS } from '../data.js';
+import { SHOP_PRICES, PASSIVE_SKILLS, CLASSES, COMBAT_SKILLS, POTIONS } from '../data.js';
 import { getRewardPool, rollRewards } from '../utils/rewards.js';
 
-export default function ShopScreen({ gold, skills, relics, ultimates, curses = [], autoPlay = false, autoSpeed = 1, onBuy, onLeave, classId = null, hp = null, maxHp = null }) {
+export default function ShopScreen({ gold, skills, relics, ultimates, curses = [], autoPlay = false, autoSpeed = 1, onBuy, onLeave, classId = null, hp = null, maxHp = null, beltCount = 0, beltSlots = 0 }) {
   const priceMultiplier = hasCurse(curses, 'curse_shopPrice+50') ? 1.5 : 1.0;
   // 상점 재고: 유물·궁극·재화는 제외하고 다양한 카테고리로
   const [stock] = useState(() => {
     const initial = rollRewards(8, false, skills, relics, ultimates, classId);
     // 유물/궁극/재화 제외, 4개만 추출
-    return initial.filter(r => 
-      r.type !== 'relic' && r.type !== 'ultimate' && 
+    const base = initial.filter(r =>
+      r.type !== 'relic' && r.type !== 'ultimate' &&
       r.type !== 'gold' && r.type !== 'gem'
     ).slice(0, 4);
+    // 1.96.0~ 황혼의 벨트 — 포션 2종 랜덤 진열 (중복 가능)
+    const potionIds = Object.keys(POTIONS);
+    const p1 = potionIds[Math.floor(Math.random() * potionIds.length)];
+    const p2 = potionIds[Math.floor(Math.random() * potionIds.length)];
+    return [...base, { type: 'potion', potionId: p1 }, { type: 'potion', potionId: p2 }];
   });
   const [bought, setBought] = useState(new Set());
 
@@ -26,6 +31,7 @@ export default function ShopScreen({ gold, skills, relics, ultimates, curses = [
     else if (r.type === 'stat') base = SHOP_PRICES.stat;
     else if (r.type === 'heal_full') base = SHOP_PRICES.heal_full;
     else if (r.type === 'heal') base = r.value === 50 ? SHOP_PRICES.heal_50 : SHOP_PRICES.heal_100;
+    else if (r.type === 'potion') base = POTIONS[r.potionId]?.price || SHOP_PRICES.default;
     else base = SHOP_PRICES.default;
     return Math.ceil(base * priceMultiplier);
   };
@@ -53,6 +59,8 @@ export default function ShopScreen({ gold, skills, relics, ultimates, curses = [
             return (skills[r.name] || 0) < (PASSIVE_SKILLS[r.name]?.maxLv || 7);
           }
           if ((r.type === 'heal' || r.type === 'heal_full') && hpRatio < 0.6) return true;
+          // 1.96.0~ 포션: 벨트 여유 있으면 자동 구매 대상 (구매분 반영 위해 beltCount + 이번 세션 구매 수)
+          if (r.type === 'potion') return beltCount < beltSlots;
           return r.type === 'stat';
         });
       const score = ({ r }) => {
@@ -60,6 +68,8 @@ export default function ShopScreen({ gold, skills, relics, ultimates, curses = [
         if (r.type === 'heal_full' && hpRatio < 0.4) return 500;
         if (r.type === 'heal' && hpRatio < 0.4) return 450;
         if ((r.type === 'heal' || r.type === 'heal_full') && hpRatio < 0.6) return 250;
+        // 1.96.0~ 포션 — 생존 직결이라 패시브 강화보다 반 단계 아래, 새 패시브보다 위
+        if (r.type === 'potion') return 150;
         if (r.type === 'skill' && PASSIVE_SKILLS[r.name]?.classOnly === classId) return 300;
         if (r.type === 'skill' && (skills[r.name] || 0) > 0) return 200 + (skills[r.name] || 0);
         if (r.type === 'skill') return 100;
@@ -86,6 +96,7 @@ export default function ShopScreen({ gold, skills, relics, ultimates, curses = [
     else if (r.type === 'stat') { title = `${r.name} +${r.value}`; color = PALETTE.dawn; }
     else if (r.type === 'heal') { title = `회복 ${r.value}`; color = PALETTE.green; }
     else if (r.type === 'heal_full') { title = '완전 회복'; color = PALETTE.legendary; }
+    else if (r.type === 'potion') { const p = POTIONS[r.potionId]; title = `${p?.icon || '🧪'} ${p?.name || '물약'} — ${p?.desc || ''}`; color = p?.color || PALETTE.green; }
     else { title = `${r.type} +${r.value}`; color = PALETTE.dawn; }
 
     // 패시브 Lv 변화 계산
@@ -93,16 +104,18 @@ export default function ShopScreen({ gold, skills, relics, ultimates, curses = [
     const nextLv = currentLv + 1;
     const maxLv = r.type === 'skill' ? (PASSIVE_SKILLS[r.name]?.maxLv || 7) : 0;
     const isMaxed = r.type === 'skill' && currentLv >= maxLv;
+    // 1.96.0~ 포션: 벨트가 가득이면 구매 불가
+    const beltFull = r.type === 'potion' && beltCount >= beltSlots;
 
     return (
-      <button key={idx} disabled={!canAfford || isBought || isMaxed}
+      <button key={idx} disabled={!canAfford || isBought || isMaxed || beltFull}
         onClick={() => { onBuy(r, price); setBought(prev => new Set([...prev, idx])); }}
         className="ui-press w-full text-left px-3 py-2.5 transition-all"
         style={{
           borderRadius: 13,
           background: isBought ? 'rgba(255,255,255,0.02)' : `${color}15`,
           border: `1px solid ${isBought ? 'var(--ui-line)' : `${color}88`}`,
-          opacity: isBought ? 0.4 : (canAfford && !isMaxed ? 1 : 0.6),
+          opacity: isBought ? 0.4 : (canAfford && !isMaxed && !beltFull ? 1 : 0.6),
         }}>
         <div className="flex items-center justify-between">
           <div className="flex-1 min-w-0">
@@ -115,7 +128,7 @@ export default function ShopScreen({ gold, skills, relics, ultimates, curses = [
               )}
             </div>
             <div className="text-[10px]" style={{ color: PALETTE.textDim }}>
-              {isBought ? '구매 완료' : r.type === 'skill' ? PASSIVE_SKILLS[r.name].desc : ''}
+              {isBought ? '구매 완료' : beltFull ? `벨트 가득 (${beltCount}/${beltSlots})` : r.type === 'potion' ? `벨트 ${beltCount}/${beltSlots}` : r.type === 'skill' ? PASSIVE_SKILLS[r.name].desc : ''}
             </div>
           </div>
           <div className="text-[11px] tabular-nums" style={{ color: canAfford ? PALETTE.dawn : PALETTE.accent }}>
