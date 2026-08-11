@@ -457,6 +457,15 @@ export default function App() {
       const cloud = await loadCloudMeta(user.uid);
       let safe;
       if (cloud) {
+        // 1.99.4~ 진행도 급락 감지 시 선택 화면 (복구 안전망 — 구글 로그인과 동일)
+        const localExisting = await loadMeta();
+        const localMine = localExisting && (!localExisting.ownerUid || localExisting.ownerUid === user.uid) ? localExisting : null;
+        if (shouldOfferRecovery(localMine, cloud)) {
+          setAuthMode('guest');
+          setAuthModeState('guest');
+          setRecoveryChoice({ local: localMine, cloud, uid: user.uid });
+          return;
+        }
         // 같은 UID로 재로그인 — 클라우드 데이터 사용 (1.99.3~ 이전 계정 로컬 잔재도 즉시 폐기)
         safe = { ...getDefaultMeta(), ...cloud, ownerUid: user.uid };
         await clearLocalMeta();
@@ -487,6 +496,15 @@ export default function App() {
       const cloud = await loadCloudMeta(user.uid);
       let safe;
       if (cloud) {
+        // 1.99.4~ 로컬이 같은 계정(또는 표식 없음)이고 진행도가 크게 어긋나면 선택 화면 (복구 안전망)
+        const localExisting = await loadMeta();
+        const localMine = localExisting && (!localExisting.ownerUid || localExisting.ownerUid === user.uid) ? localExisting : null;
+        if (shouldOfferRecovery(localMine, cloud)) {
+          setAuthMode('google');
+          setAuthModeState('google');
+          setRecoveryChoice({ local: localMine, cloud, uid: user.uid });
+          return;
+        }
         // 기존 구글 계정 재로그인 — 클라우드 데이터 사용 (1.99.3~ 이전 계정 로컬 잔재도 즉시 폐기)
         safe = { ...getDefaultMeta(), ...cloud, ownerUid: user.uid };
         await clearLocalMeta();
@@ -545,6 +563,43 @@ export default function App() {
     }
   };
 
+  // ============================================
+  // 1.99.4~ 데이터 선택 복구 (PM 실사고 대응)
+  // 로컬·클라우드 진행도가 크게 어긋나면 자동 병합(pickLatest) 대신 사용자에게 선택을 맡긴다.
+  // 정상 플레이에선 로컬·클라우드가 거의 같아 절대 뜨지 않음 — 오염·복구 상황 전용 안전망.
+  // ============================================
+  const [recoveryChoice, setRecoveryChoice] = useState(null); // { local, cloud, uid }
+
+  const progressScore = (m) => {
+    if (!m) return 0;
+    const awakenSum = Object.values(m.engravings || {}).reduce((s, e) => s + (e?.lv || 0), 0);
+    return (m.totalKills || 0) + (m.totalRuns || 0) * 10 + (m.souls || 0) / 10 + awakenSum * 50;
+  };
+
+  // pickLatest가 고르려는 쪽의 진행도가 반대쪽의 70% 미만이면 → 오염 의심, 선택 화면
+  const shouldOfferRecovery = (local, cloud) => {
+    if (!local || !cloud) return false;
+    const winner = pickLatest(local, cloud);
+    const loser = winner === local ? cloud : local;
+    const w = progressScore(winner);
+    const l = progressScore(loser);
+    return l > 100 && w < l * 0.7;
+  };
+
+  const resolveRecovery = async (pick) => {
+    if (!recoveryChoice) return;
+    const src = pick === 'local' ? recoveryChoice.local : recoveryChoice.cloud;
+    const safe = { ...getDefaultMeta(), ...src, ownerUid: recoveryChoice.uid };
+    const raidBackfill = backfillRaidSeries(safe.raid);
+    if (raidBackfill.changed) safe.raid = raidBackfill.raid;
+    setMeta(safe);
+    setMetaLoaded(true);
+    setRecoveryChoice(null);
+    // 선택한 데이터를 양쪽(로컬+클라우드) 정본으로 즉시 확정
+    saveMeta(safe);
+    try { await saveCloudMeta(recoveryChoice.uid, safe); } catch (e) { console.warn('[Recovery] cloud save 지연:', e); }
+  };
+
   // 메타 데이터 로드 (앱 시작 시 한 번, authMode가 이미 결정된 경우만)
   useEffect(() => {
     if (!authReady) return;  // Firebase 초기화 대기
@@ -567,6 +622,11 @@ export default function App() {
             if (local?.ownerUid && local.ownerUid !== firebaseUser.uid) {
               local = null;
               await clearLocalMeta();
+            }
+            // 1.99.4~ 진행도가 크게 어긋나면 자동 병합 대신 사용자 선택 (복구 안전망)
+            if (shouldOfferRecovery(local, cloud)) {
+              setRecoveryChoice({ local, cloud, uid: firebaseUser.uid });
+              return; // metaLoaded 유지 X — 선택 후 resolveRecovery가 마무리
             }
             const merged = pickLatest(local, cloud) || local || getDefaultMeta();
             const safe = { ...getDefaultMeta(), ...merged, ownerUid: firebaseUser.uid };
@@ -2836,6 +2896,50 @@ export default function App() {
                 }}
               />
             )}
+            {/* 1.99.4~ 데이터 선택 복구 — 로컬·클라우드 진행도 급락 감지 시에만 표시 */}
+            {recoveryChoice && (() => {
+              const fmt = (m) => {
+                const awaken = Object.values(m?.engravings || {}).reduce((s, e) => s + (e?.lv || 0), 0);
+                return {
+                  saved: m?.lastSavedAt ? new Date(m.lastSavedAt).toLocaleString('ko-KR') : '기록 없음',
+                  souls: m?.souls || 0, kills: m?.totalKills || 0, runs: m?.totalRuns || 0, awaken,
+                };
+              };
+              const L = fmt(recoveryChoice.local);
+              const C = fmt(recoveryChoice.cloud);
+              const Card = ({ title, d, pick, color }) => (
+                <div className="flex-1 p-3" style={{ borderRadius: 12, background: `${color}12`, border: `1.5px solid ${color}` }}>
+                  <div className="text-[11px] font-bold mb-1.5" style={{ color }}>{title}</div>
+                  <div className="space-y-0.5 text-[10.5px] tabular-nums" style={{ color: PALETTE.text }}>
+                    <div>마지막 저장: <b>{d.saved}</b></div>
+                    <div>영혼 ✦<b>{d.souls}</b> · 각성도 합 <b>{d.awaken}</b></div>
+                    <div>누적 처치 <b>{d.kills}</b> · 원정 <b>{d.runs}</b>회</div>
+                  </div>
+                  <button onClick={() => resolveRecovery(pick)} className="ui-press w-full mt-2 py-2 text-[11px] font-bold"
+                    style={{ borderRadius: 10, background: `${color}30`, border: `1px solid ${color}`, color: PALETTE.text }}>
+                    이 데이터 사용
+                  </button>
+                </div>
+              );
+              return (
+                <div className="absolute inset-0 z-[100] flex items-center justify-center px-4" style={{ background: 'rgba(0,0,0,0.92)' }}>
+                  <div className="w-full max-w-md p-4" style={{ background: PALETTE.bgDeep, border: `1.5px solid ${PALETTE.legendary}`, borderRadius: 16 }}>
+                    <div className="text-center text-[13px] font-bold mb-1" style={{ color: PALETTE.legendary }}>⚠ 데이터 선택 필요</div>
+                    <div className="text-[10.5px] text-center mb-3" style={{ color: PALETTE.textDim, lineHeight: 1.5 }}>
+                      이 기기의 데이터와 클라우드 데이터의 진행도가 크게 다릅니다.<br />
+                      <b style={{ color: PALETTE.accent }}>어느 쪽을 유지할지 직접 선택하세요 — 선택하지 않은 쪽은 덮어써집니다.</b>
+                    </div>
+                    <div className="flex gap-2.5">
+                      <Card title="📱 이 기기 데이터" d={L} pick="local" color={PALETTE.green} />
+                      <Card title="☁️ 클라우드 데이터" d={C} pick="cloud" color={PALETTE.ice} />
+                    </div>
+                    <div className="text-[9px] text-center mt-2.5" style={{ color: PALETTE.textDim }}>
+                      보통 진행도(영혼·처치·각성도)가 큰 쪽이 본래 데이터입니다. 저장 시각이 최신이라도 진행도가 낮다면 오염된 데이터일 수 있습니다.
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </PhoneFrame>
     </ResponsiveLayout>
   );
