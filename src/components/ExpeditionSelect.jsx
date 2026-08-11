@@ -97,6 +97,29 @@ export default function ExpeditionSelect({ meta, onSelect, onSelectChampionship,
   const [tab, setTab] = useState('classic');
   // 1.89.0~ 마스터즈 칭호 컬렉션 — 보고 있는 직업
   const [titleClass, setTitleClass] = useState('wanderer');
+  // 1.99.2~ 클리어 이력 직업 필터 (PM 지시) — null=전체(통합 기록), classId=해당 직업 기록
+  //   챔피언십 직업별 기록은 1.26.0부터 / 마스터즈는 1.99.2부터 누적 (이전 클리어 소급 불가)
+  const [clearFilter, setClearFilter] = useState(null);
+  const ClearFilterChips = () => (
+    <div className="flex gap-1.5 mb-2.5 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+      {[{ id: null, name: '전체' }, ...CLASSES.map(c => ({ id: c.id, name: c.name, color: c.color }))].map(f => {
+        const active = clearFilter === f.id;
+        return (
+          <button key={f.id ?? 'all'} onClick={() => setClearFilter(f.id)} className="ui-press flex-none px-2.5 py-1 text-[10px]"
+            style={{
+              borderRadius: 999,
+              background: active ? `${f.color || PALETTE.legendary}25` : 'rgba(255,255,255,0.04)',
+              border: `1px solid ${active ? (f.color || PALETTE.legendary) : 'var(--ui-line)'}`,
+              color: active ? (f.color || PALETTE.legendary) : PALETTE.textDim,
+              fontWeight: active ? 700 : 400,
+            }}>
+            {f.name}
+          </button>
+        );
+      })}
+      <span className="flex-none self-center" style={{ fontSize: 8.5, color: PALETTE.textDim }}>클리어 표시 기준</span>
+    </div>
+  );
   // 1.73.0~ 무한던전 스킵 결과 모달
   const [skipResult, setSkipResult] = useState(null);
 
@@ -378,6 +401,7 @@ export default function ExpeditionSelect({ meta, onSelect, onSelectChampionship,
             </div>
           </div>
 
+          <ClearFilterChips />
           {[['듀얼 퓨전 — 2컨셉 융합 · 보스 2연전', MASTERS_DUALS], ['트리플 퓨전 — 3컨셉 융합 · 보스 3연전 (최종)', MASTERS_TRIPLES]].map(([label, list]) => (
             <React.Fragment key={label}>
               <SectionLabel>{label}</SectionLabel>
@@ -388,7 +412,10 @@ export default function ExpeditionSelect({ meta, onSelect, onSelectChampionship,
                   const unlocked = isMastersFusionUnlocked(meta, fusion);
                   const gimmicks = fusion.concepts.map(c => MASTERS_GIMMICKS[c]);
                   const conceptNames = fusion.concepts.map(c => CHAMPIONSHIPS.find(x => x.id === c)?.name || c);
-                  const cleared = meta.clearedExpeditions?.includes(fusion.id);
+                  // 1.99.2~ 직업 필터: 선택 직업의 기록(1.99.2부터 누적, 소급 불가)만 표시
+                  const cleared = clearFilter
+                    ? !!meta.mastersClearsByClass?.[clearFilter]?.[fusion.id]
+                    : meta.clearedExpeditions?.includes(fusion.id);
                   const rates = TITLE_DROP_RATES[kind];
                   return (
                     <button key={fusion.id} disabled={!unlocked} onClick={() => unlocked && onSelectMasters?.(fusion)}
@@ -448,9 +475,13 @@ export default function ExpeditionSelect({ meta, onSelect, onSelectChampionship,
             </div>
           )}
 
+          <ClearFilterChips />
           <div className="ui-stagger flex flex-col gap-2">
             {CHAMPIONSHIPS.map((champ) => {
-              const clears = meta.championshipClears?.[champ.id] || {};
+              // 1.99.2~ 직업 필터: 선택 직업의 기록(1.26.0~ 누적)만 표시 — 해금 게이트는 전체 기록 유지
+              const clears = clearFilter
+                ? (meta.championshipClearsByClass?.[clearFilter]?.[champ.id] || {})
+                : (meta.championshipClears?.[champ.id] || {});
               const clearCount = Object.values(clears).filter(Boolean).length;
               const allCleared = clearCount === 4;
               const canEnter = championshipUnlocked;

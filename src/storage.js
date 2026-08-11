@@ -126,6 +126,10 @@ const DEFAULT_META = {
     elf:        {},
     priest:     {},
   },
+  // 1.99.2~ 마스터즈 직업별 클리어 추적 — mastersClearsByClass[classId][fusionId] = true (소급 불가)
+  mastersClearsByClass: {
+    wanderer: {}, sage: {}, demonblood: {}, elf: {}, priest: {},
+  },
   // 1.26.0 조건 시스템 추가 안내 모달 트리거 (1회만 표시)
   // null = 안내 안 보여줌 / true = 표시 필요
   awakeningConditionNotice: null,
@@ -184,6 +188,8 @@ export async function loadMeta() {
         // 1.26.0 직업별 추적 데이터 보강
         safe.ultimatesPickedByClass = { ...DEFAULT_META.ultimatesPickedByClass, ...(data.ultimatesPickedByClass || {}) };
         safe.championshipClearsByClass = { ...DEFAULT_META.championshipClearsByClass, ...(data.championshipClearsByClass || {}) };
+        // 1.99.2 마스터즈 직업별 추적 보강
+        safe.mastersClearsByClass = { ...DEFAULT_META.mastersClearsByClass, ...(data.mastersClearsByClass || {}) };
         // 1.26.0 조건 시스템 신설 안내 — ultimatesPickedByClass 키가 데이터에 없었다면 첫 마이그레이션
         if (!data.ultimatesPickedByClass && !data.awakeningConditionNotice) {
           safe.awakeningConditionNotice = true;
@@ -1307,6 +1313,21 @@ export function clearWandererRenameNotice(meta) {
 export function clearAltarRedesignNotice(meta) {
   if (!meta.altarRedesignNotice) return meta;
   return { ...meta, altarRedesignNotice: null };
+}
+
+// 1.99.2~ 마스터즈 직업별 클리어 기록 (PM 지시: 클리어 이력 직업별 분리)
+export function recordMastersClearByClass(meta, classId, fusionId) {
+  if (!classId || !fusionId) return meta;
+  const byClass = meta.mastersClearsByClass || {};
+  const classClears = byClass[classId] || {};
+  if (classClears[fusionId]) return meta;
+  return {
+    ...meta,
+    mastersClearsByClass: {
+      ...byClass,
+      [classId]: { ...classClears, [fusionId]: true },
+    },
+  };
 }
 
 // ============================================
