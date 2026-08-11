@@ -5,12 +5,15 @@ import React from 'react';
 import { PALETTE } from '../utils/helpers.js';
 import { RELICS, TITLE_TIERS } from '../data.js';
 
-export default function ExpeditionClearScreen({ expedition, soulsGained, firstClear, runStats = null, titleDrop = null, onContinue }) {
+export default function ExpeditionClearScreen({ expedition, soulsGained, firstClear, runStats = null, titleDrop = null, retreat = false, onContinue }) {
   // 신규 해금 유물 정보 찾기
   const newRelic = firstClear?.newRelic ? RELICS.find(r => r.name === firstClear.newRelic) : null;
   const isTutorial = expedition.isTutorial === true;
-  const clearLabel = isTutorial ? 'TUTORIAL CLEAR' : 'EXPEDITION CLEAR';
-  const flavor = isTutorial
+  // 1.93.0~ 무한모드 중간 포기 — 클리어가 아니라 자발 종료 정산
+  const clearLabel = retreat ? 'EXPEDITION END' : isTutorial ? 'TUTORIAL CLEAR' : 'EXPEDITION CLEAR';
+  const flavor = retreat
+    ? '"여기까지의 전리품을 챙겨\n황혼을 벗어난다."'
+    : isTutorial
     ? '"한 걸음의 끝.\n다음 시련이 기다린다."'
     : '"원정의 끝.\n영혼이 깃든다."';
 

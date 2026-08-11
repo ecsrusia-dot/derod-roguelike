@@ -7,8 +7,8 @@
 //   - 하단 탭바: 텍스트 5개 → 아이콘+라벨 4개 (미구현 "설정" 제거), 44px 터치 타깃
 // ============================================
 
-import React from 'react';
-import { BookOpen, Coins, Crown, Flame, Hammer, HelpCircle, LogOut, Skull, Sword, Trophy, User, X } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { BookOpen, Coins, Crown, Flag, Flame, Hammer, HelpCircle, LogOut, Skull, Sword, Trophy, User, X } from 'lucide-react';
 import { PALETTE } from '../utils/helpers.js';
 import { GlassPanel, Chip } from './ui/CommonUI.jsx';
 
@@ -37,7 +37,22 @@ function NavTab({ icon: Icon, label, onClick }) {
   );
 }
 
-export default function MapView({ chapter, classData, mapData, hp, maxHp, gold, gem, relics = [], activeRelicNames = null, expedition, curses = [], chapterIdx, autoHunt = false, autoHuntAllowed = false, onToggleAutoHunt = null, autoSpeed = 1, onCycleAutoSpeed = null, autoRunCount = 0, onEnterNode, onOpenStatus, onOpenAchievements, onOpenCodex, onBack }) {
+export default function MapView({ chapter, classData, mapData, hp, maxHp, gold, gem, relics = [], activeRelicNames = null, expedition, curses = [], chapterIdx, autoHunt = false, autoHuntAllowed = false, onToggleAutoHunt = null, autoSpeed = 1, onCycleAutoSpeed = null, autoRunCount = 0, onEnterNode, onOpenStatus, onOpenAchievements, onOpenCodex, onBack, onRetreat = null }) {
+  // 1.93.0~ 무한모드 중간 포기 — 오탭 방지 2단 확인 (첫 탭 후 3초 내 재탭 시 실행)
+  const [retreatArmed, setRetreatArmed] = useState(false);
+  const retreatTimerRef = useRef(null);
+  const handleRetreatTap = () => {
+    if (!onRetreat) return;
+    if (retreatArmed) {
+      clearTimeout(retreatTimerRef.current);
+      setRetreatArmed(false);
+      onRetreat();
+      return;
+    }
+    setRetreatArmed(true);
+    clearTimeout(retreatTimerRef.current);
+    retreatTimerRef.current = setTimeout(() => setRetreatArmed(false), 3000);
+  };
   // 천리안 유물 보유 (활성 상태) 시 모든 노드 공개
   const hasMapReveal = relics && relics.some(r =>
     r.statBonus?.mapReveal > 0 && (!activeRelicNames || activeRelicNames.includes(r.name))
@@ -209,10 +224,21 @@ export default function MapView({ chapter, classData, mapData, hp, maxHp, gold, 
         })}
       </div>
 
-      {/* ===== 하단 탭바 — 아이콘 + 라벨 4종 ===== */}
+      {/* ===== 하단 탭바 — 아이콘 + 라벨 4종 (무한모드는 포기 포함 5종) ===== */}
       <div className="px-3 pb-3 pt-1 flex-none">
-        <GlassPanel className="grid grid-cols-4" style={{ borderRadius: 16, padding: 5 }}>
+        <GlassPanel className={`grid ${onRetreat ? 'grid-cols-5' : 'grid-cols-4'}`} style={{ borderRadius: 16, padding: 5 }}>
           <NavTab icon={LogOut} label="나가기" onClick={onBack} />
+          {onRetreat && (
+            <button onClick={handleRetreatTap} className="ui-press text-center" style={{
+              background: retreatArmed ? 'rgba(196,69,61,0.18)' : 'transparent', border: 'none',
+              padding: '7px 0 6px', borderRadius: 12,
+            }}>
+              <Flag size={17} className="mx-auto" style={{ color: retreatArmed ? '#c4453d' : PALETTE.dawn }} />
+              <div style={{ fontSize: 10, color: retreatArmed ? '#c4453d' : PALETTE.textDim, marginTop: 2, fontWeight: retreatArmed ? 700 : 400 }}>
+                {retreatArmed ? '확인?' : '포기'}
+              </div>
+            </button>
+          )}
           <NavTab icon={BookOpen} label="도감" onClick={onOpenCodex} />
           <NavTab icon={User} label="정보" onClick={onOpenStatus} />
           <NavTab icon={Trophy} label="업적" onClick={onOpenAchievements} />
