@@ -457,12 +457,13 @@ export default function App() {
       const cloud = await loadCloudMeta(user.uid);
       let safe;
       if (cloud) {
-        // 같은 UID로 재로그인 — 클라우드 데이터 사용
-        safe = { ...getDefaultMeta(), ...cloud };
+        // 같은 UID로 재로그인 — 클라우드 데이터 사용 (1.99.3~ 이전 계정 로컬 잔재도 즉시 폐기)
+        safe = { ...getDefaultMeta(), ...cloud, ownerUid: user.uid };
+        await clearLocalMeta();
       } else {
         // 새 게스트 — 로컬 데이터 무시하고 기본값 시작
         // (이전 모드의 데이터가 들어가는 것 방지)
-        safe = getDefaultMeta();
+        safe = { ...getDefaultMeta(), ownerUid: user.uid };
         // 로컬도 초기화
         await clearLocalMeta();
       }
@@ -486,11 +487,12 @@ export default function App() {
       const cloud = await loadCloudMeta(user.uid);
       let safe;
       if (cloud) {
-        // 기존 구글 계정 재로그인 — 클라우드 데이터 사용
-        safe = { ...getDefaultMeta(), ...cloud };
+        // 기존 구글 계정 재로그인 — 클라우드 데이터 사용 (1.99.3~ 이전 계정 로컬 잔재도 즉시 폐기)
+        safe = { ...getDefaultMeta(), ...cloud, ownerUid: user.uid };
+        await clearLocalMeta();
       } else {
         // 새 구글 계정 — 로컬 데이터 무시하고 기본값 시작
-        safe = getDefaultMeta();
+        safe = { ...getDefaultMeta(), ownerUid: user.uid };
         await clearLocalMeta();
       }
       setMeta(safe);
@@ -505,11 +507,16 @@ export default function App() {
   };
   
   // 로그아웃 — Firebase signOut + 로컬 클리어 + 모드 리셋
+  // 1.99.3 픽스: signOut이 실패해도 로컬 클리어·모드 리셋은 반드시 수행 (finally)
+  //   — 이전엔 signOut 오류 시 로컬에 이전 계정 데이터가 남아 다음 계정을 오염시킬 수 있었음
   const handleLogout = async () => {
     try {
       if (authMode !== 'local' && firebaseUser) {
         await signOut();
       }
+    } catch (err) {
+      console.error('[Logout] signOut failed (로컬 클리어는 계속 진행):', err);
+    } finally {
       // 로컬 IndexedDB 클리어 — 다음 모드 선택 시 옛 데이터 안 보이도록
       await clearLocalMeta();
       // 모드 리셋
@@ -519,9 +526,6 @@ export default function App() {
       setMetaLoaded(false);
       setMeta({ souls: 0, upgrades: {}, unlocks: [], clearedExpeditions: [] });
       setScreen('title');  // LoginScreen이 표시될 것
-    } catch (err) {
-      console.error('[Logout] Failed:', err);
-      throw err;
     }
   };
   
@@ -556,9 +560,16 @@ export default function App() {
           // Firebase 사용자가 있어야 함
           if (firebaseUser) {
             const cloud = await loadCloudMeta(firebaseUser.uid);
-            const local = await loadMeta();
-            const merged = pickLatest(local, cloud) || local;
-            const safe = { ...getDefaultMeta(), ...merged };
+            let local = await loadMeta();
+            // 1.99.3 픽스: 로컬 데이터가 다른 계정 소유면 병합에서 제외 + 즉시 폐기
+            //   (계정 전환 시 이전 계정의 로컬이 최신이라는 이유로 승리 → 현재 계정 클라우드를
+            //    덮어쓰던 데이터 오염 사고 방지 — PM 실사고 보고)
+            if (local?.ownerUid && local.ownerUid !== firebaseUser.uid) {
+              local = null;
+              await clearLocalMeta();
+            }
+            const merged = pickLatest(local, cloud) || local || getDefaultMeta();
+            const safe = { ...getDefaultMeta(), ...merged, ownerUid: firebaseUser.uid };
             // 1.79.1 클라우드 메타도 레이드 레거시 장비 series 백필 (loadMeta와 동일 픽스)
             const raidBackfill = backfillRaidSeries(safe.raid);
             if (raidBackfill.changed) safe.raid = raidBackfill.raid;

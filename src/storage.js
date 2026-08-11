@@ -14,6 +14,9 @@ const META_KEY = 'meta_data';
 
 // 기본 메타 데이터 구조
 const DEFAULT_META = {
+  // 1.99.3~ 로컬 데이터 소유 계정 (Firebase uid) — 계정 전환 시 이전 계정 로컬이
+  // pickLatest에서 승리해 현재 계정 클라우드를 덮어쓰던 오염 사고 방지용. local 모드는 null 유지.
+  ownerUid: null,
   souls: 0,                 // 보유 영혼
   upgrades: {},             // { meta_startHp: 3, meta_startGold: 2, ... } 단계
   unlocks: [],              // ['unlock_priest', 'unlock_expedition_2'] 해금된 ID
