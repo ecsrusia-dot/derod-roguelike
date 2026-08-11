@@ -2351,18 +2351,23 @@ export default function App() {
     } else if (screen === 'reward' && currentRewards && currentRewards.length > 0) {
       const hpRatio = maxHp > 0 ? hp / maxHp : 1;
       const classId = classData?.id;
+      // 1.91.0~ PM 지정 직업별 패시브 획득 우선순위 (🔒 룰 동결 — PM 지시로만 변경)
+      //   1.91.2: 방랑검사 정밀 5순위 / 1.92.0: 술법사 추가
+      const CLASS_SKILL_PRIO = {
+        wanderer: ['심안류', '심안', '회피', '재생', '정밀', '잔혹', '강타', '신앙', '가속'],
+        sage: ['이프리트', '마력', '신앙', '정밀', '재생', '잔혹', '강타', '회피'],
+      };
+      const prioList = CLASS_SKILL_PRIO[classId] || null;
       // 1.84.2 완화 (PM 결정): 잔혹은 Lv.3부터 자체 출혈 부여라 물리 직업군이면 자동 픽 허용
       //   — 마법 전용 직업(술법사·사제)만 제외 (수동 픽은 항상 가능)
+      // 1.92.0~ 예외: PM 지정 우선순위가 있는 직업은 그 리스트가 우선 (술법사도 잔혹 6순위 명시)
       const physCapable = !!classData?.combatSkills?.some(k => COMBAT_SKILLS[k]?.type === 'physical');
-      const pool = currentRewards.filter(r => !(r.type === 'skill' && r.name === '잔혹' && !physCapable));
+      const pool = currentRewards.filter(r => !(r.type === 'skill' && r.name === '잔혹' && !physCapable && !prioList));
       const cand = pool.length > 0 ? pool : currentRewards;
-      // 1.91.0~ 방랑검사 전용 (PM 지시): 패시브 획득 우선순위 고정 +
-      //   상위 5순위가 하나도 없으면 보석 리롤 1회
-      // 1.91.2 변경 (PM 지시): 정밀을 5순위로 추가, 잔혹 6위·강타 7위로 조정
-      const WANDERER_SKILL_PRIO = ['심안류', '심안', '회피', '재생', '정밀', '잔혹', '강타', '신앙', '가속'];
+      // PM 룰: 상위 5순위 패시브가 하나도 없으면 보석 리롤 1회
       let autoRerolled = false;
-      if (classId === 'wanderer') {
-        const top5 = WANDERER_SKILL_PRIO.slice(0, 5);
+      if (prioList) {
+        const top5 = prioList.slice(0, 5);
         const hasTop5 = cand.some(r => r.type === 'skill' && top5.includes(r.name));
         // 회복(저체력)·궁극 진화가 있으면 그게 더 상위 픽이라 리롤하지 않음
         const mustPick = (hpRatio < 0.5 && cand.some(r => r.type === 'heal' || r.type === 'heal_full'))
@@ -2379,11 +2384,11 @@ export default function App() {
       }
       if (!autoRerolled) {
         // 1.72.1~ 직업 맞춤 보상 우선순위:
-        // 저체력 회복 > 궁극 진화 > [방랑검사: PM 지정 8순위] / [그 외: 직업 전용 패시브(classOnly) >
+        // 저체력 회복 > 궁극 진화 > [PM 지정 직업: 고정 우선순위] / [그 외: 직업 전용 패시브(classOnly) >
         // 보유 패시브 강화(Lv 높은 순 — 7Lv 궁극 진화 가속)] > 직업 주력 스탯 >
         // 새 패시브 > 유물 > 첫 번째
-        const skillPick = classId === 'wanderer'
-          ? WANDERER_SKILL_PRIO.map(name => cand.find(r => r.type === 'skill' && r.name === name)).find(Boolean)
+        const skillPick = prioList
+          ? prioList.map(name => cand.find(r => r.type === 'skill' && r.name === name)).find(Boolean)
           : (cand.find(r => r.type === 'skill' && PASSIVE_SKILLS[r.name]?.classOnly === classId) ||
              cand
                .filter(r => r.type === 'skill' && (skills[r.name] || 0) > 0)
