@@ -18,6 +18,8 @@ import {
   getActiveRelicStat,
   getEffectiveSkills,
   getMetaBonus,
+  getClassBeltSlots,
+  getBeltExpansionCount,
   hasChampionMeta,
   getChampionshipMetaHp,
   getChampionshipMetaGold,
@@ -133,7 +135,6 @@ import {
   applyRaidDifficulty,
   ENGRAVINGS,
   POTIONS,
-  BELT_BASE_SLOTS,
 } from './data.js';
 import { getKstDateKey } from './utils/dailyChallenge.js';
 import { simulateBestEndlessRun } from './utils/endlessSkipSim.js';
@@ -289,9 +290,9 @@ export default function App() {
   // 1.93.0~ 중간 보스 보상: 픽 후 챕터 클리어로 진행 / 무한 포기: 정산 화면 라벨 분기
   const [bossRewardPending, setBossRewardPending] = useState(false);
   const [runRetreat, setRunRetreat] = useState(false);
-  // 1.96.0~ 황혼의 벨트 (PM 결정) — 런 한정 포션. 슬롯 = 기본 2 + 제단 「황혼의 벨트」
+  // 1.96.0~ 황혼의 벨트 — 런 한정 포션. 1.97.0~ 직업별 슬롯 (기본/최대 = 검사 2/4 · 술법사 1/3 · 마족 0/1 · 정령사 1/3 · 사제 1/2)
   const [belt, setBelt] = useState([]);
-  const beltSlots = BELT_BASE_SLOTS + getMetaBonus(meta, 'beltSlot+1');
+  const beltSlots = getClassBeltSlots(meta, classData?.id);
   const handleConsumePotion = (idx) => setBelt(prev => prev.filter((_, i) => i !== idx));
   // 승리 화면에 표시할 획득 재화 (gold/gem/souls)
   const [victoryGains, setVictoryGains] = useState({ gold: 0, gem: 0, souls: 0 });
@@ -843,6 +844,23 @@ export default function App() {
   const initializeRun = (chapterData, idx = 0, expeditionOverride = null, cursesOverride = null) => {
     const exp = expeditionOverride || currentExpedition;
     const curses = cursesOverride || currentCurses;
+
+    // 1.97.0~ 황혼의 벨트 — 맵(챕터) 시작 시 확장 1칸당 랜덤 포션 +1 (PM 룰, 슬롯 상한).
+    //   새 런(idx 0)은 빈 벨트에서 시작 + 확장 보너스만큼 지급
+    {
+      const beltExp = getBeltExpansionCount(meta, classData.id);
+      const beltCap = getClassBeltSlots(meta, classData.id);
+      setBelt(prev => {
+        const start = idx === 0 ? [] : prev;
+        if (beltExp <= 0) return start;
+        const ids = Object.keys(POTIONS);
+        const next = [...start];
+        for (let i = 0; i < beltExp && next.length < beltCap; i++) {
+          next.push(ids[Math.floor(Math.random() * ids.length)]);
+        }
+        return next;
+      });
+    }
     
     if (idx === 0) {
       // 완전 새 런
@@ -873,8 +891,6 @@ export default function App() {
       // 1.93.0~ 보스 보상·포기 플래그 초기화
       setBossRewardPending(false);
       setRunRetreat(false);
-      // 1.96.0~ 벨트 초기화 (런 한정 소모품)
-      setBelt([]);
       // 1.27.0~ 각인 effect 통합: 직업 능력치 + HP 가산
       const _engSlots = meta?.engravings?.[classData.id]?.slots || [];
       const _engFx = aggregateEngravingEffects(classData.id, _engSlots);
@@ -1592,6 +1608,16 @@ export default function App() {
       else if (reward.type === 'maxhp') {
         setMaxHp(prev => prev + reward.value);
         setHp(prev => prev + reward.value);
+      }
+      else if (reward.type === 'potion_random') {
+        // 1.97.0~ 황혼의 연금술사 — 랜덤 포션 +1 (벨트 가득·슬롯 0이면 은화 +60 대체)
+        const beltCap = getClassBeltSlots(meta, classData?.id);
+        if (belt.length < beltCap) {
+          const pids = Object.keys(POTIONS);
+          setBelt(prev => prev.length < beltCap ? [...prev, pids[Math.floor(Math.random() * pids.length)]] : prev);
+        } else {
+          setGold(prev => prev + 60);
+        }
       }
       else if (reward.type === 'stat') {
         // 능력치 영구 상승

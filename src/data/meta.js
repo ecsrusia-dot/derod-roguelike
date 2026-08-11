@@ -26,17 +26,8 @@ export const META_UPGRADES = [
     effect: 'startGold+10',
     color: '#d4a574',
   },
-  {
-    id: 'meta_beltSlot',
-    name: '황혼의 벨트',
-    desc: '물약 벨트 슬롯 +1',
-    category: 'resource',
-    stackable: true,
-    maxStacks: 2,
-    cost: (stack) => 400 + stack * 600,  // 400→1000, 합 1,400
-    effect: 'beltSlot+1',
-    color: '#c46ba3',
-  },
+  // 1.97.0: meta_beltSlot(벨트 슬롯 제단 강화) 폐기 — PM 결정: 제단 확장은 너무 쉬움.
+  //   직업별 조건 달성 확장으로 대체 (potions.js CLASS_BELT/BELT_EXPANSIONS). 구매분은 loadMeta에서 영혼 환불.
   {
     id: 'meta_startGem',
     name: '명상의 결정',

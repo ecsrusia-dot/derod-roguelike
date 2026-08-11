@@ -16,6 +16,8 @@ import {
   CHAMPIONSHIP_EXP_IDS,
   CLASSES,
   CLASS_TITLES,
+  CLASS_BELT,
+  BELT_EXPANSIONS,
 } from '../data.js';
 
 // ===== 색상 팔레트 =====
@@ -782,4 +784,31 @@ export function describeAwakeningConditionProgress(meta, condition, classId) {
     default:
       return null;
   }
+}
+
+// ============================================
+// 1.97.0~ 황혼의 벨트 — 직업별 슬롯 (PM 지정: 검사 2/4 · 술법사 1/3 · 마족 0/1 · 정령사 1/3 · 사제 1/2)
+// ============================================
+
+// 달성한 확장 단계 수 (순차 판정 — 1차 미달이면 2차 조건 충족해도 0)
+export function getBeltExpansionCount(meta, classId) {
+  const conds = BELT_EXPANSIONS[classId] || [];
+  let n = 0;
+  for (const c of conds) {
+    let ok = false;
+    if (c.type === 'training') {
+      ok = (meta?.clearedExpeditions || []).includes(`training_${classId}`);
+    } else if (c.type === 'clears') {
+      ok = (meta?.achievements?.[`expert_${classId}`]?.progress || 0) >= c.count;
+    }
+    if (!ok) break;
+    n++;
+  }
+  return n;
+}
+
+// 현재 벨트 슬롯 수 = 기본 + 달성 확장 (최대 상한)
+export function getClassBeltSlots(meta, classId) {
+  const cfg = CLASS_BELT[classId] || { base: 2, max: 4 };
+  return Math.min(cfg.max, cfg.base + getBeltExpansionCount(meta, classId));
 }
