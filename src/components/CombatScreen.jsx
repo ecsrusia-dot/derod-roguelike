@@ -416,6 +416,15 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           newEnemy.currentHp = Math.max(0, newEnemy.currentHp - actualDmg);
           totalDmg += actualDmg;
           trackDmg(skill.name, actualDmg);
+          // 1.95.0~ 상처악화 (참격): 적중 시 적 받는 데미지 +5% 누적 (최대 +50%) — 다음 타격부터 적용
+          if (skill.woundOnHit && actualDmg > 0) {
+            const curWound = newEnemy.debuffs?.woundPct || 0;
+            const nextWound = Math.min(skill.woundMax || 50, curWound + skill.woundOnHit);
+            if (nextWound !== curWound) {
+              newEnemy.debuffs = { ...newEnemy.debuffs, woundPct: nextWound };
+              newLog.push({ type: 'passive', text: `🗡 [상처악화] 받는 데미지 +${nextWound}% (누적)` });
+            }
+          }
           // 1.82.0~ 각성 [폭풍연격]: 치명타 시 40% 확률 폭풍 일격 (해당 타격의 50% 데미지, 방어 무시)
           if (isCrit && actualDmg > 0 && hasUltimate(ultimates, 'ult_windStorm') && Math.random() < 0.4) {
             const stormDmg = Math.floor(actualDmg * 0.5);
@@ -852,9 +861,10 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     const danger = !!(intent && intent.type === 'attack' && (intent.heavy || hpRatio < 0.35));
     const defenseKey = keys.find(k => COMBAT_SKILLS[k].type === 'defense');
     // ①b 1.91.0~ 방랑검사 전용 3AP 플랜 (PM 지시 — 심안 의도 기반 스킬 순서 고정)
-    //   심안 Lv.5 미만(대략 의도): 공격 예상→참격2+방검 / 방어 예상→참격+관통 / 정보 없음→참격3
-    //   심안 Lv.5 이상(정밀 의도): 대공격 예고(또는 저체력 위험)→참격2+방검 / 방어 스킬→참격+관통 / 일반 공격→참격3
-    //   관통·방검이 CD·에테르 부족("CD에 걸릴때")이면 참격으로 대체 = 참격3
+    //   심안 Lv.5 미만(대략 의도): 공격 예상→참격2+방검 / 방어 예상→참격+폭격 / 정보 없음→참격3
+    //   심안 Lv.5 이상(정밀 의도): 대공격 예고(또는 저체력 위험)→참격2+방검 / 방어 스킬→참격+폭격 / 일반 공격→참격3
+    //   폭격·방검이 CD·에테르 부족("CD에 걸릴때")이면 참격으로 대체 = 참격3
+    //   (1.95.0~ 폭격 = 구 관통 표시명 변경 — 코드 키는 '관통' 유지)
     //   참격이 봉인(sealedSkills)된 예외 턴만 아래 공용 로직으로 폴백
     if (classData.id === 'wanderer' && usable('참격')) {
       const simanLv = getSkillLevel(skills, '심안');
@@ -875,7 +885,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       // 1.91.1~ 소울 스킬 발동 순서 (PM 지시) — 무영의 일격은 잔여 AP 전부 소모라 참격 후 마지막 발동
       //   룰 1: 턴 시작부터 소울 100 → 상황 무관 참격×2 + 무영의 일격 (커밋)
       //   룰 2: 턴 중간 AP 1에 소울 100 도달 → 방어상황이면 방검 룰 우선, 공격상황이면 무영의 일격
-      //   룰 3: 턴 중간 AP 2에 소울 100 도달 → 방어상황이면 방검 룰 우선, 공격상황이면 관통 무시 참격 → 무영의 일격
+      //   룰 3: 턴 중간 AP 2에 소울 100 도달 → 방어상황이면 방검 룰 우선, 공격상황이면 폭격 무시 참격 → 무영의 일격
       const soul100 = !!classData.ultimateId && (player.soulGauge || 0) >= 100;
       if (ap >= AP_PER_TURN) autoUltCommitRef.current = soul100; // 턴 시작 시점 커밋 판정
       if (soul100) {
@@ -886,7 +896,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           return 'ULT'; // 룰 1 마무리
         }
         if (plan !== 'guard') {
-          if (ap === 2) return '참격'; // 룰 3 — 관통 무시
+          if (ap === 2) return '참격'; // 룰 3 — 폭격 무시
           return 'ULT';                // 룰 2
         }
         // 방어상황(guard) — 방검 룰 우선, 소울은 다음 턴 시작(룰 1)에 사용
@@ -897,7 +907,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         return '참격';
       }
       if (plan === 'pierce') {
-        // 참격(1AP) 선행 → 관통(2AP) — 일섬 연계 +40% 보장. 관통 불가면 참격3 폴백
+        // 참격(1AP) 선행 → 폭격(2AP) — 폭렬 연계 +40% 보장. 폭격 불가면 참격3 폴백
         if (ap >= 3) return '참격';
         if (usable('관통')) return '관통';
         return '참격';
@@ -2690,6 +2700,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                 if (player.buffs?.dmgReduceTurns > 0 && (player.buffs?.dmgReducePct || 0) > 0) buffChips.push(<span key="swordVeil" className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#7ba3c450', color: '#fff', border: '1px solid #7ba3c4' }}>🛡 검막 -{player.buffs.dmgReducePct}% ({player.buffs.dmgReduceTurns}T)</span>);
                 // 1.94.0~ 위축은 적 디버프지만 플레이어 이득이라 이 줄에 함께 표시
                 if ((enemy.debuffs?.weakenPct || 0) > 0) buffChips.push(<span key="weaken" className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#ff6b3550', color: '#fff', border: '1px solid #ff6b35' }}>↓ 적 위축 -{enemy.debuffs.weakenPct}%</span>);
+                // 1.95.0~ 상처악화 (참격 누적) — 적 받는 데미지 증가
+                if ((enemy.debuffs?.woundPct || 0) > 0) buffChips.push(<span key="wound" className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#c4453d50', color: '#fff', border: '1px solid #c4453d' }}>🗡 상처악화 +{enemy.debuffs.woundPct}%</span>);
                 if (player.buffs?.flameBoostTurns > 0 && player.buffs?.flameBoostPct > 0) buffChips.push(<span key="flameBoost" className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#ff450050', color: '#ffd1a3', border: '1px solid #ff4500', boxShadow: '0 0 6px rgba(255,69,0,0.5)' }}>🔥 영겁의 정념 +{player.buffs.flameBoostPct}% ({player.buffs.flameBoostTurns}T)</span>);
                 if (player.buffs?.flameBarrierPending > 0) buffChips.push(<span key="flameBarrier" className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#ff6b3550', color: '#fff', border: '1px solid #ff6b35' }}>🔥 화염장막 ({player.buffs.flameBarrierPending}%)</span>);
                 if (player.buffs?.guaranteedCrit > 0) buffChips.push(<span key="gCrit" className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#c4453d50', color: '#fff', border: '1px solid #c4453d' }}>✦ 치명타 확정</span>);
