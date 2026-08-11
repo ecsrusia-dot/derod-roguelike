@@ -5,7 +5,7 @@
 // 저장되는 것: 영혼, 강화 단계, 해금 항목, 클리어 기록
 // ============================================
 
-import { ENGRAVINGS, ENGRAVING_TIERS, ENEMIES, EVENTS, RELICS, PASSIVE_SKILLS, CODEX_DISCOVERY_REWARD, CODEX_COMPLETE_REWARD, backfillRaidSeries } from './data.js';
+import { ENGRAVINGS, ENGRAVING_TIERS, ENEMIES, EVENTS, RELICS, PASSIVE_SKILLS, CODEX_DISCOVERY_REWARD, CODEX_COMPLETE_REWARD, backfillRaidSeries, FEATURE_FLAGS } from './data.js';
 
 const DB_NAME = 'derod_meta';
 const DB_VERSION = 1;
@@ -915,6 +915,8 @@ export function hasRaidWeeklyClaimed(meta, dungeonId, weekKey) {
 // dateKey: getKstDateKey() (utils/dailyChallenge.js). 날짜가 바뀌면 자동 리셋.
 // 완료 즉시 영혼 자동 지급 + claimed 기록 (중복 지급 없음)
 export function trackDailyMission(meta, mission, amount, dateKey) {
+  // 1.99.1~ 기능 플래그 비활성 시 추적·보상 지급 전면 중단 (PM 지시)
+  if (!FEATURE_FLAGS.dailyMissions) return meta;
   if (!mission || !dateKey) return meta;
   let dm = meta.dailyMissions;
   if (!dm || dm.date !== dateKey) dm = { date: dateKey, progress: {}, claimed: [] };
