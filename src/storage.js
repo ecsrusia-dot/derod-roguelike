@@ -200,6 +200,18 @@ export async function loadMeta() {
         if (!data.ultimatesPickedByClass) {
           needsImmediateSave = true;
         }
+        // 1.97.0 벨트 제단 강화(meta_beltSlot) 폐기 환불 — 1.96.0 하루 존재. 직업별 조건 확장으로 대체
+        const beltStack = safe.upgrades?.meta_beltSlot || 0;
+        if (beltStack > 0) {
+          let beltRefund = 0;
+          if (beltStack >= 1) beltRefund += 400;   // cost(0)
+          if (beltStack >= 2) beltRefund += 1000;  // cost(1)
+          safe.souls = (safe.souls || 0) + beltRefund;
+          const nu = { ...safe.upgrades };
+          delete nu.meta_beltSlot;
+          safe.upgrades = nu;
+          needsImmediateSave = true;
+        }
         // 1.79.1 레이드 레거시 장비 series 백필 — 1.75.0 이전 드랍 장비의 세트 판정 누락 픽스
         const raidBackfill = backfillRaidSeries(safe.raid);
         if (raidBackfill.changed) {

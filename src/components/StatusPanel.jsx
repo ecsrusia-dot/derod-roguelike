@@ -339,7 +339,8 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
             const dmgTakenLv5 = hasEffect(skills, 'dmgTaken-20', activeSkills) ? 20 : 0;
             const dmgTakenCharisma = getCharismaDmgReduction(stats);
             const dmgTakenEngFx = engravingFx.dmgTakenPct || 0;
-            const dmgTakenReduceTotal = dmgTakenMeta + dmgTakenRelic + dmgTakenLv5 + dmgTakenCharisma - dmgTakenEngFx;
+            // 1.97.0 픽스: 유물 dmgTaken은 음수=감소 컨벤션 — 감소량 합산엔 부호 반전 (BuildSummaryPanel과 동일 픽스)
+            const dmgTakenReduceTotal = dmgTakenMeta - dmgTakenRelic + dmgTakenLv5 + dmgTakenCharisma - dmgTakenEngFx;
             const dmgDealtCurse = hasCurse(curses, 'curse_dmgDealt-15') ? 15 : 0;
             const dmgTakenCurse15 = hasCurse(curses, 'curse_dmgTaken+15') ? 15 : 0;
             const dmgTakenCurse30 = hasCurse(curses, 'curse_dmgTaken+30') ? 30 : 0;
@@ -446,7 +447,7 @@ export default function StatusPanel({ classData, hp, maxHp, skills, stats, deriv
                       color: PALETTE.green,
                       sources: [
                         { label: '영혼의 제단: 받는 데미지 -2% × 스택', value: dmgTakenMeta, unit: '%', note: dmgTakenMetaStacks > 0 ? `${dmgTakenMetaStacks} 스택` : null },
-                        { label: '유물: 받는 데미지 감소', value: dmgTakenRelic, unit: '%' },
+                        { label: '유물: 받는 데미지 감소', value: -dmgTakenRelic, unit: '%', note: dmgTakenRelic > 0 ? '(저주 유물 — 받는 데미지 증가)' : null },
                         { label: '패시브 Lv.5: 받는 데미지 -20%', value: dmgTakenLv5, unit: '%' },
                         { label: '매력 시그니처 2단계', value: dmgTakenCharisma, unit: '%', note: (stats['매력'] || 10) < 17 ? `매력 17 필요 (현재 ${stats['매력'] || 10})` : `17~21 -5% / 22~26 -10% / 27~31 -15% (현재 -${dmgTakenCharisma}%)` },
                         { label: '각인: 받는 데미지', value: dmgTakenEngFx !== 0 ? -dmgTakenEngFx : 0, unit: '%', note: dmgTakenEngFx > 0 ? '(부정 각인 — 받는 데미지 증가)' : null },

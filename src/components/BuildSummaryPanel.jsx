@@ -110,7 +110,9 @@ export default function BuildSummaryPanel({
     const dmgTakenLv5 = hasEffect(skills, 'dmgTaken-20', activeSkills) ? 20 : 0;
     const dmgTakenCharisma = getCharismaDmgReduction(stats);
     const dmgTakenEng = engravingFx.dmgTakenPct || 0;
-    const dmgTakenReduceTotal = dmgTakenMeta + dmgTakenRelic + dmgTakenLv5 + dmgTakenCharisma - dmgTakenEng;
+    // 1.97.0 픽스: 유물 dmgTaken은 음수=감소 컨벤션(강철의 맹세 -8) — 감소량 합산엔 부호 반전 필요.
+    //   기존엔 그대로 더해서 유물 감소가 오히려 총합을 깎았음 (표시만 오류 — 전투 적용은 정상이었음)
+    const dmgTakenReduceTotal = dmgTakenMeta - dmgTakenRelic + dmgTakenLv5 + dmgTakenCharisma - dmgTakenEng;
 
     // 화염 각인 (조건부)
     const ignite = getIfritIgniteRate(skills, ultimates, activeSkills);
@@ -266,10 +268,10 @@ export default function BuildSummaryPanel({
             color: PALETTE.green,
             sources: [
               { label: '영혼의 제단: 받는 데미지 -2% × 스택', value: data.dmgTakenMeta, unit: '%', note: data.dmgTakenMetaStacks > 0 ? `${data.dmgTakenMetaStacks} 스택` : null },
-              { label: '유물: 받는 데미지', value: data.dmgTakenRelic, unit: '%' },
+              { label: '유물: 받는 데미지 감소', value: -data.dmgTakenRelic, unit: '%', note: data.dmgTakenRelic > 0 ? '(저주 유물 — 받는 데미지 증가)' : null },
               { label: '회피 Lv.5: 받는 데미지 -20%', value: data.dmgTakenLv5, unit: '%' },
               { label: '매력 시그니처 2단계', value: data.dmgTakenCharisma, unit: '%', note: data.dmgTakenCharisma > 0 ? `매력 17~21 -5% / 22~26 -10% / 27~31 -15%` : null },
-              { label: '각인: dmgTakenPct (음수 = 증가)', value: -data.dmgTakenEng, unit: '%' },
+              { label: '각인: 받는 데미지 감소', value: -data.dmgTakenEng, unit: '%', note: data.dmgTakenEng > 0 ? '(부정 각인 — 받는 데미지 증가)' : null },
             ],
           })} className="flex justify-between text-left" style={{ color: PALETTE.textDim }}>
             <span>받는 데미지 ◇</span>

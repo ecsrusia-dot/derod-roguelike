@@ -13,3 +13,22 @@ export const POTIONS = {
 };
 
 export const BELT_BASE_SLOTS = 2;
+
+// 1.97.0~ 직업별 벨트 슬롯 (PM 지정) — 기본/최대. 확장은 영혼 제단이 아니라 직업별 조건 달성으로.
+export const CLASS_BELT = {
+  wanderer:   { base: 2, max: 4 },
+  sage:       { base: 1, max: 3 },
+  demonblood: { base: 0, max: 1 },
+  elf:        { base: 1, max: 3 },
+  priest:     { base: 1, max: 2 },
+};
+
+// 확장 조건 (순차 달성 — 1차를 깨야 2차 판정) — max-base 개수만큼 정의
+// type 'training' = 해당 직업 수련의 길 클리어 / 'clears' = 해당 직업 원정 누적 클리어 N회 (expert 카운터)
+export const BELT_EXPANSIONS = {
+  wanderer:   [{ type: 'training', desc: '방랑검사의 수련 클리어' }, { type: 'clears', count: 20, desc: '방랑검사로 원정 20회 클리어' }],
+  sage:       [{ type: 'training', desc: '술법사의 수련 클리어' },   { type: 'clears', count: 20, desc: '술법사로 원정 20회 클리어' }],
+  demonblood: [{ type: 'training', desc: '혼혈 마족의 수련 클리어' }],
+  elf:        [{ type: 'training', desc: '엘프의 수련 클리어' },     { type: 'clears', count: 20, desc: '숲의 정령사로 원정 20회 클리어' }],
+  priest:     [{ type: 'training', desc: '사제의 수련 클리어' }],
+};
