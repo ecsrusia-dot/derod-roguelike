@@ -3,6 +3,6 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.97.0';
+export const GAME_VERSION = '1.98.0';
 export const VERSION_DATE = '2026-08-11';
-export const VERSION_LABEL = '벨트 직업별 개편 + 받는 데미지 표시 픽스';
+export const VERSION_LABEL = '명예의 전당 — 행동 패턴 프로그래밍 파티전 (신규 모드)';
