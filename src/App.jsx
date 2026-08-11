@@ -137,6 +137,7 @@ import {
   applyRaidDifficulty,
   ENGRAVINGS,
   POTIONS,
+  FEATURE_FLAGS,
 } from './data.js';
 import { getKstDateKey } from './utils/dailyChallenge.js';
 import { simulateBestEndlessRun } from './utils/endlessSkipSim.js';
@@ -2607,14 +2608,14 @@ export default function App() {
       <PhoneFrame screenKey={screen} persistent={
         <>
           {/* 1.80.0~ 레이드 백그라운드 진행 — raidDungeon이 있으면 화면을 떠나도 마운트 유지 (전투·반복 파밍 계속) */}
-          {raidDungeon && (
+          {FEATURE_FLAGS.raid && raidDungeon && (
             <div style={{ display: screen === 'raidBattle' ? 'contents' : 'none' }}>
               {/* 1.86.0~ 난이도 적용된 실효 던전을 전달 — 전투 코드는 난이도 무지 (applyRaidDifficulty가 전부 처리) */}
               <RaidBattleScreen key={raidDungeon.id + '-' + (raidDifficulty?.id || 'normal') + '-' + (meta?.raid?.clears?.[getRaidClearKey(raidDungeon.id, raidDifficulty?.id)] || 0)} meta={meta} dungeon={applyRaidDifficulty(raidDungeon, raidDifficulty)} repeat={raidRepeat} background={screen !== 'raidBattle'} onToggleRepeat={() => setRaidRepeat(v => !v)} onMinimize={() => setScreen('raid')} onStatus={setRaidBgStatus} onVictory={handleRaidVictory} onDefeat={handleRaidPartial} onRetreat={handleRaidPartial} />
             </div>
           )}
           {/* 1.80.0~ 레이드 백그라운드 플로팅 필 — 탭 시 전투 화면 복귀 */}
-          {raidDungeon && screen !== 'raidBattle' && (
+          {FEATURE_FLAGS.raid && raidDungeon && screen !== 'raidBattle' && (
             <button onClick={() => setScreen('raidBattle')} className="ui-press" style={{
               position: 'absolute', top: 6, left: '50%', transform: 'translateX(-50%)', zIndex: 80,
               display: 'flex', alignItems: 'center', gap: 5, padding: '4px 12px', borderRadius: 999,
@@ -2656,13 +2657,13 @@ export default function App() {
               onSelectGuest={handleSelectGuest} 
               onSelectGoogle={handleSelectGoogle} 
             />}
-            {screen === 'title' && authMode && <TitleScreen meta={meta} onStart={() => setScreen('expeditionSelect')} onResume={resumeActiveRun} onAltar={enterAltar} onEngravings={() => setScreen('engraving')} onRaid={raidUnlocked ? () => setScreen('raid') : null} onAchievements={() => { setPrevAchievementsBack('title'); setScreen('achievements'); }} onAutoStats={() => setScreen('autoStats')} onGamble={raidUnlocked ? () => { setGambleResult(null); setScreen('gamble'); } : null} onHof={raidUnlocked ? () => setScreen('hof') : null} onChangelog={() => setShowChangelog({ firstSeen: false })} onAccount={() => setScreen('account')} />}
-            {screen === 'hof' && <HofScreen meta={meta} onEnterStage={(stage) => { setHofStage(stage); setScreen('hofBattle'); }} onLevelUp={handleHofLevelUp} onSavePatterns={handleHofSavePatterns} onBack={() => setScreen('title')} />}
-            {screen === 'hofBattle' && hofStage && <HofBattleScreen meta={meta} stage={hofStage} onFinish={handleHofFinish} onRetreat={() => { setHofStage(null); setScreen('hof'); }} />}
+            {screen === 'title' && authMode && <TitleScreen meta={meta} onStart={() => setScreen('expeditionSelect')} onResume={resumeActiveRun} onAltar={enterAltar} onEngravings={() => setScreen('engraving')} onRaid={FEATURE_FLAGS.raid && raidUnlocked ? () => setScreen('raid') : null} onAchievements={() => { setPrevAchievementsBack('title'); setScreen('achievements'); }} onAutoStats={() => setScreen('autoStats')} onGamble={raidUnlocked ? () => { setGambleResult(null); setScreen('gamble'); } : null} onHof={FEATURE_FLAGS.hof && raidUnlocked ? () => setScreen('hof') : null} onChangelog={() => setShowChangelog({ firstSeen: false })} onAccount={() => setScreen('account')} />}
+            {FEATURE_FLAGS.hof && screen === 'hof' && <HofScreen meta={meta} onEnterStage={(stage) => { setHofStage(stage); setScreen('hofBattle'); }} onLevelUp={handleHofLevelUp} onSavePatterns={handleHofSavePatterns} onBack={() => setScreen('title')} />}
+            {FEATURE_FLAGS.hof && screen === 'hofBattle' && hofStage && <HofBattleScreen meta={meta} stage={hofStage} onFinish={handleHofFinish} onRetreat={() => { setHofStage(null); setScreen('hof'); }} />}
             {screen === 'autoStats' && <AutoStatsScreen meta={meta} onClose={() => setScreen('title')} />}
             {screen === 'gamble' && <GambleLobbyScreen meta={meta} result={gambleResult} onEnter={handleGambleEnter} onBuy={handleGambleBuy} onBuyLegendary={handleGambleLegendary} onRedeem={handleGambleRedeem} onBack={() => { setGambleResult(null); setScreen('title'); }} />}
             {screen === 'gambleChoice' && currentExpedition?.isGamble && <GambleChoiceScreen pot={gamblePot} jackpot={gambleJackpot} onContinue={() => setScreen('reward')} onBank={handleGambleBank} />}
-            {screen === 'raid' && <RaidScreen meta={meta} onEnterDungeon={(d, diff) => { if (raidDungeon) { setScreen('raidBattle'); return; } setRaidDungeon(d); setRaidDifficulty(diff || null); setScreen('raidBattle'); }} onEquipItem={handleRaidEquip} onAutoEquip={handleRaidAutoEquip} onDismantle={handleRaidDismantle} onDismantleJunk={handleRaidDismantleJunk} onEnhance={handleRaidEnhance} onCraft={handleRaidCraft} onGacha={handleRaidGacha} onToggleFormation={handleRaidFormation} onBack={() => setScreen('title')} />}
+            {FEATURE_FLAGS.raid && screen === 'raid' && <RaidScreen meta={meta} onEnterDungeon={(d, diff) => { if (raidDungeon) { setScreen('raidBattle'); return; } setRaidDungeon(d); setRaidDifficulty(diff || null); setScreen('raidBattle'); }} onEquipItem={handleRaidEquip} onAutoEquip={handleRaidAutoEquip} onDismantle={handleRaidDismantle} onDismantleJunk={handleRaidDismantleJunk} onEnhance={handleRaidEnhance} onCraft={handleRaidCraft} onGacha={handleRaidGacha} onToggleFormation={handleRaidFormation} onBack={() => setScreen('title')} />}
             {screen === 'account' && <AccountScreen 
               authMode={authMode} 
               firebaseUser={firebaseUser} 

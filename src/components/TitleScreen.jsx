@@ -9,7 +9,7 @@
 import React from 'react';
 import { PlayCircle, Sparkles, Gem, Trophy, ChevronRight, Swords, BarChart3, Dices, Crown } from 'lucide-react';
 import { PALETTE } from '../utils/helpers.js';
-import { GAME_VERSION, CLASSES, DAILY_MISSIONS } from '../data.js';
+import { GAME_VERSION, CLASSES, DAILY_MISSIONS, FEATURE_FLAGS } from '../data.js';
 import { getKstDateKey } from '../utils/dailyChallenge.js';
 import { GlassPanel, Chip, UIButton } from './ui/CommonUI.jsx';
 
@@ -112,8 +112,8 @@ export default function TitleScreen({ meta, onStart, onResume, onAltar, onEngrav
           {onAutoStats && <MenuRow icon={BarChart3} label="전적 분석" onClick={onAutoStats} />}
         </GlassPanel>
 
-        {/* 1.72.0~ 일일 임무 — 완료 즉시 영혼 자동 지급, KST 자정 리셋 */}
-        {(() => {
+        {/* 1.72.0~ 일일 임무 — 완료 즉시 영혼 자동 지급, KST 자정 리셋 (1.99.1~ 플래그 비활성) */}
+        {FEATURE_FLAGS.dailyMissions && (() => {
           const todayKey = getKstDateKey();
           const dm = meta?.dailyMissions?.date === todayKey ? meta.dailyMissions : null;
           return (

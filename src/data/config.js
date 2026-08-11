@@ -42,3 +42,12 @@ export const PREP_CONFIG = {
   maxSkillSelect: 5,    // 활성 패시브 개수 (모든 원정 동일)
 };
 
+
+// =========== 기능 플래그 (1.99.1~) ===========
+// PM 지시로 임시 비활성화된 기능 — 코드·데이터·저장 데이터는 보존, 진입점과 작동만 차단.
+// 재활성화는 해당 플래그를 true로 바꾸면 끝.
+export const FEATURE_FLAGS = {
+  dailyMissions: false, // 일일 임무 (타이틀 패널 + 진행 추적·보상 지급)
+  raid: false,          // 레이드 (타이틀 메뉴 + 백그라운드 전투)
+  hof: false,           // 명예의 전당 (타이틀 메뉴)
+};
