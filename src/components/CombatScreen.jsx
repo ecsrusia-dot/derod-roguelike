@@ -737,6 +737,18 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         newPlayer.hp = Math.min(newPlayer.maxHp, newPlayer.hp + heal);
         newLog.push({ type: 'passive', text: `◇ HP +${heal}` });
       }
+      // 1.94.0~ 검막 (방랑검사 방검 — PM 피해감소 컨셉): N턴간 받는 피해 -M%, 재사용 시 갱신
+      if (skill.dmgReducePct) {
+        newPlayer.buffs = { ...newPlayer.buffs, dmgReducePct: skill.dmgReducePct, dmgReduceTurns: skill.dmgReduceTurns || 2 };
+        newLog.push({ type: 'passive', text: `★ [검막] ${skill.dmgReduceTurns || 2}턴간 받는 피해 -${skill.dmgReducePct}%` });
+      }
+      // 1.94.0~ 위축 (술법사 화염장막 — PM 적 공격력 누적 감소 컨셉): 사용마다 -N% 누적, 상한 M%
+      if (skill.weakenPct) {
+        const curWeaken = newEnemy.debuffs?.weakenPct || 0;
+        const nextWeaken = Math.min(skill.weakenMax || 30, curWeaken + skill.weakenPct);
+        newEnemy.debuffs = { ...newEnemy.debuffs, weakenPct: nextWeaken };
+        newLog.push({ type: 'passive', text: `★ [위축] ${enemy.name} 공격력 -${nextWeaken}% (누적)` });
+      }
     }
     if (skill.type === 'buff' && skill.buff === 'rage') {
       newPlayer.buffs = { ...newPlayer.buffs, rage: 2 };
@@ -850,12 +862,14 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       const heavyTelegraph = !!intent?.heavy; // 대공격 예고는 심안 없이 전 직업 공개
       let plan = 'slash3';
       if (knowIntent && simanLv >= 5) {
-        if (heavyTelegraph || (intent?.type === 'attack' && hpRatio < 0.35)) plan = 'guard';
+        // 1.94.0~ 생존 보강 (PM 옵션 A): 저체력 임계 35% → 40%
+        if (heavyTelegraph || (intent?.type === 'attack' && hpRatio < 0.4)) plan = 'guard';
         else if (intent?.type === 'defend') plan = 'pierce';
       } else if (knowIntent) {
         if (intent?.type === 'attack') plan = 'guard';
         else if (intent?.type === 'defend') plan = 'pierce';
-      } else if (heavyTelegraph) {
+      } else if (heavyTelegraph || hpRatio < 0.4) {
+        // 1.94.0~ 의도 미상 + 저체력이면 방어 우선 (생존 보강)
         plan = 'guard';
       }
       // 1.91.1~ 소울 스킬 발동 순서 (PM 지시) — 무영의 일격은 잔여 AP 전부 소모라 참격 후 마지막 발동
@@ -900,6 +914,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     //   (코드 키: 마법탄=파이어볼 / 정념폭발=익스플로젼 — 1.42.0 표시명만 변경된 호환 키)
     if (classData.id === 'sage' && usable('마법탄')) {
       const heavyTelegraph = !!intent?.heavy;
+      // 1.94.0~ 생존 보강 (PM 옵션 A): 대공격 예고 외에 저체력(40% 미만)도 방어상황으로 판단
+      const defenseSituation = heavyTelegraph || hpRatio < 0.4;
       const soul100 = !!classData.ultimateId && (player.soulGauge || 0) >= 100;
       if (ap >= AP_PER_TURN) autoUltCommitRef.current = soul100;
       if (soul100) {
@@ -909,13 +925,13 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           autoUltCommitRef.current = false;
           return 'ULT'; // 소울 룰 1 마무리
         }
-        if (!heavyTelegraph) {
+        if (!defenseSituation) {
           if (ap === 2) return '마법탄'; // 소울 룰 3 — 파이어볼 후 영겁
           return 'ULT';                  // 소울 룰 2
         }
-        // 대공격 예고(방어상황) — 방어룰 우선, 소울은 다음 턴 시작(룰 1)에 사용
+        // 방어상황(대공격 예고·저체력) — 방어룰 우선, 소울은 다음 턴 시작(룰 1)에 사용
       }
-      if (heavyTelegraph) {
+      if (defenseSituation) {
         if (ap === 1) return (usable('화염장막') && (player.defense || 0) <= 0) ? '화염장막' : '마법탄';
         if (ap >= AP_PER_TURN && usable('정념폭발')) return '정념폭발';
         return '마법탄';
@@ -1316,6 +1332,14 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
               takenBreakdown.push(`마기 +${surgeBonus}`);
             }
           }
+          // 1.94.0~ 위축 (화염장막 누적) — 적 공격력 -N% (모든 가산 보너스 이후 적용)
+          if ((newEnemy.debuffs?.weakenPct || 0) > 0 && dmg > 0) {
+            const weakenCut = Math.floor(dmg * newEnemy.debuffs.weakenPct / 100);
+            if (weakenCut > 0) {
+              dmg -= weakenCut;
+              takenBreakdown.push(`위축 -${weakenCut}`);
+            }
+          }
           
           // 심안류 Lv.5: 반격 확률 사전 굴림 (성공 시 받는 데미지 30% 차단)
           // counterRollResult를 캐싱해서 나중에 같은 결과로 반격 처리
@@ -1392,6 +1416,14 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
             const reduced = Math.floor(dmg * 0.20);
             dmg -= reduced;
             if (reduced > 0) takenBreakdown.push(`수비 Lv.5 -${reduced}`);
+          }
+          // 1.94.0~ 검막 (방검 버프) — N턴간 받는 피해 -M%
+          if (newPlayer.buffs?.dmgReduceTurns > 0 && (newPlayer.buffs?.dmgReducePct || 0) > 0 && dmg > 0) {
+            const veilCut = Math.floor(dmg * newPlayer.buffs.dmgReducePct / 100);
+            if (veilCut > 0) {
+              dmg -= veilCut;
+              takenBreakdown.push(`검막 -${veilCut}`);
+            }
           }
           // 1.27.0~ 각인: 받는 데미지 +/- N% (음수면 감소)
           if (engravingFx.dmgTakenPct && dmg > 0) {
@@ -2095,6 +2127,14 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     if (newPlayer.buffs?.mirrorDodgeNext > 0) {
       newPlayer.buffs = { ...newPlayer.buffs, mirrorDodgeNext: 0 };
     }
+    // 1.94.0~ 검막 (방검) 버프 — 매 턴 -1
+    if (newPlayer.buffs?.dmgReduceTurns > 0) {
+      const remaining = newPlayer.buffs.dmgReduceTurns - 1;
+      newPlayer.buffs = { ...newPlayer.buffs, dmgReduceTurns: remaining };
+      if (remaining === 0) {
+        newLog.push({ type: 'system', text: `· 검막 종료` });
+      }
+    }
     // 방랑검사 [무영의 잔영] 반격 100% 버프 — 매 턴 -1
     if (newPlayer.buffs?.shadowCounterTurns > 0) {
       const remaining = newPlayer.buffs.shadowCounterTurns - 1;
@@ -2647,6 +2687,9 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                 const buffChips = [];
                 if (player.buffs?.rage > 0) buffChips.push(<span key="rage" className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: `${PALETTE.accent}50`, color: '#fff', border: `1px solid ${PALETTE.accent}` }}>☩ 분노 ({player.buffs.rage}T)</span>);
                 if (player.buffs?.shadowCounterTurns > 0) buffChips.push(<span key="shadow" className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#1a0f0a90', color: '#ffd86b', border: '1px solid #ffd86b', boxShadow: '0 0 6px rgba(255,216,107,0.5)' }}>☄ 무영의 잔영 반격 100% ({player.buffs.shadowCounterTurns}T)</span>);
+                if (player.buffs?.dmgReduceTurns > 0 && (player.buffs?.dmgReducePct || 0) > 0) buffChips.push(<span key="swordVeil" className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#7ba3c450', color: '#fff', border: '1px solid #7ba3c4' }}>🛡 검막 -{player.buffs.dmgReducePct}% ({player.buffs.dmgReduceTurns}T)</span>);
+                // 1.94.0~ 위축은 적 디버프지만 플레이어 이득이라 이 줄에 함께 표시
+                if ((enemy.debuffs?.weakenPct || 0) > 0) buffChips.push(<span key="weaken" className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#ff6b3550', color: '#fff', border: '1px solid #ff6b35' }}>↓ 적 위축 -{enemy.debuffs.weakenPct}%</span>);
                 if (player.buffs?.flameBoostTurns > 0 && player.buffs?.flameBoostPct > 0) buffChips.push(<span key="flameBoost" className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#ff450050', color: '#ffd1a3', border: '1px solid #ff4500', boxShadow: '0 0 6px rgba(255,69,0,0.5)' }}>🔥 영겁의 정념 +{player.buffs.flameBoostPct}% ({player.buffs.flameBoostTurns}T)</span>);
                 if (player.buffs?.flameBarrierPending > 0) buffChips.push(<span key="flameBarrier" className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#ff6b3550', color: '#fff', border: '1px solid #ff6b35' }}>🔥 화염장막 ({player.buffs.flameBarrierPending}%)</span>);
                 if (player.buffs?.guaranteedCrit > 0) buffChips.push(<span key="gCrit" className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: '#c4453d50', color: '#fff', border: '1px solid #c4453d' }}>✦ 치명타 확정</span>);
