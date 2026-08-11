@@ -7,7 +7,7 @@
 //   - 로고 부유 모션 + 골드 그라디언트 타이틀 + CTA 셔츠광
 // ============================================
 import React from 'react';
-import { PlayCircle, Sparkles, Gem, Trophy, ChevronRight, Swords, BarChart3, Dices } from 'lucide-react';
+import { PlayCircle, Sparkles, Gem, Trophy, ChevronRight, Swords, BarChart3, Dices, Crown } from 'lucide-react';
 import { PALETTE } from '../utils/helpers.js';
 import { GAME_VERSION, CLASSES, DAILY_MISSIONS } from '../data.js';
 import { getKstDateKey } from '../utils/dailyChallenge.js';
@@ -33,7 +33,7 @@ function MenuRow({ icon: Icon, label, onClick }) {
   );
 }
 
-export default function TitleScreen({ meta, onStart, onResume, onAltar, onEngravings, onRaid, onAchievements, onAutoStats = null, onGamble = null, onChangelog, onAccount }) {
+export default function TitleScreen({ meta, onStart, onResume, onAltar, onEngravings, onRaid, onAchievements, onAutoStats = null, onGamble = null, onHof = null, onChangelog, onAccount }) {
   // 진행 중인 런이 있는지 — 이어하기 버튼 노출 여부 결정
   const activeRun = meta?.activeRun;
   const canResume = !!(activeRun && activeRun.v === 1 && activeRun.expedition);
@@ -107,6 +107,7 @@ export default function TitleScreen({ meta, onStart, onResume, onAltar, onEngrav
           {onEngravings && <MenuRow icon={Gem} label="직업 각인" onClick={onEngravings} />}
           {onRaid && <MenuRow icon={Swords} label="레이드" onClick={onRaid} />}
           {onGamble && <MenuRow icon={Dices} label="황혼의 도박장" onClick={onGamble} />}
+          {onHof && <MenuRow icon={Crown} label="명예의 전당" onClick={onHof} />}
           <MenuRow icon={Trophy} label="업적" onClick={onAchievements} />
           {onAutoStats && <MenuRow icon={BarChart3} label="전적 분석" onClick={onAutoStats} />}
         </GlassPanel>

@@ -70,6 +70,8 @@ import RaidBattleScreen from './components/RaidBattleScreen.jsx';
 import AutoHuntOverlay, { AutoHuntSummaryModal } from './components/AutoHuntOverlay.jsx';
 import AutoStatsScreen from './components/AutoStatsScreen.jsx';
 import GambleLobbyScreen, { GambleChoiceScreen } from './components/GambleScreen.jsx';
+import HofScreen from './components/HofScreen.jsx';
+import HofBattleScreen from './components/HofBattleScreen.jsx';
 import NodeInfoModal from './components/NodeInfoModal.jsx';
 import BossIntroScreen from './components/BossIntroScreen.jsx';
 import PCSidebar from './components/PCSidebar.jsx';
@@ -138,7 +140,7 @@ import {
 } from './data.js';
 import { getKstDateKey } from './utils/dailyChallenge.js';
 import { simulateBestEndlessRun } from './utils/endlessSkipSim.js';
-import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, applyEngravingSlot, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear, dismantleRaidItem, dismantleRaidJunk, enhanceRaidItem, claimRaidWeekly, addRaidResources, spendRaidResourcesForItem, resolveRaidSecret, toggleRaidFormation, appendAutoRunLog, getGambleUsed, useGambleEntry, addTwilightCoins, addFateShards, redeemFateShards, buyGambleShopItem, addClassTitle, equipClassTitle } from './storage.js';
+import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, applyEngravingSlot, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear, dismantleRaidItem, dismantleRaidJunk, enhanceRaidItem, claimRaidWeekly, addRaidResources, spendRaidResourcesForItem, resolveRaidSecret, toggleRaidFormation, appendAutoRunLog, getGambleUsed, useGambleEntry, addTwilightCoins, addFateShards, redeemFateShards, buyGambleShopItem, addClassTitle, equipClassTitle, saveHofPatterns, hofLevelUpChar, recordHofClear } from './storage.js';
 
 
 
@@ -290,6 +292,38 @@ export default function App() {
   // 1.93.0~ 중간 보스 보상: 픽 후 챕터 클리어로 진행 / 무한 포기: 정산 화면 라벨 분기
   const [bossRewardPending, setBossRewardPending] = useState(false);
   const [runRetreat, setRunRetreat] = useState(false);
+  // 1.98.0~ 명예의 전당 — 진행 중 스테이지
+  const [hofStage, setHofStage] = useState(null);
+  const handleHofSavePatterns = (patterns) => {
+    setMeta(prev => {
+      const next = saveHofPatterns(prev, patterns);
+      saveMeta(next);
+      return next;
+    });
+  };
+  const handleHofLevelUp = (charId, cost) => {
+    setMeta(prev => {
+      const next = hofLevelUpChar(prev, charId, cost);
+      if (next === prev) return prev;
+      saveMeta(next);
+      return next;
+    });
+  };
+  const handleHofFinish = (result) => {
+    const stage = hofStage;
+    setHofStage(null);
+    if (result?.win && stage) {
+      setMeta(prev => {
+        const { meta: recorded, first } = recordHofClear(prev, stage.id, stage.firstMedals);
+        let next = recorded;
+        if (first) next = addSouls(next, stage.souls);
+        saveMeta(next);
+        return next;
+      });
+    }
+    setScreen('hof');
+  };
+
   // 1.96.0~ 황혼의 벨트 — 런 한정 포션. 1.97.0~ 직업별 슬롯 (기본/최대 = 검사 2/4 · 술법사 1/3 · 마족 0/1 · 정령사 1/3 · 사제 1/2)
   const [belt, setBelt] = useState([]);
   const beltSlots = getClassBeltSlots(meta, classData?.id);
@@ -2622,7 +2656,9 @@ export default function App() {
               onSelectGuest={handleSelectGuest} 
               onSelectGoogle={handleSelectGoogle} 
             />}
-            {screen === 'title' && authMode && <TitleScreen meta={meta} onStart={() => setScreen('expeditionSelect')} onResume={resumeActiveRun} onAltar={enterAltar} onEngravings={() => setScreen('engraving')} onRaid={raidUnlocked ? () => setScreen('raid') : null} onAchievements={() => { setPrevAchievementsBack('title'); setScreen('achievements'); }} onAutoStats={() => setScreen('autoStats')} onGamble={raidUnlocked ? () => { setGambleResult(null); setScreen('gamble'); } : null} onChangelog={() => setShowChangelog({ firstSeen: false })} onAccount={() => setScreen('account')} />}
+            {screen === 'title' && authMode && <TitleScreen meta={meta} onStart={() => setScreen('expeditionSelect')} onResume={resumeActiveRun} onAltar={enterAltar} onEngravings={() => setScreen('engraving')} onRaid={raidUnlocked ? () => setScreen('raid') : null} onAchievements={() => { setPrevAchievementsBack('title'); setScreen('achievements'); }} onAutoStats={() => setScreen('autoStats')} onGamble={raidUnlocked ? () => { setGambleResult(null); setScreen('gamble'); } : null} onHof={raidUnlocked ? () => setScreen('hof') : null} onChangelog={() => setShowChangelog({ firstSeen: false })} onAccount={() => setScreen('account')} />}
+            {screen === 'hof' && <HofScreen meta={meta} onEnterStage={(stage) => { setHofStage(stage); setScreen('hofBattle'); }} onLevelUp={handleHofLevelUp} onSavePatterns={handleHofSavePatterns} onBack={() => setScreen('title')} />}
+            {screen === 'hofBattle' && hofStage && <HofBattleScreen meta={meta} stage={hofStage} onFinish={handleHofFinish} onRetreat={() => { setHofStage(null); setScreen('hof'); }} />}
             {screen === 'autoStats' && <AutoStatsScreen meta={meta} onClose={() => setScreen('title')} />}
             {screen === 'gamble' && <GambleLobbyScreen meta={meta} result={gambleResult} onEnter={handleGambleEnter} onBuy={handleGambleBuy} onBuyLegendary={handleGambleLegendary} onRedeem={handleGambleRedeem} onBack={() => { setGambleResult(null); setScreen('title'); }} />}
             {screen === 'gambleChoice' && currentExpedition?.isGamble && <GambleChoiceScreen pot={gamblePot} jackpot={gambleJackpot} onContinue={() => setScreen('reward')} onBank={handleGambleBank} />}

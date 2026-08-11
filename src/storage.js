@@ -85,6 +85,14 @@ const DEFAULT_META = {
     // 1.79.0~ 전후방 배치 — { classId: 'front' | 'back' }
     formation: { wanderer: 'front', demonblood: 'front', elf: 'back', sage: 'back', priest: 'back' },
   },
+  // 1.98.0~ 명예의 전당 (HOF 제로식 모티브 — 패턴 프로그래밍 파티전, 본편·레이드와 분리)
+  // levels[charId] = 레벨(1~) / patterns[charId] = [{c, v, s}] (null이면 기본 패턴) / clears[stageId] = true / medals = 전당 훈장
+  hof: {
+    levels: {},
+    patterns: null,
+    clears: {},
+    medals: 0,
+  },
   // 진행 중인 런 스냅샷 (맵 화면 진입 시 자동 저장 — 앱 종료/새로고침 후 이어하기 용)
   // null = 진행 중 런 없음. 객체 = 재개 가능한 런 상태.
   activeRun: null,
@@ -171,6 +179,8 @@ export async function loadMeta() {
           ...(data.raid || {}),
           equipped: { ...DEFAULT_META.raid.equipped, ...(data.raid?.equipped || {}) },
         };
+        // 1.98.0 명예의 전당 중첩 객체 보강
+        safe.hof = { ...DEFAULT_META.hof, ...(data.hof || {}) };
         // 1.26.0 직업별 추적 데이터 보강
         safe.ultimatesPickedByClass = { ...DEFAULT_META.ultimatesPickedByClass, ...(data.ultimatesPickedByClass || {}) };
         safe.championshipClearsByClass = { ...DEFAULT_META.championshipClearsByClass, ...(data.championshipClearsByClass || {}) };
@@ -1295,4 +1305,41 @@ export function clearWandererRenameNotice(meta) {
 export function clearAltarRedesignNotice(meta) {
   if (!meta.altarRedesignNotice) return meta;
   return { ...meta, altarRedesignNotice: null };
+}
+
+// ============================================
+// 1.98.0~ 명예의 전당 (HOF)
+// ============================================
+
+// 패턴 저장 — patterns[charId] = [{c, v, s}] (전체 교체)
+export function saveHofPatterns(meta, patterns) {
+  return { ...meta, hof: { ...(meta.hof || {}), patterns } };
+}
+
+// 캐릭터 레벨업 — 훈장 소모 (부족하면 원본 반환)
+export function hofLevelUpChar(meta, charId, cost) {
+  const hof = meta.hof || {};
+  if ((hof.medals || 0) < cost) return meta;
+  const levels = { ...(hof.levels || {}) };
+  levels[charId] = (levels[charId] || 1) + 1;
+  return { ...meta, hof: { ...hof, medals: (hof.medals || 0) - cost, levels } };
+}
+
+// 스테이지 클리어 기록 — 첫 클리어 훈장 + 반복 훈장 1
+export function recordHofClear(meta, stageId, firstMedals) {
+  const hof = meta.hof || {};
+  const first = !hof.clears?.[stageId];
+  const gained = first ? firstMedals : 1;
+  return {
+    meta: {
+      ...meta,
+      hof: {
+        ...hof,
+        clears: { ...(hof.clears || {}), [stageId]: true },
+        medals: (hof.medals || 0) + gained,
+      },
+    },
+    first,
+    medals: gained,
+  };
 }
