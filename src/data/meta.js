@@ -27,6 +27,17 @@ export const META_UPGRADES = [
     color: '#d4a574',
   },
   {
+    id: 'meta_beltSlot',
+    name: '황혼의 벨트',
+    desc: '물약 벨트 슬롯 +1',
+    category: 'resource',
+    stackable: true,
+    maxStacks: 2,
+    cost: (stack) => 400 + stack * 600,  // 400→1000, 합 1,400
+    effect: 'beltSlot+1',
+    color: '#c46ba3',
+  },
+  {
     id: 'meta_startGem',
     name: '명상의 결정',
     desc: '시작 보석 +2',
