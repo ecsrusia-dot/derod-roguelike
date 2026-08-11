@@ -186,6 +186,8 @@ if (isCrit) {
   critMult += getAgilityCritDmgBonus(attacker) / 100;
   // 5-2. 1.44.2~ 메타 강화 「절명의 각인」: 치명타 데미지 +5%/단계
   critMult += getMetaBonus(meta, 'critDmg+5%') * 0.05;
+  // 5-3. 1.95.0~ 폭격 (코드 키 '관통'): 치명타 시 치명타 배율 ×1.5
+  if (skill.critFinalMult) critMult *= skill.critFinalMult;
   // 6. 최종 데미지 계산 (소수점 버림)
   dmg = Math.floor(dmg * critMult);
   // 7. 로그 기록 (소수점 1자리까지 표시하여 가독성 확보)
@@ -205,6 +207,15 @@ if (isCrit) {
     const bonus = Math.floor(dmg * relicDmgPct);
     dmg += bonus;
     if (bonus > 0) breakdown.push(`유물 +${bonus}`);
+  }
+  // 1.95.0~ 상처악화 (참격 누적 디버프): 적이 받는 모든 스킬 데미지 +N%
+  const woundPct = defender.debuffs?.woundPct || 0;
+  if (woundPct > 0) {
+    const woundBonus = Math.floor(dmg * woundPct / 100);
+    if (woundBonus > 0) {
+      dmg += woundBonus;
+      breakdown.push(`상처악화 +${woundBonus}`);
+    }
   }
   // 저주: 주는 데미지 -15%
   if (hasCurse(curses, 'curse_dmgDealt-15')) {
