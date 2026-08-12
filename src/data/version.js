@@ -3,6 +3,6 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.99.4';
-export const VERSION_DATE = '2026-08-11';
-export const VERSION_LABEL = '데이터 선택 복구 화면 — 로컬·클라우드 진행도 급락 감지 시 직접 선택';
+export const GAME_VERSION = '1.100.0';
+export const VERSION_DATE = '2026-08-12';
+export const VERSION_LABEL = '자동 사냥 개편 — 준비 자동 재선택 + 전투 현황 대기화면 + 런타임 베스트 기록';

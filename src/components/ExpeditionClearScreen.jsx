@@ -2,10 +2,10 @@
 // components/ExpeditionClearScreen.jsx — 원정 완전 클리어 화면
 // ============================================
 import React from 'react';
-import { PALETTE } from '../utils/helpers.js';
+import { PALETTE, formatRunTime } from '../utils/helpers.js';
 import { RELICS, TITLE_TIERS } from '../data.js';
 
-export default function ExpeditionClearScreen({ expedition, soulsGained, firstClear, runStats = null, titleDrop = null, retreat = false, onContinue }) {
+export default function ExpeditionClearScreen({ expedition, soulsGained, firstClear, runStats = null, titleDrop = null, retreat = false, runTime = null, onContinue }) {
   // 신규 해금 유물 정보 찾기
   const newRelic = firstClear?.newRelic ? RELICS.find(r => r.name === firstClear.newRelic) : null;
   const isTutorial = expedition.isTutorial === true;
@@ -69,6 +69,21 @@ export default function ExpeditionClearScreen({ expedition, soulsGained, firstCl
               ? `이미 보유 — 영혼 +${titleDrop.souls} 대체 지급`
               : `${titleDrop.title.desc} · 원정 선택 → 마스터즈 탭에서 장착`}
           </div>
+        </div>
+      )}
+
+      {/* 1.100.0~ 런타임 (×1 배속 기준) + 베스트 갱신 표시 */}
+      {runTime && (
+        <div className="mb-4 px-5 py-2 flex items-center gap-2" style={{
+          borderRadius: 999, background: runTime.best ? 'rgba(232,176,74,0.14)' : 'rgba(0,0,0,0.45)',
+          border: `1px solid ${runTime.best ? PALETTE.legendary : 'rgba(255,255,255,0.15)'}`,
+        }}>
+          <span style={{ fontSize: 12, color: PALETTE.dawn }}>⏱</span>
+          <span className="tabular-nums font-bold" style={{ fontSize: 14, color: runTime.best ? PALETTE.legendary : PALETTE.text }}>
+            {formatRunTime(runTime.ms)}
+          </span>
+          <span style={{ fontSize: 9.5, color: PALETTE.textDim }}>×1 기준</span>
+          {runTime.best && <span className="font-bold" style={{ fontSize: 10.5, color: PALETTE.legendary }}>★ 베스트 갱신!</span>}
         </div>
       )}
 

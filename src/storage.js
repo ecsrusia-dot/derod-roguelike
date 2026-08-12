@@ -129,6 +129,9 @@ const DEFAULT_META = {
     elf:        {},
     priest:     {},
   },
+  // 1.100.0~ 던전별 베스트 런타임 (×1 배속 기준 ms) — bestRunTimes[key] = { ms, cls, t }
+  //   key: 클래식 exp.id / 챔피언십 `${champId}@${diff}` / 마스터즈 fusion id. 도박장·무한 제외.
+  bestRunTimes: {},
   // 1.99.2~ 마스터즈 직업별 클리어 추적 — mastersClearsByClass[classId][fusionId] = true (소급 불가)
   mastersClearsByClass: {
     wanderer: {}, sage: {}, demonblood: {}, elf: {}, priest: {},
@@ -1316,6 +1319,20 @@ export function clearWandererRenameNotice(meta) {
 export function clearAltarRedesignNotice(meta) {
   if (!meta.altarRedesignNotice) return meta;
   return { ...meta, altarRedesignNotice: null };
+}
+
+// 1.100.0~ 베스트 런타임 갱신 — 더 빠르면 기록 (×1 기준 ms)
+export function updateBestRunTime(meta, key, ms, classId) {
+  if (!key || !ms || ms <= 0) return { meta, isBest: false };
+  const cur = meta.bestRunTimes?.[key];
+  if (cur && cur.ms <= ms) return { meta, isBest: false };
+  return {
+    meta: {
+      ...meta,
+      bestRunTimes: { ...(meta.bestRunTimes || {}), [key]: { ms, cls: classId || null, t: Date.now() } },
+    },
+    isBest: true,
+  };
 }
 
 // 1.99.2~ 마스터즈 직업별 클리어 기록 (PM 지시: 클리어 이력 직업별 분리)

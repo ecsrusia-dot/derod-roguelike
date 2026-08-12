@@ -812,3 +812,13 @@ export function getClassBeltSlots(meta, classId) {
   const cfg = CLASS_BELT[classId] || { base: 2, max: 4 };
   return Math.min(cfg.max, cfg.base + getBeltExpansionCount(meta, classId));
 }
+
+// 1.100.0~ 런타임 표기 — mm:ss (1시간 이상은 h:mm:ss)
+export function formatRunTime(ms) {
+  const total = Math.max(0, Math.round(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const sec = total % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+  return `${m}:${String(sec).padStart(2, '0')}`;
+}
