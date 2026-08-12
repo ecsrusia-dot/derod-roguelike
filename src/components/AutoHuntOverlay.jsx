@@ -99,7 +99,7 @@ const STAT_COLORS = { 근력: '#c4453d', 민첩: '#7a9a5e', 지능: '#7ba3c4', �
 export default function AutoHuntOverlay({
   classData, hp, maxHp, stats = {}, skills = {}, activeSkills = null,
   relics = [], activeRelicNames = null, ultimates = [], gold = 0, gem = 0, runSouls = 0,
-  expedition, chapter, screen, runStats = null, autoRunCount = 0, runTimeMs = null,
+  expedition, chapter, screen, runStats = null, autoRunCount = 0, runTimeMs = null, combatLive = null,
   autoSpeed = 1, onCycleSpeed, runRepeat = false, onToggleRepeat = null,
   onWatch, onStop,
 }) {
@@ -187,6 +187,79 @@ export default function AutoHuntOverlay({
             ))}
           </div>
         </GlassPanel>
+
+        {/* 1.100.1~ 전투 스테이터스 (PM 지시 — ≡ 스테이터스 모달과 동일 항목·산식, 전투 중 실시간) */}
+        {combatLive && (() => {
+          const L = combatLive;
+          const Row = ({ label, val, color }) => (
+            <div className="flex justify-between" style={{ color: PALETTE.textDim, fontSize: 11 }}>
+              <span>{label}</span><span className="font-bold tabular-nums" style={{ color }}>{val}</span>
+            </div>
+          );
+          return (
+            <GlassPanel style={{ borderRadius: 13, padding: '9px 12px' }}>
+              <div className="flex justify-between items-baseline" style={{ marginBottom: 6 }}>
+                <span style={{ fontSize: 9.5, color: L.classColor || PALETTE.dawn, fontWeight: 700, letterSpacing: '0.2em' }}>━ 전투 스테이터스 ━</span>
+                {L.enemyName && L.enemyHp && (
+                  <span className="tabular-nums" style={{ fontSize: 9.5, color: PALETTE.accent }}>vs {L.enemyName} {L.enemyHp[0]}/{L.enemyHp[1]}</span>
+                )}
+              </div>
+              {/* 체력 / 에테르 / 방어 (+소울) */}
+              <div className="grid grid-cols-3 gap-1.5 mb-2">
+                {[
+                  ['체력', `${L.hp}/${L.maxHp}`, '#8b1f1f'],
+                  ['에테르', `${L.ether}/${L.maxEther}`, '#5c4a8c'],
+                  ['방어', `${L.defense}${L.soulGauge != null ? ` · 소울 ${L.soulGauge}` : ''}`, '#7ba3c4'],
+                ].map(([label, val, color]) => (
+                  <div key={label} className="px-2 py-1" style={{ borderRadius: 9, background: `${color}20`, border: `1px solid ${color}60` }}>
+                    <div style={{ fontSize: 8.5, color: PALETTE.textDim }}>{label}</div>
+                    <div className="font-bold tabular-nums" style={{ fontSize: 11.5, color: PALETTE.text }}>{val}</div>
+                  </div>
+                ))}
+              </div>
+              {/* 활성 상태 */}
+              {L.chips.length > 0 && (
+                <div className="flex gap-1 flex-wrap mb-2">
+                  {L.chips.map((c, i) => (
+                    <span key={i} className="text-[9.5px] px-1.5 py-0.5" style={{ borderRadius: 999, background: `${c.c}30`, color: '#fff', border: `1px solid ${c.c}` }}>{c.t}</span>
+                  ))}
+                </div>
+              )}
+              {/* 전투 수치 */}
+              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 mb-1.5">
+                <Row label="치명타 발동율" val={`${L.combat.critRate}%`} color={PALETTE.legendary} />
+                <Row label="치명타 데미지" val={`+${L.combat.critDmg}%`} color={PALETTE.legendary} />
+                <Row label="회피 발동율" val={`${L.combat.dodgeRate}%`} color={PALETTE.green} />
+                {L.combat.counterRate > 0 && <Row label="반격 발동율" val={`${L.combat.counterRate}%`} color={PALETTE.accent} />}
+                {L.combat.igniteRate > 0 && <Row label="화염 각인 발동율" val={`${L.combat.igniteRate}%`} color="#d97706" />}
+              </div>
+              {/* 데미지 보정 */}
+              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 mb-1.5">
+                {L.dmg.physBonus > 0 && <Row label="물리 데미지" val={`+${L.dmg.physBonus}`} color={PALETTE.accent} />}
+                {L.dmg.magicBonus > 0 && <Row label="마법 데미지" val={`+${L.dmg.magicBonus}%`} color={PALETTE.twilight} />}
+                {L.dmg.bleedBonus > 0 && <Row label="출혈 데미지" val={`+${L.dmg.bleedBonus}%`} color={PALETTE.bleed} />}
+                {L.dmg.counterDmgBonus > 0 && <Row label="반격 데미지" val={`+${L.dmg.counterDmgBonus}%`} color={PALETTE.accent} />}
+                {L.dmg.allDmgBonus > 0 && <Row label="모든 데미지" val={`+${L.dmg.allDmgBonus}%`} color={PALETTE.legendary} />}
+                {L.dmg.rage > 0 && <Row label="분노 버프" val={`+${L.dmg.rage}%`} color={PALETTE.accent} />}
+                {L.dmg.dmgTakenReduce > 0 && <Row label="받는 데미지" val={`-${L.dmg.dmgTakenReduce}%`} color={PALETTE.green} />}
+                {L.dmg.dmgDealtCurse > 0 && <Row label="저주: 가하는 데미지" val={`-${L.dmg.dmgDealtCurse}%`} color={PALETTE.twilight} />}
+                {L.dmg.dmgTakenCurse > 0 && <Row label="저주: 받는 피해" val={`+${L.dmg.dmgTakenCurse}%`} color={PALETTE.twilight} />}
+              </div>
+              {/* 기타 효과 */}
+              {(L.misc.regenLv > 0 || L.misc.lifesteal > 0 || L.misc.reflect > 0 || L.misc.heal > 0 || L.misc.charismaHeal > 0 || L.misc.cdReduce > 0 || L.misc.magicEcho > 0) && (
+                <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
+                  {L.misc.regenLv > 0 && <Row label="HP 자동 회복" val={`+${L.misc.regenLv}/턴`} color={PALETTE.green} />}
+                  {L.misc.lifesteal > 0 && <Row label="흡혈" val={`+${L.misc.lifesteal}`} color={PALETTE.accent} />}
+                  {L.misc.reflect > 0 && <Row label="데미지 반사" val={`${L.misc.reflect}%`} color={PALETTE.accent} />}
+                  {L.misc.heal > 0 && <Row label="회복량 보너스" val={`+${L.misc.heal}%`} color={PALETTE.green} />}
+                  {L.misc.charismaHeal > 0 && <Row label="매력 시그: 회복" val={`+${L.misc.charismaHeal}%`} color={PALETTE.dawn} />}
+                  {L.misc.cdReduce > 0 && <Row label="쿨다운 감소" val={`-${L.misc.cdReduce}턴`} color={PALETTE.twilight} />}
+                  {L.misc.magicEcho > 0 && <Row label="마법 재시전 확률" val={`${L.misc.magicEcho}%`} color={PALETTE.legendary} />}
+                </div>
+              )}
+            </GlassPanel>
+          );
+        })()}
 
         {/* 활성 패시브 */}
         <GlassPanel style={{ borderRadius: 13, padding: '9px 12px' }}>

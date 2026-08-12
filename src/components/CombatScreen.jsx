@@ -48,7 +48,7 @@ import {
 } from '../combat/initCombat.js';
 import { FloatingLabel, DamageVignette, WhiteFlash, SlashFx, MagicImpactFx, MagicParticles, BarrierRing, BarrierBreakFx, ThrustFx, BladeGuardFx, ShadowStrikeFx, StatusOverlay, UltimateCutin, EternalFlameCutin, FireballFx, ExplosionFx, IgniteGlowAura, IgniteExplodeFx, FlameBarrierFx, FlameReflectFx, CritScreenFx } from './CombatEffects.jsx';
 
-export default function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimates = [], initialRelics = [], activeSkills = null, activeRelicNames = null, enemyKey, isBoss, expedition, curses = [], meta, engravingFx = {}, chapterGimmick = null, autoPlay = false, autoSpeed = 1, onCycleAutoSpeed = null, autoRunCount = 0, onToggleAuto = null, belt = [], onConsumePotion = null, onVictory, onDefeat }) {
+export default function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimates = [], initialRelics = [], activeSkills = null, activeRelicNames = null, enemyKey, isBoss, expedition, curses = [], meta, engravingFx = {}, chapterGimmick = null, autoPlay = false, autoSpeed = 1, onCycleAutoSpeed = null, autoRunCount = 0, onToggleAuto = null, belt = [], onConsumePotion = null, onLiveStatus = null, onVictory, onDefeat }) {
   // 1.80.0~ 자동 사냥 배속 — 자동 중에만 내부 진행·연출 딜레이 압축 (수동 플레이는 원속도)
   const dly = (ms) => (autoPlay && autoSpeed > 1 ? Math.max(40, Math.round(ms / autoSpeed)) : ms);
   // 1.89.0~ 마스터즈 기믹 융합 — chapterGimmick이 배열이면 전부 동시 적용
@@ -819,6 +819,98 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     setPhase('enemyTurn');
     setTimeout(() => { executeEnemyTurn(newPlayer, newEnemy, newLog); }, dly(250));
   };
+
+  // ============================================
+  // 1.100.1~ 자동 사냥 대기화면 전투 스테이터스 (PM 지시) — ≡ 스테이터스 모달과 동일 산식의 스냅샷 발행
+  //   계산은 여기(전투 상태 보유처) 한 곳, 대기화면은 받은 데이터를 같은 레이아웃으로 렌더만.
+  // ============================================
+  const buildStatusSnapshot = () => {
+    const playerDex = player.민첩 || 10;
+    let critRate = 5 + Math.max(0, (playerDex - 10) * 0.5);
+    critRate += getMinorBonus(skills, 'critRate+', activeSkills);
+    critRate += getMetaBonus(meta, 'critRate+2%') * 2;
+    critRate += relicStat.critRate || 0;
+    if (hasEffect(skills, 'weaknessPoint', activeSkills)) critRate += 10;
+    if (hasUltimate(ultimates, 'ult_counterShadow')) critRate += 15;
+    let critDmg = hasEffect(skills, 'critDmg+30', activeSkills) ? 80 : 50;
+    critDmg += relicStat.critDmg || 0;
+    if (hasEffect(skills, 'weaknessPoint', activeSkills)) critDmg += 50;
+    let dodgeRate = Math.max(0, (playerDex - 10) * 0.3);
+    dodgeRate += getMinorBonus(skills, 'dodge+', activeSkills);
+    dodgeRate += relicStat.dodge || 0;
+    if (hasEffect(skills, 'dodge+15', activeSkills)) dodgeRate += 15;
+    if (hasEffect(skills, 'detailIntent', activeSkills)) dodgeRate += 10;
+    const simanLv = skills['심안류'] || 0;
+    const hasMirror = hasUltimate(ultimates, 'ult_counterMirror');
+    const hasShock = hasUltimate(ultimates, 'ult_counterShock');
+    const hasShadow = hasUltimate(ultimates, 'ult_counterShadow');
+    if (hasMirror) dodgeRate += 10;
+    let counterRate = 0;
+    if (simanLv > 0 || hasMirror || hasShock || hasShadow || (player.buffs?.shadowCounterTurns || 0) > 0) {
+      counterRate = simanLv * 5;
+      if (simanLv >= 3) counterRate += 20;
+      if (hasMirror || hasShock || hasShadow) counterRate += 60;
+      if ((player.buffs?.shadowCounterTurns || 0) > 0) counterRate = 100;
+      if (counterRate > 100) counterRate = 100;
+    }
+    const ignite = getIfritIgniteRate(skills, ultimates, activeSkills);
+    const physBonus = getMinorBonus(skills, 'physDmg+', activeSkills);
+    const magicBonus = getMinorBonus(skills, 'magicDmg+', activeSkills);
+    const bleedBonus = getMinorBonus(skills, 'bleedDmg+', activeSkills);
+    let counterDmgBonus = simanLv * 5;
+    if (simanLv >= 5) counterDmgBonus += 15;
+    if (hasMirror || hasShock || hasShadow) counterDmgBonus += 50;
+    const allDmgBonus = getMetaBonus(meta, 'dmgDealt+2%') * 2 + (relicStat.dmgDealt || 0);
+    const dmgTakenReduce = getMetaBonus(meta, 'dmgTaken-2%') * 2 + (relicStat.dmgTaken || 0)
+      + (hasEffect(skills, 'dmgTaken-20', activeSkills) ? 20 : 0) + getCharismaDmgReduction(player);
+    const dmgDealtCurse = hasCurse(curses, 'curse_dmgDealt-15') ? 15 : 0;
+    const dmgTakenCurse = (hasCurse(curses, 'curse_dmgTaken+15') ? 15 : 0) + (hasCurse(curses, 'curse_dmgTaken+30') ? 30 : 0);
+    // 활성 상태 칩 (문자열) — 모달과 동일 조건
+    const chips = [];
+    const B = player.buffs || {}, D = player.debuffs || {};
+    if (B.rage > 0) chips.push({ t: `☩ 분노 (${B.rage}T)`, c: PALETTE.accent });
+    if (B.shadowCounterTurns > 0) chips.push({ t: `☄ 무영의 잔영 반격 100% (${B.shadowCounterTurns}T)`, c: '#ffd86b' });
+    if (B.flameBoostTurns > 0 && B.flameBoostPct > 0) chips.push({ t: `🔥 영겁의 정념 +${B.flameBoostPct}% (${B.flameBoostTurns}T)`, c: '#ff4500' });
+    if (B.flameBarrierPending > 0) chips.push({ t: `🔥 화염장막 (${B.flameBarrierPending}%)`, c: '#ff6b35' });
+    if (B.guaranteedCrit > 0) chips.push({ t: '✦ 치명타 확정', c: '#c4453d' });
+    if (B.dodgeBuffTurns > 0) chips.push({ t: `💨 회피 +${B.dodgeBuff || 0}% (${B.dodgeBuffTurns}T)`, c: PALETTE.green });
+    if (B.dmgReduceTurns > 0 && (B.dmgReducePct || 0) > 0) chips.push({ t: `🛡 검막 -${B.dmgReducePct}% (${B.dmgReduceTurns}T)`, c: PALETTE.ice });
+    if (player.firstHitImmune) chips.push({ t: '✦ 무적 1회', c: PALETTE.legendary });
+    if (player.divineShield > 0) chips.push({ t: `🛡 여명의 가호 ${player.divineShield}%`, c: '#d4a574' });
+    if (B.dawnGuardTurns > 0) chips.push({ t: `✦ 강림 가호 -${B.dawnGuard || 0}% (${B.dawnGuardTurns}T)`, c: '#d4a574' });
+    if (B.bloodLifestealTurns > 0) chips.push({ t: `🩸 흡혈 ${B.bloodLifesteal || 0}% (${B.bloodLifestealTurns}T)`, c: '#7a1818' });
+    if (B.windBoostNextDmg) chips.push({ t: '🌪 풍령 다음 공격 +50%', c: '#7a9a5e' });
+    if (B.windPierceNext) chips.push({ t: '🏹 풍령 다음 방어 무시', c: '#7a9a5e' });
+    if (B.bloodRageNext) chips.push({ t: '✸ 혈광 다음 공격 +15%', c: '#7a1818' });
+    if (B.bloodFrenzyNext) chips.push({ t: '✸ 광혈폭주 다음 공격 +40%', c: '#a02020' });
+    if (D.frostbiteDmg > 0 && D.frostbiteTurns > 0) chips.push({ t: `❄️ 동상 ${D.frostbiteDmg} (${D.frostbiteTurns}T)`, c: '#7ba3c4' });
+    if (D.sealedTurns > 0 && D.sealedSkills?.length > 0) chips.push({ t: `🔒 봉인 ${D.sealedSkills.map(k => COMBAT_SKILLS[k]?.name || k).join(',')} (${D.sealedTurns}T)`, c: '#5c4a8c' });
+    if (D.shockGauge > 0) chips.push({ t: `⚡ 충격 ${D.shockGauge}/100`, c: '#8b1f1f' });
+    if (D.stunnedTurns > 0) chips.push({ t: `💫 기절 (${D.stunnedTurns}T)`, c: '#a52a2a' });
+    if ((enemy?.debuffs?.weakenPct || 0) > 0) chips.push({ t: `↓ 적 위축 -${enemy.debuffs.weakenPct}%`, c: '#ff6b35' });
+    if ((enemy?.debuffs?.woundPct || 0) > 0) chips.push({ t: `🗡 상처악화 +${enemy.debuffs.woundPct}%`, c: '#c4453d' });
+    return {
+      className: classData?.name, classColor: classData?.color,
+      hp: player.hp, maxHp: player.maxHp, ether: player.ether, maxEther: player.maxEther, defense: player.defense || 0,
+      stats: { 근력: player.근력 || 0, 민첩: player.민첩 || 0, 지능: player.지능 || 0, 매력: player.매력 || 0 },
+      chips,
+      combat: { critRate: Math.round(critRate), critDmg: Math.round(critDmg), dodgeRate: Math.round(dodgeRate), counterRate, igniteRate: ignite.has ? ignite.rate : 0 },
+      dmg: { physBonus, magicBonus, bleedBonus, counterDmgBonus, allDmgBonus, rage: B.rage > 0 ? 30 : 0, dmgTakenReduce, dmgDealtCurse, dmgTakenCurse },
+      misc: {
+        regenLv: skills['재생'] || 0, lifesteal: relicStat.lifesteal || 0, reflect: relicStat.reflect || 0,
+        heal: relicStat.heal || 0, charismaHeal: getCharismaHealBonus(player), cdReduce: getMinorBonus(skills, 'cdReduce+', activeSkills),
+        magicEcho: getMagicEchoChance(skills, activeSkills),
+      },
+      soulGauge: classData?.ultimateId ? (player.soulGauge || 0) : null,
+      enemyName: enemy?.name || null,
+      enemyHp: enemy ? [Math.max(0, enemy.currentHp), enemy.maxHp] : null,
+    };
+  };
+
+  useEffect(() => {
+    if (!autoPlay || !onLiveStatus) return;
+    onLiveStatus(buildStatusSnapshot());
+  }, [autoPlay, player, enemy]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ============================================
   // 1.96.0~ 황혼의 벨트 — 포션 사용 (AP 소모 없음, 턴당 1회. 회복 보정 미적용 — 표기값 그대로)
