@@ -15,7 +15,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { ChevronRight, Lock, Calendar } from 'lucide-react';
-import { PALETTE, isUnlocked } from '../utils/helpers.js';
+import { PALETTE, formatRunTime, isUnlocked } from '../utils/helpers.js';
 import { EXPEDITIONS, CHAMPIONSHIPS, CHAMPIONSHIP_DIFFICULTIES, CLASSES, CURSES, ENDLESS_SKIP_LIMIT, MASTERS_DUALS, MASTERS_TRIPLES, MASTERS_GIMMICKS, MASTERS_TUNING, getMastersKind, isMastersFusionUnlocked, CLASS_TITLES, TITLE_TIERS, TITLE_DROP_RATES } from '../data.js';
 import { isChampionshipDifficultyUnlocked, getUnlockedChampionshipClasses, hasDailyCleared, getEndlessSkipUsed } from '../storage.js';
 import { buildDailyExpedition } from '../utils/dailyChallenge.js';
@@ -100,6 +100,14 @@ export default function ExpeditionSelect({ meta, onSelect, onSelectChampionship,
   // 1.99.2~ 클리어 이력 직업 필터 (PM 지시) — null=전체(통합 기록), classId=해당 직업 기록
   //   챔피언십 직업별 기록은 1.26.0부터 / 마스터즈는 1.99.2부터 누적 (이전 클리어 소급 불가)
   const [clearFilter, setClearFilter] = useState(null);
+  // 1.100.0~ 던전별 베스트 런타임 라인 (×1 기준) — "⏱ 4:32 · 방랑검사"
+  const bestLine = (key) => {
+    const b = meta?.bestRunTimes?.[key];
+    if (!b) return null;
+    const clsName = CLASSES.find(c => c.id === b.cls)?.name;
+    return `⏱ ${formatRunTime(b.ms)}${clsName ? ` · ${clsName}` : ''}`;
+  };
+
   const ClearFilterChips = () => (
     <div className="flex gap-1.5 mb-2.5 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
       {[{ id: null, name: '전체' }, ...CLASSES.map(c => ({ id: c.id, name: c.name, color: c.color }))].map(f => {
@@ -314,6 +322,7 @@ export default function ExpeditionSelect({ meta, onSelect, onSelectChampionship,
                   highlight={exp.id === nextClassicId}
                   chips={[
                     { text: `영혼 +${exp.soulReward}`, color: PALETTE.twilight },
+                    ...(bestLine(exp.id) ? [{ text: bestLine(exp.id), color: PALETTE.legendary }] : []),
                     ...(locked ? [{ text: '이전 단계 클리어 필요', color: PALETTE.accent }] : []),
                   ]}
                   onClick={() => !locked && onSelect(exp)}
@@ -337,6 +346,7 @@ export default function ExpeditionSelect({ meta, onSelect, onSelectChampionship,
                   chips={[
                     { text: `영혼 +${exp.soulReward}`, color: PALETTE.twilight },
                     { text: '4챕터', color: PALETTE.legendary },
+                    ...(bestLine(exp.id) ? [{ text: bestLine(exp.id), color: PALETTE.legendary }] : []),
                   ]}
                   progress={locked && (
                     <UnlockProgress value={clearedTutorialCount} total={tutorials.length} label="해금 조건 — 튜토리얼 클리어" />
@@ -432,6 +442,9 @@ export default function ExpeditionSelect({ meta, onSelect, onSelectChampionship,
                       </div>
                       <div className="font-semibold mt-0.5" style={{ fontSize: 13.5, color: PALETTE.text }}>{fusion.name}</div>
                       <div style={{ fontSize: 9.5, color: PALETTE.textDim }}>{conceptNames.join(' × ')}</div>
+                      {bestLine(fusion.id) && (
+                        <div className="tabular-nums" style={{ fontSize: 9.5, color: PALETTE.legendary }}>{bestLine(fusion.id)} — 베스트 (×1 기준)</div>
+                      )}
                       <div className="mt-1" style={{ fontSize: 10, color: PALETTE.dawn }}>
                         ◆ {gimmicks.map(g => g.name).join(' + ')} — 전부 동시 적용
                       </div>
@@ -505,6 +518,18 @@ export default function ExpeditionSelect({ meta, onSelect, onSelectChampionship,
                   </div>
                   <p className="mt-1 leading-relaxed" style={{ fontSize: 11, color: PALETTE.textDim }}>{champ.desc}</p>
                   <p className="mt-1.5" style={{ fontSize: 11, color: champ.color, opacity: 0.9 }}>◆ {champ.concept}</p>
+                  {(() => {
+                    const bests = CHAMPIONSHIP_DIFFICULTIES
+                      .map(d => ({ d, line: bestLine(`${champ.id}@${d.id}`) }))
+                      .filter(x => x.line);
+                    if (bests.length === 0) return null;
+                    return (
+                      <div className="mt-1.5 tabular-nums" style={{ fontSize: 9.5, color: PALETTE.legendary }}>
+                        {bests.map(x => `${x.d.name} ${x.line.replace('⏱ ', '')}`).join(' · ')}
+                        <span style={{ color: PALETTE.textDim }}> — 베스트 (×1 기준)</span>
+                      </div>
+                    );
+                  })()}
                   <div className="flex gap-1.5 mt-2.5">
                     {CHAMPIONSHIP_DIFFICULTIES.map((d) => {
                       const cleared = !!clears[d.id];

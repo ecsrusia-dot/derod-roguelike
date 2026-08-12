@@ -9,7 +9,7 @@
 // ============================================
 
 import React, { useState } from 'react';
-import { PALETTE } from '../utils/helpers.js';
+import { PALETTE, formatRunTime } from '../utils/helpers.js';
 import { PASSIVE_SKILLS, ULTIMATE_SKILLS } from '../data.js';
 import { GlassPanel, Chip } from './ui/CommonUI.jsx';
 import CardInfoModal, { buildPassiveInfo, buildRelicInfo } from './CardInfoModal.jsx';
@@ -99,7 +99,7 @@ const STAT_COLORS = { 근력: '#c4453d', 민첩: '#7a9a5e', 지능: '#7ba3c4', �
 export default function AutoHuntOverlay({
   classData, hp, maxHp, stats = {}, skills = {}, activeSkills = null,
   relics = [], activeRelicNames = null, ultimates = [], gold = 0, gem = 0, runSouls = 0,
-  expedition, chapter, screen, runStats = null, autoRunCount = 0,
+  expedition, chapter, screen, runStats = null, autoRunCount = 0, runTimeMs = null,
   autoSpeed = 1, onCycleSpeed, runRepeat = false, onToggleRepeat = null,
   onWatch, onStop,
 }) {
@@ -154,14 +154,35 @@ export default function AutoHuntOverlay({
           </div>
         </GlassPanel>
 
-        {/* 능력치 4종 */}
+        {/* 1.100.0~ 전투 현황 (PM 지시: 능력치 대신 전투 스테이터스 — 기여도는 종료 요약에서만) */}
         <GlassPanel style={{ borderRadius: 13, padding: '9px 12px' }}>
-          <div style={{ fontSize: 9.5, color: PALETTE.textDim, marginBottom: 5 }}>능력치</div>
+          <div className="flex justify-between items-baseline" style={{ marginBottom: 5 }}>
+            <span style={{ fontSize: 9.5, color: PALETTE.textDim }}>전투 현황</span>
+            {runTimeMs != null && (
+              <span className="tabular-nums" style={{ fontSize: 10, color: PALETTE.dawn }}>⏱ {formatRunTime(runTimeMs)} <span style={{ color: PALETTE.textDim }}>(×1 기준)</span></span>
+            )}
+          </div>
+          <div className="flex items-center gap-2" style={{ marginBottom: 6 }}>
+            <span style={{ fontSize: 9.5, color: PALETTE.textDim, width: 18 }}>HP</span>
+            <div className="flex-1" style={{ height: 7, borderRadius: 999, background: 'rgba(0,0,0,0.55)', overflow: 'hidden' }}>
+              <div style={{
+                height: '100%', width: `${maxHp > 0 ? Math.max(0, Math.min(100, (hp / maxHp) * 100)) : 0}%`, borderRadius: 999,
+                background: hp / Math.max(1, maxHp) > 0.5 ? 'linear-gradient(90deg, #7a9a5e88, #9ad4a3)' : hp / Math.max(1, maxHp) > 0.25 ? 'linear-gradient(90deg, #d4a57488, #e8b04a)' : 'linear-gradient(90deg, #8b1f1f88, #c4453d)',
+                transition: 'width 0.3s',
+              }} />
+            </div>
+            <span className="tabular-nums" style={{ fontSize: 10.5, color: PALETTE.text }}>{hp}/{maxHp}</span>
+          </div>
           <div className="grid grid-cols-4 gap-1.5 text-center">
-            {STAT_KEYS.map(k => (
-              <div key={k} style={{ borderRadius: 9, padding: '5px 0', background: `${STAT_COLORS[k]}14`, border: `1px solid ${STAT_COLORS[k]}55` }}>
-                <div style={{ fontSize: 9, color: STAT_COLORS[k] }}>{k}</div>
-                <div className="tabular-nums font-bold" style={{ fontSize: 13, color: PALETTE.text }}>{stats?.[k] ?? '-'}</div>
+            {[
+              ['전투', `${runStats?.battles || 0}회`, PALETTE.accent],
+              ['은화', `+${runStats?.gold || 0}`, PALETTE.dawn],
+              ['보석', `+${runStats?.gem || 0}`, PALETTE.ice],
+              ['영혼', `+${runStats?.souls || 0}`, PALETTE.legendary],
+            ].map(([label, val, color]) => (
+              <div key={label} style={{ borderRadius: 9, padding: '5px 0', background: `${color}12`, border: `1px solid ${color}44` }}>
+                <div style={{ fontSize: 9, color }}>{label}</div>
+                <div className="tabular-nums font-bold" style={{ fontSize: 12, color: PALETTE.text }}>{val}</div>
               </div>
             ))}
           </div>

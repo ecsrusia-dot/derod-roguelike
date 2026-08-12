@@ -141,7 +141,7 @@ import {
 } from './data.js';
 import { getKstDateKey } from './utils/dailyChallenge.js';
 import { simulateBestEndlessRun } from './utils/endlessSkipSim.js';
-import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, applyEngravingSlot, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear, dismantleRaidItem, dismantleRaidJunk, enhanceRaidItem, claimRaidWeekly, addRaidResources, spendRaidResourcesForItem, resolveRaidSecret, toggleRaidFormation, appendAutoRunLog, getGambleUsed, useGambleEntry, addTwilightCoins, addFateShards, redeemFateShards, buyGambleShopItem, addClassTitle, equipClassTitle, saveHofPatterns, hofLevelUpChar, recordHofClear, recordMastersClearByClass } from './storage.js';
+import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, applyEngravingSlot, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear, dismantleRaidItem, dismantleRaidJunk, enhanceRaidItem, claimRaidWeekly, addRaidResources, spendRaidResourcesForItem, resolveRaidSecret, toggleRaidFormation, appendAutoRunLog, getGambleUsed, useGambleEntry, addTwilightCoins, addFateShards, redeemFateShards, buyGambleShopItem, addClassTitle, equipClassTitle, saveHofPatterns, hofLevelUpChar, recordHofClear, recordMastersClearByClass, updateBestRunTime } from './storage.js';
 
 
 
@@ -249,6 +249,14 @@ function ResponsiveLayout({ children, sidebar }) {
 // =========== 사건 화면 ===========
 
 // =========== Main App - 통합 게임 루프 ===========
+// 1.91.0~ PM 지정 직업별 패시브 우선순위 (🔒 룰 동결 — PM 지시로만 변경)
+//   1.91.2: 방랑검사 정밀 5순위 / 1.92.0: 술법사 추가
+//   1.100.0~ 보상 픽 + 준비 화면 자동 재선택 양쪽에서 공용 사용
+const CLASS_SKILL_PRIO = {
+  wanderer: ['심안류', '심안', '회피', '재생', '정밀', '잔혹', '강타', '신앙', '가속'],
+  sage: ['이프리트', '마력', '신앙', '정밀', '재생', '잔혹', '강타', '회피'],
+};
+
 export default function App() {
   const [screen, setScreen] = useState('title');
   const [selectedClass, setSelectedClass] = useState(0);
@@ -337,6 +345,9 @@ export default function App() {
   // 1.81.0~ 일반 던전 반복 — 클리어 시 같은 원정 자동 재출정 (재출정 함수는 ref로 보존)
   const [runRepeat, setRunRepeat] = useState(false);
   const runRestartRef = useRef(null);
+  // 1.100.0~ 런타임 집계 (×1 배속 기준 ms) — null이면 기록 무효 (이어하기 복귀 런)
+  const runTimeRef = useRef(0);
+  const [runClearTime, setRunClearTime] = useState(null); // { ms, best } — 클리어 화면 표시용
   // 1.90.0~ 런 조건 특수 업적용 카운터 (ref — 고배속 자동에서도 롤백 없음)
   const runKillsRef = useRef(0);                       // 몰살자: 한 런 처치 수
   const runEventsRef = useRef({ ok: 0, fail: 0 });     // 운명의 심판자: 사건 판정 성공/실패
@@ -353,6 +364,15 @@ export default function App() {
   // 1.80.0~ 자동 사냥 배속 (×1 / ×5 / ×10 / ×20) — 자동 사냥 중에만 연출·진행 딜레이 압축
   const [autoSpeed, setAutoSpeed] = useState(1);
   const cycleAutoSpeed = () => setAutoSpeed(s => (s === 1 ? 5 : s === 5 ? 10 : s === 10 ? 20 : 1));
+  // 1.100.0~ 런타임 누적 — 1초마다 (자동 사냥 배속이면 ×배속으로 환산해 ×1 기준 시간 유지)
+  // ⚠ 이 effect는 autoHunt·autoSpeed 선언 뒤에 있어야 함 (앞에 두면 deps 평가 시 TDZ 부팅 크래시 — 1.89.1 동일 유형)
+  useEffect(() => {
+    if (!metaLoaded || !currentExpedition) return;
+    const iv = setInterval(() => {
+      if (runTimeRef.current != null) runTimeRef.current += 1000 * (autoHunt ? autoSpeed : 1);
+    }, 1000);
+    return () => clearInterval(iv);
+  }, [metaLoaded, currentExpedition, autoHunt, autoSpeed]);
   // 1.81.0~ 자동 사냥 대기화면 — 자동 켤 때마다 표시, [관전]으로 숨김 가능
   const [autoOverlayHidden, setAutoOverlayHidden] = useState(false);
   // 1.83.0~ 자동 사냥 세션 — 자동 ON~OFF 동안 런 수·클리어·전멸·합산 획득 추적
@@ -826,6 +846,9 @@ export default function App() {
     runKillsRef.current = 0;
     runEventsRef.current = { ok: 0, fail: 0 };
     initialSkillTotalRef.current = null;
+    // 1.100.0~ 이어하기 런은 런타임 기록 무효 (스냅샷 이전 시간 미상 — 베스트 오염 방지)
+    runTimeRef.current = null;
+    setRunClearTime(null);
     // 1.96.0~ 벨트 복원
     setBelt(s.belt || []);
     setStats(s.stats || {});
@@ -997,6 +1020,9 @@ export default function App() {
       // 1.93.0~ 보스 보상·포기 플래그 초기화
       setBossRewardPending(false);
       setRunRetreat(false);
+      // 1.100.0~ 런타임 리셋 (새 런)
+      runTimeRef.current = 0;
+      setRunClearTime(null);
       // 1.27.0~ 각인 effect 통합: 직업 능력치 + HP 가산
       const _engSlots = meta?.engravings?.[classData.id]?.slots || [];
       const _engFx = aggregateEngravingEffects(classData.id, _engSlots);
@@ -2240,6 +2266,18 @@ export default function App() {
         }
       }
 
+      // 1.100.0~ 던전별 베스트 런타임 (×1 기준, 도박장 제외 — 무한은 클리어 개념 없어 자연 제외)
+      if (!currentExpedition.isGamble && runTimeRef.current != null && runTimeRef.current > 0) {
+        const rtKey = currentExpedition.isChampionship
+          ? `${currentExpedition.championshipId}@${currentExpedition.difficultyId}`
+          : currentExpedition.id;
+        const rtRes = updateBestRunTime(newMeta, rtKey, runTimeRef.current, classData?.id || null);
+        newMeta = rtRes.meta;
+        setRunClearTime({ ms: runTimeRef.current, best: rtRes.isBest });
+      } else {
+        setRunClearTime(null);
+      }
+
       // 영혼 부자 (5000 누적 보유) — 영혼 추가 후 체크
       newMeta = setAchievementProgress(newMeta, 'special_souls_5000', newMeta.souls, 5000);
 
@@ -2548,12 +2586,6 @@ export default function App() {
     } else if (screen === 'reward' && currentRewards && currentRewards.length > 0) {
       const hpRatio = maxHp > 0 ? hp / maxHp : 1;
       const classId = classData?.id;
-      // 1.91.0~ PM 지정 직업별 패시브 획득 우선순위 (🔒 룰 동결 — PM 지시로만 변경)
-      //   1.91.2: 방랑검사 정밀 5순위 / 1.92.0: 술법사 추가
-      const CLASS_SKILL_PRIO = {
-        wanderer: ['심안류', '심안', '회피', '재생', '정밀', '잔혹', '강타', '신앙', '가속'],
-        sage: ['이프리트', '마력', '신앙', '정밀', '재생', '잔혹', '강타', '회피'],
-      };
       const prioList = CLASS_SKILL_PRIO[classId] || null;
       // 1.84.2 완화 (PM 결정): 잔혹은 Lv.3부터 자체 출혈 부여라 물리 직업군이면 자동 픽 허용
       //   — 마법 전용 직업(술법사·사제)만 제외 (수동 픽은 항상 가능)
@@ -2631,27 +2663,40 @@ export default function App() {
       // RestScreen 휴식 선택지와 동일 (최대 HP 20% 회복)
       later(() => handleRestChoice({ type: 'heal', value: Math.floor(maxHp * 0.2) }), 800);
     } else if (screen === 'prep' || screen === 'reselect') {
-      // PrepScreen과 동일 규칙으로 자동 선택 (제한 개수 우회 금지):
-      // 기존 활성 선택 유지 → 부족분은 레벨 높은 패시브 순으로 채움
+      // 1.100.0~ PM 룰: 제한 초과 시 이전 선택 유지가 아니라 직업 우선순위로 재선택
       const owned = Object.entries(skills).filter(([n, lv]) => lv > 0 && PASSIVE_SKILLS[n]).map(([n]) => n);
       const maxSk = PREP_CONFIG.maxSkillSelect;
       let selSkills;
       if (owned.length <= maxSk) {
         selSkills = owned;
       } else {
-        const prevSk = (activeSkills || []).filter(n => owned.includes(n));
-        const restSk = owned.filter(n => !prevSk.includes(n)).sort((a, b) => (skills[b] || 0) - (skills[a] || 0));
-        selSkills = [...prevSk, ...restSk].slice(0, maxSk);
+        const prio = CLASS_SKILL_PRIO[classData?.id] || null;
+        if (prio) {
+          // PM 지정 우선순위 순서 → 목록 밖 패시브는 레벨 높은 순으로 뒤에
+          const inPrio = prio.filter(n => owned.includes(n));
+          const restSk = owned.filter(n => !inPrio.includes(n)).sort((a, b) => (skills[b] || 0) - (skills[a] || 0));
+          selSkills = [...inPrio, ...restSk].slice(0, maxSk);
+        } else {
+          // 우선순위 미지정 직업(마족·정령사·사제): 직업 전용 패시브 → 레벨 높은 순
+          const classOnly = owned.filter(n => PASSIVE_SKILLS[n]?.classOnly === classData?.id);
+          const restSk = owned.filter(n => !classOnly.includes(n)).sort((a, b) => (skills[b] || 0) - (skills[a] || 0));
+          selSkills = [...classOnly, ...restSk].slice(0, maxSk);
+        }
       }
+      // 1.100.0~ PM 룰: 유물 초과 시 직업 선호 점수순 재선택 — 천리안(mapReveal)·시작 은화(startGold) 계열 무조건 배제
       const maxRel = currentExpedition?.maxRelicSelect || 1;
       const relNames = relics.map(r => r.name);
       let selRelics;
       if (relNames.length <= maxRel) {
         selRelics = relNames;
       } else {
-        const prevRel = (activeRelicNames || []).filter(n => relNames.includes(n));
-        const restRel = relNames.filter(n => !prevRel.includes(n));
-        selRelics = [...prevRel, ...restRel].slice(0, maxRel);
+        const usableRelics = relics.filter(r => !((r.statBonus?.mapReveal || 0) > 0 || (r.statBonus?.startGold || 0) > 0));
+        selRelics = [...usableRelics]
+          .sort((a, b) => scoreRelicForClass(b, classData?.id) - scoreRelicForClass(a, classData?.id))
+          .slice(0, maxRel)
+          .map(r => r.name);
+        // 배제 유물뿐이라 한 칸도 못 채우는 극단 케이스만 폴백 (빈 활성은 순손실)
+        if (selRelics.length === 0) selRelics = relNames.slice(0, maxRel);
       }
       if (screen === 'prep') later(() => handlePrepConfirm(selSkills, selRelics), 800);
       else later(() => handleReselectConfirm(selSkills, selRelics), 800);
@@ -2705,7 +2750,7 @@ export default function App() {
               classData={classData} hp={hp} maxHp={maxHp} stats={{ ...classData?.stats, ...stats }}
               skills={skills} activeSkills={activeSkills} relics={relics} activeRelicNames={activeRelicNames} ultimates={ultimates}
               gold={gold} gem={gem} runSouls={runSouls}
-              expedition={currentExpedition} chapter={chapter} screen={screen} runStats={runStats} autoRunCount={autoSession?.runCount || 0}
+              expedition={currentExpedition} chapter={chapter} screen={screen} runStats={runStats} autoRunCount={autoSession?.runCount || 0} runTimeMs={runTimeRef.current}
               autoSpeed={autoSpeed} onCycleSpeed={cycleAutoSpeed}
               runRepeat={runRepeat} onToggleRepeat={currentExpedition?.endless ? null : () => setRunRepeat(v => !v)}
               onWatch={() => setAutoOverlayHidden(true)} onStop={() => setAutoHunt(false)}
@@ -2798,7 +2843,7 @@ export default function App() {
             {screen === 'shop' && <ShopScreen gold={gold} skills={skills} relics={relics} ultimates={ultimates} curses={currentCurses} autoPlay={autoHunt} autoSpeed={autoSpeed} onBuy={handleShopBuy} onLeave={handleShopLeave} classId={classData?.id} hp={hp} maxHp={maxHp} beltCount={belt.length} beltSlots={beltSlots} />}
             {screen === 'forge' && <ForgeScreen relics={relics} skills={skills} activeRelicNames={activeRelicNames} meta={meta} onCombine={handleForgeCombine} onLeave={handleForgeLeave} />}
             {screen === 'chapterClear' && chapter && <ChapterClearScreen chapter={chapter} isLastChapter={false} hp={hp} maxHp={maxHp} meta={meta} curses={currentCurses} onContinue={handleChapterContinue} />}
-            {screen === 'expeditionClear' && currentExpedition && <ExpeditionClearScreen expedition={currentExpedition} soulsGained={runSouls} firstClear={runFirstChampClear} runStats={runStats} titleDrop={currentExpedition.isMasters ? mastersDrop : null} retreat={runRetreat} onContinue={handleExpeditionClearContinue} />}
+            {screen === 'expeditionClear' && currentExpedition && <ExpeditionClearScreen expedition={currentExpedition} soulsGained={runSouls} firstClear={runFirstChampClear} runStats={runStats} titleDrop={currentExpedition.isMasters ? mastersDrop : null} retreat={runRetreat} runTime={runClearTime} onContinue={handleExpeditionClearContinue} />}
             {screen === 'defeat' && <DefeatScreen classData={classData} chapter={chapter} soulsGained={runSouls} onContinue={handleDefeatContinue} />}
             {screen === 'status' && (() => {
               const _baseStats = { ...classData.stats, ...stats };
