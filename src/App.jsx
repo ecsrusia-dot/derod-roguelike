@@ -345,6 +345,8 @@ export default function App() {
   // 1.81.0~ 일반 던전 반복 — 클리어 시 같은 원정 자동 재출정 (재출정 함수는 ref로 보존)
   const [runRepeat, setRunRepeat] = useState(false);
   const runRestartRef = useRef(null);
+  // 1.100.1~ 자동 사냥 대기화면 전투 스테이터스 — CombatScreen이 발행하는 실시간 스냅샷
+  const [combatLive, setCombatLive] = useState(null);
   // 1.100.0~ 런타임 집계 (×1 배속 기준 ms) — null이면 기록 무효 (이어하기 복귀 런)
   const runTimeRef = useRef(0);
   const [runClearTime, setRunClearTime] = useState(null); // { ms, best } — 클리어 화면 표시용
@@ -1023,6 +1025,7 @@ export default function App() {
       // 1.100.0~ 런타임 리셋 (새 런)
       runTimeRef.current = 0;
       setRunClearTime(null);
+      setCombatLive(null);
       // 1.27.0~ 각인 effect 통합: 직업 능력치 + HP 가산
       const _engSlots = meta?.engravings?.[classData.id]?.slots || [];
       const _engFx = aggregateEngravingEffects(classData.id, _engSlots);
@@ -2750,7 +2753,7 @@ export default function App() {
               classData={classData} hp={hp} maxHp={maxHp} stats={{ ...classData?.stats, ...stats }}
               skills={skills} activeSkills={activeSkills} relics={relics} activeRelicNames={activeRelicNames} ultimates={ultimates}
               gold={gold} gem={gem} runSouls={runSouls}
-              expedition={currentExpedition} chapter={chapter} screen={screen} runStats={runStats} autoRunCount={autoSession?.runCount || 0} runTimeMs={runTimeRef.current}
+              expedition={currentExpedition} chapter={chapter} screen={screen} runStats={runStats} autoRunCount={autoSession?.runCount || 0} runTimeMs={runTimeRef.current} combatLive={combatLive}
               autoSpeed={autoSpeed} onCycleSpeed={cycleAutoSpeed}
               runRepeat={runRepeat} onToggleRepeat={currentExpedition?.endless ? null : () => setRunRepeat(v => !v)}
               onWatch={() => setAutoOverlayHidden(true)} onStop={() => setAutoHunt(false)}
@@ -2833,7 +2836,7 @@ export default function App() {
             {screen === 'map' && chapter && mapData && <MapView chapter={chapter} classData={classData} mapData={mapData} hp={hp} maxHp={maxHp} gold={gold} gem={gem} relics={relics} activeRelicNames={activeRelicNames} expedition={currentExpedition} curses={currentCurses} chapterIdx={chapterIdx} autoHunt={autoHunt} autoHuntAllowed={autoHuntAllowed} onToggleAutoHunt={toggleAutoHunt} autoSpeed={autoSpeed} onCycleAutoSpeed={cycleAutoSpeed} autoRunCount={autoSession?.runCount || 0} onEnterNode={handleEnterNode} onOpenStatus={() => setScreen('status')} onOpenAchievements={() => { setPrevAchievementsBack('map'); setScreen('achievements'); }} onOpenCodex={() => setScreen('codex')} onBack={() => setScreen('title')} onRetreat={currentExpedition?.endless ? handleEndlessRetreat : null} />}
             {screen === 'codex' && <CodexScreen meta={meta} onBack={() => setScreen('map')} />}
             {screen === 'bossIntro' && currentEnemy && <BossIntroScreen enemyKey={currentEnemy} onComplete={() => setScreen('combat')} />}
-            {screen === 'combat' && currentEnemy && <CombatScreen key={`${activeNodeId}-${currentEnemy}`} classData={classData} initialPlayer={{ hp, maxHp, ...classData.stats, ...stats }} initialSkills={skills} initialUltimates={ultimates} initialRelics={relics} activeSkills={activeSkills} activeRelicNames={activeRelicNames} enemyKey={currentEnemy} isBoss={isBossReward} expedition={currentExpedition} curses={currentCurses} meta={meta} engravingFx={getCombinedClassFx(meta, classData?.id)} chapterGimmick={chapter?.gimmick || null} autoPlay={autoHunt} autoSpeed={autoSpeed} onCycleAutoSpeed={cycleAutoSpeed} autoRunCount={autoSession?.runCount || 0} onToggleAuto={toggleAutoHunt} belt={belt} onConsumePotion={handleConsumePotion} onVictory={handleVictory} onDefeat={handleDefeat} />}
+            {screen === 'combat' && currentEnemy && <CombatScreen key={`${activeNodeId}-${currentEnemy}`} classData={classData} initialPlayer={{ hp, maxHp, ...classData.stats, ...stats }} initialSkills={skills} initialUltimates={ultimates} initialRelics={relics} activeSkills={activeSkills} activeRelicNames={activeRelicNames} enemyKey={currentEnemy} isBoss={isBossReward} expedition={currentExpedition} curses={currentCurses} meta={meta} engravingFx={getCombinedClassFx(meta, classData?.id)} chapterGimmick={chapter?.gimmick || null} autoPlay={autoHunt} autoSpeed={autoSpeed} onCycleAutoSpeed={cycleAutoSpeed} autoRunCount={autoSession?.runCount || 0} onToggleAuto={toggleAutoHunt} belt={belt} onConsumePotion={handleConsumePotion} onLiveStatus={autoHunt ? setCombatLive : null} onVictory={handleVictory} onDefeat={handleDefeat} />}
             {screen === 'reward' && <RewardSelect rewards={currentRewards} gem={gem} skills={skills} relics={relics} ultimates={ultimates} onPick={handlePickReward} onReroll={handleReroll} hasRerolled={hasRerolled} isElite={isEliteReward} classId={classData?.id} meta={meta} expedition={currentExpedition} />}
             {screen === 'victory' && <VictoryScreen classData={classData} enemy={currentEnemy ? ENEMIES[currentEnemy] : null} gains={victoryGains} stats={victoryStats} onContinue={handleVictoryContinue} />}
             {screen === 'event' && currentEvent && <EventScreen event={currentEvent} classData={classData} stats={{ ...classData.stats, ...stats }} skills={skills} gold={gold} gem={gem} autoPlay={autoHunt} autoSpeed={autoSpeed} onResolve={handleEventResolve} />}
