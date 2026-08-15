@@ -8,7 +8,7 @@ import React, { useState } from 'react';
 import { ChevronLeft, Skull, Package, BarChart3, Lock } from 'lucide-react';
 import { PALETTE } from '../../utils/helpers.js';
 import {
-  BURIED_CLASSES, BURIED_ADVANCED_CLASSES, BURIED_DUNGEONS,
+  BURIED_CLASSES, BURIED_ADVANCED_CLASSES, BURIED_ENCOUNTER_CLASSES, BURIED_DUNGEONS,
   BURIED_LEGACY_MAX, BURIED_LEGACY_GOLD_PCT, BURIED_SKILL_MAX_LV,
   BURIED_SLOTS, BURIED_FORGE, BURIED_LEGACY_CAP_MAX,
   buriedForgeLevel, buriedLegacyExpandCost,
@@ -36,8 +36,13 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
   const d = char ? buriedDerived(char) : null;
   const curDungeon = char ? getBuriedDungeon(char.dungeonId) : null;
 
-  // 선택 가능한 직업 = 기본 5직업 + 해금된 상위 직업
-  const selectable = [...BURIED_CLASSES, ...BURIED_ADVANCED_CLASSES.filter(c => unlockedClasses.includes(c.id))];
+  // 선택 가능한 직업 = 기본 5직업 + 해금된 상위 직업 + 해금된 조우 직업 (1.109.0)
+  const selectable = [
+    ...BURIED_CLASSES,
+    ...BURIED_ADVANCED_CLASSES.filter(c => unlockedClasses.includes(c.id)),
+    ...BURIED_ENCOUNTER_CLASSES.filter(c => unlockedClasses.includes(c.id)),
+  ];
+  const killsByEnemy = b.killsByEnemy || {};
   const isDungeonUnlocked = (dg) => unlockedDungeons.includes(dg.id);
 
   return (
@@ -181,6 +186,21 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
                   style={{ borderRadius: 'var(--r-chip, 8px)', background: PALETTE.panel, border: `1px solid ${PALETTE.panelBorder}`, color: PALETTE.textDim }}>
                   🔒 <b style={{ color: PALETTE.text }}>전직</b> — 해당 직업으로 잊혀진 미궁을 클리어하면 상위 직업이 열린다.
                   아직 잠긴 전직: {BURIED_ADVANCED_CLASSES.filter(c => !unlockedClasses.includes(c.id)).map(c => c.name).join(', ')}
+                </div>
+              )}
+              {/* 조우 해금 직업 진행도 (1.109.0) */}
+              {BURIED_ENCOUNTER_CLASSES.filter(c => !unlockedClasses.includes(c.id)).length > 0 && (
+                <div className="mt-1.5 px-3 py-2 space-y-1 text-[11px] leading-relaxed"
+                  style={{ borderRadius: 'var(--r-chip, 8px)', background: PALETTE.panel, border: `1px solid ${PALETTE.panelBorder}` }}>
+                  <div style={{ color: PALETTE.text }}>🔒 <b>조우 해금</b> — 특정 마물을 거듭 쓰러뜨리면 새 직업이 열린다.</div>
+                  {BURIED_ENCOUNTER_CLASSES.filter(c => !unlockedClasses.includes(c.id)).map(c => (
+                    <div key={c.id} style={{ color: PALETTE.textDim }}>
+                      <span style={{ color: c.color }}>{c.name}</span> — {c.unlock.label}
+                      <span className="tabular-nums" style={{ color: (killsByEnemy[c.unlock.enemyKey] || 0) > 0 ? PALETTE.legendary : PALETTE.textDim }}>
+                        {' '}({Math.min(killsByEnemy[c.unlock.enemyKey] || 0, c.unlock.kills)}/{c.unlock.kills})
+                      </span>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

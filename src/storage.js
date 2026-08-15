@@ -5,7 +5,7 @@
 // 저장되는 것: 영혼, 강화 단계, 해금 항목, 클리어 기록
 // ============================================
 
-import { ENGRAVINGS, ENGRAVING_TIERS, ENEMIES, EVENTS, RELICS, PASSIVE_SKILLS, CODEX_DISCOVERY_REWARD, CODEX_COMPLETE_REWARD, backfillRaidSeries, FEATURE_FLAGS, BURIED_LEGACY_MAX, addBuriedItemToChar, buriedDustValue as buriedDustValueOf } from './data.js';
+import { ENGRAVINGS, ENGRAVING_TIERS, ENEMIES, EVENTS, RELICS, PASSIVE_SKILLS, CODEX_DISCOVERY_REWARD, CODEX_COMPLETE_REWARD, backfillRaidSeries, FEATURE_FLAGS, BURIED_LEGACY_MAX, addBuriedItemToChar, buriedDustValue as buriedDustValueOf, checkBuriedEncounterUnlock } from './data.js';
 
 const DB_NAME = 'derod_meta';
 const DB_VERSION = 1;
@@ -1428,6 +1428,7 @@ const EMPTY_BURIED = {
   char: null, legacy: [], legacyGold: 0, dust: 0, deepest: 0,
   clears: {}, deaths: 0, runs: 0, unlockedDungeons: ['labyrinth'], unlockedClasses: [],
   legacySlots: 6,
+  killsByEnemy: {}, // 1.109.0~ 조우 해금 진행 (적 키 → 누적 처치 수)
 };
 export function getBuried(meta) {
   const b = meta?.buried || EMPTY_BURIED;
@@ -1440,6 +1441,7 @@ export function getBuried(meta) {
       ? b.unlockedDungeons : ['labyrinth'],
     unlockedClasses: Array.isArray(b.unlockedClasses) ? b.unlockedClasses : [],
     legacySlots: Math.max(6, b.legacySlots || 6),
+    killsByEnemy: b.killsByEnemy || {},
   };
 }
 
@@ -1548,3 +1550,22 @@ export function expandBuriedLegacy(meta, cost) {
   return { ...meta, buried: { ...b, legacySlots: cur + 1, dust: b.dust - cost } };
 }
 
+
+// 1.109.0 — 적 처치 추적 + 조우 해금 판정 (마검사·흡혈귀·페어리)
+// 반환: { meta, unlocked: classId | null }
+export function trackBuriedKill(meta, enemyKey) {
+  const b = getBuried(meta);
+  const killsByEnemy = { ...b.killsByEnemy, [enemyKey]: (b.killsByEnemy[enemyKey] || 0) + 1 };
+  const unlocked = checkBuriedEncounterUnlock(killsByEnemy, b.unlockedClasses);
+  return {
+    meta: {
+      ...meta,
+      buried: {
+        ...b,
+        killsByEnemy,
+        unlockedClasses: unlocked ? [...b.unlockedClasses, unlocked] : b.unlockedClasses,
+      },
+    },
+    unlocked,
+  };
+}
