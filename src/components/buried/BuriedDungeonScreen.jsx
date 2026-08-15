@@ -28,6 +28,7 @@ import {
   BURIED_SKULL_ROOM, BURIED_CURSE_MAX, getBuriedCurse, buriedCurseIds,
   rollBuriedCurseOffer, acceptBuriedCurse, hasBuriedCurse, BURIED_CURSE_REWARD,
   aggregateBuriedContracts,
+  BURIED_CALAMITY_GAUGE_MAX, buildBuriedCalamity,
 } from '../../data.js';
 import { BuriedItemCard, BuriedBar, BURIED_DUST_ICON, slotMeta } from './BuriedCommon.jsx';
 import BuriedManage from './BuriedManage.jsx';
@@ -176,13 +177,16 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
     onEnterBattle(enemy, 'elite', char.roomEffect || null);
   };
 
+  // 재앙 게이지 (1.112.0) — 이벤트 방(묘비·샘·석상·나그네·관·해골왕관) 해결마다 +1, 5에서 소환 배너
+  const bumpGauge = (c) => ({ ...c, calamityGauge: Math.min(BURIED_CALAMITY_GAUGE_MAX, (c.calamityGauge || 0) + 1) });
+
   // ===== 해골 왕관 (1.108.0) — 저주 수락 = 즉시 보상 + 런 전체 페널티 =====
   const acceptCurse = () => {
     const offer = char.roomData?.offer;
     if (!offer || char.roomData?.done) return;
     const { char: cursed, reward } = acceptBuriedCurse(char, offer);
     const c = getBuriedCurse(offer);
-    onUpdateChar({ ...cursed, roomData: { ...char.roomData, done: true, text: `「${c.name}」의 저주를 받아들였다 — 🕯 ${reward.dust} · 🪙 ${reward.gold}. 이번 런이 끝날 때까지 저주가 따라붙는다.` } }, reward.dust);
+    onUpdateChar(bumpGauge({ ...cursed, roomData: { ...char.roomData, done: true, text: `「${c.name}」의 저주를 받아들였다 — 🕯 ${reward.dust} · 🪙 ${reward.gold}. 이번 런이 끝날 때까지 저주가 따라붙는다.` } }), reward.dust);
   };
 
   // ===== 이벤트 방 (1.107.0) — 도박: 영구 보너스와 함정이 한 테이블에 =====
@@ -194,13 +198,20 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
       const added = addBuriedItemToChar(next, r.item);
       next = { ...added.char, roomData: next.roomData };
     }
-    onUpdateChar(next, r.dustGain || 0);
+    onUpdateChar(bumpGauge(next), r.dustGain || 0);
   };
   const runWanderer = (kind) => {
     if (char.roomData?.done) return;
     const fn = kind === 'option' ? wandererAddOption : kind === 'mod' ? wandererApplyMod : wandererReroll;
     const r = fn(char);
-    onUpdateChar({ ...r.char, roomData: { done: true, text: r.text, tone: 'good' } }, 0);
+    onUpdateChar(bumpGauge({ ...r.char, roomData: { done: true, text: r.text, tone: 'good' } }), 0);
+  };
+
+  // ===== 재앙 (1.112.0) — 게이지 5에서 소환 배너, 맞서면 게이지 0. 무시하고 계속 갈 수 있다 =====
+  const faceCalamity = () => {
+    const beast = buildBuriedCalamity(char);
+    onUpdateChar({ ...char, calamityGauge: 0 }, 0);
+    onEnterBattle(beast, 'calamity', null);
   };
 
   // 망자의 서고 — 장착 스킬 하나의 레벨을 올린다
@@ -232,6 +243,7 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
             </div>
             <div className="text-[11px]" style={{ color: PALETTE.textDim }}>
               {cls?.name} Lv.{char.lv} · 🪙 {char.gold} · 🧪 {char.potions || 0} · 마물 Lv.{monLevel}
+              {(char.calamityGauge || 0) > 0 && <span style={{ color: '#c48bd4' }}> · 🌑 {char.calamityGauge}/{BURIED_CALAMITY_GAUGE_MAX}</span>}
             </div>
           </div>
           <button onClick={() => setManage(true)} className="ui-press p-1.5 relative" style={{ color: PALETTE.dawn }}>
@@ -265,6 +277,22 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
         {notice && (
           <div className="px-3 py-2 text-[12px]" style={{ borderRadius: 'var(--r-chip, 8px)', background: `${PALETTE.dawn}15`, border: `1px solid ${PALETTE.dawn}55`, color: PALETTE.dawn }}>
             {notice}
+          </div>
+        )}
+
+        {/* ===== 재앙 소환 배너 (1.112.0) — 게이지 5. 무시하고 다른 방으로 가도 된다 ===== */}
+        {!inRoom && (char.calamityGauge || 0) >= BURIED_CALAMITY_GAUGE_MAX && (
+          <div className="px-3 py-3 space-y-2"
+            style={{ borderRadius: 'var(--r-panel, 18px)', background: '#1a0d22', border: '1px solid #7b3fa0' }}>
+            <div className="text-[13px] font-bold" style={{ color: '#c48bd4' }}>🌑 재앙이 냄새를 맡았다</div>
+            <div className="text-[11px] leading-relaxed" style={{ color: PALETTE.textDim }}>
+              무덤을 너무 헤집었다. 낙젤리온의 그림자가 이 층 어딘가에서 기다린다.
+              맞서 이기면 <b style={{ color: '#c48bd4' }}>☠ 죽음의 조각 대량 + ⚔ 전설의 무구 확정</b>. 무시하고 계속 갈 수도 있다.
+            </div>
+            <button onClick={faceCalamity} className="ui-press w-full py-2.5 text-[12px] font-bold"
+              style={{ borderRadius: 'var(--r-btn, 13px)', background: '#4a1f5c', color: '#e8c8f4', border: '1px solid #7b3fa0' }}>
+              맞선다 (초고난도)
+            </button>
           </div>
         )}
 

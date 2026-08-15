@@ -15,11 +15,12 @@ import {
   BURIED_CONTRACTS, BURIED_CONTRACT_COST, BURIED_CONTRACT_CARRY, getBuriedContract, rollBuriedContract,
   buriedDerived, buriedExpToNext, getBuriedClass, getBuriedDungeon, buildBuriedLegacy,
   buriedTraitIds, getBuriedTrait, buriedMonsterLevel,
+  BURIED_PARTS, BURIED_PART_SLOT_COSTS, getBuriedPart, BURIED_SHARD,
 } from '../../data.js';
 import { BuriedItemCard, BuriedBar, BURIED_DUST_ICON, BuriedTierLegend } from './BuriedCommon.jsx';
 import BuriedManage from './BuriedManage.jsx';
 
-export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateChar, onRetire, onForge, onExpandLegacy, onBuyContract, forgeNotice, onBack }) {
+export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateChar, onRetire, onForge, onExpandLegacy, onBuyContract, onBuyPart, onDetachParts, forgeNotice, onBack }) {
   const b = meta?.buried || {};
   const char = b.char || null;
   const legacy = Array.isArray(b.legacy) ? b.legacy : [];
@@ -59,7 +60,10 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
           <div className="text-[12px] tracking-[0.35em] font-bold" style={{ color: PALETTE.legendary }}>⚰ 무덤의 유산 ⚰</div>
           <div className="text-[11px] mt-0.5" style={{ color: PALETTE.textDim }}>남기는 것은 장비뿐이다</div>
         </div>
-        <div className="text-[11px] tabular-nums font-bold" style={{ color: PALETTE.dawn }}>{BURIED_DUST_ICON} {b.dust || 0}</div>
+        <div className="text-[11px] tabular-nums font-bold text-right" style={{ color: PALETTE.dawn }}>
+          {BURIED_DUST_ICON} {b.dust || 0}
+          <div style={{ color: '#c48bd4' }}>{BURIED_SHARD.icon} {b.shards || 0}</div>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-4">
@@ -356,6 +360,71 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
                   ) : null;
                 })}
               </div>
+            )}
+          </div>
+        </div>
+
+        {/* ===== 연구실 (1.112.0) — ☠ 죽음의 조각 소비처 ===== */}
+        <div>
+          <div className="text-[11px] tracking-[0.25em] mb-1.5" style={{ color: '#c48bd4' }}>
+            ⚗ 연구실 — {BURIED_SHARD.icon} {BURIED_SHARD.name} {b.shards || 0}
+          </div>
+          <div className="px-3 py-2.5 space-y-2" style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panel, border: '1px solid #7b3fa055' }}>
+            <div className="text-[11px] leading-relaxed" style={{ color: PALETTE.textDim }}>
+              보스와 🌑재앙이 떨어뜨리는 {BURIED_SHARD.icon}조각으로 시체에 부품을 심는다.
+              최대 <b style={{ color: PALETTE.text }}>5칸</b> — 칸이 늘수록 비쌈 ({BURIED_PART_SLOT_COSTS.map(c => c === 0 ? '무료' : c).join('→')}).
+              효과는 <b style={{ color: '#c48bd4' }}>다음 캐릭터 생성부터</b> 적용된다. 탈착은 전체 일괄({BURIED_DUST_ICON}50, 부품 소멸)만 가능.
+            </div>
+            {(b.parts || []).length > 0 && (
+              <div className="space-y-0.5">
+                {(b.parts || []).map(id => {
+                  const p = getBuriedPart(id);
+                  return p ? (
+                    <div key={id} className="text-[11px]" style={{ color: PALETTE.textDim }}>
+                      <span style={{ color: '#c48bd4' }}>{p.name}</span> — {p.desc}
+                    </div>
+                  ) : null;
+                })}
+              </div>
+            )}
+            {(b.parts || []).length < 5 && (() => {
+              const nextCost = BURIED_PART_SLOT_COSTS[(b.parts || []).length];
+              const avail = BURIED_PARTS.filter(p => !(b.parts || []).includes(p.id));
+              return (
+                <div className="space-y-1">
+                  <div className="text-[11px]" style={{ color: PALETTE.textDim }}>
+                    다음 칸 비용 — <b style={{ color: (b.shards || 0) >= nextCost ? '#c48bd4' : PALETTE.textDim }}>{BURIED_SHARD.icon}{nextCost === 0 ? ' 무료' : nextCost}</b>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1">
+                    {avail.map(p => {
+                      const ok = (b.shards || 0) >= nextCost;
+                      return (
+                        <button key={p.id} onClick={() => ok && onBuyPart(p.id)} disabled={!ok}
+                          className="ui-press px-2 py-1.5 text-left text-[11px]"
+                          style={{
+                            borderRadius: 'var(--r-chip, 8px)', border: `1px solid ${ok ? '#7b3fa0' : PALETTE.panelBorder}`,
+                            background: ok ? PALETTE.panelLight : 'transparent',
+                            color: ok ? PALETTE.text : PALETTE.textDim, opacity: ok ? 1 : 0.5,
+                          }}>
+                          <div style={{ color: ok ? '#c48bd4' : PALETTE.textDim }}>{p.name}</div>
+                          <div>{p.desc}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+            {(b.parts || []).length > 0 && (
+              <button onClick={onDetachParts} disabled={(b.dust || 0) < 50}
+                className="ui-press w-full py-2 text-[11px]"
+                style={{
+                  borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panel,
+                  border: `1px solid ${PALETTE.panelBorder}`, color: (b.dust || 0) >= 50 ? PALETTE.textDim : PALETTE.textDim,
+                  opacity: (b.dust || 0) >= 50 ? 1 : 0.5,
+                }}>
+                전체 일괄 탈착 — {BURIED_DUST_ICON}50 (부품은 소멸, 칸 비용은 처음부터)
+              </button>
             )}
           </div>
         </div>

@@ -1430,6 +1430,8 @@ const EMPTY_BURIED = {
   legacySlots: 6,
   killsByEnemy: {}, // 1.109.0~ 조우 해금 진행 (적 키 → 누적 처치 수)
   contracts: [],    // 1.111.0~ 보유한 마의 계약 id 목록 (영구)
+  shards: 0,        // 1.112.0~ ☠ 죽음의 조각 (보스·재앙 처치 획득, 연구실 재화)
+  parts: [],        // 1.112.0~ 연구실 부품 id 목록 (영구, 최대 5칸)
 };
 export function getBuried(meta) {
   const b = meta?.buried || EMPTY_BURIED;
@@ -1444,6 +1446,8 @@ export function getBuried(meta) {
     legacySlots: Math.max(6, b.legacySlots || 6),
     killsByEnemy: b.killsByEnemy || {},
     contracts: Array.isArray(b.contracts) ? b.contracts : [],
+    shards: Math.max(0, b.shards || 0),
+    parts: Array.isArray(b.parts) ? b.parts : [],
   };
 }
 
@@ -1577,4 +1581,32 @@ export function buyBuriedContract(meta, contractId, cost) {
   const b = getBuried(meta);
   if (!contractId || (b.dust || 0) < cost || b.contracts.includes(contractId)) return meta;
   return { ...meta, buried: { ...b, dust: b.dust - cost, contracts: [...b.contracts, contractId] } };
+}
+
+// ============================================
+// 무덤의 유산 1.112.0 — 연구실 부품 (☠ 죽음의 조각 경제)
+// ============================================
+
+// ☠ 죽음의 조각 획득 (보스·재앙 처치)
+export function addBuriedShards(meta, amount) {
+  const b = getBuried(meta);
+  if (amount < 0 && (b.shards || 0) + amount < 0) return meta;
+  return { ...meta, buried: { ...b, shards: (b.shards || 0) + amount } };
+}
+
+// 연구실 부품 구입 — 슬롯 순서 비용 (BURIED_PART_SLOT_COSTS), 최대 5칸, 중복 불가.
+// 부품 효과는 다음 캐릭터 생성부터 적용 (진행 중 캐릭터에는 소급 X — 로비 UI에 고지)
+export function buyBuriedPart(meta, partId, slotCosts) {
+  const b = getBuried(meta);
+  if (!partId || b.parts.includes(partId) || b.parts.length >= 5) return meta;
+  const cost = slotCosts[b.parts.length];
+  if (cost == null || (b.shards || 0) < cost) return meta;
+  return { ...meta, buried: { ...b, shards: b.shards - cost, parts: [...b.parts, partId] } };
+}
+
+// 연구실 부품 일괄 탈착 (원작 룰: 개별 해제 없음) — 🕯 먼지 소모, 부품은 소멸
+export function detachBuriedParts(meta, dustCost) {
+  const b = getBuried(meta);
+  if (b.parts.length === 0 || (b.dust || 0) < dustCost) return meta;
+  return { ...meta, buried: { ...b, dust: b.dust - dustCost, parts: [] } };
 }
