@@ -25,6 +25,8 @@ import {
   hasBuriedUnique, maybeBuriedFloorSkillUp,
   BURIED_EVENT_ROOMS, BURIED_EVENT_ROOM_IDS, resolveBuriedEvent,
   buriedWandererOffers, wandererAddOption, wandererApplyMod, wandererReroll,
+  BURIED_SKULL_ROOM, BURIED_CURSE_MAX, getBuriedCurse, buriedCurseIds,
+  rollBuriedCurseOffer, acceptBuriedCurse, hasBuriedCurse, BURIED_CURSE_REWARD,
 } from '../../data.js';
 import { BuriedItemCard, BuriedBar, BURIED_DUST_ICON, slotMeta } from './BuriedCommon.jsx';
 import BuriedManage from './BuriedManage.jsx';
@@ -85,6 +87,7 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
     if (type === 'negotiate') roomData = { deal: buildBuriedNegotiation(char), done: false };
     if (type === 'library') roomData = { done: false };
     if (BURIED_EVENT_ROOM_IDS.includes(type)) roomData = { done: false, text: null, tone: null };
+    if (type === 'skullcrown') roomData = { offer: rollBuriedCurseOffer(char), done: false };
     onUpdateChar({ ...char, room: type, roomData, roomEffect: offer.effect || null }, 0);
   };
 
@@ -123,6 +126,7 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
   };
 
   const shrineHeal = () => {
+    if (hasBuriedCurse(char, 'gremory')) { setNotice('그레모리의 저주 — 제단의 빛이 닿지 않는다.'); return; }
     const amount = Math.round(d.maxHp * 0.6);
     onUpdateChar({ ...char, hp: Math.min(d.maxHp, char.hp + amount) }, 0);
     setNotice(`제단의 빛이 HP ${amount}을(를) 되돌렸다.`);
@@ -142,6 +146,11 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
   };
 
   const rest = () => {
+    if (hasBuriedCurse(char, 'gremory')) {
+      onUpdateChar({ ...char, potions: (char.potions || 0) + 1 }, 0);
+      setNotice('그레모리의 저주 — 잠들지 못했다. 물약만 하나 만들었다.');
+      return;
+    }
     const amount = Math.round(d.maxHp * 0.45);
     onUpdateChar({ ...char, hp: Math.min(d.maxHp, char.hp + amount), potions: (char.potions || 0) + 1 }, 0);
     setNotice(`야영으로 HP ${amount} 회복. 물약도 하나 만들었다.`);
@@ -164,6 +173,15 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
     const enemy = buildBuriedRoomEnemy(char, 'elite', char.roomEffect);
     onUpdateChar({ ...char, room: 'elite' }, 0);
     onEnterBattle(enemy, 'elite', char.roomEffect || null);
+  };
+
+  // ===== 해골 왕관 (1.108.0) — 저주 수락 = 즉시 보상 + 런 전체 페널티 =====
+  const acceptCurse = () => {
+    const offer = char.roomData?.offer;
+    if (!offer || char.roomData?.done) return;
+    const { char: cursed, reward } = acceptBuriedCurse(char, offer);
+    const c = getBuriedCurse(offer);
+    onUpdateChar({ ...cursed, roomData: { ...char.roomData, done: true, text: `「${c.name}」의 저주를 받아들였다 — 🕯 ${reward.dust} · 🪙 ${reward.gold}. 이번 런이 끝날 때까지 저주가 따라붙는다.` } }, reward.dust);
   };
 
   // ===== 이벤트 방 (1.107.0) — 도박: 영구 보너스와 함정이 한 테이블에 =====
@@ -226,7 +244,15 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
         </div>
         {/* 걸음수 — 원작 규칙: 방을 지날수록 마물이 강해진다 */}
         <div className="flex items-center justify-between mt-1.5 text-[11px]" style={{ color: PALETTE.textDim }}>
-          <span>걸음 {char.steps || 0} · {dungeon.stepsPerLevel}걸음마다 마물 Lv.+1</span>
+          <span>
+            걸음 {char.steps || 0} · {dungeon.stepsPerLevel}걸음마다 마물 Lv.+1
+            {buriedCurseIds(char).length > 0 && (
+              <span className="ml-1.5" style={{ color: '#c9a86a' }}
+                title={buriedCurseIds(char).map(id => `${getBuriedCurse(id)?.name}: ${getBuriedCurse(id)?.desc}`).join('\n')}>
+                💀{buriedCurseIds(char).map(id => getBuriedCurse(id)?.name).join('·')}
+              </span>
+            )}
+          </span>
           {floorFx && (
             <span className="px-1.5 py-0.5" style={{ borderRadius: 'var(--r-chip, 8px)', border: `1px solid ${PALETTE.legendary}66`, color: PALETTE.legendary }}
               title={floorFx.desc}>★ {floorFx.name}</span>
@@ -249,7 +275,7 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
             </div>
             <div className="space-y-2">
               {offers.map((o, i) => {
-                const r = BURIED_ROOMS[o.type] || BURIED_EVENT_ROOMS[o.type] || BURIED_ROOMS.battle;
+                const r = BURIED_ROOMS[o.type] || BURIED_EVENT_ROOMS[o.type] || (o.type === 'skullcrown' ? BURIED_SKULL_ROOM : BURIED_ROOMS.battle);
                 const fx = getBuriedRoomEffect(o.effect);
                 const fxColor = fx ? (BURIED_ROOM_COLORS[fx.color]?.color || PALETTE.dawn) : null;
                 return (
@@ -467,6 +493,47 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
             </button>
           </div>
         )}
+        {/* ===== 해골 왕관 (1.108.0) ===== */}
+        {room === 'skullcrown' && (() => {
+          const rd = char.roomData || {};
+          const c = rd.offer ? getBuriedCurse(rd.offer) : null;
+          return (
+            <div className="space-y-2">
+              <div className="text-[12px] font-bold" style={{ color: BURIED_SKULL_ROOM.color }}>💀 해골 왕관</div>
+              <div className="text-[12px] leading-relaxed" style={{ color: PALETTE.textDim }}>{BURIED_SKULL_ROOM.desc}</div>
+              {rd.text && (
+                <div className="px-3 py-2.5 text-[12px] leading-relaxed" style={{ borderRadius: 'var(--r-chip, 8px)', background: `${BURIED_SKULL_ROOM.color}15`, border: `1px solid ${BURIED_SKULL_ROOM.color}66`, color: BURIED_SKULL_ROOM.color }}>
+                  {rd.text}
+                </div>
+              )}
+              {!rd.done && c && (
+                <div className="px-3 py-2.5 space-y-1" style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panel, border: `1px solid ${BURIED_SKULL_ROOM.color}55` }}>
+                  <div className="text-[12px] font-bold" style={{ color: BURIED_SKULL_ROOM.color }}>
+                    「{c.name}」 {'★'.repeat(c.sev)}
+                  </div>
+                  <div className="text-[12px] leading-relaxed" style={{ color: PALETTE.text }}>{c.desc}</div>
+                  <div className="text-[11px]" style={{ color: PALETTE.legendary }}>
+                    보상: 🕯 {BURIED_CURSE_REWARD[c.sev].dust} · 🪙 {BURIED_CURSE_REWARD[c.sev].gold} (즉시) · 저주는 이번 런 내내 지속 ({buriedCurseIds(char).length}/{BURIED_CURSE_MAX})
+                  </div>
+                </div>
+              )}
+              {!rd.done && !c && (
+                <div className="text-[12px]" style={{ color: PALETTE.textDim }}>왕관은 더 이상 너에게 관심이 없다. (저주 {BURIED_CURSE_MAX}개 보유)</div>
+              )}
+              {!rd.done && c && (
+                <button onClick={acceptCurse} className="ui-press w-full py-2.5 text-[12px] font-bold"
+                  style={{ borderRadius: 'var(--r-btn, 13px)', background: BURIED_SKULL_ROOM.color, color: '#0a0608' }}>
+                  저주를 받아들인다
+                </button>
+              )}
+              <button onClick={advance} className="ui-press w-full py-2.5 text-[12px]"
+                style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panelLight, color: PALETTE.text, border: `1px solid ${PALETTE.panelBorder}` }}>
+                {rd.done ? '다음 층으로' : '거절한다 — 다음 층으로'}
+              </button>
+            </div>
+          );
+        })()}
+
         {/* ===== 이벤트 방 5종 (1.107.0) ===== */}
         {BURIED_EVENT_ROOM_IDS.includes(room) && (() => {
           const ev = BURIED_EVENT_ROOMS[room];

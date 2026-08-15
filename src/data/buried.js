@@ -419,7 +419,7 @@ export function buriedDerived(char) {
   return {
     stats: st,
     traitFx: tf,
-    maxHp:   Math.round((140 + st.vit * 11 + (lv - 1) * 18 + (gear.hp || 0) + (tf.hp || 0))),
+    maxHp:   Math.round((140 + st.vit * 11 + (lv - 1) * 18 + (gear.hp || 0) + (tf.hp || 0)) * (1 - Math.min(50, char.curseHpLossPct || 0) / 100)),
     maxSp:   Math.round(38 + st.int * 1.3 + (gear.sp || 0) + (tf.sp || 0)),
     atk:     Math.round((10 + st.str * 1.6 + (gear.atk || 0)) * (1 + (tf.physPct || 0) / 100)),
     fin:     Math.round((10 + st.dex * 1.6 + (gear.atk || 0)) * (1 + (tf.physPct || 0) / 100)),
@@ -650,6 +650,7 @@ export function rollBuriedOffers(floor, dungeonId = 'labyrinth') {
   const pool = [
     ...Object.values(BURIED_ROOMS).filter(r => r.weight > 0),
     ...Object.values(BURIED_EVENT_ROOMS),
+    BURIED_SKULL_ROOM,
   ];
   const offers = [];
   // 최소 1칸은 전투 — 성장이 멈추지 않도록
@@ -1045,6 +1046,8 @@ export function buriedSkillLvNote(skill, lv) {
 
 // 장비 획득 시 스킬 레벨 상승 (이미 만렙이면 그대로)
 export function raiseBuriedSkill(char, skillId) {
+  // 저주 「나베리우스」 — 스킬 레벨 상승 불가
+  if ((char?.curses || []).includes('naberius')) return { char, raised: false, lv: char?.skillLevels?.[skillId] || 1 };
   const cur = char?.skillLevels?.[skillId] || 1;
   if (cur >= BURIED_SKILL_MAX_LV) return { char, raised: false, lv: cur };
   const lv = cur + 1;
@@ -1566,3 +1569,55 @@ export function wandererReroll(char) {
   };
   return { char: { ...char, equipped: { ...char.equipped, [slot]: next } }, text: `${item.name}의 옵션 수치가 다시 굴려졌다.` };
 }
+
+// =========================================================
+// 23. 저주 — 해골 왕관 (1.108.0)
+// =========================================================
+// 원작의 저주 72종(솔로몬 악마) 중 18종 각색. 「해골 왕관」 방에서 제안받는다.
+// 수락 = 즉시 보상(먼지+골드) + **이번 런이 끝날 때까지** 페널티. 최대 3개.
+// fx 판정: 전투는 hasBuriedCurse(char, id) 분기, 던전·성장은 각 지점에서 분기.
+export const BURIED_CURSES = [
+  { id: 'gaap',       name: '가프',       sev: 1, desc: '치명타 확률이 0이 된다.' },
+  { id: 'balam',      name: '발람',       sev: 3, desc: '전투에서 승리해도 HP가 1이 된다.' },
+  { id: 'berith',     name: '베리트',     sev: 2, desc: '모든 적이 🧱방벽 2개를 두르고 나타난다.' },
+  { id: 'bathin',     name: '바팀',       sev: 2, desc: '적의 공격력 +15%.' },
+  { id: 'vual',       name: '부알',       sev: 2, desc: '모든 스킬 쿨다운 +1.' },
+  { id: 'belial',     name: '베리알',     sev: 2, desc: '회피할 수 없다.' },
+  { id: 'amon',       name: '아몬',       sev: 1, desc: '보호막이 절반이 된다.' },
+  { id: 'sabnock',    name: '사브나크',   sev: 1, desc: '적이 거는 상태이상 스택 +1.' },
+  { id: 'paimon',     name: '파이몬',     sev: 2, desc: '내가 받는 지속피해(도트) 2배.' },
+  { id: 'gremory',    name: '그레모리',   sev: 2, desc: '제단·야영지에서 HP를 회복할 수 없다.' },
+  { id: 'naberius',   name: '나베리우스', sev: 2, desc: '스킬 레벨이 오르지 않는다.' },
+  { id: 'malphas',    name: '말파스',     sev: 2, desc: '전투 중 물약을 마실 수 없다.' },
+  { id: 'leraje',     name: '레라지에',   sev: 3, desc: '적을 처치할 때마다 최대 HP -1% (이번 런 영구, 최대 -50%).' },
+  { id: 'marchosias', name: '마르코시아스', sev: 3, desc: '자신에게 버프를 걸 수 없다.' },
+  { id: 'andras',     name: '안드라스',   sev: 1, desc: '🧱방벽을 얻을 수 없다.' },
+  { id: 'alloces',    name: '알로켄',     sev: 2, desc: '전투를 보호막 0으로 시작한다.' },
+  { id: 'decarabia',  name: '데카라비아', sev: 2, desc: '적이 매 턴 [격노] 1을 얻는다.' },
+  { id: 'phenex',     name: '페넥스',     sev: 2, desc: '적이 매 턴 최대 HP의 3%를 회복한다.' },
+];
+export const BURIED_CURSE_MAX = 3;
+export const getBuriedCurse = (id) => BURIED_CURSES.find(c => c.id === id) || null;
+export const buriedCurseIds = (char) => char?.curses || [];
+export const hasBuriedCurse = (char, id) => buriedCurseIds(char).includes(id);
+// 심각도별 보상 (수락 즉시)
+export const BURIED_CURSE_REWARD = { 1: { dust: 40, gold: 60 }, 2: { dust: 75, gold: 110 }, 3: { dust: 120, gold: 180 } };
+// 해골 왕관 방 — 아직 안 받은 저주 중 하나를 제안
+export function rollBuriedCurseOffer(char) {
+  if (buriedCurseIds(char).length >= BURIED_CURSE_MAX) return null;
+  const pool = BURIED_CURSES.filter(c => !hasBuriedCurse(char, c.id));
+  return pool.length > 0 ? pick(pool).id : null;
+}
+export function acceptBuriedCurse(char, curseId) {
+  const c = getBuriedCurse(curseId);
+  if (!c || hasBuriedCurse(char, curseId)) return { char, reward: null };
+  const reward = BURIED_CURSE_REWARD[c.sev];
+  return {
+    char: { ...char, curses: [...buriedCurseIds(char), curseId], gold: char.gold + reward.gold },
+    reward,
+  };
+}
+export const BURIED_SKULL_ROOM = {
+  id: 'skullcrown', name: '해골 왕관', icon: '💀', color: '#c9a86a', weight: 6,
+  desc: '허공에 뜬 왕관이 거래를 제안한다 — 저주를 받아들이면 보상을 주겠다고.',
+};
