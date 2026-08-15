@@ -435,6 +435,20 @@ export async function loadMeta() {
           safe.altarRedesignDone = true;
           needsImmediateSave = true;
         }
+        // 1.101.0 에테르 시스템 삭제 — 제단 「에테르의 그릇」(meta_maxEther) 폐기 전액 환불
+        // ※ 1.44.2 레거시 환불 블록 뒤에 두어야 함 — 구가격(200/400) 구매분은 위에서 정산되고,
+        //   여기는 1.44.2 이후 재구매분(1500/3000)만 남음. 키 삭제로 멱등
+        const etherStack = safe.upgrades?.meta_maxEther || 0;
+        if (etherStack > 0) {
+          let etherRefund = 0;
+          if (etherStack >= 1) etherRefund += 1500;  // cost(0)
+          if (etherStack >= 2) etherRefund += 3000;  // cost(1)
+          safe.souls = (safe.souls || 0) + etherRefund;
+          const nu2 = { ...safe.upgrades };
+          delete nu2.meta_maxEther;
+          safe.upgrades = nu2;
+          needsImmediateSave = true;
+        }
         if (needsImmediateSave) {
           // 즉시 저장해 재실행 방지
           saveMeta(safe).then(() => resolve(safe)).catch(() => resolve(safe));

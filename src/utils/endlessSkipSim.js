@@ -34,7 +34,7 @@ export function simulateEndlessRun(meta, classId) {
   // 스킬 기대 데미지: AP 3 가정 — 기본기×2 + 주력기×0.8(쿨다운 평균 가동률)
   const skillDefs = (cls.combatSkills || []).map(k => COMBAT_SKILLS[k]).filter(Boolean);
   const atkSkills = skillDefs.filter(s => s.type === 'physical' || s.type === 'magic');
-  const basic = atkSkills.find(s => (s.cost || 0) === 0) || atkSkills[0];
+  const basic = atkSkills.find(s => (s.cd || 0) === 0) || atkSkills[0];
   const main = atkSkills.find(s => s !== basic) || basic;
   const avgDmg = (s) => (s && s.baseDmg ? ((s.baseDmg[0] + s.baseDmg[1]) / 2) * (s.hitCount || 1) : 0);
   // 콤보 연계(+40%)는 주력기 사용 턴의 절반에 적중한다고 가정

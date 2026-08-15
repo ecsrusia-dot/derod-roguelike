@@ -9,7 +9,8 @@ export const POTIONS = {
   hp_small:  { id: 'hp_small',  name: '회복 물약 (소)', icon: '🧪', color: '#9ad4a3', desc: '최대 HP 25% 회복', healPct: 25, price: 50 },
   hp_medium: { id: 'hp_medium', name: '회복 물약 (중)', icon: '⚗️', color: '#d4a574', desc: '최대 HP 50% 회복', healPct: 50, price: 100 },
   hp_large:  { id: 'hp_large',  name: '회복 물약 (대)', icon: '🏺', color: '#e8b04a', desc: 'HP 완전 회복', healFull: true, price: 180 },
-  ether:     { id: 'ether',     name: '에테르 물약',    icon: '💧', color: '#7ba3c4', desc: '에테르 +3', ether: 3, price: 60 },
+  // 1.101.0~ 에테르 폐지 — 에테르 물약 → 소울 물약 대체 (PM 승인)
+  soul:      { id: 'soul',      name: '소울 물약',      icon: '💧', color: '#7ba3c4', desc: '소울 게이지 +40', soul: 40, price: 60 },
 };
 
 export const BELT_BASE_SLOTS = 2;

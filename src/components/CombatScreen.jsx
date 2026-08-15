@@ -248,7 +248,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       if (hasGimmick('sealEcho')) {
         const sealable = (classData?.combatSkills || []).filter(key => {
           const sk = COMBAT_SKILLS[key];
-          return sk && ((sk.cost || 0) > 0 || (sk.cd || 0) > 0);
+          return sk && (sk.cd || 0) > 0; // 기본기(cd 0) 봉인 제외 — 1.101.0~ 에테르 폐지로 cd 기준
         });
         if (sealable.length > 0) {
           const pick = sealable[Math.floor(Math.random() * sealable.length)];
@@ -286,9 +286,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     if (player.cooldowns[skillKey] > 0) return;
     // 단독 버프 스킬은 턴당 1회 — 같은 턴 재사용 차단 (쿨타임 0이어도)
     if (skill.type === 'buff' && player.usedBuffThisTurn) return;
-    // 1.45.3: 마력 Lv5 etherCost-20 효과 폐기 (재시전 +10%로 변경됨)
-    let etherCost = skill.cost || 0;
-    if (etherCost > player.ether) return;
+    // 1.101.0~ 에테르 폐지 — 사용 제한은 CD·AP만
     // 1.69.0 전투 개편 B — AP(행동력) 검증
     const apCost = getSkillApCost(skill);
     const curAp = player.ap ?? AP_PER_TURN;
@@ -303,7 +301,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       ...(isFirstActionOfTurn ? [{ type: 'turnDivider', turn }] : []),
       { type: 'player', text: `▸ ${skill.name}` },
     ];
-    let newPlayer = { ...player, ether: player.ether - etherCost, ap: curAp - apCost };
+    let newPlayer = { ...player, ap: curAp - apCost };
     let newEnemy = { ...enemy };
 
     if (skill.selfDmg) {
@@ -891,7 +889,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     if ((enemy?.debuffs?.woundPct || 0) > 0) chips.push({ t: `🗡 상처악화 +${enemy.debuffs.woundPct}%`, c: '#c4453d' });
     return {
       className: classData?.name, classColor: classData?.color,
-      hp: player.hp, maxHp: player.maxHp, ether: player.ether, maxEther: player.maxEther, defense: player.defense || 0,
+      hp: player.hp, maxHp: player.maxHp, defense: player.defense || 0,
       stats: { 근력: player.근력 || 0, 민첩: player.민첩 || 0, 지능: player.지능 || 0, 매력: player.매력 || 0 },
       chips,
       combat: { critRate: Math.round(critRate), critDmg: Math.round(critDmg), dodgeRate: Math.round(dodgeRate), counterRate, igniteRate: ignite.has ? ignite.rate : 0 },
@@ -915,10 +913,12 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
   // ============================================
   // 1.96.0~ 황혼의 벨트 — 포션 사용 (AP 소모 없음, 턴당 1회. 회복 보정 미적용 — 표기값 그대로)
   // ============================================
+  const potionSealed = hasCurse(curses, 'curse_potionSeal'); // 1.101.0~ 저주 [물약 봉인]
   const handleUsePotion = (idx) => {
     if (phase !== 'playerTurn') return;
     if (actionLockRef.current) return;
     if (player.usedPotionThisTurn) return;
+    if (potionSealed) return;
     const potion = POTIONS[belt[idx]];
     if (!potion || !onConsumePotion) return;
     const newPlayer = { ...player, usedPotionThisTurn: true };
@@ -931,9 +931,10 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       newPlayer.hp = Math.min(newPlayer.maxHp, newPlayer.hp + heal);
       newLog.push({ type: 'heal', text: `${potion.icon} [${potion.name}] HP +${actual}` });
       if (actual > 0) pushFxLabel('player', 'heal', actual);
-    } else if (potion.ether) {
-      newPlayer.ether = (newPlayer.ether || 0) + potion.ether;
-      newLog.push({ type: 'system', text: `${potion.icon} [${potion.name}] 에테르 +${potion.ether}` });
+    } else if (potion.soul) {
+      // 1.101.0~ 소울 물약 — 소울 게이지 +40 (최대 100)
+      newPlayer.soulGauge = Math.min(100, (newPlayer.soulGauge || 0) + potion.soul);
+      newLog.push({ type: 'system', text: `${potion.icon} [${potion.name}] 소울 게이지 +${potion.soul}` });
     }
     setPlayer(newPlayer);
     setLog(newLog);
@@ -941,9 +942,11 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
   };
 
   // 1.96.0~ 자동 사냥 물약 룰 (PM 결정): HP 50% 미만 → 부족분을 채우는 가장 작은 HP 물약
-  //   (없으면 가장 큰 것) / 에테르 0 → 에테르 물약. 사용해도 AP 미소모 — 같은 턴 행동 계속
+  //   (없으면 가장 큰 것) / 1.101.0~ 소울 게이지 60 이하 → 소울 물약 (+40 낭비 없는 구간).
+  //   사용해도 AP 미소모 — 같은 턴 행동 계속
   const chooseAutoPotion = () => {
     if (player.usedPotionThisTurn || belt.length === 0 || !onConsumePotion) return -1;
+    if (potionSealed) return -1;
     const hpRatio = player.maxHp > 0 ? player.hp / player.maxHp : 1;
     if (hpRatio < 0.5) {
       const missing = player.maxHp - player.hp;
@@ -954,9 +957,9 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
         return (covering[0] || [...hpPots].sort((a, b) => healVal(b.pid) - healVal(a.pid))[0]).i;
       }
     }
-    if ((player.ether || 0) === 0) {
-      const eIdx = belt.findIndex(pid => POTIONS[pid]?.ether);
-      if (eIdx >= 0) return eIdx;
+    if (classData?.ultimateId && (player.soulGauge || 0) <= 60) {
+      const sIdx = belt.findIndex(pid => POTIONS[pid]?.soul);
+      if (sIdx >= 0) return sIdx;
     }
     return -1;
   };
@@ -983,7 +986,6 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       const s = COMBAT_SKILLS[key];
       if (!s) return false;
       if ((player.cooldowns[key] || 0) > 0) return false;
-      if ((s.cost || 0) > player.ether) return false;
       if (s.type === 'buff' && player.usedBuffThisTurn) return false;
       if ((player.debuffs?.sealedSkills || []).includes(key)) return false;
       if (getSkillApCost(s) > ap) return false;
@@ -1112,7 +1114,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       if (defenseKey && (player.defense || 0) <= 0) return defenseKey;
       return 'END';
     }
-    // ④ 콤보 셋업 — 연계기와 선행기 둘 다 이번 턴 AP·에테르 안에 들어가면 선행기부터
+    // ④ 콤보 셋업 — 연계기와 선행기 둘 다 이번 턴 AP 안에 들어가면 선행기부터
     for (const k of attackKeys) {
       const s = COMBAT_SKILLS[k];
       if (!s.comboAfter) continue;
@@ -1120,8 +1122,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       const enabler = COMBAT_SKILLS[s.comboAfter];
       if (!enabler || !usable(s.comboAfter)) continue;
       const setAp = getSkillApCost(enabler) + getSkillApCost(s);
-      const setEther = (enabler.cost || 0) + (s.cost || 0);
-      if (setAp <= ap && setEther <= player.ether) return s.comboAfter;
+      if (setAp <= ap) return s.comboAfter;
     }
     // ④b 마지막 AP 방어 전환 — 적이 공격 의도이고 체력 여유가 없으면 기본기(평균 ~14)보다
     //    방어(30~50)가 기대값 우위. 방랑검사는 심안류 반격, 정령사는 회피 버프 추가 가치.
@@ -1783,10 +1784,10 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           const sealCount = intent.seal;
           const sealDur = intent.sealTurns || 2;  // 1.49.0~ 패턴별 차등
           // 1.49.0~ 액티브 스킬 봉인 — 직업 액티브 슬롯 중 봉인 가능한 것
-          // 기본 스킬(cost 0 && cd 0 — 참격·정밀사격·마법탄·신성광선·광폭참격)은 봉인 제외
+          // 기본 스킬(cd 0 — 참격·정밀사격·마법탄·신성광선·광폭참격)은 봉인 제외
           const sealableActives = (classData?.combatSkills || []).filter(key => {
             const sk = COMBAT_SKILLS[key];
-            return sk && ((sk.cost || 0) > 0 || (sk.cd || 0) > 0);
+            return sk && (sk.cd || 0) > 0; // 기본기(cd 0) 봉인 제외 — 1.101.0~ 에테르 폐지로 cd 기준
           });
           const alreadySealed = newPlayer.debuffs?.sealedSkills || [];
           const sealable = sealableActives.filter(s => !alreadySealed.includes(s));
@@ -2326,7 +2327,6 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     if (newPlayer.defense > 0) {
       newPlayer.defense = 0;
     }
-    newPlayer.ether = Math.min(newPlayer.maxEther, newPlayer.ether + 1);
 
     let extraTurnTriggered = false;
     let bestExtraTurnInterval = Infinity;
@@ -2871,7 +2871,6 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                 const hiddenCount = buffChips.length - visibleBuffs.length;
                 return (
                   <div className="flex items-center gap-1.5 flex-wrap min-h-[20px]">
-                    <span className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: `${PALETTE.twilight}50`, color: '#fff', border: `1px solid ${PALETTE.twilight}` }}>✦ 에테르 {player.ether}/{player.maxEther}</span>
                     {player.defense > 0 && (<span className="text-[10px] px-2 py-0.5" style={{ borderRadius: 999, background: `${PALETTE.defense}50`, color: '#fff', border: `1px solid ${PALETTE.defense}` }}>◈ 방어 {player.defense}</span>)}
                     {debuffChips}
                     {visibleBuffs}
@@ -2968,11 +2967,11 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           {/* 1.96.0~ 황혼의 벨트 — 포션 슬롯 (AP 소모 없음, 턴당 1회) */}
           {phase === 'playerTurn' && belt.length > 0 && (
             <div className="flex gap-1.5 w-full mb-1.5 items-center">
-              <span className="text-[9px] flex-none" style={{ color: PALETTE.textDim, letterSpacing: '0.15em' }}>벨트</span>
+              <span className="text-[9px] flex-none" style={{ color: PALETTE.textDim, letterSpacing: '0.15em' }}>{potionSealed ? '벨트 🔒' : '벨트'}</span>
               {belt.map((pid, idx) => {
                 const potion = POTIONS[pid];
                 if (!potion) return null;
-                const disabled = !!player.usedPotionThisTurn;
+                const disabled = !!player.usedPotionThisTurn || potionSealed;
                 return (
                   <button key={`${pid}-${idx}`} disabled={disabled} onClick={() => handleUsePotion(idx)}
                     className="ui-press flex items-center gap-1 px-2 py-1"
@@ -2982,7 +2981,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                       opacity: disabled ? 0.45 : 1,
                     }}>
                     <span style={{ fontSize: 13 }}>{potion.icon}</span>
-                    <span className="text-[10px]" style={{ color: PALETTE.text }}>{potion.name.replace('회복 물약 ', '').replace('에테르 물약', '에테르')}</span>
+                    <span className="text-[10px]" style={{ color: PALETTE.text }}>{potion.name.replace('회복 물약 ', '').replace('소울 물약', '소울')}</span>
                   </button>
                 );
               })}
@@ -2995,8 +2994,6 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                 const skill = COMBAT_SKILLS[skillKey];
                 if (!skill) return null;
                 const onCd = (player.cooldowns[skillKey] || 0) > 0;
-                let cost = skill.cost || 0;
-                const noEther = cost > player.ether;
                 const buffUsedThisTurn = skill.type === 'buff' && player.usedBuffThisTurn;
                 // 1.49.0~ 신전 액티브 스킬 봉인
                 const isSealed = (player.debuffs?.sealedSkills || []).includes(skillKey);
@@ -3005,7 +3002,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                 const noAp = apCost > (player.ap ?? AP_PER_TURN);
                 // 1.69.0 콤보 연계 예고 — 이번 턴 선행 스킬을 썼으면 이 스킬이 연계 대기 상태
                 const comboReady = !!(skill.comboAfter && player._lastSkillThisTurn === skill.comboAfter);
-                const disabled = onCd || noEther || buffUsedThisTurn || isSealed || noAp;
+                const disabled = onCd || buffUsedThisTurn || isSealed || noAp;
                 // 1.66.0 카드형 버튼 — 상단 타입 컬러 엣지 + 타입 글리프
                 const typeColor = skill.type === 'physical' ? PALETTE.accent : skill.type === 'magic' ? PALETTE.twilight : skill.type === 'defense' ? PALETTE.ice : PALETTE.dawn;
                 const typeGlyph = skill.type === 'physical' ? '⚔' : skill.type === 'magic' ? '✦' : skill.type === 'defense' ? '🛡' : '◈';
@@ -3034,7 +3031,6 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                             return dmgRange ? `${dmgRange[0]}-${dmgRange[1]}` : `${skill.baseDmg[0]}-${skill.baseDmg[1]}`;
                           })()
                       }
-                      {cost > 0 && ` ✦${cost}`}
                     </span>
                     {isSealed && <span className="text-[9px] font-bold" style={{ color: '#c0b0e8' }}>🔒 {player.debuffs?.sealedTurns || 0}T</span>}
                     {!isSealed && onCd && <span className="text-[9px] font-bold" style={{ color: PALETTE.accent }}>CD {player.cooldowns[skillKey]}</span>}
@@ -3103,19 +3099,19 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
               <button onClick={() => setStatusModalOpen(false)} className="text-[14px] px-2" style={{ color: PALETTE.textDim }}>✕</button>
             </div>
             
-            {/* HP / 에테르 / 방어 */}
+            {/* HP / 방어 / 소울 (1.101.0~ 에테르 폐지) */}
             <div className="grid grid-cols-3 gap-2 text-[11px] mb-3">
               <div className="px-2 py-1.5" style={{ background: `${PALETTE.blood}20`, border: `1px solid ${PALETTE.blood}60` }}>
                 <div className="text-[9px]" style={{ color: PALETTE.textDim }}>체력</div>
                 <div className="font-bold tabular-nums" style={{ color: PALETTE.text }}>{player.hp}/{player.maxHp}</div>
               </div>
-              <div className="px-2 py-1.5" style={{ background: `${PALETTE.twilight}20`, border: `1px solid ${PALETTE.twilight}60` }}>
-                <div className="text-[9px]" style={{ color: PALETTE.textDim }}>에테르</div>
-                <div className="font-bold tabular-nums" style={{ color: PALETTE.text }}>{player.ether}/{player.maxEther}</div>
-              </div>
               <div className="px-2 py-1.5" style={{ background: `${PALETTE.defense}20`, border: `1px solid ${PALETTE.defense}60` }}>
                 <div className="text-[9px]" style={{ color: PALETTE.textDim }}>방어</div>
                 <div className="font-bold tabular-nums" style={{ color: PALETTE.text }}>{player.defense || 0}</div>
+              </div>
+              <div className="px-2 py-1.5" style={{ background: `${PALETTE.dawn}20`, border: `1px solid ${PALETTE.dawn}60` }}>
+                <div className="text-[9px]" style={{ color: PALETTE.textDim }}>소울</div>
+                <div className="font-bold tabular-nums" style={{ color: PALETTE.text }}>{classData?.ultimateId ? `${player.soulGauge || 0}/100` : '—'}</div>
               </div>
             </div>
 

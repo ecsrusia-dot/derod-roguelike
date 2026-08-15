@@ -51,18 +51,8 @@ export const META_UPGRADES = [
     color: '#e8b04a',
   },
 
-  // === 전투 강화 (7) ===
-  {
-    id: 'meta_maxEther',
-    name: '에테르의 그릇',
-    desc: '최대 에테르 +1',
-    category: 'combat',
-    stackable: true,
-    maxStacks: 2,
-    cost: (stack) => stack === 0 ? 1500 : 3000,  // 1500, 3000, 합 4,500
-    effect: 'maxEther+1',
-    color: '#5c4a8c',
-  },
+  // === 전투 강화 (6) ===
+  // 1.101.0: meta_maxEther(에테르의 그릇) 폐기 — 에테르 시스템 삭제. loadMeta에서 전액 환불
   {
     id: 'meta_dmgDealt',
     name: '강자의 길',

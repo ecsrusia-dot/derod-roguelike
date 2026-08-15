@@ -204,12 +204,12 @@ export default function AutoHuntOverlay({
                   <span className="tabular-nums" style={{ fontSize: 9.5, color: PALETTE.accent }}>vs {L.enemyName} {L.enemyHp[0]}/{L.enemyHp[1]}</span>
                 )}
               </div>
-              {/* 체력 / 에테르 / 방어 (+소울) */}
+              {/* 체력 / 방어 / 소울 (1.101.0~ 에테르 폐지) */}
               <div className="grid grid-cols-3 gap-1.5 mb-2">
                 {[
                   ['체력', `${L.hp}/${L.maxHp}`, '#8b1f1f'],
-                  ['에테르', `${L.ether}/${L.maxEther}`, '#5c4a8c'],
-                  ['방어', `${L.defense}${L.soulGauge != null ? ` · 소울 ${L.soulGauge}` : ''}`, '#7ba3c4'],
+                  ['방어', `${L.defense}`, '#7ba3c4'],
+                  ['소울', L.soulGauge != null ? `${L.soulGauge}/100` : '—', '#e8b04a'],
                 ].map(([label, val, color]) => (
                   <div key={label} className="px-2 py-1" style={{ borderRadius: 9, background: `${color}20`, border: `1px solid ${color}60` }}>
                     <div style={{ fontSize: 8.5, color: PALETTE.textDim }}>{label}</div>
