@@ -457,6 +457,7 @@ export default function App() {
       gold: (char.gold || 0) + (res.gold || 0),
       potions: res.potions ?? char.potions,
       kills: (char.kills || 0) + 1,
+      pendingStatuses: null, // 1.107.0 — 이벤트 함정의 지연 상태이상은 1회 적용 후 소거
     };
     for (const it of (res.drops || [])) c = addBuriedItemToChar(c, it).char;
     // [u100] 수확자의 서 — 처치 시 75% 확률 무작위 스킬 레벨 +1 (전투 화면이 판정, 여기서 적용)

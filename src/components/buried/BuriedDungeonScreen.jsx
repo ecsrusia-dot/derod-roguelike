@@ -23,6 +23,8 @@ import {
   getBuriedRoomEffect, getBuriedFloorEffect,
   buildBuriedNegotiation, buriedLibraryChoices, raiseBuriedSkill, buriedSkillLv,
   hasBuriedUnique, maybeBuriedFloorSkillUp,
+  BURIED_EVENT_ROOMS, BURIED_EVENT_ROOM_IDS, resolveBuriedEvent,
+  buriedWandererOffers, wandererAddOption, wandererApplyMod, wandererReroll,
 } from '../../data.js';
 import { BuriedItemCard, BuriedBar, BURIED_DUST_ICON, slotMeta } from './BuriedCommon.jsx';
 import BuriedManage from './BuriedManage.jsx';
@@ -82,6 +84,7 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
     }
     if (type === 'negotiate') roomData = { deal: buildBuriedNegotiation(char), done: false };
     if (type === 'library') roomData = { done: false };
+    if (BURIED_EVENT_ROOM_IDS.includes(type)) roomData = { done: false, text: null, tone: null };
     onUpdateChar({ ...char, room: type, roomData, roomEffect: offer.effect || null }, 0);
   };
 
@@ -163,6 +166,24 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
     onEnterBattle(enemy, 'elite', char.roomEffect || null);
   };
 
+  // ===== 이벤트 방 (1.107.0) — 도박: 영구 보너스와 함정이 한 테이블에 =====
+  const runEvent = (roomId) => {
+    if (char.roomData?.done) return;
+    const r = resolveBuriedEvent(roomId, char);
+    let next = { ...r.char, roomData: { done: true, text: r.text, tone: r.tone } };
+    if (r.item) {
+      const added = addBuriedItemToChar(next, r.item);
+      next = { ...added.char, roomData: next.roomData };
+    }
+    onUpdateChar(next, r.dustGain || 0);
+  };
+  const runWanderer = (kind) => {
+    if (char.roomData?.done) return;
+    const fn = kind === 'option' ? wandererAddOption : kind === 'mod' ? wandererApplyMod : wandererReroll;
+    const r = fn(char);
+    onUpdateChar({ ...r.char, roomData: { done: true, text: r.text, tone: 'good' } }, 0);
+  };
+
   // 망자의 서고 — 장착 스킬 하나의 레벨을 올린다
   const studySkill = (skillId) => {
     if (char.roomData?.done) return;
@@ -228,7 +249,7 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
             </div>
             <div className="space-y-2">
               {offers.map((o, i) => {
-                const r = BURIED_ROOMS[o.type] || BURIED_ROOMS.battle;
+                const r = BURIED_ROOMS[o.type] || BURIED_EVENT_ROOMS[o.type] || BURIED_ROOMS.battle;
                 const fx = getBuriedRoomEffect(o.effect);
                 const fxColor = fx ? (BURIED_ROOM_COLORS[fx.color]?.color || PALETTE.dawn) : null;
                 return (
@@ -446,6 +467,55 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
             </button>
           </div>
         )}
+        {/* ===== 이벤트 방 5종 (1.107.0) ===== */}
+        {BURIED_EVENT_ROOM_IDS.includes(room) && (() => {
+          const ev = BURIED_EVENT_ROOMS[room];
+          const rd = char.roomData || {};
+          const wOffers = room === 'wanderer' ? buriedWandererOffers(char) : null;
+          return (
+            <div className="space-y-2">
+              <div className="text-[12px] font-bold" style={{ color: ev.color }}>{ev.icon} {ev.name}</div>
+              <div className="text-[12px] leading-relaxed" style={{ color: PALETTE.textDim }}>{ev.desc}</div>
+              {rd.text && (
+                <div className="px-3 py-2.5 text-[12px] leading-relaxed"
+                  style={{
+                    borderRadius: 'var(--r-chip, 8px)',
+                    background: rd.tone === 'bad' ? `${PALETTE.accent}15` : rd.tone === 'good' ? `${PALETTE.green}12` : PALETTE.panel,
+                    border: `1px solid ${rd.tone === 'bad' ? PALETTE.accent : rd.tone === 'good' ? PALETTE.green : PALETTE.panelBorder}55`,
+                    color: rd.tone === 'bad' ? PALETTE.accent : rd.tone === 'good' ? PALETTE.green : PALETTE.text,
+                  }}>
+                  {rd.text}
+                </div>
+              )}
+              {!rd.done && room !== 'wanderer' && (
+                <button onClick={() => runEvent(room)} className="ui-press w-full py-2.5 text-[12px] font-bold"
+                  style={{ borderRadius: 'var(--r-btn, 13px)', background: ev.color, color: '#0a0608' }}>
+                  {room === 'gravestone' ? '파헤친다' : room === 'spring' ? '마신다' : room === 'statue' ? '손을 댄다' : '연다'} — 무슨 일이 생길지 모른다
+                </button>
+              )}
+              {!rd.done && room === 'wanderer' && (
+                <div className="space-y-1.5">
+                  <button disabled={!wOffers.canAddOption} onClick={() => runWanderer('option')} className="ui-press w-full py-2.5 text-[12px] text-left px-3"
+                    style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panel, border: `1px solid ${PALETTE.dawn}55`, color: wOffers.canAddOption ? PALETTE.text : PALETTE.textDim, opacity: wOffers.canAddOption ? 1 : 0.5 }}>
+                    ① 무작위 장착 장비에 <b style={{ color: PALETTE.dawn }}>옵션 1개 추가</b>
+                  </button>
+                  <button disabled={!wOffers.canMod} onClick={() => runWanderer('mod')} className="ui-press w-full py-2.5 text-[12px] text-left px-3"
+                    style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panel, border: `1px solid ${PALETTE.twilight}55`, color: wOffers.canMod ? PALETTE.text : PALETTE.textDim, opacity: wOffers.canMod ? 1 : 0.5 }}>
+                    ② 무작위 장비에 <b style={{ color: PALETTE.twilight }}>◈스킬 변화</b> 부여 (접두어 13종 중 랜덤)
+                  </button>
+                  <button disabled={!wOffers.canReroll} onClick={() => runWanderer('reroll')} className="ui-press w-full py-2.5 text-[12px] text-left px-3"
+                    style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panel, border: `1px solid ${PALETTE.panelBorder}`, color: wOffers.canReroll ? PALETTE.text : PALETTE.textDim, opacity: wOffers.canReroll ? 1 : 0.5 }}>
+                    ③ 무작위 장비의 <b>옵션 수치 재조정</b> (도박)
+                  </button>
+                </div>
+              )}
+              <button onClick={advance} className="ui-press w-full py-2.5 text-[12px]"
+                style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panelLight, color: PALETTE.text, border: `1px solid ${PALETTE.panelBorder}` }}>
+                {rd.done ? '다음 층으로' : '지나친다 — 다음 층으로'}
+              </button>
+            </div>
+          );
+        })()}
       </div>
 
       {manage && (
