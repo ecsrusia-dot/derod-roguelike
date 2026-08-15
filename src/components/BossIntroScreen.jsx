@@ -14,7 +14,8 @@ import { PALETTE, getEnemyImageSrc } from '../utils/helpers.js';
 const AUTO_ADVANCE_MS = 2500;
 const FALLBACK_ADVANCE_MS = 300;
 
-export default function BossIntroScreen({ enemyKey, onComplete }) {
+// fastSkip: 1.102.0~ 자동 사냥 ⏩스킵 모드 — 컷신을 폴백 딜레이(0.3초)로 즉시 통과
+export default function BossIntroScreen({ enemyKey, onComplete, fastSkip = false }) {
   const enemy = ENEMIES[enemyKey];
   const [imgFailed, setImgFailed] = useState(false);
   const [exiting, setExiting] = useState(false);
@@ -32,10 +33,10 @@ export default function BossIntroScreen({ enemyKey, onComplete }) {
       onComplete();
       return;
     }
-    const delay = imgFailed || !introSrc ? FALLBACK_ADVANCE_MS : AUTO_ADVANCE_MS;
+    const delay = fastSkip || imgFailed || !introSrc ? FALLBACK_ADVANCE_MS : AUTO_ADVANCE_MS;
     const t = setTimeout(finish, delay);
     return () => clearTimeout(t);
-  }, [enemy, imgFailed, introSrc]);
+  }, [enemy, imgFailed, introSrc, fastSkip]);
 
   if (!enemy) return null;
 

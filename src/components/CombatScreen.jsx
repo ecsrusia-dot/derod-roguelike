@@ -35,6 +35,7 @@ import {
   GAME_CONFIG,
   CLASS_ULTIMATES,
   POTIONS,
+  AUTO_SPEED_SKIP,
 } from '../data.js';
 import { calculateDamage, getDisplayDamage, rollCrit, rollDodge } from '../combat/damage.js';
 import {
@@ -50,7 +51,12 @@ import { FloatingLabel, DamageVignette, WhiteFlash, SlashFx, MagicImpactFx, Magi
 
 export default function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimates = [], initialRelics = [], activeSkills = null, activeRelicNames = null, enemyKey, isBoss, expedition, curses = [], meta, engravingFx = {}, chapterGimmick = null, autoPlay = false, autoSpeed = 1, onCycleAutoSpeed = null, autoRunCount = 0, onToggleAuto = null, belt = [], onConsumePotion = null, onLiveStatus = null, onVictory, onDefeat }) {
   // 1.80.0~ 자동 사냥 배속 — 자동 중에만 내부 진행·연출 딜레이 압축 (수동 플레이는 원속도)
-  const dly = (ms) => (autoPlay && autoSpeed > 1 ? Math.max(40, Math.round(ms / autoSpeed)) : ms);
+  // 1.102.0~ ⏩스킵: 딜레이 0 — 동일 전투 로직을 즉시 진행 (승리 전투는 순식간에 통과, 패배는 그대로 노출)
+  const dly = (ms) => {
+    if (!autoPlay || autoSpeed <= 1) return ms;
+    if (autoSpeed >= AUTO_SPEED_SKIP) return 0;
+    return Math.max(40, Math.round(ms / autoSpeed));
+  };
   // 1.89.0~ 마스터즈 기믹 융합 — chapterGimmick이 배열이면 전부 동시 적용
   const gimmicks = Array.isArray(chapterGimmick) ? chapterGimmick : (chapterGimmick ? [chapterGimmick] : []);
   const hasGimmick = (id) => gimmicks.some(g => g?.id === id);
@@ -2942,7 +2948,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                     boxShadow: '0 0 8px rgba(232,176,74,0.45)',
                   }}>AUTO ⏸</button>
                 )}
-                {/* 1.80.0~ 자동 사냥 배속 순환 (×1→×5→×10) */}
+                {/* 1.80.0~ 자동 사냥 배속 순환 (×1→×5→×10→×20→⏩스킵) */}
                 {autoPlay && onCycleAutoSpeed && (
                   <button onClick={onCycleAutoSpeed} className="ui-press flex-none tabular-nums" style={{
                     fontSize: 10, fontWeight: 700,
@@ -2950,7 +2956,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                     background: autoSpeed > 1 ? 'rgba(123,163,196,0.18)' : 'rgba(255,255,255,0.05)',
                     border: `1px solid ${autoSpeed > 1 ? `${PALETTE.ice}aa` : 'var(--ui-line)'}`,
                     borderRadius: 999, padding: '3px 8px',
-                  }}>⚡×{autoSpeed}</button>
+                  }}>{autoSpeed >= AUTO_SPEED_SKIP ? '⏩스킵' : `⚡×${autoSpeed}`}</button>
                 )}
                 {phase === 'playerTurn' && !autoPlay && (
                   <button onClick={handleEndTurn} className="ui-press flex-none" style={{

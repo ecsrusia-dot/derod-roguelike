@@ -10,6 +10,7 @@
 import React, { useRef, useState } from 'react';
 import { BookOpen, Coins, Crown, Flag, Flame, Hammer, HelpCircle, LogOut, Skull, Sword, Trophy, User, X } from 'lucide-react';
 import { PALETTE } from '../utils/helpers.js';
+import { AUTO_SPEED_SKIP } from '../data.js';
 import { GlassPanel, Chip } from './ui/CommonUI.jsx';
 
 // 노드 종류별 아이콘/색상/라벨 — 색 값은 디자인 토큰(--ui-*)과 동일 계열
@@ -109,14 +110,14 @@ export default function MapView({ chapter, classData, mapData, hp, maxHp, gold, 
               {autoHunt ? '⏸ 자동 사냥 중' : '▶ 자동 사냥'}
             </button>
           )}
-          {/* 1.80.0~ 자동 사냥 배속 (×1→×5→×10 순환) — 자동 사냥 중에만 노출 */}
+          {/* 1.80.0~ 자동 사냥 배속 (×1→×5→×10→×20→⏩스킵 순환) — 자동 사냥 중에만 노출 */}
           {autoHuntAllowed && autoHunt && onCycleAutoSpeed && (
             <button onClick={onCycleAutoSpeed} className="ui-press tabular-nums" style={{
               height: 20, padding: '0 8px', borderRadius: 999, fontSize: 10, fontWeight: 700,
               background: autoSpeed > 1 ? 'rgba(123,163,196,0.2)' : 'rgba(255,255,255,0.05)',
               border: `1px solid ${autoSpeed > 1 ? `${PALETTE.ice}aa` : 'rgba(255,255,255,0.15)'}`,
               color: autoSpeed > 1 ? PALETTE.ice : PALETTE.textDim,
-            }}>⚡ ×{autoSpeed}</button>
+            }}>{autoSpeed >= AUTO_SPEED_SKIP ? '⏩ 스킵' : `⚡ ×${autoSpeed}`}</button>
           )}
           {/* 1.83.0~ 자동 사냥 런 카운터 */}
           {autoHunt && autoRunCount > 0 && (

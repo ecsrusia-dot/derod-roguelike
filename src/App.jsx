@@ -138,6 +138,7 @@ import {
   ENGRAVINGS,
   POTIONS,
   FEATURE_FLAGS,
+  AUTO_SPEED_SKIP,
 } from './data.js';
 import { getKstDateKey } from './utils/dailyChallenge.js';
 import { simulateBestEndlessRun } from './utils/endlessSkipSim.js';
@@ -363,14 +364,16 @@ export default function App() {
   // 1.72.0~ 자동 사냥 모드 — 노드 선택·스킬 선택·보상 선택 모두 자동
   // 허용 범위: 수련의 길(training) + 무한모드(endless)만. 사망/원정 클리어 시 자동 해제.
   const [autoHunt, setAutoHunt] = useState(false);
-  // 1.80.0~ 자동 사냥 배속 (×1 / ×5 / ×10 / ×20) — 자동 사냥 중에만 연출·진행 딜레이 압축
+  // 1.80.0~ 자동 사냥 배속 (×1 / ×5 / ×10 / ×20) + 1.102.0~ ⏩스킵 (전투 딜레이 0 — 승리 전투는 안 보고 통과)
   const [autoSpeed, setAutoSpeed] = useState(1);
-  const cycleAutoSpeed = () => setAutoSpeed(s => (s === 1 ? 5 : s === 5 ? 10 : s === 10 ? 20 : 1));
+  const cycleAutoSpeed = () => setAutoSpeed(s => (s === 1 ? 5 : s === 5 ? 10 : s === 10 ? 20 : s === 20 ? AUTO_SPEED_SKIP : 1));
   // 1.100.0~ 런타임 누적 — 1초마다 (자동 사냥 배속이면 ×배속으로 환산해 ×1 기준 시간 유지)
+  // 1.102.0~ ⏩스킵 모드는 ×1 환산 불가 → 런타임 기록 무효 (이어하기와 동일 취급, 베스트 오염 방지)
   // ⚠ 이 effect는 autoHunt·autoSpeed 선언 뒤에 있어야 함 (앞에 두면 deps 평가 시 TDZ 부팅 크래시 — 1.89.1 동일 유형)
   useEffect(() => {
     if (!metaLoaded || !currentExpedition) return;
     const iv = setInterval(() => {
+      if (autoHunt && autoSpeed === AUTO_SPEED_SKIP) { runTimeRef.current = null; return; }
       if (runTimeRef.current != null) runTimeRef.current += 1000 * (autoHunt ? autoSpeed : 1);
     }, 1000);
     return () => clearInterval(iv);
@@ -2835,7 +2838,7 @@ export default function App() {
             {screen === 'achievements' && <AchievementScreen meta={meta} onClaim={handleClaimAchievement} onClose={() => setScreen(prevAchievementsBack)} />}
             {screen === 'map' && chapter && mapData && <MapView chapter={chapter} classData={classData} mapData={mapData} hp={hp} maxHp={maxHp} gold={gold} gem={gem} relics={relics} activeRelicNames={activeRelicNames} expedition={currentExpedition} curses={currentCurses} chapterIdx={chapterIdx} autoHunt={autoHunt} autoHuntAllowed={autoHuntAllowed} onToggleAutoHunt={toggleAutoHunt} autoSpeed={autoSpeed} onCycleAutoSpeed={cycleAutoSpeed} autoRunCount={autoSession?.runCount || 0} onEnterNode={handleEnterNode} onOpenStatus={() => setScreen('status')} onOpenAchievements={() => { setPrevAchievementsBack('map'); setScreen('achievements'); }} onOpenCodex={() => setScreen('codex')} onBack={() => setScreen('title')} onRetreat={currentExpedition?.endless ? handleEndlessRetreat : null} />}
             {screen === 'codex' && <CodexScreen meta={meta} onBack={() => setScreen('map')} />}
-            {screen === 'bossIntro' && currentEnemy && <BossIntroScreen enemyKey={currentEnemy} onComplete={() => setScreen('combat')} />}
+            {screen === 'bossIntro' && currentEnemy && <BossIntroScreen enemyKey={currentEnemy} fastSkip={autoHunt && autoSpeed >= AUTO_SPEED_SKIP} onComplete={() => setScreen('combat')} />}
             {screen === 'combat' && currentEnemy && <CombatScreen key={`${activeNodeId}-${currentEnemy}`} classData={classData} initialPlayer={{ hp, maxHp, ...classData.stats, ...stats }} initialSkills={skills} initialUltimates={ultimates} initialRelics={relics} activeSkills={activeSkills} activeRelicNames={activeRelicNames} enemyKey={currentEnemy} isBoss={isBossReward} expedition={currentExpedition} curses={currentCurses} meta={meta} engravingFx={getCombinedClassFx(meta, classData?.id)} chapterGimmick={chapter?.gimmick || null} autoPlay={autoHunt} autoSpeed={autoSpeed} onCycleAutoSpeed={cycleAutoSpeed} autoRunCount={autoSession?.runCount || 0} onToggleAuto={toggleAutoHunt} belt={belt} onConsumePotion={handleConsumePotion} onLiveStatus={autoHunt ? setCombatLive : null} onVictory={handleVictory} onDefeat={handleDefeat} />}
             {screen === 'reward' && <RewardSelect rewards={currentRewards} gem={gem} skills={skills} relics={relics} ultimates={ultimates} onPick={handlePickReward} onReroll={handleReroll} hasRerolled={hasRerolled} isElite={isEliteReward} classId={classData?.id} meta={meta} expedition={currentExpedition} />}
             {screen === 'victory' && <VictoryScreen classData={classData} enemy={currentEnemy ? ENEMIES[currentEnemy] : null} gains={victoryGains} stats={victoryStats} onContinue={handleVictoryContinue} />}
