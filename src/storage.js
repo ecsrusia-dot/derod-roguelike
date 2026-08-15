@@ -5,7 +5,7 @@
 // 저장되는 것: 영혼, 강화 단계, 해금 항목, 클리어 기록
 // ============================================
 
-import { ENGRAVINGS, ENGRAVING_TIERS, ENEMIES, EVENTS, RELICS, PASSIVE_SKILLS, CODEX_DISCOVERY_REWARD, CODEX_COMPLETE_REWARD, backfillRaidSeries, FEATURE_FLAGS } from './data.js';
+import { ENGRAVINGS, ENGRAVING_TIERS, ENEMIES, EVENTS, RELICS, PASSIVE_SKILLS, CODEX_DISCOVERY_REWARD, CODEX_COMPLETE_REWARD, backfillRaidSeries, FEATURE_FLAGS, BURIED_LEGACY_MAX } from './data.js';
 
 const DB_NAME = 'derod_meta';
 const DB_VERSION = 1;
@@ -95,6 +95,19 @@ const DEFAULT_META = {
     patterns: null,
     clears: {},
     medals: 0,
+  },
+  // 1.103.0~ 무덤의 유산 (BuriedBornes 모티브 별도 모드 — 본편과 완전 분리)
+  // char: 진행 중 캐릭터 스냅샷(사망 시 null) / legacy: 계승 대기 장비 / legacyGold: 계승 골드
+  // deepest: 도달 최고 층 / clears: 던전 클리어 횟수 / deaths: 사망 횟수 / dust: 무덤 먼지
+  buried: {
+    char: null,
+    legacy: [],
+    legacyGold: 0,
+    dust: 0,
+    deepest: 0,
+    clears: 0,
+    deaths: 0,
+    runs: 0,
   },
   // 진행 중인 런 스냅샷 (맵 화면 진입 시 자동 저장 — 앱 종료/새로고침 후 이어하기 용)
   // null = 진행 중 런 없음. 객체 = 재개 가능한 런 상태.
@@ -191,6 +204,8 @@ export async function loadMeta() {
         };
         // 1.98.0 명예의 전당 중첩 객체 보강
         safe.hof = { ...DEFAULT_META.hof, ...(data.hof || {}) };
+        // 1.103.0 무덤의 유산 중첩 객체 보강
+        safe.buried = { ...DEFAULT_META.buried, ...(data.buried || {}) };
         // 1.26.0 직업별 추적 데이터 보강
         safe.ultimatesPickedByClass = { ...DEFAULT_META.ultimatesPickedByClass, ...(data.ultimatesPickedByClass || {}) };
         safe.championshipClearsByClass = { ...DEFAULT_META.championshipClearsByClass, ...(data.championshipClearsByClass || {}) };
@@ -1399,4 +1414,80 @@ export function recordHofClear(meta, stageId, firstMedals) {
     first,
     medals: gained,
   };
+}
+
+// ============================================
+// 무덤의 유산 (1.103.0) — BuriedBornes 모티브 별도 모드
+// ============================================
+// 본편 메타(영혼·각인·유물)와 완전 분리. 이 모드의 모든 영속 상태는 meta.buried 하나에만 쌓인다.
+
+const EMPTY_BURIED = { char: null, legacy: [], legacyGold: 0, dust: 0, deepest: 0, clears: 0, deaths: 0, runs: 0 };
+export function getBuried(meta) {
+  const b = meta?.buried || EMPTY_BURIED;
+  return { ...EMPTY_BURIED, ...b, legacy: Array.isArray(b.legacy) ? b.legacy : [] };
+}
+
+// 진행 중 캐릭터 스냅샷 저장 (층 이동·장비 변경·전투 종료마다 호출)
+export function saveBuriedChar(meta, char) {
+  const b = getBuried(meta);
+  const deepest = Math.max(b.deepest || 0, char?.floor || 0);
+  return { ...meta, buried: { ...b, char, deepest } };
+}
+
+// 새 캐릭터 시작 — 유산 보관함을 비우고 캐릭터에 넘긴다
+export function startBuriedChar(meta, char, usedLegacyCount) {
+  const b = getBuried(meta);
+  return {
+    ...meta,
+    buried: {
+      ...b,
+      char,
+      legacy: b.legacy.slice(usedLegacyCount || b.legacy.length),
+      legacyGold: 0,
+      runs: (b.runs || 0) + 1,
+      deepest: Math.max(b.deepest || 0, char?.floor || 1),
+    },
+  };
+}
+
+// 사망 — 캐릭터 소멸 + 유산 계승 (보관함 초과분은 무덤 먼지로 환산)
+export function recordBuriedDeath(meta, legacy, dustOverflow = 0) {
+  const b = getBuried(meta);
+  const merged = [...(legacy?.items || []), ...b.legacy].slice(0, BURIED_LEGACY_MAX);
+  return {
+    ...meta,
+    buried: {
+      ...b,
+      char: null,
+      legacy: merged,
+      legacyGold: (b.legacyGold || 0) + (legacy?.gold || 0),
+      dust: (b.dust || 0) + dustOverflow,
+      deaths: (b.deaths || 0) + 1,
+    },
+  };
+}
+// 던전 클리어 — 캐릭터는 살아서 로비로 귀환 (장비·레벨 유지)
+export function recordBuriedClear(meta, char) {
+  const b = getBuried(meta);
+  return {
+    ...meta,
+    buried: {
+      ...b,
+      char,
+      clears: (b.clears || 0) + 1,
+      deepest: Math.max(b.deepest || 0, char?.floor || 0),
+    },
+  };
+}
+
+// 무덤 먼지 증감 (분해 획득 / 강화 소모). 부족하면 원본 반환
+export function addBuriedDust(meta, amount) {
+  const b = getBuried(meta);
+  if (amount < 0 && (b.dust || 0) + amount < 0) return meta;
+  return { ...meta, buried: { ...b, dust: (b.dust || 0) + amount } };
+}
+
+// 캐릭터 포기 (로비에서 명시적 은퇴) — 유산은 사망과 동일 규칙으로 남긴다
+export function retireBuriedChar(meta, legacy) {
+  return recordBuriedDeath(meta, legacy, 0);
 }
