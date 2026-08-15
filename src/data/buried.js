@@ -357,7 +357,7 @@ export function buriedDustValue(item) {
 // =========================================================
 export const buriedExpToNext = (lv) => 32 + lv * 20;
 
-export function createBuriedChar(classId, legacy = { items: [], gold: 0 }, dungeonId = 'labyrinth', contracts = []) {
+export function createBuriedChar(classId, legacy = { items: [], gold: 0 }, dungeonId = 'labyrinth', contracts = [], partsFx = {}) {
   const cls = getBuriedClass(classId);
   if (!cls) return null;
   const equipped = {};
@@ -384,6 +384,7 @@ export function createBuriedChar(classId, legacy = { items: [], gold: 0 }, dunge
     // 1.104.0 — 던전 선택 / 걸음수 기반 마물 레벨 / 스킬 레벨 / 방·층 효과
     dungeonId,
     contracts: (contracts || []).slice(0, BURIED_CONTRACT_CARRY),
+    partsFx: partsFx || {},  // 1.112.0 — 연구실 부품 효과 (생성 시점에 구움, 소급 없음)
     floor: 1, steps: 0, room: null, roomEffect: null, floorEffect: null, offers: null, roomDone: false,
     skillLevels: {},
     potions: 2,
@@ -419,23 +420,25 @@ export function buriedDerived(char) {
   const tf = aggregateBuriedTraits(char);
   // 마의 계약 (1.111.0) — 지참 계약 2개의 fx
   const cf = aggregateBuriedContracts(char);
+  // 연구실 부품 (1.112.0) — 생성 시점에 구워진 fx
+  const pf = char.partsFx || {};
   return {
     stats: st,
     traitFx: tf,
-    maxHp:   Math.max(1, Math.round((140 + st.vit * 11 + (lv - 1) * 18 + (gear.hp || 0) + (tf.hp || 0)) * (tf.hpMult || 1) * (1 + (cf.hpPct || 0) / 100) * (1 - Math.min(50, char.curseHpLossPct || 0) / 100))),
+    maxHp:   Math.max(1, Math.round((140 + st.vit * 11 + (lv - 1) * 18 + (gear.hp || 0) + (tf.hp || 0) + (pf.hp || 0)) * (tf.hpMult || 1) * (1 + (cf.hpPct || 0) / 100) * (1 - Math.min(50, char.curseHpLossPct || 0) / 100))),
     maxSp:   Math.round(38 + st.int * 1.3 + (gear.sp || 0) + (tf.sp || 0)),
-    atk:     Math.round((10 + st.str * 1.6 + (gear.atk || 0)) * (1 + ((tf.physPct || 0) + (cf.physPct || 0)) / 100)),
-    fin:     Math.round((10 + st.dex * 1.6 + (gear.atk || 0)) * (1 + ((tf.physPct || 0) + (cf.physPct || 0)) / 100)),
-    mag:     Math.round((10 + st.int * 1.6 + (gear.mag || 0)) * (1 + ((tf.magPct || 0) + (cf.magPct || 0)) / 100)),
-    def:     Math.round(4 + st.vit * 0.9 + (gear.def || 0)),
-    crit:    Math.round(5 + st.dex * 0.6 + (gear.crit || 0) + (tf.crit || 0) + (cf.crit || 0)),
+    atk:     Math.round((10 + st.str * 1.6 + (gear.atk || 0) + (pf.atk || 0)) * (1 + ((tf.physPct || 0) + (cf.physPct || 0)) / 100)),
+    fin:     Math.round((10 + st.dex * 1.6 + (gear.atk || 0) + (pf.atk || 0)) * (1 + ((tf.physPct || 0) + (cf.physPct || 0)) / 100)),
+    mag:     Math.round((10 + st.int * 1.6 + (gear.mag || 0) + (pf.mag || 0)) * (1 + ((tf.magPct || 0) + (cf.magPct || 0)) / 100)),
+    def:     Math.round(4 + st.vit * 0.9 + (gear.def || 0) + (pf.def || 0)),
+    crit:    Math.round(5 + st.dex * 0.6 + (gear.crit || 0) + (tf.crit || 0) + (cf.crit || 0) + (pf.crit || 0)),
     critDmg: 60 + (gear.critDmg || 0),
-    dodge:   Math.min(45, Math.round(3 + st.dex * 0.4 + (gear.dodge || 0) + (tf.dodge || 0) + (cf.dodge || 0))),
-    spRegen: Math.round(9 + st.int / 8 + (gear.spRegen || 0)),
-    barrier: Math.round(((gear.barrier || 0) + (tf.barrier || 0)) * (1 + (cf.barrierPct || 0) / 100)),
-    chase:   Math.round((gear.chase || 0) + (tf.chase || 0)),
-    healPct: (tf.healPct || 0) + (cf.healPct || 0),
-    drainPct: (tf.drainPct || 0) + (cf.drainPct || 0),
+    dodge:   Math.min(45, Math.round(3 + st.dex * 0.4 + (gear.dodge || 0) + (tf.dodge || 0) + (cf.dodge || 0) + (pf.dodge || 0))),
+    spRegen: Math.round(9 + st.int / 8 + (gear.spRegen || 0) + (pf.spRegen || 0)),
+    barrier: Math.round(((gear.barrier || 0) + (tf.barrier || 0) + (pf.barrier || 0)) * (1 + (cf.barrierPct || 0) / 100)),
+    chase:   Math.round((gear.chase || 0) + (tf.chase || 0) + (pf.chase || 0)),
+    healPct: (tf.healPct || 0) + (cf.healPct || 0) + (pf.healPct || 0),
+    drainPct: (tf.drainPct || 0) + (cf.drainPct || 0) + (pf.drainPct || 0),
   };
 }
 
@@ -1436,9 +1439,9 @@ export function rollBuriedUniqueItem({ classId, floor = 1, excludeIds = [] } = {
 
 // 보스 유니크 드랍 확률 (%) — 던전이 깊을수록 후하다. 최종 보스는 2배
 export const BURIED_UNIQUE_DROP = { labyrinth: 8, ruins: 12, chasm: 16, abyss: 22 };
-export function rollBuriedUniqueDrop({ dungeonId, isFinalBoss, classId, floor, ownedIds = [] }) {
+export function rollBuriedUniqueDrop({ dungeonId, isFinalBoss, classId, floor, ownedIds = [], guaranteed = false }) {
   const base = BURIED_UNIQUE_DROP[dungeonId] || 8;
-  const chance = base * (isFinalBoss ? 2 : 1);
+  const chance = guaranteed ? 100 : base * (isFinalBoss ? 2 : 1);
   if (Math.random() * 100 >= chance) return null;
   return rollBuriedUniqueItem({ classId, floor, excludeIds: ownedIds });
 }
@@ -1752,3 +1755,83 @@ export function aggregateBuriedContracts(char) {
   }
   return out;
 }
+
+// =========================================================
+// 26. 연구실 부품 + 죽음의 조각 (1.112.0)
+// =========================================================
+// 원작: 죽음의 조각으로 부품 구입, 슬롯 5칸 (무료→20→100→240→500), 일괄 탈착만 가능.
+// 각색: 조각은 보스·재앙이 떨어뜨린다. 부품 효과는 **새 캐릭터 생성 시점에 구워져**(partsFx)
+// 런 내내 적용 — 진행 중 캐릭터에는 소급되지 않는다 (원작의 "시체 개조" 감성).
+export const BURIED_SHARD = { name: '죽음의 조각', icon: '☠' };
+export const BURIED_PART_SLOT_COSTS = [0, 20, 100, 240, 500]; // n번째 부품 장착 비용
+export const BURIED_PARTS = [
+  { id: 'p_atk',    name: '완력 코어',    desc: '물리·기교 공격력 +6', fx: { atk: 6 } },
+  { id: 'p_mag',    name: '마도 코어',    desc: '마법 공격력 +6',      fx: { mag: 6 } },
+  { id: 'p_hp',     name: '생체 조직',    desc: '최대 HP +40',        fx: { hp: 40 } },
+  { id: 'p_def',    name: '골판 장갑',    desc: '방어력 +6',           fx: { def: 6 } },
+  { id: 'p_shield', name: '역장 발생기',  desc: '보호막 +25',          fx: { barrier: 25 } },
+  { id: 'p_crit',   name: '조준 렌즈',    desc: '치명 확률 +5%',       fx: { crit: 5 } },
+  { id: 'p_dodge',  name: '반사 신경',    desc: '회피율 +4%',          fx: { dodge: 4 } },
+  { id: 'p_chase',  name: '추격 기관',    desc: '추격 피해 +6',        fx: { chase: 6 } },
+  { id: 'p_sp',     name: '순환 펌프',    desc: 'SP 회복 +3',          fx: { spRegen: 3 } },
+  { id: 'p_drain',  name: '흡혈 침샘',    desc: '흡혈 +4%',            fx: { drainPct: 4 } },
+  { id: 'p_heal',   name: '재생 세포',    desc: '회복량 +15%',         fx: { healPct: 15 } },
+  { id: 'p_status', name: '독선 분비샘',  desc: '상태이상 확률 +15%',   fx: { statusChance: 15 } },
+  { id: 'p_luck',   name: '도굴꾼의 눈',  desc: '드랍 등급 운 +1',     fx: { dropLuck: 1 } },
+  { id: 'p_gold',   name: '탐욕 회로',    desc: '골드 +15%',           fx: { goldPct: 15 } },
+  { id: 'p_exp',    name: '학습 회로',    desc: '경험치 +15%',         fx: { expPct: 15 } },
+  { id: 'p_wall',   name: '증축 골조',    desc: '전투 시작 🧱방벽 +1', fx: { startWall: 1 } },
+];
+export const getBuriedPart = (id) => BURIED_PARTS.find(p => p.id === id) || null;
+export function aggregateBuriedParts(partIds) {
+  const out = {};
+  for (const id of partIds || []) {
+    const p = getBuriedPart(id);
+    if (!p) continue;
+    for (const [k, v] of Object.entries(p.fx)) out[k] = (out[k] || 0) + v;
+  }
+  return out;
+}
+// 보스 처치 조각 (던전별) — 최종 보스는 2배
+export const BURIED_SHARD_DROP = { labyrinth: 1, ruins: 2, chasm: 3, abyss: 5 };
+
+// =========================================================
+// 27. 재앙 (1.112.0) — 소환형 초고난도 보스
+// =========================================================
+// 원작: 연구실 방문 5회 누적 시 「둥지」에 재앙 출현 (계정 단위 게이지).
+// 각색: **이벤트 방(묘비·샘·석상·나그네·관·해골왕관)을 해결할 때마다 게이지 +1**,
+// 5가 되면 던전 화면에 소환 배너 — 맞서면 게이지 0으로. 도망칠 수 있다(배너 무시).
+export const BURIED_CALAMITY_GAUGE_MAX = 5;
+export const BURIED_CALAMITY = {
+  key: 'calamity', name: '재앙 — 낙젤리온의 그림자',
+  img: { key: 'nakzelionShadow', chapter: 4 }, color: '#4a1f5c',
+  desc: '이 무덤 아래 잠든 것의 그림자. 마주친 자는 돌아오지 못했다.',
+  tier: 'boss',
+  actions: [
+    { name: '그림자 발톱', power: 118, kind: 'attack', apply: [{ s: 'bleed', n: 3, p: 100 }], weight: 3 },
+    { name: '심연의 응시', power: 70, kind: 'attack', apply: [{ s: 'curse', n: 2, p: 100 }, { s: 'confuse', n: 1, p: 60 }], weight: 2 },
+    { name: '종언의 파도', power: 95, kind: 'attack', hits: 3, heavy: true, weight: 2 },
+    { name: '그림자 육신', kind: 'defend', self: [{ s: 'guard', n: 4 }, { s: 'wall', n: 1 }], weight: 1 },
+  ],
+};
+// 재앙 실체화 — 현재 마물 레벨 기반으로 크게 강하다.
+// ⚠️ 기울기 0.16 — 보스(던전별 스케일)보다 완만하면 심연에서 역전된다 (시뮬 검증 필수)
+export function buildBuriedCalamity(char) {
+  const lv = buriedMonsterLevel(char) + 3;
+  const m = 1 + (lv - 1) * 0.16;
+  return {
+    ...BURIED_CALAMITY,
+    lv,
+    hp: Math.round(480 * m * 1.35),
+    atk: Math.round(34 * m * 1.15),
+    def: Math.round(12 * (1 + (lv - 1) * 0.08)),
+    exp: Math.round(300 * (1 + (lv - 1) * 0.1)),
+    gold: [260, 420],
+    roomType: 'calamity', isBoss: true,
+  };
+}
+// 재앙 보상 — 조각 대량 + 유니크 확정 + 먼지
+export const BURIED_CALAMITY_REWARD = {
+  shards: { labyrinth: 15, ruins: 20, chasm: 25, abyss: 30 },
+  dust: 80,
+};

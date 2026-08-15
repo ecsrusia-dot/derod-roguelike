@@ -45,6 +45,9 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
   const cs = (id) => hasBuriedCurse(char, id);
   // ===== 마의 계약 (1.111.0) — 지참 fx =====
   const cf = aggregateBuriedContracts(char);
+  // ===== 연구실 부품 (1.112.0) — 캐릭터 생성 시 구운 partsFx.
+  // 스탯 키(hp·atk 등)는 buriedDerived가 이미 반영 — 여기서는 전투·전리품 전용 키만 읽는다
+  const pf = char.partsFx || {};
   // 스킬 단계 보정 — [u113] 쿨 0 / [u101] 쿨 상한 1 / [u99] 레벨당 위력 +2% / [u94] 2회 시전·위력 절반
   const applyUniqueSkillMods = (sk) => {
     let out = { ...sk };
@@ -96,7 +99,8 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
         ? (() => {
             const w = (traits.includes('fairywing') ? 2 : 0)
               + (uniques.includes('u76') ? 2 : 0)
-              + (aggregateBuriedContracts(char).startWall || 0); // 「방벽의 계약」
+              + (aggregateBuriedContracts(char).startWall || 0) // 「방벽의 계약」
+              + (char.partsFx?.startWall || 0); // 부품 「증축 골조」
             return w > 0 ? { wall: w } : {};
           })() : {},
       char.pendingStatuses || []
@@ -202,27 +206,28 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
   };
   const dmgText = (r, extra = '') => `-${r.toHp}${r.absorbed > 0 ? ` (🔷${r.absorbed})` : ''}${extra}`;
 
-  const statusOpts = { chancePct: (env.self.statusChancePct || 0) + (uq('u57') ? 100 : 0) + (cf.statusChance || 0), extra: env.self.statusExtra || 0 };
+  const statusOpts = { chancePct: (env.self.statusChancePct || 0) + (uq('u57') ? 100 : 0) + (cf.statusChance || 0) + (pf.statusChance || 0), extra: env.self.statusExtra || 0 };
   const foeStatusOpts = { chancePct: (env.foe.statusChancePct || 0) - (cf.statusResist || 0), extra: (uq('u113') ? 1 : 0) + (cs('sabnock') ? 1 : 0) };
 
   // ===== 전투 종료 =====
   const finish = (win, finalHp) => {
     if (win) {
       // [u112] 전당의 휘장 — 승리 골드 +50%
-      const goldMult = dungeon.goldMult * (1 + (env.meta.goldPct || 0) / 100) * (uq('u112') ? 1.5 : 1) * (uq('u27') ? 3 : 1) * (1 + (cf.goldPct || 0) / 100);
+      const goldMult = dungeon.goldMult * (1 + (env.meta.goldPct || 0) / 100) * (uq('u112') ? 1.5 : 1) * (uq('u27') ? 3 : 1) * (1 + ((cf.goldPct || 0) + (pf.goldPct || 0)) / 100);
       const gold = Math.round(rnd(enemy.gold[0], enemy.gold[1]) * goldMult);
-      const exp = Math.round(enemy.exp * dungeon.expMult * (uq('u40') ? 2 : 1) * (1 + (cf.expPct || 0) / 100));
-      const dropChance = roomType === 'boss' ? 100 : roomType === 'elite' ? 100 : 38;
+      const exp = Math.round(enemy.exp * dungeon.expMult * (uq('u40') ? 2 : 1) * (1 + ((cf.expPct || 0) + (pf.expPct || 0)) / 100));
+      const bossy = roomType === 'boss' || roomType === 'calamity';
+      const dropChance = bossy || roomType === 'elite' ? 100 : 38;
       const drops = [];
-      const luck = dungeon.dropLuck + (cf.dropLuck || 0) + (roomType === 'boss' ? 6 : roomType === 'elite' ? 3 : 0);
+      const luck = dungeon.dropLuck + (cf.dropLuck || 0) + (pf.dropLuck || 0) + (bossy ? 6 : roomType === 'elite' ? 3 : 0);
       if (Math.random() * 100 < dropChance) {
         const it = rollBuriedItem({ slot: null, classId: char.classId, floor: enemy.lv || char.floor, luck });
         if (it) drops.push(it);
       }
-      if (roomType === 'boss') {
+      if (bossy) {
         const extra = rollBuriedItem({ slot: null, classId: char.classId, floor: enemy.lv || char.floor, luck: luck + 2 });
         if (extra) drops.push(extra);
-        // ===== 전설의 무구 드랍 (1.106.0, PM 결정: 보스 전용) =====
+        // ===== 전설의 무구 드랍 (1.106.0, PM 결정: 보스 전용 / 1.112.0 재앙은 확정) =====
         const owned = [
           ...Object.values(char.equipped || {}).map(i => i?.unique),
           ...(char.inventory || []).map(i => i.unique),
@@ -233,6 +238,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
           classId: char.classId,
           floor: enemy.lv || char.floor,
           ownedIds: owned,
+          guaranteed: roomType === 'calamity',
         });
         if (uniqueDrop) drops.push(uniqueDrop);
       }
@@ -712,7 +718,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
               {enemy.name} <span style={{ color: PALETTE.textDim }}>Lv.{enemy.lv || 1}</span>
             </span>
             <span className="text-[11px]" style={{ color: PALETTE.textDim }}>
-              {roomType === 'boss' ? '👑 ' : roomType === 'elite' ? '☠ ' : ''}방어 {buriedEffDef(foe)} · 회피 {buriedEffDodge(foe)}%
+              {roomType === 'calamity' ? '🌑 ' : roomType === 'boss' ? '👑 ' : roomType === 'elite' ? '☠ ' : ''}방어 {buriedEffDef(foe)} · 회피 {buriedEffDodge(foe)}%
             </span>
           </div>
           <BuriedBar value={foe.hp} max={foe.maxHp} color={PALETTE.accent} height={9} showText={false} />

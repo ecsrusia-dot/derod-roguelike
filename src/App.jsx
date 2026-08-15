@@ -162,10 +162,14 @@ import {
   raiseBuriedSkill,
   buriedEquippedSkills,
   BURIED_SKILL_MAX_LV,
+  aggregateBuriedParts,
+  BURIED_PART_SLOT_COSTS,
+  BURIED_SHARD_DROP,
+  BURIED_CALAMITY_REWARD,
 } from './data.js';
 import { getKstDateKey } from './utils/dailyChallenge.js';
 import { simulateBestEndlessRun } from './utils/endlessSkipSim.js';
-import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, applyEngravingSlot, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear, dismantleRaidItem, dismantleRaidJunk, enhanceRaidItem, claimRaidWeekly, addRaidResources, spendRaidResourcesForItem, resolveRaidSecret, toggleRaidFormation, appendAutoRunLog, getGambleUsed, useGambleEntry, addTwilightCoins, addFateShards, redeemFateShards, buyGambleShopItem, addClassTitle, equipClassTitle, saveHofPatterns, hofLevelUpChar, recordHofClear, recordMastersClearByClass, updateBestRunTime, getBuried, saveBuriedChar, startBuriedChar, recordBuriedDeath, recordBuriedClear, addBuriedDust, craftBuriedForgeItem, expandBuriedLegacy, trackBuriedKill, buyBuriedContract } from './storage.js';
+import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, applyEngravingSlot, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear, dismantleRaidItem, dismantleRaidJunk, enhanceRaidItem, claimRaidWeekly, addRaidResources, spendRaidResourcesForItem, resolveRaidSecret, toggleRaidFormation, appendAutoRunLog, getGambleUsed, useGambleEntry, addTwilightCoins, addFateShards, redeemFateShards, buyGambleShopItem, addClassTitle, equipClassTitle, saveHofPatterns, hofLevelUpChar, recordHofClear, recordMastersClearByClass, updateBestRunTime, getBuried, saveBuriedChar, startBuriedChar, recordBuriedDeath, recordBuriedClear, addBuriedDust, craftBuriedForgeItem, expandBuriedLegacy, trackBuriedKill, buyBuriedContract, addBuriedShards, buyBuriedPart, detachBuriedParts } from './storage.js';
 
 
 
@@ -364,7 +368,7 @@ export default function App() {
   const handleBuriedStart = (classId, dungeonId = 'labyrinth', contracts = []) => {
     setMeta(prev => {
       const b = getBuried(prev);
-      const char = createBuriedChar(classId, { items: b.legacy, gold: b.legacyGold }, dungeonId, contracts);
+      const char = createBuriedChar(classId, { items: b.legacy, gold: b.legacyGold }, dungeonId, contracts, aggregateBuriedParts(b.parts));
       if (!char) return prev;
       const next = startBuriedChar(prev, char, b.legacy.length);
       saveMeta(next);
@@ -410,6 +414,24 @@ export default function App() {
     });
   };
 
+  // 연구실 부품 (1.112.0) — ☠ 죽음의 조각으로 구입, 다음 캐릭터부터 적용
+  const handleBuriedBuyPart = (partId) => {
+    setMeta(prev => {
+      const next = buyBuriedPart(prev, partId, BURIED_PART_SLOT_COSTS);
+      if (next === prev) return prev;
+      saveMeta(next);
+      return next;
+    });
+  };
+  const handleBuriedDetachParts = () => {
+    setMeta(prev => {
+      const next = detachBuriedParts(prev, 50);
+      if (next === prev) return prev;
+      saveMeta(next);
+      return next;
+    });
+  };
+
   const handleBuriedExpandLegacy = () => {
     setMeta(prev => {
       const b = getBuried(prev);
@@ -436,7 +458,7 @@ export default function App() {
     // 전직은 첫 던전(미궁)을 클리어했을 때만 열린다
     const cls = getBuriedClass(char?.classId);
     const advanceClassId = dungeonId === 'labyrinth' ? (cls?.advance || null) : null;
-    const reset = { ...char, floor: 1, steps: 0, offers: null, room: null, roomData: null, roomEffect: null, floorEffect: null, curses: [], curseHpLossPct: 0, pendingStatuses: null };
+    const reset = { ...char, floor: 1, steps: 0, offers: null, room: null, roomData: null, roomEffect: null, floorEffect: null, curses: [], curseHpLossPct: 0, pendingStatuses: null, calamityGauge: 0 };
     setMeta(prev => {
       const next = recordBuriedClear(prev, reset, { dungeonId, nextDungeonId, advanceClassId });
       saveMeta(next);
@@ -507,10 +529,30 @@ export default function App() {
         grown = { ...grown, stats: { ...grown.stats, [k]: (grown.stats[k] || 0) + 2 } };
       }
     }
+    // 재앙 (1.112.0) — 층 이동 없이 같은 층으로 복귀. 조각·먼지 대량 보상, 게이지는 소환 수락 때 이미 0
+    if (buriedRoom === 'calamity') {
+      const dId = grown.dungeonId || 'labyrinth';
+      const shardGain = BURIED_CALAMITY_REWARD.shards[dId] || 15;
+      setBuriedEnemy(null); setBuriedRoom(null); setBuriedRoomFx(null);
+      setMeta(prev => {
+        let next = addBuriedShards(prev, shardGain);
+        next = addBuriedDust(next, BURIED_CALAMITY_REWARD.dust + (res.dustGain || 0));
+        saveMeta(next);
+        return next;
+      });
+      setBuriedForgeNotice(`🌑 재앙 격퇴 — ☠ 죽음의 조각 +${shardGain} · 🕯 먼지 +${BURIED_CALAMITY_REWARD.dust}`);
+      updateBuriedChar(grown, 0);
+      setScreen('buriedDungeon');
+      return;
+    }
+    // ☠ 죽음의 조각 (1.112.0) — 보스 처치 시 던전별 획득, 최종 보스는 2배
+    const shardBase = buriedRoom === 'boss' ? (BURIED_SHARD_DROP[grown.dungeonId || 'labyrinth'] || 1) : 0;
     // 방을 하나 지났으므로 걸음수 +1 + [u102] 층 이동 스킬 레벨 판정
     const { char: blessed } = maybeBuriedFloorSkillUp(stepBuriedChar(grown));
     const { char: advanced, cleared } = advanceBuriedFloor(blessed);
     setBuriedEnemy(null); setBuriedRoom(null); setBuriedRoomFx(null);
+    const shardGain = shardBase * (cleared ? 2 : 1);
+    if (shardGain) setMeta(prev => { const next = addBuriedShards(prev, shardGain); saveMeta(next); return next; });
     // [u109] 저주 포식자 — 전투 중 얻은 먼지 정산
     const dustGain = res.dustGain || 0;
     if (cleared) {
@@ -3036,6 +3078,8 @@ export default function App() {
               onForge={handleBuriedForge}
               onExpandLegacy={handleBuriedExpandLegacy}
               onBuyContract={handleBuriedBuyContract}
+              onBuyPart={handleBuriedBuyPart}
+              onDetachParts={handleBuriedDetachParts}
               forgeNotice={buriedForgeNotice}
               onBack={() => { setBuriedForgeNotice(null); setScreen('title'); }} />}
             {FEATURE_FLAGS.buried && screen === 'buriedDungeon' && meta?.buried?.char && <BuriedDungeonScreen meta={meta}
