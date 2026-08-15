@@ -8,6 +8,7 @@ import { PALETTE } from '../../utils/helpers.js';
 import {
   BURIED_SKILLS, BURIED_STATUS, BURIED_SLOTS, BURIED_TIERS,
   getBuriedTier, buriedItemStats, buriedDustValue, buriedEnhanceMult,
+  buriedSkillEffectLines,
 } from '../../data.js';
 
 export const slotMeta = (slotId) => BURIED_SLOTS.find(s => s.id === slotId) || { name: slotId, icon: '◆' };
@@ -42,6 +43,7 @@ const STAT_LABEL = {
   atk: '공격력', mag: '마력', def: '방어력', hp: '최대 HP', sp: '최대 SP',
   crit: '치명 확률', critDmg: '치명 피해', dodge: '회피율', spRegen: 'SP 회복',
   str: '완력', dex: '기교', int: '지혜', vit: '체력',
+  barrier: '🔷 보호막', chase: '추격 피해',
 };
 const PCT_KEYS = new Set(['crit', 'critDmg', 'dodge']);
 export const statLabel = (k) => STAT_LABEL[k] || k;
@@ -158,6 +160,16 @@ export function BuriedItemSheet({ item, compare, onEquip, onUnequip, onDismantle
           <button onClick={onClose} className="ui-press text-[12px] px-2 py-1" style={{ color: PALETTE.textDim }}>닫기</button>
         </div>
 
+        {/* 1.105.0 — 실물 비교: 장착 중 장비를 위에, 지금 보는 장비를 아래에 나란히 */}
+        {compare && (
+          <div className="mb-2 space-y-1">
+            <div className="text-[11px] tracking-[0.2em]" style={{ color: PALETTE.textDim }}>지금 장착 중</div>
+            <BuriedItemCard item={compare} dim />
+            <div className="text-center text-[13px] leading-none" style={{ color: PALETTE.dawn }}>▼ 교체 후보</div>
+            <BuriedItemCard item={item} />
+          </div>
+        )}
+
         {/* 내장 스킬 — 원작의 핵심: 이 장비를 껴야만 이 스킬을 쓴다 */}
         {skill && (
           <div className="px-3 py-2.5 mb-2" style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panelLight, border: `1px solid ${PALETTE.dawn}44` }}>
@@ -171,6 +183,14 @@ export function BuriedItemSheet({ item, compare, onEquip, onUnequip, onDismantle
               {skill.pierce ? ' · 방어 무시' : ''}
             </div>
             <div className="text-[12px] mt-1 leading-relaxed" style={{ color: PALETTE.textDim }}>{skill.desc}</div>
+            {/* 1.105.0 — 효과 풀이: "[파쇄] 2"가 정확히 무엇인지 그 자리에서 설명 */}
+            {buriedSkillEffectLines(skill).length > 0 && (
+              <div className="mt-1.5 pt-1.5 space-y-1" style={{ borderTop: `1px solid ${PALETTE.panelBorder}` }}>
+                {buriedSkillEffectLines(skill).map((l, i) => (
+                  <div key={i} className="text-[11px] leading-relaxed" style={{ color: l.color || PALETTE.textDim }}>· {l.text}</div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

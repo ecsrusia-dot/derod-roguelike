@@ -10,13 +10,15 @@ import { PALETTE } from '../../utils/helpers.js';
 import {
   BURIED_CLASSES, BURIED_ADVANCED_CLASSES, BURIED_DUNGEONS,
   BURIED_LEGACY_MAX, BURIED_LEGACY_GOLD_PCT, BURIED_SKILL_MAX_LV,
+  BURIED_SLOTS, BURIED_FORGE, BURIED_LEGACY_CAP_MAX,
+  buriedForgeLevel, buriedLegacyExpandCost,
   buriedDerived, buriedExpToNext, getBuriedClass, getBuriedDungeon, buildBuriedLegacy,
   buriedTraitIds, getBuriedTrait, buriedMonsterLevel,
 } from '../../data.js';
 import { BuriedItemCard, BuriedBar, BURIED_DUST_ICON, BuriedTierLegend } from './BuriedCommon.jsx';
 import BuriedManage from './BuriedManage.jsx';
 
-export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateChar, onRetire, onBack }) {
+export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateChar, onRetire, onForge, onExpandLegacy, forgeNotice, onBack }) {
   const b = meta?.buried || {};
   const char = b.char || null;
   const legacy = Array.isArray(b.legacy) ? b.legacy : [];
@@ -28,6 +30,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
   const [pickDungeon, setPickDungeon] = useState(unlockedDungeons[unlockedDungeons.length - 1] || 'labyrinth');
   const [manage, setManage] = useState(false);
   const [confirmRetire, setConfirmRetire] = useState(false);
+  const [forgeSlot, setForgeSlot] = useState('weapon');
 
   const cls = char ? getBuriedClass(char.classId) : null;
   const d = char ? buriedDerived(char) : null;
@@ -213,10 +216,76 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
           </div>
         )}
 
+        {/* ===== 무덤 재련소 (1.105.0) — 먼지 소비처 ===== */}
+        <div>
+          <div className="text-[11px] tracking-[0.25em] mb-1.5" style={{ color: PALETTE.dawn }}>
+            {BURIED_DUST_ICON} 무덤 재련소 — 보유 먼지 {b.dust || 0}
+          </div>
+          <div className="px-3 py-2.5 space-y-2" style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panel, border: `1px solid ${PALETTE.panelBorder}` }}>
+            <div className="text-[11px] leading-relaxed" style={{ color: PALETTE.textDim }}>
+              장비를 분해해 모은 먼지로 새 장비를 벼린다. 제작 레벨은 <b style={{ color: PALETTE.text }}>역대 최고 도달 층({buriedForgeLevel(b.deepest)})</b> 기반 —
+              죽어도 남는 진행도다. {char ? '완성품은 캐릭터 가방으로 간다.' : '완성품은 유산 보관함으로 간다.'}
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {BURIED_SLOTS.map(sl => (
+                <button key={sl.id} onClick={() => setForgeSlot(sl.id)} className="ui-press px-2 py-1 text-[11px]"
+                  style={{
+                    borderRadius: 'var(--r-chip, 8px)',
+                    border: `1px solid ${forgeSlot === sl.id ? PALETTE.dawn : PALETTE.panelBorder}`,
+                    color: forgeSlot === sl.id ? PALETTE.dawn : PALETTE.textDim,
+                    background: forgeSlot === sl.id ? PALETTE.panelLight : 'transparent',
+                  }}>{sl.icon} {sl.name}</button>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => onForge(forgeSlot, false, char ? char.classId : pickClass)}
+                disabled={(b.dust || 0) < BURIED_FORGE.randomCost}
+                className="ui-press flex-1 py-2 text-[12px] font-bold"
+                style={{
+                  borderRadius: 'var(--r-btn, 13px)',
+                  background: (b.dust || 0) >= BURIED_FORGE.randomCost ? PALETTE.panelLight : PALETTE.panel,
+                  border: `1px solid ${PALETTE.dawn}55`,
+                  color: (b.dust || 0) >= BURIED_FORGE.randomCost ? PALETTE.dawn : PALETTE.textDim,
+                  opacity: (b.dust || 0) >= BURIED_FORGE.randomCost ? 1 : 0.5,
+                }}>
+                랜덤 제작 {BURIED_DUST_ICON}{BURIED_FORGE.randomCost}
+              </button>
+              <button onClick={() => onForge(forgeSlot, true, char ? char.classId : pickClass)}
+                disabled={(b.dust || 0) < BURIED_FORGE.epicCost}
+                className="ui-press flex-1 py-2 text-[12px] font-bold"
+                style={{
+                  borderRadius: 'var(--r-btn, 13px)',
+                  background: (b.dust || 0) >= BURIED_FORGE.epicCost ? PALETTE.panelLight : PALETTE.panel,
+                  border: `1px solid ${PALETTE.legendary}66`,
+                  color: (b.dust || 0) >= BURIED_FORGE.epicCost ? PALETTE.legendary : PALETTE.textDim,
+                  opacity: (b.dust || 0) >= BURIED_FORGE.epicCost ? 1 : 0.5,
+                }}>
+                영웅급 확정 {BURIED_DUST_ICON}{BURIED_FORGE.epicCost}
+              </button>
+            </div>
+            {forgeNotice && (
+              <div className="px-2.5 py-1.5 text-[11px]" style={{ borderRadius: 'var(--r-chip, 8px)', background: `${PALETTE.dawn}15`, border: `1px solid ${PALETTE.dawn}55`, color: PALETTE.dawn }}>
+                {forgeNotice}
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* ===== 유산 보관함 ===== */}
         <div>
-          <div className="text-[11px] tracking-[0.25em] mb-1.5 flex items-center gap-1.5" style={{ color: PALETTE.dawn }}>
-            <Package size={12} /> 유산 보관함 — {legacy.length} / {BURIED_LEGACY_MAX}
+          <div className="text-[11px] tracking-[0.25em] mb-1.5 flex items-center justify-between" style={{ color: PALETTE.dawn }}>
+            <span className="flex items-center gap-1.5"><Package size={12} /> 유산 보관함 — {legacy.length} / {b.legacySlots || BURIED_LEGACY_MAX}</span>
+            {(b.legacySlots || BURIED_LEGACY_MAX) < BURIED_LEGACY_CAP_MAX && (
+              <button onClick={onExpandLegacy} disabled={(b.dust || 0) < buriedLegacyExpandCost(b.legacySlots || BURIED_LEGACY_MAX)}
+                className="ui-press px-2 py-1 text-[11px]"
+                style={{
+                  borderRadius: 'var(--r-chip, 8px)', border: `1px solid ${PALETTE.dawn}55`,
+                  color: (b.dust || 0) >= buriedLegacyExpandCost(b.legacySlots || BURIED_LEGACY_MAX) ? PALETTE.dawn : PALETTE.textDim,
+                  opacity: (b.dust || 0) >= buriedLegacyExpandCost(b.legacySlots || BURIED_LEGACY_MAX) ? 1 : 0.5,
+                }}>
+                +1칸 {BURIED_DUST_ICON}{buriedLegacyExpandCost(b.legacySlots || BURIED_LEGACY_MAX)}
+              </button>
+            )}
           </div>
           <div className="px-3 py-2 mb-1.5 text-[11px] leading-relaxed"
             style={{ borderRadius: 'var(--r-chip, 8px)', background: PALETTE.panel, border: `1px solid ${PALETTE.panelBorder}`, color: PALETTE.textDim }}>
