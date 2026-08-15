@@ -24,6 +24,7 @@ import {
   buriedSkillAt, buriedSkillLv, buriedSkillLvNote, buriedTraitIds, getBuriedTrait,
   getBuriedRoomEffect, getBuriedFloorEffect, resolveBuriedEnvFx, getBuriedDungeon,
   buriedUniqueIds, getBuriedUnique, rollBuriedUniqueDrop, BURIED_UNDEAD_KEYS,
+  buriedModdedSkill,
 } from '../../data.js';
 import { BuriedBar, BuriedStatusRow, BuriedItemCard, slotMeta, SkillKindBadge } from './BuriedCommon.jsx';
 
@@ -70,7 +71,9 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     mag: d.mag + (uniques.includes('u111') ? Math.round((d.barrier || 0) * 0.3) : 0),
     def: d.def, chase: d.chase || 0,
     crit: d.crit, critDmg: d.critDmg, dodge: d.dodge, spRegen: d.spRegen,
-    statuses: {}, cds: {}, reflect: 0, reflectTurns: 0,
+    // 1.107.0 — 이벤트 방 함정의 지연 상태이상 (다음 전투 시작 시 적용)
+    statuses: applyBuriedStatuses({}, char.pendingStatuses || []),
+    cds: {}, reflect: 0, reflectTurns: 0,
     envDmgPct: env.self.dmgPct || 0, envTakenPct: env.self.takenPct || 0,
     envCritAdd: env.self.critAdd || 0, envMagPct: env.self.magPct || 0,
     envDodgeAdd: env.self.dodgeAdd || 0,
@@ -232,6 +235,16 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
         }
         // [u87] 도살자의 눈 — 치명타마다 치명 확률 누적
         if (uq('u87') && res.crits > 0) { P.crit += 2 * res.crits; pushLog(`도살자의 눈 — 치명 확률 +${2 * res.crits}% (현재 ${P.crit}%)`, PALETTE.legendary); }
+        // 접두어 「반응형」 — 적중 시 다른 스킬 쿨다운 -1
+        if (skill.cdrOnHit) {
+          const keys = Object.keys(P.cds).filter(k => k !== skill.id);
+          if (keys.length > 0) {
+            const k = keys[Math.floor(Math.random() * keys.length)];
+            P.cds[k] = Math.max(0, P.cds[k] - skill.cdrOnHit);
+            if (P.cds[k] === 0) delete P.cds[k];
+            pushLog('반응형 — 다른 스킬 쿨다운 -1', PALETTE.ice);
+          }
+        }
         const r = hurt(E, res.total, !!skill.pierce);
         pushFloat('enemy', dmgText(r, res.crits > 0 ? ' 치명!' : ''), res.crits > 0 ? PALETTE.legendary : PALETTE.accent);
         pushLog(`${E.name}에게 ${res.total} 피해${r.absorbed > 0 ? ` (보호막 ${r.absorbed} 흡수)` : ''}${res.crits > 0 ? ` · 치명타 ${res.crits}회` : ''}`, PALETTE.accent);
@@ -324,6 +337,11 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     if (skill && skill.spGain) { P.sp = Math.min(P.maxSp, P.sp + skill.spGain); pushLog(`SP +${skill.spGain}`, PALETTE.ice); }
     if (skill && skill.selfDmg) { hurt(P, skill.selfDmg, true); pushFloat('player', `-${skill.selfDmg}`, PALETTE.blood); pushLog(`자해 ${skill.selfDmg}`, PALETTE.blood); }
     if (skill && skill.reflect) { P.reflect = skill.reflect; P.reflectTurns = 2; }
+    // 접두어 「수호하는」 — 사용 시 확률 방벽
+    if (skill && skill.wallChance && Math.random() * 100 < skill.wallChance) {
+      P.statuses = applyBuriedStatuses(P.statuses, [{ s: 'wall', n: 1 }]);
+      pushLog('수호하는 — 🧱방벽 +1', PALETTE.ice);
+    }
 
     setPlayer(P); setFoe(E);
     await wait(520);
@@ -613,7 +631,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
           {/* 장착 장비 6칸 = 스킬 6개 (스킬 레벨 반영) */}
           {equipped.map(({ slot, item, skill }) => {
             const lv = buriedSkillLv(char, skill.id);
-            const eff = applyUniqueSkillMods(buriedSkillAt(skill, lv));
+            const eff = applyUniqueSkillMods(buriedModdedSkill(buriedSkillAt(skill, lv), item.mod));
             const cd = player.cds[eff.id] || 0;
             const spCost = Math.round(eff.sp * (1 + (env.self.spCostPct || 0) / 100));
             const noSp = spCost > player.sp;

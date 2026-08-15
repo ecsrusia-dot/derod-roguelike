@@ -8,7 +8,7 @@ import { PALETTE } from '../../utils/helpers.js';
 import {
   BURIED_SKILLS, BURIED_STATUS, BURIED_SLOTS, BURIED_TIERS,
   getBuriedTier, buriedItemStats, buriedDustValue, buriedEnhanceMult,
-  buriedSkillEffectLines, getBuriedUnique,
+  buriedSkillEffectLines, getBuriedUnique, getBuriedMod,
 } from '../../data.js';
 
 export const slotMeta = (slotId) => BURIED_SLOTS.find(s => s.id === slotId) || { name: slotId, icon: '◆' };
@@ -132,6 +132,12 @@ export function BuriedItemCard({ item, slotId, onClick, right, dim = false, show
         {item.unique && getBuriedUnique(item.unique) && (
           <div className="text-[11px] truncate" style={{ color: tier.color }}>
             ✦ {getBuriedUnique(item.unique).desc}
+          </div>
+        )}
+        {/* 스킬 변화 접두어 (1.107.0) */}
+        {item.mod && getBuriedMod(item.mod) && (
+          <div className="text-[11px] truncate" style={{ color: PALETTE.twilight }}>
+            ◈ {getBuriedMod(item.mod).name} — {getBuriedMod(item.mod).desc}
           </div>
         )}
       </div>

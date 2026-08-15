@@ -646,7 +646,11 @@ export function rollBuriedOffers(floor, dungeonId = 'labyrinth') {
   const bossKey = dg.bossFloors[floor];
   if (bossKey) return [{ type: 'boss', enemyKey: bossKey, effect: rollBuriedRoomEffect(dg.roomEffectChance) }];
   const count = Math.random() < 0.45 ? 2 : 3;
-  const pool = Object.values(BURIED_ROOMS).filter(r => r.weight > 0);
+  // 1.107.0 — 이벤트 방 5종(묘비·샘·석상·나그네·관)도 선택지 풀에 합류
+  const pool = [
+    ...Object.values(BURIED_ROOMS).filter(r => r.weight > 0),
+    ...Object.values(BURIED_EVENT_ROOMS),
+  ];
   const offers = [];
   // 최소 1칸은 전투 — 성장이 멈추지 않도록
   offers.push({ type: 'battle' });
@@ -1406,3 +1410,159 @@ export function maybeBuriedFloorSkillUp(char) {
 
 // 유니크 [u91] — 망자 계열 판정
 export const BURIED_UNDEAD_KEYS = ['graveWraith', 'rottedSpirit', 'twilightHusk'];
+
+// =========================================================
+// 21. 스킬 변화 — 접두어 (1.107.0)
+// =========================================================
+// 원작의 「변화」 시스템 (접두어 40종 중 13종 선별 이식).
+// 장비에 붙어(item.mod) 내장 스킬을 개조한다. 부여처: 수상한 나그네 이벤트.
+export const BURIED_MODS = {
+  bloody:   { id: 'bloody',   name: '블러디',   desc: '위력 +35%, 사용 시 자해 8',        fx: { powerPct: 35, selfDmg: 8 } },
+  reactive: { id: 'reactive', name: '반응형',   desc: '적중 시 다른 스킬 쿨다운 -1',       fx: { cdrOnHit: 1 } },
+  vampiric: { id: 'vampiric', name: '흡혈',     desc: '준 피해의 25% 흡혈',               fx: { drain: 25 } },
+  piercing: { id: 'piercing', name: '관통',     desc: '방어·보호막 무시',                 fx: { pierce: true } },
+  light:    { id: 'light',    name: '경쾌한',   desc: 'SP 소모 -30%, 위력 -15%',          fx: { spPct: -30, powerPct: -15 } },
+  double:   { id: 'double',   name: '더블',     desc: '위력 +100%, 쿨다운 2배(최소 2)',    fx: { powerPct: 100, cdMult: 2 } },
+  legendary:{ id: 'legendary',name: '전설의',   desc: '위력 +20%, 쿨다운 -1',             fx: { powerPct: 20, cdAdd: -1 } },
+  sharp:    { id: 'sharp',    name: '날카로운', desc: '이 스킬 치명 확률 +15%',           fx: { critBonus: 15 } },
+  guarding: { id: 'guarding', name: '수호하는', desc: '사용 시 30% 확률 🧱방벽 +1',       fx: { wallChance: 30 } },
+  covering: { id: 'covering', name: '덮는',     desc: '사용 시 보호막 +15',               fx: { barrierGain: 15 } },
+  healing:  { id: 'healing',  name: '치유의',   desc: '사용 시 HP 12 회복',               fx: { heal: 12 } },
+  venomous: { id: 'venomous', name: '유독성',   desc: '적중 시 [중독] 2 부여',            fx: { addApply: { s: 'poison', n: 2, p: 100 } } },
+  binding:  { id: 'binding',  name: '묶는',     desc: '적중 시 [속박] 1 부여',            fx: { addApply: { s: 'bind', n: 1, p: 100 } } },
+};
+export const getBuriedMod = (id) => BURIED_MODS[id] || null;
+export const rollBuriedMod = () => pick(Object.keys(BURIED_MODS));
+
+// 접두어를 실효 스킬에 반영 — buriedSkillAt 결과에 이어 적용한다
+export function buriedModdedSkill(skill, modId) {
+  const mod = getBuriedMod(modId);
+  if (!skill || !mod) return skill;
+  const fx = mod.fx;
+  const out = { ...skill, modId };
+  if (fx.powerPct && out.power) out.power = Math.max(1, Math.round(out.power * (1 + fx.powerPct / 100)));
+  if (fx.spPct) out.sp = Math.max(0, Math.round(out.sp * (1 + fx.spPct / 100)));
+  if (fx.cdMult) out.cd = Math.max(2, (out.cd || 0) * fx.cdMult);
+  if (fx.cdAdd) out.cd = Math.max(0, (out.cd || 0) + fx.cdAdd);
+  if (fx.pierce) out.pierce = true;
+  if (fx.critBonus) out.critBonus = (out.critBonus || 0) + fx.critBonus;
+  if (fx.drain) out.drain = (out.drain || 0) + fx.drain;
+  if (fx.heal) out.heal = (out.heal || 0) + fx.heal;
+  if (fx.barrierGain) out.barrierGain = (out.barrierGain || 0) + fx.barrierGain;
+  if (fx.selfDmg) out.selfDmg = (out.selfDmg || 0) + fx.selfDmg;
+  if (fx.addApply && out.power) out.apply = [...(out.apply || []), fx.addApply];
+  if (fx.wallChance) out.wallChance = fx.wallChance;   // 전투 화면이 판정
+  if (fx.cdrOnHit) out.cdrOnHit = fx.cdrOnHit;         // 전투 화면이 판정
+  return out;
+}
+
+// =========================================================
+// 22. 이벤트 방 5종 (1.107.0) — 원작의 묘비·샘·조각상·나그네·관
+// =========================================================
+// 원작 규칙: 이벤트는 도박이다 — 영구 보너스와 함정이 한 테이블에 섞여 있다.
+// 결과는 순수 함수가 뽑고(char 패치 + 로그 반환), 화면은 표시만 한다.
+// pendingStatuses: 다음 전투 시작 시 자신에게 적용될 상태이상 (함정의 지연 청구서)
+export const BURIED_EVENT_ROOMS = {
+  gravestone: { id: 'gravestone', name: '이끼 낀 묘비', icon: '🪦', color: '#8b8378', weight: 8,
+    desc: '누군가의 묘비다. 파헤칠 수도, 그냥 지나갈 수도 있다.' },
+  spring:     { id: 'spring',     name: '빛나는 샘',   icon: '⛲', color: '#7ba3c4', weight: 6,
+    desc: '바닥이 보이지 않는 샘이 빛난다. 마실 것인가.' },
+  statue:     { id: 'statue',     name: '이름 없는 석상', icon: '🗿', color: '#9b8975', weight: 5,
+    desc: '기도하는 자세의 석상. 손을 대면 무슨 일이 일어날 것 같다.' },
+  wanderer:   { id: 'wanderer',   name: '수상한 나그네', icon: '🧙', color: '#5c4a8c', weight: 6,
+    desc: '어둠 속의 나그네가 세 가지 제안을 내민다.' },
+  coffin:     { id: 'coffin',     name: '장식된 관',   icon: '⚱', color: '#e8b04a', weight: 4,
+    desc: '지나치게 화려한 관. 좋은 것이 들었거나, 나쁜 것이 들었다.' },
+};
+export const BURIED_EVENT_ROOM_IDS = Object.keys(BURIED_EVENT_ROOMS);
+
+// 결과 테이블 — { w: 가중치, run(char, ctx) → { char, text, tone } }  tone: 'good'|'bad'|'neutral'
+const pendStatus = (char, s, n) => ({ ...char, pendingStatuses: [...(char.pendingStatuses || []), { s, n }] });
+const EVENT_OUTCOMES = {
+  gravestone: [
+    { w: 22, run: (c) => ({ char: { ...c, gold: c.gold + 90 }, text: '관 틈에서 🪙 90을 찾아냈다.', tone: 'good' }) },
+    { w: 18, run: (c) => ({ char: { ...c, statPoints: (c.statPoints || 0) + 1 }, text: '비석의 문양을 읽자 무언가 깨달았다 — 능력치 포인트 +1.', tone: 'good' }) },
+    { w: 16, run: (c, ctx) => ({ char: c, text: `먼지가 쏟아진다 — 🕯 무덤 먼지 +${ctx.dustGain = 35}.`, tone: 'good' }) },
+    { w: 16, run: (c) => { const d = buriedDerived(c); return { char: { ...c, hp: Math.min(d.maxHp, c.hp + Math.round(d.maxHp * 0.35)) }, text: '따뜻한 기운이 감돈다 — HP 35% 회복.', tone: 'good' }; } },
+    { w: 14, run: (c) => { const d = buriedDerived(c); return { char: { ...c, hp: Math.max(1, c.hp - Math.round(d.maxHp * 0.25)) }, text: '함정이다! 폭발이 일어났다 — 최대 HP의 25% 피해.', tone: 'bad' }; } },
+    { w: 14, run: (c) => ({ char: pendStatus(c, 'poison', 3), text: '독가스가 새어나온다 — 다음 전투를 [중독] 3으로 시작한다.', tone: 'bad' }) },
+  ],
+  spring: [
+    { w: 20, run: (c) => { const k = pick(['str', 'dex', 'int', 'vit']); const nm = BURIED_STATS.find(s => s.id === k)?.name; return { char: { ...c, stats: { ...c.stats, [k]: (c.stats[k] || 0) + 2 } }, text: `힘이 차오른다 — ${nm} +2 (영구).`, tone: 'good' }; } },
+    { w: 22, run: (c) => { const d = buriedDerived(c); return { char: { ...c, hp: d.maxHp }, text: '몸의 상처가 전부 아문다 — HP 완전 회복.', tone: 'good' }; } },
+    { w: 16, run: (c) => ({ char: { ...c, potions: (c.potions || 0) + 1 }, text: '샘물을 병에 담았다 — 🧪 물약 +1.', tone: 'good' }) },
+    { w: 20, run: (c) => { const d = buriedDerived(c); return { char: { ...c, hp: Math.max(1, c.hp - Math.round(d.maxHp * 0.25)) }, text: '물이 시커멓게 변한다 — 최대 HP의 25% 피해.', tone: 'bad' }; } },
+    { w: 12, run: (c) => ({ char: pendStatus(c, 'curse', 2), text: '샘 바닥의 눈과 마주쳤다 — 다음 전투를 [저주] 2로 시작한다.', tone: 'bad' }) },
+    { w: 10, run: (c) => ({ char: c, text: '그냥 물이었다.', tone: 'neutral' }) },
+  ],
+  statue: [
+    { w: 22, run: (c) => ({ char: { ...c, statPoints: (c.statPoints || 0) + 2 }, text: '석상이 고개를 끄덕인다 — 능력치 포인트 +2.', tone: 'good' }) },
+    { w: 20, run: (c) => { const d = buriedDerived(c); return { char: { ...c, hp: Math.min(d.maxHp, c.hp + Math.round(d.maxHp * 0.5)) }, text: '석상의 손이 빛난다 — HP 50% 회복.', tone: 'good' }; } },
+    { w: 16, run: (c) => ({ char: { ...c, gold: c.gold + 140 }, text: '석상 밑에서 헌금함을 찾았다 — 🪙 140.', tone: 'good' }) },
+    { w: 22, run: (c) => ({ char: { ...c, exp: Math.max(0, (c.exp || 0) - 30) }, text: '기억이 흐려진다 — 경험치 30을 잃었다.', tone: 'bad' }) },
+    { w: 12, run: (c) => ({ char: pendStatus(c, 'confuse', 1), text: '석상의 눈이 빙글 돈다 — 다음 전투를 [혼란] 1로 시작한다.', tone: 'bad' }) },
+  ],
+  coffin: [
+    { w: 34, run: (c, ctx) => { ctx.item = rollBuriedItem({ slot: null, classId: c.classId, floor: buriedMonsterLevel(c), tier: 'epic' }); return { char: c, text: '영웅의 장비가 잠들어 있었다!', tone: 'good' }; } },
+    { w: 16, run: (c, ctx) => { ctx.item = rollBuriedItem({ slot: null, classId: c.classId, floor: buriedMonsterLevel(c), tier: 'relic' }); return { char: c, text: '유물급 장비가 잠들어 있었다!', tone: 'good' }; } },
+    { w: 26, run: (c) => { const d = buriedDerived(c); return { char: { ...c, hp: Math.max(1, c.hp - Math.round(d.maxHp * 0.3)) }, text: '관 속의 것이 손을 뻗는다 — 최대 HP의 30% 피해.', tone: 'bad' }; } },
+    { w: 14, run: (c) => ({ char: pendStatus(c, 'silence', 2), text: '봉인 문자가 목에 감긴다 — 다음 전투를 [침묵] 2로 시작한다.', tone: 'bad' }) },
+    { w: 10, run: (c) => ({ char: { ...c, gold: c.gold + 60 }, text: '부장품 몇 닢뿐이었다 — 🪙 60.', tone: 'neutral' }) },
+  ],
+};
+
+// 이벤트 실행 — 반환 { char, text, tone, item(관 전용), dustGain }
+export function resolveBuriedEvent(roomId, char) {
+  const table = EVENT_OUTCOMES[roomId];
+  if (!table) return { char, text: '아무 일도 일어나지 않았다.', tone: 'neutral' };
+  const ctx = { dustGain: 0, item: null };
+  const picked = weightedPick(table, (o) => o.w);
+  const r = picked.run(char, ctx);
+  return { char: r.char, text: r.text, tone: r.tone, item: ctx.item, dustGain: ctx.dustGain };
+}
+
+// 수상한 나그네 — 세 가지 제안 (원작 그대로: 옵션 추가 / 스킬 변화 / 수치 재조정)
+export function buriedWandererOffers(char) {
+  const equippedSlots = BURIED_SLOT_IDS.filter(s => char.equipped?.[s]);
+  return {
+    canAddOption: equippedSlots.length > 0,
+    canMod: equippedSlots.some(s => !char.equipped[s].mod && !char.equipped[s].unique),
+    canReroll: equippedSlots.some(s => (char.equipped[s].options || []).length > 0),
+  };
+}
+// ① 무작위 장착 장비에 랜덤 옵션 1개 추가
+export function wandererAddOption(char) {
+  const slots = BURIED_SLOT_IDS.filter(s => char.equipped?.[s]);
+  if (slots.length === 0) return { char, text: '장비가 없다.' };
+  const slot = pick(slots);
+  const item = char.equipped[slot];
+  const o = pick(BURIED_OPTIONS);
+  const next = { ...item, options: [...(item.options || []), { key: o.key, name: o.name, pct: !!o.pct, affix: o.affix, value: rnd(o.min, o.max) }] };
+  return { char: { ...char, equipped: { ...char.equipped, [slot]: next } }, text: `${item.name}에 「${o.name}」 옵션이 새겨졌다.` };
+}
+// ② 무작위 장착 장비에 스킬 변화(접두어) 부여 — 유니크·이미 변화된 장비 제외
+export function wandererApplyMod(char) {
+  const slots = BURIED_SLOT_IDS.filter(s => char.equipped?.[s] && !char.equipped[s].mod && !char.equipped[s].unique);
+  if (slots.length === 0) return { char, text: '변화를 받을 장비가 없다.' };
+  const slot = pick(slots);
+  const item = char.equipped[slot];
+  const modId = rollBuriedMod();
+  const mod = getBuriedMod(modId);
+  const next = { ...item, mod: modId, name: `${mod.name} ${item.name}` };
+  return { char: { ...char, equipped: { ...char.equipped, [slot]: next } }, text: `${item.name}이(가) 「${mod.name}」 변화를 얻었다 — ${mod.desc}` };
+}
+// ③ 무작위 장착 장비의 옵션 수치 재조정
+export function wandererReroll(char) {
+  const slots = BURIED_SLOT_IDS.filter(s => char.equipped?.[s] && (char.equipped[s].options || []).length > 0);
+  if (slots.length === 0) return { char, text: '재조정할 옵션이 없다.' };
+  const slot = pick(slots);
+  const item = char.equipped[slot];
+  const next = {
+    ...item,
+    options: item.options.map(o => {
+      const def = BURIED_OPTIONS.find(x => x.key === o.key);
+      return def ? { ...o, value: rnd(def.min, def.max) } : o;
+    }),
+  };
+  return { char: { ...char, equipped: { ...char.equipped, [slot]: next } }, text: `${item.name}의 옵션 수치가 다시 굴려졌다.` };
+}
