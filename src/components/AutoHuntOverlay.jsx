@@ -3,14 +3,14 @@
 // ============================================
 // PM 요청: 자동 사냥 중엔 화면이 휙휙 넘어가는 대신 차분한 상태창만 표시.
 //   - 능력치 4종 / 활성 패시브(최대 5종) / 유물 / 재화·획득 현황 / 런 정산
-//   - 컨트롤: 배속 ×1/×5/×10 · 던전 반복 · 관전(대기화면 숨김) · 자동 해제
+//   - 컨트롤: 배속 ×1/×5/×10/×20/⏩스킵 · 던전 반복 · 관전(대기화면 숨김) · 자동 해제
 // 오버레이는 화면 위에 덮일 뿐 — 실제 진행(전투·이벤트·보상)은 밑에서 계속 돈다.
 // PhoneFrame persistent 레이어에서 렌더 (화면 전환 리마운트 제외).
 // ============================================
 
 import React, { useState } from 'react';
 import { PALETTE, formatRunTime } from '../utils/helpers.js';
-import { PASSIVE_SKILLS, ULTIMATE_SKILLS } from '../data.js';
+import { PASSIVE_SKILLS, ULTIMATE_SKILLS, AUTO_SPEED_SKIP } from '../data.js';
 import { GlassPanel, Chip } from './ui/CommonUI.jsx';
 import CardInfoModal, { buildPassiveInfo, buildRelicInfo } from './CardInfoModal.jsx';
 
@@ -349,7 +349,7 @@ export default function AutoHuntOverlay({
           background: autoSpeed > 1 ? 'rgba(123,163,196,0.18)' : 'rgba(255,255,255,0.04)',
           border: `1px solid ${autoSpeed > 1 ? `${PALETTE.ice}aa` : 'var(--ui-line)'}`,
           color: autoSpeed > 1 ? PALETTE.ice : PALETTE.textDim,
-        }}>⚡ ×{autoSpeed}</button>
+        }}>{autoSpeed >= AUTO_SPEED_SKIP ? '⏩ 스킵' : `⚡ ×${autoSpeed}`}</button>
         {onToggleRepeat && (
           <button onClick={onToggleRepeat} className="ui-press flex-1" style={{
             height: 42, borderRadius: 'var(--r-btn)', fontSize: 11.5, fontWeight: 700,
