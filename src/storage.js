@@ -105,9 +105,11 @@ const DEFAULT_META = {
     legacyGold: 0,
     dust: 0,
     deepest: 0,
-    clears: 0,
+    clears: {},        // 1.104.0~ { dungeonId: 클리어 횟수 }
     deaths: 0,
     runs: 0,
+    unlockedDungeons: ['labyrinth'],  // 1.104.0~ 해금된 던전 (미궁은 항상 열림)
+    unlockedClasses: [],              // 1.104.0~ 해금된 상위(전직) 직업 id
   },
   // 진행 중인 런 스냅샷 (맵 화면 진입 시 자동 저장 — 앱 종료/새로고침 후 이어하기 용)
   // null = 진행 중 런 없음. 객체 = 재개 가능한 런 상태.
@@ -1421,10 +1423,21 @@ export function recordHofClear(meta, stageId, firstMedals) {
 // ============================================
 // 본편 메타(영혼·각인·유물)와 완전 분리. 이 모드의 모든 영속 상태는 meta.buried 하나에만 쌓인다.
 
-const EMPTY_BURIED = { char: null, legacy: [], legacyGold: 0, dust: 0, deepest: 0, clears: 0, deaths: 0, runs: 0 };
+const EMPTY_BURIED = {
+  char: null, legacy: [], legacyGold: 0, dust: 0, deepest: 0,
+  clears: {}, deaths: 0, runs: 0, unlockedDungeons: ['labyrinth'], unlockedClasses: [],
+};
 export function getBuried(meta) {
   const b = meta?.buried || EMPTY_BURIED;
-  return { ...EMPTY_BURIED, ...b, legacy: Array.isArray(b.legacy) ? b.legacy : [] };
+  return {
+    ...EMPTY_BURIED, ...b,
+    legacy: Array.isArray(b.legacy) ? b.legacy : [],
+    // 1.103.0 세이브는 clears가 숫자(총 클리어 횟수)였다 — 미궁 클리어로 환산
+    clears: typeof b.clears === 'number' ? (b.clears > 0 ? { labyrinth: b.clears } : {}) : (b.clears || {}),
+    unlockedDungeons: Array.isArray(b.unlockedDungeons) && b.unlockedDungeons.length > 0
+      ? b.unlockedDungeons : ['labyrinth'],
+    unlockedClasses: Array.isArray(b.unlockedClasses) ? b.unlockedClasses : [],
+  };
 }
 
 // 진행 중 캐릭터 스냅샷 저장 (층 이동·장비 변경·전투 종료마다 호출)
@@ -1466,16 +1479,25 @@ export function recordBuriedDeath(meta, legacy, dustOverflow = 0) {
     },
   };
 }
-// 던전 클리어 — 캐릭터는 살아서 로비로 귀환 (장비·레벨 유지)
-export function recordBuriedClear(meta, char) {
+// 던전 클리어 — 캐릭터는 살아서 로비로 귀환 (장비·레벨 유지).
+// 클리어 시 ①다음 던전 해금 ②해당 직업의 전직(상위 직업) 해금.
+// nextDungeonId / advanceClassId는 호출부(App)가 data/buried.js를 보고 넘긴다.
+export function recordBuriedClear(meta, char, { dungeonId, nextDungeonId = null, advanceClassId = null } = {}) {
   const b = getBuried(meta);
+  const id = dungeonId || char?.dungeonId || 'labyrinth';
+  const unlockedDungeons = [...b.unlockedDungeons];
+  if (nextDungeonId && !unlockedDungeons.includes(nextDungeonId)) unlockedDungeons.push(nextDungeonId);
+  const unlockedClasses = [...b.unlockedClasses];
+  if (advanceClassId && !unlockedClasses.includes(advanceClassId)) unlockedClasses.push(advanceClassId);
   return {
     ...meta,
     buried: {
       ...b,
       char,
-      clears: (b.clears || 0) + 1,
+      clears: { ...b.clears, [id]: (b.clears[id] || 0) + 1 },
       deepest: Math.max(b.deepest || 0, char?.floor || 0),
+      unlockedDungeons,
+      unlockedClasses,
     },
   };
 }

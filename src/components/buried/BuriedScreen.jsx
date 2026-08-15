@@ -1,15 +1,17 @@
 // ============================================
-// components/buried/BuriedScreen.jsx — 무덤의 유산 로비 (1.103.0)
+// components/buried/BuriedScreen.jsx — 무덤의 유산 로비 (1.104.0)
 // ============================================
-// 캐릭터 생성 / 탐험 계속 / 유산 보관함 / 기록.
+// 던전 선택 / 캐릭터 생성(전직 포함) / 탐험 계속 / 유산 보관함 / 기록.
 // 원작 감성: 캐릭터는 죽어 없어지고, 남는 것은 유산뿐이다.
 
 import React, { useState } from 'react';
-import { ChevronLeft, Skull, Package, BarChart3 } from 'lucide-react';
+import { ChevronLeft, Skull, Package, BarChart3, Lock } from 'lucide-react';
 import { PALETTE } from '../../utils/helpers.js';
 import {
-  BURIED_CLASSES, BURIED_DUNGEON, BURIED_LEGACY_MAX, BURIED_LEGACY_GOLD_PCT,
-  buriedDerived, buriedExpToNext, getBuriedClass, buildBuriedLegacy,
+  BURIED_CLASSES, BURIED_ADVANCED_CLASSES, BURIED_DUNGEONS,
+  BURIED_LEGACY_MAX, BURIED_LEGACY_GOLD_PCT, BURIED_SKILL_MAX_LV,
+  buriedDerived, buriedExpToNext, getBuriedClass, getBuriedDungeon, buildBuriedLegacy,
+  buriedTraitIds, getBuriedTrait, buriedMonsterLevel,
 } from '../../data.js';
 import { BuriedItemCard, BuriedBar, BURIED_DUST_ICON, BuriedTierLegend } from './BuriedCommon.jsx';
 import BuriedManage from './BuriedManage.jsx';
@@ -18,12 +20,22 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
   const b = meta?.buried || {};
   const char = b.char || null;
   const legacy = Array.isArray(b.legacy) ? b.legacy : [];
+  const clears = (b.clears && typeof b.clears === 'object') ? b.clears : {};
+  const unlockedDungeons = b.unlockedDungeons || ['labyrinth'];
+  const unlockedClasses = b.unlockedClasses || [];
+
   const [pickClass, setPickClass] = useState(BURIED_CLASSES[0].id);
+  const [pickDungeon, setPickDungeon] = useState(unlockedDungeons[unlockedDungeons.length - 1] || 'labyrinth');
   const [manage, setManage] = useState(false);
   const [confirmRetire, setConfirmRetire] = useState(false);
 
   const cls = char ? getBuriedClass(char.classId) : null;
   const d = char ? buriedDerived(char) : null;
+  const curDungeon = char ? getBuriedDungeon(char.dungeonId) : null;
+
+  // 선택 가능한 직업 = 기본 5직업 + 해금된 상위 직업
+  const selectable = [...BURIED_CLASSES, ...BURIED_ADVANCED_CLASSES.filter(c => unlockedClasses.includes(c.id))];
+  const isDungeonUnlocked = (dg) => unlockedDungeons.includes(dg.id);
 
   return (
     <div className="absolute inset-0 flex flex-col ui-screen-enter" style={{ background: PALETTE.bgDeep }}>
@@ -50,9 +62,10 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
                 <div className="flex-1 min-w-0">
                   <div className="text-[13px] font-bold" style={{ color: cls?.color }}>
                     {cls?.name} <span style={{ color: PALETTE.text }}>Lv.{char.lv}</span>
+                    {cls?.advanced && <span className="text-[11px] ml-1" style={{ color: PALETTE.legendary }}>전직</span>}
                   </div>
                   <div className="text-[11px] tabular-nums mb-1.5" style={{ color: PALETTE.textDim }}>
-                    {BURIED_DUNGEON.name} {char.floor}층 · 🪙 {char.gold} · 처치 {char.kills || 0}
+                    {curDungeon?.name} {char.floor}층 · 마물 Lv.{buriedMonsterLevel(char)} · 🪙 {char.gold}
                   </div>
                   <BuriedBar value={char.hp} max={d.maxHp} color={PALETTE.accent} label="HP" />
                 </div>
@@ -83,44 +96,119 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
           </div>
         ) : (
           /* ===== 새 캐릭터 ===== */
-          <div className="ui-stagger">
-            <div className="text-[11px] tracking-[0.25em] mb-1.5" style={{ color: PALETTE.dawn }}>새 캐릭터 — 직업 선택</div>
-            <div className="space-y-1.5">
-              {BURIED_CLASSES.map(c => {
-                const on = pickClass === c.id;
-                return (
-                  <button key={c.id} onClick={() => setPickClass(c.id)} className="ui-press w-full flex gap-2.5 px-2.5 py-2.5 text-left"
-                    style={{
-                      borderRadius: 'var(--r-btn, 13px)',
-                      background: on ? PALETTE.panelLight : PALETTE.panel,
-                      border: `1px solid ${on ? c.color : PALETTE.panelBorder}`,
-                    }}>
-                    <div className="w-12 h-12 shrink-0 overflow-hidden" style={{ borderRadius: 'var(--r-chip, 8px)' }}>
-                      <img src={c.image} alt="" className="w-full h-full object-cover" style={{ filter: on ? 'none' : 'grayscale(60%)' }} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[12px] font-bold" style={{ color: c.color }}>{c.name}</div>
-                      <div className="text-[11px] truncate" style={{ color: PALETTE.textDim }}>{c.desc}</div>
-                      <div className="text-[11px] mt-0.5" style={{ color: PALETTE.dawn }}>
-                        ◆ {c.trait.name} · 무기 계열 {c.lines.weapon} / {c.lines.offhand}
+          <div className="ui-stagger space-y-3">
+            {/* 던전 선택 */}
+            <div>
+              <div className="text-[11px] tracking-[0.25em] mb-1.5" style={{ color: PALETTE.dawn }}>
+                던전 선택 — 깊을수록 마물이 빨리 자란다
+              </div>
+              <div className="space-y-1.5">
+                {BURIED_DUNGEONS.map(dg => {
+                  const open = isDungeonUnlocked(dg);
+                  const on = pickDungeon === dg.id;
+                  const cleared = clears[dg.id] || 0;
+                  return (
+                    <button key={dg.id} disabled={!open} onClick={() => setPickDungeon(dg.id)}
+                      className="ui-press w-full flex items-start gap-2.5 px-3 py-2.5 text-left"
+                      style={{
+                        borderRadius: 'var(--r-btn, 13px)',
+                        background: on ? PALETTE.panelLight : PALETTE.panel,
+                        border: `1px solid ${on ? dg.color : PALETTE.panelBorder}`,
+                        opacity: open ? 1 : 0.45,
+                      }}>
+                      <span className="text-[15px] mt-0.5">{open ? '⚰' : <Lock size={13} />}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[12px] font-bold" style={{ color: dg.color }}>
+                          {dg.name}
+                          {cleared > 0 && <span className="text-[11px] ml-1.5" style={{ color: PALETTE.legendary }}>클리어 {cleared}</span>}
+                        </div>
+                        <div className="text-[11px]" style={{ color: PALETTE.textDim }}>
+                          {dg.floors}층 · {dg.stepsPerLevel}걸음마다 마물 Lv.+1 · 시작 마물 Lv.{dg.baseLevel + 1}
+                        </div>
+                        <div className="text-[11px]" style={{ color: PALETTE.textDim }}>
+                          골드 ×{dg.goldMult} · 경험치 ×{dg.expMult} · 방 효과 {dg.roomEffectChance}%
+                        </div>
+                        {!open && (
+                          <div className="text-[11px] mt-0.5" style={{ color: PALETTE.accent }}>
+                            🔒 {getBuriedDungeon(dg.unlock)?.name} 클리어 시 해금
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  </button>
-                );
-              })}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
+
+            {/* 직업 선택 */}
+            <div>
+              <div className="text-[11px] tracking-[0.25em] mb-1.5" style={{ color: PALETTE.dawn }}>
+                직업 선택 — 특성 3개와 장비 계열이 결정된다
+              </div>
+              <div className="space-y-1.5">
+                {selectable.map(c => {
+                  const on = pickClass === c.id;
+                  return (
+                    <button key={c.id} onClick={() => setPickClass(c.id)} className="ui-press w-full flex gap-2.5 px-2.5 py-2.5 text-left"
+                      style={{
+                        borderRadius: 'var(--r-btn, 13px)',
+                        background: on ? PALETTE.panelLight : PALETTE.panel,
+                        border: `1px solid ${on ? c.color : PALETTE.panelBorder}`,
+                      }}>
+                      <div className="w-12 h-12 shrink-0 overflow-hidden" style={{ borderRadius: 'var(--r-chip, 8px)' }}>
+                        <img src={c.image} alt="" className="w-full h-full object-cover" style={{ filter: on ? 'none' : 'grayscale(60%)' }} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[12px] font-bold" style={{ color: c.color }}>
+                          {c.name}
+                          {c.advanced && <span className="text-[11px] ml-1.5 px-1.5 py-0.5" style={{ borderRadius: 4, background: `${PALETTE.legendary}22`, color: PALETTE.legendary }}>전직</span>}
+                        </div>
+                        <div className="text-[11px] truncate" style={{ color: PALETTE.textDim }}>{c.desc}</div>
+                        <div className="text-[11px] mt-0.5" style={{ color: PALETTE.dawn }}>
+                          {c.traits.map(id => getBuriedTrait(id)?.name).filter(Boolean).join(' · ')}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              {/* 잠긴 전직 안내 */}
+              {BURIED_ADVANCED_CLASSES.filter(c => !unlockedClasses.includes(c.id)).length > 0 && (
+                <div className="mt-1.5 px-3 py-2 text-[11px] leading-relaxed"
+                  style={{ borderRadius: 'var(--r-chip, 8px)', background: PALETTE.panel, border: `1px solid ${PALETTE.panelBorder}`, color: PALETTE.textDim }}>
+                  🔒 <b style={{ color: PALETTE.text }}>전직</b> — 해당 직업으로 잊혀진 미궁을 클리어하면 상위 직업이 열린다.
+                  아직 잠긴 전직: {BURIED_ADVANCED_CLASSES.filter(c => !unlockedClasses.includes(c.id)).map(c => c.name).join(', ')}
+                </div>
+              )}
+            </div>
+
+            {/* 선택한 직업의 특성 3개 */}
             {(() => {
               const c = getBuriedClass(pickClass);
-              return c?.trait ? (
-                <div className="mt-2 px-3 py-2.5 text-[12px] leading-relaxed"
-                  style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panelLight, border: `1px solid ${c.color}44`, color: PALETTE.textDim }}>
-                  <span className="font-bold" style={{ color: c.color }}>{c.trait.name}</span> — {c.trait.desc}
+              if (!c) return null;
+              return (
+                <div className="px-3 py-2.5 space-y-1.5" style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panelLight, border: `1px solid ${c.color}44` }}>
+                  <div className="text-[11px] tracking-[0.2em]" style={{ color: c.color }}>영구 특성 3개 (★ = 직업 전용)</div>
+                  {c.traits.map((id, i) => {
+                    const t = getBuriedTrait(id);
+                    if (!t) return null;
+                    return (
+                      <div key={id} className="text-[12px] leading-relaxed">
+                        <span className="font-bold" style={{ color: i === 0 ? c.color : PALETTE.text }}>{i === 0 ? '★' : '◆'} {t.name}</span>
+                        <span style={{ color: PALETTE.textDim }}> — {t.desc}</span>
+                      </div>
+                    );
+                  })}
+                  <div className="text-[11px] pt-1" style={{ color: PALETTE.textDim, borderTop: `1px solid ${PALETTE.panelBorder}` }}>
+                    장비 계열 — 무기 {c.lines.weapon} / 보조 {c.lines.offhand}
+                  </div>
                 </div>
-              ) : null;
+              );
             })()}
-            <button onClick={() => onStartChar(pickClass)} className="ui-press ui-sheen w-full mt-2.5 py-3 text-[13px] font-bold"
+
+            <button onClick={() => onStartChar(pickClass, pickDungeon)} className="ui-press ui-sheen w-full py-3 text-[13px] font-bold"
               style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.accent, color: '#fff' }}>
-              무덤으로 내려간다{legacy.length > 0 ? ` — 유산 ${legacy.length}개 계승` : ''}
+              {getBuriedDungeon(pickDungeon).name}(으)로 내려간다{legacy.length > 0 ? ` — 유산 ${legacy.length}개 계승` : ''}
             </button>
           </div>
         )}
@@ -153,7 +241,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
           <div className="grid grid-cols-4 gap-1.5">
             {[
               { l: '최고 층', v: b.deepest || 0, c: PALETTE.legendary },
-              { l: '클리어', v: b.clears || 0, c: PALETTE.green },
+              { l: '클리어', v: Object.values(clears).reduce((s, n) => s + n, 0), c: PALETTE.green },
               { l: '사망', v: b.deaths || 0, c: PALETTE.accent },
               { l: '캐릭터', v: b.runs || 0, c: PALETTE.ice },
             ].map(x => (
@@ -167,11 +255,14 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
 
         {/* ===== 안내 ===== */}
         <div className="px-3 py-2.5 space-y-1.5" style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panel, border: `1px solid ${PALETTE.panelBorder}` }}>
-          <div className="text-[11px] tracking-[0.2em]" style={{ color: PALETTE.dawn }}>{BURIED_DUNGEON.name} — {BURIED_DUNGEON.floors}층</div>
+          <div className="text-[11px] tracking-[0.2em]" style={{ color: PALETTE.dawn }}>규칙</div>
           <div className="text-[12px] leading-relaxed" style={{ color: PALETTE.textDim }}>
-            {BURIED_DUNGEON.desc}<br />
-            <b style={{ color: PALETTE.text }}>장비 6칸이 곧 스킬 6개다.</b> 장비를 바꾸지 않으면 새로운 수를 쓸 수 없다.
-            SP는 턴마다 회복하며, 기본 공격은 SP를 되돌려준다.
+            <b style={{ color: PALETTE.text }}>장비 6칸이 곧 스킬 6개다.</b> 장비를 바꾸지 않으면 새로운 수를 쓸 수 없다.<br />
+            같은 스킬이 붙은 장비를 다시 얻으면 그 <b style={{ color: PALETTE.text }}>스킬 레벨이 오른다</b> (최대 Lv.{BURIED_SKILL_MAX_LV},
+            Lv.3·Lv.8에서 추가 효과).<br />
+            마물 레벨은 층이 아니라 <b style={{ color: PALETTE.text }}>지나온 방 수</b>로 오른다. 방마다 색이 다른 효과가 붙고,
+            <span style={{ color: PALETTE.accent }}> 붉은 이름의 방</span>은 나와 적 모두에게 적용된다.<br />
+            <b style={{ color: PALETTE.ice }}>보호막</b>은 HP보다 먼저 깎이고, <b style={{ color: PALETTE.dawn }}>추격 피해</b>는 스킬이 적중할 때마다 한 번 더 들어간다.
           </div>
           <BuriedTierLegend />
         </div>

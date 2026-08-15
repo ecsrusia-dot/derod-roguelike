@@ -48,8 +48,9 @@ export const slotPool = (slotId) => (slotId === 'acc1' || slotId === 'acc2' ? 'a
 // =========================================================
 // 3. 직업 5종 — 본편 CLASSES에서 정체성만 계승
 // =========================================================
-// lines: 착용 가능한 무기/보조 계열 (원작의 직업별 장비 제한)
-// trait: 직업 고유 패시브 (원작의 Job Trait 대응). 판정은 BuriedBattleScreen.
+// lines  : 착용 가능한 무기/보조 계열 (원작의 직업별 장비 제한)
+// traits : 영구 특성 3개. 원작 규칙대로 **첫 번째가 그 직업 전용**, 나머지 2개는 공용 풀에서 선택.
+// advance: 전직 대상 상위 직업 id (해당 직업으로 미궁을 클리어하면 해금)
 export const BURIED_CLASSES = [
   {
     id: 'wanderer', name: '방랑검사', sub: 'Gravewalker Blade', color: '#c4453d',
@@ -57,15 +58,17 @@ export const BURIED_CLASSES = [
     desc: '어둠 속에서도 검을 뻗는 자. 반격으로 되갚는다.',
     lines: { weapon: 'sword', offhand: 'blade' },
     stats: { str: 12, dex: 9, int: 5, vit: 9 },
-    trait: { id: 'riposte', name: '반격', desc: '회피에 성공하면 즉시 기본 공격의 60% 위력으로 반격한다.' },
+    traits: ['riposte', 'swordmastery', 'agility'],
+    advance: 'wanderer_adv',
   },
   {
     id: 'sage', name: '술법사', sub: 'Sorcerer of Ash', color: '#5c4a8c',
     image: './classes/sage.jpg',
     desc: '정념을 태우는 자. 불길은 꺼지지 않는다.',
     lines: { weapon: 'staff', offhand: 'tome' },
-    stats: { str: 4, dex: 7, int: 14, vit: 6 },
-    trait: { id: 'kindle', name: '발화', desc: '마법 스킬이 적중하면 30% 확률로 [화상] 1스택을 추가로 부여한다.' },
+    stats: { str: 4, dex: 7, int: 14, vit: 8 },
+    traits: ['kindle', 'arcana', 'willpower'],
+    advance: 'sage_adv',
   },
   {
     id: 'demonblood', name: '혼혈 마족', sub: 'Demon Heritage', color: '#8b1f1f',
@@ -73,7 +76,8 @@ export const BURIED_CLASSES = [
     desc: '마왕의 피가 흐르는 자. 상처가 곧 힘이 된다.',
     lines: { weapon: 'axe', offhand: 'claw' },
     stats: { str: 13, dex: 6, int: 5, vit: 11 },
-    trait: { id: 'bloodrush', name: '혈투', desc: 'HP가 50% 이하일 때 주는 데미지 +25%.' },
+    traits: ['bloodrush', 'toughness', 'sanguine'],
+    advance: 'demonblood_adv',
   },
   {
     id: 'elf', name: '숲의 정령사', sub: 'Elf of Twilight', color: '#7a9a5e',
@@ -81,18 +85,21 @@ export const BURIED_CLASSES = [
     desc: '바람과 교감하는 자. 화살은 빗나가지 않는다.',
     lines: { weapon: 'bow', offhand: 'quiver' },
     stats: { str: 5, dex: 14, int: 8, vit: 7 },
-    trait: { id: 'gale', name: '질풍', desc: '치명타가 터질 때마다 SP +12를 회복한다.' },
+    traits: ['gale', 'precision', 'lightstep'],
+    advance: 'elf_adv',
   },
   {
     id: 'priest', name: '여명의 사제', sub: 'Priest of Dawn', color: '#d4a574',
     image: './classes/priest.jpg',
     desc: '여명의 가호를 받은 자. 죽음을 거부한다.',
     lines: { weapon: 'mace', offhand: 'relic' },
-    stats: { str: 5, dex: 6, int: 14, vit: 10 },
-    trait: { id: 'dawnlight', name: '여명', desc: '모든 회복량 +30%.' },
+    stats: { str: 5, dex: 6, int: 14, vit: 12 },
+    traits: ['dawnlight', 'faith', 'wardstone'],
+    advance: 'priest_adv',
   },
 ];
-export const getBuriedClass = (id) => BURIED_CLASSES.find(c => c.id === id) || null;
+// 기본 5직업 + 상위(전직) 5직업 모두에서 찾는다 (BURIED_ALL_CLASSES는 아래에서 정의)
+export const getBuriedClass = (id) => BURIED_ALL_CLASSES.find(c => c.id === id) || null;
 
 // =========================================================
 // 4. 상태이상 13종 — 전부 스택형
@@ -236,11 +243,11 @@ export const getBuriedTier = (id) => BURIED_TIERS.find(t => t.id === id) || BURI
 
 // 슬롯별 기본 스탯 (1층 기준). 층·등급 배율이 곱해진다.
 const SLOT_BASE = {
-  weapon:  { atk: 14, mag: 14 },
-  offhand: { atk: 7,  mag: 7, def: 3 },
-  armor:   { def: 9,  hp: 26 },
-  helm:    { def: 5,  hp: 12, sp: 8 },
-  acc:     { atk: 4,  mag: 4, hp: 10, sp: 5 },
+  weapon:  { atk: 14, mag: 14, chase: 3 },
+  offhand: { atk: 7,  mag: 7, def: 3, barrier: 8 },
+  armor:   { def: 9,  hp: 26, barrier: 16 },
+  helm:    { def: 5,  hp: 12, sp: 8, barrier: 6 },
+  acc:     { atk: 4,  mag: 4, hp: 10, sp: 5, chase: 2 },
 };
 
 // 랜덤 옵션 풀 — 등급 opts 수만큼 붙는다
@@ -254,6 +261,8 @@ export const BURIED_OPTIONS = [
   { key: 'critDmg',name: '치명 피해', min: 8,  max: 22, affix: '잔혹한', pct: true },
   { key: 'dodge',  name: '회피율',   min: 2,  max: 5,  affix: '민첩한', pct: true },
   { key: 'spRegen',name: 'SP 회복',  min: 2,  max: 5,  affix: '순환의' },
+  { key: 'barrier',name: '보호막',   min: 12, max: 34, affix: '수호의' },
+  { key: 'chase',  name: '추격 피해', min: 4,  max: 12, affix: '추격의' },
   { key: 'str',    name: '완력',     min: 1,  max: 3,  affix: '역사의' },
   { key: 'dex',    name: '기교',     min: 1,  max: 3,  affix: '숙련된' },
   { key: 'int',    name: '지혜',     min: 1,  max: 3,  affix: '현자의' },
@@ -342,7 +351,7 @@ export function buriedDustValue(item) {
 // =========================================================
 export const buriedExpToNext = (lv) => 32 + lv * 20;
 
-export function createBuriedChar(classId, legacy = { items: [], gold: 0 }) {
+export function createBuriedChar(classId, legacy = { items: [], gold: 0 }, dungeonId = 'labyrinth') {
   const cls = getBuriedClass(classId);
   if (!cls) return null;
   const equipped = {};
@@ -366,18 +375,27 @@ export function createBuriedChar(classId, legacy = { items: [], gold: 0 }) {
     gold: 80 + (legacy.gold || 0),
     dust: 0,
     equipped, inventory,
-    floor: 1, room: null, offers: null, roomDone: false,
+    // 1.104.0 — 던전 선택 / 걸음수 기반 마물 레벨 / 스킬 레벨 / 방·층 효과
+    dungeonId,
+    floor: 1, steps: 0, room: null, roomEffect: null, floorEffect: null, offers: null, roomDone: false,
+    skillLevels: {},
     potions: 2,
     kills: 0, startedAt: Date.now(),
     legacyTaken: (legacy.items || []).length,
   };
+  // 시작 장비·유산 장비의 스킬은 Lv.1로 등록
+  for (const s of BURIED_SLOT_IDS) {
+    const it = equipped[s];
+    if (it?.skillId) char.skillLevels[it.skillId] = char.skillLevels[it.skillId] || 1;
+  }
   char.hp = buriedDerived(char).maxHp;
   return char;
 }
 
-// 파생 스탯 — 장비·레벨·스탯 전부 합산
+// 파생 스탯 — 장비·레벨·스탯·특성 전부 합산
+// 1.104.0~ barrier(보호막)·chase(추격 피해) 추가 — 원작의 핵심 2축
 export function buriedDerived(char) {
-  if (!char) return { maxHp: 1, maxSp: 1, atk: 1, mag: 1, fin: 1, def: 0, crit: 0, critDmg: 60, dodge: 0, spRegen: 12, stats: { str: 0, dex: 0, int: 0, vit: 0 } };
+  if (!char) return { maxHp: 1, maxSp: 1, atk: 1, mag: 1, fin: 1, def: 0, crit: 0, critDmg: 60, dodge: 0, spRegen: 12, barrier: 0, chase: 0, healPct: 0, drainPct: 0, stats: { str: 0, dex: 0, int: 0, vit: 0 } };
   const gear = {};
   for (const s of BURIED_SLOT_IDS) {
     const st = buriedItemStats(char.equipped?.[s]);
@@ -390,18 +408,25 @@ export function buriedDerived(char) {
     vit: (char.stats?.vit || 0) + (gear.vit || 0),
   };
   const lv = char.lv || 1;
+  // 특성(최대 3개)의 스탯 보정 — 전투 화면은 여기 결과만 읽는다
+  const tf = aggregateBuriedTraits(char);
   return {
     stats: st,
-    maxHp:   Math.round(140 + st.vit * 11 + (lv - 1) * 18 + (gear.hp || 0)),
-    maxSp:   Math.round(38 + st.int * 1.3 + (gear.sp || 0)),
-    atk:     Math.round(10 + st.str * 1.6 + (gear.atk || 0)),
-    fin:     Math.round(10 + st.dex * 1.6 + (gear.atk || 0)),
-    mag:     Math.round(10 + st.int * 1.6 + (gear.mag || 0)),
+    traitFx: tf,
+    maxHp:   Math.round((140 + st.vit * 11 + (lv - 1) * 18 + (gear.hp || 0) + (tf.hp || 0))),
+    maxSp:   Math.round(38 + st.int * 1.3 + (gear.sp || 0) + (tf.sp || 0)),
+    atk:     Math.round((10 + st.str * 1.6 + (gear.atk || 0)) * (1 + (tf.physPct || 0) / 100)),
+    fin:     Math.round((10 + st.dex * 1.6 + (gear.atk || 0)) * (1 + (tf.physPct || 0) / 100)),
+    mag:     Math.round((10 + st.int * 1.6 + (gear.mag || 0)) * (1 + (tf.magPct || 0) / 100)),
     def:     Math.round(4 + st.vit * 0.9 + (gear.def || 0)),
-    crit:    Math.round(5 + st.dex * 0.6 + (gear.crit || 0)),
+    crit:    Math.round(5 + st.dex * 0.6 + (gear.crit || 0) + (tf.crit || 0)),
     critDmg: 60 + (gear.critDmg || 0),
-    dodge:   Math.min(45, Math.round(3 + st.dex * 0.4 + (gear.dodge || 0))),
+    dodge:   Math.min(45, Math.round(3 + st.dex * 0.4 + (gear.dodge || 0) + (tf.dodge || 0))),
     spRegen: Math.round(9 + st.int / 8 + (gear.spRegen || 0)),
+    barrier: Math.round((gear.barrier || 0) + (tf.barrier || 0)),
+    chase:   Math.round((gear.chase || 0) + (tf.chase || 0)),
+    healPct: tf.healPct || 0,
+    drainPct: tf.drainPct || 0,
   };
 }
 
@@ -538,7 +563,7 @@ export const BURIED_ENEMIES = {
     key: 'sealWitch', name: '봉인의 마녀', img: { key: 'iceMage', chapter: 1 }, color: '#7ba3c4',
     desc: '무덤 5층을 봉인한 자. 열쇠는 그녀의 심장이다.',
     tier: 'boss', minFloor: 5, maxFloor: 5,
-    hp: 430, atk: 33, def: 12, exp: 320, gold: [220, 320],
+    hp: 360, atk: 31, def: 11, exp: 320, gold: [220, 320],
     actions: [
       { name: '빙결의 창', power: 118, kind: 'attack', apply: [{ s: 'bind', n: 2, p: 100 }], weight: 3 },
       { name: '봉인 각인', power: 62, kind: 'attack', apply: [{ s: 'silence', n: 2, p: 100 }, { s: 'weaken', n: 3, p: 100 }], weight: 2 },
@@ -550,7 +575,7 @@ export const BURIED_ENEMIES = {
     key: 'tombTyrant', name: '무덤의 폭군', img: { key: 'forestTyrant', chapter: 2 }, color: '#8b1f1f',
     desc: '이 무덤에 묻힌 모든 것의 주인. 유산은 그의 손에 있다.',
     tier: 'boss', minFloor: 10, maxFloor: 10,
-    hp: 820, atk: 50, def: 16, exp: 900, gold: [520, 780],
+    hp: 620, atk: 44, def: 15, exp: 900, gold: [520, 780],
     actions: [
       { name: '폭군의 낫', power: 128, kind: 'attack', apply: [{ s: 'bleed', n: 4, p: 100 }], weight: 3 },
       { name: '무덤의 손아귀', power: 96, kind: 'attack', drain: 60, apply: [{ s: 'curse', n: 3, p: 100 }], weight: 2 },
@@ -595,20 +620,25 @@ export const BURIED_ROOMS = {
   shop:     { id: 'shop',     name: '무덤 상인',  icon: '🪙', color: '#d4a574', desc: '골드로 장비를 산다.', weight: 12 },
   shrine:   { id: 'shrine',   name: '제단',       icon: '⛩', color: '#7ba3c4', desc: '회복하거나 장비를 강화한다.', weight: 12 },
   rest:     { id: 'rest',     name: '야영지',     icon: '🔥', color: '#7a9a5e', desc: 'HP를 회복하고 물약을 챙긴다.', weight: 6 },
+  // 1.104.0 신규 — 원작의 협상·서고 방
+  negotiate:{ id: 'negotiate',name: '협상',       icon: '🤝', color: '#d4a574', desc: '길을 막은 것과 거래한다. 골드를 내면 그냥 지나간다.', weight: 10 },
+  library:  { id: 'library',  name: '망자의 서고', icon: '📜', color: '#5c4a8c', desc: '스킬 하나의 레벨을 올린다 (최대 Lv.8).', weight: 10 },
   boss:     { id: 'boss',     name: '봉인의 문',  icon: '👑', color: '#e8b04a', desc: '보스가 기다린다.', weight: 0 },
 };
 
+// 1.104.0 이전의 단일 던전 상수 — 이제 '잊혀진 미궁'의 별칭 (하위 호환용, 신규 코드는 BURIED_DUNGEONS 사용)
 export const BURIED_DUNGEON = {
-  id: 'tomb', name: '잊혀진 무덤', sub: 'The Forgotten Tomb',
+  id: 'labyrinth', name: '잊혀진 미궁', sub: 'The Forgotten Labyrinth',
   floors: 10,
   bossFloors: { 5: 'sealWitch', 10: 'tombTyrant' },
   desc: '열 개의 층. 바닥에는 먼저 내려간 자들의 유산이 쌓여 있다.',
 };
 
-// 이번 층에서 고를 방 2~3개
-export function rollBuriedOffers(floor) {
-  const bossKey = BURIED_DUNGEON.bossFloors[floor];
-  if (bossKey) return [{ type: 'boss', enemyKey: bossKey }];
+// 이번 층에서 고를 방 2~3개. 각 방에는 던전 난이도에 따라 **방 효과**가 붙는다.
+export function rollBuriedOffers(floor, dungeonId = 'labyrinth') {
+  const dg = getBuriedDungeon(dungeonId);
+  const bossKey = dg.bossFloors[floor];
+  if (bossKey) return [{ type: 'boss', enemyKey: bossKey, effect: rollBuriedRoomEffect(dg.roomEffectChance) }];
   const count = Math.random() < 0.45 ? 2 : 3;
   const pool = Object.values(BURIED_ROOMS).filter(r => r.weight > 0);
   const offers = [];
@@ -625,7 +655,10 @@ export function rollBuriedOffers(floor) {
     const j = Math.floor(Math.random() * (i + 1));
     [offers[i], offers[j]] = [offers[j], offers[i]];
   }
-  return offers;
+  // 방 효과는 전투 계열에만 (비전투 방은 효과 없이 깔끔하게)
+  return offers.map(o => (o.type === 'battle' || o.type === 'elite')
+    ? { ...o, effect: rollBuriedRoomEffect(dg.roomEffectChance) }
+    : o);
 }
 
 // 상점 진열 (장비 3종)
@@ -666,33 +699,40 @@ export function buriedEffDef(u) {
   const raw = u?.def || 0;
   return Math.max(0, Math.round(raw * Math.max(0.2, 1 - stacksOf(u, 'shatter') * 0.10)));
 }
-// 실효 회피율 (잔영 ↑, 속박이면 0)
+// 실효 회피율 (잔영 ↑, 속박이면 0, 방 효과 반영)
 export function buriedEffDodge(u) {
   if (stacksOf(u, 'bind') > 0) return 0;
-  return Math.min(70, (u?.dodge || 0) + stacksOf(u, 'evade') * 15);
+  return Math.min(70, (u?.dodge || 0) + stacksOf(u, 'evade') * 15 + (u?.envDodgeAdd || 0));
 }
 // 회복 가능 여부 (저주 = 회복 무효)
 export const buriedCanHeal = (u) => stacksOf(u, 'curse') === 0;
 
-// 스킬 1회 판정. 반환: { dodged, hits:[{dmg,crit}], total }
-export function resolveBuriedAttack(att, def, skill, { isPlayer = false, traitId = null } = {}) {
+// 스킬 1회 판정.
+// 방·층 효과는 유닛에 미리 발라둔 env* 값으로 읽는다 (envDmgPct/envTakenPct/envCritAdd/envMagPct/envDodgeAdd).
+// traits: 공격자가 가진 특성 id 배열 (트리거형 판정용).
+// 반환: { dodged, hits:[{dmg,crit}], total, crits, chase }
+//   chase = 추격 피해 (원작의 추격 데미지). 보호막 처리 규칙이 본체와 달라 따로 돌려준다.
+export function resolveBuriedAttack(att, def, skill, { isPlayer = false, traits = [] } = {}) {
   const dodgeRoll = Math.random() * 100 < buriedEffDodge(def);
-  if (dodgeRoll) return { dodged: true, hits: [], total: 0, crits: 0 };
+  if (dodgeRoll) return { dodged: true, hits: [], total: 0, crits: 0, chase: 0 };
 
   const statKey = skill.stat || 'str';
   const baseAtk = statKey === 'int' ? (att.mag || 0) : statKey === 'dex' ? (att.fin || 0) : (att.atk || 0);
   const hitCount = Math.max(1, skill.hits || 1);
-  const critRate = (att.crit || 0) + (skill.critBonus || 0);
-  const offense = buriedOffenseMult(att);
-  const taken = buriedTakenMult(def);
+  const critRate = (att.crit || 0) + (skill.critBonus || 0) + (att.envCritAdd || 0);
+  let offense = buriedOffenseMult(att) * (1 + (att.envDmgPct || 0) / 100);
+  if (statKey === 'int') offense *= 1 + (att.envMagPct || 0) / 100;
+  const taken = buriedTakenMult(def) * (1 + (def.envTakenPct || 0) / 100);
   const effDef = skill.pierce ? 0 : buriedEffDef(def);
   const defMult = 100 / (100 + effDef);
 
   let power = skill.power || 0;
   if (skill.executeBelow && def.maxHp > 0 && (def.hp / def.maxHp) * 100 <= skill.executeBelow) power *= 2;
   if (skill.berserk && att.maxHp > 0) power *= 1 + (1 - att.hp / att.maxHp);
-  // 직업 특성 — 혼혈 마족 혈투
-  if (traitId === 'bloodrush' && att.maxHp > 0 && att.hp / att.maxHp <= 0.5) power *= 1.25;
+  // 특성 — 혈투 / 혈군 (HP가 낮을수록 강해진다)
+  const lowHp = att.maxHp > 0 && att.hp / att.maxHp <= 0.5;
+  if (lowHp && traits.includes('bloodlord')) power *= 1.45;
+  else if (lowHp && traits.includes('bloodrush')) power *= 1.25;
 
   const globalMult = isPlayer ? BURIED_TUNING.playerDmgMult : BURIED_TUNING.enemyDmgMult;
   const hits = [];
@@ -705,18 +745,32 @@ export function resolveBuriedAttack(att, def, skill, { isPlayer = false, traitId
     if (crit) dmg *= 1 + (att.critDmg || 60) / 100;
     hits.push({ dmg: Math.max(1, Math.round(dmg)), crit });
   }
-  return { dodged: false, hits, total: hits.reduce((s, h) => s + h.dmg, 0), crits };
+
+  // ===== 추격 피해 (원작의 chase damage) =====
+  // 스킬이 적중하면 본체 데미지와 별개로 한 번 더 들어간다. 방어력 영향을 받지 않는다.
+  let chase = 0;
+  if (skill.power && (att.chase || 0) > 0) {
+    chase = (att.chase || 0) * (1 + (skill.chaseBonusPct || 0) / 100);
+    // 특성 — 혈군: 잃은 HP 1%당 추격 +0.6 / 폭풍: 추격 2배
+    if (traits.includes('bloodlord') && att.maxHp > 0) chase += (1 - att.hp / att.maxHp) * 100 * 0.6;
+    if (traits.includes('tempest')) chase *= 2;
+    chase = Math.max(0, Math.round(chase * (1 + (att.envDmgPct || 0) / 100)));
+  }
+  return { dodged: false, hits, total: hits.reduce((s, h) => s + h.dmg, 0), crits, chase };
 }
 
-// 상태이상 부여 — 확률·최대 스택 반영. 새 statuses 객체 반환
-export function applyBuriedStatuses(statuses, list) {
+// 상태이상 부여 — 확률·최대 스택 + 방/층 효과 반영. 새 statuses 객체 반환
+//   chancePct: 부여 확률 가감 (방 효과 「고요의 방」 등)
+//   extra    : 스택 가산 (층 효과 「정적의 층」)
+export function applyBuriedStatuses(statuses, list, { chancePct = 0, extra = 0 } = {}) {
   if (!list || list.length === 0) return statuses;
   const next = { ...statuses };
   for (const a of list) {
     const def = BURIED_STATUS[a.s];
     if (!def) continue;
-    if (a.p != null && Math.random() * 100 >= a.p) continue;
-    next[a.s] = Math.min(def.max, (next[a.s] || 0) + (a.n || 1));
+    const chance = a.p != null ? a.p + chancePct : 100 + chancePct;
+    if (chance < 100 && Math.random() * 100 >= chance) continue;
+    next[a.s] = Math.min(def.max, (next[a.s] || 0) + (a.n || 1) + extra);
   }
   return next;
 }
@@ -776,22 +830,413 @@ export function buildBuriedLegacy(char) {
 // 무덤 먼지 — 유산 보관함이 가득 찼을 때의 대체 보상 + 제단 강화 재료
 export const BURIED_DUST = { name: '무덤 먼지', icon: '🕯' };
 
-// 다음 층으로. 10층을 넘어서면 던전 클리어.
+// 다음 층으로. 마지막 층을 넘어서면 던전 클리어.
+// 층을 오를 때 **층 효과**를 새로 굴리고(이전 층 효과는 소멸), 방 선택지도 새로 만든다.
 export function advanceBuriedFloor(char) {
+  const dg = getBuriedDungeon(char?.dungeonId);
   const next = (char.floor || 1) + 1;
-  if (next > BURIED_DUNGEON.floors) return { char: { ...char, room: null, roomData: null }, cleared: true };
+  if (next > dg.floors) return { char: { ...char, room: null, roomData: null, roomEffect: null }, cleared: true };
   return {
-    char: { ...char, floor: next, offers: rollBuriedOffers(next), room: null, roomData: null },
+    char: {
+      ...char,
+      floor: next,
+      offers: rollBuriedOffers(next, char.dungeonId),
+      floorEffect: rollBuriedFloorEffect(dg.floorEffectChance),
+      room: null, roomData: null, roomEffect: null,
+    },
     cleared: false,
   };
 }
 
-// 방 하나에서 만날 적 (전투/강적/보스 공용)
-export function buildBuriedRoomEnemy(char, roomType) {
+// 방을 하나 지날 때마다 걸음수 +1 (원작: 마물 레벨은 층이 아니라 걸음수로 오른다)
+export function stepBuriedChar(char, extraSteps = 0) {
+  return { ...char, steps: (char.steps || 0) + 1 + extraSteps };
+}
+
+// 방 하나에서 만날 적 (전투/강적/보스 공용). 스펙은 **걸음수 기반 마물 레벨**로 정해진다.
+export function buildBuriedRoomEnemy(char, roomType, roomEffectId = null) {
+  const dg = getBuriedDungeon(char?.dungeonId);
   const floor = char?.floor || 1;
+  const envBump = getBuriedRoomEffect(roomEffectId)?.fx?.monsterLevel || 0;
+  const monLevel = buriedMonsterLevel(char) + envBump;
+  let key;
   if (roomType === 'boss') {
-    const key = BURIED_DUNGEON.bossFloors[floor];
-    return key ? buriedEnemyAt(key, floor) : rollBuriedEnemy(floor, 'normal');
+    key = dg.bossFloors[floor];
   }
-  return rollBuriedEnemy(floor, roomType === 'elite' ? 'elite' : 'normal');
+  if (!key) {
+    const tier = roomType === 'elite' ? 'elite' : 'normal';
+    const band = Math.min(10, Math.max(1, Math.round(monLevel * 0.8)));
+    const pool = BURIED_ENEMY_LIST.filter(e => e.tier === tier && band >= e.minFloor && band <= e.maxFloor);
+    const fallback = BURIED_ENEMY_LIST.filter(e => e.tier === tier);
+    key = pick(pool.length > 0 ? pool : fallback).key;
+  }
+  const enemy = buriedEnemyAtLevel(key, monLevel);
+  return { ...enemy, roomType, isBoss: roomType === 'boss' };
+}
+
+// =========================================================
+// 12. 특성 (Ability) — 1.104.0
+// =========================================================
+// 원작 규칙: 직업은 **영구 특성 3개를 결정하며 그중 1개는 그 직업 전용**이다.
+// 스탯형 특성은 buriedDerived에서 자동 합산되고, 트리거형(riposte 등)은 전투 화면이 판정한다.
+export const BURIED_TRAITS = {
+  // --- 직업 전용 (각 직업 1개) ---
+  riposte:   { id: 'riposte',   name: '반격',   exclusive: 'wanderer',   trigger: true, desc: '회피에 성공하면 즉시 기본 공격의 60% 위력으로 반격한다.' },
+  kindle:    { id: 'kindle',    name: '발화',   exclusive: 'sage',       trigger: true, desc: '마법 스킬이 적중하면 30% 확률로 [화상] 1스택을 추가 부여한다.' },
+  bloodrush: { id: 'bloodrush', name: '혈투',   exclusive: 'demonblood', trigger: true, desc: 'HP가 50% 이하일 때 주는 데미지 +25%.' },
+  gale:      { id: 'gale',      name: '질풍',   exclusive: 'elf',        trigger: true, desc: '치명타가 터질 때마다 SP +12를 회복한다.' },
+  dawnlight: { id: 'dawnlight', name: '여명',   exclusive: 'priest',     trigger: true, desc: '모든 회복량 +30%.' },
+  // --- 상위 직업 전용 ---
+  soulbind:  { id: 'soulbind',  name: '혼결',   exclusive: 'wanderer_adv',   trigger: true, desc: '반격이 기본 공격의 120% 위력이 되고, 반격 시 [출혈] 2를 부여한다.' },
+  conflag:   { id: 'conflag',   name: '겁화',   exclusive: 'sage_adv',       trigger: true, desc: '[화상]을 가진 적을 타격하면 화상 스택당 추가 3 피해. 발화 확률 60%.' },
+  bloodlord: { id: 'bloodlord', name: '혈군',   exclusive: 'demonblood_adv', trigger: true, desc: 'HP가 50% 이하일 때 주는 데미지 +45%이며, 잃은 HP 1%당 추격 피해 +0.6.' },
+  tempest:   { id: 'tempest',   name: '폭풍',   exclusive: 'elf_adv',        trigger: true, desc: '치명타마다 SP +12, 추가로 추격 피해가 2배로 들어간다.' },
+  highdawn:  { id: 'highdawn',  name: '대여명', exclusive: 'priest_adv',     trigger: true, desc: '회복량 +60%. 회복할 때마다 회복량의 50%만큼 보호막을 얻는다.' },
+  // --- 공용 (스탯형 — buriedDerived가 자동 반영) ---
+  swordmastery: { id: 'swordmastery', name: '검술 숙련', fx: { physPct: 10 }, desc: '물리·기교 공격력 +10%.' },
+  arcana:       { id: 'arcana',       name: '비전 지식', fx: { magPct: 10 },  desc: '마법 공격력 +10%.' },
+  agility:      { id: 'agility',      name: '기민함',   fx: { dodge: 5 },    desc: '회피율 +5%.' },
+  lightstep:    { id: 'lightstep',    name: '경신술',   fx: { dodge: 8 },    desc: '회피율 +8%.' },
+  precision:    { id: 'precision',    name: '정밀',     fx: { crit: 6 },     desc: '치명 확률 +6%.' },
+  toughness:    { id: 'toughness',    name: '강인함',   fx: { hp: 34 },      desc: '최대 HP +34.' },
+  willpower:    { id: 'willpower',    name: '정신력',   fx: { sp: 9 },       desc: '최대 SP +9.' },
+  faith:        { id: 'faith',        name: '신앙',     fx: { hp: 32, healPct: 15 }, desc: '최대 HP +32, 회복량 +15%.' },
+  wardstone:    { id: 'wardstone',    name: '수호석',   fx: { barrier: 45 }, desc: '전투 시작 시 보호막 +45.' },
+  sanguine:     { id: 'sanguine',     name: '흡혈 기질', fx: { drainPct: 6 }, desc: '주는 피해의 6%만큼 HP를 회복한다.' },
+  hunter:       { id: 'hunter',       name: '추격자',   fx: { chase: 9 },    desc: '추격 피해 +9.' },
+};
+export const getBuriedTrait = (id) => BURIED_TRAITS[id] || null;
+
+// 캐릭터의 특성 목록 (전직했다면 상위 직업 기준)
+export function buriedTraitIds(char) {
+  const cls = getBuriedClass(char?.classId);
+  return cls?.traits || [];
+}
+// 스탯형 특성 합산 — buriedDerived가 호출
+export function aggregateBuriedTraits(char) {
+  const out = {};
+  for (const id of buriedTraitIds(char)) {
+    const t = BURIED_TRAITS[id];
+    if (!t?.fx) continue;
+    for (const [k, v] of Object.entries(t.fx)) out[k] = (out[k] || 0) + v;
+  }
+  return out;
+}
+// 트리거형 특성 보유 여부 — 전투 화면이 판정에 사용
+export const hasBuriedTrait = (char, id) => buriedTraitIds(char).includes(id);
+
+// =========================================================
+// 13. 전직 — 상위 직업 5종 (1.104.0)
+// =========================================================
+// 원작의 상위 직업 개념. 해당 직업으로 미궁(1번 던전)을 클리어하면 해금되고,
+// 이후 새 캐릭터를 만들 때 선택할 수 있다. 능력치·특성이 전면 강화된다.
+export const BURIED_ADVANCED_CLASSES = [
+  {
+    id: 'wanderer_adv', name: '무명검성', sub: 'Nameless Blade', color: '#e05a50', base: 'wanderer',
+    image: './classes/wanderer.jpg', advanced: true,
+    desc: '이름을 버린 검. 되돌아오는 칼날이 더 깊이 벤다.',
+    lines: { weapon: 'sword', offhand: 'blade' },
+    stats: { str: 16, dex: 12, int: 6, vit: 12 },
+    traits: ['soulbind', 'swordmastery', 'precision'],
+  },
+  {
+    id: 'sage_adv', name: '겁화술사', sub: 'Emberlord', color: '#7a5fb0', base: 'sage',
+    image: './classes/sage.jpg', advanced: true,
+    desc: '꺼지지 않는 불을 다루는 자. 태운 것은 되살아나지 않는다.',
+    lines: { weapon: 'staff', offhand: 'tome' },
+    stats: { str: 5, dex: 9, int: 19, vit: 9 },
+    traits: ['conflag', 'arcana', 'willpower'],
+  },
+  {
+    id: 'demonblood_adv', name: '마혈군주', sub: 'Blood Sovereign', color: '#b02626', base: 'demonblood',
+    image: './classes/demonblood.jpg', advanced: true,
+    desc: '피를 지배하는 자. 상처가 깊을수록 왕좌에 가깝다.',
+    lines: { weapon: 'axe', offhand: 'claw' },
+    stats: { str: 17, dex: 8, int: 6, vit: 15 },
+    traits: ['bloodlord', 'toughness', 'sanguine'],
+  },
+  {
+    id: 'elf_adv', name: '바람의 대사수', sub: 'Galewarden', color: '#95bd72', base: 'elf',
+    image: './classes/elf.jpg', advanced: true,
+    desc: '바람을 다스리는 궁수. 화살은 두 번 꽂힌다.',
+    lines: { weapon: 'bow', offhand: 'quiver' },
+    stats: { str: 7, dex: 19, int: 10, vit: 10 },
+    traits: ['tempest', 'precision', 'hunter'],
+  },
+  {
+    id: 'priest_adv', name: '여명의 대사제', sub: 'Highpriest of Dawn', color: '#e8c090', base: 'priest',
+    image: './classes/priest.jpg', advanced: true,
+    desc: '여명을 대리하는 자. 그 앞에서는 죽음도 물러선다.',
+    lines: { weapon: 'mace', offhand: 'relic' },
+    stats: { str: 6, dex: 8, int: 18, vit: 14 },
+    traits: ['highdawn', 'faith', 'wardstone'],
+  },
+];
+export const BURIED_ALL_CLASSES = [...BURIED_CLASSES, ...BURIED_ADVANCED_CLASSES];
+
+// =========================================================
+// 14. 스킬 레벨 1~8 (1.104.0)
+// =========================================================
+// 원작 규칙: 같은 스킬을 다시 얻으면 레벨이 오르고, **Lv.3과 Lv.8에서 추가 효과**를 받는다 (8이 만렙).
+// 여기서는 같은 스킬이 붙은 장비를 획득하면 그 스킬의 레벨이 오른다.
+export const BURIED_SKILL_MAX_LV = 8;
+export const buriedSkillLv = (char, skillId) =>
+  Math.min(BURIED_SKILL_MAX_LV, Math.max(1, char?.skillLevels?.[skillId] || 1));
+
+// 스킬 등급 A~D (A가 가장 희귀) — 드랍 가중치에 반영
+export const BURIED_SKILL_RANKS = {
+  A: { id: 'A', name: 'A', color: '#e8b04a', weight: 8 },
+  B: { id: 'B', name: 'B', color: '#5c4a8c', weight: 17 },
+  C: { id: 'C', name: 'C', color: '#7ba3c4', weight: 30 },
+  D: { id: 'D', name: 'D', color: '#8b8378', weight: 45 },
+};
+// 등급은 SP 비용으로 자동 산출 — 비싼 스킬일수록 희귀하다 (데이터 중복 없이 일관)
+export function buriedSkillRank(skill) {
+  if (!skill) return 'D';
+  const cost = (skill.sp || 0) + (skill.cd || 0) * 4;
+  if (cost >= 30) return 'A';
+  if (cost >= 20) return 'B';
+  if (cost >= 13) return 'C';
+  return 'D';
+}
+
+// 레벨이 반영된 실효 스킬 객체. 전투·표시 모두 이것만 쓴다.
+//   - Lv.2~8 : 위력 +7% / 레벨 (누적)
+//   - Lv.3   : 부여 상태이상 +1스택 (비공격기는 자기 강화 +1), SP -2
+//   - Lv.8   : 위력 +10% 추가, 추격 피해 +20%, 상태이상 +1스택 더
+// 스킬 데이터에 lv3 / lv8 오브젝트가 있으면 그쪽이 우선한다 (개별 개성 부여용).
+export function buriedSkillAt(skill, lv = 1) {
+  if (!skill) return skill;
+  const L = Math.min(BURIED_SKILL_MAX_LV, Math.max(1, lv));
+  if (L === 1) return skill;
+  const out = { ...skill, lv: L };
+  let mult = 1 + (L - 1) * 0.07;
+  let stackBonus = 0;
+  if (L >= 3) { stackBonus += 1; out.sp = Math.max(0, skill.sp - 2); }
+  if (L >= 8) { mult += 0.10; stackBonus += 1; out.chaseBonusPct = (out.chaseBonusPct || 0) + 20; }
+  if (out.power) out.power = Math.round(skill.power * mult);
+  if (out.heal) out.heal = Math.round(skill.heal * mult);
+  if (out.barrierGain) out.barrierGain = Math.round(skill.barrierGain * mult);
+  if (stackBonus > 0) {
+    if (skill.apply) out.apply = skill.apply.map(a => ({ ...a, n: (a.n || 1) + stackBonus }));
+    if (skill.self) out.self = skill.self.map(a => ({ ...a, n: (a.n || 1) + stackBonus }));
+  }
+  if (skill.lv3 && L >= 3) Object.assign(out, skill.lv3);
+  if (skill.lv8 && L >= 8) Object.assign(out, skill.lv8);
+  return out;
+}
+// Lv.3 / Lv.8에서 무엇이 열리는지 안내 문구 (UI 표시용)
+export function buriedSkillLvNote(skill, lv) {
+  const notes = [];
+  notes.push(lv >= 3 ? '✓ Lv.3 — 상태이상 +1스택 · SP -2' : '· Lv.3 — 상태이상 +1스택 · SP -2');
+  notes.push(lv >= 8 ? '✓ Lv.8 — 위력 +10% · 추격 +20% · 상태이상 +1' : '· Lv.8 — 위력 +10% · 추격 +20% · 상태이상 +1');
+  return notes;
+}
+
+// 장비 획득 시 스킬 레벨 상승 (이미 만렙이면 그대로)
+export function raiseBuriedSkill(char, skillId) {
+  const cur = char?.skillLevels?.[skillId] || 1;
+  if (cur >= BURIED_SKILL_MAX_LV) return { char, raised: false, lv: cur };
+  const lv = cur + 1;
+  return { char: { ...char, skillLevels: { ...(char.skillLevels || {}), [skillId]: lv } }, raised: true, lv };
+}
+
+// =========================================================
+// 15. 방 효과 / 층 효과 (1.104.0)
+// =========================================================
+// 원작 규칙: 방의 색마다 효과가 다르고, **이름이 붉은 방은 나와 적 모두에게** 적용된다.
+// 색 우선순위(원작): 빨강 → 초록 → 파랑 → 보라 → 노랑 → 하늘 → 검정.
+// 층 자체에 걸리는 효과도 있으며 다음 층으로 올라가면 사라진다.
+export const BURIED_ROOM_COLORS = {
+  red:    { id: 'red',    color: '#c4453d', order: 0 },
+  green:  { id: 'green',  color: '#7a9a5e', order: 1 },
+  blue:   { id: 'blue',   color: '#7ba3c4', order: 2 },
+  purple: { id: 'purple', color: '#5c4a8c', order: 3 },
+  yellow: { id: 'yellow', color: '#e8b04a', order: 4 },
+  sky:    { id: 'sky',    color: '#9fd0e8', order: 5 },
+  black:  { id: 'black',  color: '#6b6b6b', order: 6 },
+};
+
+// fx 키 — 전투 화면이 그대로 읽는다
+//   dmgPct / takenPct / healPct / critAdd / dodgeAdd / spAdd / statusChancePct / spCostPct
+//   goldPct / hpDrainPct(턴당 최대HP %) / hpRegenPct / monsterLevel(진입 즉시 +N)
+export const BURIED_ROOM_EFFECTS = [
+  { id: 'bloodAltar',  name: '피의 제단',   color: 'red',    both: true,  fx: { dmgPct: 25 },            desc: '나와 적 모두 주는 데미지 +25%' },
+  { id: 'agonyHall',   name: '고통의 방',   color: 'red',    both: true,  fx: { hpDrainPct: 4 },         desc: '나와 적 모두 매 턴 최대 HP의 4% 감소' },
+  { id: 'ruinChamber', name: '붕괴의 방',   color: 'red',    both: true,  fx: { takenPct: 20 },          desc: '나와 적 모두 받는 데미지 +20%' },
+  { id: 'mossGarden',  name: '이끼 정원',   color: 'green',  both: false, fx: { hpRegenPct: 5 },         desc: '매 턴 최대 HP의 5% 회복' },
+  { id: 'lifeSpring',  name: '생명의 샘',   color: 'green',  both: false, fx: { healPct: 50 },           desc: '회복량 +50%' },
+  { id: 'frostHall',   name: '서리 회랑',   color: 'blue',   both: false, fx: { spAdd: 8 },              desc: '매 턴 SP +8 추가 회복' },
+  { id: 'stillRoom',   name: '고요의 방',   color: 'blue',   both: true,  fx: { statusChancePct: -40 },  desc: '나와 적 모두 상태이상 부여 확률 -40%' },
+  { id: 'cursedCrypt', name: '저주받은 묘실', color: 'purple', both: true, fx: { noHeal: true },          desc: '나와 적 모두 회복 불가' },
+  { id: 'manaVortex',  name: '마력 소용돌이', color: 'purple', both: false, fx: { magPct: 35 },           desc: '마법 스킬 데미지 +35%' },
+  { id: 'goldTomb',    name: '황금 무덤',   color: 'yellow', both: false, fx: { goldPct: 100 },          desc: '이 방의 골드 획득 2배' },
+  { id: 'thunderRoom', name: '뇌명의 방',   color: 'yellow', both: true,  fx: { critAdd: 20 },           desc: '나와 적 모두 치명 확률 +20%' },
+  { id: 'sunkenRoom',  name: '수몰된 방',   color: 'sky',    both: false, fx: { monsterLevel: 1, goldPct: 60 }, desc: '진입 즉시 마물 레벨 +1. 대신 골드 +60%' },
+  { id: 'windPassage', name: '바람의 통로', color: 'sky',    both: false, fx: { dodgeAdd: 20 },          desc: '회피율 +20%' },
+  { id: 'pitchDark',   name: '칠흑',       color: 'black',  both: true,  fx: { dodgeAdd: 15 },          desc: '나와 적 모두 회피율 +15%' },
+  { id: 'sealedRoom',  name: '봉인의 방',   color: 'black',  both: false, fx: { spCostPct: 50 },         desc: '스킬 SP 소모 +50%' },
+];
+export const getBuriedRoomEffect = (id) => BURIED_ROOM_EFFECTS.find(e => e.id === id) || null;
+
+export const BURIED_FLOOR_EFFECTS = [
+  { id: 'tombBreath',  name: '무덤의 숨결', fx: { enemyDmgPct: 20 },  desc: '이 층의 모든 적이 주는 데미지 +20%' },
+  { id: 'restfulDead', name: '망자의 가호', fx: { roomHealPct: 8 },   desc: '방에 들어설 때마다 HP 8% 회복' },
+  { id: 'greedFloor',  name: '탐욕의 층',   fx: { goldPct: 50, takenPct: 15 }, desc: '골드 +50%, 받는 데미지 +15%' },
+  { id: 'silentFloor', name: '정적의 층',   fx: { statusExtra: 1 },   desc: '내가 부여하는 상태이상 +1스택' },
+  { id: 'ironFloor',   name: '강철의 층',   fx: { barrierAdd: 40 },   desc: '전투 시작 시 보호막 +40' },
+];
+export const getBuriedFloorEffect = (id) => BURIED_FLOOR_EFFECTS.find(e => e.id === id) || null;
+
+// 방 효과 굴림 — 전투 계열 방에만 붙고, 확률은 던전 난이도를 따른다
+export function rollBuriedRoomEffect(chance = 45) {
+  if (Math.random() * 100 >= chance) return null;
+  return pick(BURIED_ROOM_EFFECTS).id;
+}
+export function rollBuriedFloorEffect(chance = 22) {
+  if (Math.random() * 100 >= chance) return null;
+  return pick(BURIED_FLOOR_EFFECTS).id;
+}
+
+// 방+층 효과를 전투가 바로 읽을 수 있는 하나의 fx 뭉치로 합친다
+// 반환: { self: {...}, foe: {...}, meta: { goldPct, monsterLevel } }
+export function resolveBuriedEnvFx(roomEffectId, floorEffectId) {
+  const self = {}, foe = {}, meta = { goldPct: 0, monsterLevel: 0 };
+  const add = (bag, k, v) => { bag[k] = (bag[k] || 0) + v; };
+  const room = getBuriedRoomEffect(roomEffectId);
+  if (room) {
+    for (const [k, v] of Object.entries(room.fx)) {
+      if (k === 'goldPct') { meta.goldPct += v; continue; }
+      if (k === 'monsterLevel') { meta.monsterLevel += v; continue; }
+      if (k === 'noHeal') { self.noHeal = true; if (room.both) foe.noHeal = true; continue; }
+      add(self, k, v);
+      if (room.both) add(foe, k, v);
+    }
+  }
+  const floor = getBuriedFloorEffect(floorEffectId);
+  if (floor) {
+    for (const [k, v] of Object.entries(floor.fx)) {
+      if (k === 'goldPct') { meta.goldPct += v; continue; }
+      if (k === 'enemyDmgPct') { add(foe, 'dmgPct', v); continue; }
+      if (k === 'roomHealPct' || k === 'statusExtra' || k === 'barrierAdd') { add(self, k, v); continue; }
+      add(self, k, v);
+    }
+  }
+  return { self, foe, meta };
+}
+
+// =========================================================
+// 16. 보호막 (Barrier) — 1.104.0
+// =========================================================
+// 원작의 핵심 내구 자원. HP 위에 덧씌워지며 피격 시 **먼저 소모**된다.
+// 관통(pierce) 스킬·관통 옵션 추격은 보호막을 무시하고 HP를 직접 때린다.
+// 반환: { barrier, hp, absorbed, toHp }
+export function applyBuriedDamage(unit, dmg, { pierceBarrier = false } = {}) {
+  const d = Math.max(0, Math.round(dmg));
+  if (pierceBarrier || !unit.barrier || unit.barrier <= 0) {
+    return { barrier: unit.barrier || 0, hp: unit.hp - d, absorbed: 0, toHp: d };
+  }
+  const absorbed = Math.min(unit.barrier, d);
+  return { barrier: unit.barrier - absorbed, hp: unit.hp - (d - absorbed), absorbed, toHp: d - absorbed };
+}
+
+// =========================================================
+// 17. 던전 4종 — 난이도 단계 (1.104.0)
+// =========================================================
+// 원작 규칙: 처음에는 미궁만 열려 있고, 조건을 만족하면 새 던전이 열린다.
+// **마물 레벨은 층이 아니라 "지나온 방 수(걸음수)"로 오르며, 난이도가 높을수록 빨리 오른다.**
+export const BURIED_DUNGEONS = [
+  {
+    id: 'labyrinth', name: '잊혀진 미궁', sub: 'The Forgotten Labyrinth', color: '#7ba3c4',
+    floors: 10, stepsPerLevel: 4, baseLevel: 0, roomEffectChance: 40, floorEffectChance: 18,
+    dropLuck: 1, goldMult: 1.0, expMult: 1.15,
+    bossFloors: { 5: 'sealWitch', 10: 'tombTyrant' },
+    unlock: null,
+    desc: '열 개의 층. 바닥에는 먼저 내려간 자들의 유산이 쌓여 있다.',
+  },
+  {
+    id: 'ruins', name: '침몰한 폐허', sub: 'The Sunken Ruins', color: '#7a9a5e',
+    floors: 12, stepsPerLevel: 4, baseLevel: 2, roomEffectChance: 55, floorEffectChance: 26,
+    dropLuck: 2, goldMult: 1.4, expMult: 1.25,
+    bossFloors: { 6: 'boneGiant', 12: 'tombTyrant' },
+    unlock: 'labyrinth',
+    desc: '물에 잠긴 층계. 걸음이 빨라질수록 마물도 빨리 자란다.',
+  },
+  {
+    id: 'chasm', name: '나락의 계단', sub: 'The Chasm Stair', color: '#c4453d',
+    floors: 14, stepsPerLevel: 3, baseLevel: 4, roomEffectChance: 65, floorEffectChance: 34,
+    dropLuck: 3, goldMult: 1.9, expMult: 1.5,
+    bossFloors: { 7: 'twilightHusk', 14: 'tombTyrant' },
+    unlock: 'ruins',
+    desc: '내려갈수록 좁아지는 계단. 한 걸음마다 무언가가 자란다.',
+  },
+  {
+    id: 'abyss', name: '심연', sub: 'The Abyss', color: '#5c4a8c',
+    floors: 20, stepsPerLevel: 2, baseLevel: 6, roomEffectChance: 75, floorEffectChance: 42,
+    dropLuck: 5, goldMult: 2.6, expMult: 1.8,
+    bossFloors: { 5: 'boneGiant', 10: 'sealWitch', 15: 'twilightHusk', 20: 'tombTyrant' },
+    unlock: 'chasm',
+    desc: '끝이 있는지 아무도 모른다. 여기서 죽은 자의 장비만이 위로 올라간다.',
+  },
+];
+export const getBuriedDungeon = (id) => BURIED_DUNGEONS.find(d => d.id === id) || BURIED_DUNGEONS[0];
+
+// 걸음수 → 마물 레벨 (원작 규칙)
+export function buriedMonsterLevel(char) {
+  const dg = getBuriedDungeon(char?.dungeonId);
+  const steps = char?.steps || 0;
+  return 1 + dg.baseLevel + Math.floor(steps / dg.stepsPerLevel);
+}
+
+// 마물 레벨 기준 적 생성 (기존 층 기준 buriedEnemyAt을 대체)
+export function buriedEnemyAtLevel(key, monLevel) {
+  const base = BURIED_ENEMIES[key];
+  if (!base) return null;
+  const lv = Math.max(1, monLevel || 1);
+  const m = 1 + (lv - 1) * 0.13;
+  return {
+    ...base,
+    lv,
+    hp: Math.round(base.hp * m),
+    atk: Math.round(base.atk * m),
+    def: Math.round(base.def * (1 + (lv - 1) * 0.08)),
+    exp: Math.round(base.exp * (1 + (lv - 1) * 0.1)),
+  };
+}
+
+// 장비를 캐릭터에게 넣는 단일 창구 (드랍·부장품·상점 공용).
+// 원작 규칙: **같은 스킬을 다시 얻으면 그 스킬의 레벨이 오른다.** 처음 보는 스킬이면 Lv.1로 등록.
+// 빈 슬롯이면 즉시 장착하고, 아니면 가방으로 보낸다.
+export function addBuriedItemToChar(char, item) {
+  if (!char || !item) return { char, raised: false, lv: 1 };
+  let c = char;
+  const cur = c.skillLevels?.[item.skillId];
+  let raised = false, lv = 1;
+  if (cur) {
+    const r = raiseBuriedSkill(c, item.skillId);
+    c = r.char; raised = r.raised; lv = r.lv;
+  } else {
+    c = { ...c, skillLevels: { ...(c.skillLevels || {}), [item.skillId]: 1 } };
+  }
+  if (!c.equipped?.[item.slot]) c = { ...c, equipped: { ...c.equipped, [item.slot]: item } };
+  else c = { ...c, inventory: [...c.inventory, item] };
+  return { char: c, raised, lv, equippedDirect: !char.equipped?.[item.slot] };
+}
+
+// 협상 방 — 지불액과 보상. 마물 레벨이 높을수록 비싸고 크다.
+export function buildBuriedNegotiation(char) {
+  const lv = buriedMonsterLevel(char);
+  const price = Math.round(45 + lv * 22);
+  return {
+    price,
+    // 지불하면 전투 없이 통과 + 장비 1개. 거절하면 강적과 싸운다.
+    reward: rollBuriedItem({ slot: null, classId: char.classId, floor: lv, luck: 4 }),
+  };
+}
+
+// 망자의 서고 — 올릴 수 있는 스킬 목록 (만렙 제외)
+export function buriedLibraryChoices(char) {
+  return buriedEquippedSkills(char)
+    .map(x => ({ ...x, lv: buriedSkillLv(char, x.skill.id) }))
+    .filter(x => x.lv < BURIED_SKILL_MAX_LV);
 }

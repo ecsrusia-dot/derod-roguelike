@@ -1,18 +1,27 @@
 // ============================================
-// components/buried/BuriedDungeonScreen.jsx — 층 진행 + 방 선택 (1.103.0)
+// components/buried/BuriedDungeonScreen.jsx — 층 진행 + 방 선택 (1.104.0)
 // ============================================
-// 원작 구조: 층마다 방 2~3개 중 하나를 고른다. 5층 중간보스 / 10층 보스.
-// 전투 방은 App으로 위임(onEnterBattle), 나머지 방(상점·제단·부장품·야영)은 이 화면에서 해결.
+// 원작 구조: 층마다 방 2~3개 중 하나를 고른다. 마지막 층에 보스.
+// 전투 방은 App으로 위임(onEnterBattle), 나머지 방은 이 화면에서 해결한다.
+//
+// 1.104.0 추가:
+//   - 던전 4종 (미궁/폐허/나락/심연) — 층수·마물 성장 속도·보상이 전부 다르다
+//   - **걸음수 기반 마물 레벨** — 층이 아니라 "지나온 방 수"로 오른다 (원작 규칙)
+//   - 방 효과 / 층 효과 배지 — 붉은 이름 방은 나와 적 모두에게 적용
+//   - 신규 방 2종: 협상(🤝) / 망자의 서고(📜)
 
 import React, { useEffect, useState } from 'react';
 import { ChevronLeft, Package } from 'lucide-react';
 import { PALETTE } from '../../utils/helpers.js';
 import {
-  BURIED_DUNGEON, BURIED_ROOMS, BURIED_ENHANCE_MAX, BURIED_SLOT_IDS,
-  BURIED_POTION_HEAL_PCT, BURIED_POTION_PRICE,
-  buriedDerived, buriedExpToNext, buriedEnhanceCost, buriedItemStats,
-  getBuriedClass, getBuriedTier, rollBuriedOffers, rollBuriedItem, rollBuriedShop,
-  advanceBuriedFloor, buildBuriedRoomEnemy,
+  BURIED_ROOMS, BURIED_ENHANCE_MAX, BURIED_SLOT_IDS, BURIED_ROOM_COLORS,
+  BURIED_POTION_HEAL_PCT, BURIED_POTION_PRICE, BURIED_SKILL_MAX_LV,
+  buriedDerived, buriedExpToNext, buriedEnhanceCost,
+  getBuriedClass, getBuriedTier, getBuriedDungeon, buriedMonsterLevel,
+  rollBuriedOffers, rollBuriedItem, rollBuriedShop,
+  advanceBuriedFloor, buildBuriedRoomEnemy, addBuriedItemToChar, stepBuriedChar,
+  getBuriedRoomEffect, getBuriedFloorEffect,
+  buildBuriedNegotiation, buriedLibraryChoices, raiseBuriedSkill, buriedSkillLv,
 } from '../../data.js';
 import { BuriedItemCard, BuriedBar, BURIED_DUST_ICON, slotMeta } from './BuriedCommon.jsx';
 import BuriedManage from './BuriedManage.jsx';
@@ -26,57 +35,70 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
   // 이번 층의 방 선택지가 없으면 생성 (새로고침 후에도 그대로 이어진다)
   useEffect(() => {
     if (char && !char.offers) {
-      onUpdateChar({ ...char, offers: rollBuriedOffers(char.floor), room: null, roomData: null }, 0);
+      onUpdateChar({ ...char, offers: rollBuriedOffers(char.floor, char.dungeonId), room: null, roomData: null }, 0);
     }
   }, [char, onUpdateChar]);
 
   if (!char) return null;
   const cls = getBuriedClass(char.classId);
+  const dungeon = getBuriedDungeon(char.dungeonId);
   const d = buriedDerived(char);
   const offers = char.offers || [];
+  const monLevel = buriedMonsterLevel(char);
+  const floorFx = getBuriedFloorEffect(char.floorEffect);
 
+  // 방을 하나 해결하면 걸음수 +1 후 다음 층으로
   const advance = () => {
-    const { char: next, cleared } = advanceBuriedFloor(char);
+    const stepped = stepBuriedChar(char);
+    const { char: next, cleared } = advanceBuriedFloor(stepped);
     if (cleared) onClear(next);
     else onUpdateChar(next, 0);
     setNotice(null);
   };
 
   // ===== 방 진입 =====
-  const enterRoom = (type) => {
+  const enterRoom = (offer) => {
+    const type = offer.type;
     if (type === 'battle' || type === 'elite' || type === 'boss') {
-      const enemy = buildBuriedRoomEnemy(char, type);
-      onUpdateChar({ ...char, room: type }, 0);
-      onEnterBattle(enemy, type);
+      const enemy = buildBuriedRoomEnemy(char, type, offer.effect);
+      onUpdateChar({ ...char, room: type, roomEffect: offer.effect || null }, 0);
+      onEnterBattle(enemy, type, offer.effect || null);
       return;
     }
     let roomData = null;
-    if (type === 'shop') roomData = { shop: rollBuriedShop(char.floor, char.classId), bought: [] };
-    if (type === 'treasure') roomData = { item: rollBuriedItem({ slot: null, classId: char.classId, floor: char.floor, luck: 2 }), taken: false };
-    onUpdateChar({ ...char, room: type, roomData }, 0);
+    if (type === 'shop') roomData = { shop: rollBuriedShop(monLevel, char.classId), bought: [] };
+    if (type === 'treasure') roomData = { item: rollBuriedItem({ slot: null, classId: char.classId, floor: monLevel, luck: 2 + dungeon.dropLuck }), taken: false };
+    if (type === 'negotiate') roomData = { deal: buildBuriedNegotiation(char), done: false };
+    if (type === 'library') roomData = { done: false };
+    onUpdateChar({ ...char, room: type, roomData, roomEffect: offer.effect || null }, 0);
   };
 
-  // ===== 방 처리 =====
+  // 장비 획득 — 같은 스킬이면 스킬 레벨이 오른다 (원작 규칙)
+  const gainItem = (item, extraPatch = {}) => {
+    const { char: next, raised, lv, equippedDirect } = addBuriedItemToChar(char, item);
+    onUpdateChar({ ...next, ...extraPatch }, 0);
+    setNotice(raised
+      ? `${item.name} — 같은 스킬을 다시 얻어 [${item.skillId}] 스킬이 Lv.${lv}이 되었다.`
+      : equippedDirect
+        ? `${item.name} — 빈 ${slotMeta(item.slot).name} 슬롯에 바로 장착했다.`
+        : `${item.name} — 가방에 넣었다.`);
+  };
+
   const takeTreasure = () => {
     const item = char.roomData?.item;
     if (!item || char.roomData?.taken) return;
-    const slotEmpty = !char.equipped?.[item.slot];
-    const next = slotEmpty
-      ? { ...char, equipped: { ...char.equipped, [item.slot]: item }, roomData: { ...char.roomData, taken: true } }
-      : { ...char, inventory: [...char.inventory, item], roomData: { ...char.roomData, taken: true } };
-    onUpdateChar(next, 0);
-    setNotice(slotEmpty ? `${item.name} — 빈 ${slotMeta(item.slot).name} 슬롯에 바로 장착했다.` : `${item.name} — 가방에 넣었다.`);
+    gainItem(item, { roomData: { ...char.roomData, taken: true } });
   };
 
   const buy = (entry, idx) => {
     if (char.gold < entry.price || char.roomData?.bought?.includes(idx)) return;
+    const { char: next, raised, lv } = addBuriedItemToChar(char, entry.item);
     onUpdateChar({
-      ...char,
+      ...next,
       gold: char.gold - entry.price,
-      inventory: [...char.inventory, entry.item],
       roomData: { ...char.roomData, bought: [...(char.roomData.bought || []), idx] },
     }, 0);
-    setNotice(`${entry.item.name}을(를) 샀다. 장비 버튼에서 장착할 수 있다.`);
+    setNotice(raised ? `${entry.item.name} 구매 — 스킬이 Lv.${lv}이 되었다.` : `${entry.item.name}을(를) 샀다.`);
   };
 
   const buyPotion = () => {
@@ -96,12 +118,11 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
     if (!item || item.plus >= BURIED_ENHANCE_MAX) return;
     const cost = buriedEnhanceCost(item.plus);
     if (char.gold < cost) return;
-    const next = {
+    onUpdateChar({
       ...char,
       gold: char.gold - cost,
       equipped: { ...char.equipped, [slot]: { ...item, plus: (item.plus || 0) + 1 } },
-    };
-    onUpdateChar(next, 0);
+    }, 0);
     setNotice(`${item.name} +${(item.plus || 0) + 1} 강화 성공.`);
   };
 
@@ -111,9 +132,39 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
     setNotice(`야영으로 HP ${amount} 회복. 물약도 하나 만들었다.`);
   };
 
+  // 협상 — 지불하면 전투 없이 통과 + 장비. 거절하면 강적과 싸운다.
+  const payNegotiation = () => {
+    const deal = char.roomData?.deal;
+    if (!deal || char.roomData?.done || char.gold < deal.price) return;
+    if (deal.reward) {
+      const { char: next, raised, lv } = addBuriedItemToChar(char, deal.reward);
+      onUpdateChar({ ...next, gold: char.gold - deal.price, roomData: { ...char.roomData, done: true } }, 0);
+      setNotice(raised ? `거래 성립 — 스킬이 Lv.${lv}이 되었다.` : '거래 성립. 길이 열렸다.');
+    } else {
+      onUpdateChar({ ...char, gold: char.gold - deal.price, roomData: { ...char.roomData, done: true } }, 0);
+      setNotice('거래 성립. 길이 열렸다.');
+    }
+  };
+  const refuseNegotiation = () => {
+    const enemy = buildBuriedRoomEnemy(char, 'elite', char.roomEffect);
+    onUpdateChar({ ...char, room: 'elite' }, 0);
+    onEnterBattle(enemy, 'elite', char.roomEffect || null);
+  };
+
+  // 망자의 서고 — 장착 스킬 하나의 레벨을 올린다
+  const studySkill = (skillId) => {
+    if (char.roomData?.done) return;
+    const { char: next, lv } = raiseBuriedSkill(char, skillId);
+    onUpdateChar({ ...next, roomData: { ...char.roomData, done: true } }, 0);
+    setNotice(`서고의 기록을 읽었다 — 스킬이 Lv.${lv}이 되었다.`);
+  };
+
   // ===== 렌더 =====
   const room = char.room;
   const inRoom = room && room !== 'battle' && room !== 'elite' && room !== 'boss';
+  const libChoices = room === 'library' ? buriedLibraryChoices(char) : [];
+
+  const nextBossFloor = Object.keys(dungeon.bossFloors).map(Number).sort((a, b) => a - b).find(f => f > char.floor);
 
   return (
     <div className="absolute inset-0 flex flex-col ui-screen-enter" style={{ background: PALETTE.bgDeep }}>
@@ -124,11 +175,11 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
             <ChevronLeft size={20} />
           </button>
           <div className="text-center">
-            <div className="text-[12px] tracking-[0.3em] font-bold" style={{ color: PALETTE.legendary }}>
-              {BURIED_DUNGEON.name} · {char.floor} / {BURIED_DUNGEON.floors}층
+            <div className="text-[12px] tracking-[0.25em] font-bold" style={{ color: dungeon.color }}>
+              {dungeon.name} · {char.floor} / {dungeon.floors}층
             </div>
             <div className="text-[11px]" style={{ color: PALETTE.textDim }}>
-              {cls?.name} Lv.{char.lv} · 🪙 {char.gold} · 🧪 {char.potions || 0}
+              {cls?.name} Lv.{char.lv} · 🪙 {char.gold} · 🧪 {char.potions || 0} · 마물 Lv.{monLevel}
             </div>
           </div>
           <button onClick={() => setManage(true)} className="ui-press p-1.5 relative" style={{ color: PALETTE.dawn }}>
@@ -139,6 +190,14 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
         <BuriedBar value={char.hp} max={d.maxHp} color={PALETTE.accent} label="HP" />
         <div className="mt-1">
           <BuriedBar value={char.exp} max={buriedExpToNext(char.lv)} color={PALETTE.twilight} label="EXP" height={4} showText={false} />
+        </div>
+        {/* 걸음수 — 원작 규칙: 방을 지날수록 마물이 강해진다 */}
+        <div className="flex items-center justify-between mt-1.5 text-[11px]" style={{ color: PALETTE.textDim }}>
+          <span>걸음 {char.steps || 0} · {dungeon.stepsPerLevel}걸음마다 마물 Lv.+1</span>
+          {floorFx && (
+            <span className="px-1.5 py-0.5" style={{ borderRadius: 'var(--r-chip, 8px)', border: `1px solid ${PALETTE.legendary}66`, color: PALETTE.legendary }}
+              title={floorFx.desc}>★ {floorFx.name}</span>
+          )}
         </div>
       </div>
 
@@ -158,14 +217,22 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
             <div className="space-y-2">
               {offers.map((o, i) => {
                 const r = BURIED_ROOMS[o.type] || BURIED_ROOMS.battle;
+                const fx = getBuriedRoomEffect(o.effect);
+                const fxColor = fx ? (BURIED_ROOM_COLORS[fx.color]?.color || PALETTE.dawn) : null;
                 return (
-                  <button key={`${o.type}-${i}`} onClick={() => enterRoom(o.type)}
-                    className="ui-press w-full flex items-center gap-3 px-3 py-3.5 text-left"
-                    style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panel, border: `1px solid ${r.color}66` }}>
-                    <span className="text-[22px]">{r.icon}</span>
+                  <button key={`${o.type}-${i}`} onClick={() => enterRoom(o)}
+                    className="ui-press w-full flex items-start gap-3 px-3 py-3 text-left"
+                    style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panel, border: `1px solid ${fxColor || r.color}66` }}>
+                    <span className="text-[22px] mt-0.5">{r.icon}</span>
                     <div className="flex-1 min-w-0">
                       <div className="text-[13px] font-bold" style={{ color: r.color }}>{r.name}</div>
                       <div className="text-[12px]" style={{ color: PALETTE.textDim }}>{r.desc}</div>
+                      {fx && (
+                        <div className="mt-1 text-[11px]" style={{ color: fxColor }}>
+                          {fx.both ? '◆' : '◇'} {fx.name} — {fx.desc}
+                          {fx.both && <span style={{ color: PALETTE.textDim }}> (나와 적 모두)</span>}
+                        </div>
+                      )}
                     </div>
                   </button>
                 );
@@ -174,8 +241,7 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
             <div className="px-3 py-2.5 text-[11px] leading-relaxed"
               style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panel, border: `1px solid ${PALETTE.panelBorder}`, color: PALETTE.textDim }}>
               한 층에서는 방 하나만 고를 수 있다. 고르지 않은 방은 사라진다.
-              {char.floor === 4 && <><br /><b style={{ color: PALETTE.legendary }}>다음 층은 봉인의 문이다. 정비할 마지막 기회.</b></>}
-              {char.floor === 9 && <><br /><b style={{ color: PALETTE.accent }}>다음 층에 무덤의 폭군이 있다.</b></>}
+              {nextBossFloor === char.floor + 1 && <><br /><b style={{ color: PALETTE.legendary }}>다음 층은 봉인의 문이다. 정비할 마지막 기회.</b></>}
             </div>
           </>
         )}
@@ -206,14 +272,12 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
               const sold = char.roomData?.bought?.includes(i);
               const afford = char.gold >= entry.price;
               return (
-                <div key={i} className="space-y-1">
-                  <BuriedItemCard item={entry.item} showSlot dim={sold}
-                    right={<span className="text-[12px] tabular-nums font-bold shrink-0"
-                      style={{ color: sold ? PALETTE.textDim : afford ? PALETTE.legendary : PALETTE.accent }}>
-                      {sold ? '판매됨' : `🪙${entry.price}`}
-                    </span>}
-                    onClick={sold || !afford ? null : () => buy(entry, i)} />
-                </div>
+                <BuriedItemCard key={i} item={entry.item} showSlot dim={sold}
+                  right={<span className="text-[12px] tabular-nums font-bold shrink-0"
+                    style={{ color: sold ? PALETTE.textDim : afford ? PALETTE.legendary : PALETTE.accent }}>
+                    {sold ? '판매됨' : `🪙${entry.price}`}
+                  </span>}
+                  onClick={sold || !afford ? null : () => buy(entry, i)} />
               );
             })}
             <button onClick={buyPotion} disabled={char.gold < BURIED_POTION_PRICE}
@@ -289,6 +353,78 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
               style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.green, color: '#0a0608' }}>
               쉰다 — HP 45% 회복 + 물약 +1
             </button>
+            <button onClick={advance} className="ui-press w-full py-2.5 text-[12px]"
+              style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panelLight, color: PALETTE.text, border: `1px solid ${PALETTE.panelBorder}` }}>
+              다음 층으로
+            </button>
+          </div>
+        )}
+
+        {/* ===== 협상 (1.104.0) ===== */}
+        {room === 'negotiate' && (
+          <div className="space-y-2">
+            <div className="text-[12px] font-bold" style={{ color: PALETTE.dawn }}>🤝 협상</div>
+            <div className="text-[12px] leading-relaxed" style={{ color: PALETTE.textDim }}>
+              길을 막은 것이 손을 내민다. 값을 치르면 싸우지 않고 지나갈 수 있다.
+              거절하면 <b style={{ color: PALETTE.accent }}>강적</b>이 덤빈다.
+            </div>
+            {char.roomData?.deal?.reward && !char.roomData?.done && (
+              <>
+                <div className="text-[11px] tracking-[0.2em]" style={{ color: PALETTE.dawn }}>내놓은 물건</div>
+                <BuriedItemCard item={char.roomData.deal.reward} showSlot />
+              </>
+            )}
+            {!char.roomData?.done && (
+              <div className="flex gap-2">
+                <button onClick={payNegotiation} disabled={char.gold < (char.roomData?.deal?.price || 0)}
+                  className="ui-press flex-1 py-2.5 text-[12px] font-bold"
+                  style={{
+                    borderRadius: 'var(--r-btn, 13px)',
+                    background: char.gold >= (char.roomData?.deal?.price || 0) ? PALETTE.dawn : PALETTE.panelLight,
+                    color: char.gold >= (char.roomData?.deal?.price || 0) ? '#0a0608' : PALETTE.textDim,
+                  }}>
+                  🪙 {char.roomData?.deal?.price} 지불
+                </button>
+                <button onClick={refuseNegotiation} className="ui-press flex-1 py-2.5 text-[12px]"
+                  style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panelLight, color: PALETTE.accent, border: `1px solid ${PALETTE.accent}55` }}>
+                  거절한다 — 싸운다
+                </button>
+              </div>
+            )}
+            {char.roomData?.done && (
+              <button onClick={advance} className="ui-press w-full py-2.5 text-[12px]"
+                style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panelLight, color: PALETTE.text, border: `1px solid ${PALETTE.panelBorder}` }}>
+                다음 층으로
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* ===== 망자의 서고 (1.104.0) ===== */}
+        {room === 'library' && (
+          <div className="space-y-2">
+            <div className="text-[12px] font-bold" style={{ color: PALETTE.twilight }}>📜 망자의 서고</div>
+            <div className="text-[12px] leading-relaxed" style={{ color: PALETTE.textDim }}>
+              먼저 죽은 자들이 남긴 기록. 장착 중인 스킬 하나를 <b style={{ color: PALETTE.text }}>한 단계</b> 끌어올릴 수 있다 (최대 Lv.{BURIED_SKILL_MAX_LV}).
+            </div>
+            {char.roomData?.done
+              ? <div className="text-[12px]" style={{ color: PALETTE.textDim }}>기록은 재로 바스러졌다.</div>
+              : libChoices.length === 0
+                ? <div className="text-[12px]" style={{ color: PALETTE.textDim }}>더 올릴 수 있는 스킬이 없다.</div>
+                : libChoices.map(({ slot, item, skill, lv }) => (
+                    <button key={slot} onClick={() => studySkill(skill.id)}
+                      className="ui-press w-full flex items-center gap-2 px-3 py-2.5 text-left"
+                      style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panel, border: `1px solid ${PALETTE.twilight}55` }}>
+                      <span className="text-[13px]">{slotMeta(slot).icon}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[12px] font-bold truncate" style={{ color: PALETTE.text }}>{skill.name}</div>
+                        <div className="text-[11px]" style={{ color: PALETTE.textDim }}>{item.name}</div>
+                      </div>
+                      <span className="text-[12px] tabular-nums shrink-0" style={{ color: PALETTE.legendary }}>
+                        Lv.{lv} → {lv + 1}
+                      </span>
+                    </button>
+                  ))}
             <button onClick={advance} className="ui-press w-full py-2.5 text-[12px]"
               style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panelLight, color: PALETTE.text, border: `1px solid ${PALETTE.panelBorder}` }}>
               다음 층으로

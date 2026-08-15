@@ -7,8 +7,9 @@ import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { PALETTE } from '../../utils/helpers.js';
 import {
-  BURIED_SLOTS, BURIED_SLOT_IDS, BURIED_STATS, BURIED_SKILLS,
+  BURIED_SLOTS, BURIED_SLOT_IDS, BURIED_STATS, BURIED_SKILLS, BURIED_SKILL_MAX_LV,
   buriedDerived, buriedDustValue, canClassUseSkill, getBuriedClass, slotPool,
+  buriedTraitIds, getBuriedTrait, buriedSkillLv, buriedSkillAt, buriedSkillRank, BURIED_SKILL_RANKS,
 } from '../../data.js';
 import { BuriedItemCard, BuriedItemSheet, slotMeta, BURIED_DUST_ICON } from './BuriedCommon.jsx';
 
@@ -113,6 +114,8 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose }) {
                 { l: '물리/기교/마법', v: `${d.atk}/${d.fin}/${d.mag}`, c: PALETTE.dawn },
                 { l: '치명', v: `${d.crit}% ×${(1 + d.critDmg / 100).toFixed(1)}`, c: PALETTE.legendary },
                 { l: '회피 / SP회복', v: `${d.dodge}% / +${d.spRegen}`, c: PALETTE.green },
+                { l: '🔷 보호막', v: d.barrier || 0, c: PALETTE.ice },
+                { l: '추격 피해', v: d.chase || 0, c: PALETTE.dawn },
               ].map(x => (
                 <div key={x.l} className="px-2 py-1.5" style={{ borderRadius: 'var(--r-chip, 8px)', background: PALETTE.panel, border: `1px solid ${PALETTE.panelBorder}` }}>
                   <div className="text-[11px]" style={{ color: PALETTE.textDim }}>{x.l}</div>
@@ -129,8 +132,18 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose }) {
               <div className="space-y-1.5">
                 {BURIED_SLOTS.map(s => {
                   const item = char.equipped?.[s.id] || null;
+                  const lv = item ? buriedSkillLv(char, item.skillId) : 1;
+                  const rank = item ? buriedSkillRank(BURIED_SKILLS[item.skillId]) : null;
                   return (
                     <BuriedItemCard key={s.id} item={item} slotId={s.id}
+                      right={item ? (
+                        <div className="text-right shrink-0">
+                          <div className="text-[11px] font-bold tabular-nums" style={{ color: lv >= BURIED_SKILL_MAX_LV ? PALETTE.legendary : PALETTE.text }}>
+                            Lv.{lv}
+                          </div>
+                          <div className="text-[11px]" style={{ color: BURIED_SKILL_RANKS[rank]?.color }}>{rank}급</div>
+                        </div>
+                      ) : null}
                       onClick={() => { setPickSlot(s.id); setSheet(item ? { item, from: 'equipped' } : null); }} />
                   );
                 })}
@@ -205,13 +218,22 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose }) {
                   }}>+1</button>
               </div>
             ))}
-            {cls?.trait && (
-              <div className="px-3 py-2.5" style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panelLight, border: `1px solid ${cls.color}55` }}>
-                <div className="text-[11px] tracking-[0.2em] mb-1" style={{ color: cls.color }}>직업 특성</div>
-                <div className="text-[12px] font-bold" style={{ color: PALETTE.text }}>{cls.trait.name}</div>
-                <div className="text-[12px] mt-0.5 leading-relaxed" style={{ color: PALETTE.textDim }}>{cls.trait.desc}</div>
-              </div>
-            )}
+            {/* 특성 3개 — 원작 규칙: 첫 번째가 직업 전용 */}
+            <div className="px-3 py-2.5 space-y-2" style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panelLight, border: `1px solid ${cls?.color}55` }}>
+              <div className="text-[11px] tracking-[0.2em]" style={{ color: cls?.color }}>영구 특성 — 3개 (첫 번째는 직업 전용)</div>
+              {buriedTraitIds(char).map((id, i) => {
+                const t = getBuriedTrait(id);
+                if (!t) return null;
+                return (
+                  <div key={id}>
+                    <div className="text-[12px] font-bold" style={{ color: i === 0 ? cls?.color : PALETTE.text }}>
+                      {i === 0 ? '★' : '◆'} {t.name}
+                    </div>
+                    <div className="text-[12px] leading-relaxed" style={{ color: PALETTE.textDim }}>{t.desc}</div>
+                  </div>
+                );
+              })}
+            </div>
           </>
         )}
       </div>
