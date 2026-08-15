@@ -57,4 +57,5 @@ export const FEATURE_FLAGS = {
   dailyMissions: false, // 일일 임무 (타이틀 패널 + 진행 추적·보상 지급)
   raid: false,          // 레이드 (타이틀 메뉴 + 백그라운드 전투)
   hof: false,           // 명예의 전당 (타이틀 메뉴)
+  buried: true,         // 1.103.0~ 무덤의 유산 (BuriedBornes 모티브 별도 모드)
 };

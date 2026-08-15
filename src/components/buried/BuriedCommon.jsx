@@ -1,0 +1,209 @@
+// ============================================
+// components/buried/BuriedCommon.jsx — 무덤의 유산 공통 부품 (1.103.0)
+// ============================================
+// 세 화면(로비·던전·전투)이 공유하는 표시 부품. 로직은 data/buried.js에만 둔다.
+
+import React from 'react';
+import { PALETTE } from '../../utils/helpers.js';
+import {
+  BURIED_SKILLS, BURIED_STATUS, BURIED_SLOTS, BURIED_TIERS,
+  getBuriedTier, buriedItemStats, buriedDustValue, buriedEnhanceMult,
+} from '../../data.js';
+
+export const slotMeta = (slotId) => BURIED_SLOTS.find(s => s.id === slotId) || { name: slotId, icon: '◆' };
+
+const STAT_LABEL = {
+  atk: '공격력', mag: '마력', def: '방어력', hp: '최대 HP', sp: '최대 SP',
+  crit: '치명 확률', critDmg: '치명 피해', dodge: '회피율', spRegen: 'SP 회복',
+  str: '완력', dex: '기교', int: '지혜', vit: '체력',
+};
+const PCT_KEYS = new Set(['crit', 'critDmg', 'dodge']);
+export const statLabel = (k) => STAT_LABEL[k] || k;
+export const statText = (k, v) => `${v > 0 ? '+' : ''}${v}${PCT_KEYS.has(k) ? '%' : ''}`;
+
+// ===== 체력/SP 바 =====
+export function BuriedBar({ value, max, color, label, height = 8, showText = true }) {
+  const pct = max > 0 ? Math.max(0, Math.min(100, (value / max) * 100)) : 0;
+  return (
+    <div>
+      <div className="w-full overflow-hidden" style={{ height, borderRadius: 4, background: '#000', border: `1px solid ${PALETTE.panelBorder}` }}>
+        <div style={{ width: `${pct}%`, height: '100%', background: color, transition: 'width 260ms ease' }} />
+      </div>
+      {showText && (
+        <div className="flex justify-between mt-0.5">
+          {label && <span className="text-[11px]" style={{ color: PALETTE.textDim }}>{label}</span>}
+          <span className="text-[11px] tabular-nums ml-auto" style={{ color }}>{Math.max(0, Math.round(value))} / {Math.round(max)}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ===== 상태이상 칩 줄 =====
+export function BuriedStatusRow({ statuses, align = 'left' }) {
+  const list = Object.entries(statuses || {}).filter(([, n]) => n > 0);
+  if (list.length === 0) return <div style={{ height: 20 }} />;
+  return (
+    <div className="flex flex-wrap gap-1" style={{ justifyContent: align === 'right' ? 'flex-end' : 'flex-start', minHeight: 20 }}>
+      {list.map(([key, n]) => {
+        const def = BURIED_STATUS[key];
+        if (!def) return null;
+        return (
+          <span key={key} className="px-1.5 py-0.5 text-[11px] tabular-nums flex items-center gap-0.5"
+            style={{ borderRadius: 'var(--r-chip, 8px)', background: `${def.color}22`, border: `1px solid ${def.color}66`, color: def.color }}
+            title={`${def.name} — ${def.desc}`}>
+            <span>{def.icon}</span>{n}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+// ===== 장비 카드 =====
+// mode: 'row'(목록) | 'slot'(장착 슬롯)
+export function BuriedItemCard({ item, slotId, onClick, right, dim = false, showSlot = false }) {
+  const meta = slotMeta(slotId || item?.slot);
+  if (!item) {
+    return (
+      <button onClick={onClick} disabled={!onClick}
+        className="ui-press w-full flex items-center gap-2.5 px-3 py-2.5 text-left"
+        style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panel, border: `1px dashed ${PALETTE.panelBorder}`, opacity: 0.75 }}>
+        <span className="text-[15px] w-5 text-center" style={{ color: PALETTE.textDim }}>{meta.icon}</span>
+        <div className="flex-1 min-w-0">
+          <div className="text-[12px]" style={{ color: PALETTE.textDim }}>{meta.name} — 비어 있음</div>
+          <div className="text-[11px]" style={{ color: PALETTE.textDim, opacity: 0.7 }}>장비가 없으면 그 스킬도 쓸 수 없다</div>
+        </div>
+      </button>
+    );
+  }
+  const tier = getBuriedTier(item.tier);
+  const skill = BURIED_SKILLS[item.skillId];
+  const st = buriedItemStats(item);
+  return (
+    <button onClick={onClick} disabled={!onClick}
+      className="ui-press w-full flex items-center gap-2.5 px-3 py-2.5 text-left"
+      style={{
+        borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panel,
+        border: `1px solid ${tier.color}55`, opacity: dim ? 0.55 : 1,
+      }}>
+      <span className="text-[15px] w-5 text-center" style={{ color: tier.color }}>{meta.icon}</span>
+      <div className="flex-1 min-w-0">
+        <div className="text-[12px] font-bold truncate" style={{ color: tier.color }}>
+          {item.name}{item.plus > 0 && <span style={{ color: PALETTE.legendary }}> +{item.plus}</span>}
+        </div>
+        <div className="text-[11px] truncate" style={{ color: PALETTE.dawn }}>
+          ◆ {skill ? skill.name : '스킬 없음'}{skill && <span style={{ color: PALETTE.textDim }}> · SP {skill.sp}{skill.cd > 0 ? ` · CD ${skill.cd}` : ''}</span>}
+        </div>
+        <div className="text-[11px] truncate" style={{ color: PALETTE.textDim }}>
+          {showSlot && <span>{meta.name} · </span>}
+          {Object.entries(st).map(([k, v]) => `${statLabel(k)} ${statText(k, v)}`).join(' · ') || '옵션 없음'}
+        </div>
+      </div>
+      {right}
+    </button>
+  );
+}
+
+// ===== 장비 상세 시트 (장착·분해·비교) =====
+export function BuriedItemSheet({ item, compare, onEquip, onUnequip, onDismantle, onClose, extra }) {
+  if (!item) return null;
+  const tier = getBuriedTier(item.tier);
+  const skill = BURIED_SKILLS[item.skillId];
+  const st = buriedItemStats(item);
+  const cmp = compare ? buriedItemStats(compare) : null;
+  const keys = [...new Set([...Object.keys(st), ...Object.keys(cmp || {})])];
+
+  return (
+    <div className="absolute inset-0 z-50 flex items-end" style={{ background: 'rgba(0,0,0,0.72)' }} onClick={onClose}>
+      <div className="w-full px-3 pb-4 pt-3" onClick={(e) => e.stopPropagation()}
+        style={{ background: PALETTE.bgDeep, borderTop: `1px solid ${tier.color}66`, borderRadius: '18px 18px 0 0', maxHeight: '86%', overflowY: 'auto' }}>
+        <div className="flex items-start gap-2 mb-2">
+          <div className="flex-1">
+            <div className="text-[14px] font-bold" style={{ color: tier.color }}>
+              {item.name}{item.plus > 0 && <span style={{ color: PALETTE.legendary }}> +{item.plus}</span>}
+            </div>
+            <div className="text-[11px] mt-0.5" style={{ color: PALETTE.textDim }}>
+              {slotMeta(item.slot).name} · {tier.name} 등급 · {item.floor}층 산출
+              {item.plus > 0 && ` · 강화 배율 ×${buriedEnhanceMult(item.plus).toFixed(2)}`}
+            </div>
+          </div>
+          <button onClick={onClose} className="ui-press text-[12px] px-2 py-1" style={{ color: PALETTE.textDim }}>닫기</button>
+        </div>
+
+        {/* 내장 스킬 — 원작의 핵심: 이 장비를 껴야만 이 스킬을 쓴다 */}
+        {skill && (
+          <div className="px-3 py-2.5 mb-2" style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panelLight, border: `1px solid ${PALETTE.dawn}44` }}>
+            <div className="text-[11px] tracking-[0.2em] mb-1" style={{ color: PALETTE.dawn }}>내장 스킬</div>
+            <div className="text-[13px] font-bold" style={{ color: PALETTE.text }}>{skill.name}</div>
+            <div className="text-[11px] mt-0.5 tabular-nums" style={{ color: PALETTE.ice }}>
+              SP {skill.sp}{skill.cd > 0 ? ` · 쿨다운 ${skill.cd}턴` : ' · 쿨다운 없음'}
+              {skill.power ? ` · 위력 ${skill.power}%${skill.hits ? ` ×${skill.hits}` : ''}` : ''}
+              {skill.pierce ? ' · 방어 무시' : ''}
+            </div>
+            <div className="text-[12px] mt-1 leading-relaxed" style={{ color: PALETTE.textDim }}>{skill.desc}</div>
+          </div>
+        )}
+
+        {/* 스탯 (비교 있으면 증감 표시) */}
+        <div className="px-3 py-2.5 mb-2" style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panel, border: `1px solid ${PALETTE.panelBorder}` }}>
+          <div className="text-[11px] tracking-[0.2em] mb-1.5" style={{ color: PALETTE.dawn }}>
+            능력치{cmp ? ' (장착 중과 비교)' : ''}
+          </div>
+          {keys.length === 0 && <div className="text-[12px]" style={{ color: PALETTE.textDim }}>부여된 능력치 없음</div>}
+          {keys.map(k => {
+            const a = st[k] || 0, b = cmp ? (cmp[k] || 0) : null;
+            const diff = b === null ? null : a - b;
+            return (
+              <div key={k} className="flex justify-between items-center text-[12px] py-0.5">
+                <span style={{ color: PALETTE.textDim }}>{statLabel(k)}</span>
+                <span className="tabular-nums" style={{ color: PALETTE.text }}>
+                  {statText(k, a)}
+                  {diff !== null && diff !== 0 && (
+                    <span className="ml-1.5" style={{ color: diff > 0 ? PALETTE.green : PALETTE.accent }}>
+                      ({diff > 0 ? '+' : ''}{diff})
+                    </span>
+                  )}
+                </span>
+              </div>
+            );
+          })}
+          {(item.options || []).length > 0 && (
+            <div className="mt-1.5 pt-1.5 text-[11px]" style={{ borderTop: `1px solid ${PALETTE.panelBorder}`, color: PALETTE.textDim }}>
+              랜덤 옵션 {item.options.length}개 · 분해 시 {BURIED_DUST_ICON} {buriedDustValue(item)}
+            </div>
+          )}
+        </div>
+
+        {extra}
+
+        <div className="flex gap-2 mt-1">
+          {onEquip && <button onClick={onEquip} className="ui-press flex-1 py-2.5 text-[12px] font-bold"
+            style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.accent, color: '#fff' }}>장착</button>}
+          {onUnequip && <button onClick={onUnequip} className="ui-press flex-1 py-2.5 text-[12px]"
+            style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panelLight, color: PALETTE.text, border: `1px solid ${PALETTE.panelBorder}` }}>해제</button>}
+          {onDismantle && <button onClick={onDismantle} className="ui-press px-4 py-2.5 text-[12px]"
+            style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panelLight, color: PALETTE.textDim, border: `1px solid ${PALETTE.panelBorder}` }}>
+            분해 {BURIED_DUST_ICON}{buriedDustValue(item)}
+          </button>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export const BURIED_DUST_ICON = '🕯';
+
+// ===== 등급 범례 =====
+export function BuriedTierLegend() {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {BURIED_TIERS.map(t => (
+        <span key={t.id} className="px-1.5 py-0.5 text-[11px]"
+          style={{ borderRadius: 'var(--r-chip, 8px)', color: t.color, border: `1px solid ${t.color}55` }}>
+          {t.name}
+        </span>
+      ))}
+    </div>
+  );
+}

@@ -72,6 +72,9 @@ import AutoStatsScreen from './components/AutoStatsScreen.jsx';
 import GambleLobbyScreen, { GambleChoiceScreen } from './components/GambleScreen.jsx';
 import HofScreen from './components/HofScreen.jsx';
 import HofBattleScreen from './components/HofBattleScreen.jsx';
+import BuriedScreen from './components/buried/BuriedScreen.jsx';
+import BuriedDungeonScreen from './components/buried/BuriedDungeonScreen.jsx';
+import BuriedBattleScreen from './components/buried/BuriedBattleScreen.jsx';
 import NodeInfoModal from './components/NodeInfoModal.jsx';
 import BossIntroScreen from './components/BossIntroScreen.jsx';
 import PCSidebar from './components/PCSidebar.jsx';
@@ -139,10 +142,19 @@ import {
   POTIONS,
   FEATURE_FLAGS,
   AUTO_SPEED_SKIP,
+  createBuriedChar,
+  grantBuriedExp,
+  advanceBuriedFloor,
+  buildBuriedLegacy,
+  addBuriedItemToChar,
+  stepBuriedChar,
+  getBuriedDungeon,
+  getBuriedClass,
+  BURIED_DUNGEONS,
 } from './data.js';
 import { getKstDateKey } from './utils/dailyChallenge.js';
 import { simulateBestEndlessRun } from './utils/endlessSkipSim.js';
-import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, applyEngravingSlot, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear, dismantleRaidItem, dismantleRaidJunk, enhanceRaidItem, claimRaidWeekly, addRaidResources, spendRaidResourcesForItem, resolveRaidSecret, toggleRaidFormation, appendAutoRunLog, getGambleUsed, useGambleEntry, addTwilightCoins, addFateShards, redeemFateShards, buyGambleShopItem, addClassTitle, equipClassTitle, saveHofPatterns, hofLevelUpChar, recordHofClear, recordMastersClearByClass, updateBestRunTime } from './storage.js';
+import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, applyEngravingSlot, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear, dismantleRaidItem, dismantleRaidJunk, enhanceRaidItem, claimRaidWeekly, addRaidResources, spendRaidResourcesForItem, resolveRaidSecret, toggleRaidFormation, appendAutoRunLog, getGambleUsed, useGambleEntry, addTwilightCoins, addFateShards, redeemFateShards, buyGambleShopItem, addClassTitle, equipClassTitle, saveHofPatterns, hofLevelUpChar, recordHofClear, recordMastersClearByClass, updateBestRunTime, getBuried, saveBuriedChar, startBuriedChar, recordBuriedDeath, recordBuriedClear, addBuriedDust } from './storage.js';
 
 
 
@@ -304,6 +316,10 @@ export default function App() {
   const [runRetreat, setRunRetreat] = useState(false);
   // 1.98.0~ 명예의 전당 — 진행 중 스테이지
   const [hofStage, setHofStage] = useState(null);
+  // 무덤의 유산 (1.103.0) — 진행 상태는 meta.buried.char가 단일 출처. 아래 둘은 전투 중에만 쓰는 임시값.
+  const [buriedEnemy, setBuriedEnemy] = useState(null);
+  const [buriedRoom, setBuriedRoom] = useState(null);
+  const [buriedRoomFx, setBuriedRoomFx] = useState(null);
   const handleHofSavePatterns = (patterns) => {
     setMeta(prev => {
       const next = saveHofPatterns(prev, patterns);
@@ -319,6 +335,93 @@ export default function App() {
       return next;
     });
   };
+  // ============================================
+  // 무덤의 유산 (1.103.0) — BuriedBornes 모티브 별도 모드
+  // ============================================
+  // 캐릭터 스냅샷은 매 변경마다 meta.buried.char에 저장된다 (앱을 꺼도 그대로 이어진다).
+  const updateBuriedChar = (char, dustGain = 0) => {
+    setMeta(prev => {
+      let next = saveBuriedChar(prev, char);
+      if (dustGain) next = addBuriedDust(next, dustGain);
+      saveMeta(next);
+      return next;
+    });
+  };
+
+  // 새 캐릭터 — 보관함의 유산을 전부 물려받고 보관함을 비운다
+  const handleBuriedStart = (classId, dungeonId = 'labyrinth') => {
+    setMeta(prev => {
+      const b = getBuried(prev);
+      const char = createBuriedChar(classId, { items: b.legacy, gold: b.legacyGold }, dungeonId);
+      if (!char) return prev;
+      const next = startBuriedChar(prev, char, b.legacy.length);
+      saveMeta(next);
+      return next;
+    });
+    setScreen('buriedDungeon');
+  };
+
+  const handleBuriedEnterBattle = (enemy, roomType, roomEffectId = null) => {
+    setBuriedEnemy(enemy);
+    setBuriedRoom(roomType);
+    setBuriedRoomFx(roomEffectId);
+    setScreen('buriedBattle');
+  };
+
+  // 던전 클리어 — 캐릭터는 살아서 로비로. 다음 도전은 1층부터 (장비·레벨 유지).
+  // 클리어로 ①다음 던전 ②해당 직업의 전직(상위 직업)이 열린다.
+  const handleBuriedClear = (char) => {
+    const dungeonId = char?.dungeonId || 'labyrinth';
+    const idx = BURIED_DUNGEONS.findIndex(dg => dg.id === dungeonId);
+    const nextDungeonId = idx >= 0 && idx + 1 < BURIED_DUNGEONS.length ? BURIED_DUNGEONS[idx + 1].id : null;
+    // 전직은 첫 던전(미궁)을 클리어했을 때만 열린다
+    const cls = getBuriedClass(char?.classId);
+    const advanceClassId = dungeonId === 'labyrinth' ? (cls?.advance || null) : null;
+    const reset = { ...char, floor: 1, steps: 0, offers: null, room: null, roomData: null, roomEffect: null, floorEffect: null };
+    setMeta(prev => {
+      const next = recordBuriedClear(prev, reset, { dungeonId, nextDungeonId, advanceClassId });
+      saveMeta(next);
+      return next;
+    });
+    setBuriedEnemy(null); setBuriedRoom(null); setBuriedRoomFx(null);
+    setScreen('buried');
+  };
+
+  // 사망 — 캐릭터 소멸 + 유산 계승
+  const handleBuriedDeath = (char) => {
+    const legacy = buildBuriedLegacy(char);
+    setMeta(prev => {
+      const next = recordBuriedDeath(prev, legacy, 0);
+      saveMeta(next);
+      return next;
+    });
+    setBuriedEnemy(null); setBuriedRoom(null); setBuriedRoomFx(null);
+    setScreen('buried');
+  };
+
+  const handleBuriedBattleFinish = (res) => {
+    const char = meta?.buried?.char;
+    if (!char) { setBuriedEnemy(null); setScreen('buried'); return; }
+    if (!res?.win) { handleBuriedDeath(char); return; }
+
+    // 전리품 — addBuriedItemToChar가 스킬 레벨 상승·자동 장착을 함께 처리한다
+    let c = {
+      ...char,
+      hp: res.hp,
+      gold: (char.gold || 0) + (res.gold || 0),
+      potions: res.potions ?? char.potions,
+      kills: (char.kills || 0) + 1,
+    };
+    for (const it of (res.drops || [])) c = addBuriedItemToChar(c, it).char;
+    const { char: leveled } = grantBuriedExp(c, res.exp || 0);
+    // 방을 하나 지났으므로 걸음수 +1 (마물 레벨은 걸음수로 오른다)
+    const { char: advanced, cleared } = advanceBuriedFloor(stepBuriedChar(leveled));
+    setBuriedEnemy(null); setBuriedRoom(null); setBuriedRoomFx(null);
+    if (cleared) { handleBuriedClear(advanced); return; }
+    updateBuriedChar(advanced, 0);
+    setScreen('buriedDungeon');
+  };
+
   const handleHofFinish = (result) => {
     const stage = hofStage;
     setHofStage(null);
@@ -2820,9 +2923,26 @@ export default function App() {
               onSelectGuest={handleSelectGuest} 
               onSelectGoogle={handleSelectGoogle} 
             />}
-            {screen === 'title' && authMode && <TitleScreen meta={meta} onStart={() => setScreen('expeditionSelect')} onResume={resumeActiveRun} onAltar={enterAltar} onEngravings={() => setScreen('engraving')} onRaid={FEATURE_FLAGS.raid && raidUnlocked ? () => setScreen('raid') : null} onAchievements={() => { setPrevAchievementsBack('title'); setScreen('achievements'); }} onAutoStats={() => setScreen('autoStats')} onGamble={raidUnlocked ? () => { setGambleResult(null); setScreen('gamble'); } : null} onHof={FEATURE_FLAGS.hof && raidUnlocked ? () => setScreen('hof') : null} onChangelog={() => setShowChangelog({ firstSeen: false })} onAccount={() => setScreen('account')} />}
+            {screen === 'title' && authMode && <TitleScreen meta={meta} onStart={() => setScreen('expeditionSelect')} onResume={resumeActiveRun} onAltar={enterAltar} onEngravings={() => setScreen('engraving')} onRaid={FEATURE_FLAGS.raid && raidUnlocked ? () => setScreen('raid') : null} onAchievements={() => { setPrevAchievementsBack('title'); setScreen('achievements'); }} onAutoStats={() => setScreen('autoStats')} onGamble={raidUnlocked ? () => { setGambleResult(null); setScreen('gamble'); } : null} onHof={FEATURE_FLAGS.hof && raidUnlocked ? () => setScreen('hof') : null} onBuried={FEATURE_FLAGS.buried ? () => setScreen('buried') : null} onChangelog={() => setShowChangelog({ firstSeen: false })} onAccount={() => setScreen('account')} />}
             {FEATURE_FLAGS.hof && screen === 'hof' && <HofScreen meta={meta} onEnterStage={(stage) => { setHofStage(stage); setScreen('hofBattle'); }} onLevelUp={handleHofLevelUp} onSavePatterns={handleHofSavePatterns} onBack={() => setScreen('title')} />}
             {FEATURE_FLAGS.hof && screen === 'hofBattle' && hofStage && <HofBattleScreen meta={meta} stage={hofStage} onFinish={handleHofFinish} onRetreat={() => { setHofStage(null); setScreen('hof'); }} />}
+            {FEATURE_FLAGS.buried && screen === 'buried' && <BuriedScreen meta={meta}
+              onStartChar={handleBuriedStart}
+              onContinue={() => setScreen('buriedDungeon')}
+              onUpdateChar={updateBuriedChar}
+              onRetire={(legacy) => {
+                setMeta(prev => { const next = recordBuriedDeath(prev, legacy, 0); saveMeta(next); return next; });
+              }}
+              onBack={() => setScreen('title')} />}
+            {FEATURE_FLAGS.buried && screen === 'buriedDungeon' && meta?.buried?.char && <BuriedDungeonScreen meta={meta}
+              onUpdateChar={updateBuriedChar}
+              onEnterBattle={handleBuriedEnterBattle}
+              onClear={handleBuriedClear}
+              onLeave={() => setScreen('buried')} />}
+            {FEATURE_FLAGS.buried && screen === 'buriedBattle' && meta?.buried?.char && buriedEnemy && <BuriedBattleScreen
+              key={`${meta.buried.char.floor}-${buriedEnemy.key}`}
+              char={meta.buried.char} enemy={buriedEnemy} roomType={buriedRoom} roomEffectId={buriedRoomFx}
+              onFinish={handleBuriedBattleFinish} />}
             {screen === 'autoStats' && <AutoStatsScreen meta={meta} onClose={() => setScreen('title')} />}
             {screen === 'gamble' && <GambleLobbyScreen meta={meta} result={gambleResult} onEnter={handleGambleEnter} onBuy={handleGambleBuy} onBuyLegendary={handleGambleLegendary} onRedeem={handleGambleRedeem} onBack={() => { setGambleResult(null); setScreen('title'); }} />}
             {screen === 'gambleChoice' && currentExpedition?.isGamble && <GambleChoiceScreen pot={gamblePot} jackpot={gambleJackpot} onContinue={() => setScreen('reward')} onBank={handleGambleBank} />}

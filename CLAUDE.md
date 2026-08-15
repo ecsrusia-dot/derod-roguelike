@@ -104,6 +104,7 @@ src/
 ├── main.jsx / index.css          # 진입점 + 전역 스타일 + FX 키프레임
 ├── combat/damage.js              # 데미지·치명·회피 계산. 1.27.0~ engravingFx 인자
 ├── data/changelog.js             # 버전별 changelog (인게임 모달용)
+├── data/buried.js                # ★ 무덤의 유산 — BB 모티브 모드의 데이터+순수 로직 전부 (1.103.0, 1.104.0 확장)
 ├── utils/
 │   ├── helpers.js                # PALETTE, 패시브/유물/저주 헬퍼, getEnemyImageSrc, aggregateEngravingEffects(1.27.0~), isAwakeningConditionMet(1.26.0~), 4스탯 시그니처 헬퍼 9종(1.37.0~)
 │   ├── mapGen.js                 # linearSequence / branchSequence / 일반 가중치
@@ -125,6 +126,12 @@ src/
     ├── MapView.jsx               # 챕터 맵
     ├── TitleScreen.jsx           # 메인 (이어하기 버튼 포함)
     ├── EngravingScreen.jsx       # ★ 직업 각인 시스템 (1.25.0~). 각성도 10단계 + 슬롯 3칸 + 가챠. EngravingMigrationModal + AwakeningConditionNoticeModal(1.26.0~) export
+    ├── buried/                   # ★ 무덤의 유산 (1.103.0) — 본편 컴포넌트와 완전 분리
+    │   ├── BuriedScreen.jsx      #   로비 (캐릭터 생성·이어하기·유산 보관함·기록)
+    │   ├── BuriedDungeonScreen.jsx #  층 진행 + 방 선택 + 상점·제단·부장품·야영
+    │   ├── BuriedBattleScreen.jsx #  1:1 턴제 전투 (SP·상태이상 13종·직업 특성)
+    │   ├── BuriedManage.jsx      #   장비 6슬롯 교체 + 능력치 배분 (로비·던전 공용)
+    │   └── BuriedCommon.jsx      #   공통 표시 부품 (아이템 카드·상태 칩·바)
     └── …
 
 public/
@@ -987,7 +994,7 @@ PM이 AskUserQuestion으로 확정한 설계. **던전앤파이터 모티브, "�
 | 항목 | 값 |
 |---|---|
 | 브랜치 | `claude/set-effect-not-applied-3m931u` (1.79.1~1.90.0 시리즈 — 매 PR 머지 후 `git checkout -B <브랜치> origin/main`으로 재분기) |
-| 현재 게임 버전 | **1.90.0** (1.79~1.81 레이드 백그라운드·자동 사냥 확장 → 1.82 각성 스킬 15종 → 1.83~1.84 자동 전적·업적 롤백 픽스 → 1.85 도박장 → 1.86~1.87 레이드 난이도·초월 → 1.88 Wake Lock → 1.89 마스터즈+칭호 → **1.90.0 업적 전면 개편**: 죽은 업적 11개 부활·리뉴얼 + 신규 콘텐츠 업적 20개) |
+| 현재 게임 버전 | **1.104.0** (1.103.0 ⚰ 무덤의 유산 신설 → 1.104.0 원작 시스템 대폭 확장) / 이전 **1.90.0** (1.79~1.81 레이드 백그라운드·자동 사냥 확장 → 1.82 각성 스킬 15종 → 1.83~1.84 자동 전적·업적 롤백 픽스 → 1.85 도박장 → 1.86~1.87 레이드 난이도·초월 → 1.88 Wake Lock → 1.89 마스터즈+칭호 → **1.90.0 업적 전면 개편**: 죽은 업적 11개 부활·리뉴얼 + 신규 콘텐츠 업적 20개) |
 | **PR 머지 정책** | PM 상시 승인 (1.90.0 세션): **PR 생성 후 자동 머지** — 별도 확인 없이 진행 |
 | **다음 세션 브랜치 전략** | 다음 PR은 **`git fetch origin main` + `git checkout -B <새브랜치> origin/main`**으로 최신 main에서 분기 |
 
@@ -1041,6 +1048,7 @@ PM이 AskUserQuestion으로 확정한 설계. **던전앤파이터 모티브, "�
 | **에테르 시스템 삭제** (1.101.0) | skills.js cost 필드 전삭제 + initCombat(ether 초기화·재생 삭제, 기본기 판정 cd 0 기준) + CombatScreen(가드·HUD 칩·≡ 모달 3칸 체력/방어/소울) + storage.js loadMeta 「에테르의 그릇」 환불(1,500+3,000, 1.44.2 블록 **뒤**에 배치 — 구가격 이중정산 방지) | PM 결정: 에테르는 실제 제약이 아니었음(기본 3 + 턴당 +1 vs 소모 1~2 + CD). 스킬 제한 = **CD + AP만**. 침묵의 저주 → [물약 봉인](curse_potionSeal — handleUsePotion/chooseAutoPotion/벨트 UI 3곳 가드) / 에테르 물약 → 소울 물약(soul: 40, 이어하기 belt 'ether'→'soul' 치환). 신규 스킬에 cost 필드 재도입 금지 |
 | **황혼의 벨트 — 포션** (1.96.0, 1.97.0 직업별 개편) | `data/potions.js`(POTIONS 4종·CLASS_BELT 기본/최대·BELT_EXPANSIONS 조건) + helpers `getClassBeltSlots/getBeltExpansionCount` + App `belt` state(런 한정, 스냅샷 포함) + CombatScreen `handleUsePotion/chooseAutoPotion` + ShopScreen 포션 진열 + 사건 `twilight_alchemist`(potion_random) | 직업별 슬롯(PM 지정): 검사 2/4·술법사 1/3·마족 0/1·정령사 1/3·사제 1/2. 확장 = 조건 순차 달성(수련 클리어 → 원정 20회), 확장 1칸당 챕터 시작 랜덤 포션 +1. 제단 meta_beltSlot은 1.97.0 폐기·환불(loadMeta). 사용: AP 미소모·턴당 1회. 자동 룰: HP<50% 최소 충족 물약 / 소울 게이지 ≤60 → 소울 물약(1.101.0~). 회복 보정 미적용 |
 | **명예의 전당 — HOF** (1.98.0) | `data/hof.js`(HOF_CLASSES 5인·HOF_SKILLS·HOF_CONDITIONS 8종·HOF_STAGES 10단계·simulateHofBattle 순수 함수) + `HofScreen`(로비+패턴 편집기)/`HofBattleScreen`(로그 재생) + `meta.hof`(levels/patterns/clears/medals) | Hall of Fame(제로식) 모티브 — 유저가 짠 패턴(조건+값+스킬, 위→아래 첫 충족 실행)이 곧 전투력. 본편·레이드와 완전 분리. 시뮬은 순수 함수 → UI는 이벤트 로그 재생만 (밸런스 검증도 node로 가능). 밸런스: 스테이지 mult·훈장은 HOF_STAGES 한 곳, 성장은 hofStatAt(+10%/lv)·hofLevelCost. 검증 기준: 기본 패턴으로 8단계까지, 9~10단계는 패턴 튜닝 필수 |
+| **⚰ 무덤의 유산** (1.103.0 신설 / 1.104.0 확장) | `data/buried.js`(단일 데이터+순수함수 파일, 1,300줄) + `components/buried/`(Screen·Dungeon·Battle·Manage·Common) + `meta.buried` + `FEATURE_FLAGS.buried` | **BuriedBornes(Nussy) 모티브 별도 모드**. PM 결정: "캐릭터만 살리고" — 본편에서 계승하는 것은 5직업의 이름·일러·컬러뿐. 패시브·유물·각인·노드맵·AP 일절 미사용.<br>**1.103.0 6축**: ①**장비=스킬**(6슬롯 각각에 스킬 1개 내장) ②**SP**(턴당 회복, 기본 공격이 회수) ③**상태이상 13종**(중독은 미감소·저주는 회복 차단) ④**층 진행형 던전** ⑤**유산 계승형 사망** ⑥**레벨업 스탯 배분**(3p/lv).<br>**1.104.0 원작 확장 9종**: ⑦**보호막**(HP보다 먼저 깎임, 관통·도트는 무시 → `applyBuriedDamage`) ⑧**추격 피해**(적중 시 별개로 1회 추가, 방어 무시 → `resolveBuriedAttack`의 `chase`) ⑨**스킬 레벨 1~8**(같은 스킬 재획득 시 상승, Lv.3·8 추가 효과 → `buriedSkillAt`이 실효 스킬 생성) ⑩**방 효과 15종 + 층 효과 5종**(붉은 방은 양쪽 적용 → `resolveBuriedEnvFx`가 env 뭉치 반환, 전투는 `env*` 필드만 읽음) ⑪**걸음수 기반 마물 레벨**(층 아님 → `buriedMonsterLevel`) ⑫**던전 4종**(미궁→폐허→나락→심연, 순차 해금) ⑬**전직 상위 직업 5종**(미궁 클리어로 해금) ⑭**특성 3개**(1개 전용 + 공용 2, 스탯형은 `aggregateBuriedTraits`가 자동 합산) ⑮**신규 방 2종**(협상·망자의 서고).<br>⚠️ **밸런스 조정은 `data/buried.js` 한 곳** — `BURIED_DUNGEONS`(난이도 4축: floors/stepsPerLevel/baseLevel/보상배율) / `BURIED_TUNING` / `buriedDerived` / 적 hp·atk.<br>⚠️ **난이도 함정 2건 (재발 방지)**: ①상위 던전의 보상 배율(expMult·dropLuck)이 높으면 캐릭터가 더 빨리 자라 **난이도가 역전**된다 ②특정 보스만 유독 강하면 **그 보스가 있는 던전만** 어려워진다 → 최종 보스는 전 던전 공통(무덤의 폭군)으로 통일하고 난이도 축은 마물 레벨만 담당. UI가 순수 함수를 호출만 하므로 **node 시뮬로 검증 필수** |
 | **황혼의 도박장** (1.85.0) | `data/gamble.js`(GAMBLE_CONFIG·GAMBLE_SHOP·buildGambleExpedition) + `chapters.js` gamble_arena(챕터 1·2 적 풀 재사용, boss 배열 지원) + `GambleScreen.jsx` + `meta.twilightCoins/fateShards/gambleDaily` | 일일 3회 3연전 더블 업(❂10→20→40, 전멸 시 소멸) + 승리당 0.5% 잭팟 ❂500 + 천장(조각 100=❂500) + 전용 상점(영혼·심연석·정수). 도박 런은 스냅샷·반복·전문가 카운트 제외. 밸런스는 GAMBLE_CONFIG 한 곳 |
 | **자동 사냥 대기화면·정산·반복** (1.81.0) | `AutoHuntOverlay.jsx`(persistent 레이어) + CombatScreen `dmgStatsRef/trackDmg` + App `runStats/victoryStats/runRepeat/runRestartRef` | 대기화면: 자동 ON 시 상태창 오버레이(관전 토글). 정산: onVictory 3번째 인자 `{total, bySource}` → VictoryScreen(전투)·ExpeditionClearScreen(런). 반복: 드라이버 expeditionClear 분기에서 `runRestartRef.current()` 재출정 (클래식 startExpedition / 챔피언십 startChampionship 클로저 보존, 전멸 시 해제). 새 데미지 경로 추가 시 **trackDmg 호출 잊지 말 것** |
 | **자동 사냥** (1.72.0, 1.80.0 확장) | App 드라이버 useEffect + CombatScreen `chooseAutoAction` + EventScreen autoPlay | 1.80.0~ **전 원정 허용** (`autoHuntAllowed = !!currentExpedition`, 미클리어 포함) + **배속 ×1/×5/×10/×20/⏩스킵** (`autoSpeed` state → CombatScreen `dly()` 헬퍼로 자동 중에만 딜레이 압축. 1.102.1~ **⏩ 던전 스킵은 별도 버튼** (PM 정정 — 배속 단계 아님): App `runSkip` state + `startRunSkip/cancelRunSkip`, 내부적으로 autoSpeed를 `AUTO_SPEED_SKIP`(config.js)으로 올려 전 딜레이 0 + zIndex 88 커버 화면으로 가림, 결과 화면(expeditionClear/defeat) 도달 시 이전 배속 자동 복원. 보스 컷신 fastSkip, 스킵 런은 런타임 베스트 기록 무효). 전투 AI 우선순위: 소울100 → heavy·저체력 방어 → **회복 방어 선제(사제 가호, HP<50%)** → 버프 → 콤보 셋업 → **마지막 AP 방어 전환(적 공격 의도+HP<65%)** → AP당 기대 데미지 최대. **자해 스킬은 잔여 HP<15면 금지**. usable() 가드는 handlePlayerAction과 반드시 일치 유지 |
