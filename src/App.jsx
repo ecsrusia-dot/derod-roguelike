@@ -156,13 +156,16 @@ import {
   buriedLegacyExpandCost,
   hasBuriedUnique,
   maybeBuriedFloorSkillUp,
+  rollBuriedContract,
+  getBuriedContract,
+  BURIED_CONTRACT_COST,
   raiseBuriedSkill,
   buriedEquippedSkills,
   BURIED_SKILL_MAX_LV,
 } from './data.js';
 import { getKstDateKey } from './utils/dailyChallenge.js';
 import { simulateBestEndlessRun } from './utils/endlessSkipSim.js';
-import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, applyEngravingSlot, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear, dismantleRaidItem, dismantleRaidJunk, enhanceRaidItem, claimRaidWeekly, addRaidResources, spendRaidResourcesForItem, resolveRaidSecret, toggleRaidFormation, appendAutoRunLog, getGambleUsed, useGambleEntry, addTwilightCoins, addFateShards, redeemFateShards, buyGambleShopItem, addClassTitle, equipClassTitle, saveHofPatterns, hofLevelUpChar, recordHofClear, recordMastersClearByClass, updateBestRunTime, getBuried, saveBuriedChar, startBuriedChar, recordBuriedDeath, recordBuriedClear, addBuriedDust, craftBuriedForgeItem, expandBuriedLegacy, trackBuriedKill } from './storage.js';
+import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, applyEngravingSlot, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear, dismantleRaidItem, dismantleRaidJunk, enhanceRaidItem, claimRaidWeekly, addRaidResources, spendRaidResourcesForItem, resolveRaidSecret, toggleRaidFormation, appendAutoRunLog, getGambleUsed, useGambleEntry, addTwilightCoins, addFateShards, redeemFateShards, buyGambleShopItem, addClassTitle, equipClassTitle, saveHofPatterns, hofLevelUpChar, recordHofClear, recordMastersClearByClass, updateBestRunTime, getBuried, saveBuriedChar, startBuriedChar, recordBuriedDeath, recordBuriedClear, addBuriedDust, craftBuriedForgeItem, expandBuriedLegacy, trackBuriedKill, buyBuriedContract } from './storage.js';
 
 
 
@@ -358,10 +361,10 @@ export default function App() {
   };
 
   // 새 캐릭터 — 보관함의 유산을 전부 물려받고 보관함을 비운다
-  const handleBuriedStart = (classId, dungeonId = 'labyrinth') => {
+  const handleBuriedStart = (classId, dungeonId = 'labyrinth', contracts = []) => {
     setMeta(prev => {
       const b = getBuried(prev);
-      const char = createBuriedChar(classId, { items: b.legacy, gold: b.legacyGold }, dungeonId);
+      const char = createBuriedChar(classId, { items: b.legacy, gold: b.legacyGold }, dungeonId, contracts);
       if (!char) return prev;
       const next = startBuriedChar(prev, char, b.legacy.length);
       saveMeta(next);
@@ -390,6 +393,20 @@ export default function App() {
       );
       saveMeta(r.meta);
       return r.meta;
+    });
+  };
+
+  // 마의 계약 랜덤 구입 (1.111.0)
+  const handleBuriedBuyContract = () => {
+    setMeta(prev => {
+      const b = getBuried(prev);
+      const id = rollBuriedContract(b.contracts);
+      if (!id) return prev;
+      const next = buyBuriedContract(prev, id, BURIED_CONTRACT_COST);
+      if (next === prev) return prev;
+      setBuriedForgeNotice(`📜 「${getBuriedContract(id)?.name}」 체결 — ${getBuriedContract(id)?.desc}`);
+      saveMeta(next);
+      return next;
     });
   };
 
@@ -3018,6 +3035,7 @@ export default function App() {
               }}
               onForge={handleBuriedForge}
               onExpandLegacy={handleBuriedExpandLegacy}
+              onBuyContract={handleBuriedBuyContract}
               forgeNotice={buriedForgeNotice}
               onBack={() => { setBuriedForgeNotice(null); setScreen('title'); }} />}
             {FEATURE_FLAGS.buried && screen === 'buriedDungeon' && meta?.buried?.char && <BuriedDungeonScreen meta={meta}
