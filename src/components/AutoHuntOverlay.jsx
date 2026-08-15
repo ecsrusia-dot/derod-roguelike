@@ -100,7 +100,7 @@ export default function AutoHuntOverlay({
   classData, hp, maxHp, stats = {}, skills = {}, activeSkills = null,
   relics = [], activeRelicNames = null, ultimates = [], gold = 0, gem = 0, runSouls = 0,
   expedition, chapter, screen, runStats = null, autoRunCount = 0, runTimeMs = null, combatLive = null,
-  autoSpeed = 1, onCycleSpeed, runRepeat = false, onToggleRepeat = null,
+  autoSpeed = 1, onCycleSpeed, runRepeat = false, onToggleRepeat = null, onSkipRun = null,
   onWatch, onStop,
 }) {
   // 1.82.0~ 스킬·유물·각성 탭 시 정보 모달 (PM 요청)
@@ -343,7 +343,16 @@ export default function AutoHuntOverlay({
       </div>
 
       {/* 하단 컨트롤 */}
-      <div className="p-3 flex-none flex gap-2" style={{ borderTop: '1px solid var(--ui-line)', background: PALETTE.bgDeep }}>
+      <div className="p-3 flex-none flex flex-col gap-2" style={{ borderTop: '1px solid var(--ui-line)', background: PALETTE.bgDeep }}>
+        {/* 1.102.1~ ⏩ 던전 스킵 (PM 지시) — 이번 런 전 과정을 즉시 진행하고 결과만 표시 */}
+        {onSkipRun && (
+          <button onClick={onSkipRun} className="ui-press ui-sheen w-full" style={{
+            height: 42, borderRadius: 'var(--r-btn)', fontSize: 12, fontWeight: 700,
+            background: 'rgba(232,176,74,0.16)', border: `1px solid ${PALETTE.legendary}`,
+            color: PALETTE.legendary, boxShadow: '0 0 10px rgba(232,176,74,0.25)',
+          }}>⏩ 던전 스킵 — 결과 바로 보기</button>
+        )}
+        <div className="flex gap-2">
         <button onClick={onCycleSpeed} className="ui-press flex-1 tabular-nums" style={{
           height: 42, borderRadius: 'var(--r-btn)', fontSize: 11.5, fontWeight: 700,
           background: autoSpeed > 1 ? 'rgba(123,163,196,0.18)' : 'rgba(255,255,255,0.04)',
@@ -366,6 +375,7 @@ export default function AutoHuntOverlay({
           height: 42, borderRadius: 'var(--r-btn)', fontSize: 11.5, fontWeight: 700,
           background: 'rgba(232,176,74,0.14)', border: `1px solid ${PALETTE.legendary}88`, color: PALETTE.legendary,
         }}>⏸ 자동 해제</button>
+        </div>
       </div>
 
       {/* 스킬·유물·각성 정보 모달 */}
