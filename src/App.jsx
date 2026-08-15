@@ -419,7 +419,7 @@ export default function App() {
     // 전직은 첫 던전(미궁)을 클리어했을 때만 열린다
     const cls = getBuriedClass(char?.classId);
     const advanceClassId = dungeonId === 'labyrinth' ? (cls?.advance || null) : null;
-    const reset = { ...char, floor: 1, steps: 0, offers: null, room: null, roomData: null, roomEffect: null, floorEffect: null };
+    const reset = { ...char, floor: 1, steps: 0, offers: null, room: null, roomData: null, roomEffect: null, floorEffect: null, curses: [], curseHpLossPct: 0, pendingStatuses: null };
     setMeta(prev => {
       const next = recordBuriedClear(prev, reset, { dungeonId, nextDungeonId, advanceClassId });
       saveMeta(next);
@@ -459,6 +459,8 @@ export default function App() {
       kills: (char.kills || 0) + 1,
       pendingStatuses: null, // 1.107.0 — 이벤트 함정의 지연 상태이상은 1회 적용 후 소거
     };
+    // 저주 「레라지에」 — 처치마다 최대 HP -1% (런 한정, 최대 -50%)
+    if ((c.curses || []).includes('leraje')) c = { ...c, curseHpLossPct: Math.min(50, (c.curseHpLossPct || 0) + 1) };
     for (const it of (res.drops || [])) c = addBuriedItemToChar(c, it).char;
     // [u100] 수확자의 서 — 처치 시 75% 확률 무작위 스킬 레벨 +1 (전투 화면이 판정, 여기서 적용)
     if (res.skillLvUp) {

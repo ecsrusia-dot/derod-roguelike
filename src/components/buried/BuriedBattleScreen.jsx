@@ -24,7 +24,7 @@ import {
   buriedSkillAt, buriedSkillLv, buriedSkillLvNote, buriedTraitIds, getBuriedTrait,
   getBuriedRoomEffect, getBuriedFloorEffect, resolveBuriedEnvFx, getBuriedDungeon,
   buriedUniqueIds, getBuriedUnique, rollBuriedUniqueDrop, BURIED_UNDEAD_KEYS,
-  buriedModdedSkill,
+  buriedModdedSkill, hasBuriedCurse,
 } from '../../data.js';
 import { BuriedBar, BuriedStatusRow, BuriedItemCard, slotMeta, SkillKindBadge } from './BuriedCommon.jsx';
 
@@ -41,6 +41,8 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
   // ===== 전설의 무구 (1.106.0) — 장착 중 유니크 효과 =====
   const uniques = buriedUniqueIds(char);
   const uq = (id) => uniques.includes(id);
+  // ===== 저주 (1.108.0) — 해골 왕관과의 거래 대가 =====
+  const cs = (id) => hasBuriedCurse(char, id);
   // 스킬 단계 보정 — [u113] 쿨 0 / [u101] 쿨 상한 1 / [u99] 레벨당 위력 +2% / [u94] 2회 시전·위력 절반
   const applyUniqueSkillMods = (sk) => {
     let out = { ...sk };
@@ -52,6 +54,8 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
       if (uq('u94')) { out.hits = Math.max(1, (out.hits || 1)) * 2; mult *= 0.5; }
       out.power = Math.max(1, Math.round(out.power * mult));
     }
+    // 저주 「부알」 — 쿨다운 +1 (폭주 기관의 쿨 0에는 못 이긴다)
+    if (!uq('u113') && cs('vual') && out.cd > 0) out.cd += 1;
     return out;
   };
 
@@ -64,13 +68,17 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     name: cls?.name || '탐험가',
     hp: char.hp, maxHp: d.maxHp,
     sp: Math.round(d.maxSp * (uniques.includes('u106') ? 1 : 0.55)), maxSp: d.maxSp,
-    barrier: (d.barrier || 0) + (env.self.barrierAdd || 0),
+    barrier: hasBuriedCurse(char, 'alloces') ? 0
+      : Math.round(((d.barrier || 0) + (env.self.barrierAdd || 0)) * (hasBuriedCurse(char, 'amon') ? 0.5 : 1)),
     // [u107] 물리·기교 += 최대 HP 8% / [u111] 마법 += 보호막 30%
     atk: d.atk + (uniques.includes('u107') ? Math.round(d.maxHp * 0.08) : 0),
     fin: d.fin + (uniques.includes('u107') ? Math.round(d.maxHp * 0.08) : 0),
     mag: d.mag + (uniques.includes('u111') ? Math.round((d.barrier || 0) * 0.3) : 0),
     def: d.def, chase: d.chase || 0,
-    crit: d.crit, critDmg: d.critDmg, dodge: d.dodge, spRegen: d.spRegen,
+    crit: hasBuriedCurse(char, 'gaap') ? 0 : d.crit,
+    critDmg: d.critDmg,
+    dodge: hasBuriedCurse(char, 'belial') ? -999 : d.dodge,
+    spRegen: d.spRegen,
     // 1.107.0 — 이벤트 방 함정의 지연 상태이상 (다음 전투 시작 시 적용)
     statuses: applyBuriedStatuses({}, char.pendingStatuses || []),
     cds: {}, reflect: 0, reflectTurns: 0,
@@ -82,9 +90,12 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     name: enemy.name, hp: enemy.hp, maxHp: enemy.hp,
     // 1.106.0 — 강적·보스는 보호막을 두른다 ([u90] 파성추의 3배 조건이 의미를 갖는 지점)
     barrier: enemy.tier === 'boss' ? Math.round(enemy.hp * 0.15) : enemy.tier === 'elite' ? Math.round(enemy.hp * 0.08) : 0,
-    atk: enemy.atk, fin: enemy.atk, mag: enemy.atk, def: enemy.def, chase: 0,
+    atk: Math.round(enemy.atk * (hasBuriedCurse(char, 'bathin') ? 1.15 : 1)),
+    fin: Math.round(enemy.atk * (hasBuriedCurse(char, 'bathin') ? 1.15 : 1)),
+    mag: Math.round(enemy.atk * (hasBuriedCurse(char, 'bathin') ? 1.15 : 1)),
+    def: enemy.def, chase: 0,
     crit: 6, critDmg: 55, dodge: 3,
-    statuses: {},
+    statuses: hasBuriedCurse(char, 'berith') ? { wall: 2 } : {},
     envDmgPct: env.foe.dmgPct || 0, envTakenPct: env.foe.takenPct || 0,
     envCritAdd: env.foe.critAdd || 0, envMagPct: 0, envDodgeAdd: env.foe.dodgeAdd || 0,
   }));
@@ -149,7 +160,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
   const dmgText = (r, extra = '') => `-${r.toHp}${r.absorbed > 0 ? ` (🔷${r.absorbed})` : ''}${extra}`;
 
   const statusOpts = { chancePct: env.self.statusChancePct || 0, extra: env.self.statusExtra || 0 };
-  const foeStatusOpts = { chancePct: env.foe.statusChancePct || 0, extra: uq('u113') ? 1 : 0 };
+  const foeStatusOpts = { chancePct: env.foe.statusChancePct || 0, extra: (uq('u113') ? 1 : 0) + (cs('sabnock') ? 1 : 0) };
 
   // ===== 전투 종료 =====
   const finish = (win, finalHp) => {
@@ -189,7 +200,9 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
         pushLog('망자 사냥꾼 — 망자의 기운을 흡수해 HP 15% 회복', PALETTE.green);
       }
       setResult({
-        win: true, gold, exp, drops, hp, potions,
+        win: true, gold, exp, drops,
+        hp: cs('balam') ? 1 : hp, // 저주 「발람」 — 승리해도 HP 1
+        potions,
         dustGain: dustGainRef.current,
         skillLvUp: uq('u100') && Math.random() < 0.75, // [u100] 수확자의 서
       });
@@ -222,7 +235,13 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
       pushLog(`▶ ${skill.name}${skill.lv > 1 ? ` Lv.${skill.lv}` : ''}`, PALETTE.dawn);
     }
 
-    if (skill && skill.power) {
+    if (skill && skill.power && (E.statuses.wall || 0) > 0) {
+      // 적의 🧱방벽 — 내 공격 행동 1회를 통째로 막고 1개 소모
+      E.statuses = { ...E.statuses, wall: E.statuses.wall - 1 };
+      if (E.statuses.wall <= 0) delete E.statuses.wall;
+      pushFloat('enemy', '🧱 방벽!', PALETTE.ice);
+      pushLog(`${E.name}의 방벽이 공격을 막았다.`, PALETTE.ice);
+    } else if (skill && skill.power) {
       const res = resolveBuriedAttack(P, E, skill, { isPlayer: true, traits });
       if (res.dodged) {
         pushLog(`${E.name}이(가) 회피했다.`, PALETTE.textDim);
@@ -315,6 +334,12 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
 
     if (skill && skill.self) {
       let selfList = uq('u95') ? skill.self.map(a => ({ ...a, n: 5 })) : skill.self;
+      // 저주 「마르코시아스」 — 버프 획득 불가 (디버프성 self는 통과)
+      if (cs('marchosias')) {
+        const before = selfList.length;
+        selfList = selfList.filter(a => BURIED_STATUS[a.s]?.kind !== 'buff');
+        if (selfList.length < before) pushLog('마르코시아스의 저주 — 버프가 스러진다.', '#c9a86a');
+      }
       if (uq('u88')) selfList = selfList.map(a => ({ ...a, n: (a.n || 1) * 2 })); // [u88] 증폭의 심장
       P.statuses = applyBuriedStatuses(P.statuses, selfList, { extra: env.self.statusExtra || 0 });
       pushLog(`자신에게 ${selfList.map(a => `[${BURIED_STATUS[a.s]?.name}] ${a.n}`).join(' ')}`, PALETTE.ice);
@@ -447,6 +472,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     // ---------- 3. 라운드 종료 — 상태이상 + 방/층 효과 ----------
     const canP = buriedCanHeal(P) && !env.self.noHeal;
     const pt = tickBuriedStatuses(P, { canHeal: canP });
+    if (cs('paimon') && pt.dmg > 0) pt.dmg *= 2; // 저주 「파이몬」 — 도트 2배
     if (pt.dmg > 0) { hurt(P, pt.dmg, true); pushFloat('player', `-${pt.dmg}`, PALETTE.bleed); pushLog(`상태이상 피해 ${pt.dmg} (${pt.log.filter(x => x.dmg).map(x => x.name).join('·')})`, PALETTE.bleed); }
     if (pt.heal > 0) { const h = applyHeal(P, pt.heal); if (h > 0) { pushFloat('player', `+${h}`, PALETTE.green); pushLog(`재생 ${h} 회복`, PALETTE.green); } }
     P.statuses = pt.statuses;
@@ -489,6 +515,15 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
       pushLog(`광인의 벽 — 혼란 ${P.statuses.confuse}스택 → 🧱방벽 +${P.statuses.confuse}`, PALETTE.ice);
     }
 
+    // 저주 — 안드라스(방벽 몰수) / 데카라비아(적 격노) / 페넥스(적 회복)
+    if (cs('andras') && P.statuses.wall) { delete P.statuses.wall; pushLog('안드라스의 저주 — 방벽이 부서진다.', '#c9a86a'); }
+    if (cs('decarabia') && E.hp > 0) E.statuses = applyBuriedStatuses(E.statuses, [{ s: 'rage', n: 1 }]);
+    if (cs('phenex') && E.hp > 0 && !env.foe.noHeal && buriedCanHeal(E)) {
+      const h = Math.round(E.maxHp * 0.03);
+      E.hp = Math.min(E.maxHp, E.hp + h);
+      pushLog(`페넥스의 저주 — ${E.name}이(가) ${h} 회복했다.`, '#c9a86a');
+    }
+
     // SP 회복 + 쿨다운 감소 + 반사 지속
     P.sp = Math.min(P.maxSp, P.sp + P.spRegen + (env.self.spAdd || 0));
     for (const k of Object.keys(P.cds)) { P.cds[k] = Math.max(0, P.cds[k] - 1); if (P.cds[k] === 0) delete P.cds[k]; }
@@ -506,6 +541,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
   // 물약 — 턴을 소모하지 않지만 한 턴에 하나만
   const usePotion = () => {
     if (busy || result || potions <= 0 || potionUsedThisTurn) return;
+    if (cs('malphas')) { pushLog('말파스의 저주 — 물약이 목을 넘어가지 않는다.', '#c9a86a'); return; }
     const P = { ...player };
     const h = applyHeal(P, Math.round(player.maxHp * BURIED_POTION_HEAL_PCT / 100));
     if (h <= 0) { pushLog('회복이 봉쇄되어 있다.', PALETTE.textDim); return; }
