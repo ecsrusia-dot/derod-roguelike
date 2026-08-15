@@ -364,9 +364,30 @@ export default function App() {
   // 1.72.0~ 자동 사냥 모드 — 노드 선택·스킬 선택·보상 선택 모두 자동
   // 허용 범위: 수련의 길(training) + 무한모드(endless)만. 사망/원정 클리어 시 자동 해제.
   const [autoHunt, setAutoHunt] = useState(false);
-  // 1.80.0~ 자동 사냥 배속 (×1 / ×5 / ×10 / ×20) + 1.102.0~ ⏩스킵 (전투 딜레이 0 — 승리 전투는 안 보고 통과)
+  // 1.80.0~ 자동 사냥 배속 (×1 / ×5 / ×10 / ×20)
   const [autoSpeed, setAutoSpeed] = useState(1);
-  const cycleAutoSpeed = () => setAutoSpeed(s => (s === 1 ? 5 : s === 5 ? 10 : s === 10 ? 20 : s === 20 ? AUTO_SPEED_SKIP : 1));
+  const cycleAutoSpeed = () => setAutoSpeed(s => (s === 1 ? 5 : s === 5 ? 10 : s === 10 ? 20 : 1));
+  // 1.102.1~ ⏩ 던전 스킵 (PM 정정: 배속 단계가 아니라 별도 버튼) — 누르면 이번 런 전 과정을
+  // 딜레이 0으로 즉시 진행하고 커버 화면으로 가린 뒤, 던전 결과(클리어/전멸)만 노출.
+  // 동일 로직·동일 AI 룰을 빨리 감기만 함 — 결과 미리 계산·조작 없음. 런 결과가 나오면 이전 배속 복원.
+  const [runSkip, setRunSkip] = useState(false);
+  const preSkipSpeedRef = useRef(1);
+  const startRunSkip = () => {
+    if (!autoHunt || runSkip) return;
+    preSkipSpeedRef.current = autoSpeed < AUTO_SPEED_SKIP ? autoSpeed : 1;
+    setAutoSpeed(AUTO_SPEED_SKIP);
+    setRunSkip(true);
+    runTimeRef.current = null; // ×1 환산 불가 — 이번 런 베스트 기록 무효
+  };
+  const cancelRunSkip = () => {
+    setRunSkip(false);
+    setAutoSpeed(preSkipSpeedRef.current || 1);
+  };
+  // 런 결과 도달(클리어/전멸) 또는 자동 해제 시 스킵 종료 → 결과 화면이 그대로 보임
+  useEffect(() => {
+    if (!runSkip) return;
+    if (screen === 'expeditionClear' || screen === 'defeat' || !autoHunt) cancelRunSkip();
+  }, [runSkip, screen, autoHunt]); // eslint-disable-line react-hooks/exhaustive-deps
   // 1.100.0~ 런타임 누적 — 1초마다 (자동 사냥 배속이면 ×배속으로 환산해 ×1 기준 시간 유지)
   // 1.102.0~ ⏩스킵 모드는 ×1 환산 불가 → 런타임 기록 무효 (이어하기와 동일 취급, 베스트 오염 방지)
   // ⚠ 이 effect는 autoHunt·autoSpeed 선언 뒤에 있어야 함 (앞에 두면 deps 평가 시 TDZ 부팅 크래시 — 1.89.1 동일 유형)
@@ -2561,7 +2582,7 @@ export default function App() {
     }
     let t = null;
     // 1.80.0~ 배속 반영 (최소 60ms — 상태 반영 여유)
-    const later = (fn, ms) => { t = setTimeout(fn, Math.max(60, Math.round(ms / autoSpeed))); };
+    const later = (fn, ms) => { t = setTimeout(fn, autoSpeed >= AUTO_SPEED_SKIP ? 0 : Math.max(60, Math.round(ms / autoSpeed))); };
     if (screen === 'map' && mapData) {
       const candidates = mapData.nodes.filter(n => n.current && !n.locked);
       if (candidates.length > 0) {
@@ -2760,7 +2781,25 @@ export default function App() {
               autoSpeed={autoSpeed} onCycleSpeed={cycleAutoSpeed}
               runRepeat={runRepeat} onToggleRepeat={currentExpedition?.endless ? null : () => setRunRepeat(v => !v)}
               onWatch={() => setAutoOverlayHidden(true)} onStop={() => setAutoHunt(false)}
+              onSkipRun={runSkip ? null : startRunSkip}
             />
+          )}
+          {/* 1.102.1~ ⏩ 던전 스킵 커버 — 전 과정을 가리고 결과(클리어/전멸)만 노출. 진행은 밑에서 최고 속도로 계속 */}
+          {runSkip && screen !== 'expeditionClear' && screen !== 'defeat' && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3" style={{ zIndex: 88, background: 'rgba(10,7,9,0.97)' }}>
+              <div style={{ fontSize: 12, letterSpacing: '0.3em', color: PALETTE.legendary, fontWeight: 700 }}>⏩ 던전 스킵 진행 중</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: PALETTE.text }}>{currentExpedition?.name || ''}</div>
+              <div className="tabular-nums" style={{ fontSize: 11, color: PALETTE.textDim }}>
+                전투 {(runStats?.battles || 0)}회 진행 · 결과 산출 중…
+              </div>
+              <div style={{ width: 120, height: 4, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                <div className="fx-skip-sweep" style={{ height: '100%', width: '40%', borderRadius: 999, background: `linear-gradient(90deg, transparent, ${PALETTE.legendary})` }} />
+              </div>
+              <button onClick={cancelRunSkip} className="ui-press" style={{
+                marginTop: 10, padding: '6px 16px', borderRadius: 999, fontSize: 10.5,
+                background: 'rgba(255,255,255,0.05)', border: '1px solid var(--ui-line)', color: PALETTE.textDim,
+              }}>✕ 스킵 취소 (계속 관전)</button>
+            </div>
           )}
           {/* 1.83.0~ 자동 사냥 종료 요약 모달 — 세션 전체 런 합산 획득 정보 */}
           {autoSummary && <AutoHuntSummaryModal summary={autoSummary} onClose={() => setAutoSummary(null)} />}
@@ -2836,10 +2875,10 @@ export default function App() {
             {screen === 'altar' && <SoulAltar meta={meta} slots={altarSlots} onPurchase={purchaseUpgrade} onReroll={rerollAltar} onBack={() => setScreen('title')} />}
             {screen === 'engraving' && <EngravingScreen meta={meta} onMetaUpdate={setMeta} onBack={() => setScreen('title')} />}
             {screen === 'achievements' && <AchievementScreen meta={meta} onClaim={handleClaimAchievement} onClose={() => setScreen(prevAchievementsBack)} />}
-            {screen === 'map' && chapter && mapData && <MapView chapter={chapter} classData={classData} mapData={mapData} hp={hp} maxHp={maxHp} gold={gold} gem={gem} relics={relics} activeRelicNames={activeRelicNames} expedition={currentExpedition} curses={currentCurses} chapterIdx={chapterIdx} autoHunt={autoHunt} autoHuntAllowed={autoHuntAllowed} onToggleAutoHunt={toggleAutoHunt} autoSpeed={autoSpeed} onCycleAutoSpeed={cycleAutoSpeed} autoRunCount={autoSession?.runCount || 0} onEnterNode={handleEnterNode} onOpenStatus={() => setScreen('status')} onOpenAchievements={() => { setPrevAchievementsBack('map'); setScreen('achievements'); }} onOpenCodex={() => setScreen('codex')} onBack={() => setScreen('title')} onRetreat={currentExpedition?.endless ? handleEndlessRetreat : null} />}
+            {screen === 'map' && chapter && mapData && <MapView chapter={chapter} classData={classData} mapData={mapData} hp={hp} maxHp={maxHp} gold={gold} gem={gem} relics={relics} activeRelicNames={activeRelicNames} expedition={currentExpedition} curses={currentCurses} chapterIdx={chapterIdx} autoHunt={autoHunt} autoHuntAllowed={autoHuntAllowed} onToggleAutoHunt={toggleAutoHunt} autoSpeed={autoSpeed} onCycleAutoSpeed={cycleAutoSpeed} onSkipRun={autoHunt && !runSkip ? startRunSkip : null} autoRunCount={autoSession?.runCount || 0} onEnterNode={handleEnterNode} onOpenStatus={() => setScreen('status')} onOpenAchievements={() => { setPrevAchievementsBack('map'); setScreen('achievements'); }} onOpenCodex={() => setScreen('codex')} onBack={() => setScreen('title')} onRetreat={currentExpedition?.endless ? handleEndlessRetreat : null} />}
             {screen === 'codex' && <CodexScreen meta={meta} onBack={() => setScreen('map')} />}
             {screen === 'bossIntro' && currentEnemy && <BossIntroScreen enemyKey={currentEnemy} fastSkip={autoHunt && autoSpeed >= AUTO_SPEED_SKIP} onComplete={() => setScreen('combat')} />}
-            {screen === 'combat' && currentEnemy && <CombatScreen key={`${activeNodeId}-${currentEnemy}`} classData={classData} initialPlayer={{ hp, maxHp, ...classData.stats, ...stats }} initialSkills={skills} initialUltimates={ultimates} initialRelics={relics} activeSkills={activeSkills} activeRelicNames={activeRelicNames} enemyKey={currentEnemy} isBoss={isBossReward} expedition={currentExpedition} curses={currentCurses} meta={meta} engravingFx={getCombinedClassFx(meta, classData?.id)} chapterGimmick={chapter?.gimmick || null} autoPlay={autoHunt} autoSpeed={autoSpeed} onCycleAutoSpeed={cycleAutoSpeed} autoRunCount={autoSession?.runCount || 0} onToggleAuto={toggleAutoHunt} belt={belt} onConsumePotion={handleConsumePotion} onLiveStatus={autoHunt ? setCombatLive : null} onVictory={handleVictory} onDefeat={handleDefeat} />}
+            {screen === 'combat' && currentEnemy && <CombatScreen key={`${activeNodeId}-${currentEnemy}`} classData={classData} initialPlayer={{ hp, maxHp, ...classData.stats, ...stats }} initialSkills={skills} initialUltimates={ultimates} initialRelics={relics} activeSkills={activeSkills} activeRelicNames={activeRelicNames} enemyKey={currentEnemy} isBoss={isBossReward} expedition={currentExpedition} curses={currentCurses} meta={meta} engravingFx={getCombinedClassFx(meta, classData?.id)} chapterGimmick={chapter?.gimmick || null} autoPlay={autoHunt} autoSpeed={autoSpeed} onCycleAutoSpeed={cycleAutoSpeed} onSkipRun={autoHunt && !runSkip ? startRunSkip : null} autoRunCount={autoSession?.runCount || 0} onToggleAuto={toggleAutoHunt} belt={belt} onConsumePotion={handleConsumePotion} onLiveStatus={autoHunt ? setCombatLive : null} onVictory={handleVictory} onDefeat={handleDefeat} />}
             {screen === 'reward' && <RewardSelect rewards={currentRewards} gem={gem} skills={skills} relics={relics} ultimates={ultimates} onPick={handlePickReward} onReroll={handleReroll} hasRerolled={hasRerolled} isElite={isEliteReward} classId={classData?.id} meta={meta} expedition={currentExpedition} />}
             {screen === 'victory' && <VictoryScreen classData={classData} enemy={currentEnemy ? ENEMIES[currentEnemy] : null} gains={victoryGains} stats={victoryStats} onContinue={handleVictoryContinue} />}
             {screen === 'event' && currentEvent && <EventScreen event={currentEvent} classData={classData} stats={{ ...classData.stats, ...stats }} skills={skills} gold={gold} gem={gem} autoPlay={autoHunt} autoSpeed={autoSpeed} onResolve={handleEventResolve} />}

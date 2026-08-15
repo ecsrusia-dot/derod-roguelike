@@ -49,7 +49,7 @@ import {
 } from '../combat/initCombat.js';
 import { FloatingLabel, DamageVignette, WhiteFlash, SlashFx, MagicImpactFx, MagicParticles, BarrierRing, BarrierBreakFx, ThrustFx, BladeGuardFx, ShadowStrikeFx, StatusOverlay, UltimateCutin, EternalFlameCutin, FireballFx, ExplosionFx, IgniteGlowAura, IgniteExplodeFx, FlameBarrierFx, FlameReflectFx, CritScreenFx } from './CombatEffects.jsx';
 
-export default function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimates = [], initialRelics = [], activeSkills = null, activeRelicNames = null, enemyKey, isBoss, expedition, curses = [], meta, engravingFx = {}, chapterGimmick = null, autoPlay = false, autoSpeed = 1, onCycleAutoSpeed = null, autoRunCount = 0, onToggleAuto = null, belt = [], onConsumePotion = null, onLiveStatus = null, onVictory, onDefeat }) {
+export default function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimates = [], initialRelics = [], activeSkills = null, activeRelicNames = null, enemyKey, isBoss, expedition, curses = [], meta, engravingFx = {}, chapterGimmick = null, autoPlay = false, autoSpeed = 1, onCycleAutoSpeed = null, onSkipRun = null, autoRunCount = 0, onToggleAuto = null, belt = [], onConsumePotion = null, onLiveStatus = null, onVictory, onDefeat }) {
   // 1.80.0~ 자동 사냥 배속 — 자동 중에만 내부 진행·연출 딜레이 압축 (수동 플레이는 원속도)
   // 1.102.0~ ⏩스킵: 딜레이 0 — 동일 전투 로직을 즉시 진행 (승리 전투는 순식간에 통과, 패배는 그대로 노출)
   const dly = (ms) => {
@@ -2957,6 +2957,14 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                     border: `1px solid ${autoSpeed > 1 ? `${PALETTE.ice}aa` : 'var(--ui-line)'}`,
                     borderRadius: 999, padding: '3px 8px',
                   }}>{autoSpeed >= AUTO_SPEED_SKIP ? '⏩스킵' : `⚡×${autoSpeed}`}</button>
+                )}
+                {/* 1.102.1~ ⏩ 던전 스킵 — 이번 런 전 과정을 즉시 진행하고 결과만 표시 */}
+                {autoPlay && onSkipRun && (
+                  <button onClick={onSkipRun} className="ui-press flex-none" style={{
+                    fontSize: 10, fontWeight: 700, color: PALETTE.legendary,
+                    background: 'rgba(232,176,74,0.14)', border: `1px solid ${PALETTE.legendary}88`,
+                    borderRadius: 999, padding: '3px 8px',
+                  }}>⏩ 스킵</button>
                 )}
                 {phase === 'playerTurn' && !autoPlay && (
                   <button onClick={handleEndTurn} className="ui-press flex-none" style={{

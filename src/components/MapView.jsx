@@ -38,7 +38,7 @@ function NavTab({ icon: Icon, label, onClick }) {
   );
 }
 
-export default function MapView({ chapter, classData, mapData, hp, maxHp, gold, gem, relics = [], activeRelicNames = null, expedition, curses = [], chapterIdx, autoHunt = false, autoHuntAllowed = false, onToggleAutoHunt = null, autoSpeed = 1, onCycleAutoSpeed = null, autoRunCount = 0, onEnterNode, onOpenStatus, onOpenAchievements, onOpenCodex, onBack, onRetreat = null }) {
+export default function MapView({ chapter, classData, mapData, hp, maxHp, gold, gem, relics = [], activeRelicNames = null, expedition, curses = [], chapterIdx, autoHunt = false, autoHuntAllowed = false, onToggleAutoHunt = null, autoSpeed = 1, onCycleAutoSpeed = null, onSkipRun = null, autoRunCount = 0, onEnterNode, onOpenStatus, onOpenAchievements, onOpenCodex, onBack, onRetreat = null }) {
   // 1.93.0~ 무한모드 중간 포기 — 오탭 방지 2단 확인 (첫 탭 후 3초 내 재탭 시 실행)
   const [retreatArmed, setRetreatArmed] = useState(false);
   const retreatTimerRef = useRef(null);
@@ -118,6 +118,13 @@ export default function MapView({ chapter, classData, mapData, hp, maxHp, gold, 
               border: `1px solid ${autoSpeed > 1 ? `${PALETTE.ice}aa` : 'rgba(255,255,255,0.15)'}`,
               color: autoSpeed > 1 ? PALETTE.ice : PALETTE.textDim,
             }}>{autoSpeed >= AUTO_SPEED_SKIP ? '⏩ 스킵' : `⚡ ×${autoSpeed}`}</button>
+          )}
+          {/* 1.102.1~ ⏩ 던전 스킵 — 이번 런 전 과정 즉시 진행 후 결과만 표시 */}
+          {autoHunt && onSkipRun && (
+            <button onClick={onSkipRun} className="ui-press" style={{
+              height: 20, padding: '0 8px', borderRadius: 999, fontSize: 10, fontWeight: 700,
+              background: 'rgba(232,176,74,0.14)', border: `1px solid ${PALETTE.legendary}88`, color: PALETTE.legendary,
+            }}>⏩ 스킵</button>
           )}
           {/* 1.83.0~ 자동 사냥 런 카운터 */}
           {autoHunt && autoRunCount > 0 && (
