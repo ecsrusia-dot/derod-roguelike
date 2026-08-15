@@ -99,7 +99,7 @@ export const BURIED_CLASSES = [
   },
 ];
 // 기본 5직업 + 상위(전직) 5직업 모두에서 찾는다 (BURIED_ALL_CLASSES는 아래에서 정의)
-export const getBuriedClass = (id) => BURIED_ALL_CLASSES.find(c => c.id === id) || null;
+export const getBuriedClass = (id) => buriedAllClasses().find(c => c.id === id) || null;
 
 // =========================================================
 // 4. 상태이상 13종 — 전부 스택형
@@ -419,7 +419,7 @@ export function buriedDerived(char) {
   return {
     stats: st,
     traitFx: tf,
-    maxHp:   Math.round((140 + st.vit * 11 + (lv - 1) * 18 + (gear.hp || 0) + (tf.hp || 0)) * (1 - Math.min(50, char.curseHpLossPct || 0) / 100)),
+    maxHp:   Math.max(1, Math.round((140 + st.vit * 11 + (lv - 1) * 18 + (gear.hp || 0) + (tf.hp || 0)) * (tf.hpMult || 1) * (1 - Math.min(50, char.curseHpLossPct || 0) / 100))),
     maxSp:   Math.round(38 + st.int * 1.3 + (gear.sp || 0) + (tf.sp || 0)),
     atk:     Math.round((10 + st.str * 1.6 + (gear.atk || 0)) * (1 + (tf.physPct || 0) / 100)),
     fin:     Math.round((10 + st.dex * 1.6 + (gear.atk || 0)) * (1 + (tf.physPct || 0) / 100)),
@@ -914,6 +914,10 @@ export const BURIED_TRAITS = {
   faith:        { id: 'faith',        name: '신앙',     fx: { hp: 32, healPct: 15 }, desc: '최대 HP +32, 회복량 +15%.' },
   wardstone:    { id: 'wardstone',    name: '수호석',   fx: { barrier: 45 }, desc: '전투 시작 시 보호막 +45.' },
   sanguine:     { id: 'sanguine',     name: '흡혈 기질', fx: { drainPct: 6 }, desc: '주는 피해의 6%만큼 HP를 회복한다.' },
+  // 1.109.0 — 조우 해금 직업 전용
+  bloodflow:  { id: 'bloodflow',  name: '혈류',       exclusive: 'magiblade', trigger: true, desc: '자해가 있는 스킬을 쓸 때마다 이 전투 동안 주는 데미지 +15% (최대 +150%).' },
+  cursedblood:{ id: 'cursedblood',name: '저주받은 혈족', exclusive: 'vampire', trigger: true, fx: { hpMult: 0.6 }, desc: '최대 HP가 40% 줄어드는 대신, 전투 중 매 턴 최대 HP의 10%를 회복한다.' },
+  fairywing:  { id: 'fairywing',  name: '요정의 날개', exclusive: 'fairy',   trigger: true, fx: { hpMult: 0.75 }, desc: '최대 HP가 25% 줄어드는 대신, 전투를 🧱방벽 2개로 시작한다.' },
   hunter:       { id: 'hunter',       name: '추격자',   fx: { chase: 9 },    desc: '추격 피해 +9.' },
 };
 export const getBuriedTrait = (id) => BURIED_TRAITS[id] || null;
@@ -929,7 +933,10 @@ export function aggregateBuriedTraits(char) {
   for (const id of buriedTraitIds(char)) {
     const t = BURIED_TRAITS[id];
     if (!t?.fx) continue;
-    for (const [k, v] of Object.entries(t.fx)) out[k] = (out[k] || 0) + v;
+    for (const [k, v] of Object.entries(t.fx)) {
+      if (k === 'hpMult') out.hpMult = (out.hpMult || 1) * v; // 곱산 (감소 배율)
+      else out[k] = (out[k] || 0) + v;
+    }
   }
   return out;
 }
@@ -983,7 +990,8 @@ export const BURIED_ADVANCED_CLASSES = [
     traits: ['highdawn', 'faith', 'wardstone'],
   },
 ];
-export const BURIED_ALL_CLASSES = [...BURIED_CLASSES, ...BURIED_ADVANCED_CLASSES];
+// 전 직업 목록 — 조우 직업(파일 하단 정의)까지 포함해야 하므로 호출 시점에 평가 (TDZ 회피)
+export const buriedAllClasses = () => [...BURIED_CLASSES, ...BURIED_ADVANCED_CLASSES, ...BURIED_ENCOUNTER_CLASSES];
 
 // =========================================================
 // 14. 스킬 레벨 1~8 (1.104.0)
@@ -1621,3 +1629,47 @@ export const BURIED_SKULL_ROOM = {
   id: 'skullcrown', name: '해골 왕관', icon: '💀', color: '#c9a86a', weight: 6,
   desc: '허공에 뜬 왕관이 거래를 제안한다 — 저주를 받아들이면 보상을 주겠다고.',
 };
+
+// =========================================================
+// 24. 조우 해금 직업 3종 (1.109.0)
+// =========================================================
+// 원작 패턴: 성녀·용기병·다크엘프는 "이벤트 4회 조우"로 해금된다.
+// 각색: **특정 적을 N회 처치**하면 해금. 진행은 meta.buried.killsByEnemy로 추적.
+// 원작 모티브: 마검사(혈류) / 흡혈귀(저주받은 혈족) / 페어리(요정의 날개)
+export const BURIED_ENCOUNTER_CLASSES = [
+  {
+    id: 'magiblade', name: '마검사', sub: 'Spellblade', color: '#a8556e',
+    image: './classes/wanderer.jpg', encounter: true,
+    desc: '검과 마도서를 함께 쥔 자. 제 피를 태워 칼날을 벼린다.',
+    lines: { weapon: 'sword', offhand: 'tome' },
+    stats: { str: 11, dex: 6, int: 11, vit: 8 },
+    traits: ['bloodflow', 'swordmastery', 'arcana'],
+    unlock: { enemyKey: 'sealWitch', kills: 4, label: '봉인의 마녀 4회 처치' },
+  },
+  {
+    id: 'vampire', name: '흡혈귀', sub: 'Cursed Blood', color: '#7d2b4a',
+    image: './classes/demonblood.jpg', encounter: true,
+    desc: '저주받은 혈족. 생명의 그릇은 작지만, 피는 마르지 않는다.',
+    lines: { weapon: 'sword', offhand: 'claw' },
+    stats: { str: 12, dex: 8, int: 6, vit: 10 },
+    traits: ['cursedblood', 'sanguine', 'toughness'],
+    unlock: { enemyKey: 'graveWraith', kills: 8, label: '묘지 망령 8회 처치' },
+  },
+  {
+    id: 'fairy', name: '페어리', sub: 'Twilight Fae', color: '#8fb8d8',
+    image: './classes/elf.jpg', encounter: true,
+    desc: '황혼의 요정. 몸은 유리처럼 여리지만, 날개가 칼날을 흘려낸다.',
+    lines: { weapon: 'staff', offhand: 'relic' },
+    stats: { str: 4, dex: 10, int: 13, vit: 5 },
+    traits: ['fairywing', 'wardstone', 'lightstep'],
+    unlock: { enemyKey: 'twilightHusk', kills: 4, label: '황혼의 잔재 4회 처치' },
+  },
+];
+// 조우 해금 판정 — killsByEnemy 갱신 후 새로 열린 직업 id 반환 (없으면 null)
+export function checkBuriedEncounterUnlock(killsByEnemy, alreadyUnlocked) {
+  for (const c of BURIED_ENCOUNTER_CLASSES) {
+    if (alreadyUnlocked.includes(c.id)) continue;
+    if ((killsByEnemy[c.unlock.enemyKey] || 0) >= c.unlock.kills) return c.id;
+  }
+  return null;
+}

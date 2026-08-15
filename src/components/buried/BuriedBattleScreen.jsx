@@ -79,8 +79,11 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     critDmg: d.critDmg,
     dodge: hasBuriedCurse(char, 'belial') ? -999 : d.dodge,
     spRegen: d.spRegen,
-    // 1.107.0 — 이벤트 방 함정의 지연 상태이상 (다음 전투 시작 시 적용)
-    statuses: applyBuriedStatuses({}, char.pendingStatuses || []),
+    // 1.107.0 — 이벤트 방 함정의 지연 상태이상 + 1.109.0 요정의 날개(시작 방벽 2)
+    statuses: applyBuriedStatuses(
+      traits.includes('fairywing') && !hasBuriedCurse(char, 'andras') ? { wall: 2 } : {},
+      char.pendingStatuses || []
+    ),
     cds: {}, reflect: 0, reflectTurns: 0,
     envDmgPct: env.self.dmgPct || 0, envTakenPct: env.self.takenPct || 0,
     envCritAdd: env.self.critAdd || 0, envMagPct: env.self.magPct || 0,
@@ -360,7 +363,15 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
       pushLog(`보호막 +${skill.barrierGain}`, PALETTE.ice);
     }
     if (skill && skill.spGain) { P.sp = Math.min(P.maxSp, P.sp + skill.spGain); pushLog(`SP +${skill.spGain}`, PALETTE.ice); }
-    if (skill && skill.selfDmg) { hurt(P, skill.selfDmg, true); pushFloat('player', `-${skill.selfDmg}`, PALETTE.blood); pushLog(`자해 ${skill.selfDmg}`, PALETTE.blood); }
+    if (skill && skill.selfDmg) {
+      hurt(P, skill.selfDmg, true); pushFloat('player', `-${skill.selfDmg}`, PALETTE.blood); pushLog(`자해 ${skill.selfDmg}`, PALETTE.blood);
+      // 특성 「혈류」 (마검사) — 자해 스킬마다 이 전투 동안 데미지 +15% (최대 +150%)
+      if (traits.includes('bloodflow') && (P.bloodflowStacks || 0) < 10) {
+        P.bloodflowStacks = (P.bloodflowStacks || 0) + 1;
+        P.envDmgPct = (P.envDmgPct || 0) + 15;
+        pushLog(`혈류 — 피가 칼날을 벼린다. 데미지 +15% (누적 +${P.bloodflowStacks * 15}%)`, '#a8556e');
+      }
+    }
     if (skill && skill.reflect) { P.reflect = skill.reflect; P.reflectTurns = 2; }
     // 접두어 「수호하는」 — 사용 시 확률 방벽
     if (skill && skill.wallChance && Math.random() * 100 < skill.wallChance) {
@@ -513,6 +524,12 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     if (uq('u97') && (P.statuses.confuse || 0) > 0) {
       P.statuses = applyBuriedStatuses(P.statuses, [{ s: 'wall', n: P.statuses.confuse }]);
       pushLog(`광인의 벽 — 혼란 ${P.statuses.confuse}스택 → 🧱방벽 +${P.statuses.confuse}`, PALETTE.ice);
+    }
+
+    // 특성 「저주받은 혈족」 (흡혈귀) — 매 턴 최대 HP 10% 회복
+    if (traits.includes('cursedblood') && P.hp > 0) {
+      const h = applyHeal(P, Math.round(P.maxHp * 0.10));
+      if (h > 0) { pushFloat('player', `+${h}`, PALETTE.green); pushLog(`저주받은 혈족 — 피가 스스로 차오른다. +${h}`, '#7d2b4a'); }
     }
 
     // 저주 — 안드라스(방벽 몰수) / 데카라비아(적 격노) / 페넥스(적 회복)
