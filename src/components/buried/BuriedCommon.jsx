@@ -8,7 +8,7 @@ import { PALETTE } from '../../utils/helpers.js';
 import {
   BURIED_SKILLS, BURIED_STATUS, BURIED_SLOTS, BURIED_TIERS,
   getBuriedTier, buriedItemStats, buriedDustValue, buriedEnhanceMult,
-  buriedSkillEffectLines,
+  buriedSkillEffectLines, getBuriedUnique,
 } from '../../data.js';
 
 export const slotMeta = (slotId) => BURIED_SLOTS.find(s => s.id === slotId) || { name: slotId, icon: '◆' };
@@ -128,6 +128,12 @@ export function BuriedItemCard({ item, slotId, onClick, right, dim = false, show
           {showSlot && <span>{meta.name} · </span>}
           {Object.entries(st).map(([k, v]) => `${statLabel(k)} ${statText(k, v)}`).join(' · ') || '옵션 없음'}
         </div>
+        {/* 전설의 무구 (1.106.0) — 고유 효과 한 줄 */}
+        {item.unique && getBuriedUnique(item.unique) && (
+          <div className="text-[11px] truncate" style={{ color: tier.color }}>
+            ✦ {getBuriedUnique(item.unique).desc}
+          </div>
+        )}
       </div>
       {right}
     </button>
@@ -167,6 +173,15 @@ export function BuriedItemSheet({ item, compare, onEquip, onUnequip, onDismantle
             <BuriedItemCard item={compare} dim />
             <div className="text-center text-[13px] leading-none" style={{ color: PALETTE.dawn }}>▼ 교체 후보</div>
             <BuriedItemCard item={item} />
+          </div>
+        )}
+
+        {/* 전설의 무구 고유 효과 (1.106.0) */}
+        {item.unique && getBuriedUnique(item.unique) && (
+          <div className="px-3 py-2.5 mb-2" style={{ borderRadius: 'var(--r-panel, 18px)', background: `${tier.color}14`, border: `1px solid ${tier.color}66` }}>
+            <div className="text-[11px] tracking-[0.2em] mb-1" style={{ color: tier.color }}>✦ 전설의 무구 — 고유 효과</div>
+            <div className="text-[12px] leading-relaxed" style={{ color: PALETTE.text }}>{getBuriedUnique(item.unique).desc}</div>
+            <div className="text-[11px] mt-1" style={{ color: PALETTE.textDim }}>장착 중일 때만 발동한다. 보스만 떨어뜨리는 장비.</div>
           </div>
         )}
 

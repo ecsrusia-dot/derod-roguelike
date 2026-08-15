@@ -154,6 +154,11 @@ import {
   BURIED_FORGE,
   craftBuriedItem,
   buriedLegacyExpandCost,
+  hasBuriedUnique,
+  maybeBuriedFloorSkillUp,
+  raiseBuriedSkill,
+  buriedEquippedSkills,
+  BURIED_SKILL_MAX_LV,
 } from './data.js';
 import { getKstDateKey } from './utils/dailyChallenge.js';
 import { simulateBestEndlessRun } from './utils/endlessSkipSim.js';
@@ -439,7 +444,11 @@ export default function App() {
   const handleBuriedBattleFinish = (res) => {
     const char = meta?.buried?.char;
     if (!char) { setBuriedEnemy(null); setScreen('buried'); return; }
-    if (!res?.win) { handleBuriedDeath(char); return; }
+    if (!res?.win) {
+      if (res?.dustGain) setMeta(prev => { const next = addBuriedDust(prev, res.dustGain); saveMeta(next); return next; });
+      handleBuriedDeath(char);
+      return;
+    }
 
     // 전리품 — addBuriedItemToChar가 스킬 레벨 상승·자동 장착을 함께 처리한다
     let c = {
@@ -450,12 +459,34 @@ export default function App() {
       kills: (char.kills || 0) + 1,
     };
     for (const it of (res.drops || [])) c = addBuriedItemToChar(c, it).char;
-    const { char: leveled } = grantBuriedExp(c, res.exp || 0);
-    // 방을 하나 지났으므로 걸음수 +1 (마물 레벨은 걸음수로 오른다)
-    const { char: advanced, cleared } = advanceBuriedFloor(stepBuriedChar(leveled));
+    // [u100] 수확자의 서 — 처치 시 75% 확률 무작위 스킬 레벨 +1 (전투 화면이 판정, 여기서 적용)
+    if (res.skillLvUp) {
+      const ids = buriedEquippedSkills(c).map(x => x.skill.id)
+        .filter(id => (c.skillLevels?.[id] || 1) < BURIED_SKILL_MAX_LV);
+      if (ids.length > 0) c = raiseBuriedSkill(c, ids[Math.floor(Math.random() * ids.length)]).char;
+    }
+    const { char: leveled, levels } = grantBuriedExp(c, res.exp || 0);
+    let grown = leveled;
+    // [u85] 성장의 씨앗 — 레벨업마다 무작위 능력치 +2 추가
+    if (levels.length > 0 && hasBuriedUnique(grown, 'u85')) {
+      const keys = ['str', 'dex', 'int', 'vit'];
+      for (let i = 0; i < levels.length; i++) {
+        const k = keys[Math.floor(Math.random() * keys.length)];
+        grown = { ...grown, stats: { ...grown.stats, [k]: (grown.stats[k] || 0) + 2 } };
+      }
+    }
+    // 방을 하나 지났으므로 걸음수 +1 + [u102] 층 이동 스킬 레벨 판정
+    const { char: blessed } = maybeBuriedFloorSkillUp(stepBuriedChar(grown));
+    const { char: advanced, cleared } = advanceBuriedFloor(blessed);
     setBuriedEnemy(null); setBuriedRoom(null); setBuriedRoomFx(null);
-    if (cleared) { handleBuriedClear(advanced); return; }
-    updateBuriedChar(advanced, 0);
+    // [u109] 저주 포식자 — 전투 중 얻은 먼지 정산
+    const dustGain = res.dustGain || 0;
+    if (cleared) {
+      if (dustGain) setMeta(prev => { const next = addBuriedDust(prev, dustGain); saveMeta(next); return next; });
+      handleBuriedClear(advanced);
+      return;
+    }
+    updateBuriedChar(advanced, dustGain);
     setScreen('buriedDungeon');
   };
 

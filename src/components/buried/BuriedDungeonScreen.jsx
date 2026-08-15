@@ -22,6 +22,7 @@ import {
   advanceBuriedFloor, buildBuriedRoomEnemy, addBuriedItemToChar, stepBuriedChar,
   getBuriedRoomEffect, getBuriedFloorEffect,
   buildBuriedNegotiation, buriedLibraryChoices, raiseBuriedSkill, buriedSkillLv,
+  hasBuriedUnique, maybeBuriedFloorSkillUp,
 } from '../../data.js';
 import { BuriedItemCard, BuriedBar, BURIED_DUST_ICON, slotMeta } from './BuriedCommon.jsx';
 import BuriedManage from './BuriedManage.jsx';
@@ -49,11 +50,12 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
 
   // 방을 하나 해결하면 걸음수 +1 후 다음 층으로
   const advance = () => {
-    const stepped = stepBuriedChar(char);
-    const { char: next, cleared } = advanceBuriedFloor(stepped);
-    if (cleared) onClear(next);
-    else onUpdateChar(next, 0);
-    setNotice(null);
+    // [u102] 순례자의 성표 — 층 이동 시 25% 확률 무작위 스킬 레벨 +1
+    const { char: blessed, raised } = maybeBuriedFloorSkillUp(stepBuriedChar(char));
+    const { char: next, cleared } = advanceBuriedFloor(blessed);
+    if (cleared) { onClear(next); return; }
+    onUpdateChar(next, 0);
+    setNotice(raised ? `순례자의 성표 — 오르는 길에 [${raised.id}] 스킬이 Lv.${raised.lv}이 되었다.` : null);
   };
 
   // ===== 방 진입 =====
@@ -66,8 +68,18 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
       return;
     }
     let roomData = null;
-    if (type === 'shop') roomData = { shop: rollBuriedShop(monLevel, char.classId), bought: [] };
-    if (type === 'treasure') roomData = { item: rollBuriedItem({ slot: null, classId: char.classId, floor: monLevel, luck: 2 + dungeon.dropLuck }), taken: false };
+    if (type === 'shop') {
+      let shop = rollBuriedShop(monLevel, char.classId);
+      // [u103] 상인의 인장 — 판매가 40% 할인
+      if (hasBuriedUnique(char, 'u103')) shop = shop.map(e => ({ ...e, price: Math.round(e.price * 0.6) }));
+      roomData = { shop, bought: [] };
+    }
+    if (type === 'treasure') {
+      // [u110] 도굴왕의 곡괭이 — 부장품 방에서 장비 1개 추가
+      const items = [rollBuriedItem({ slot: null, classId: char.classId, floor: monLevel, luck: 2 + dungeon.dropLuck })];
+      if (hasBuriedUnique(char, 'u110')) items.push(rollBuriedItem({ slot: null, classId: char.classId, floor: monLevel, luck: 2 + dungeon.dropLuck }));
+      roomData = { items: items.filter(Boolean), taken: [] };
+    }
     if (type === 'negotiate') roomData = { deal: buildBuriedNegotiation(char), done: false };
     if (type === 'library') roomData = { done: false };
     onUpdateChar({ ...char, room: type, roomData, roomEffect: offer.effect || null }, 0);
@@ -84,10 +96,10 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
         : `${item.name} — 가방에 넣었다.`);
   };
 
-  const takeTreasure = () => {
-    const item = char.roomData?.item;
-    if (!item || char.roomData?.taken) return;
-    gainItem(item, { roomData: { ...char.roomData, taken: true } });
+  const takeTreasure = (idx) => {
+    const item = char.roomData?.items?.[idx];
+    if (!item || char.roomData?.taken?.includes(idx)) return;
+    gainItem(item, { roomData: { ...char.roomData, taken: [...(char.roomData.taken || []), idx] } });
   };
 
   const buy = (entry, idx) => {
@@ -249,14 +261,17 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
         {/* ===== 부장품 ===== */}
         {room === 'treasure' && (
           <div className="space-y-2">
-            <div className="text-[12px] font-bold" style={{ color: PALETTE.legendary }}>📦 부장품</div>
-            {char.roomData?.item
-              ? <BuriedItemCard item={char.roomData.item} showSlot />
-              : <div className="text-[12px]" style={{ color: PALETTE.textDim }}>관은 비어 있었다.</div>}
-            {char.roomData?.item && !char.roomData?.taken && (
-              <button onClick={takeTreasure} className="ui-press w-full py-2.5 text-[12px] font-bold"
-                style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.accent, color: '#fff' }}>가져간다</button>
-            )}
+            <div className="text-[12px] font-bold" style={{ color: PALETTE.legendary }}>📦 부장품{(char.roomData?.items?.length || 0) > 1 ? ' — 도굴왕의 곡괭이가 빛난다' : ''}</div>
+            {(char.roomData?.items?.length || 0) === 0 && <div className="text-[12px]" style={{ color: PALETTE.textDim }}>관은 비어 있었다.</div>}
+            {(char.roomData?.items || []).map((it, idx) => (
+              <div key={it.id} className="space-y-1">
+                <BuriedItemCard item={it} showSlot dim={char.roomData?.taken?.includes(idx)} />
+                {!char.roomData?.taken?.includes(idx) && (
+                  <button onClick={() => takeTreasure(idx)} className="ui-press w-full py-2 text-[12px] font-bold"
+                    style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.accent, color: '#fff' }}>가져간다</button>
+                )}
+              </div>
+            ))}
             <button onClick={advance} className="ui-press w-full py-2.5 text-[12px]"
               style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panelLight, color: PALETTE.text, border: `1px solid ${PALETTE.panelBorder}` }}>
               다음 층으로
