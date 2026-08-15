@@ -467,7 +467,10 @@ export default function App() {
       potions: res.potions ?? char.potions,
       kills: (char.kills || 0) + 1,
       pendingStatuses: null, // 1.107.0 — 이벤트 함정의 지연 상태이상은 1회 적용 후 소거
+      carryBarrier: res.carryBarrier || 0, // [u6] 달인 — 남은 보호막을 다음 전투로
     };
+    // [u36] 비전 — 처치마다 모든 공격력 +2 (런 영구)
+    if (res.research) c = { ...c, researchPower: (c.researchPower || 0) + res.research };
     // 저주 「레라지에」 — 처치마다 최대 HP -1% (런 한정, 최대 -50%)
     if ((c.curses || []).includes('leraje')) c = { ...c, curseHpLossPct: Math.min(50, (c.curseHpLossPct || 0) + 1) };
     for (const it of (res.drops || [])) c = addBuriedItemToChar(c, it).char;
