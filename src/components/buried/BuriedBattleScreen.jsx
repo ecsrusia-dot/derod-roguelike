@@ -24,7 +24,7 @@ import {
   buriedSkillAt, buriedSkillLv, buriedSkillLvNote, buriedTraitIds, getBuriedTrait,
   getBuriedRoomEffect, getBuriedFloorEffect, resolveBuriedEnvFx, getBuriedDungeon,
   buriedUniqueIds, getBuriedUnique, rollBuriedUniqueDrop, BURIED_UNDEAD_KEYS,
-  buriedModdedSkill, hasBuriedCurse,
+  buriedModdedSkill, hasBuriedCurse, aggregateBuriedContracts,
 } from '../../data.js';
 import { BuriedBar, BuriedStatusRow, BuriedItemCard, slotMeta, SkillKindBadge } from './BuriedCommon.jsx';
 
@@ -43,6 +43,8 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
   const uq = (id) => uniques.includes(id);
   // ===== 저주 (1.108.0) — 해골 왕관과의 거래 대가 =====
   const cs = (id) => hasBuriedCurse(char, id);
+  // ===== 마의 계약 (1.111.0) — 지참 fx =====
+  const cf = aggregateBuriedContracts(char);
   // 스킬 단계 보정 — [u113] 쿨 0 / [u101] 쿨 상한 1 / [u99] 레벨당 위력 +2% / [u94] 2회 시전·위력 절반
   const applyUniqueSkillMods = (sk) => {
     let out = { ...sk };
@@ -76,7 +78,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
   const [player, setPlayer] = useState(() => ({
     name: cls?.name || '탐험가',
     hp: char.hp, maxHp: d.maxHp,
-    sp: Math.round(d.maxSp * (uniques.includes('u106') ? 1 : 0.55)), maxSp: d.maxSp,
+    sp: Math.round(d.maxSp * (uniques.includes('u106') ? 1 : 0.55 + (aggregateBuriedContracts(char).startSpPct || 0) / 100)), maxSp: d.maxSp,
     barrier: hasBuriedCurse(char, 'alloces') ? 0
       : Math.round(((d.barrier || 0) + (env.self.barrierAdd || 0) + (char.carryBarrier || 0)) * (hasBuriedCurse(char, 'amon') ? 0.5 : 1)),
     // [u107] 물리·기교 += 최대 HP 8% / [u111] 마법 += 보호막 30%
@@ -90,8 +92,13 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     spRegen: d.spRegen,
     // 1.107.0 — 이벤트 방 함정의 지연 상태이상 + 1.109.0 요정의 날개(시작 방벽 2)
     statuses: applyBuriedStatuses(
-      ((traits.includes('fairywing') || uniques.includes('u76')) && !hasBuriedCurse(char, 'andras'))
-        ? { wall: (traits.includes('fairywing') ? 2 : 0) + (uniques.includes('u76') ? 2 : 0) } : {},
+      (!hasBuriedCurse(char, 'andras'))
+        ? (() => {
+            const w = (traits.includes('fairywing') ? 2 : 0)
+              + (uniques.includes('u76') ? 2 : 0)
+              + (aggregateBuriedContracts(char).startWall || 0); // 「방벽의 계약」
+            return w > 0 ? { wall: w } : {};
+          })() : {},
       char.pendingStatuses || []
     ),
     cds: {}, reflect: 0, reflectTurns: 0,
@@ -195,19 +202,19 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
   };
   const dmgText = (r, extra = '') => `-${r.toHp}${r.absorbed > 0 ? ` (🔷${r.absorbed})` : ''}${extra}`;
 
-  const statusOpts = { chancePct: (env.self.statusChancePct || 0) + (uq('u57') ? 100 : 0), extra: env.self.statusExtra || 0 };
-  const foeStatusOpts = { chancePct: env.foe.statusChancePct || 0, extra: (uq('u113') ? 1 : 0) + (cs('sabnock') ? 1 : 0) };
+  const statusOpts = { chancePct: (env.self.statusChancePct || 0) + (uq('u57') ? 100 : 0) + (cf.statusChance || 0), extra: env.self.statusExtra || 0 };
+  const foeStatusOpts = { chancePct: (env.foe.statusChancePct || 0) - (cf.statusResist || 0), extra: (uq('u113') ? 1 : 0) + (cs('sabnock') ? 1 : 0) };
 
   // ===== 전투 종료 =====
   const finish = (win, finalHp) => {
     if (win) {
       // [u112] 전당의 휘장 — 승리 골드 +50%
-      const goldMult = dungeon.goldMult * (1 + (env.meta.goldPct || 0) / 100) * (uq('u112') ? 1.5 : 1) * (uq('u27') ? 3 : 1);
+      const goldMult = dungeon.goldMult * (1 + (env.meta.goldPct || 0) / 100) * (uq('u112') ? 1.5 : 1) * (uq('u27') ? 3 : 1) * (1 + (cf.goldPct || 0) / 100);
       const gold = Math.round(rnd(enemy.gold[0], enemy.gold[1]) * goldMult);
-      const exp = Math.round(enemy.exp * dungeon.expMult * (uq('u40') ? 2 : 1));
+      const exp = Math.round(enemy.exp * dungeon.expMult * (uq('u40') ? 2 : 1) * (1 + (cf.expPct || 0) / 100));
       const dropChance = roomType === 'boss' ? 100 : roomType === 'elite' ? 100 : 38;
       const drops = [];
-      const luck = dungeon.dropLuck + (roomType === 'boss' ? 6 : roomType === 'elite' ? 3 : 0);
+      const luck = dungeon.dropLuck + (cf.dropLuck || 0) + (roomType === 'boss' ? 6 : roomType === 'elite' ? 3 : 0);
       if (Math.random() * 100 < dropChance) {
         const it = rollBuriedItem({ slot: null, classId: char.classId, floor: enemy.lv || char.floor, luck });
         if (it) drops.push(it);
@@ -501,6 +508,12 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
             P.hp = 1;
             pushFloat('player', '버티기!', PALETTE.legendary);
             pushLog('최후의 성벽 — 모든 방벽을 소모하고 HP 1로 버틴다!', PALETTE.legendary);
+          }
+          // 「근성의 계약」 — 전투당 1회, 25% 확률 HP 1 생존
+          if ((cf.guts || 0) > 0 && P.hp <= 0 && !P.gutsUsed && Math.random() * 100 < cf.guts) {
+            P.hp = 1; P.gutsUsed = true;
+            pushFloat('player', '근성!', PALETTE.legendary);
+            pushLog('근성의 계약 — 이를 악물고 버텼다. HP 1', PALETTE.legendary);
           }
           if (P.reflectTurns > 0 && P.reflect > 0) {
             const back = Math.max(1, Math.round(res.total * P.reflect / 100));

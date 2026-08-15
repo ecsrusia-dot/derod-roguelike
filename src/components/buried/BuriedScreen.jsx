@@ -12,13 +12,14 @@ import {
   BURIED_LEGACY_MAX, BURIED_LEGACY_GOLD_PCT, BURIED_SKILL_MAX_LV,
   BURIED_SLOTS, BURIED_FORGE, BURIED_LEGACY_CAP_MAX,
   buriedForgeLevel, buriedLegacyExpandCost,
+  BURIED_CONTRACTS, BURIED_CONTRACT_COST, BURIED_CONTRACT_CARRY, getBuriedContract, rollBuriedContract,
   buriedDerived, buriedExpToNext, getBuriedClass, getBuriedDungeon, buildBuriedLegacy,
   buriedTraitIds, getBuriedTrait, buriedMonsterLevel,
 } from '../../data.js';
 import { BuriedItemCard, BuriedBar, BURIED_DUST_ICON, BuriedTierLegend } from './BuriedCommon.jsx';
 import BuriedManage from './BuriedManage.jsx';
 
-export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateChar, onRetire, onForge, onExpandLegacy, forgeNotice, onBack }) {
+export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateChar, onRetire, onForge, onExpandLegacy, onBuyContract, forgeNotice, onBack }) {
   const b = meta?.buried || {};
   const char = b.char || null;
   const legacy = Array.isArray(b.legacy) ? b.legacy : [];
@@ -31,6 +32,10 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
   const [manage, setManage] = useState(false);
   const [confirmRetire, setConfirmRetire] = useState(false);
   const [forgeSlot, setForgeSlot] = useState('weapon');
+  const [carryPicks, setCarryPicks] = useState([]); // 출정 지참 계약 (최대 2)
+  const ownedContracts = b.contracts || [];
+  const toggleCarry = (id) => setCarryPicks(p =>
+    p.includes(id) ? p.filter(x => x !== id) : (p.length < BURIED_CONTRACT_CARRY ? [...p, id] : p));
 
   const cls = char ? getBuriedClass(char.classId) : null;
   const d = char ? buriedDerived(char) : null;
@@ -229,9 +234,36 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
               );
             })()}
 
-            <button onClick={() => onStartChar(pickClass, pickDungeon)} className="ui-press ui-sheen w-full py-3 text-[13px] font-bold"
+            {/* 마의 계약 지참 (1.111.0) — 보유 중 최대 2개 */}
+            {ownedContracts.length > 0 && (
+              <div>
+                <div className="text-[11px] tracking-[0.25em] mb-1.5" style={{ color: PALETTE.dawn }}>
+                  마의 계약 지참 — {carryPicks.length}/{BURIED_CONTRACT_CARRY}
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {ownedContracts.map(id => {
+                    const c = getBuriedContract(id);
+                    if (!c) return null;
+                    const on = carryPicks.includes(id);
+                    return (
+                      <button key={id} onClick={() => toggleCarry(id)} className="ui-press px-2 py-1.5 text-[11px] text-left"
+                        title={c.desc}
+                        style={{
+                          borderRadius: 'var(--r-chip, 8px)',
+                          background: on ? PALETTE.panelLight : PALETTE.panel,
+                          border: `1px solid ${on ? PALETTE.legendary : PALETTE.panelBorder}`,
+                          color: on ? PALETTE.legendary : PALETTE.textDim,
+                        }}>
+                        {on ? '✓ ' : ''}{c.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            <button onClick={() => onStartChar(pickClass, pickDungeon, carryPicks)} className="ui-press ui-sheen w-full py-3 text-[13px] font-bold"
               style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.accent, color: '#fff' }}>
-              {getBuriedDungeon(pickDungeon).name}(으)로 내려간다{legacy.length > 0 ? ` — 유산 ${legacy.length}개 계승` : ''}
+              {getBuriedDungeon(pickDungeon).name}(으)로 내려간다{legacy.length > 0 ? ` — 유산 ${legacy.length}개 계승` : ''}{carryPicks.length > 0 ? ` · 계약 ${carryPicks.length}` : ''}
             </button>
           </div>
         )}
@@ -286,6 +318,43 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
             {forgeNotice && (
               <div className="px-2.5 py-1.5 text-[11px]" style={{ borderRadius: 'var(--r-chip, 8px)', background: `${PALETTE.dawn}15`, border: `1px solid ${PALETTE.dawn}55`, color: PALETTE.dawn }}>
                 {forgeNotice}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ===== 마의 계약 상점 (1.111.0) ===== */}
+        <div>
+          <div className="text-[11px] tracking-[0.25em] mb-1.5" style={{ color: PALETTE.dawn }}>
+            📜 마의 계약 — 보유 {ownedContracts.length} / {BURIED_CONTRACTS.length}
+          </div>
+          <div className="px-3 py-2.5 space-y-2" style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panel, border: `1px solid ${PALETTE.panelBorder}` }}>
+            <div className="text-[11px] leading-relaxed" style={{ color: PALETTE.textDim }}>
+              출정 시 <b style={{ color: PALETTE.text }}>최대 {BURIED_CONTRACT_CARRY}개</b>를 지참하는 영구 패시브.
+              먼지로 미보유 계약 중 하나를 무작위로 얻는다.
+            </div>
+            <button onClick={onBuyContract}
+              disabled={(b.dust || 0) < BURIED_CONTRACT_COST || ownedContracts.length >= BURIED_CONTRACTS.length}
+              className="ui-press w-full py-2 text-[12px] font-bold"
+              style={{
+                borderRadius: 'var(--r-btn, 13px)',
+                background: (b.dust || 0) >= BURIED_CONTRACT_COST && ownedContracts.length < BURIED_CONTRACTS.length ? PALETTE.panelLight : PALETTE.panel,
+                border: `1px solid ${PALETTE.twilight}66`,
+                color: (b.dust || 0) >= BURIED_CONTRACT_COST && ownedContracts.length < BURIED_CONTRACTS.length ? PALETTE.twilight : PALETTE.textDim,
+                opacity: (b.dust || 0) >= BURIED_CONTRACT_COST && ownedContracts.length < BURIED_CONTRACTS.length ? 1 : 0.5,
+              }}>
+              {ownedContracts.length >= BURIED_CONTRACTS.length ? '모든 계약 수집 완료' : `랜덤 계약 체결 — ${BURIED_DUST_ICON}${BURIED_CONTRACT_COST}`}
+            </button>
+            {ownedContracts.length > 0 && (
+              <div className="space-y-0.5">
+                {ownedContracts.map(id => {
+                  const c = getBuriedContract(id);
+                  return c ? (
+                    <div key={id} className="text-[11px]" style={{ color: PALETTE.textDim }}>
+                      <span style={{ color: PALETTE.twilight }}>{c.name}</span> — {c.desc}
+                    </div>
+                  ) : null;
+                })}
               </div>
             )}
           </div>

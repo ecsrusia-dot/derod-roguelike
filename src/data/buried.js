@@ -357,7 +357,7 @@ export function buriedDustValue(item) {
 // =========================================================
 export const buriedExpToNext = (lv) => 32 + lv * 20;
 
-export function createBuriedChar(classId, legacy = { items: [], gold: 0 }, dungeonId = 'labyrinth') {
+export function createBuriedChar(classId, legacy = { items: [], gold: 0 }, dungeonId = 'labyrinth', contracts = []) {
   const cls = getBuriedClass(classId);
   if (!cls) return null;
   const equipped = {};
@@ -383,6 +383,7 @@ export function createBuriedChar(classId, legacy = { items: [], gold: 0 }, dunge
     equipped, inventory,
     // 1.104.0 — 던전 선택 / 걸음수 기반 마물 레벨 / 스킬 레벨 / 방·층 효과
     dungeonId,
+    contracts: (contracts || []).slice(0, BURIED_CONTRACT_CARRY),
     floor: 1, steps: 0, room: null, roomEffect: null, floorEffect: null, offers: null, roomDone: false,
     skillLevels: {},
     potions: 2,
@@ -416,23 +417,25 @@ export function buriedDerived(char) {
   const lv = char.lv || 1;
   // 특성(최대 3개)의 스탯 보정 — 전투 화면은 여기 결과만 읽는다
   const tf = aggregateBuriedTraits(char);
+  // 마의 계약 (1.111.0) — 지참 계약 2개의 fx
+  const cf = aggregateBuriedContracts(char);
   return {
     stats: st,
     traitFx: tf,
-    maxHp:   Math.max(1, Math.round((140 + st.vit * 11 + (lv - 1) * 18 + (gear.hp || 0) + (tf.hp || 0)) * (tf.hpMult || 1) * (1 - Math.min(50, char.curseHpLossPct || 0) / 100))),
+    maxHp:   Math.max(1, Math.round((140 + st.vit * 11 + (lv - 1) * 18 + (gear.hp || 0) + (tf.hp || 0)) * (tf.hpMult || 1) * (1 + (cf.hpPct || 0) / 100) * (1 - Math.min(50, char.curseHpLossPct || 0) / 100))),
     maxSp:   Math.round(38 + st.int * 1.3 + (gear.sp || 0) + (tf.sp || 0)),
-    atk:     Math.round((10 + st.str * 1.6 + (gear.atk || 0)) * (1 + (tf.physPct || 0) / 100)),
-    fin:     Math.round((10 + st.dex * 1.6 + (gear.atk || 0)) * (1 + (tf.physPct || 0) / 100)),
-    mag:     Math.round((10 + st.int * 1.6 + (gear.mag || 0)) * (1 + (tf.magPct || 0) / 100)),
+    atk:     Math.round((10 + st.str * 1.6 + (gear.atk || 0)) * (1 + ((tf.physPct || 0) + (cf.physPct || 0)) / 100)),
+    fin:     Math.round((10 + st.dex * 1.6 + (gear.atk || 0)) * (1 + ((tf.physPct || 0) + (cf.physPct || 0)) / 100)),
+    mag:     Math.round((10 + st.int * 1.6 + (gear.mag || 0)) * (1 + ((tf.magPct || 0) + (cf.magPct || 0)) / 100)),
     def:     Math.round(4 + st.vit * 0.9 + (gear.def || 0)),
-    crit:    Math.round(5 + st.dex * 0.6 + (gear.crit || 0) + (tf.crit || 0)),
+    crit:    Math.round(5 + st.dex * 0.6 + (gear.crit || 0) + (tf.crit || 0) + (cf.crit || 0)),
     critDmg: 60 + (gear.critDmg || 0),
-    dodge:   Math.min(45, Math.round(3 + st.dex * 0.4 + (gear.dodge || 0) + (tf.dodge || 0))),
+    dodge:   Math.min(45, Math.round(3 + st.dex * 0.4 + (gear.dodge || 0) + (tf.dodge || 0) + (cf.dodge || 0))),
     spRegen: Math.round(9 + st.int / 8 + (gear.spRegen || 0)),
-    barrier: Math.round((gear.barrier || 0) + (tf.barrier || 0)),
+    barrier: Math.round(((gear.barrier || 0) + (tf.barrier || 0)) * (1 + (cf.barrierPct || 0) / 100)),
     chase:   Math.round((gear.chase || 0) + (tf.chase || 0)),
-    healPct: tf.healPct || 0,
-    drainPct: tf.drainPct || 0,
+    healPct: (tf.healPct || 0) + (cf.healPct || 0),
+    drainPct: (tf.drainPct || 0) + (cf.drainPct || 0),
   };
 }
 
@@ -1206,7 +1209,9 @@ export const getBuriedDungeon = (id) => BURIED_DUNGEONS.find(d => d.id === id) |
 export function buriedMonsterLevel(char) {
   const dg = getBuriedDungeon(char?.dungeonId);
   const steps = char?.steps || 0;
-  return 1 + dg.baseLevel + Math.floor(steps / dg.stepsPerLevel);
+  // 「유유자적의 계약」 — 성장에 필요한 걸음 +N (aggregateBuriedContracts는 아래 정의라 지연 참조)
+  const stepBonus = (char?.contracts || []).includes('c_calm') ? 1 : 0;
+  return 1 + dg.baseLevel + Math.floor(steps / (dg.stepsPerLevel + stepBonus));
 }
 
 // 마물 레벨 기준 적 생성 (기존 층 기준 buriedEnemyAt을 대체)
@@ -1703,4 +1708,47 @@ export function checkBuriedEncounterUnlock(killsByEnemy, alreadyUnlocked) {
     if ((killsByEnemy[c.unlock.enemyKey] || 0) >= c.unlock.kills) return c.id;
   }
   return null;
+}
+
+// =========================================================
+// 25. 마의 계약 (1.111.0) — 출정 시 지참하는 영구 패시브
+// =========================================================
+// 원작: 마의 계약 상점(500마석 랜덤 구입) + 출정 시 지참. 각색: 먼지로 구입, 지참 최대 2개.
+// 스탯형은 aggregateBuriedContracts가 fx 뭉치로 합산 → 파생 스탯·전투·던전이 나눠 읽는다.
+export const BURIED_CONTRACT_COST = 60;      // 랜덤 1개 구입 (미보유 풀에서)
+export const BURIED_CONTRACT_CARRY = 2;      // 출정 시 지참 한도
+export const BURIED_CONTRACTS = [
+  { id: 'c_vitality', name: '활력의 계약',   desc: '최대 HP +15%',                        fx: { hpPct: 15 } },
+  { id: 'c_might',    name: '완력의 계약',   desc: '물리·기교 공격력 +12%',                fx: { physPct: 12 } },
+  { id: 'c_arcane',   name: '마도의 계약',   desc: '마법 공격력 +12%',                     fx: { magPct: 12 } },
+  { id: 'c_recovery', name: '회복의 계약',   desc: '모든 회복량 +30%',                     fx: { healPct: 30 } },
+  { id: 'c_evasion',  name: '회피의 계약',   desc: '회피율 +8%',                          fx: { dodge: 8 } },
+  { id: 'c_shield',   name: '수호의 계약',   desc: '보호막 +30%',                         fx: { barrierPct: 30 } },
+  { id: 'c_crit',     name: '치명의 계약',   desc: '치명 확률 +10%',                      fx: { crit: 10 } },
+  { id: 'c_exp',      name: '경험의 계약',   desc: '경험치 +20%',                         fx: { expPct: 20 } },
+  { id: 'c_greed',    name: '탐욕의 계약',   desc: '전투 승리 골드 +30%',                 fx: { goldPct: 30 } },
+  { id: 'c_fortune',  name: '행운의 계약',   desc: '장비 드랍의 등급 운 +2',              fx: { dropLuck: 2 } },
+  { id: 'c_venom',    name: '부여의 계약',   desc: '내가 거는 상태이상 확률 +30%',         fx: { statusChance: 30 } },
+  { id: 'c_resist',   name: '내성의 계약',   desc: '적이 거는 상태이상 확률 -30%',         fx: { statusResist: 30 } },
+  { id: 'c_first',    name: '선제의 계약',   desc: '전투를 SP 80%로 시작한다',            fx: { startSpPct: 25 } },
+  { id: 'c_drain',    name: '흡혈의 계약',   desc: '주는 피해의 5% 흡혈',                 fx: { drainPct: 5 } },
+  { id: 'c_wall',     name: '방벽의 계약',   desc: '전투를 🧱방벽 1개로 시작한다',        fx: { startWall: 1 } },
+  { id: 'c_guts',     name: '근성의 계약',   desc: 'HP가 0이 될 피해를 전투당 1회, 25% 확률로 HP 1로 버틴다', fx: { guts: 25 } },
+  { id: 'c_calm',     name: '유유자적의 계약', desc: '마물 레벨이 1레벨 오르는 데 필요한 걸음 +1', fx: { stepBonus: 1 } },
+  { id: 'c_camp',     name: '야영의 계약',   desc: '제단·야영지 회복량 +25%',             fx: { campPct: 25 } },
+];
+export const getBuriedContract = (id) => BURIED_CONTRACTS.find(c => c.id === id) || null;
+export function rollBuriedContract(ownedIds) {
+  const pool = BURIED_CONTRACTS.filter(c => !ownedIds.includes(c.id));
+  return pool.length > 0 ? pick(pool).id : null;
+}
+// 지참 중인 계약의 fx 합산 — 전투·던전·파생 스탯이 이 뭉치를 나눠 읽는다
+export function aggregateBuriedContracts(char) {
+  const out = {};
+  for (const id of char?.contracts || []) {
+    const c = getBuriedContract(id);
+    if (!c) continue;
+    for (const [k, v] of Object.entries(c.fx)) out[k] = (out[k] || 0) + v;
+  }
+  return out;
 }

@@ -1429,6 +1429,7 @@ const EMPTY_BURIED = {
   clears: {}, deaths: 0, runs: 0, unlockedDungeons: ['labyrinth'], unlockedClasses: [],
   legacySlots: 6,
   killsByEnemy: {}, // 1.109.0~ 조우 해금 진행 (적 키 → 누적 처치 수)
+  contracts: [],    // 1.111.0~ 보유한 마의 계약 id 목록 (영구)
 };
 export function getBuried(meta) {
   const b = meta?.buried || EMPTY_BURIED;
@@ -1442,6 +1443,7 @@ export function getBuried(meta) {
     unlockedClasses: Array.isArray(b.unlockedClasses) ? b.unlockedClasses : [],
     legacySlots: Math.max(6, b.legacySlots || 6),
     killsByEnemy: b.killsByEnemy || {},
+    contracts: Array.isArray(b.contracts) ? b.contracts : [],
   };
 }
 
@@ -1568,4 +1570,11 @@ export function trackBuriedKill(meta, enemyKey) {
     },
     unlocked,
   };
+}
+
+// 1.111.0 — 마의 계약 랜덤 구입 (먼지 소모, 미보유 풀에서)
+export function buyBuriedContract(meta, contractId, cost) {
+  const b = getBuried(meta);
+  if (!contractId || (b.dust || 0) < cost || b.contracts.includes(contractId)) return meta;
+  return { ...meta, buried: { ...b, dust: b.dust - cost, contracts: [...b.contracts, contractId] } };
 }

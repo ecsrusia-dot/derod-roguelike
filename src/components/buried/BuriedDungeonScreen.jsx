@@ -27,6 +27,7 @@ import {
   buriedWandererOffers, wandererAddOption, wandererApplyMod, wandererReroll,
   BURIED_SKULL_ROOM, BURIED_CURSE_MAX, getBuriedCurse, buriedCurseIds,
   rollBuriedCurseOffer, acceptBuriedCurse, hasBuriedCurse, BURIED_CURSE_REWARD,
+  aggregateBuriedContracts,
 } from '../../data.js';
 import { BuriedItemCard, BuriedBar, BURIED_DUST_ICON, slotMeta } from './BuriedCommon.jsx';
 import BuriedManage from './BuriedManage.jsx';
@@ -127,7 +128,7 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
 
   const shrineHeal = () => {
     if (hasBuriedCurse(char, 'gremory')) { setNotice('그레모리의 저주 — 제단의 빛이 닿지 않는다.'); return; }
-    const amount = Math.round(d.maxHp * 0.6);
+    const amount = Math.round(d.maxHp * 0.6 * (1 + (aggregateBuriedContracts(char).campPct || 0) / 100));
     onUpdateChar({ ...char, hp: Math.min(d.maxHp, char.hp + amount) }, 0);
     setNotice(`제단의 빛이 HP ${amount}을(를) 되돌렸다.`);
   };
@@ -151,7 +152,7 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
       setNotice('그레모리의 저주 — 잠들지 못했다. 물약만 하나 만들었다.');
       return;
     }
-    const amount = Math.round(d.maxHp * 0.45);
+    const amount = Math.round(d.maxHp * 0.45 * (1 + (aggregateBuriedContracts(char).campPct || 0) / 100));
     onUpdateChar({ ...char, hp: Math.min(d.maxHp, char.hp + amount), potions: (char.potions || 0) + 1 }, 0);
     setNotice(`야영으로 HP ${amount} 회복. 물약도 하나 만들었다.`);
   };
