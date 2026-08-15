@@ -118,9 +118,13 @@ export const BURIED_STATUS = {
   weaken:  { id: 'weaken',  name: '약화', icon: '⬇',  color: '#9b8975', kind: 'debuff', max: 10, decay: 'one',  desc: '주는 데미지 스택당 -6% (최대 -60%)' },
   shatter: { id: 'shatter', name: '파쇄', icon: '⚒',  color: '#c4453d', kind: 'debuff', max: 8,  decay: 'one',  desc: '방어력 스택당 -10% (최대 -80%)' },
   rage:    { id: 'rage',    name: '격노', icon: '🔺', color: '#c4453d', kind: 'buff',   max: 10, decay: 'one',  desc: '주는 데미지 스택당 +10%' },
-  guard:   { id: 'guard',   name: '방벽', icon: '🔷', color: '#7ba3c4', kind: 'buff',   max: 8,  decay: 'one',  desc: '받는 피해 스택당 -12% (최대 -80%)' },
+  guard:   { id: 'guard',   name: '수호', icon: '🛡', color: '#7ba3c4', kind: 'buff',   max: 8,  decay: 'one',  desc: '받는 피해 스택당 -12% (최대 -80%)' },
   regen:   { id: 'regen',   name: '재생', icon: '💚', color: '#7a9a5e', kind: 'buff',   max: 10, tickHeal: 5, decay: 'one', desc: '턴 종료 시 스택×5 회복. 매 턴 1 감소' },
   evade:   { id: 'evade',   name: '잔영', icon: '💨', color: '#d4a574', kind: 'buff',   max: 6,  decay: 'one',  desc: '회피율 스택당 +15%' },
+  // 1.106.0 — 원작의 방벽(개수형)·혼란·노화
+  wall:    { id: 'wall',    name: '방벽', icon: '🧱', color: '#b8a678', kind: 'buff',   max: 5,  decay: 'none', desc: '적의 공격 행동 1회를 완전히 무효화하고 1개 소모. 스스로 사라지지 않는다' },
+  confuse: { id: 'confuse', name: '혼란', icon: '🌀', color: '#c48bd4', kind: 'debuff', max: 3,  decay: 'one',  desc: '행동 시 스택×30% 확률로 허우적거리며 턴을 날린다. 매 턴 1 감소' },
+  aging:   { id: 'aging',   name: '노화', icon: '⏳', color: '#8b8378', kind: 'debuff', max: 10, decay: 'none', desc: '주는 데미지 스택당 -4%. 스스로 사라지지 않는다' },
 };
 export const BURIED_STATUS_LIST = Object.values(BURIED_STATUS);
 
@@ -148,7 +152,7 @@ export const BURIED_SKILLS = {
   sunderCut:   SK({ id: 'sunderCut',   name: '파쇄격',     slot: 'weapon', line: 'sword', gear: '중검',       sp: 20, cd: 1, stat: 'str', power: 108, apply: [{ s: 'shatter', n: 2, p: 100 }], desc: '적 방어를 깎는다. [파쇄] 2' }),
   executioner: SK({ id: 'executioner', name: '처형검',     slot: 'weapon', line: 'sword', gear: '처형검',     sp: 30, cd: 2, stat: 'str', power: 155, executeBelow: 35, desc: '적 HP 35% 이하면 데미지 2배.' }),
   // ===== 방랑검사 — 단검(blade) =====
-  riposteEdge: SK({ id: 'riposteEdge', name: '역린',       slot: 'offhand', line: 'blade', gear: '수비 단검', sp: 14, cd: 0, stat: 'str', power: 68, self: [{ s: 'guard', n: 2 }], desc: '베며 자세를 굳힌다. [방벽] 2' }),
+  riposteEdge: SK({ id: 'riposteEdge', name: '역린',       slot: 'offhand', line: 'blade', gear: '수비 단검', sp: 14, cd: 0, stat: 'str', power: 68, self: [{ s: 'guard', n: 2 }], desc: '베며 자세를 굳힌다. [수호] 2' }),
   vitalStab:   SK({ id: 'vitalStab',   name: '급소 찌르기', slot: 'offhand', line: 'blade', gear: '송곳 단검', sp: 18, cd: 1, stat: 'str', power: 98, critBonus: 30, apply: [{ s: 'bleed', n: 2, p: 100 }], desc: '치명 확률 +30%. [출혈] 2' }),
   afterimage:  SK({ id: 'afterimage',  name: '잔영',       slot: 'offhand', line: 'blade', gear: '환영 단검', sp: 16, cd: 2, self: [{ s: 'evade', n: 3 }], spGain: 8, desc: '그림자를 남긴다. [잔영] 3, SP +8' }),
 
@@ -160,7 +164,7 @@ export const BURIED_SKILLS = {
   // ===== 술법사 — 마도서(tome) =====
   manaDrain:   SK({ id: 'manaDrain',   name: '마력 흡수',  slot: 'offhand', line: 'tome', gear: '흡마 마도서', sp: 6,  cd: 0, stat: 'int', power: 58, spGain: 22, desc: 'SP +22' }),
   curseSigil:  SK({ id: 'curseSigil',  name: '저주 각인',  slot: 'offhand', line: 'tome', gear: '저주 마도서', sp: 20, cd: 2, stat: 'int', power: 42, apply: [{ s: 'curse', n: 2, p: 100 }, { s: 'weaken', n: 2, p: 100 }], desc: '[저주] 2 + [약화] 2' }),
-  arcaneWard:  SK({ id: 'arcaneWard',  name: '마법 방벽',  slot: 'offhand', line: 'tome', gear: '수호 마도서', sp: 16, cd: 2, self: [{ s: 'guard', n: 3 }], desc: '[방벽] 3' }),
+  arcaneWard:  SK({ id: 'arcaneWard',  name: '비전 수호',  slot: 'offhand', line: 'tome', gear: '수호 마도서', sp: 16, cd: 2, self: [{ s: 'guard', n: 3 }], desc: '[수호] 3' }),
 
   // ===== 혼혈 마족 — 도끼(axe) =====
   savageAxe:   SK({ id: 'savageAxe',   name: '광폭 도끼',  slot: 'weapon', line: 'axe', gear: '전투 도끼',   sp: 12, cd: 0, stat: 'str', power: 126, desc: '거칠게 내리찍는다.' }),
@@ -189,12 +193,12 @@ export const BURIED_SKILLS = {
   dawnCrush:   SK({ id: 'dawnCrush',   name: '여명의 강타', slot: 'weapon', line: 'mace', gear: '여명의 대추', sp: 30, cd: 2, stat: 'int', power: 170, apply: [{ s: 'stun', n: 1, p: 40 }], desc: '40% 확률 [기절] 1' }),
   // ===== 여명의 사제 — 성물(relic) =====
   healPrayer:  SK({ id: 'healPrayer',  name: '치유 기도',  slot: 'offhand', line: 'relic', gear: '치유의 성물', sp: 20, cd: 1, heal: 72, desc: 'HP 62 회복.' }),
-  benediction: SK({ id: 'benediction', name: '가호',       slot: 'offhand', line: 'relic', gear: '가호의 성물', sp: 16, cd: 2, self: [{ s: 'guard', n: 3 }, { s: 'regen', n: 2 }], desc: '[방벽] 3 + [재생] 2' }),
+  benediction: SK({ id: 'benediction', name: '가호',       slot: 'offhand', line: 'relic', gear: '가호의 성물', sp: 16, cd: 2, self: [{ s: 'guard', n: 3 }, { s: 'regen', n: 2 }], desc: '[수호] 3 + [재생] 2' }),
   blessing:    SK({ id: 'blessing',    name: '축복',       slot: 'offhand', line: 'relic', gear: '축복의 성물', sp: 14, cd: 2, self: [{ s: 'rage', n: 2 }], heal: 15, desc: '[격노] 2, HP 15 회복.' }),
 
   // ===== 방어구 (전 직업 공용) =====
-  ironWall:    SK({ id: 'ironWall',    name: '철벽',       slot: 'armor', line: null, gear: '판금 갑옷',   sp: 14, cd: 1, self: [{ s: 'guard', n: 3 }], desc: '[방벽] 3' }),
-  thornMail:   SK({ id: 'thornMail',   name: '가시 갑주',  slot: 'armor', line: null, gear: '가시 갑주',   sp: 12, cd: 1, self: [{ s: 'guard', n: 2 }], reflect: 35, desc: '[방벽] 2. 2턴간 받은 피해의 35% 반사' }),
+  ironWall:    SK({ id: 'ironWall',    name: '철벽',       slot: 'armor', line: null, gear: '판금 갑옷',   sp: 14, cd: 1, self: [{ s: 'guard', n: 3 }], desc: '[수호] 3' }),
+  thornMail:   SK({ id: 'thornMail',   name: '가시 갑주',  slot: 'armor', line: null, gear: '가시 갑주',   sp: 12, cd: 1, self: [{ s: 'guard', n: 2 }], reflect: 35, desc: '[수호] 2. 2턴간 받은 피해의 35% 반사' }),
   regenScale:  SK({ id: 'regenScale',  name: '재생의 비늘', slot: 'armor', line: null, gear: '용린 갑옷',   sp: 16, cd: 2, self: [{ s: 'regen', n: 4 }], desc: '[재생] 4' }),
   shadowCloak: SK({ id: 'shadowCloak', name: '그림자 망토', slot: 'armor', line: null, gear: '그림자 망토', sp: 14, cd: 2, self: [{ s: 'evade', n: 3 }], desc: '[잔영] 3' }),
 
@@ -238,6 +242,8 @@ export const BURIED_TIERS = [
   { id: 'rare',  name: '희귀한', color: '#7ba3c4', mult: 1.60, opts: 2, weight: 17, dust: 8 },
   { id: 'epic',  name: '영웅의', color: '#5c4a8c', mult: 2.00, opts: 3, weight: 9,  dust: 20 },
   { id: 'relic', name: '유물급', color: '#e8b04a', mult: 2.55, opts: 4, weight: 3,  dust: 50 },
+  // 1.106.0 — 전설의 무구 전용 등급. weight 0이라 일반 드랍 풀에는 절대 나오지 않는다
+  { id: 'legend', name: '전설의', color: '#ff7b54', mult: 2.9, opts: 3, weight: 0, dust: 120 },
 ];
 export const getBuriedTier = (id) => BURIED_TIERS.find(t => t.id === id) || BURIED_TIERS[0];
 
@@ -566,7 +572,7 @@ export const BURIED_ENEMIES = {
     hp: 360, atk: 31, def: 11, exp: 320, gold: [220, 320],
     actions: [
       { name: '빙결의 창', power: 118, kind: 'attack', apply: [{ s: 'bind', n: 2, p: 100 }], weight: 3 },
-      { name: '봉인 각인', power: 62, kind: 'attack', apply: [{ s: 'silence', n: 2, p: 100 }, { s: 'weaken', n: 3, p: 100 }], weight: 2 },
+      { name: '봉인 각인', power: 62, kind: 'attack', apply: [{ s: 'silence', n: 2, p: 100 }, { s: 'confuse', n: 1, p: 60 }], weight: 2 },
       { name: '서리 폭풍', power: 92, kind: 'attack', hits: 3, heavy: true, weight: 2 },
       { name: '얼음 결계', kind: 'defend', self: [{ s: 'guard', n: 5 }, { s: 'regen', n: 4 }], weight: 1 },
     ],
@@ -578,7 +584,7 @@ export const BURIED_ENEMIES = {
     hp: 620, atk: 44, def: 15, exp: 900, gold: [520, 780],
     actions: [
       { name: '폭군의 낫', power: 128, kind: 'attack', apply: [{ s: 'bleed', n: 4, p: 100 }], weight: 3 },
-      { name: '무덤의 손아귀', power: 96, kind: 'attack', drain: 60, apply: [{ s: 'curse', n: 3, p: 100 }], weight: 2 },
+      { name: '무덤의 손아귀', power: 96, kind: 'attack', drain: 60, apply: [{ s: 'curse', n: 2, p: 100 }, { s: 'aging', n: 1, p: 70 }], weight: 2 },
       { name: '종언의 일격', power: 205, kind: 'attack', heavy: true, apply: [{ s: 'shatter', n: 4, p: 100 }], weight: 2 },
       { name: '망자의 군세', kind: 'defend', self: [{ s: 'guard', n: 4 }, { s: 'rage', n: 4 }], weight: 1 },
     ],
@@ -686,11 +692,11 @@ export const BURIED_TUNING = {
 
 const stacksOf = (u, key) => (u?.statuses?.[key] || 0);
 
-// 주는 데미지 배율 (격노 ↑ / 약화 ↓)
+// 주는 데미지 배율 (격노 ↑ / 약화·노화 ↓)
 export function buriedOffenseMult(u) {
-  return Math.max(0.2, 1 + stacksOf(u, 'rage') * 0.10 - stacksOf(u, 'weaken') * 0.06);
+  return Math.max(0.2, 1 + stacksOf(u, 'rage') * 0.10 - stacksOf(u, 'weaken') * 0.06 - stacksOf(u, 'aging') * 0.04);
 }
-// 받는 데미지 배율 (속박·저주 ↑ / 방벽 ↓)
+// 받는 데미지 배율 (속박·저주 ↑ / 수호 ↓)
 export function buriedTakenMult(u) {
   return Math.max(0.2, 1 + stacksOf(u, 'bind') * 0.20 + stacksOf(u, 'curse') * 0.15 - stacksOf(u, 'guard') * 0.12);
 }
@@ -1299,3 +1305,104 @@ export function buriedSkillEffectLines(skill) {
   if (skill.reflect) push(`2턴간 받은 피해의 ${skill.reflect}%를 반사`);
   return lines;
 }
+
+// =========================================================
+// 20. 전설의 무구 (1.106.0) — 커뮤니티 유니크 효과 30종
+// =========================================================
+// PM 제공: 베리드본즈 갤러리 「모든 효과 정리」의 유니크 효과 [84]~[113] 30종.
+// 원작 그대로 옮길 수 없는 7종([91][103][106][108][109][110][112])은 우리 모드 문맥으로 각색.
+// 획득처: **보스 확률 드랍 전용** (PM 결정). 일반 드랍·재련소에서는 절대 나오지 않는다.
+//
+// 규칙:
+//   - slot은 전 직업 공용 4칸(armor/helm/acc1/acc2)만 사용 — 무기 계열 제한 문제 회피
+//   - 내장 스킬은 기존 공용 스킬 재사용 (장비=스킬 원칙 유지)
+//   - 효과 판정은 hasBuriedUnique(char, id)로 BuriedBattleScreen·DungeonScreen·App이 분기
+//   - 보스는 즉사([u84]) 면역
+const UQ = (o) => o;
+export const BURIED_UNIQUES = [
+  // ===== 전투 — 처형·화력 =====
+  UQ({ id: 'u84',  name: '사신의 낫끝',     slot: 'acc',   skillId: 'bloodSigil',  src: 84,  desc: '공격 적중 시 HP가 절반 이하인 적을 즉사시킨다. (보스 면역)' }),
+  UQ({ id: 'u90',  name: '파성추',          slot: 'acc',   skillId: 'sunderSigil', src: 90,  desc: '보호막과 방벽이 없는 적에게 데미지 3배.' }),
+  UQ({ id: 'u93',  name: '거인 살해자',     slot: 'acc',   skillId: 'sunderSigil', src: 93,  desc: '공격 적중 시 적 최대 HP의 3% 추가 피해 (보스 1.5%).' }),
+  UQ({ id: 'u94',  name: '쌍둥이 검흔',     slot: 'acc',   skillId: 'berserkSigil',src: 94,  desc: '공격 스킬이 2회 시전되지만 위력은 절반이 된다.' }),
+  UQ({ id: 'u87',  name: '도살자의 눈',     slot: 'acc',   skillId: 'bloodSigil',  src: 87,  desc: '치명타를 입힐 때마다 이 전투 동안 치명 확률 +2%.' }),
+  UQ({ id: 'u99',  name: '연륜의 증표',     slot: 'acc',   skillId: 'lifeCharm',   src: 99,  desc: '스킬 위력이 캐릭터 레벨당 +2% 증가한다.' }),
+  UQ({ id: 'u107', name: '거체의 반지',     slot: 'acc',   skillId: 'bloodSigil',  src: 107, desc: '물리·기교 공격력이 최대 HP의 8%만큼 증가한다.' }),
+  UQ({ id: 'u111', name: '마력 격막',       slot: 'acc',   skillId: 'venomSigil',  src: 111, desc: '마법 공격력이 보호막 수치의 30%만큼 증가한다.' }),
+  // ===== 전투 — 방벽 =====
+  UQ({ id: 'u89',  name: '최후의 성벽',     slot: 'armor', skillId: 'ironWall',    src: 89,  desc: 'HP가 0이 될 피해를 받을 때 방벽이 있으면 전부 소모하고 HP 1로 버틴다.' }),
+  UQ({ id: 'u92',  name: '재생하는 성벽',   slot: 'armor', skillId: 'thornMail',   src: 92,  desc: '방벽이 없으면 턴 종료 시 방벽 1개를 얻는다.' }),
+  UQ({ id: 'u96',  name: '축복의 벽돌',     slot: 'helm',  skillId: 'insight',     src: 96,  desc: '버프를 얻을 때마다 방벽 1개를 얻는다.' }),
+  UQ({ id: 'u97',  name: '광인의 벽',       slot: 'helm',  skillId: 'focusMind',   src: 97,  desc: '[혼란]에 빠져도 행동이 실패하지 않고, 혼란 스택당 매 턴 방벽 1개를 얻는다.' }),
+  UQ({ id: 'u105', name: '기절 수집가',     slot: 'acc',   skillId: 'silenceSigil',src: 105, desc: '적에게 [기절]을 부여할 때마다 방벽 1개를 얻는다.' }),
+  UQ({ id: 'u104', name: '균열의 종',       slot: 'armor', skillId: 'regenScale',  src: 104, desc: '내 보호막이 깨지는 순간 적에게 [기절] 1을 부여한다.' }),
+  // ===== 전투 — 상태이상·버프 =====
+  UQ({ id: 'u88',  name: '증폭의 심장',     slot: 'armor', skillId: 'regenScale',  src: 88,  desc: '자신에게 거는 강화(버프) 스택이 2배가 된다.' }),
+  UQ({ id: 'u95',  name: '균일한 저주',     slot: 'acc',   skillId: 'venomSigil',  src: 95,  desc: '내가 부여하는 상태이상 스택이 항상 5가 된다.' }),
+  UQ({ id: 'u98',  name: '거울 가면',       slot: 'helm',  skillId: 'intimidate',  src: 98,  desc: '내가 디버프에 걸릴 때 같은 디버프를 적에게도 건다.' }),
+  UQ({ id: 'u86',  name: '뇌격의 고동',     slot: 'helm',  skillId: 'helmBash',    src: 86,  desc: '적을 기절시킬 때마다 모든 스킬의 쿨다운이 1 줄어든다.' }),
+  UQ({ id: 'u113', name: '폭주 기관',       slot: 'acc',   skillId: 'berserkSigil',src: 113, desc: '모든 스킬의 쿨다운이 0이 되지만, 적이 거는 상태이상 스택 +1.' }),
+  UQ({ id: 'u101', name: '시간 왜곡구',     slot: 'acc',   skillId: 'lifeCharm',   src: 101, desc: '스킬 쿨다운이 1턴을 초과하지 않는다.' }),
+  // ===== 전투 — 특수 트리거 =====
+  UQ({ id: 'u91',  name: '망자 사냥꾼',     slot: 'acc',   skillId: 'bloodSigil',  src: 91,  desc: '망령·정령·잔재 계열을 처치하면 최대 HP의 15%를 회복한다.' }),
+  UQ({ id: 'u108', name: '역행의 모래시계', slot: 'acc',   skillId: 'lifeCharm',   src: 108, desc: '[노화]에 걸리면 즉시 제거하고 모든 쿨다운을 초기화한다.' }),
+  UQ({ id: 'u109', name: '저주 포식자',     slot: 'acc',   skillId: 'silenceSigil',src: 109, desc: '[저주]에 걸릴 때마다 무덤 먼지 10을 얻는다.' }),
+  UQ({ id: 'u106', name: '각성의 관',       slot: 'helm',  skillId: 'focusMind',   src: 106, desc: '전투를 SP 100%로 시작한다. (기본 55%)' }),
+  // ===== 성장·탐험 =====
+  UQ({ id: 'u85',  name: '성장의 씨앗',     slot: 'helm',  skillId: 'insight',     src: 85,  desc: '레벨이 오를 때마다 무작위 능력치 +2를 추가로 얻는다.' }),
+  UQ({ id: 'u100', name: '수확자의 서',     slot: 'acc',   skillId: 'venomSigil',  src: 100, desc: '적 처치 시 75% 확률로 장착 스킬 하나의 레벨이 오른다.' }),
+  UQ({ id: 'u102', name: '순례자의 성표',   slot: 'acc',   skillId: 'lifeCharm',   src: 102, desc: '층을 오를 때마다 25% 확률로 무작위 스킬 레벨이 오른다.' }),
+  UQ({ id: 'u103', name: '상인의 인장',     slot: 'acc',   skillId: 'bloodSigil',  src: 103, desc: '무덤 상인의 판매 가격이 40% 할인된다.' }),
+  UQ({ id: 'u110', name: '도굴왕의 곡괭이', slot: 'acc',   skillId: 'sunderSigil', src: 110, desc: '부장품 방에서 장비를 1개 더 얻는다.' }),
+  UQ({ id: 'u112', name: '전당의 휘장',     slot: 'acc',   skillId: 'lifeCharm',   src: 112, desc: '전투 승리 골드 +50%.' }),
+];
+export const getBuriedUnique = (id) => BURIED_UNIQUES.find(u => u.id === id) || null;
+
+// 장착 중인 유니크 효과 보유 여부 — 전투·던전·App이 이것 하나로 분기
+export function buriedUniqueIds(char) {
+  if (!char) return [];
+  return BURIED_SLOT_IDS
+    .map(s => char.equipped?.[s]?.unique)
+    .filter(Boolean);
+}
+export const hasBuriedUnique = (char, id) => buriedUniqueIds(char).includes(id);
+
+// 유니크 장비 생성 — 스탯은 전설 등급 배율, 이름·스킬·효과 고정
+export function rollBuriedUniqueItem({ classId, floor = 1, excludeIds = [] } = {}) {
+  const pool = BURIED_UNIQUES.filter(u => !excludeIds.includes(u.id));
+  if (pool.length === 0) return null;
+  const def = pick(pool);
+  const slotId = def.slot === 'acc' ? (Math.random() < 0.5 ? 'acc1' : 'acc2') : def.slot;
+  const base = rollBuriedItem({ slot: slotId, classId, floor, tier: 'legend' });
+  if (!base) return null;
+  return {
+    ...base,
+    skillId: def.skillId,
+    unique: def.id,
+    name: def.name,
+  };
+}
+
+// 보스 유니크 드랍 확률 (%) — 던전이 깊을수록 후하다. 최종 보스는 2배
+export const BURIED_UNIQUE_DROP = { labyrinth: 8, ruins: 12, chasm: 16, abyss: 22 };
+export function rollBuriedUniqueDrop({ dungeonId, isFinalBoss, classId, floor, ownedIds = [] }) {
+  const base = BURIED_UNIQUE_DROP[dungeonId] || 8;
+  const chance = base * (isFinalBoss ? 2 : 1);
+  if (Math.random() * 100 >= chance) return null;
+  return rollBuriedUniqueItem({ classId, floor, excludeIds: ownedIds });
+}
+
+// 층 이동 시 유니크 [u102] 판정 — 25% 확률 무작위 스킬 레벨 +1
+export function maybeBuriedFloorSkillUp(char) {
+  if (!hasBuriedUnique(char, 'u102') || Math.random() >= 0.25) return { char, raised: null };
+  const ids = buriedEquippedSkills(char)
+    .map(x => x.skill.id)
+    .filter(id => (char.skillLevels?.[id] || 1) < BURIED_SKILL_MAX_LV);
+  if (ids.length === 0) return { char, raised: null };
+  const id = pick(ids);
+  const r = raiseBuriedSkill(char, id);
+  return { char: r.char, raised: { id, lv: r.lv } };
+}
+
+// 유니크 [u91] — 망자 계열 판정
+export const BURIED_UNDEAD_KEYS = ['graveWraith', 'rottedSpirit', 'twilightHusk'];
