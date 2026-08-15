@@ -8,6 +8,7 @@ import { X } from 'lucide-react';
 import { PALETTE } from '../../utils/helpers.js';
 import {
   BURIED_SLOTS, BURIED_SLOT_IDS, BURIED_STATS, BURIED_SKILLS, BURIED_SKILL_MAX_LV,
+  BURIED_TIERS, getBuriedTier,
   buriedDerived, buriedDustValue, canClassUseSkill, getBuriedClass, slotPool,
   buriedTraitIds, getBuriedTrait, buriedSkillLv, buriedSkillAt, buriedSkillRank, BURIED_SKILL_RANKS,
 } from '../../data.js';
@@ -17,6 +18,7 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose }) {
   const [tab, setTab] = useState('gear');       // gear | stats
   const [sheet, setSheet] = useState(null);     // { item, from: 'equipped'|'bag' }
   const [pickSlot, setPickSlot] = useState(null); // 슬롯 탭 시 후보 목록
+  const [bulkConfirm, setBulkConfirm] = useState(null); // 일괄 분해 확인 { tierIds, count, dust }
 
   if (!char) return null;
   const cls = getBuriedClass(char.classId);
@@ -73,6 +75,18 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose }) {
   // 특정 슬롯에 넣을 수 있는 가방 속 후보
   const candidatesFor = (slot) => char.inventory.filter(i =>
     slotPool(i.slot) === slotPool(slot) && canClassUseSkill(char.classId, BURIED_SKILLS[i.skillId]));
+
+  // 일괄 분해 (1.105.0) — 가방에서 지정 등급 "이하" 전부. 장착 장비는 건드리지 않는다.
+  const bulkPreview = (maxTierIdx) => {
+    const tierIds = BURIED_TIERS.slice(0, maxTierIdx + 1).map(t => t.id);
+    const target = char.inventory.filter(i => tierIds.includes(i.tier));
+    return { tierIds, count: target.length, dust: target.reduce((s, i) => s + buriedDustValue(i), 0) };
+  };
+  const bulkDismantle = ({ tierIds, dust: gain }) => {
+    const next = { ...char, inventory: char.inventory.filter(i => !tierIds.includes(i.tier)) };
+    onUpdate(next, gain);
+    setBulkConfirm(null);
+  };
 
   return (
     <div className="absolute inset-0 z-40 flex flex-col" style={{ background: PALETTE.bgDeep }}>
@@ -173,7 +187,29 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose }) {
 
             {/* 가방 */}
             <div>
-              <div className="text-[11px] tracking-[0.2em] mb-1.5" style={{ color: PALETTE.dawn }}>가방 — {char.inventory.length}개</div>
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="text-[11px] tracking-[0.2em]" style={{ color: PALETTE.dawn }}>가방 — {char.inventory.length}개</div>
+              </div>
+              {/* 일괄 분해 (1.105.0) — 해당 등급 이하를 한 번에 */}
+              {char.inventory.length > 0 && (
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <span className="text-[11px] shrink-0" style={{ color: PALETTE.textDim }}>일괄 분해:</span>
+                  {[0, 1, 2].map(idx => {
+                    const t = BURIED_TIERS[idx];
+                    const pv = bulkPreview(idx);
+                    return (
+                      <button key={t.id} disabled={pv.count === 0} onClick={() => setBulkConfirm(pv)}
+                        className="ui-press px-2 py-1 text-[11px]"
+                        style={{
+                          borderRadius: 'var(--r-chip, 8px)', border: `1px solid ${t.color}66`,
+                          color: pv.count > 0 ? t.color : PALETTE.textDim, opacity: pv.count > 0 ? 1 : 0.4,
+                        }}>
+                        {t.name} 이하 ({pv.count})
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
               {char.inventory.length === 0
                 ? <div className="text-[12px] px-3 py-3" style={{ color: PALETTE.textDim, background: PALETTE.panel, borderRadius: 'var(--r-btn, 13px)' }}>비어 있다.</div>
                 : <div className="space-y-1.5">
@@ -237,6 +273,25 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose }) {
           </>
         )}
       </div>
+
+      {bulkConfirm && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.78)' }}>
+          <div className="w-full px-4 py-4" style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.bgDeep, border: `1px solid ${PALETTE.dawn}66` }}>
+            <div className="text-[13px] font-bold mb-1.5" style={{ color: PALETTE.dawn }}>일괄 분해</div>
+            <div className="text-[12px] leading-relaxed mb-3" style={{ color: PALETTE.textDim }}>
+              가방의 해당 등급 이하 장비 <b style={{ color: PALETTE.text }}>{bulkConfirm.count}개</b>를 분해해
+              {' '}{BURIED_DUST_ICON} <b style={{ color: PALETTE.legendary }}>{bulkConfirm.dust}</b>을 얻는다.
+              장착 중인 장비는 건드리지 않는다. <b style={{ color: PALETTE.text }}>되돌릴 수 없다.</b>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => bulkDismantle(bulkConfirm)} className="ui-press flex-1 py-2.5 text-[12px] font-bold"
+                style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.accent, color: '#fff' }}>분해한다</button>
+              <button onClick={() => setBulkConfirm(null)} className="ui-press flex-1 py-2.5 text-[12px]"
+                style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panelLight, color: PALETTE.text, border: `1px solid ${PALETTE.panelBorder}` }}>취소</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {sheet && (
         <BuriedItemSheet

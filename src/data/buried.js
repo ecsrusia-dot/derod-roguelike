@@ -1240,3 +1240,62 @@ export function buriedLibraryChoices(char) {
     .map(x => ({ ...x, lv: buriedSkillLv(char, x.skill.id) }))
     .filter(x => x.lv < BURIED_SKILL_MAX_LV);
 }
+
+// =========================================================
+// 18. 무덤 재련소 + 유산 보관함 확장 (1.105.0) — 무덤 먼지 소비처
+// =========================================================
+// PM 결정: 분해로 얻는 먼지의 용도 2종.
+//   ① 재련소 — 슬롯을 골라 장비 제작. 레벨은 역대 최고 도달 층 기반 (죽어도 남는 진행도).
+//   ② 유산 보관함 확장 — 6칸 → 최대 12칸.
+export const BURIED_FORGE = {
+  randomCost: 40,    // 랜덤 등급 제작
+  epicCost: 180,     // 영웅의 이상 확정 제작 (영웅 75% / 유물급 25%)
+};
+// 제작 장비 레벨 — 역대 최고 도달 층 기반 (최소 3)
+export const buriedForgeLevel = (deepest) => Math.max(3, deepest || 0);
+
+export function craftBuriedItem({ slot, classId, deepest, epic = false }) {
+  const floor = buriedForgeLevel(deepest);
+  if (!epic) return rollBuriedItem({ slot, classId, floor, luck: 3 });
+  const tier = Math.random() < 0.75 ? 'epic' : 'relic';
+  return rollBuriedItem({ slot, classId, floor, tier });
+}
+
+export const BURIED_LEGACY_CAP_MAX = 12;
+// 확장 비용 — 7칸째 60, 8칸째 90, … (칸당 +30)
+export const buriedLegacyExpandCost = (currentSlots) => 60 + (currentSlots - BURIED_LEGACY_MAX) * 30;
+
+// =========================================================
+// 19. 스킬 효과 풀이 (1.105.0) — "[파쇄] 2"가 무엇인지 그 자리에서 설명
+// =========================================================
+// 장비 상세·전투 상세가 공용으로 쓰는 설명 줄 생성기.
+// 반환: [{ text, color }] — 상태이상 줄은 해당 상태 색.
+export function buriedSkillEffectLines(skill) {
+  if (!skill) return [];
+  const lines = [];
+  const push = (text, color = null) => lines.push({ text, color });
+  if (skill.power) {
+    if (skill.hits > 1) push(`${skill.hits}회 연속 타격 — 타격마다 위력 ${skill.power}% 적용`);
+    if (skill.pierce) push('방어 무시 — 적 방어력을 계산하지 않는다');
+    if (skill.critBonus) push(`이 스킬 한정 치명 확률 +${skill.critBonus}%`);
+    if (skill.executeBelow) push(`적 HP ${skill.executeBelow}% 이하면 데미지 2배`);
+    if (skill.berserk) push('잃은 HP 비율만큼 위력 증가 (최대 2배)');
+    if (skill.drain) push(`준 피해의 ${skill.drain}%만큼 HP 회복`);
+  }
+  for (const a of skill.apply || []) {
+    const st = BURIED_STATUS[a.s];
+    if (!st) continue;
+    push(`적에게 ${st.icon}[${st.name}] ${a.n}${a.p != null && a.p < 100 ? ` (${a.p}% 확률)` : ''} — ${st.desc}`, st.color);
+  }
+  for (const a of skill.self || []) {
+    const st = BURIED_STATUS[a.s];
+    if (!st) continue;
+    push(`자신에게 ${st.icon}[${st.name}] ${a.n} — ${st.desc}`, st.color);
+  }
+  if (skill.heal) push(`자신 HP ${skill.heal} 회복`);
+  if (skill.barrierGain) push(`보호막 +${skill.barrierGain} — HP보다 먼저 깎이는 추가 내구`);
+  if (skill.spGain) push(`SP +${skill.spGain} 회복`);
+  if (skill.selfDmg) push(`자해 ${skill.selfDmg} (보호막 무시)`);
+  if (skill.reflect) push(`2턴간 받은 피해의 ${skill.reflect}%를 반사`);
+  return lines;
+}
