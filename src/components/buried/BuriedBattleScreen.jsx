@@ -24,7 +24,7 @@ import {
   buriedSkillAt, buriedSkillLv, buriedSkillLvNote, buriedTraitIds, getBuriedTrait,
   getBuriedRoomEffect, getBuriedFloorEffect, resolveBuriedEnvFx, getBuriedDungeon,
 } from '../../data.js';
-import { BuriedBar, BuriedStatusRow, BuriedItemCard, slotMeta } from './BuriedCommon.jsx';
+import { BuriedBar, BuriedStatusRow, BuriedItemCard, slotMeta, SkillKindBadge } from './BuriedCommon.jsx';
 
 const wait = (ms) => new Promise(r => setTimeout(r, ms));
 const rnd = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
@@ -477,8 +477,9 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
                 onContextMenu={(e) => { e.preventDefault(); setDetail({ item, skill: eff, slot, lv }); }}
                 className="ui-press px-2.5 py-2 text-left"
                 style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panel, border: `1px solid ${tier.color}66`, opacity: off ? 0.42 : 1 }}>
-                <div className="text-[12px] font-bold truncate" style={{ color: tier.color }}>
-                  {eff.name}{lv > 1 && <span style={{ color: PALETTE.legendary }}> Lv.{lv}</span>}
+                <div className="text-[12px] font-bold truncate flex items-center gap-1" style={{ color: tier.color }}>
+                  <SkillKindBadge skill={eff} />
+                  <span className="truncate">{eff.name}{lv > 1 && <span style={{ color: PALETTE.legendary }}> Lv.{lv}</span>}</span>
                 </div>
                 <div className="text-[11px] tabular-nums truncate" style={{ color: noSp ? PALETTE.accent : PALETTE.ice }}>
                   SP {spCost}{cd > 0 ? ` · 쿨 ${cd}` : ''}{eff.power ? ` · ${eff.power}%${eff.hits ? `×${eff.hits}` : ''}` : ''}

@@ -12,6 +12,32 @@ import {
 
 export const slotMeta = (slotId) => BURIED_SLOTS.find(s => s.id === slotId) || { name: slotId, icon: '◆' };
 
+// ===== 스킬 공격 계열 (1.104.1) =====
+// 공격 스킬은 skill.stat이 참조하는 능력치로 위력이 정해진다 — 물리(완력)/기교/마법(지혜).
+// 비공격 스킬(방어·회복·버프)은 '보조'로 표기해 스탯 무관임을 명시한다.
+// 색은 BURIED_STATS의 스탯 색과 동일 — 능력치 배분 화면과 1:1로 이어진다.
+const SKILL_KIND = {
+  str: { label: '물리', icon: '💪', color: '#c4453d', refs: '완력' },
+  dex: { label: '기교', icon: '🎯', color: '#7a9a5e', refs: '기교' },
+  int: { label: '마법', icon: '📖', color: '#5c4a8c', refs: '지혜' },
+  none: { label: '보조', icon: '◈', color: '#9b8975', refs: null },
+};
+export function skillKindMeta(skill) {
+  if (!skill) return null;
+  if (!skill.power) return SKILL_KIND.none;
+  return SKILL_KIND[skill.stat || 'str'] || SKILL_KIND.str;
+}
+export function SkillKindBadge({ skill }) {
+  const k = skillKindMeta(skill);
+  if (!k) return null;
+  return (
+    <span className="px-1 py-px text-[11px] font-bold align-middle inline-flex items-center gap-0.5 shrink-0"
+      style={{ borderRadius: 'var(--r-chip, 8px)', background: `${k.color}22`, border: `1px solid ${k.color}66`, color: k.color, lineHeight: 1.3 }}>
+      {k.icon}{k.label}
+    </span>
+  );
+}
+
 const STAT_LABEL = {
   atk: '공격력', mag: '마력', def: '방어력', hp: '최대 HP', sp: '최대 SP',
   crit: '치명 확률', critDmg: '치명 피해', dodge: '회피율', spRegen: 'SP 회복',
@@ -92,8 +118,9 @@ export function BuriedItemCard({ item, slotId, onClick, right, dim = false, show
         <div className="text-[12px] font-bold truncate" style={{ color: tier.color }}>
           {item.name}{item.plus > 0 && <span style={{ color: PALETTE.legendary }}> +{item.plus}</span>}
         </div>
-        <div className="text-[11px] truncate" style={{ color: PALETTE.dawn }}>
-          ◆ {skill ? skill.name : '스킬 없음'}{skill && <span style={{ color: PALETTE.textDim }}> · SP {skill.sp}{skill.cd > 0 ? ` · CD ${skill.cd}` : ''}</span>}
+        <div className="text-[11px] truncate flex items-center gap-1" style={{ color: PALETTE.dawn }}>
+          {skill && <SkillKindBadge skill={skill} />}
+          <span className="truncate">◆ {skill ? skill.name : '스킬 없음'}{skill && <span style={{ color: PALETTE.textDim }}> · SP {skill.sp}{skill.cd > 0 ? ` · CD ${skill.cd}` : ''}</span>}</span>
         </div>
         <div className="text-[11px] truncate" style={{ color: PALETTE.textDim }}>
           {showSlot && <span>{meta.name} · </span>}
@@ -135,10 +162,12 @@ export function BuriedItemSheet({ item, compare, onEquip, onUnequip, onDismantle
         {skill && (
           <div className="px-3 py-2.5 mb-2" style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panelLight, border: `1px solid ${PALETTE.dawn}44` }}>
             <div className="text-[11px] tracking-[0.2em] mb-1" style={{ color: PALETTE.dawn }}>내장 스킬</div>
-            <div className="text-[13px] font-bold" style={{ color: PALETTE.text }}>{skill.name}</div>
+            <div className="text-[13px] font-bold flex items-center gap-1.5" style={{ color: PALETTE.text }}>
+              {skill.name} <SkillKindBadge skill={skill} />
+            </div>
             <div className="text-[11px] mt-0.5 tabular-nums" style={{ color: PALETTE.ice }}>
               SP {skill.sp}{skill.cd > 0 ? ` · 쿨다운 ${skill.cd}턴` : ' · 쿨다운 없음'}
-              {skill.power ? ` · 위력 ${skill.power}%${skill.hits ? ` ×${skill.hits}` : ''}` : ''}
+              {skill.power ? ` · 위력 ${skill.power}%${skill.hits ? ` ×${skill.hits}` : ''} (${skillKindMeta(skill).refs} 기반 ${skillKindMeta(skill).label} 공격력 참조)` : ' · 스탯 무관 (보조 스킬)'}
               {skill.pierce ? ' · 방어 무시' : ''}
             </div>
             <div className="text-[12px] mt-1 leading-relaxed" style={{ color: PALETTE.textDim }}>{skill.desc}</div>
