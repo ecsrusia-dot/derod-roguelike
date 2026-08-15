@@ -31,9 +31,9 @@ export const CURSES = [
   },
   {
     id: 'curse_silence',
-    name: '침묵의 저주',
-    desc: '에테르 최대치 -1',
-    effect: 'curse_ether-1',
+    name: '물약 봉인',
+    desc: '벨트 물약 사용 불가',
+    effect: 'curse_potionSeal',
     color: '#7ba3c4',
   },
   {

@@ -851,8 +851,8 @@ export default function App() {
     // 1.100.0~ 이어하기 런은 런타임 기록 무효 (스냅샷 이전 시간 미상 — 베스트 오염 방지)
     runTimeRef.current = null;
     setRunClearTime(null);
-    // 1.96.0~ 벨트 복원
-    setBelt(s.belt || []);
+    // 1.96.0~ 벨트 복원 (1.101.0~ 구 스냅샷의 에테르 물약 → 소울 물약 치환)
+    setBelt((s.belt || []).map(pid => pid === 'ether' ? 'soul' : pid));
     setStats(s.stats || {});
     setRelics(s.relics || []);
     setUltimates(s.ultimates || []);

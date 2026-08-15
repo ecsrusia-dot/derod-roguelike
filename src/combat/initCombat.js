@@ -7,7 +7,6 @@
 
 import {
   getMetaBonus,
-  hasCurse,
   getEffectiveSkills,
   getActiveRelicStat,
 } from '../utils/helpers.js';
@@ -34,7 +33,7 @@ export function getSkillApCost(skill) {
   if (!skill) return 1;
   if (skill.ap) return skill.ap;
   if (skill.type === 'defense' || skill.type === 'buff') return 1;
-  if ((skill.cost || 0) === 0 && (skill.cd || 0) === 0) return 1; // 기본기
+  if ((skill.cd || 0) === 0) return 1; // 기본기 (1.101.0~ 에테르 폐지 — cd 0 기준)
   return 2; // 주력기
 }
 
@@ -46,19 +45,12 @@ export const AP_TUNING = { enemyHpMult: 1.6, enemyDmgMult: 1.25 };
 export function buildInitialPlayer({ initialPlayer, initialSkills, initialUltimates, activeSkills, meta, curses }) {
   let p = {
     ...initialPlayer, defense: 0, buffs: {}, debuffs: {}, cooldowns: {},
-    ether: 3, maxEther: 3, firstHitImmune: false, revivedThisCombat: false,
+    firstHitImmune: false, revivedThisCombat: false,
     soulGauge: 0, ap: AP_PER_TURN,
   };
   if (meta) {
-    const etherBonus = getMetaBonus(meta, 'maxEther+1');
-    p.maxEther += etherBonus;
-    p.ether += etherBonus;
     const startDefenseBonus = getMetaBonus(meta, 'startDefense+5') * 5;
     if (startDefenseBonus > 0) p.defense += startDefenseBonus;
-  }
-  if (hasCurse(curses, 'curse_ether-1')) {
-    p.maxEther = Math.max(1, p.maxEther - 1);
-    p.ether = Math.max(1, p.ether - 1);
   }
   // 이프리트 minor (Tier 효과 누적): 지능 +2 (Lv.3) +3 (Lv.5) +4 (Lv.7)
   const ifritLv = (initialSkills && initialSkills['이프리트']) || 0;

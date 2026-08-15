@@ -58,7 +58,6 @@ export function buildActiveSkillInfo(name, classColor = null) {
     const typeLabel = sk.type === 'physical' ? '물리' : sk.type === 'magic' ? '마법' : sk.type === 'defense' ? '방어' : sk.type;
     stats.push(['타입', typeLabel]);
   }
-  if (typeof sk.cost === 'number') stats.push(['마나', String(sk.cost)]);
   if (typeof sk.cd === 'number') stats.push(['쿨다운', `${sk.cd}턴`]);
   if (Array.isArray(sk.baseDmg)) stats.push(['데미지', `${sk.baseDmg[0]}~${sk.baseDmg[1]}`]);
   if (typeof sk.defense === 'number') stats.push(['방어', `+${sk.defense}`]);
