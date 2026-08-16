@@ -9,7 +9,7 @@ import { ChevronLeft, Skull, BarChart3, Lock } from 'lucide-react';
 import { PALETTE } from '../../utils/helpers.js';
 import {
   BURIED_CLASSES, BURIED_ADVANCED_CLASSES, BURIED_ENCOUNTER_CLASSES, BURIED_DUNGEONS,
-  BURIED_LEGACY_GOLD_PCT, BURIED_SKILL_MAX_LV,
+  BURIED_SKILL_MAX_LV,
   BURIED_SLOTS, BURIED_FORGE,
   buriedForgeLevel,
   BURIED_CONTRACTS, BURIED_CONTRACT_COST, BURIED_CONTRACT_CARRY, getBuriedContract, rollBuriedContract,
@@ -570,7 +570,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
               <Skull size={14} /> 이 캐릭터를 묻는다
             </div>
             <div className="text-[12px] leading-relaxed mb-3" style={{ color: PALETTE.textDim }}>
-              {cls?.name} Lv.{char.lv}는 사라진다. 장착 장비는 전부 분해되어 🕯먼지로 정산되고, 골드 {BURIED_LEGACY_GOLD_PCT}%만 다음 캐릭터에게 넘어간다.
+              {cls?.name} Lv.{char.lv}는 사라진다. 장착 장비는 전부 분해되어 🕯먼지로 정산되고, 골드는 무덤에 흩어진다.
               <b style={{ color: PALETTE.text }}> 되돌릴 수 없다.</b>
             </div>
             <div className="flex gap-2">
