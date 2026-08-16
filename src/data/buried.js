@@ -683,14 +683,14 @@ export const BURIED_DUNGEON = {
 };
 
 // 이번 층에서 고를 방 2~3개. 각 방에는 던전 난이도에 따라 **방 효과**가 붙는다.
-export function rollBuriedOffers(floor, dungeonId = 'labyrinth') {
+export function rollBuriedOffers(floor, dungeonId = 'labyrinth', extraOffers = 0) {
   const dg = getBuriedDungeon(dungeonId);
   const bossKey = buriedBossKeyAt(dg, floor);
   if (bossKey) return [{ type: 'boss', enemyKey: bossKey, effect: rollBuriedRoomEffect(dg.roomEffectChance) }];
-  // 기믹 「갈림길」(미궁) — 선택지가 항상 3~4개
-  const count = dg.gimmick?.id === 'maze'
+  // 기믹 「갈림길」(미궁) — 선택지가 항상 3~4개. extraOffers: [dl1] 미궁의 실타래 +1
+  const count = (dg.gimmick?.id === 'maze'
     ? (Math.random() < 0.25 ? 4 : 3)
-    : (Math.random() < 0.45 ? 2 : 3);
+    : (Math.random() < 0.45 ? 2 : 3)) + (extraOffers || 0);
   // 1.107.0 — 이벤트 방 5종(묘비·샘·석상·나그네·관)도 선택지 풀에 합류
   const pool = [
     ...Object.values(BURIED_ROOMS).filter(r => r.weight > 0),
@@ -736,9 +736,13 @@ export function buriedChuteJump(char) {
     ...char,
     floor: land,
     steps: (char.steps || 0) + 1,
-    offers: rollBuriedOffers(land, char.dungeonId),
+    offers: rollBuriedOffers(land, char.dungeonId, hasBuriedUnique(char, 'dl1') ? 1 : 0),
     floorEffect: rollBuriedFloorEffect(dg.floorEffectChance),
     room: null, roomData: null, roomEffect: null,
+    // [dc2] 추락자의 갑주 — 낙하 시 다음 전투를 🧱방벽 1로 시작
+    pendingStatuses: hasBuriedUnique(char, 'dc2')
+      ? [...(char.pendingStatuses || []), { s: 'wall', n: 1 }]
+      : char.pendingStatuses,
   };
 }
 
@@ -923,14 +927,21 @@ export const BURIED_DUST = { name: '무덤 먼지', icon: '🕯' };
 export function advanceBuriedFloor(char) {
   const dg = getBuriedDungeon(char?.dungeonId);
   const next = (char.floor || 1) + 1;
+  let out = {
+    ...char,
+    floor: next,
+    // [dl1] 미궁의 실타래 — 방 선택지 +1
+    offers: rollBuriedOffers(next, char.dungeonId, hasBuriedUnique(char, 'dl1') ? 1 : 0),
+    floorEffect: rollBuriedFloorEffect(dg.floorEffectChance),
+    room: null, roomData: null, roomEffect: null,
+  };
+  // [dl2] 미로 걸음 — 층 이동 시 30% 확률 최대 HP 12% 회복
+  if (hasBuriedUnique(char, 'dl2') && Math.random() < 0.30) {
+    const maxHp = buriedDerived(out).maxHp;
+    out = { ...out, hp: Math.min(maxHp, (out.hp || 1) + Math.round(maxHp * 0.12)) };
+  }
   return {
-    char: {
-      ...char,
-      floor: next,
-      offers: rollBuriedOffers(next, char.dungeonId),
-      floorEffect: rollBuriedFloorEffect(dg.floorEffectChance),
-      room: null, roomData: null, roomEffect: null,
-    },
+    char: out,
     cleared: false, // 하위 호환 — 클리어 개념 폐지 (정복 판정은 App의 보스 처치 시점)
   };
 }
@@ -1525,6 +1536,29 @@ export const BURIED_UNIQUES = [
   UQ({ id: 'u76',  name: '씨앗',           slot: 'armor', skillId: 'thornMail',   src: 76,  desc: '전투를 🧱방벽 2개로 시작한다.' }),
   UQ({ id: 'u79',  name: '눈보라',         slot: 'acc',   skillId: 'sunderSigil', src: 79,  desc: '치명타마다 30% 확률로 적에게 [기절] 1.' }),
   UQ({ id: 'u83',  name: '수수께끼의 보석', slot: 'acc',   skillId: 'lifeCharm',   src: 83,  desc: '피격당할 때마다 15% 확률로 모든 쿨다운이 초기화된다.' }),
+
+  // ===== 던전 전용 유니크 16종 (1.115.0) — 그 던전의 **심층 보스**(정복 층 이후)만 떨어뜨린다 =====
+  // 각 던전의 기믹 정체성을 강화하는 방향으로 설계 (PM 결정: 공략 요소)
+  // 🌀 미궁 — 선택·탐험
+  UQ({ id: 'dl1', dungeon: 'labyrinth', name: '미궁의 실타래',   slot: 'acc',    skillId: 'lifeCharm',   src: 0, desc: '[미궁 심층] 층을 오를 때 방 선택지가 1개 더 늘어난다.' }),
+  UQ({ id: 'dl2', dungeon: 'labyrinth', name: '미로 걸음',       slot: 'helm',   skillId: 'focusMind',   src: 0, desc: '[미궁 심층] 층을 이동할 때마다 30% 확률로 최대 HP의 12%를 회복한다.' }),
+  UQ({ id: 'dl3', dungeon: 'labyrinth', name: '선택자의 낫',     slot: 'weapon', skillId: 'decapitate',  src: 0, desc: '[미궁 심층] 방 선택지가 3개 이상이던 층에서는 전투를 [격노] 2로 시작한다.' }),
+  UQ({ id: 'dl4', dungeon: 'labyrinth', name: '유산 도굴사',     slot: 'offhand',skillId: 'vitalStab',    src: 0, desc: '[미궁 심층] 전투 승리 시 장비 드랍 확률 +20%p.' }),
+  // 🌊 폐허 — 도트·부패
+  UQ({ id: 'dr1', dungeon: 'ruins', name: '가라앉은 왕의 창',    slot: 'weapon', skillId: 'fireball',    src: 0, desc: '[폐허 심층] 공격 스킬이 적중하면 [중독] 2를 추가로 부여한다.' }),
+  UQ({ id: 'dr2', dungeon: 'ruins', name: '부패의 심장',         slot: 'armor',  skillId: 'regenScale',  src: 0, desc: '[폐허 심층] 적이 지속피해를 받을 때마다 그 50%만큼 내가 회복한다.' }),
+  UQ({ id: 'dr3', dungeon: 'ruins', name: '침수된 성배',         slot: 'acc',    skillId: 'lifeCharm',   src: 0, desc: '[폐허 심층] 침수의 회복 페널티를 무시하고, 모든 회복 +25%.' }),
+  UQ({ id: 'dr4', dungeon: 'ruins', name: '곪은 낫',             slot: 'offhand',skillId: 'laceration', src: 0, desc: '[폐허 심층] 지속피해를 앓는 적에게 주는 피해 +25%.' }),
+  // 🕳 나락 — 낙하·희생
+  UQ({ id: 'dc1', dungeon: 'chasm', name: '나락의 갈고리',       slot: 'acc',    skillId: 'bloodSigil',  src: 0, desc: '[나락 심층] 낙하 구멍의 HP 비용이 절반이 된다.' }),
+  UQ({ id: 'dc2', dungeon: 'chasm', name: '추락자의 갑주',       slot: 'armor',  skillId: 'thornMail',   src: 0, desc: '[나락 심층] 낙하할 때마다 다음 전투를 🧱방벽 1로 시작한다.' }),
+  UQ({ id: 'dc3', dungeon: 'chasm', name: '심락의 대검',         slot: 'weapon', skillId: 'decapitate',  src: 0, desc: '[나락 심층] 잃은 HP 1%당 주는 피해 +0.5% (최대 +40%).' }),
+  UQ({ id: 'dc4', dungeon: 'chasm', name: '바닥 없는 주머니',    slot: 'offhand',skillId: 'manaDrain',    src: 0, desc: '[나락 심층] 골드 +50%, 전투 승리 시 최대 HP의 8%를 회복한다.' }),
+  // 🌑 심연 — 어둠·일격
+  UQ({ id: 'da1', dungeon: 'abyss', name: '심연의 눈',           slot: 'helm',   skillId: 'insight',     src: 0, desc: '[심연 심층] 어둠을 꿰뚫는다 — 적 수치가 다시 보이고, 치명 확률 +8%.' }),
+  UQ({ id: 'da2', dungeon: 'abyss', name: '어둠에 벼린 칼',      slot: 'weapon', skillId: 'executioner', src: 0, desc: '[심연 심층] 매 전투 첫 공격의 피해가 2배가 된다.' }),
+  UQ({ id: 'da3', dungeon: 'abyss', name: '그림자 장막',         slot: 'armor',  skillId: 'shadowCloak', src: 0, desc: '[심연 심층] 전투를 🧱방벽 1로 시작하고, 회피율 +8%.' }),
+  UQ({ id: 'da4', dungeon: 'abyss', name: '종언의 낫',           slot: 'acc',    skillId: 'berserkSigil',src: 0, desc: '[심연 심층] HP 30% 이하의 적을 공격하면 20% 확률로 즉사시킨다 (보스 제외).' }),
 ];
 export const getBuriedUnique = (id) => BURIED_UNIQUES.find(u => u.id === id) || null;
 
@@ -1537,9 +1571,15 @@ export function buriedUniqueIds(char) {
 }
 export const hasBuriedUnique = (char, id) => buriedUniqueIds(char).includes(id);
 
-// 유니크 장비 생성 — 스탯은 전설 등급 배율, 이름·스킬·효과 고정
-export function rollBuriedUniqueItem({ classId, floor = 1, excludeIds = [] } = {}) {
-  const pool = BURIED_UNIQUES.filter(u => !excludeIds.includes(u.id));
+// 유니크 장비 생성 — 스탯은 전설 등급 배율, 이름·스킬·효과 고정.
+// 1.115.0 — dungeonId·deep: 던전 전용 유니크는 그 던전 심층에서만 풀에 들어오고,
+// 미보유 전용이 남아 있으면 50% 확률로 전용 쪽을 우선 뽑는다 (공략 목적지 역할)
+export function rollBuriedUniqueItem({ classId, floor = 1, excludeIds = [], dungeonId = null, deep = false } = {}) {
+  const generic = BURIED_UNIQUES.filter(u => !u.dungeon && !excludeIds.includes(u.id));
+  const exclusive = (deep && dungeonId)
+    ? BURIED_UNIQUES.filter(u => u.dungeon === dungeonId && !excludeIds.includes(u.id))
+    : [];
+  const pool = exclusive.length > 0 && Math.random() < 0.5 ? exclusive : [...generic, ...exclusive];
   if (pool.length === 0) return null;
   const def = pick(pool);
   const slotId = def.slot === 'acc' ? (Math.random() < 0.5 ? 'acc1' : 'acc2') : def.slot;
@@ -1559,7 +1599,8 @@ export function rollBuriedUniqueDrop({ dungeonId, isFinalBoss, classId, floor, o
   const base = BURIED_UNIQUE_DROP[dungeonId] || 8;
   const chance = guaranteed ? 100 : base * (isFinalBoss ? 2 : 1);
   if (Math.random() * 100 >= chance) return null;
-  return rollBuriedUniqueItem({ classId, floor, excludeIds: ownedIds });
+  // isFinalBoss = 정복 층 이상 보스 → 심층 판정과 동일 (전용 유니크 풀 개방)
+  return rollBuriedUniqueItem({ classId, floor, excludeIds: ownedIds, dungeonId, deep: !!isFinalBoss });
 }
 
 // 층 이동 시 유니크 [u102] 판정 — 25% 확률 무작위 스킬 레벨 +1
@@ -1897,6 +1938,15 @@ export const BURIED_PARTS = [
   { id: 'p_gold',   name: '탐욕 회로',    desc: '골드 +15%',           fx: { goldPct: 15 } },
   { id: 'p_exp',    name: '학습 회로',    desc: '경험치 +15%',         fx: { expPct: 15 } },
   { id: 'p_wall',   name: '증축 골조',    desc: '전투 시작 🧱방벽 +1', fx: { startWall: 1 } },
+  // ===== 던전 전용 부품 8종 (1.115.0) — 해당 던전 100층 도달 시 구매 해금. 기본 부품보다 강하다 =====
+  { id: 'p_lab_exp',    dungeon: 'labyrinth', needDeep: 100, name: '탐험자 회로',   desc: '경험치 +30%', fx: { expPct: 30 } },
+  { id: 'p_lab_eye',    dungeon: 'labyrinth', needDeep: 100, name: '도굴 광학 렌즈', desc: '드랍 등급 운 +2', fx: { dropLuck: 2 } },
+  { id: 'p_ruin_rot',   dungeon: 'ruins',     needDeep: 100, name: '부패 배양낭',   desc: '상태이상 확률 +30%', fx: { statusChance: 30 } },
+  { id: 'p_ruin_seal',  dungeon: 'ruins',     needDeep: 100, name: '방수 격막',     desc: '회복량 +25%', fx: { healPct: 25 } },
+  { id: 'p_chasm_bone', dungeon: 'chasm',     needDeep: 100, name: '충격 흡수 골격', desc: '최대 HP +80', fx: { hp: 80 } },
+  { id: 'p_chasm_core', dungeon: 'chasm',     needDeep: 100, name: '낙하자의 심장', desc: '물리·기교 공격력 +10, 마법 +10', fx: { atk: 10, mag: 10 } },
+  { id: 'p_abyss_eye',  dungeon: 'abyss',     needDeep: 100, name: '심연 동공',     desc: '치명 확률 +8%, 추격 피해 +8', fx: { crit: 8, chase: 8 } },
+  { id: 'p_abyss_skin', dungeon: 'abyss',     needDeep: 100, name: '어둠막 피막',   desc: '보호막 +60, 전투 시작 🧱방벽 +1', fx: { barrier: 60, startWall: 1 } },
 ];
 export const getBuriedPart = (id) => BURIED_PARTS.find(p => p.id === id) || null;
 export function aggregateBuriedParts(partIds) {

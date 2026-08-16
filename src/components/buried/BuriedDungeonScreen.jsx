@@ -68,9 +68,9 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
   // ===== 방 진입 =====
   const enterRoom = (offer) => {
     const type = offer.type;
-    // 기믹 「낙하 구멍」(나락, 1.114.0) — HP를 바치고 층을 건너뛴다
+    // 기믹 「낙하 구멍」(나락, 1.114.0) — HP를 바치고 층을 건너뛴다. [dc1] 나락의 갈고리 — 비용 절반
     if (type === 'chute') {
-      const cost = Math.round(d.maxHp * BURIED_CHUTE_HP_PCT / 100);
+      const cost = Math.round(d.maxHp * BURIED_CHUTE_HP_PCT / (hasBuriedUnique(char, 'dc1') ? 200 : 100));
       if (char.hp <= cost) { setNotice('HP가 부족해 뛰어내릴 수 없다.'); return; }
       const jumped = buriedChuteJump({ ...char, hp: char.hp - cost });
       onUpdateChar(jumped, 0);

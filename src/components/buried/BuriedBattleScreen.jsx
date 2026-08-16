@@ -50,6 +50,10 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
   const pf = char.partsFx || {};
   // ===== 던전 고유 기믹 (1.114.0) — flood(침수): 도트 ×1.5·회복 -25% 양쪽 / dark(어둠): 적 수치 은폐
   const gimmickId = dungeon.gimmick?.id || null;
+  // [da1] 심연의 눈 — 어둠을 꿰뚫는다 (수치 은폐 무효)
+  const darkBlind = gimmickId === 'dark' && !buriedUniqueIds(char).includes('da1');
+  // [da2] 어둠에 벼린 칼 — 매 전투 첫 공격 2배 (1회 소비)
+  const firstStrikeRef = useRef(true);
   // 스킬 단계 보정 — [u113] 쿨 0 / [u101] 쿨 상한 1 / [u99] 레벨당 위력 +2% / [u94] 2회 시전·위력 절반
   const applyUniqueSkillMods = (sk) => {
     let out = { ...sk };
@@ -69,6 +73,8 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     }
     // 저주 「부알」 — 쿨다운 +1 (폭주 기관의 쿨 0에는 못 이긴다)
     if (!uq('u113') && cs('vual') && out.cd > 0) out.cd += 1;
+    // [dr1] 가라앉은 왕의 창 — 공격 스킬 적중 시 [중독] 2 추가
+    if (uq('dr1') && out.power) out.apply = [...(out.apply || []), { s: 'poison', n: 2, p: 100 }];
     return out;
   };
 
@@ -91,9 +97,9 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     fin: d.fin + (uniques.includes('u107') ? Math.round(d.maxHp * 0.08) : 0) + (char.researchPower || 0),
     mag: d.mag + (uniques.includes('u111') ? Math.round((d.barrier || 0) * 0.3) : 0) + (char.researchPower || 0),
     def: d.def, chase: d.chase || 0,
-    crit: hasBuriedCurse(char, 'gaap') ? 0 : (uniques.includes('u52') ? 100 : d.crit),
+    crit: hasBuriedCurse(char, 'gaap') ? 0 : (uniques.includes('u52') ? 100 : d.crit + (uniques.includes('da1') ? 8 : 0)),
     critDmg: d.critDmg,
-    dodge: hasBuriedCurse(char, 'belial') ? -999 : d.dodge,
+    dodge: hasBuriedCurse(char, 'belial') ? -999 : d.dodge + (uniques.includes('da3') ? 8 : 0),
     spRegen: d.spRegen,
     // 1.107.0 — 이벤트 방 함정의 지연 상태이상 + 1.109.0 요정의 날개(시작 방벽 2)
     statuses: applyBuriedStatuses(
@@ -102,8 +108,12 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
             const w = (traits.includes('fairywing') ? 2 : 0)
               + (uniques.includes('u76') ? 2 : 0)
               + (aggregateBuriedContracts(char).startWall || 0) // 「방벽의 계약」
-              + (char.partsFx?.startWall || 0); // 부품 「증축 골조」
-            return w > 0 ? { wall: w } : {};
+              + (char.partsFx?.startWall || 0) // 부품 「증축 골조」
+              + (uniques.includes('da3') ? 1 : 0); // [da3] 그림자 장막
+            const init = w > 0 ? { wall: w } : {};
+            // [dl3] 선택자의 낫 — 방 선택지 3개 이상이던 층은 [격노] 2로 시작
+            if (uniques.includes('dl3') && (char.offers || []).length >= 3) init.rage = (init.rage || 0) + 2;
+            return init;
           })() : {},
       char.pendingStatuses || []
     ),
@@ -176,7 +186,9 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
       mult += (d.healPct || 0) / 100;
       mult += (env.self.healPct || 0) / 100;
     }
-    if (gimmickId === 'flood') mult -= 0.25; // 기믹 「침수」 — 회복 -25% (양쪽)
+    // 기믹 「침수」 — 회복 -25% (양쪽). [dr3] 침수된 성배 — 페널티 무시 + 회복 +25%
+    if (gimmickId === 'flood' && !(isPlayer && buriedUniqueIds(char).includes('dr3'))) mult -= 0.25;
+    if (isPlayer && buriedUniqueIds(char).includes('dr3')) mult += 0.25;
     return Math.max(0, Math.round(base * mult));
   };
 
@@ -216,11 +228,12 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
   const finish = (win, finalHp) => {
     if (win) {
       // [u112] 전당의 휘장 — 승리 골드 +50%
-      const goldMult = dungeon.goldMult * (1 + (env.meta.goldPct || 0) / 100) * (uq('u112') ? 1.5 : 1) * (uq('u27') ? 3 : 1) * (1 + ((cf.goldPct || 0) + (pf.goldPct || 0)) / 100);
+      const goldMult = dungeon.goldMult * (1 + (env.meta.goldPct || 0) / 100) * (uq('u112') ? 1.5 : 1) * (uq('u27') ? 3 : 1) * (uq('dc4') ? 1.5 : 1) * (1 + ((cf.goldPct || 0) + (pf.goldPct || 0)) / 100);
       const gold = Math.round(rnd(enemy.gold[0], enemy.gold[1]) * goldMult);
       const exp = Math.round(enemy.exp * dungeon.expMult * (uq('u40') ? 2 : 1) * (1 + ((cf.expPct || 0) + (pf.expPct || 0)) / 100));
       const bossy = roomType === 'boss' || roomType === 'calamity';
-      const dropChance = bossy || roomType === 'elite' ? 100 : 38;
+      // [dl4] 유산 도굴사 — 드랍 확률 +20%p
+      const dropChance = bossy || roomType === 'elite' ? 100 : Math.min(100, 38 + (uq('dl4') ? 20 : 0));
       const drops = [];
       const luck = dungeon.dropLuck + (cf.dropLuck || 0) + (pf.dropLuck || 0) + (bossy ? 6 : roomType === 'elite' ? 3 : 0);
       if (Math.random() * 100 < dropChance) {
@@ -253,6 +266,8 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
       }
       // [u7] 드라큘라 — 처치 시 HP 전액 회복
       if (uq('u7')) { hp = d.maxHp; pushLog('드라큘라 — 적의 피가 상처를 전부 메운다.', '#7d2b4a'); }
+      // [dc4] 바닥 없는 주머니 — 승리 시 최대 HP 8% 회복
+      if (uq('dc4')) hp = Math.min(d.maxHp, hp + Math.round(d.maxHp * 0.08));
       setResult({
         win: true, gold, exp, drops,
         hp: cs('balam') ? 1 : hp, // 저주 「발람」 — 승리해도 HP 1
@@ -308,6 +323,22 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
           res.total *= 3; res.chase *= 3;
           pushLog('파성추 — 무방비 적에게 3배 피해!', PALETTE.legendary);
         }
+        // [dr4] 곪은 낫 — 지속피해를 앓는 적에게 +25%
+        if (uq('dr4') && ((E.statuses.poison || 0) + (E.statuses.bleed || 0) + (E.statuses.burn || 0)) > 0) {
+          res.total = Math.round(res.total * 1.25); res.chase = Math.round(res.chase * 1.25);
+        }
+        // [dc3] 심락의 대검 — 잃은 HP 1%당 +0.5% (최대 +40%)
+        if (uq('dc3')) {
+          const lostPct = Math.max(0, (1 - P.hp / P.maxHp) * 100);
+          const mult = 1 + Math.min(40, lostPct * 0.5) / 100;
+          res.total = Math.round(res.total * mult); res.chase = Math.round(res.chase * mult);
+        }
+        // [da2] 어둠에 벼린 칼 — 매 전투 첫 공격 2배
+        if (uq('da2') && firstStrikeRef.current) {
+          res.total *= 2; res.chase *= 2;
+          firstStrikeRef.current = false;
+          pushLog('어둠에 벼린 칼 — 어둠 속의 일격, 피해 2배!', PALETTE.legendary);
+        }
         // [u87] 도살자의 눈 — 치명타마다 치명 확률 누적
         if (uq('u87') && res.crits > 0) { P.crit += 2 * res.crits; pushLog(`도살자의 눈 — 치명 확률 +${2 * res.crits}% (현재 ${P.crit}%)`, PALETTE.legendary); }
         // 접두어 「반응형」 — 적중 시 다른 스킬 쿨다운 -1
@@ -339,6 +370,12 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
             pushFloat('enemy', dmgText(xr), PALETTE.legendary);
             pushLog(`${chaser[2]} — 추가 타격 ${extra}`, PALETTE.legendary);
           }
+        }
+        // [da4] 종언의 낫 — HP 30% 이하의 적 20% 확률 즉사 (보스·재앙 제외)
+        if (uq('da4') && E.hp > 0 && E.hp <= E.maxHp * 0.3 && enemy.tier !== 'boss' && Math.random() < 0.2) {
+          E.hp = 0;
+          pushFloat('enemy', '💀 종언', '#c48bd4');
+          pushLog('종언의 낫 — 어둠이 목숨을 거두어 갔다.', '#c48bd4');
         }
         // [u79] 눈보라 — 치명타마다 30% [기절]
         if (uq('u79') && res.crits > 0 && Math.random() < 0.3 * res.crits) {
@@ -594,6 +631,11 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
       if (et.heal > 0) et.heal = Math.round(et.heal * 0.75);
     }
     if (uq('u17') && et.dmg > 0) et.dmg *= 2; // [u17] 아누비스 — 내 도트 2배
+    // [dr2] 부패의 심장 — 적 도트 피해의 50%를 내가 회복
+    if (uq('dr2') && et.dmg > 0 && P.hp > 0) {
+      const h = applyHeal(P, Math.round(et.dmg * 0.5));
+      if (h > 0) { pushFloat('player', `+${h}`, PALETTE.green); pushLog(`부패의 심장 — 곪은 상처에서 ${h}을 빨아들였다.`, PALETTE.green); }
+    }
     if (et.dmg > 0) { hurt(E, et.dmg, true); pushFloat('enemy', `-${et.dmg}`, PALETTE.bleed); pushLog(`${E.name} 상태이상 피해 ${et.dmg}`, PALETTE.bleed); }
     if (et.heal > 0) {
       E.hp = Math.min(E.maxHp, E.hp + et.heal);
@@ -727,15 +769,15 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
             </span>
             <span className="text-[11px]" style={{ color: PALETTE.textDim }}>
               {roomType === 'calamity' ? '🌑 ' : roomType === 'boss' ? '👑 ' : roomType === 'elite' ? '☠ ' : ''}
-              {gimmickId === 'dark'
+              {darkBlind
                 ? '방어 ?? · 회피 ??%'
                 : `방어 ${buriedEffDef(foe)} · 회피 ${buriedEffDodge(foe)}%`}
             </span>
           </div>
           <BuriedBar value={foe.hp} max={foe.maxHp} color={PALETTE.accent} height={9} showText={false} />
           <div className="text-[11px] tabular-nums text-right mt-0.5" style={{ color: PALETTE.accent }}>
-            {(foe.barrier || 0) > 0 && <span style={{ color: PALETTE.ice }}>🔷{gimmickId === 'dark' ? '??' : foe.barrier} · </span>}
-            {gimmickId === 'dark' ? '?? / ??' : `${Math.max(0, foe.hp)} / ${foe.maxHp}`}
+            {(foe.barrier || 0) > 0 && <span style={{ color: PALETTE.ice }}>🔷{darkBlind ? '??' : foe.barrier} · </span>}
+            {darkBlind ? '?? / ??' : `${Math.max(0, foe.hp)} / ${foe.maxHp}`}
           </div>
         </div>
         {/* 방·층 효과 배지 */}
