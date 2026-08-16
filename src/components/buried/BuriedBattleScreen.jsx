@@ -178,6 +178,14 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
   };
   const floatSeq = useRef(0);
   const logRef = useRef(null);
+  // ===== 1.119.0 전투 이펙트 — 슬래시·버스트·치명 링·셰이크·피격 비네트·회복 글로우 =====
+  const [fxHit, setFxHit] = useState(null);   // { kind, crit, id } — 적 피격 오버레이
+  const [fxHurt, setFxHurt] = useState(0);    // 플레이어 피격 비네트 트리거 id
+  const [fxHeal, setFxHeal] = useState(0);    // 회복 글로우 트리거 id
+  const enemyBoxRef = useRef(null);
+  const rootRef = useRef(null);
+  const retriggerClass = (el, cls) => { if (!el) return; el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); };
+  const FX_SLASH_COLOR = { str: '#ff8a7a', dex: '#b9e08a', any: '#e8c8a0' };
   const dustGainRef = useRef(0); // [u109] 전투 중 획득한 먼지 — 결과에 실어 보낸다
   const playerRef = useRef(null); // [u6] 달인 — 종료 시점 보호막 계승용
 
@@ -190,6 +198,12 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     const id = ++floatSeq.current;
     setFloats(f => [...f, { id, side, text, color }]);
     setTimeout(() => setFloats(f => f.filter(x => x.id !== id)), 950);
+    // 1.119.0 — 이펙트 자동 트리거: 부호로 판별 (도트·자해·반사까지 전부 커버)
+    if (typeof text === 'string') {
+      if (side === 'player' && text.startsWith('-')) setFxHurt(id);
+      else if (side === 'player' && text.startsWith('+')) setFxHeal(id);
+      else if (side === 'enemy' && text.startsWith('-')) retriggerClass(enemyBoxRef.current, 'fx-b-shake');
+    }
   };
 
   // 회복량 — [저주]·「저주받은 묘실」이면 0. 여명/대여명 특성과 「생명의 샘」 반영
@@ -379,6 +393,9 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
           }
         }
         const r = hurt(E, res.total, !!skill.pierce);
+        // 1.119.0 — 스킬 계열별 피격 이펙트 (물리·기교 슬래시 / 마법 버스트 / 치명 링+펀치)
+        setFxHit({ kind: skill.stat || 'any', crit: res.crits > 0, id: ++floatSeq.current });
+        if (res.crits > 0) retriggerClass(rootRef.current, 'fx-b-punch');
         pushFloat('enemy', dmgText(r, res.crits > 0 ? ' 치명!' : ''), res.crits > 0 ? PALETTE.legendary : PALETTE.accent);
         pushLog(`${E.name}에게 ${res.total} 피해${r.absorbed > 0 ? ` (보호막 ${r.absorbed} 흡수)` : ''}${res.crits > 0 ? ` · 치명타 ${res.crits}회` : ''}`, PALETTE.accent);
 
@@ -782,9 +799,24 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
   const roomColor = roomFx ? (BURIED_ROOM_COLORS[roomFx.color]?.color || PALETTE.dawn) : null;
 
   return (
-    <div className="absolute inset-0 flex flex-col" style={{ background: PALETTE.bgDeep }}>
+    <div ref={rootRef} className="absolute inset-0 flex flex-col" style={{ background: PALETTE.bgDeep }}>
+      {/* 1.119.0 — 피격 비네트 / 회복 글로우 (부호 자동 트리거, forwards라 종료 후 투명) */}
+      {fxHurt > 0 && <div key={`hurt-${fxHurt}`} className="fx-b-hurt" />}
+      {fxHeal > 0 && <div key={`heal-${fxHeal}`} className="fx-b-healglow" />}
       {/* ===== 적 ===== */}
-      <div className="relative shrink-0" style={{ height: '35%', minHeight: 180 }}>
+      <div ref={enemyBoxRef} className="relative shrink-0" style={{ height: '35%', minHeight: 180 }}>
+        {/* 1.119.0 — 스킬 계열별 피격 오버레이 */}
+        {fxHit && (
+          <div key={`hit-${fxHit.id}`} className="absolute inset-0 pointer-events-none" style={{ zIndex: 25, overflow: 'hidden' }}>
+            {fxHit.kind !== 'int' && (
+              <div className="fx-b-slash" style={{ background: `linear-gradient(90deg, transparent, ${FX_SLASH_COLOR[fxHit.kind] || '#fff'}, #fff, transparent)` }} />
+            )}
+            {fxHit.kind === 'int' && (
+              <div className="fx-b-burst" style={{ background: 'radial-gradient(circle, rgba(176,127,224,0.75) 0%, rgba(92,74,140,0.35) 45%, transparent 70%)' }} />
+            )}
+            {fxHit.crit && <div className="fx-b-critring" />}
+          </div>
+        )}
         {imgSrc && !imgFailed
           ? <img src={imgSrc} alt="" className="absolute inset-0 w-full h-full object-cover" onError={() => setImgFailed(true)} style={{ filter: foe.hp <= 0 ? 'grayscale(100%) brightness(0.4)' : 'none', transition: 'filter 500ms' }} />
           : <div className="absolute inset-0 flex items-center justify-center text-[12px]" style={{ background: PALETTE.panel, color: PALETTE.textDim }}>[ 적 모습 미구현 ]</div>}
