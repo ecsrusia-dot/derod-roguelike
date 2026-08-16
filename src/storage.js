@@ -258,6 +258,17 @@ export async function loadMeta() {
           safe.raid = raidBackfill.raid;
           needsImmediateSave = true;
         }
+        // 1.113.0 무덤의 유산 — 인벤토리 폐지 마이그레이션.
+        // 진행 중 캐릭터의 가방 장비는 전부 자동 분해(먼지 환산), 미사용 스탯 포인트 필드는 제거
+        const bChar = safe.buried?.char;
+        if (bChar && (Array.isArray(bChar.inventory) || bChar.statPoints != null)) {
+          const bagDust = (bChar.inventory || []).reduce((s, i) => s + buriedDustValueOf(i), 0);
+          const nc = { ...bChar, pendingLoot: bChar.pendingLoot || [] };
+          delete nc.inventory;
+          delete nc.statPoints;
+          safe.buried = { ...safe.buried, char: nc, dust: (safe.buried.dust || 0) + bagDust };
+          needsImmediateSave = true;
+        }
         // 1.35.0 lanthert → wanderer 내부 코드명 변경 마이그레이션
         // 기존 사용자의 lanthert 키 데이터를 wanderer로 자동 이전. 멱등성 보장 (이미 이전했으면 스킵)
         const lanthertEng = data.engravings?.lanthert;
@@ -1432,6 +1443,7 @@ const EMPTY_BURIED = {
   contracts: [],    // 1.111.0~ 보유한 마의 계약 id 목록 (영구)
   shards: 0,        // 1.112.0~ ☠ 죽음의 조각 (보스·재앙 처치 획득, 연구실 재화)
   parts: [],        // 1.112.0~ 연구실 부품 id 목록 (영구, 최대 5칸)
+  deepestByDungeon: {}, // 1.113.0~ 던전별 최고 도달 층 (무한층 기록)
 };
 export function getBuried(meta) {
   const b = meta?.buried || EMPTY_BURIED;
@@ -1448,6 +1460,7 @@ export function getBuried(meta) {
     contracts: Array.isArray(b.contracts) ? b.contracts : [],
     shards: Math.max(0, b.shards || 0),
     parts: Array.isArray(b.parts) ? b.parts : [],
+    deepestByDungeon: (b.deepestByDungeon && typeof b.deepestByDungeon === 'object') ? b.deepestByDungeon : {},
   };
 }
 
@@ -1455,18 +1468,25 @@ export function getBuried(meta) {
 export function saveBuriedChar(meta, char) {
   const b = getBuried(meta);
   const deepest = Math.max(b.deepest || 0, char?.floor || 0);
-  return { ...meta, buried: { ...b, char, deepest } };
+  // 1.113.0 — 던전별 최고 도달 층 (무한층 기록)
+  const dId = char?.dungeonId;
+  const deepestByDungeon = dId
+    ? { ...b.deepestByDungeon, [dId]: Math.max(b.deepestByDungeon[dId] || 0, char?.floor || 0) }
+    : b.deepestByDungeon;
+  return { ...meta, buried: { ...b, char, deepest, deepestByDungeon } };
 }
 
-// 새 캐릭터 시작 — 유산 보관함을 비우고 캐릭터에 넘긴다
-export function startBuriedChar(meta, char, usedLegacyCount) {
+// 새 캐릭터 시작 — 1.113.0: 장착에 실제로 쓰인 유산(legacyUsedIds)만 보관함에서 차감,
+// 못 쓴 유산은 다음 캐릭터를 위해 남는다. 골드는 전액 계승.
+export function startBuriedChar(meta, char) {
   const b = getBuried(meta);
+  const usedIds = char?.legacyUsedIds || [];
   return {
     ...meta,
     buried: {
       ...b,
       char,
-      legacy: b.legacy.slice(usedLegacyCount || b.legacy.length),
+      legacy: b.legacy.filter(it => !usedIds.includes(it.id)),
       legacyGold: 0,
       runs: (b.runs || 0) + 1,
       deepest: Math.max(b.deepest || 0, char?.floor || 1),

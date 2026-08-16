@@ -1,91 +1,35 @@
 // ============================================
-// components/buried/BuriedManage.jsx — 장비·능력치 관리 시트 (1.103.0)
+// components/buried/BuriedManage.jsx — 장비·스킬 관리 시트 (1.103.0 / 1.113.0 개편)
 // ============================================
-// 로비와 던전 양쪽에서 같은 시트를 띄운다 (원작: 언제든 장비 교체 = 스킬 교체).
+// 로비와 던전 양쪽에서 같은 시트를 띄운다 (원작: 언제든 장비 확인 = 스킬 확인).
+// 1.113.0 — 인벤토리·능력치 배분 폐지 (PM: 스탯은 장비를 통해서만, 획득 즉시 판단).
+// 이 화면은 장착 6슬롯 + 능력치 출처 열람 전용이 됐다.
 
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { PALETTE } from '../../utils/helpers.js';
 import {
   BURIED_SLOTS, BURIED_SLOT_IDS, BURIED_STATS, BURIED_SKILLS, BURIED_SKILL_MAX_LV,
-  BURIED_TIERS, getBuriedTier,
-  buriedDerived, buriedDustValue, canClassUseSkill, getBuriedClass, slotPool,
-  buriedTraitIds, getBuriedTrait, buriedSkillLv, buriedSkillAt, buriedSkillRank, BURIED_SKILL_RANKS,
+  buriedDerived, buriedDustValue, getBuriedClass,
+  buriedTraitIds, getBuriedTrait, buriedSkillLv, buriedSkillRank, BURIED_SKILL_RANKS,
 } from '../../data.js';
-import { BuriedItemCard, BuriedItemSheet, slotMeta, BURIED_DUST_ICON } from './BuriedCommon.jsx';
+import { BuriedItemCard, BuriedItemSheet, BURIED_DUST_ICON } from './BuriedCommon.jsx';
 
 export default function BuriedManage({ char, dust = 0, onUpdate, onClose }) {
-  const [tab, setTab] = useState('gear');       // gear | stats
-  const [sheet, setSheet] = useState(null);     // { item, from: 'equipped'|'bag' }
-  const [pickSlot, setPickSlot] = useState(null); // 슬롯 탭 시 후보 목록
-  const [bulkConfirm, setBulkConfirm] = useState(null); // 일괄 분해 확인 { tierIds, count, dust }
+  const [sheet, setSheet] = useState(null); // { item, slot }
 
   if (!char) return null;
   const cls = getBuriedClass(char.classId);
   const d = buriedDerived(char);
 
-  const equip = (item) => {
-    const slot = pickSlot || item.slot;
-    const prev = char.equipped?.[slot] || null;
-    const next = {
-      ...char,
-      equipped: { ...char.equipped, [slot]: item },
-      inventory: char.inventory.filter(i => i.id !== item.id).concat(prev ? [prev] : []),
-    };
-    // 최대 HP가 줄면 현재 HP도 같이 clamp
-    next.hp = Math.min(next.hp, buriedDerived(next).maxHp);
-    onUpdate(next, 0);
-    setSheet(null); setPickSlot(null);
-  };
-  const unequip = (slot) => {
-    const item = char.equipped?.[slot];
-    if (!item) return;
-    const next = { ...char, equipped: { ...char.equipped, [slot]: null }, inventory: [...char.inventory, item] };
-    next.hp = Math.min(next.hp, buriedDerived(next).maxHp);
-    onUpdate(next, 0);
-    setSheet(null); setPickSlot(null);
-  };
-  const dismantle = (item, from) => {
+  // 장착 장비 분해 — 슬롯이 비면 그 스킬도 못 쓴다 (신중히)
+  const dismantle = (item) => {
     const gain = buriedDustValue(item);
-    let next;
-    if (from === 'equipped') {
-      const slot = BURIED_SLOT_IDS.find(s => char.equipped?.[s]?.id === item.id);
-      next = { ...char, equipped: { ...char.equipped, [slot]: null } };
-    } else {
-      next = { ...char, inventory: char.inventory.filter(i => i.id !== item.id) };
-    }
+    const slot = BURIED_SLOT_IDS.find(s => char.equipped?.[s]?.id === item.id);
+    const next = { ...char, equipped: { ...char.equipped, [slot]: null } };
     next.hp = Math.min(next.hp, buriedDerived(next).maxHp);
     onUpdate(next, gain);
-    setSheet(null); setPickSlot(null);
-  };
-  const spendPoint = (statId) => {
-    if ((char.statPoints || 0) <= 0) return;
-    const next = {
-      ...char,
-      statPoints: char.statPoints - 1,
-      stats: { ...char.stats, [statId]: (char.stats[statId] || 0) + 1 },
-    };
-    // 체력을 올렸으면 늘어난 최대치만큼 현재 HP도 함께 상승
-    const before = buriedDerived(char).maxHp;
-    const after = buriedDerived(next).maxHp;
-    next.hp = Math.min(after, char.hp + Math.max(0, after - before));
-    onUpdate(next, 0);
-  };
-
-  // 특정 슬롯에 넣을 수 있는 가방 속 후보
-  const candidatesFor = (slot) => char.inventory.filter(i =>
-    slotPool(i.slot) === slotPool(slot) && canClassUseSkill(char.classId, BURIED_SKILLS[i.skillId]));
-
-  // 일괄 분해 (1.105.0) — 가방에서 지정 등급 "이하" 전부. 장착 장비는 건드리지 않는다.
-  const bulkPreview = (maxTierIdx) => {
-    const tierIds = BURIED_TIERS.slice(0, maxTierIdx + 1).map(t => t.id);
-    const target = char.inventory.filter(i => tierIds.includes(i.tier));
-    return { tierIds, count: target.length, dust: target.reduce((s, i) => s + buriedDustValue(i), 0) };
-  };
-  const bulkDismantle = ({ tierIds, dust: gain }) => {
-    const next = { ...char, inventory: char.inventory.filter(i => !tierIds.includes(i.tier)) };
-    onUpdate(next, gain);
-    setBulkConfirm(null);
+    setSheet(null);
   };
 
   return (
@@ -97,209 +41,100 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose }) {
             {cls?.name} <span style={{ color: PALETTE.textDim }}>Lv.{char.lv}</span>
           </div>
           <div className="text-[11px] tabular-nums" style={{ color: PALETTE.textDim }}>
-            🪙 {char.gold} · {BURIED_DUST_ICON} {dust} · 가방 {char.inventory.length}
+            🪙 {char.gold} · {BURIED_DUST_ICON} {dust}
           </div>
         </div>
         <button onClick={onClose} className="ui-press p-1.5" style={{ color: PALETTE.textDim }}><X size={18} /></button>
       </div>
 
-      {/* 탭 */}
-      <div className="flex gap-1.5 px-3 py-2">
-        {[{ id: 'gear', name: '장비 · 스킬' }, { id: 'stats', name: `능력치${char.statPoints > 0 ? ` (${char.statPoints})` : ''}` }].map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)} className="ui-press flex-1 py-2 text-[12px]"
-            style={{
-              borderRadius: 'var(--r-btn, 13px)',
-              background: tab === t.id ? PALETTE.panelLight : 'transparent',
-              border: `1px solid ${tab === t.id ? PALETTE.dawn + '88' : PALETTE.panelBorder}`,
-              color: tab === t.id ? PALETTE.dawn : PALETTE.textDim,
-            }}>{t.name}</button>
-        ))}
-      </div>
-
-      <div className="flex-1 overflow-y-auto px-3 pb-4 space-y-3">
-        {tab === 'gear' && (
-          <>
-            {/* 파생 스탯 요약 */}
-            <div className="grid grid-cols-3 gap-1.5">
-              {[
-                { l: '최대 HP', v: d.maxHp, c: PALETTE.accent },
-                { l: '최대 SP', v: d.maxSp, c: PALETTE.ice },
-                { l: '방어력', v: d.def, c: PALETTE.ice },
-                { l: '물리/기교/마법', v: `${d.atk}/${d.fin}/${d.mag}`, c: PALETTE.dawn },
-                { l: '치명', v: `${d.crit}% ×${(1 + d.critDmg / 100).toFixed(1)}`, c: PALETTE.legendary },
-                { l: '회피 / SP회복', v: `${d.dodge}% / +${d.spRegen}`, c: PALETTE.green },
-                { l: '🔷 보호막', v: d.barrier || 0, c: PALETTE.ice },
-                { l: '추격 피해', v: d.chase || 0, c: PALETTE.dawn },
-              ].map(x => (
-                <div key={x.l} className="px-2 py-1.5" style={{ borderRadius: 'var(--r-chip, 8px)', background: PALETTE.panel, border: `1px solid ${PALETTE.panelBorder}` }}>
-                  <div className="text-[11px]" style={{ color: PALETTE.textDim }}>{x.l}</div>
-                  <div className="text-[12px] font-bold tabular-nums" style={{ color: x.c }}>{x.v}</div>
-                </div>
-              ))}
+      <div className="flex-1 overflow-y-auto px-3 py-3 pb-4 space-y-3">
+        {/* 파생 스탯 요약 */}
+        <div className="grid grid-cols-3 gap-1.5">
+          {[
+            { l: '최대 HP', v: d.maxHp, c: PALETTE.accent },
+            { l: '최대 SP', v: d.maxSp, c: PALETTE.ice },
+            { l: '방어력', v: d.def, c: PALETTE.ice },
+            { l: '물리/기교/마법', v: `${d.atk}/${d.fin}/${d.mag}`, c: PALETTE.dawn },
+            { l: '치명', v: `${d.crit}% ×${(1 + d.critDmg / 100).toFixed(1)}`, c: PALETTE.legendary },
+            { l: '회피 / SP회복', v: `${d.dodge}% / +${d.spRegen}`, c: PALETTE.green },
+            { l: '🔷 보호막', v: d.barrier || 0, c: PALETTE.ice },
+            { l: '추격 피해', v: d.chase || 0, c: PALETTE.dawn },
+          ].map(x => (
+            <div key={x.l} className="px-2 py-1.5" style={{ borderRadius: 'var(--r-chip, 8px)', background: PALETTE.panel, border: `1px solid ${PALETTE.panelBorder}` }}>
+              <div className="text-[11px]" style={{ color: PALETTE.textDim }}>{x.l}</div>
+              <div className="text-[12px] font-bold tabular-nums" style={{ color: x.c }}>{x.v}</div>
             </div>
+          ))}
+        </div>
 
-            {/* 6슬롯 */}
-            <div>
-              <div className="text-[11px] tracking-[0.2em] mb-1.5" style={{ color: PALETTE.dawn }}>
-                장착 — 슬롯 6칸이 곧 전투 스킬 6개
-              </div>
-              <div className="space-y-1.5">
-                {BURIED_SLOTS.map(s => {
-                  const item = char.equipped?.[s.id] || null;
-                  const lv = item ? buriedSkillLv(char, item.skillId) : 1;
-                  const rank = item ? buriedSkillRank(BURIED_SKILLS[item.skillId]) : null;
-                  return (
-                    <BuriedItemCard key={s.id} item={item} slotId={s.id}
-                      right={item ? (
-                        <div className="text-right shrink-0">
-                          <div className="text-[11px] font-bold tabular-nums" style={{ color: lv >= BURIED_SKILL_MAX_LV ? PALETTE.legendary : PALETTE.text }}>
-                            Lv.{lv}
-                          </div>
-                          <div className="text-[11px]" style={{ color: BURIED_SKILL_RANKS[rank]?.color }}>{rank}급</div>
-                        </div>
-                      ) : null}
-                      onClick={() => { setPickSlot(s.id); setSheet(item ? { item, from: 'equipped' } : null); }} />
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* 슬롯 후보 목록 */}
-            {pickSlot && !sheet && (
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <div className="text-[11px] tracking-[0.2em]" style={{ color: PALETTE.dawn }}>
-                    {slotMeta(pickSlot).name} 후보
-                  </div>
-                  <button onClick={() => setPickSlot(null)} className="ui-press text-[11px]" style={{ color: PALETTE.textDim }}>취소</button>
-                </div>
-                {candidatesFor(pickSlot).length === 0
-                  ? <div className="text-[12px] px-3 py-3" style={{ color: PALETTE.textDim, background: PALETTE.panel, borderRadius: 'var(--r-btn, 13px)' }}>
-                      가방에 이 슬롯에 넣을 장비가 없다.
-                    </div>
-                  : <div className="space-y-1.5">
-                      {candidatesFor(pickSlot).map(i => (
-                        <BuriedItemCard key={i.id} item={i} slotId={pickSlot} onClick={() => setSheet({ item: i, from: 'bag' })} />
-                      ))}
-                    </div>}
-              </div>
-            )}
-
-            {/* 가방 */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <div className="text-[11px] tracking-[0.2em]" style={{ color: PALETTE.dawn }}>가방 — {char.inventory.length}개</div>
-              </div>
-              {/* 일괄 분해 (1.105.0) — 해당 등급 이하를 한 번에 */}
-              {char.inventory.length > 0 && (
-                <div className="flex items-center gap-1.5 mb-1.5">
-                  <span className="text-[11px] shrink-0" style={{ color: PALETTE.textDim }}>일괄 분해:</span>
-                  {[0, 1, 2].map(idx => {
-                    const t = BURIED_TIERS[idx];
-                    const pv = bulkPreview(idx);
-                    return (
-                      <button key={t.id} disabled={pv.count === 0} onClick={() => setBulkConfirm(pv)}
-                        className="ui-press px-2 py-1 text-[11px]"
-                        style={{
-                          borderRadius: 'var(--r-chip, 8px)', border: `1px solid ${t.color}66`,
-                          color: pv.count > 0 ? t.color : PALETTE.textDim, opacity: pv.count > 0 ? 1 : 0.4,
-                        }}>
-                        {t.name} 이하 ({pv.count})
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-              {char.inventory.length === 0
-                ? <div className="text-[12px] px-3 py-3" style={{ color: PALETTE.textDim, background: PALETTE.panel, borderRadius: 'var(--r-btn, 13px)' }}>비어 있다.</div>
-                : <div className="space-y-1.5">
-                    {char.inventory.map(i => (
-                      <BuriedItemCard key={i.id} item={i} showSlot onClick={() => { setPickSlot(i.slot); setSheet({ item: i, from: 'bag' }); }} />
-                    ))}
-                  </div>}
-            </div>
-          </>
-        )}
-
-        {tab === 'stats' && (
-          <>
-            <div className="px-3 py-2.5" style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panel, border: `1px solid ${PALETTE.panelBorder}` }}>
-              <div className="text-[12px]" style={{ color: PALETTE.text }}>
-                남은 포인트 <span className="font-bold tabular-nums" style={{ color: PALETTE.legendary }}>{char.statPoints || 0}</span>
-              </div>
-              <div className="text-[11px] mt-0.5" style={{ color: PALETTE.textDim }}>
-                레벨업마다 3포인트. 배분한 포인트는 되돌릴 수 없다.
-              </div>
-            </div>
+        {/* 능력치 4종 — 1.113.0: 배분 폐지, 장비 출처 열람만 */}
+        <div className="px-3 py-2.5" style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panel, border: `1px solid ${PALETTE.panelBorder}` }}>
+          <div className="text-[11px] tracking-[0.2em] mb-1.5" style={{ color: PALETTE.dawn }}>
+            능력치 — 성장은 100% 장비 (배분 없음)
+          </div>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1">
             {BURIED_STATS.map(s => (
-              <div key={s.id} className="flex items-center gap-2.5 px-3 py-2.5"
-                style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panel, border: `1px solid ${PALETTE.panelBorder}` }}>
-                <span className="text-[15px]">{s.icon}</span>
-                <div className="flex-1 min-w-0">
-                  <div className="text-[12px] font-bold" style={{ color: s.color }}>
-                    {s.name} <span className="tabular-nums" style={{ color: PALETTE.text }}>{char.stats[s.id] || 0}</span>
-                    {d.stats[s.id] !== char.stats[s.id] && (
-                      <span className="text-[11px] ml-1" style={{ color: PALETTE.green }}>(+{d.stats[s.id] - (char.stats[s.id] || 0)} 장비)</span>
-                    )}
-                  </div>
-                  <div className="text-[11px]" style={{ color: PALETTE.textDim }}>{s.desc}</div>
-                </div>
-                <button disabled={(char.statPoints || 0) <= 0} onClick={() => spendPoint(s.id)}
-                  className="ui-press px-3 py-1.5 text-[13px] font-bold"
-                  style={{
-                    borderRadius: 'var(--r-chip, 8px)',
-                    background: (char.statPoints || 0) > 0 ? PALETTE.accent : PALETTE.panelLight,
-                    color: (char.statPoints || 0) > 0 ? '#fff' : PALETTE.textDim,
-                    opacity: (char.statPoints || 0) > 0 ? 1 : 0.5,
-                  }}>+1</button>
+              <div key={s.id} className="flex justify-between items-center text-[12px]">
+                <span style={{ color: s.color }}>{s.icon} {s.name}</span>
+                <span className="tabular-nums" style={{ color: PALETTE.text }}>
+                  {d.stats[s.id]}
+                  {d.stats[s.id] !== (char.stats[s.id] || 0) && (
+                    <span className="text-[11px] ml-1" style={{ color: PALETTE.green }}>(+{d.stats[s.id] - (char.stats[s.id] || 0)})</span>
+                  )}
+                </span>
               </div>
             ))}
-            {/* 특성 3개 — 원작 규칙: 첫 번째가 직업 전용 */}
-            <div className="px-3 py-2.5 space-y-2" style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panelLight, border: `1px solid ${cls?.color}55` }}>
-              <div className="text-[11px] tracking-[0.2em]" style={{ color: cls?.color }}>영구 특성 — 3개 (첫 번째는 직업 전용)</div>
-              {buriedTraitIds(char).map((id, i) => {
-                const t = getBuriedTrait(id);
-                if (!t) return null;
-                return (
-                  <div key={id}>
-                    <div className="text-[12px] font-bold" style={{ color: i === 0 ? cls?.color : PALETTE.text }}>
-                      {i === 0 ? '★' : '◆'} {t.name}
-                    </div>
-                    <div className="text-[12px] leading-relaxed" style={{ color: PALETTE.textDim }}>{t.desc}</div>
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        )}
-      </div>
-
-      {bulkConfirm && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.78)' }}>
-          <div className="w-full px-4 py-4" style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.bgDeep, border: `1px solid ${PALETTE.dawn}66` }}>
-            <div className="text-[13px] font-bold mb-1.5" style={{ color: PALETTE.dawn }}>일괄 분해</div>
-            <div className="text-[12px] leading-relaxed mb-3" style={{ color: PALETTE.textDim }}>
-              가방의 해당 등급 이하 장비 <b style={{ color: PALETTE.text }}>{bulkConfirm.count}개</b>를 분해해
-              {' '}{BURIED_DUST_ICON} <b style={{ color: PALETTE.legendary }}>{bulkConfirm.dust}</b>을 얻는다.
-              장착 중인 장비는 건드리지 않는다. <b style={{ color: PALETTE.text }}>되돌릴 수 없다.</b>
-            </div>
-            <div className="flex gap-2">
-              <button onClick={() => bulkDismantle(bulkConfirm)} className="ui-press flex-1 py-2.5 text-[12px] font-bold"
-                style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.accent, color: '#fff' }}>분해한다</button>
-              <button onClick={() => setBulkConfirm(null)} className="ui-press flex-1 py-2.5 text-[12px]"
-                style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panelLight, color: PALETTE.text, border: `1px solid ${PALETTE.panelBorder}` }}>취소</button>
-            </div>
           </div>
         </div>
-      )}
+
+        {/* 6슬롯 */}
+        <div>
+          <div className="text-[11px] tracking-[0.2em] mb-1.5" style={{ color: PALETTE.dawn }}>
+            장착 — 슬롯 6칸이 곧 전투 스킬 6개. 교체는 새 장비를 주웠을 때만 (인벤토리 없음)
+          </div>
+          <div className="space-y-1.5">
+            {BURIED_SLOTS.map(s => {
+              const item = char.equipped?.[s.id] || null;
+              const lv = item ? buriedSkillLv(char, item.skillId) : 1;
+              const rank = item ? buriedSkillRank(BURIED_SKILLS[item.skillId]) : null;
+              return (
+                <BuriedItemCard key={s.id} item={item} slotId={s.id}
+                  right={item ? (
+                    <div className="text-right shrink-0">
+                      <div className="text-[11px] font-bold tabular-nums" style={{ color: lv >= BURIED_SKILL_MAX_LV ? PALETTE.legendary : PALETTE.text }}>
+                        Lv.{lv}
+                      </div>
+                      <div className="text-[11px]" style={{ color: BURIED_SKILL_RANKS[rank]?.color }}>{rank}급</div>
+                    </div>
+                  ) : null}
+                  onClick={item ? () => setSheet({ item, slot: s.id }) : null} />
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 특성 3개 — 원작 규칙: 첫 번째가 직업 전용 */}
+        <div className="px-3 py-2.5 space-y-2" style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panelLight, border: `1px solid ${cls?.color}55` }}>
+          <div className="text-[11px] tracking-[0.2em]" style={{ color: cls?.color }}>영구 특성 — 3개 (첫 번째는 직업 전용)</div>
+          {buriedTraitIds(char).map((id, i) => {
+            const t = getBuriedTrait(id);
+            if (!t) return null;
+            return (
+              <div key={id}>
+                <div className="text-[12px] font-bold" style={{ color: i === 0 ? cls?.color : PALETTE.text }}>
+                  {i === 0 ? '★' : '◆'} {t.name}
+                </div>
+                <div className="text-[12px] leading-relaxed" style={{ color: PALETTE.textDim }}>{t.desc}</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
       {sheet && (
         <BuriedItemSheet
           item={sheet.item}
-          compare={sheet.from === 'bag' ? (char.equipped?.[pickSlot || sheet.item.slot] || null) : null}
-          onEquip={sheet.from === 'bag' ? () => equip(sheet.item) : null}
-          onUnequip={sheet.from === 'equipped' ? () => unequip(BURIED_SLOT_IDS.find(s => char.equipped?.[s]?.id === sheet.item.id)) : null}
-          onDismantle={() => dismantle(sheet.item, sheet.from)}
+          onDismantle={() => dismantle(sheet.item)}
           onClose={() => setSheet(null)}
         />
       )}

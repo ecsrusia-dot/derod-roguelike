@@ -29,11 +29,12 @@ import {
   rollBuriedCurseOffer, acceptBuriedCurse, hasBuriedCurse, BURIED_CURSE_REWARD,
   aggregateBuriedContracts,
   BURIED_CALAMITY_GAUGE_MAX, buildBuriedCalamity,
+  resolveBuriedLoot, buriedBossKeyAt,
 } from '../../data.js';
-import { BuriedItemCard, BuriedBar, BURIED_DUST_ICON, slotMeta } from './BuriedCommon.jsx';
+import { BuriedItemCard, BuriedBar, BURIED_DUST_ICON, slotMeta, BuriedLootModal } from './BuriedCommon.jsx';
 import BuriedManage from './BuriedManage.jsx';
 
-export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle, onClear, onLeave }) {
+export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle, onLeave }) {
   const b = meta?.buried || {};
   const char = b.char || null;
   const [manage, setManage] = useState(false);
@@ -54,12 +55,11 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
   const monLevel = buriedMonsterLevel(char);
   const floorFx = getBuriedFloorEffect(char.floorEffect);
 
-  // 방을 하나 해결하면 걸음수 +1 후 다음 층으로
+  // 방을 하나 해결하면 걸음수 +1 후 다음 층으로 (1.113.0~ 층 무한 — 클리어 귀환 없음)
   const advance = () => {
     // [u102] 순례자의 성표 — 층 이동 시 25% 확률 무작위 스킬 레벨 +1
     const { char: blessed, raised } = maybeBuriedFloorSkillUp(stepBuriedChar(char));
-    const { char: next, cleared } = advanceBuriedFloor(blessed);
-    if (cleared) { onClear(next); return; }
+    const { char: next } = advanceBuriedFloor(blessed);
     onUpdateChar(next, 0);
     setNotice(raised ? `순례자의 성표 — 오르는 길에 [${raised.id}] 스킬이 Lv.${raised.lv}이 되었다.` : null);
   };
@@ -101,7 +101,7 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
       ? `${item.name} — 같은 스킬을 다시 얻어 [${item.skillId}] 스킬이 Lv.${lv}이 되었다.`
       : equippedDirect
         ? `${item.name} — 빈 ${slotMeta(item.slot).name} 슬롯에 바로 장착했다.`
-        : `${item.name} — 가방에 넣었다.`);
+        : `${item.name} — [교체/버리기]를 판단하라.`);
   };
 
   const takeTreasure = (idx) => {
@@ -227,7 +227,8 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
   const inRoom = room && room !== 'battle' && room !== 'elite' && room !== 'boss';
   const libChoices = room === 'library' ? buriedLibraryChoices(char) : [];
 
-  const nextBossFloor = Object.keys(dungeon.bossFloors).map(Number).sort((a, b) => a - b).find(f => f > char.floor);
+  // 1.113.0 무한층 — 다음 층 보스 경고는 buriedBossKeyAt로 (정복 층 이후 반복 보스 포함)
+  const nextBossFloor = buriedBossKeyAt(dungeon, char.floor + 1) ? char.floor + 1 : null;
 
   return (
     <div className="absolute inset-0 flex flex-col ui-screen-enter" style={{ background: PALETTE.bgDeep }}>
@@ -239,7 +240,7 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
           </button>
           <div className="text-center">
             <div className="text-[12px] tracking-[0.25em] font-bold" style={{ color: dungeon.color }}>
-              {dungeon.name} · {char.floor} / {dungeon.floors}층
+              {dungeon.name} · {char.floor}층{char.floor <= dungeon.floors ? ` (정복 ${dungeon.floors}층)` : ' · ∞'}
             </div>
             <div className="text-[11px]" style={{ color: PALETTE.textDim }}>
               {cls?.name} Lv.{char.lv} · 🪙 {char.gold} · 🧪 {char.potions || 0} · 마물 Lv.{monLevel}
@@ -248,7 +249,6 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
           </div>
           <button onClick={() => setManage(true)} className="ui-press p-1.5 relative" style={{ color: PALETTE.dawn }}>
             <Package size={18} />
-            {char.statPoints > 0 && <span className="absolute top-0 right-0 w-2 h-2 rounded-full" style={{ background: PALETTE.legendary }} />}
           </button>
         </div>
         <BuriedBar value={char.hp} max={d.maxHp} color={PALETTE.accent} label="HP" />
@@ -618,6 +618,15 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
         <BuriedManage char={char} dust={b.dust || 0}
           onUpdate={(next, dustGain) => onUpdateChar(next, dustGain)}
           onClose={() => setManage(false)} />
+      )}
+
+      {/* 획득 판단 (1.113.0) — 인벤토리 폐지: 대기열이 빌 때까지 차례로 [교체/버리기] */}
+      {(char.pendingLoot || []).length > 0 && (
+        <BuriedLootModal char={char} onResolve={(replace) => {
+          const r = resolveBuriedLoot(char, replace);
+          onUpdateChar(r.char, r.dustGain);
+          if (r.dismantled) setNotice(`${r.dismantled.name} 자동 분해 — ${BURIED_DUST_ICON} +${r.dustGain}`);
+        }} />
       )}
     </div>
   );
