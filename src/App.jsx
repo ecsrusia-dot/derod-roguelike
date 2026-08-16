@@ -468,7 +468,7 @@ export default function App() {
       saveMeta(next);
       return next;
     });
-    setBuriedForgeNotice(`⚰ 정산 — 장비 ${settle.itemCount}개 분해 🕯 +${settle.dust} · 다음 캐릭터에게 🪙 ${settle.gold} 계승`);
+    setBuriedForgeNotice(`⚰ 정산 — 장비 ${settle.itemCount}개 분해 🕯 +${settle.dust} · 골드는 무덤에 흩어졌다`);
     setBuriedEnemy(null); setBuriedRoom(null); setBuriedRoomFx(null);
     setScreen('buried');
   };
@@ -3082,7 +3082,7 @@ export default function App() {
               onRetire={(char) => {
                 const settle = buriedDeathSettlement(char);
                 setMeta(prev => { const next = recordBuriedDeath(prev, settle); saveMeta(next); return next; });
-                setBuriedForgeNotice(`⚰ 정산 — 장비 ${settle.itemCount}개 분해 🕯 +${settle.dust} · 다음 캐릭터에게 🪙 ${settle.gold} 계승`);
+                setBuriedForgeNotice(`⚰ 정산 — 장비 ${settle.itemCount}개 분해 🕯 +${settle.dust} · 골드는 무덤에 흩어졌다`);
               }}
               onForge={handleBuriedForge}
               onBuyContract={handleBuriedBuyContract}

@@ -1502,7 +1502,8 @@ export function startBuriedChar(meta, char) {
   };
 }
 
-// 사망 — 1.117.0: 장비 계승 폐지. 장비는 전부 먼지로 정산(settlement.dust), 골드 30%만 계승
+// 사망 — 1.117.0 장비는 전부 먼지로 정산 / 1.118.0 골드는 전액 소멸 (계승 없음).
+// 기존 계승 대기 골드(legacyGold)는 다음 캐릭터가 한 번 소비하고 끝난다 (신규 누적 없음)
 export function recordBuriedDeath(meta, settlement) {
   const b = getBuried(meta);
   return {
@@ -1510,7 +1511,6 @@ export function recordBuriedDeath(meta, settlement) {
     buried: {
       ...b,
       char: null,
-      legacyGold: (b.legacyGold || 0) + (settlement?.gold || 0),
       dust: (b.dust || 0) + (settlement?.dust || 0),
       deaths: (b.deaths || 0) + 1,
     },

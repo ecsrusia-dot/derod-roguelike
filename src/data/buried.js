@@ -460,7 +460,9 @@ export function buriedDerived(char) {
     crit:    Math.round(5 + st.dex * 0.6 + (gear.crit || 0) + (tf.crit || 0) + (cf.crit || 0) + (pf.crit || 0)),
     critDmg: 60 + (gear.critDmg || 0),
     dodge:   Math.min(45, Math.round(3 + st.dex * 0.4 + (gear.dodge || 0) + (tf.dodge || 0) + (cf.dodge || 0) + (pf.dodge || 0))),
-    spRegen: Math.round(9 + st.int / 8 + (gear.spRegen || 0) + (pf.spRegen || 0)),
+    // 1.118.0 — 패시브 회복 9+int/8 → 3+int/12 (PM: SP가 무의미). 이제 SP의 주 엔진은
+    // 기본 공격(+14)·마력 흡수·집중이고, 패시브·장비 spRegen은 보조가 된다
+    spRegen: Math.round(3 + st.int / 12 + (gear.spRegen || 0) + (pf.spRegen || 0)),
     barrier: Math.round(((gear.barrier || 0) + (tf.barrier || 0) + (pf.barrier || 0)) * (1 + (cf.barrierPct || 0) / 100)),
     chase:   Math.round((gear.chase || 0) + (tf.chase || 0) + (pf.chase || 0)),
     healPct: (tf.healPct || 0) + (cf.healPct || 0) + (pf.healPct || 0),
@@ -867,10 +869,10 @@ export function chooseBuriedEnemyAction(enemyUnit, actions) {
 // =========================================================
 // 11. 유산 — 사망 시 계승 규칙
 // =========================================================
-export const BURIED_LEGACY_GOLD_PCT = 30; // 계승 골드 비율
 
-// 1.117.0 PM 결정 — 장비 계승 폐지. 사망·은퇴 시 장착 장비(+판단 대기 장비)를 전부
-// **자동 분해해 먼지로 정산**한다. 골드 30% 계승(legacyGold)은 유지.
+// 1.117.0 PM 결정 — 장비 계승 폐지: 사망·은퇴 시 장착 장비(+판단 대기 장비)를 전부
+// **자동 분해해 먼지로 정산**한다.
+// 1.118.0 PM 결정 — **골드도 전액 소멸** (계승 없음. 9만 골드 축적 문제 — 죽음이 골드 싱크가 된다)
 export function buriedDeathSettlement(char) {
   if (!char) return { dust: 0, gold: 0, itemCount: 0 };
   const items = [
@@ -879,7 +881,7 @@ export function buriedDeathSettlement(char) {
   ];
   return {
     dust: items.reduce((s, it) => s + buriedDustValue(it), 0),
-    gold: Math.floor((char.gold || 0) * BURIED_LEGACY_GOLD_PCT / 100),
+    gold: 0, // 소멸 — 무덤에 흩어진다
     itemCount: items.length,
   };
 }

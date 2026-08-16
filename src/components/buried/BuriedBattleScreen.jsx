@@ -991,7 +991,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
               <>
                 <div className="text-[12px] text-center leading-relaxed mb-3" style={{ color: PALETTE.textDim }}>
                   {cls?.name}은(는) {dungeon.name} {char.floor}층에서 무덤의 일부가 되었다.<br />
-                  장비는 전부 분해되어 <b style={{ color: PALETTE.dawn }}>🕯 먼지</b>로 정산되고, 골드 30%만 다음 캐릭터에게 넘어간다.
+                  장비는 전부 분해되어 <b style={{ color: PALETTE.dawn }}>🕯 먼지</b>로 정산된다. 골드는 무덤에 흩어진다.
                 </div>
                 <button onClick={() => onFinish(result)} className="ui-press w-full py-3 text-[13px] font-bold"
                   style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panelLight, color: PALETTE.text, border: `1px solid ${PALETTE.panelBorder}` }}>
