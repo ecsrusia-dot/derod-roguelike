@@ -117,8 +117,10 @@ export function BuriedInfoModal({ info, onClose }) {
 
 // ===== 장비 카드 =====
 // mode: 'row'(목록) | 'slot'(장착 슬롯)
-export function BuriedItemCard({ item, slotId, onClick, right, dim = false, showSlot = false }) {
+// full=true — 말줄임 없이 전체 표시 (획득 판단 모달·상세 비교용, 1.120.1)
+export function BuriedItemCard({ item, slotId, onClick, right, dim = false, showSlot = false, full = false }) {
   const meta = slotMeta(slotId || item?.slot);
+  const wrap = full ? 'break-keep leading-relaxed' : 'truncate';
   if (!item) {
     return (
       <button onClick={onClick} disabled={!onClick}
@@ -144,27 +146,27 @@ export function BuriedItemCard({ item, slotId, onClick, right, dim = false, show
       }}>
       <span className="text-[15px] w-5 text-center" style={{ color: tier.color }}>{meta.icon}</span>
       <div className="flex-1 min-w-0">
-        <div className="text-[12px] font-bold truncate" style={{ color: tier.color }}>
+        <div className={`text-[12px] font-bold ${wrap}`} style={{ color: tier.color }}>
           <span className="tabular-nums font-normal" style={{ color: PALETTE.textDim }}>Lv.{item.floor || 1} </span>
           {item.name}{item.plus > 0 && <span style={{ color: PALETTE.legendary }}> +{item.plus}</span>}
         </div>
-        <div className="text-[11px] truncate flex items-center gap-1" style={{ color: PALETTE.dawn }}>
+        <div className={`text-[11px] ${full ? '' : 'truncate'} flex items-center gap-1 flex-wrap`} style={{ color: PALETTE.dawn }}>
           {skill && <SkillKindBadge skill={skill} />}
-          <span className="truncate">◆ {skill ? skill.name : '스킬 없음'}{skill && <span style={{ color: PALETTE.textDim }}> · SP {skill.sp}{skill.cd > 0 ? ` · CD ${skill.cd}` : ''}</span>}</span>
+          <span className={wrap}>◆ {skill ? skill.name : '스킬 없음'}{skill && <span style={{ color: PALETTE.textDim }}> · SP {skill.sp}{skill.cd > 0 ? ` · CD ${skill.cd}` : ''}</span>}</span>
         </div>
-        <div className="text-[11px] truncate" style={{ color: PALETTE.textDim }}>
+        <div className={`text-[11px] ${wrap}`} style={{ color: PALETTE.textDim }}>
           {showSlot && <span>{meta.name} · </span>}
           {Object.entries(st).map(([k, v]) => `${statLabel(k)} ${statText(k, v)}`).join(' · ') || '옵션 없음'}
         </div>
         {/* 전설의 무구 (1.106.0) — 고유 효과 한 줄 */}
         {item.unique && getBuriedUnique(item.unique) && (
-          <div className="text-[11px] truncate" style={{ color: tier.color }}>
+          <div className={`text-[11px] ${wrap}`} style={{ color: tier.color }}>
             ✦ {getBuriedUnique(item.unique).desc}
           </div>
         )}
         {/* 스킬 변화 접두어 (1.107.0) */}
         {item.mod && getBuriedMod(item.mod) && (
-          <div className="text-[11px] truncate" style={{ color: PALETTE.twilight }}>
+          <div className={`text-[11px] ${wrap}`} style={{ color: PALETTE.twilight }}>
             ◈ {getBuriedMod(item.mod).name} — {getBuriedMod(item.mod).desc}
           </div>
         )}
@@ -204,9 +206,9 @@ export function BuriedItemSheet({ item, compare, onEquip, onUnequip, onDismantle
         {compare && (
           <div className="mb-2 space-y-1">
             <div className="text-[11px] tracking-[0.2em]" style={{ color: PALETTE.textDim }}>지금 장착 중</div>
-            <BuriedItemCard item={compare} dim />
+            <BuriedItemCard item={compare} dim full />
             <div className="text-center text-[13px] leading-none" style={{ color: PALETTE.dawn }}>▼ 교체 후보</div>
-            <BuriedItemCard item={item} />
+            <BuriedItemCard item={item} full />
           </div>
         )}
 
@@ -314,13 +316,13 @@ export function BuriedLootModal({ char, onResolve }) {
           {cur ? (
             <>
               <div className="text-[11px]" style={{ color: PALETTE.textDim }}>지금 장착 중</div>
-              <BuriedItemCard item={cur} dim />
+              <BuriedItemCard item={cur} dim full />
               <div className="text-center text-[13px] leading-none" style={{ color: PALETTE.dawn }}>▼ 새 장비</div>
             </>
           ) : (
             <div className="text-[11px]" style={{ color: PALETTE.textDim }}>{slotMeta(item.slot).name} 슬롯 — 비어 있음</div>
           )}
-          <BuriedItemCard item={item} />
+          <BuriedItemCard item={item} full />
         </div>
         {/* 스탯 증감 비교 */}
         {cur && keys.length > 0 && (
