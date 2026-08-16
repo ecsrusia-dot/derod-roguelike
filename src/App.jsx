@@ -369,6 +369,7 @@ export default function App() {
   // 새 캐릭터 — 1.113.0: 유산은 빈 슬롯에 장착된 것만 소비, 나머지는 보관함에 남는다.
   // 1.114.0: startFloor — 100층 단위 체크포인트 재출발 (그 층 마물 레벨의 낡은 장비 6종 지급)
   const handleBuriedStart = (classId, dungeonId = 'labyrinth', contracts = [], startFloor = 1) => {
+    setBuriedForgeNotice(null); // 이전 캐릭터의 정산·해금 알림 제거 (1.117.0)
     setMeta(prev => {
       const b = getBuried(prev);
       const char = createBuriedChar(classId, { items: [], gold: b.legacyGold }, dungeonId, contracts, aggregateBuriedParts(b.parts), startFloor, buriedEarnedDepthTraits(b.deepestByDungeon));
@@ -381,38 +382,36 @@ export default function App() {
   };
 
   // 재련소 (1.105.0) — 먼지로 장비 제작. 캐릭터가 있으면 가방, 없으면 유산 보관함으로.
+  // 1.117.0 — 랜덤 롤·알림은 updater 밖에서 (StrictMode 이중 실행 시 아이템이 두 번 굴려지는 버그 픽스)
   const handleBuriedForge = (slot, epic, classId) => {
+    const b0 = getBuried(meta);
+    const cost = epic ? BURIED_FORGE.epicCost : BURIED_FORGE.randomCost;
+    if ((b0.dust || 0) < cost) { setBuriedForgeNotice('먼지가 부족하다.'); return; }
+    if (!b0.char) { setBuriedForgeNotice('탐험 중인 캐릭터가 있어야 벼릴 수 있다.'); return; }
+    const item = craftBuriedItem({ slot, classId, deepest: b0.deepest, epic });
+    if (!item) return;
+    let notice = null;
     setMeta(prev => {
-      const b = getBuried(prev);
-      const cost = epic ? BURIED_FORGE.epicCost : BURIED_FORGE.randomCost;
-      if ((b.dust || 0) < cost) return prev;
-      const item = craftBuriedItem({ slot, classId, deepest: b.deepest, epic });
-      if (!item) return prev;
       const r = craftBuriedForgeItem(prev, item, cost);
-      if (!r.ok) {
-        setBuriedForgeNotice(r.reason === 'nochar' ? '탐험 중인 캐릭터가 있어야 벼릴 수 있다.' : '먼지가 부족하다.');
-        return prev;
-      }
-      setBuriedForgeNotice(
-        r.raised ? `${item.name} 완성 — 같은 스킬이라 Lv.${r.lv}이 되었다.` : `${item.name} 완성 — [교체/버리기]를 판단하라.`
-      );
+      if (!r.ok) { notice = '먼지가 부족하다.'; return prev; }
+      notice = r.raised ? `${item.name} 완성 — 같은 스킬이라 Lv.${r.lv}이 되었다.` : `${item.name} 완성 — [교체/버리기]를 판단하라.`;
       saveMeta(r.meta);
       return r.meta;
     });
+    setTimeout(() => notice && setBuriedForgeNotice(notice), 0);
   };
 
   // 마의 계약 랜덤 구입 (1.111.0)
   const handleBuriedBuyContract = () => {
+    const id = rollBuriedContract(getBuried(meta).contracts); // 롤은 updater 밖 (이중 실행 방지)
+    if (!id) return;
     setMeta(prev => {
-      const b = getBuried(prev);
-      const id = rollBuriedContract(b.contracts);
-      if (!id) return prev;
       const next = buyBuriedContract(prev, id, BURIED_CONTRACT_COST);
       if (next === prev) return prev;
-      setBuriedForgeNotice(`📜 「${getBuriedContract(id)?.name}」 체결 — ${getBuriedContract(id)?.desc}`);
       saveMeta(next);
       return next;
     });
+    setBuriedForgeNotice(`📜 「${getBuriedContract(id)?.name}」 체결 — ${getBuriedContract(id)?.desc}`);
   };
 
   // 연구실 부품 (1.112.0) — ☠ 죽음의 조각으로 구입, 다음 캐릭터부터 적용.
@@ -479,9 +478,10 @@ export default function App() {
     if (!char) { setBuriedEnemy(null); setScreen('buried'); return; }
     // 1.109.0 — 조우 해금 추적 (마검사·흡혈귀·페어리). 승패 무관하게 처치 시점은 승리뿐이라 win일 때만
     if (res?.win && buriedEnemy?.key) {
+      const peek = trackBuriedKill(meta, buriedEnemy.key); // 알림용 판정 (결정론 함수)
+      if (peek.unlocked) setBuriedForgeNotice(`🔓 새 직업 해금 — ${getBuriedClass(peek.unlocked)?.name}! 로비에서 선택할 수 있다.`);
       setMeta(prev => {
         const r = trackBuriedKill(prev, buriedEnemy.key);
-        if (r.unlocked) setBuriedForgeNotice(`🔓 새 직업 해금 — ${getBuriedClass(r.unlocked)?.name}! 로비에서 선택할 수 있다.`);
         saveMeta(r.meta);
         return r.meta;
       });
@@ -554,11 +554,12 @@ export default function App() {
     if (conquest) recordBuriedConquest(advanced);
     // 심층 직업 해금 (1.116.0) — 100층 이상 보스 처치
     if (buriedRoom === 'boss' && (char.floor || 1) >= 100) {
+      const peekCid = checkBuriedDepthClassUnlock(char.dungeonId || 'labyrinth', char.floor || 1, getBuried(meta).unlockedClasses);
+      if (peekCid) setBuriedForgeNotice(`🔓 심층 직업 해금 — ${getBuriedClass(peekCid)?.name}! 로비에서 선택할 수 있다.`);
       setMeta(prev => {
         const b = getBuried(prev);
         const cid = checkBuriedDepthClassUnlock(char.dungeonId || 'labyrinth', char.floor || 1, b.unlockedClasses);
         if (!cid) return prev;
-        setBuriedForgeNotice(`🔓 심층 직업 해금 — ${getBuriedClass(cid)?.name}! 로비에서 선택할 수 있다.`);
         const next = { ...prev, buried: { ...b, unlockedClasses: [...b.unlockedClasses, cid] } };
         saveMeta(next);
         return next;
@@ -3092,6 +3093,8 @@ export default function App() {
             {FEATURE_FLAGS.buried && screen === 'buriedDungeon' && meta?.buried?.char && <BuriedDungeonScreen meta={meta}
               onUpdateChar={updateBuriedChar}
               onEnterBattle={handleBuriedEnterBattle}
+              notice={buriedForgeNotice}
+              onClearNotice={() => setBuriedForgeNotice(null)}
               onLeave={() => setScreen('buried')} />}
             {FEATURE_FLAGS.buried && screen === 'buriedBattle' && meta?.buried?.char && buriedEnemy && <BuriedBattleScreen
               key={`${meta.buried.char.floor}-${buriedEnemy.key}`}

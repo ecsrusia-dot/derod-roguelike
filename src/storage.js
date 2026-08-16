@@ -5,7 +5,7 @@
 // 저장되는 것: 영혼, 강화 단계, 해금 항목, 클리어 기록
 // ============================================
 
-import { ENGRAVINGS, ENGRAVING_TIERS, ENEMIES, EVENTS, RELICS, PASSIVE_SKILLS, CODEX_DISCOVERY_REWARD, CODEX_COMPLETE_REWARD, backfillRaidSeries, FEATURE_FLAGS, BURIED_LEGACY_MAX, addBuriedItemToChar, buriedDustValue as buriedDustValueOf, checkBuriedEncounterUnlock } from './data.js';
+import { ENGRAVINGS, ENGRAVING_TIERS, ENEMIES, EVENTS, RELICS, PASSIVE_SKILLS, CODEX_DISCOVERY_REWARD, CODEX_COMPLETE_REWARD, backfillRaidSeries, FEATURE_FLAGS, addBuriedItemToChar, buriedDustValue as buriedDustValueOf, checkBuriedEncounterUnlock } from './data.js';
 
 const DB_NAME = 'derod_meta';
 const DB_VERSION = 1;
@@ -109,8 +109,12 @@ const DEFAULT_META = {
     deaths: 0,
     runs: 0,
     unlockedDungeons: ['labyrinth'],  // 1.104.0~ 해금된 던전 (미궁은 항상 열림)
-    unlockedClasses: [],              // 1.104.0~ 해금된 상위(전직) 직업 id
-    legacySlots: 6,                   // 1.105.0~ 유산 보관함 크기 (먼지로 최대 12칸 확장)
+    unlockedClasses: [],              // 1.104.0~ 해금된 상위(전직)·조우·심층 직업 id
+    killsByEnemy: {},                 // 1.109.0~ 조우 해금 진행
+    contracts: [],                    // 1.111.0~ 마의 계약 (영구)
+    shards: 0,                        // 1.112.0~ ☠ 죽음의 조각
+    parts: [],                        // 1.112.0~ 연구실 부품 (최대 5칸)
+    deepestByDungeon: {},             // 1.113.0~ 던전별 최고 도달 층
   },
   // 진행 중인 런 스냅샷 (맵 화면 진입 시 자동 저장 — 앱 종료/새로고침 후 이어하기 용)
   // null = 진행 중 런 없음. 객체 = 재개 가능한 런 상태.
@@ -1483,17 +1487,14 @@ export function saveBuriedChar(meta, char) {
   return { ...meta, buried: { ...b, char, deepest, deepestByDungeon } };
 }
 
-// 새 캐릭터 시작 — 1.113.0: 장착에 실제로 쓰인 유산(legacyUsedIds)만 보관함에서 차감,
-// 못 쓴 유산은 다음 캐릭터를 위해 남는다. 골드는 전액 계승.
+// 새 캐릭터 시작 — 1.117.0: 장비 계승 폐지, 계승 골드만 소비된다
 export function startBuriedChar(meta, char) {
   const b = getBuried(meta);
-  const usedIds = char?.legacyUsedIds || [];
   return {
     ...meta,
     buried: {
       ...b,
       char,
-      legacy: b.legacy.filter(it => !usedIds.includes(it.id)),
       legacyGold: 0,
       runs: (b.runs || 0) + 1,
       deepest: Math.max(b.deepest || 0, char?.floor || 1),

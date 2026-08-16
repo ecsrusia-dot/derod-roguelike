@@ -270,6 +270,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
         const uniqueDrop = rollBuriedUniqueDrop({
           dungeonId: char.dungeonId,
           isFinalBoss: (char.floor || 1) >= dungeon.floors,
+          deep: (char.floor || 1) > dungeon.floors, // 전용 유니크는 정복 층 '이후'만 (1.117.0 off-by-one 픽스)
           classId: char.classId,
           floor: enemy.lv || char.floor,
           ownedIds: owned,
@@ -800,7 +801,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
                 : `방어 ${buriedEffDef(foe)} · 회피 ${buriedEffDodge(foe)}%`}
             </span>
           </div>
-          <BuriedBar value={foe.hp} max={foe.maxHp} color={PALETTE.accent} height={9} showText={false} />
+          <BuriedBar value={darkBlind ? (foe.hp > 0 ? foe.maxHp : 0) : foe.hp} max={foe.maxHp} color={PALETTE.accent} height={9} showText={false} />
           <div className="text-[11px] tabular-nums text-right mt-0.5" style={{ color: PALETTE.accent }}>
             {(foe.barrier || 0) > 0 && <span style={{ color: PALETTE.ice }}>🔷{darkBlind ? '??' : foe.barrier} · </span>}
             {darkBlind ? '?? / ??' : `${Math.max(0, foe.hp)} / ${foe.maxHp}`}
@@ -990,7 +991,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
               <>
                 <div className="text-[12px] text-center leading-relaxed mb-3" style={{ color: PALETTE.textDim }}>
                   {cls?.name}은(는) {dungeon.name} {char.floor}층에서 무덤의 일부가 되었다.<br />
-                  장착 중이던 장비 일부와 골드가 <b style={{ color: PALETTE.text }}>유산</b>으로 남는다.
+                  장비는 전부 분해되어 <b style={{ color: PALETTE.dawn }}>🕯 먼지</b>로 정산되고, 골드 30%만 다음 캐릭터에게 넘어간다.
                 </div>
                 <button onClick={() => onFinish(result)} className="ui-press w-full py-3 text-[13px] font-bold"
                   style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panelLight, color: PALETTE.text, border: `1px solid ${PALETTE.panelBorder}` }}>

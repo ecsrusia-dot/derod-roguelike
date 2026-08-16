@@ -19,7 +19,7 @@ import {
   resolveBuriedLoot, buriedCheckpointFloors,
   BURIED_DEPTH_CLASSES, buriedEarnedDepthTraits,
 } from '../../data.js';
-import { BuriedItemCard, BuriedBar, BURIED_DUST_ICON, BuriedTierLegend, BuriedLootModal } from './BuriedCommon.jsx';
+import { BuriedBar, BURIED_DUST_ICON, BuriedTierLegend, BuriedLootModal } from './BuriedCommon.jsx';
 import BuriedManage from './BuriedManage.jsx';
 
 export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateChar, onRetire, onForge, onBuyContract, onBuyPart, onDetachParts, forgeNotice, onBack }) {
@@ -362,26 +362,26 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
             </div>
             <div className="flex gap-2">
               <button onClick={() => onForge(forgeSlot, false, char ? char.classId : pickClass)}
-                disabled={(b.dust || 0) < BURIED_FORGE.randomCost}
+                disabled={(b.dust || 0) < BURIED_FORGE.randomCost || !char}
                 className="ui-press flex-1 py-2 text-[12px] font-bold"
                 style={{
                   borderRadius: 'var(--r-btn, 13px)',
-                  background: (b.dust || 0) >= BURIED_FORGE.randomCost ? PALETTE.panelLight : PALETTE.panel,
+                  background: ((b.dust || 0) >= BURIED_FORGE.randomCost && char) ? PALETTE.panelLight : PALETTE.panel,
                   border: `1px solid ${PALETTE.dawn}55`,
-                  color: (b.dust || 0) >= BURIED_FORGE.randomCost ? PALETTE.dawn : PALETTE.textDim,
-                  opacity: (b.dust || 0) >= BURIED_FORGE.randomCost ? 1 : 0.5,
+                  color: ((b.dust || 0) >= BURIED_FORGE.randomCost && char) ? PALETTE.dawn : PALETTE.textDim,
+                  opacity: ((b.dust || 0) >= BURIED_FORGE.randomCost && char) ? 1 : 0.5,
                 }}>
                 랜덤 제작 {BURIED_DUST_ICON}{BURIED_FORGE.randomCost}
               </button>
               <button onClick={() => onForge(forgeSlot, true, char ? char.classId : pickClass)}
-                disabled={(b.dust || 0) < BURIED_FORGE.epicCost}
+                disabled={(b.dust || 0) < BURIED_FORGE.epicCost || !char}
                 className="ui-press flex-1 py-2 text-[12px] font-bold"
                 style={{
                   borderRadius: 'var(--r-btn, 13px)',
-                  background: (b.dust || 0) >= BURIED_FORGE.epicCost ? PALETTE.panelLight : PALETTE.panel,
+                  background: ((b.dust || 0) >= BURIED_FORGE.epicCost && char) ? PALETTE.panelLight : PALETTE.panel,
                   border: `1px solid ${PALETTE.legendary}66`,
-                  color: (b.dust || 0) >= BURIED_FORGE.epicCost ? PALETTE.legendary : PALETTE.textDim,
-                  opacity: (b.dust || 0) >= BURIED_FORGE.epicCost ? 1 : 0.5,
+                  color: ((b.dust || 0) >= BURIED_FORGE.epicCost && char) ? PALETTE.legendary : PALETTE.textDim,
+                  opacity: ((b.dust || 0) >= BURIED_FORGE.epicCost && char) ? 1 : 0.5,
                 }}>
                 영웅급 확정 {BURIED_DUST_ICON}{BURIED_FORGE.epicCost}
               </button>
@@ -520,7 +520,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
           <div className="grid grid-cols-4 gap-1.5">
             {[
               { l: '최고 층', v: b.deepest || 0, c: PALETTE.legendary },
-              { l: '클리어', v: Object.values(clears).reduce((s, n) => s + n, 0), c: PALETTE.green },
+              { l: '정복', v: Object.values(clears).reduce((s, n) => s + n, 0), c: PALETTE.green },
               { l: '사망', v: b.deaths || 0, c: PALETTE.accent },
               { l: '캐릭터', v: b.runs || 0, c: PALETTE.ice },
             ].map(x => (

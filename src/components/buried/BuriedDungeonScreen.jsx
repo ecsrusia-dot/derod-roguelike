@@ -15,13 +15,13 @@ import { ChevronLeft, Package } from 'lucide-react';
 import { PALETTE } from '../../utils/helpers.js';
 import {
   BURIED_ROOMS, BURIED_ENHANCE_MAX, BURIED_SLOT_IDS, BURIED_ROOM_COLORS,
-  BURIED_POTION_HEAL_PCT, BURIED_POTION_PRICE, BURIED_SKILL_MAX_LV,
+  BURIED_POTION_HEAL_PCT, buriedPotionPrice, BURIED_SKILL_MAX_LV,
   buriedDerived, buriedExpToNext, buriedEnhanceCost,
   getBuriedClass, getBuriedTier, getBuriedDungeon, buriedMonsterLevel,
   rollBuriedOffers, rollBuriedItem, rollBuriedShop,
   advanceBuriedFloor, buildBuriedRoomEnemy, addBuriedItemToChar, stepBuriedChar,
   getBuriedRoomEffect, getBuriedFloorEffect,
-  buildBuriedNegotiation, buriedLibraryChoices, raiseBuriedSkill, buriedSkillLv,
+  buildBuriedNegotiation, buriedLibraryChoices, raiseBuriedSkill, buriedSkillLv, buriedTraitIds,
   hasBuriedUnique, maybeBuriedFloorSkillUp,
   BURIED_EVENT_ROOMS, BURIED_EVENT_ROOM_IDS, resolveBuriedEvent,
   buriedWandererOffers, wandererAddOption, wandererApplyMod, wandererReroll,
@@ -35,18 +35,29 @@ import {
 import { BuriedItemCard, BuriedBar, BURIED_DUST_ICON, slotMeta, BuriedLootModal } from './BuriedCommon.jsx';
 import BuriedManage from './BuriedManage.jsx';
 
-export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle, onLeave }) {
+export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle, onLeave, notice: extNotice, onClearNotice }) {
   const b = meta?.buried || {};
   const char = b.char || null;
   const [manage, setManage] = useState(false);
   const [notice, setNotice] = useState(null);
 
-  // 이번 층의 방 선택지가 없으면 생성 (새로고침 후에도 그대로 이어진다)
+  // 이번 층의 방 선택지가 없으면 생성 (새로고침 후에도 그대로 이어진다).
+  // 1.117.0 — 첫 층에도 [dl1] 실타래 / 「길잡이」 선택지 +1 적용 (advance와 동일 규칙)
   useEffect(() => {
     if (char && !char.offers) {
-      onUpdateChar({ ...char, offers: rollBuriedOffers(char.floor, char.dungeonId), room: null, roomData: null }, 0);
+      const extra = (hasBuriedUnique(char, 'dl1') || buriedTraitIds(char).includes('pathfinder')) ? 1 : 0;
+      onUpdateChar({ ...char, offers: rollBuriedOffers(char.floor, char.dungeonId, extra), room: null, roomData: null }, 0);
     }
   }, [char, onUpdateChar]);
+
+  // 1.117.0 — 새로고침 도주 차단: 전투 방에 들어간 상태로 복귀하면 즉시 전투로 되돌린다.
+  // (전투 상태는 저장되지 않으므로 적은 새로 굴려지지만, 도망은 불가능해진다)
+  useEffect(() => {
+    if (char && (char.room === 'battle' || char.room === 'elite' || char.room === 'boss')) {
+      onEnterBattle(buildBuriedRoomEnemy(char, char.room, char.roomEffect), char.room, char.roomEffect || null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (!char) return null;
   const cls = getBuriedClass(char.classId);
@@ -131,9 +142,10 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
     setNotice(raised ? `${entry.item.name} 구매 — 스킬이 Lv.${lv}이 되었다.` : `${entry.item.name}을(를) 샀다.`);
   };
 
+  const potionPrice = buriedPotionPrice(monLevel); // 1.117.0 — 깊이에 따라 가격 상승
   const buyPotion = () => {
-    if (char.gold < BURIED_POTION_PRICE) return;
-    onUpdateChar({ ...char, gold: char.gold - BURIED_POTION_PRICE, potions: (char.potions || 0) + 1 }, 0);
+    if (char.gold < potionPrice) return;
+    onUpdateChar({ ...char, gold: char.gold - potionPrice, potions: (char.potions || 0) + 1 }, 0);
     setNotice('물약을 하나 챙겼다.');
   };
 
@@ -147,7 +159,7 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
   const enhance = (slot) => {
     const item = char.equipped?.[slot];
     if (!item || item.plus >= BURIED_ENHANCE_MAX) return;
-    const cost = buriedEnhanceCost(item.plus);
+    const cost = buriedEnhanceCost(item.plus, monLevel);
     if (char.gold < cost) return;
     onUpdateChar({
       ...char,
@@ -288,6 +300,12 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
+        {extNotice && (
+          <button onClick={onClearNotice} className="ui-press w-full px-3 py-2 text-left text-[12px]"
+            style={{ borderRadius: 'var(--r-chip, 8px)', background: `${PALETTE.legendary}15`, border: `1px solid ${PALETTE.legendary}66`, color: PALETTE.legendary }}>
+            {extNotice} <span style={{ color: PALETTE.textDim }}>(탭하여 닫기)</span>
+          </button>
+        )}
         {notice && (
           <div className="px-3 py-2 text-[12px]" style={{ borderRadius: 'var(--r-chip, 8px)', background: `${PALETTE.dawn}15`, border: `1px solid ${PALETTE.dawn}55`, color: PALETTE.dawn }}>
             {notice}
@@ -386,15 +404,15 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
                   onClick={sold || !afford ? null : () => buy(entry, i)} />
               );
             })}
-            <button onClick={buyPotion} disabled={char.gold < BURIED_POTION_PRICE}
+            <button onClick={buyPotion} disabled={char.gold < potionPrice}
               className="ui-press w-full py-2.5 text-[12px]"
               style={{
                 borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panel,
                 border: `1px solid ${PALETTE.panelBorder}`,
-                color: char.gold >= BURIED_POTION_PRICE ? PALETTE.text : PALETTE.textDim,
-                opacity: char.gold >= BURIED_POTION_PRICE ? 1 : 0.5,
+                color: char.gold >= potionPrice ? PALETTE.text : PALETTE.textDim,
+                opacity: char.gold >= potionPrice ? 1 : 0.5,
               }}>
-              🧪 물약 구매 — 🪙{BURIED_POTION_PRICE} (전투 중 HP {BURIED_POTION_HEAL_PCT}% 회복)
+              🧪 물약 구매 — 🪙{potionPrice} (전투 중 HP {BURIED_POTION_HEAL_PCT}% 회복)
             </button>
             <button onClick={advance} className="ui-press w-full py-2.5 text-[12px]"
               style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panelLight, color: PALETTE.text, border: `1px solid ${PALETTE.panelBorder}` }}>
@@ -421,7 +439,7 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
               const item = char.equipped?.[slot];
               if (!item) return null;
               const maxed = item.plus >= BURIED_ENHANCE_MAX;
-              const cost = buriedEnhanceCost(item.plus);
+              const cost = buriedEnhanceCost(item.plus, monLevel);
               const afford = char.gold >= cost;
               const tier = getBuriedTier(item.tier);
               return (
