@@ -16,7 +16,7 @@ import {
   buriedDerived, buriedExpToNext, getBuriedClass, getBuriedDungeon, buildBuriedLegacy,
   buriedTraitIds, getBuriedTrait, buriedMonsterLevel,
   BURIED_PARTS, BURIED_PART_SLOT_COSTS, getBuriedPart, BURIED_SHARD,
-  resolveBuriedLoot,
+  resolveBuriedLoot, buriedCheckpointFloors,
 } from '../../data.js';
 import { BuriedItemCard, BuriedBar, BURIED_DUST_ICON, BuriedTierLegend, BuriedLootModal } from './BuriedCommon.jsx';
 import BuriedManage from './BuriedManage.jsx';
@@ -31,6 +31,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
 
   const [pickClass, setPickClass] = useState(BURIED_CLASSES[0].id);
   const [pickDungeon, setPickDungeon] = useState(unlockedDungeons[unlockedDungeons.length - 1] || 'labyrinth');
+  const [pickStart, setPickStart] = useState(1); // 1.114.0 — 체크포인트 시작 층
   const [manage, setManage] = useState(false);
   const [confirmRetire, setConfirmRetire] = useState(false);
   const [forgeSlot, setForgeSlot] = useState('weapon');
@@ -126,7 +127,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
                   const on = pickDungeon === dg.id;
                   const cleared = clears[dg.id] || 0;
                   return (
-                    <button key={dg.id} disabled={!open} onClick={() => setPickDungeon(dg.id)}
+                    <button key={dg.id} disabled={!open} onClick={() => { setPickDungeon(dg.id); setPickStart(1); }}
                       className="ui-press w-full flex items-start gap-2.5 px-3 py-2.5 text-left"
                       style={{
                         borderRadius: 'var(--r-btn, 13px)',
@@ -144,6 +145,11 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
                         <div className="text-[11px]" style={{ color: PALETTE.textDim }}>
                           층 무한 (정복 {dg.floors}층) · {dg.stepsPerLevel}걸음마다 마물 Lv.+1 · 시작 마물 Lv.{dg.baseLevel + 1}
                         </div>
+                        {dg.gimmick && (
+                          <div className="text-[11px] mt-0.5" style={{ color: dg.color }}>
+                            {dg.gimmick.icon} <b>{dg.gimmick.name}</b> — {dg.gimmick.desc}
+                          </div>
+                        )}
                         <div className="text-[11px]" style={{ color: PALETTE.textDim }}>
                           골드 ×{dg.goldMult} · 경험치 ×{dg.expMult} · 방 효과 {dg.roomEffectChance}%
                         </div>
@@ -158,6 +164,35 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
                 })}
               </div>
             </div>
+
+            {/* 체크포인트 시작 층 (1.114.0) — 던전별 최고 도달 층 기준 100층 단위 */}
+            {(() => {
+              const cps = buriedCheckpointFloors(b.deepestByDungeon?.[pickDungeon] || 0);
+              if (cps.length === 0) return null;
+              return (
+                <div>
+                  <div className="text-[11px] tracking-[0.25em] mb-1.5" style={{ color: PALETTE.dawn }}>
+                    시작 층 — 100층 단위 재출발 (최고 {b.deepestByDungeon?.[pickDungeon] || 0}층 도달 기록)
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[1, ...cps].map(f => (
+                      <button key={f} onClick={() => setPickStart(f)} className="ui-press px-3 py-1.5 text-[12px] font-bold"
+                        style={{
+                          borderRadius: 'var(--r-chip, 8px)',
+                          border: `1px solid ${pickStart === f ? PALETTE.dawn : PALETTE.panelBorder}`,
+                          background: pickStart === f ? PALETTE.panelLight : 'transparent',
+                          color: pickStart === f ? PALETTE.dawn : PALETTE.textDim,
+                        }}>{f}층</button>
+                    ))}
+                  </div>
+                  {pickStart > 1 && (
+                    <div className="text-[11px] mt-1" style={{ color: PALETTE.textDim }}>
+                      그 층 마물 레벨에 맞춘 <b style={{ color: PALETTE.text }}>낡은 장비 6종</b>으로 시작한다 — 유산을 챙겨 가면 그만큼 유리하다.
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* 직업 선택 */}
             <div>
@@ -267,7 +302,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
                 </div>
               </div>
             )}
-            <button onClick={() => onStartChar(pickClass, pickDungeon, carryPicks)} className="ui-press ui-sheen w-full py-3 text-[13px] font-bold"
+            <button onClick={() => onStartChar(pickClass, pickDungeon, carryPicks, pickStart)} className="ui-press ui-sheen w-full py-3 text-[13px] font-bold"
               style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.accent, color: '#fff' }}>
               {getBuriedDungeon(pickDungeon).name}(으)로 내려간다{legacy.length > 0 ? ` — 유산 ${legacy.length}개 계승` : ''}{carryPicks.length > 0 ? ` · 계약 ${carryPicks.length}` : ''}
             </button>

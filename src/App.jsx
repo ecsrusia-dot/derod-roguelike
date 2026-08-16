@@ -364,11 +364,12 @@ export default function App() {
     });
   };
 
-  // 새 캐릭터 — 1.113.0: 유산은 빈 슬롯에 장착된 것만 소비, 나머지는 보관함에 남는다
-  const handleBuriedStart = (classId, dungeonId = 'labyrinth', contracts = []) => {
+  // 새 캐릭터 — 1.113.0: 유산은 빈 슬롯에 장착된 것만 소비, 나머지는 보관함에 남는다.
+  // 1.114.0: startFloor — 100층 단위 체크포인트 재출발 (그 층 마물 레벨의 낡은 장비 6종 지급)
+  const handleBuriedStart = (classId, dungeonId = 'labyrinth', contracts = [], startFloor = 1) => {
     setMeta(prev => {
       const b = getBuried(prev);
-      const char = createBuriedChar(classId, { items: b.legacy, gold: b.legacyGold }, dungeonId, contracts, aggregateBuriedParts(b.parts));
+      const char = createBuriedChar(classId, { items: b.legacy, gold: b.legacyGold }, dungeonId, contracts, aggregateBuriedParts(b.parts), startFloor);
       if (!char) return prev;
       const next = startBuriedChar(prev, char);
       saveMeta(next);

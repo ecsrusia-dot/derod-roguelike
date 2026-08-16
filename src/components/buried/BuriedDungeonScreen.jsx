@@ -30,6 +30,7 @@ import {
   aggregateBuriedContracts,
   BURIED_CALAMITY_GAUGE_MAX, buildBuriedCalamity,
   resolveBuriedLoot, buriedBossKeyAt,
+  BURIED_CHUTE_ROOM, BURIED_CHUTE_HP_PCT, buriedChuteJump,
 } from '../../data.js';
 import { BuriedItemCard, BuriedBar, BURIED_DUST_ICON, slotMeta, BuriedLootModal } from './BuriedCommon.jsx';
 import BuriedManage from './BuriedManage.jsx';
@@ -67,6 +68,15 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
   // ===== 방 진입 =====
   const enterRoom = (offer) => {
     const type = offer.type;
+    // 기믹 「낙하 구멍」(나락, 1.114.0) — HP를 바치고 층을 건너뛴다
+    if (type === 'chute') {
+      const cost = Math.round(d.maxHp * BURIED_CHUTE_HP_PCT / 100);
+      if (char.hp <= cost) { setNotice('HP가 부족해 뛰어내릴 수 없다.'); return; }
+      const jumped = buriedChuteJump({ ...char, hp: char.hp - cost });
+      onUpdateChar(jumped, 0);
+      setNotice(`🕳 어둠 속으로 낙하 — HP ${cost}을 바치고 ${jumped.floor}층에 착지했다.`);
+      return;
+    }
     if (type === 'battle' || type === 'elite' || type === 'boss') {
       const enemy = buildBuriedRoomEnemy(char, type, offer.effect);
       onUpdateChar({ ...char, room: type, roomEffect: offer.effect || null }, 0);
@@ -266,6 +276,10 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
               </span>
             )}
           </span>
+          {dungeon.gimmick && (
+            <span className="px-1.5 py-0.5" style={{ borderRadius: 'var(--r-chip, 8px)', border: `1px solid ${dungeon.color}66`, color: dungeon.color }}
+              title={dungeon.gimmick.desc}>{dungeon.gimmick.icon} {dungeon.gimmick.name}</span>
+          )}
           {floorFx && (
             <span className="px-1.5 py-0.5" style={{ borderRadius: 'var(--r-chip, 8px)', border: `1px solid ${PALETTE.legendary}66`, color: PALETTE.legendary }}
               title={floorFx.desc}>★ {floorFx.name}</span>
@@ -304,7 +318,8 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
             </div>
             <div className="space-y-2">
               {offers.map((o, i) => {
-                const r = BURIED_ROOMS[o.type] || BURIED_EVENT_ROOMS[o.type] || (o.type === 'skullcrown' ? BURIED_SKULL_ROOM : BURIED_ROOMS.battle);
+                const r = BURIED_ROOMS[o.type] || BURIED_EVENT_ROOMS[o.type]
+                  || (o.type === 'skullcrown' ? BURIED_SKULL_ROOM : o.type === 'chute' ? BURIED_CHUTE_ROOM : BURIED_ROOMS.battle);
                 const fx = getBuriedRoomEffect(o.effect);
                 const fxColor = fx ? (BURIED_ROOM_COLORS[fx.color]?.color || PALETTE.dawn) : null;
                 return (
