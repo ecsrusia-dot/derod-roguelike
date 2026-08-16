@@ -368,7 +368,7 @@ export function buriedDustValue(item) {
 // =========================================================
 export const buriedExpToNext = (lv) => 32 + lv * 20;
 
-export function createBuriedChar(classId, legacy = { items: [], gold: 0 }, dungeonId = 'labyrinth', contracts = [], partsFx = {}, startFloor = 1) {
+export function createBuriedChar(classId, legacy = { items: [], gold: 0 }, dungeonId = 'labyrinth', contracts = [], partsFx = {}, startFloor = 1, depthTraits = []) {
   const cls = getBuriedClass(classId);
   if (!cls) return null;
   const equipped = {};
@@ -411,6 +411,7 @@ export function createBuriedChar(classId, legacy = { items: [], gold: 0 }, dunge
     dungeonId,
     contracts: (contracts || []).slice(0, BURIED_CONTRACT_CARRY),
     partsFx: partsFx || {},  // 1.112.0 — 연구실 부품 효과 (생성 시점에 구움, 소급 없음)
+    depthTraits: depthTraits || [], // 1.116.0 — 심층 특성 (150층 해금분, 생성 시 구움)
     floor: fromFloor, steps: startSteps, room: null, roomEffect: null, floorEffect: null, offers: null, roomDone: false,
     skillLevels: {},
     potions: 2,
@@ -736,7 +737,7 @@ export function buriedChuteJump(char) {
     ...char,
     floor: land,
     steps: (char.steps || 0) + 1,
-    offers: rollBuriedOffers(land, char.dungeonId, hasBuriedUnique(char, 'dl1') ? 1 : 0),
+    offers: rollBuriedOffers(land, char.dungeonId, (hasBuriedUnique(char, 'dl1') || hasBuriedTrait(char, 'pathfinder')) ? 1 : 0),
     floorEffect: rollBuriedFloorEffect(dg.floorEffectChance),
     room: null, roomData: null, roomEffect: null,
     // [dc2] 추락자의 갑주 — 낙하 시 다음 전투를 🧱방벽 1로 시작
@@ -930,8 +931,8 @@ export function advanceBuriedFloor(char) {
   let out = {
     ...char,
     floor: next,
-    // [dl1] 미궁의 실타래 — 방 선택지 +1
-    offers: rollBuriedOffers(next, char.dungeonId, hasBuriedUnique(char, 'dl1') ? 1 : 0),
+    // [dl1] 미궁의 실타래 / 특성 「길잡이」 — 방 선택지 +1
+    offers: rollBuriedOffers(next, char.dungeonId, (hasBuriedUnique(char, 'dl1') || hasBuriedTrait(char, 'pathfinder')) ? 1 : 0),
     floorEffect: rollBuriedFloorEffect(dg.floorEffectChance),
     room: null, roomData: null, roomEffect: null,
   };
@@ -1026,6 +1027,16 @@ export const BURIED_TRAITS = {
   wardstone:    { id: 'wardstone',    name: '수호석',   fx: { barrier: 45 }, desc: '전투 시작 시 보호막 +45.' },
   sanguine:     { id: 'sanguine',     name: '흡혈 기질', fx: { drainPct: 6 }, desc: '주는 피해의 6%만큼 HP를 회복한다.' },
   // 1.109.0 — 조우 해금 직업 전용
+  // 1.116.0 — 던전 심층 직업 전용
+  pathfinder: { id: 'pathfinder', name: '길잡이',     exclusive: 'mazewarden', trigger: true, desc: '전투를 SP +25%로 시작하고, 층을 오를 때 방 선택지가 1개 더 늘어난다.' },
+  pestilence: { id: 'pestilence', name: '역병',       exclusive: 'plaguedoc',  trigger: true, desc: '내가 거는 모든 상태이상의 스택이 +1 된다.' },
+  freefall:   { id: 'freefall',   name: '자유낙하',   exclusive: 'chasmrager', trigger: true, desc: '잃은 HP 1%당 주는 피해 +0.4% (최대 +32%).' },
+  voidsight:  { id: 'voidsight',  name: '공허시',     exclusive: 'voidwalker', trigger: true, desc: '어둠 속에서도 적의 수치가 보이고, 매 전투 첫 공격의 피해 +50%.' },
+  // 1.116.0 — 던전 심층 특성 (150층 도달 해금, 모든 캐릭터에 자동 적용)
+  echoMaze: { id: 'echoMaze', name: '미궁의 메아리', fx: { sp: 14, crit: 3 },      desc: '[미궁 150층] 최대 SP +14, 치명 확률 +3%.' },
+  rotVein:  { id: 'rotVein',  name: '부패 혈맥',     fx: { drainPct: 4, healPct: 10 }, desc: '[폐허 150층] 흡혈 +4%, 회복량 +10%.' },
+  ironFall: { id: 'ironFall', name: '낙하 단련',     fx: { hp: 60, physPct: 5 },   desc: '[나락 150층] 최대 HP +60, 물리·기교 공격력 +5%.' },
+  nightEye: { id: 'nightEye', name: '밤눈',          fx: { crit: 5, dodge: 4 },    desc: '[심연 150층] 치명 확률 +5%, 회피율 +4%.' },
   bloodflow:  { id: 'bloodflow',  name: '혈류',       exclusive: 'magiblade', trigger: true, desc: '자해가 있는 스킬을 쓸 때마다 이 전투 동안 주는 데미지 +15% (최대 +150%).' },
   cursedblood:{ id: 'cursedblood',name: '저주받은 혈족', exclusive: 'vampire', trigger: true, fx: { hpMult: 0.6 }, desc: '최대 HP가 40% 줄어드는 대신, 전투 중 매 턴 최대 HP의 10%를 회복한다.' },
   fairywing:  { id: 'fairywing',  name: '요정의 날개', exclusive: 'fairy',   trigger: true, fx: { hpMult: 0.75 }, desc: '최대 HP가 25% 줄어드는 대신, 전투를 🧱방벽 2개로 시작한다.' },
@@ -1036,7 +1047,8 @@ export const getBuriedTrait = (id) => BURIED_TRAITS[id] || null;
 // 캐릭터의 특성 목록 (전직했다면 상위 직업 기준)
 export function buriedTraitIds(char) {
   const cls = getBuriedClass(char?.classId);
-  return cls?.traits || [];
+  // 1.116.0 — 심층 특성(150층 해금, 생성 시 구움)은 직업 특성 3개 뒤에 붙는다
+  return [...(cls?.traits || []), ...(char?.depthTraits || [])];
 }
 // 스탯형 특성 합산 — buriedDerived가 호출
 export function aggregateBuriedTraits(char) {
@@ -1102,7 +1114,7 @@ export const BURIED_ADVANCED_CLASSES = [
   },
 ];
 // 전 직업 목록 — 조우 직업(파일 하단 정의)까지 포함해야 하므로 호출 시점에 평가 (TDZ 회피)
-export const buriedAllClasses = () => [...BURIED_CLASSES, ...BURIED_ADVANCED_CLASSES, ...BURIED_ENCOUNTER_CLASSES];
+export const buriedAllClasses = () => [...BURIED_CLASSES, ...BURIED_ADVANCED_CLASSES, ...BURIED_ENCOUNTER_CLASSES, ...BURIED_DEPTH_CLASSES];
 
 // =========================================================
 // 14. 스킬 레벨 1~8 (1.104.0)
@@ -1868,6 +1880,71 @@ export function checkBuriedEncounterUnlock(killsByEnemy, alreadyUnlocked) {
     if ((killsByEnemy[c.unlock.enemyKey] || 0) >= c.unlock.kills) return c.id;
   }
   return null;
+}
+
+// =========================================================
+// 26b. 던전 심층 직업 4종 (1.116.0) — 100층 이상 보스 처치로 해금
+// =========================================================
+// PM 결정: "이 던전 고층에서만 얻을 수 있는 직업" — 각 던전 기믹과 한 몸인 전용 특성을 가진다.
+export const BURIED_DEPTH_CLASSES = [
+  {
+    id: 'mazewarden', name: '미궁의 안내인', sub: 'Maze Warden', color: '#7ba3c4',
+    image: './classes/wanderer.jpg', depth: true,
+    desc: '길을 전부 외운 자. 갈림길 앞에서 웃는다.',
+    lines: { weapon: 'sword', offhand: 'tome' },
+    stats: { str: 10, dex: 8, int: 10, vit: 9 },
+    traits: ['pathfinder', 'swordmastery', 'willpower'],
+    unlock: { dungeonId: 'labyrinth', floor: 100, label: '잊혀진 미궁 100층 이상 보스 처치' },
+  },
+  {
+    id: 'plaguedoc', name: '역병 사제', sub: 'Plague Cleric', color: '#7a9a5e',
+    image: './classes/priest.jpg', depth: true,
+    desc: '곪은 물에서 기도하는 자. 병이 곧 축복이다.',
+    lines: { weapon: 'mace', offhand: 'relic' },
+    stats: { str: 5, dex: 6, int: 13, vit: 10 },
+    traits: ['pestilence', 'arcana', 'faith'],
+    unlock: { dungeonId: 'ruins', floor: 100, label: '침몰한 폐허 100층 이상 보스 처치' },
+  },
+  {
+    id: 'chasmrager', name: '나락의 광전사', sub: 'Chasm Rager', color: '#c4453d',
+    image: './classes/demonblood.jpg', depth: true,
+    desc: '떨어지며 강해진 자. 바닥이 없다는 걸 안다.',
+    lines: { weapon: 'axe', offhand: 'claw' },
+    stats: { str: 15, dex: 6, int: 4, vit: 10 },
+    traits: ['freefall', 'toughness', 'sanguine'],
+    unlock: { dungeonId: 'chasm', floor: 100, label: '나락의 계단 100층 이상 보스 처치' },
+  },
+  {
+    id: 'voidwalker', name: '공허 감시자', sub: 'Void Watcher', color: '#5c4a8c',
+    image: './classes/elf.jpg', depth: true,
+    desc: '어둠을 너무 오래 본 자. 이제 어둠이 그를 비켜 간다.',
+    lines: { weapon: 'bow', offhand: 'blade' },
+    stats: { str: 5, dex: 15, int: 8, vit: 8 },
+    traits: ['voidsight', 'precision', 'lightstep'],
+    unlock: { dungeonId: 'abyss', floor: 100, label: '심연 100층 이상 보스 처치' },
+  },
+];
+// 심층 직업 해금 판정 — 100층 이상 보스 처치 시 호출
+export function checkBuriedDepthClassUnlock(dungeonId, floor, alreadyUnlocked) {
+  const c = BURIED_DEPTH_CLASSES.find(x => x.unlock.dungeonId === dungeonId);
+  if (!c || alreadyUnlocked.includes(c.id) || (floor || 1) < c.unlock.floor) return null;
+  return c.id;
+}
+
+// =========================================================
+// 26c. 던전 심층 특성 4종 (1.116.0) — 150층 도달 해금, 전 캐릭터 자동 적용
+// =========================================================
+export const BURIED_DEPTH_TRAITS = [
+  { id: 'echoMaze', dungeon: 'labyrinth', need: 150 },
+  { id: 'rotVein',  dungeon: 'ruins',     need: 150 },
+  { id: 'ironFall', dungeon: 'chasm',     need: 150 },
+  { id: 'nightEye', dungeon: 'abyss',     need: 150 },
+];
+// 도달 기록 → 획득한 심층 특성 id 목록 (캐릭터 생성 시 구워진다)
+export function buriedEarnedDepthTraits(deepestByDungeon) {
+  return BURIED_DEPTH_TRAITS
+    .filter(t => (deepestByDungeon?.[t.dungeon] || 0) >= t.need)
+    .map(t => t.id);
 }
 
 // =========================================================
