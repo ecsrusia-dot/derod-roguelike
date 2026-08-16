@@ -118,6 +118,7 @@ export function BuriedItemCard({ item, slotId, onClick, right, dim = false, show
       <span className="text-[15px] w-5 text-center" style={{ color: tier.color }}>{meta.icon}</span>
       <div className="flex-1 min-w-0">
         <div className="text-[12px] font-bold truncate" style={{ color: tier.color }}>
+          <span className="tabular-nums font-normal" style={{ color: PALETTE.textDim }}>Lv.{item.floor || 1} </span>
           {item.name}{item.plus > 0 && <span style={{ color: PALETTE.legendary }}> +{item.plus}</span>}
         </div>
         <div className="text-[11px] truncate flex items-center gap-1" style={{ color: PALETTE.dawn }}>
@@ -165,7 +166,7 @@ export function BuriedItemSheet({ item, compare, onEquip, onUnequip, onDismantle
               {item.name}{item.plus > 0 && <span style={{ color: PALETTE.legendary }}> +{item.plus}</span>}
             </div>
             <div className="text-[11px] mt-0.5" style={{ color: PALETTE.textDim }}>
-              {slotMeta(item.slot).name} · {tier.name} 등급 · {item.floor}층 산출
+              {slotMeta(item.slot).name} · {tier.name} 등급 · <b style={{ color: PALETTE.text }}>장비 Lv.{item.floor || 1}</b>
               {item.plus > 0 && ` · 강화 배율 ×${buriedEnhanceMult(item.plus).toFixed(2)}`}
             </div>
           </div>
@@ -263,6 +264,68 @@ export function BuriedItemSheet({ item, compare, onEquip, onUnequip, onDismantle
 }
 
 export const BURIED_DUST_ICON = '🕯';
+
+// ===== 획득 판단 모달 (1.113.0) — 인벤토리 폐지: 획득 즉시 [교체] or [버리기] =====
+// 어느 쪽이든 밀려난/버려진 장비는 자동 분해 → 먼지. onResolve(replace: boolean)
+export function BuriedLootModal({ char, onResolve }) {
+  const item = char?.pendingLoot?.[0];
+  if (!item) return null;
+  const tier = getBuriedTier(item.tier);
+  const cur = char.equipped?.[item.slot] || null;
+  const st = buriedItemStats(item);
+  const cmp = cur ? buriedItemStats(cur) : {};
+  const keys = [...new Set([...Object.keys(st), ...Object.keys(cmp)])];
+  const queueLeft = (char.pendingLoot || []).length - 1;
+  return (
+    <div className="absolute inset-0 z-50 flex items-end" style={{ background: 'rgba(0,0,0,0.78)' }}>
+      <div className="w-full px-3 pb-4 pt-3"
+        style={{ background: PALETTE.bgDeep, borderTop: `1px solid ${tier.color}66`, borderRadius: '18px 18px 0 0', maxHeight: '88%', overflowY: 'auto' }}>
+        <div className="text-[11px] tracking-[0.25em] mb-1.5" style={{ color: PALETTE.dawn }}>
+          ⚖ 장비 획득 — 즉시 판단{queueLeft > 0 ? ` (대기 ${queueLeft}개)` : ''}
+        </div>
+        <div className="space-y-1 mb-2">
+          {cur ? (
+            <>
+              <div className="text-[11px]" style={{ color: PALETTE.textDim }}>지금 장착 중</div>
+              <BuriedItemCard item={cur} dim />
+              <div className="text-center text-[13px] leading-none" style={{ color: PALETTE.dawn }}>▼ 새 장비</div>
+            </>
+          ) : (
+            <div className="text-[11px]" style={{ color: PALETTE.textDim }}>{slotMeta(item.slot).name} 슬롯 — 비어 있음</div>
+          )}
+          <BuriedItemCard item={item} />
+        </div>
+        {/* 스탯 증감 비교 */}
+        {cur && keys.length > 0 && (
+          <div className="px-3 py-2 mb-2" style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panel, border: `1px solid ${PALETTE.panelBorder}` }}>
+            {keys.map(k => {
+              const a = st[k] || 0, b = cmp[k] || 0, diff = a - b;
+              return (
+                <div key={k} className="flex justify-between items-center text-[12px] py-0.5">
+                  <span style={{ color: PALETTE.textDim }}>{statLabel(k)}</span>
+                  <span className="tabular-nums" style={{ color: PALETTE.text }}>
+                    {statText(k, a)}
+                    {diff !== 0 && <span className="ml-1.5" style={{ color: diff > 0 ? PALETTE.green : PALETTE.accent }}>({diff > 0 ? '+' : ''}{diff})</span>}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <div className="flex gap-2">
+          <button onClick={() => onResolve(true)} className="ui-press flex-1 py-2.5 text-[12px] font-bold"
+            style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.accent, color: '#fff' }}>
+            교체{cur ? ` (기존 분해 ${BURIED_DUST_ICON}${buriedDustValue(cur)})` : ''}
+          </button>
+          <button onClick={() => onResolve(false)} className="ui-press flex-1 py-2.5 text-[12px]"
+            style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panelLight, color: PALETTE.text, border: `1px solid ${PALETTE.panelBorder}` }}>
+            버리기 ({BURIED_DUST_ICON}{buriedDustValue(item)})
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ===== 등급 범례 =====
 export function BuriedTierLegend() {

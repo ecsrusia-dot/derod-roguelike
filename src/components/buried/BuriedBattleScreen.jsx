@@ -230,7 +230,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
         // ===== 전설의 무구 드랍 (1.106.0, PM 결정: 보스 전용 / 1.112.0 재앙은 확정) =====
         const owned = [
           ...Object.values(char.equipped || {}).map(i => i?.unique),
-          ...(char.inventory || []).map(i => i.unique),
+          ...(char.pendingLoot || []).map(i => i.unique),
         ].filter(Boolean);
         const uniqueDrop = rollBuriedUniqueDrop({
           dungeonId: char.dungeonId,

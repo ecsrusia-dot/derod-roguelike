@@ -16,8 +16,9 @@ import {
   buriedDerived, buriedExpToNext, getBuriedClass, getBuriedDungeon, buildBuriedLegacy,
   buriedTraitIds, getBuriedTrait, buriedMonsterLevel,
   BURIED_PARTS, BURIED_PART_SLOT_COSTS, getBuriedPart, BURIED_SHARD,
+  resolveBuriedLoot,
 } from '../../data.js';
-import { BuriedItemCard, BuriedBar, BURIED_DUST_ICON, BuriedTierLegend } from './BuriedCommon.jsx';
+import { BuriedItemCard, BuriedBar, BURIED_DUST_ICON, BuriedTierLegend, BuriedLootModal } from './BuriedCommon.jsx';
 import BuriedManage from './BuriedManage.jsx';
 
 export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateChar, onRetire, onForge, onExpandLegacy, onBuyContract, onBuyPart, onDetachParts, forgeNotice, onBack }) {
@@ -90,9 +91,9 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
               <div className="mt-2">
                 <BuriedBar value={char.exp} max={buriedExpToNext(char.lv)} color={PALETTE.twilight} label="EXP" height={5} />
               </div>
-              {char.statPoints > 0 && (
+              {(char.pendingLoot || []).length > 0 && (
                 <div className="mt-2 px-2.5 py-1.5 text-[11px]" style={{ borderRadius: 'var(--r-chip, 8px)', background: `${PALETTE.legendary}1a`, border: `1px solid ${PALETTE.legendary}55`, color: PALETTE.legendary }}>
-                  능력치 포인트 {char.statPoints}점이 남아 있다 — 배분하지 않으면 그대로 사라진다.
+                  판단 대기 장비 {(char.pendingLoot || []).length}개 — [교체/버리기]를 결정하라.
                 </div>
               )}
               <div className="flex gap-2 mt-2.5">
@@ -137,17 +138,18 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
                       <div className="flex-1 min-w-0">
                         <div className="text-[12px] font-bold" style={{ color: dg.color }}>
                           {dg.name}
-                          {cleared > 0 && <span className="text-[11px] ml-1.5" style={{ color: PALETTE.legendary }}>클리어 {cleared}</span>}
+                          {cleared > 0 && <span className="text-[11px] ml-1.5" style={{ color: PALETTE.legendary }}>정복 {cleared}</span>}
+                          {(b.deepestByDungeon?.[dg.id] || 0) > 0 && <span className="text-[11px] ml-1.5" style={{ color: PALETTE.dawn }}>최고 {b.deepestByDungeon[dg.id]}층</span>}
                         </div>
                         <div className="text-[11px]" style={{ color: PALETTE.textDim }}>
-                          {dg.floors}층 · {dg.stepsPerLevel}걸음마다 마물 Lv.+1 · 시작 마물 Lv.{dg.baseLevel + 1}
+                          층 무한 (정복 {dg.floors}층) · {dg.stepsPerLevel}걸음마다 마물 Lv.+1 · 시작 마물 Lv.{dg.baseLevel + 1}
                         </div>
                         <div className="text-[11px]" style={{ color: PALETTE.textDim }}>
                           골드 ×{dg.goldMult} · 경험치 ×{dg.expMult} · 방 효과 {dg.roomEffectChance}%
                         </div>
                         {!open && (
                           <div className="text-[11px] mt-0.5" style={{ color: PALETTE.accent }}>
-                            🔒 {getBuriedDungeon(dg.unlock)?.name} 클리어 시 해금
+                            🔒 {getBuriedDungeon(dg.unlock)?.name} 정복(구 최종층 보스) 시 해금
                           </div>
                         )}
                       </div>
@@ -280,7 +282,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
           <div className="px-3 py-2.5 space-y-2" style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panel, border: `1px solid ${PALETTE.panelBorder}` }}>
             <div className="text-[11px] leading-relaxed" style={{ color: PALETTE.textDim }}>
               장비를 분해해 모은 먼지로 새 장비를 벼린다. 제작 레벨은 <b style={{ color: PALETTE.text }}>역대 최고 도달 층({buriedForgeLevel(b.deepest)})</b> 기반 —
-              죽어도 남는 진행도다. {char ? '완성품은 캐릭터 가방으로 간다.' : '완성품은 유산 보관함으로 간다.'}
+              죽어도 남는 진행도다. {char ? '완성품은 즉시 [교체/버리기]로 판단한다.' : '완성품은 유산 보관함으로 간다.'}
             </div>
             <div className="flex flex-wrap gap-1">
               {BURIED_SLOTS.map(sl => (
@@ -500,6 +502,14 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
         <BuriedManage char={char} dust={b.dust || 0}
           onUpdate={(next, dustGain) => onUpdateChar(next, dustGain)}
           onClose={() => setManage(false)} />
+      )}
+
+      {/* 획득 판단 (1.113.0) — 재련소 제작품 등, 로비에서도 대기열을 비운다 */}
+      {char && (char.pendingLoot || []).length > 0 && (
+        <BuriedLootModal char={char} onResolve={(replace) => {
+          const r = resolveBuriedLoot(char, replace);
+          onUpdateChar(r.char, r.dustGain);
+        }} />
       )}
 
       {/* 은퇴 확인 */}

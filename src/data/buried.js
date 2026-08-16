@@ -28,7 +28,8 @@ export const BURIED_STATS = [
   { id: 'vit', name: '체력', icon: '🛡', color: '#7ba3c4', desc: '최대 HP +11, 방어 +0.9 / 포인트' },
 ];
 
-export const BURIED_STAT_POINTS_PER_LEVEL = 3;
+// 1.113.0 — 레벨업 스탯 포인트 폐지 (PM: 스탯은 장비를 통해서만). 상수는 하위 호환용 0
+export const BURIED_STAT_POINTS_PER_LEVEL = 0;
 
 // =========================================================
 // 2. 장비 슬롯 6종 — 각 슬롯에 스킬 1개가 내장된다 (원작 핵심)
@@ -310,22 +311,32 @@ export function rollBuriedItem({ slot, classId, floor = 1, tier = null, luck = 0
   const t = tier ? getBuriedTier(tier)
     : weightedPick(BURIED_TIERS, (x) => tierWeightAt(x, (floor || 1) + luck));
 
+  // 1.113.0 — 장비 레벨(floor) 체계.
+  //   기본 스탯: 레벨당 +14% × 랜덤 굴림. 일반 장비 굴림 폭 0.75~1.20 (더 좋은 굴림 사냥 동기),
+  //   전설(legend)은 **고정 굴림 1.0** — 유니크는 레벨 배율만 다르다 (PM 결정)
   const floorMult = 1 + Math.max(0, (floor || 1) - 1) * 0.14;
+  const roll = t.id === 'legend' ? 1 : (0.75 + Math.random() * 0.45);
   const base = SLOT_BASE[pool] || {};
   const stats = {};
   for (const [k, v] of Object.entries(base)) {
-    const val = Math.round(v * t.mult * floorMult * (0.85 + Math.random() * 0.3));
+    const val = Math.round(v * t.mult * floorMult * roll);
     if (val > 0) stats[k] = val;
   }
   // 무기·장신구는 스킬이 참조하는 능력치 쪽만 남겨 낭비 방지
   if (skill.stat === 'int' && stats.atk) { stats.mag = Math.max(stats.mag || 0, stats.atk); delete stats.atk; }
   if ((skill.stat === 'str' || skill.stat === 'dex') && stats.mag) { stats.atk = Math.max(stats.atk || 0, stats.mag); delete stats.mag; }
 
+  // 1.113.0 — 랜덤 옵션도 장비 레벨 배율 적용 → 고층 낡은 장비가 저층 유물급을 역전할 수 있다.
+  //   확률형(crit·dodge)·치명 피해는 폭주 방지 상한 ×2.2, 나머지는 기본 스탯과 같은 배율.
+  //   전설은 옵션 값도 고정 굴림(중앙값)
   const optPool = [...BURIED_OPTIONS];
   const options = [];
+  const pctMult = Math.min(2.2, 1 + Math.max(0, (floor || 1) - 1) * 0.05);
   for (let i = 0; i < t.opts && optPool.length > 0; i++) {
     const o = optPool.splice(Math.floor(Math.random() * optPool.length), 1)[0];
-    options.push({ key: o.key, name: o.name, pct: !!o.pct, affix: o.affix, value: rnd(o.min, o.max) });
+    const baseVal = t.id === 'legend' ? Math.round((o.min + o.max) / 2) : rnd(o.min, o.max);
+    const scaled = Math.max(1, Math.round(baseVal * (o.pct ? pctMult : floorMult)));
+    options.push({ key: o.key, name: o.name, pct: !!o.pct, affix: o.affix, value: scaled });
   }
   const affix = options.length > 0 ? options[0].affix : null;
   return {
@@ -368,19 +379,21 @@ export function createBuriedChar(classId, legacy = { items: [], gold: 0 }, dunge
   if (w) equipped.weapon = w;
   if (a) equipped.armor = a;
 
-  // 유산 계승 — 슬롯이 비어 있으면 자동 장착, 아니면 가방으로
-  const inventory = [];
+  // 1.113.0 — 인벤토리 폐지. 유산은 슬롯이 비어 있을 때만 장착하고,
+  // 못 쓴 유산은 **보관함에 그대로 남는다** (legacyUsedIds로 소비분만 차감)
+  const legacyUsedIds = [];
   for (const it of (legacy.items || [])) {
-    if (it && !equipped[it.slot]) equipped[it.slot] = it;
-    else if (it) inventory.push(it);
+    if (it && !equipped[it.slot]) { equipped[it.slot] = it; legacyUsedIds.push(it.id); }
   }
 
   const char = {
-    classId, lv: 1, exp: 0, statPoints: 0,
+    classId, lv: 1, exp: 0,
     stats: { ...cls.stats },
     gold: 80 + (legacy.gold || 0),
     dust: 0,
-    equipped, inventory,
+    equipped,
+    pendingLoot: [], // 1.113.0 — 획득 즉시 [교체/버리기] 판단 대기열
+    legacyUsedIds,
     // 1.104.0 — 던전 선택 / 걸음수 기반 마물 레벨 / 스킬 레벨 / 방·층 효과
     dungeonId,
     contracts: (contracts || []).slice(0, BURIED_CONTRACT_CARRY),
@@ -389,7 +402,7 @@ export function createBuriedChar(classId, legacy = { items: [], gold: 0 }, dunge
     skillLevels: {},
     potions: 2,
     kills: 0, startedAt: Date.now(),
-    legacyTaken: (legacy.items || []).length,
+    legacyTaken: legacyUsedIds.length,
   };
   // 시작 장비·유산 장비의 스킬은 Lv.1로 등록
   for (const s of BURIED_SLOT_IDS) {
@@ -425,7 +438,8 @@ export function buriedDerived(char) {
   return {
     stats: st,
     traitFx: tf,
-    maxHp:   Math.max(1, Math.round((140 + st.vit * 11 + (lv - 1) * 18 + (gear.hp || 0) + (tf.hp || 0) + (pf.hp || 0)) * (tf.hpMult || 1) * (1 + (cf.hpPct || 0) / 100) * (1 - Math.min(50, char.curseHpLossPct || 0) / 100))),
+    // 1.113.0 — 레벨당 HP+18 폐지 (성장은 100% 장비)
+    maxHp:   Math.max(1, Math.round((140 + st.vit * 11 + (gear.hp || 0) + (tf.hp || 0) + (pf.hp || 0)) * (tf.hpMult || 1) * (1 + (cf.hpPct || 0) / 100) * (1 - Math.min(50, char.curseHpLossPct || 0) / 100))),
     maxSp:   Math.round(38 + st.int * 1.3 + (gear.sp || 0) + (tf.sp || 0)),
     atk:     Math.round((10 + st.str * 1.6 + (gear.atk || 0) + (pf.atk || 0)) * (1 + ((tf.physPct || 0) + (cf.physPct || 0)) / 100)),
     fin:     Math.round((10 + st.dex * 1.6 + (gear.atk || 0) + (pf.atk || 0)) * (1 + ((tf.physPct || 0) + (cf.physPct || 0)) / 100)),
@@ -451,14 +465,14 @@ export function buriedEquippedSkills(char) {
     .map(x => ({ slot: x.slot, item: x.item, skill: BURIED_SKILLS[x.item.skillId] }));
 }
 
-// 경험치 적용 — 레벨업 시 스탯 포인트 지급 + HP 완전 회복 (원작 규칙)
+// 경험치 적용 — 1.113.0 PM 결정: 레벨업 보상은 **HP 전액 회복뿐** (스탯 3p 폐지).
+// 성장은 100% 장비 — 레벨은 기록·회복 리듬용 지표로만 남는다.
 export function grantBuriedExp(char, amount) {
   let c = { ...char, exp: (char.exp || 0) + amount };
   const gained = [];
   while (c.exp >= buriedExpToNext(c.lv)) {
     c.exp -= buriedExpToNext(c.lv);
     c.lv += 1;
-    c.statPoints = (c.statPoints || 0) + BURIED_STAT_POINTS_PER_LEVEL;
     gained.push(c.lv);
   }
   if (gained.length > 0) c.hp = buriedDerived(c).maxHp;
@@ -649,7 +663,7 @@ export const BURIED_DUNGEON = {
 // 이번 층에서 고를 방 2~3개. 각 방에는 던전 난이도에 따라 **방 효과**가 붙는다.
 export function rollBuriedOffers(floor, dungeonId = 'labyrinth') {
   const dg = getBuriedDungeon(dungeonId);
-  const bossKey = dg.bossFloors[floor];
+  const bossKey = buriedBossKeyAt(dg, floor);
   if (bossKey) return [{ type: 'boss', enemyKey: bossKey, effect: rollBuriedRoomEffect(dg.roomEffectChance) }];
   const count = Math.random() < 0.45 ? 2 : 3;
   // 1.107.0 — 이벤트 방 5종(묘비·샘·석상·나그네·관)도 선택지 풀에 합류
@@ -696,8 +710,11 @@ export const BURIED_POTION_PRICE = 55;
 // 10. 전투 계산 — 순수 함수 (BuriedBattleScreen이 호출만 한다)
 // =========================================================
 export const BURIED_TUNING = {
-  enemyDmgMult: 1.0,   // 적 화력 체감 조정은 여기 한 곳
+  enemyDmgMult: 1.1,   // 적 화력 체감 조정은 여기 한 곳. 1.113.0 — 레벨 스탯 폐지에도 "너무 쉽다" 응답으로 +10%
   playerDmgMult: 1.0,
+  // 1.113.0 무한층 — 정복 층(dg.floors)을 넘어선 깊이는 층당 +3%씩 적 hp·atk에 복리 압력.
+  // 드랍 장비 레벨은 마물 레벨을 따라가므로(≈파리티) 이 압력이 없으면 무한 스노볼이 된다 (시뮬 검증)
+  depthPressurePerFloor: 0.03,
   spPerTurn: 0,        // 파생 spRegen에 더해지는 고정값 (SP 압박 조정은 buriedDerived의 spRegen과 함께)
 };
 
@@ -847,12 +864,12 @@ export function buildBuriedLegacy(char) {
 // 무덤 먼지 — 유산 보관함이 가득 찼을 때의 대체 보상 + 제단 강화 재료
 export const BURIED_DUST = { name: '무덤 먼지', icon: '🕯' };
 
-// 다음 층으로. 마지막 층을 넘어서면 던전 클리어.
+// 다음 층으로. 1.113.0 PM 결정: **층은 무한** — 죽거나 포기할 때까지 내려간다.
+// dg.floors는 이제 "정복 층" (그 층의 보스를 잡으면 해금 판정, 런은 계속).
 // 층을 오를 때 **층 효과**를 새로 굴리고(이전 층 효과는 소멸), 방 선택지도 새로 만든다.
 export function advanceBuriedFloor(char) {
   const dg = getBuriedDungeon(char?.dungeonId);
   const next = (char.floor || 1) + 1;
-  if (next > dg.floors) return { char: { ...char, room: null, roomData: null, roomEffect: null }, cleared: true };
   return {
     char: {
       ...char,
@@ -861,8 +878,21 @@ export function advanceBuriedFloor(char) {
       floorEffect: rollBuriedFloorEffect(dg.floorEffectChance),
       room: null, roomData: null, roomEffect: null,
     },
-    cleared: false,
+    cleared: false, // 하위 호환 — 클리어 개념 폐지 (정복 판정은 App의 보스 처치 시점)
   };
+}
+
+// 1.113.0 — 무한층 보스 배치. 정복 층까지는 기존 bossFloors, 그 뒤로는 같은 간격으로 보스 로테이션.
+// 예) 미궁(5·10) → 15·20·25…층마다 봉인의 마녀 → 무덤의 폭군 → 반복
+export function buriedBossKeyAt(dg, floor) {
+  if (dg.bossFloors[floor]) return dg.bossFloors[floor];
+  if (floor <= dg.floors) return null;
+  const bossFloorList = Object.keys(dg.bossFloors).map(Number).sort((a, b) => a - b);
+  const interval = bossFloorList[0] || 5;
+  const over = floor - dg.floors;
+  if (over % interval !== 0) return null;
+  const rotation = bossFloorList.map(f => dg.bossFloors[f]);
+  return rotation[(over / interval - 1) % rotation.length];
 }
 
 // 방을 하나 지날 때마다 걸음수 +1 (원작: 마물 레벨은 층이 아니라 걸음수로 오른다)
@@ -878,7 +908,7 @@ export function buildBuriedRoomEnemy(char, roomType, roomEffectId = null) {
   const monLevel = buriedMonsterLevel(char) + envBump;
   let key;
   if (roomType === 'boss') {
-    key = dg.bossFloors[floor];
+    key = buriedBossKeyAt(dg, floor);
   }
   if (!key) {
     const tier = roomType === 'elite' ? 'elite' : 'normal';
@@ -887,7 +917,13 @@ export function buildBuriedRoomEnemy(char, roomType, roomEffectId = null) {
     const fallback = BURIED_ENEMY_LIST.filter(e => e.tier === tier);
     key = pick(pool.length > 0 ? pool : fallback).key;
   }
-  const enemy = buriedEnemyAtLevel(key, monLevel);
+  let enemy = buriedEnemyAtLevel(key, monLevel);
+  // 1.113.0 — 깊이의 압력: 정복 층 이후 층당 +3% 복리 (장비는 마물 레벨만 따라가므로 여기서 격차가 벌어진다)
+  const over = Math.max(0, floor - dg.floors);
+  if (over > 0) {
+    const pressure = Math.pow(1 + (BURIED_TUNING.depthPressurePerFloor || 0), over);
+    enemy = { ...enemy, hp: Math.round(enemy.hp * pressure), atk: Math.round(enemy.atk * pressure) };
+  }
   return { ...enemy, roomType, isBoss: roomType === 'boss' };
 }
 
@@ -1235,7 +1271,8 @@ export function buriedEnemyAtLevel(key, monLevel) {
 
 // 장비를 캐릭터에게 넣는 단일 창구 (드랍·부장품·상점 공용).
 // 원작 규칙: **같은 스킬을 다시 얻으면 그 스킬의 레벨이 오른다.** 처음 보는 스킬이면 Lv.1로 등록.
-// 빈 슬롯이면 즉시 장착하고, 아니면 가방으로 보낸다.
+// 1.113.0 — 인벤토리 폐지: 빈 슬롯이면 즉시 장착, 아니면 pendingLoot 대기열로 →
+// 던전·로비 화면이 [교체 / 버리기] 모달을 띄운다. 스킬 레벨은 **획득 시점에** 오른다 (버려도 유지).
 export function addBuriedItemToChar(char, item) {
   if (!char || !item) return { char, raised: false, lv: 1 };
   let c = char;
@@ -1248,8 +1285,24 @@ export function addBuriedItemToChar(char, item) {
     c = { ...c, skillLevels: { ...(c.skillLevels || {}), [item.skillId]: 1 } };
   }
   if (!c.equipped?.[item.slot]) c = { ...c, equipped: { ...c.equipped, [item.slot]: item } };
-  else c = { ...c, inventory: [...c.inventory, item] };
-  return { char: c, raised, lv, equippedDirect: !char.equipped?.[item.slot] };
+  else c = { ...c, pendingLoot: [...(c.pendingLoot || []), item] };
+  return { char: c, raised, lv, equippedDirect: !char.equipped?.[item.slot], queued: !!char.equipped?.[item.slot] };
+}
+
+// 1.113.0 — pendingLoot 첫 항목 판단. replace=true면 기존 장비를 밀어내고 장착.
+// 밀려나거나 버려진 장비는 자동 분해 → 먼지 반환. 반환: { char, dustGain, dismantled }
+export function resolveBuriedLoot(char, replace) {
+  const queue = char?.pendingLoot || [];
+  if (queue.length === 0) return { char, dustGain: 0, dismantled: null };
+  const item = queue[0];
+  const rest = queue.slice(1);
+  if (!replace) {
+    return { char: { ...char, pendingLoot: rest }, dustGain: buriedDustValue(item), dismantled: item };
+  }
+  const prev = char.equipped?.[item.slot] || null;
+  let next = { ...char, pendingLoot: rest, equipped: { ...char.equipped, [item.slot]: item } };
+  next.hp = Math.min(next.hp, buriedDerived(next).maxHp);
+  return { char: next, dustGain: prev ? buriedDustValue(prev) : 0, dismantled: prev };
 }
 
 // 협상 방 — 지불액과 보상. 마물 레벨이 높을수록 비싸고 크다.
@@ -1531,7 +1584,7 @@ const pendStatus = (char, s, n) => ({ ...char, pendingStatuses: [...(char.pendin
 const EVENT_OUTCOMES = {
   gravestone: [
     { w: 22, run: (c) => ({ char: { ...c, gold: c.gold + 90 }, text: '관 틈에서 🪙 90을 찾아냈다.', tone: 'good' }) },
-    { w: 18, run: (c) => ({ char: { ...c, statPoints: (c.statPoints || 0) + 1 }, text: '비석의 문양을 읽자 무언가 깨달았다 — 능력치 포인트 +1.', tone: 'good' }) },
+    { w: 18, run: (c, ctx) => ({ char: c, text: `비석의 문양을 읽자 잊힌 자의 기억이 먼지가 되어 흩어진다 — 🕯 +${ctx.dustGain = 20}.`, tone: 'good' }) },
     { w: 16, run: (c, ctx) => ({ char: c, text: `먼지가 쏟아진다 — 🕯 무덤 먼지 +${ctx.dustGain = 35}.`, tone: 'good' }) },
     { w: 16, run: (c) => { const d = buriedDerived(c); return { char: { ...c, hp: Math.min(d.maxHp, c.hp + Math.round(d.maxHp * 0.35)) }, text: '따뜻한 기운이 감돈다 — HP 35% 회복.', tone: 'good' }; } },
     { w: 14, run: (c) => { const d = buriedDerived(c); return { char: { ...c, hp: Math.max(1, c.hp - Math.round(d.maxHp * 0.25)) }, text: '함정이다! 폭발이 일어났다 — 최대 HP의 25% 피해.', tone: 'bad' }; } },
@@ -1546,7 +1599,7 @@ const EVENT_OUTCOMES = {
     { w: 10, run: (c) => ({ char: c, text: '그냥 물이었다.', tone: 'neutral' }) },
   ],
   statue: [
-    { w: 22, run: (c) => ({ char: { ...c, statPoints: (c.statPoints || 0) + 2 }, text: '석상이 고개를 끄덕인다 — 능력치 포인트 +2.', tone: 'good' }) },
+    { w: 22, run: (c, ctx) => ({ char: c, text: `석상이 고개를 끄덕이며 손에 든 것을 부수어 준다 — 🕯 +${ctx.dustGain = 30}.`, tone: 'good' }) },
     { w: 20, run: (c) => { const d = buriedDerived(c); return { char: { ...c, hp: Math.min(d.maxHp, c.hp + Math.round(d.maxHp * 0.5)) }, text: '석상의 손이 빛난다 — HP 50% 회복.', tone: 'good' }; } },
     { w: 16, run: (c) => ({ char: { ...c, gold: c.gold + 140 }, text: '석상 밑에서 헌금함을 찾았다 — 🪙 140.', tone: 'good' }) },
     { w: 22, run: (c) => ({ char: { ...c, exp: Math.max(0, (c.exp || 0) - 30) }, text: '기억이 흐려진다 — 경험치 30을 잃었다.', tone: 'bad' }) },

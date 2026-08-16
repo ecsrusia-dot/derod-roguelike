@@ -364,13 +364,13 @@ export default function App() {
     });
   };
 
-  // 새 캐릭터 — 보관함의 유산을 전부 물려받고 보관함을 비운다
+  // 새 캐릭터 — 1.113.0: 유산은 빈 슬롯에 장착된 것만 소비, 나머지는 보관함에 남는다
   const handleBuriedStart = (classId, dungeonId = 'labyrinth', contracts = []) => {
     setMeta(prev => {
       const b = getBuried(prev);
       const char = createBuriedChar(classId, { items: b.legacy, gold: b.legacyGold }, dungeonId, contracts, aggregateBuriedParts(b.parts));
       if (!char) return prev;
-      const next = startBuriedChar(prev, char, b.legacy.length);
+      const next = startBuriedChar(prev, char);
       saveMeta(next);
       return next;
     });
@@ -392,7 +392,7 @@ export default function App() {
       }
       setBuriedForgeNotice(
         r.toChar
-          ? (r.raised ? `${item.name} 완성 — 같은 스킬이라 Lv.${r.lv}이 되었다. 가방에서 확인.` : `${item.name} 완성 — 캐릭터 가방으로.`)
+          ? (r.raised ? `${item.name} 완성 — 같은 스킬이라 Lv.${r.lv}이 되었다.` : `${item.name} 완성 — [교체/버리기]를 판단하라.`)
           : `${item.name} 완성 — 유산 보관함으로. 다음 캐릭터가 물려받는다.`
       );
       saveMeta(r.meta);
@@ -449,23 +449,21 @@ export default function App() {
     setScreen('buriedBattle');
   };
 
-  // 던전 클리어 — 캐릭터는 살아서 로비로. 다음 도전은 1층부터 (장비·레벨 유지).
-  // 클리어로 ①다음 던전 ②해당 직업의 전직(상위 직업)이 열린다.
-  const handleBuriedClear = (char) => {
+  // 정복 (1.113.0) — 층 무한화로 "클리어 귀환" 폐지. 정복 층(구 최종층) 보스를 잡으면
+  // ①다음 던전 ②전직(미궁 한정) 해금 + 정복 횟수 기록만 하고 **런은 계속된다**.
+  const recordBuriedConquest = (char) => {
     const dungeonId = char?.dungeonId || 'labyrinth';
     const idx = BURIED_DUNGEONS.findIndex(dg => dg.id === dungeonId);
     const nextDungeonId = idx >= 0 && idx + 1 < BURIED_DUNGEONS.length ? BURIED_DUNGEONS[idx + 1].id : null;
-    // 전직은 첫 던전(미궁)을 클리어했을 때만 열린다
     const cls = getBuriedClass(char?.classId);
     const advanceClassId = dungeonId === 'labyrinth' ? (cls?.advance || null) : null;
-    const reset = { ...char, floor: 1, steps: 0, offers: null, room: null, roomData: null, roomEffect: null, floorEffect: null, curses: [], curseHpLossPct: 0, pendingStatuses: null, calamityGauge: 0 };
     setMeta(prev => {
-      const next = recordBuriedClear(prev, reset, { dungeonId, nextDungeonId, advanceClassId });
+      const next = recordBuriedClear(prev, char, { dungeonId, nextDungeonId, advanceClassId });
       saveMeta(next);
       return next;
     });
-    setBuriedEnemy(null); setBuriedRoom(null); setBuriedRoomFx(null);
-    setScreen('buried');
+    const dg = getBuriedDungeon(dungeonId);
+    setBuriedForgeNotice(`👑 ${dg?.name} 정복!${nextDungeonId ? ` 다음 던전이 열렸다.` : ''}${advanceClassId ? ` 전직 「${getBuriedClass(advanceClassId)?.name}」 해금.` : ''} 무덤은 더 깊이 이어진다…`);
   };
 
   // 사망 — 캐릭터 소멸 + 유산 계승
@@ -545,21 +543,21 @@ export default function App() {
       setScreen('buriedDungeon');
       return;
     }
-    // ☠ 죽음의 조각 (1.112.0) — 보스 처치 시 던전별 획득, 최종 보스는 2배
+    // ☠ 죽음의 조각 (1.112.0) — 보스 처치 시 던전별 획득. 정복 층(구 최종층) 이상 보스는 2배
+    const dgNow = getBuriedDungeon(char.dungeonId);
+    const isDeepBoss = buriedRoom === 'boss' && (char.floor || 1) >= (dgNow?.floors || 10);
     const shardBase = buriedRoom === 'boss' ? (BURIED_SHARD_DROP[grown.dungeonId || 'labyrinth'] || 1) : 0;
+    const shardGain = shardBase * (isDeepBoss ? 2 : 1);
+    // 정복 판정 (1.113.0) — 정복 층 보스를 잡는 순간 해금·기록, 런은 계속
+    const conquest = buriedRoom === 'boss' && (char.floor || 1) === (dgNow?.floors || 10);
     // 방을 하나 지났으므로 걸음수 +1 + [u102] 층 이동 스킬 레벨 판정
     const { char: blessed } = maybeBuriedFloorSkillUp(stepBuriedChar(grown));
-    const { char: advanced, cleared } = advanceBuriedFloor(blessed);
+    const { char: advanced } = advanceBuriedFloor(blessed);
     setBuriedEnemy(null); setBuriedRoom(null); setBuriedRoomFx(null);
-    const shardGain = shardBase * (cleared ? 2 : 1);
     if (shardGain) setMeta(prev => { const next = addBuriedShards(prev, shardGain); saveMeta(next); return next; });
+    if (conquest) recordBuriedConquest(advanced);
     // [u109] 저주 포식자 — 전투 중 얻은 먼지 정산
     const dustGain = res.dustGain || 0;
-    if (cleared) {
-      if (dustGain) setMeta(prev => { const next = addBuriedDust(prev, dustGain); saveMeta(next); return next; });
-      handleBuriedClear(advanced);
-      return;
-    }
     updateBuriedChar(advanced, dustGain);
     setScreen('buriedDungeon');
   };
@@ -3085,7 +3083,6 @@ export default function App() {
             {FEATURE_FLAGS.buried && screen === 'buriedDungeon' && meta?.buried?.char && <BuriedDungeonScreen meta={meta}
               onUpdateChar={updateBuriedChar}
               onEnterBattle={handleBuriedEnterBattle}
-              onClear={handleBuriedClear}
               onLeave={() => setScreen('buried')} />}
             {FEATURE_FLAGS.buried && screen === 'buriedBattle' && meta?.buried?.char && buriedEnemy && <BuriedBattleScreen
               key={`${meta.buried.char.floor}-${buriedEnemy.key}`}
