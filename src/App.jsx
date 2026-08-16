@@ -166,6 +166,7 @@ import {
   BURIED_PART_SLOT_COSTS,
   BURIED_SHARD_DROP,
   BURIED_CALAMITY_REWARD,
+  getBuriedPart,
 } from './data.js';
 import { getKstDateKey } from './utils/dailyChallenge.js';
 import { simulateBestEndlessRun } from './utils/endlessSkipSim.js';
@@ -415,9 +416,13 @@ export default function App() {
     });
   };
 
-  // 연구실 부품 (1.112.0) — ☠ 죽음의 조각으로 구입, 다음 캐릭터부터 적용
+  // 연구실 부품 (1.112.0) — ☠ 죽음의 조각으로 구입, 다음 캐릭터부터 적용.
+  // 1.115.0 — 던전 전용 부품은 해당 던전 100층 도달 시에만 구매 가능
   const handleBuriedBuyPart = (partId) => {
     setMeta(prev => {
+      const b = getBuried(prev);
+      const def = getBuriedPart(partId);
+      if (def?.dungeon && (b.deepestByDungeon?.[def.dungeon] || 0) < (def.needDeep || 100)) return prev;
       const next = buyBuriedPart(prev, partId, BURIED_PART_SLOT_COSTS);
       if (next === prev) return prev;
       saveMeta(next);

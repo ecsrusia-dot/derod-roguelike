@@ -426,6 +426,8 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
             )}
             {(b.parts || []).length < 5 && (() => {
               const nextCost = BURIED_PART_SLOT_COSTS[(b.parts || []).length];
+              // 1.115.0 — 던전 전용 부품: 해당 던전 100층 도달 시 해금
+              const isLocked = (p) => p.dungeon && (b.deepestByDungeon?.[p.dungeon] || 0) < (p.needDeep || 100);
               const avail = BURIED_PARTS.filter(p => !(b.parts || []).includes(p.id));
               return (
                 <div className="space-y-1">
@@ -434,7 +436,9 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
                   </div>
                   <div className="grid grid-cols-2 gap-1">
                     {avail.map(p => {
-                      const ok = (b.shards || 0) >= nextCost;
+                      const locked = isLocked(p);
+                      const ok = !locked && (b.shards || 0) >= nextCost;
+                      const dgName = p.dungeon ? getBuriedDungeon(p.dungeon)?.name : null;
                       return (
                         <button key={p.id} onClick={() => ok && onBuyPart(p.id)} disabled={!ok}
                           className="ui-press px-2 py-1.5 text-left text-[11px]"
@@ -443,8 +447,12 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
                             background: ok ? PALETTE.panelLight : 'transparent',
                             color: ok ? PALETTE.text : PALETTE.textDim, opacity: ok ? 1 : 0.5,
                           }}>
-                          <div style={{ color: ok ? '#c48bd4' : PALETTE.textDim }}>{p.name}</div>
+                          <div style={{ color: ok ? '#c48bd4' : PALETTE.textDim }}>
+                            {dgName && '★ '}{p.name}
+                          </div>
                           <div>{p.desc}</div>
+                          {locked && <div style={{ color: PALETTE.accent }}>🔒 {dgName} 100층 도달 시</div>}
+                          {dgName && !locked && <div style={{ color: '#c48bd4' }}>{dgName} 전용</div>}
                         </button>
                       );
                     })}
