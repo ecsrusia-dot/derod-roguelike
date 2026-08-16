@@ -28,9 +28,6 @@ export const BURIED_STATS = [
   { id: 'vit', name: '체력', icon: '🛡', color: '#7ba3c4', desc: '최대 HP +11, 방어 +0.9 / 포인트' },
 ];
 
-// 1.113.0 — 레벨업 스탯 포인트 폐지 (PM: 스탯은 장비를 통해서만). 상수는 하위 호환용 0
-export const BURIED_STAT_POINTS_PER_LEVEL = 0;
-
 // =========================================================
 // 2. 장비 슬롯 6종 — 각 슬롯에 스킬 1개가 내장된다 (원작 핵심)
 // =========================================================
@@ -127,7 +124,6 @@ export const BURIED_STATUS = {
   confuse: { id: 'confuse', name: '혼란', icon: '🌀', color: '#c48bd4', kind: 'debuff', max: 3,  decay: 'one',  desc: '행동 시 스택×30% 확률로 허우적거리며 턴을 날린다. 매 턴 1 감소' },
   aging:   { id: 'aging',   name: '노화', icon: '⏳', color: '#8b8378', kind: 'debuff', max: 10, decay: 'none', desc: '주는 데미지 스택당 -4%. 스스로 사라지지 않는다' },
 };
-export const BURIED_STATUS_LIST = Object.values(BURIED_STATUS);
 
 // =========================================================
 // 5. 스킬 49종 — 전부 장비에 내장된다 (독립 획득 불가)
@@ -193,7 +189,7 @@ export const BURIED_SKILLS = {
   purifyLight: SK({ id: 'purifyLight', name: '정화의 빛',  slot: 'weapon', line: 'mace', gear: '정화의 철퇴', sp: 18, cd: 1, stat: 'int', power: 88, heal: 25, desc: '자신 HP 25 회복.' }),
   dawnCrush:   SK({ id: 'dawnCrush',   name: '여명의 강타', slot: 'weapon', line: 'mace', gear: '여명의 대추', sp: 30, cd: 2, stat: 'int', power: 170, apply: [{ s: 'stun', n: 1, p: 40 }], desc: '40% 확률 [기절] 1' }),
   // ===== 여명의 사제 — 성물(relic) =====
-  healPrayer:  SK({ id: 'healPrayer',  name: '치유 기도',  slot: 'offhand', line: 'relic', gear: '치유의 성물', sp: 20, cd: 1, heal: 72, desc: 'HP 62 회복.' }),
+  healPrayer:  SK({ id: 'healPrayer',  name: '치유 기도',  slot: 'offhand', line: 'relic', gear: '치유의 성물', sp: 20, cd: 1, heal: 72, desc: 'HP 72 회복.' }),
   benediction: SK({ id: 'benediction', name: '가호',       slot: 'offhand', line: 'relic', gear: '가호의 성물', sp: 16, cd: 2, self: [{ s: 'guard', n: 3 }, { s: 'regen', n: 2 }], desc: '[수호] 3 + [재생] 2' }),
   blessing:    SK({ id: 'blessing',    name: '축복',       slot: 'offhand', line: 'relic', gear: '축복의 성물', sp: 14, cd: 2, self: [{ s: 'rage', n: 2 }], heal: 15, desc: '[격노] 2, HP 15 회복.' }),
 
@@ -276,10 +272,11 @@ export const BURIED_OPTIONS = [
   { key: 'vit',    name: '체력',     min: 1,  max: 3,  affix: '불굴의' },
 ];
 
-// 강화 — 제단에서 +1씩. 단계당 스탯 +12%
+// 강화 — 제단에서 +1씩. 단계당 스탯 +12%. 1.117.0 — 비용이 마물 레벨을 따라 자란다 (심층 골드 싱크)
 export const BURIED_ENHANCE_MAX = 5;
 export const buriedEnhanceMult = (plus) => 1 + (plus || 0) * 0.12;
-export const buriedEnhanceCost = (plus) => 60 + (plus || 0) * 55;
+export const buriedEnhanceCost = (plus, monLevel = 1) =>
+  Math.round((60 + (plus || 0) * 55) * (1 + Math.max(0, (monLevel || 1) - 1) * 0.06));
 
 const rnd = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
@@ -295,6 +292,7 @@ const nextItemId = () => `bi_${Date.now().toString(36)}_${(_buriedItemSeq++).toS
 
 // 층이 깊을수록 상위 등급 가중치 상승
 function tierWeightAt(tier, floor) {
+  if (tier.weight <= 0) return 0; // legend 등급 — 일반 풀 절대 제외 (1.117.0 유출 픽스)
   const depth = Math.max(0, (floor || 1) - 1);
   const rankIdx = BURIED_TIERS.indexOf(tier);
   return Math.max(0.5, tier.weight * (1 + rankIdx * depth * 0.09) - (rankIdx === 0 ? depth * 2.6 : 0));
@@ -357,10 +355,10 @@ export function buriedItemStats(item) {
   return out;
 }
 
-// 분해 가치 (무덤 먼지)
+// 분해 가치 (무덤 먼지) — 1.117.0~ 장비 레벨도 반영 (심층 장비 정산이 의미를 갖도록)
 export function buriedDustValue(item) {
   if (!item) return 0;
-  return getBuriedTier(item.tier).dust + (item.plus || 0) * 2;
+  return getBuriedTier(item.tier).dust + (item.plus || 0) * 2 + Math.floor((item.floor || 1) / 3);
 }
 
 // =========================================================
@@ -374,22 +372,16 @@ export function createBuriedChar(classId, legacy = { items: [], gold: 0 }, dunge
   const equipped = {};
   for (const s of BURIED_SLOT_IDS) equipped[s] = null;
   // 1.114.0 체크포인트 — 100층 단위 재출발. 걸음수는 층 파리티(1방/층).
-  // 시작 장비 레벨 = 마물 레벨 + **깊이의 압력 보정** (압력 ×3.25를 장비 레벨로 환산해 더한다) —
-  // 보정 없이는 낡은 장비가 압력을 못 덮어 체크포인트 시작이 즉사가 된다 (시뮬 검증)
+  // 시작 장비 레벨 = 마물 레벨 + **깊이의 압력 보정**. 1.117.0 — 보정식 수정:
+  // 장비 배율의 기저는 1이 아니라 (1+(L-1)×0.14)이므로 그 배수만큼 환산해야 압력을 실제로 덮는다.
+  // 계약(유유자적)도 마물 레벨 계산에 반영해 장비-마물 파리티를 유지한다.
   const fromFloor = Math.max(1, startFloor || 1);
   const startSteps = fromFloor - 1;
+  const startMonLv = fromFloor > 1 ? buriedMonsterLevel({ dungeonId, steps: startSteps, contracts }) : 1;
+  const startPressure = buriedDepthPressure(getBuriedDungeon(dungeonId), fromFloor);
   const startGearLv = fromFloor > 1
-    ? buriedMonsterLevel({ dungeonId, steps: startSteps })
-      + Math.round((buriedDepthPressure(getBuriedDungeon(dungeonId), fromFloor) - 1) / 0.14)
+    ? startMonLv + Math.round((startPressure - 1) * (1 + (startMonLv - 1) * 0.14) / 0.14)
     : 1;
-
-  // 1.113.0 — 인벤토리 폐지. 유산은 슬롯이 비어 있을 때만 장착하고,
-  // 못 쓴 유산은 **보관함에 그대로 남는다** (legacyUsedIds로 소비분만 차감)
-  // 체크포인트 시작이면 유산을 먼저 채운다 (낡은 지급 장비보다 유산이 우선)
-  const legacyUsedIds = [];
-  for (const it of (legacy.items || [])) {
-    if (it && !equipped[it.slot]) { equipped[it.slot] = it; legacyUsedIds.push(it.id); }
-  }
 
   // 시작 장비 — 1층 시작: 무기+방어구 낡은 2종 (BB: 맨몸 시작 방지) / 체크포인트: 빈 슬롯 전부 낡은 장비
   const startSlots = fromFloor > 1 ? BURIED_SLOT_IDS : ['weapon', 'armor'];
@@ -403,10 +395,8 @@ export function createBuriedChar(classId, legacy = { items: [], gold: 0 }, dunge
     classId, lv: 1, exp: 0,
     stats: { ...cls.stats },
     gold: 80 + (legacy.gold || 0),
-    dust: 0,
     equipped,
     pendingLoot: [], // 1.113.0 — 획득 즉시 [교체/버리기] 판단 대기열
-    legacyUsedIds,
     // 1.104.0 — 던전 선택 / 걸음수 기반 마물 레벨 / 스킬 레벨 / 방·층 효과
     dungeonId,
     contracts: (contracts || []).slice(0, BURIED_CONTRACT_CARRY),
@@ -416,12 +406,11 @@ export function createBuriedChar(classId, legacy = { items: [], gold: 0 }, dunge
     skillLevels: {},
     potions: 2,
     kills: 0, startedAt: Date.now(),
-    legacyTaken: legacyUsedIds.length,
   };
-  // 시작 장비·유산 장비의 스킬은 Lv.1로 등록
+  // 시작 장비의 스킬 등록 — 같은 스킬이 중복 지급되면 정상 획득 경로처럼 레벨이 오른다 (1.117.0)
   for (const s of BURIED_SLOT_IDS) {
     const it = equipped[s];
-    if (it?.skillId) char.skillLevels[it.skillId] = char.skillLevels[it.skillId] || 1;
+    if (it?.skillId) char.skillLevels[it.skillId] = Math.min(BURIED_SKILL_MAX_LV, (char.skillLevels[it.skillId] || 0) + 1);
   }
   char.hp = buriedDerived(char).maxHp;
   return char;
@@ -635,30 +624,6 @@ export const BURIED_ENEMIES = {
 };
 export const BURIED_ENEMY_LIST = Object.values(BURIED_ENEMIES);
 
-// 층 배율 — 같은 적도 깊을수록 강해진다
-export function buriedEnemyAt(key, floor) {
-  const base = BURIED_ENEMIES[key];
-  if (!base) return null;
-  const depth = Math.max(0, (floor || 1) - (base.minFloor || 1));
-  const m = 1 + depth * 0.16;
-  return {
-    ...base,
-    hp: Math.round(base.hp * m),
-    atk: Math.round(base.atk * m),
-    def: Math.round(base.def * (1 + depth * 0.1)),
-    exp: Math.round(base.exp * (1 + depth * 0.12)),
-    floor: floor || 1,
-  };
-}
-
-export function rollBuriedEnemy(floor, tier = 'normal') {
-  const pool = BURIED_ENEMY_LIST.filter(e =>
-    e.tier === tier && floor >= e.minFloor && floor <= e.maxFloor);
-  const fallback = BURIED_ENEMY_LIST.filter(e => e.tier === tier);
-  const chosen = pick(pool.length > 0 ? pool : fallback);
-  return buriedEnemyAt(chosen.key, floor);
-}
-
 // =========================================================
 // 9. 던전 — 층 진행 + 방 선택
 // =========================================================
@@ -673,14 +638,6 @@ export const BURIED_ROOMS = {
   negotiate:{ id: 'negotiate',name: '협상',       icon: '🤝', color: '#d4a574', desc: '길을 막은 것과 거래한다. 골드를 내면 그냥 지나간다.', weight: 10 },
   library:  { id: 'library',  name: '망자의 서고', icon: '📜', color: '#5c4a8c', desc: '스킬 하나의 레벨을 올린다 (최대 Lv.8).', weight: 10 },
   boss:     { id: 'boss',     name: '봉인의 문',  icon: '👑', color: '#e8b04a', desc: '보스가 기다린다.', weight: 0 },
-};
-
-// 1.104.0 이전의 단일 던전 상수 — 이제 '잊혀진 미궁'의 별칭 (하위 호환용, 신규 코드는 BURIED_DUNGEONS 사용)
-export const BURIED_DUNGEON = {
-  id: 'labyrinth', name: '잊혀진 미궁', sub: 'The Forgotten Labyrinth',
-  floors: 10,
-  bossFloors: { 5: 'sealWitch', 10: 'tombTyrant' },
-  desc: '열 개의 층. 바닥에는 먼저 내려간 자들의 유산이 쌓여 있다.',
 };
 
 // 이번 층에서 고를 방 2~3개. 각 방에는 던전 난이도에 따라 **방 효과**가 붙는다.
@@ -729,9 +686,10 @@ export const BURIED_CHUTE_FLOORS = 3;
 // 걸음수는 +1만 — 마물이 자라기 전에 깊이 닿는 것이 이 기믹의 전략 가치.
 export function buriedChuteJump(char) {
   const dg = getBuriedDungeon(char?.dungeonId);
+  // 도중에 보스 층이 있으면 그 직전에 멈춘다 — 25% HP를 내고 보스 앞에 강제 착지당하는 함정 방지 (1.117.0)
   let land = (char.floor || 1) + BURIED_CHUTE_FLOORS;
-  for (let f = (char.floor || 1) + 1; f < land; f++) {
-    if (buriedBossKeyAt(dg, f)) { land = f; break; }
+  for (let f = (char.floor || 1) + 1; f <= land; f++) {
+    if (buriedBossKeyAt(dg, f)) { land = Math.max((char.floor || 1) + 1, f - 1); break; }
   }
   return {
     ...char,
@@ -759,7 +717,9 @@ export function rollBuriedShop(floor, classId) {
 }
 
 export const BURIED_POTION_HEAL_PCT = 45;
-export const BURIED_POTION_PRICE = 55;
+export const BURIED_POTION_PRICE = 55; // 기준가 — 실판매가는 buriedPotionPrice(마물 레벨)
+export const buriedPotionPrice = (monLevel = 1) =>
+  Math.round(BURIED_POTION_PRICE * (1 + Math.max(0, (monLevel || 1) - 1) * 0.08));
 
 // =========================================================
 // 10. 전투 계산 — 순수 함수 (BuriedBattleScreen이 호출만 한다)
@@ -773,7 +733,6 @@ export const BURIED_TUNING = {
   // 점근 비율이 정해져 있어(구조적), 압력 2배 = 실질 벽. 100층(PM 체크포인트 단위)이
   // "엘리트 빌드의 이정표"가 되도록 100층 ≈ ×1.9 / 200층 ≈ ×2.9로 조정 (시뮬 검증)
   depthPressurePerFloor: 0.01,
-  spPerTurn: 0,        // 파생 spRegen에 더해지는 고정값 (SP 압박 조정은 buriedDerived의 spRegen과 함께)
 };
 
 const stacksOf = (u, key) => (u?.statuses?.[key] || 0);
@@ -808,8 +767,12 @@ export function resolveBuriedAttack(att, def, skill, { isPlayer = false, traits 
   const dodgeRoll = Math.random() * 100 < buriedEffDodge(def);
   if (dodgeRoll) return { dodged: true, hits: [], total: 0, crits: 0, chase: 0 };
 
-  const statKey = skill.stat || 'str';
-  const baseAtk = statKey === 'int' ? (att.mag || 0) : statKey === 'dex' ? (att.fin || 0) : (att.atk || 0);
+  // stat 미지정(기본 공격)은 최고 공격 스탯을 따른다 — int 빌드도 기본기가 살아 있도록 (1.117.0)
+  const statKey = skill.stat || null;
+  const baseAtk = statKey === 'int' ? (att.mag || 0)
+    : statKey === 'dex' ? (att.fin || 0)
+    : statKey === 'str' ? (att.atk || 0)
+    : Math.max(att.atk || 0, att.fin || 0, att.mag || 0);
   const hitCount = Math.max(1, skill.hits || 1);
   const critRate = (att.crit || 0) + (skill.critBonus || 0) + (att.envCritAdd || 0);
   let offense = buriedOffenseMult(att) * (1 + (att.envDmgPct || 0) / 100);
@@ -904,23 +867,24 @@ export function chooseBuriedEnemyAction(enemyUnit, actions) {
 // =========================================================
 // 11. 유산 — 사망 시 계승 규칙
 // =========================================================
-export const BURIED_LEGACY_MAX = 6;       // 보관 가능한 유산 장비 수
 export const BURIED_LEGACY_GOLD_PCT = 30; // 계승 골드 비율
 
-// 사망한 캐릭터에서 계승 대상 산출. 층이 깊을수록 더 많이 남긴다 (1~3개)
-export function buildBuriedLegacy(char) {
-  if (!char) return { items: [], gold: 0 };
-  const equipped = BURIED_SLOT_IDS.map(s => char.equipped?.[s]).filter(Boolean);
-  const count = Math.min(equipped.length, (char.floor || 1) >= 8 ? 3 : (char.floor || 1) >= 4 ? 2 : 1);
-  const shuffled = [...equipped].sort(() => Math.random() - 0.5);
+// 1.117.0 PM 결정 — 장비 계승 폐지. 사망·은퇴 시 장착 장비(+판단 대기 장비)를 전부
+// **자동 분해해 먼지로 정산**한다. 골드 30% 계승(legacyGold)은 유지.
+export function buriedDeathSettlement(char) {
+  if (!char) return { dust: 0, gold: 0, itemCount: 0 };
+  const items = [
+    ...BURIED_SLOT_IDS.map(s => char.equipped?.[s]).filter(Boolean),
+    ...(char.pendingLoot || []),
+  ];
   return {
-    items: shuffled.slice(0, count),
+    dust: items.reduce((s, it) => s + buriedDustValue(it), 0),
     gold: Math.floor((char.gold || 0) * BURIED_LEGACY_GOLD_PCT / 100),
+    itemCount: items.length,
   };
 }
 
-// 무덤 먼지 — 유산 보관함이 가득 찼을 때의 대체 보상 + 제단 강화 재료
-export const BURIED_DUST = { name: '무덤 먼지', icon: '🕯' };
+
 
 // 다음 층으로. 1.113.0 PM 결정: **층은 무한** — 죽거나 포기할 때까지 내려간다.
 // dg.floors는 이제 "정복 층" (그 층의 보스를 잡으면 해금 판정, 런은 계속).
@@ -940,6 +904,12 @@ export function advanceBuriedFloor(char) {
   if (hasBuriedUnique(char, 'dl2') && Math.random() < 0.30) {
     const maxHp = buriedDerived(out).maxHp;
     out = { ...out, hp: Math.min(maxHp, (out.hp || 1) + Math.round(maxHp * 0.12)) };
+  }
+  // 층 효과 「망자의 가호」 — 층에 들어설 때 회복 (1.117.0 배선 — 정의만 있고 미적용이던 효과)
+  const enterFx = getBuriedFloorEffect(out.floorEffect)?.fx;
+  if (enterFx?.roomHealPct) {
+    const maxHp = buriedDerived(out).maxHp;
+    out = { ...out, hp: Math.min(maxHp, (out.hp || 1) + Math.round(maxHp * enterFx.roomHealPct / 100)) };
   }
   return {
     char: out,
@@ -991,7 +961,7 @@ export function buildBuriedRoomEnemy(char, roomType, roomEffectId = null) {
   return { ...enemy, roomType, isBoss: roomType === 'boss' };
 }
 
-// 깊이의 압력 배율 — 정복 층 이후 층당 +2.5% 선형 (1.114.0)
+// 깊이의 압력 배율 — 정복 층 이후 층당 +1% 선형 (BURIED_TUNING.depthPressurePerFloor)
 export function buriedDepthPressure(dg, floor) {
   const over = Math.max(0, (floor || 1) - dg.floors);
   return 1 + over * (BURIED_TUNING.depthPressurePerFloor || 0);
@@ -1334,8 +1304,8 @@ export const getBuriedDungeon = (id) => BURIED_DUNGEONS.find(d => d.id === id) |
 export function buriedMonsterLevel(char) {
   const dg = getBuriedDungeon(char?.dungeonId);
   const steps = char?.steps || 0;
-  // 「유유자적의 계약」 — 성장에 필요한 걸음 +N (aggregateBuriedContracts는 아래 정의라 지연 참조)
-  const stepBonus = (char?.contracts || []).includes('c_calm') ? 1 : 0;
+  // 「유유자적의 계약」 등 — 성장에 필요한 걸음 +N (fx 집계로 읽어 다른 출처도 자동 합산)
+  const stepBonus = aggregateBuriedContracts(char).stepBonus || 0;
   return 1 + dg.baseLevel + Math.floor(steps / (dg.stepsPerLevel + stepBonus));
 }
 
@@ -1352,6 +1322,7 @@ export function buriedEnemyAtLevel(key, monLevel) {
     atk: Math.round(base.atk * m),
     def: Math.round(base.def * (1 + (lv - 1) * 0.08)),
     exp: Math.round(base.exp * (1 + (lv - 1) * 0.1)),
+    gold: [Math.round(base.gold[0] * m), Math.round(base.gold[1] * m)], // 1.117.0 — 골드도 레벨 스케일 (상점·강화 경제 유지)
   };
 }
 
@@ -1419,8 +1390,9 @@ export const BURIED_FORGE = {
   randomCost: 40,    // 랜덤 등급 제작
   epicCost: 180,     // 영웅의 이상 확정 제작 (영웅 75% / 유물급 25%)
 };
-// 제작 장비 레벨 — 역대 최고 도달 층 기반 (최소 3)
-export const buriedForgeLevel = (deepest) => Math.max(3, deepest || 0);
+// 제작 장비 레벨 — 1.117.0: 역대 최고 도달 '층'을 **마물 레벨로 환산** (미궁 기준 4걸음/Lv).
+// 층수를 그대로 장비 레벨로 쓰면 드랍(마물 레벨 기준) 대비 3.7배 파워 브레이크가 난다 (감사 픽스)
+export const buriedForgeLevel = (deepest) => Math.max(3, 1 + Math.floor(Math.max(0, (deepest || 0) - 1) / 4));
 
 export function craftBuriedItem({ slot, classId, deepest, epic = false }) {
   const floor = buriedForgeLevel(deepest);
@@ -1428,10 +1400,6 @@ export function craftBuriedItem({ slot, classId, deepest, epic = false }) {
   const tier = Math.random() < 0.75 ? 'epic' : 'relic';
   return rollBuriedItem({ slot, classId, floor, tier });
 }
-
-export const BURIED_LEGACY_CAP_MAX = 12;
-// 확장 비용 — 7칸째 60, 8칸째 90, … (칸당 +30)
-export const buriedLegacyExpandCost = (currentSlots) => 60 + (currentSlots - BURIED_LEGACY_MAX) * 30;
 
 // =========================================================
 // 19. 스킬 효과 풀이 (1.105.0) — "[파쇄] 2"가 무엇인지 그 자리에서 설명
@@ -1607,12 +1575,13 @@ export function rollBuriedUniqueItem({ classId, floor = 1, excludeIds = [], dung
 
 // 보스 유니크 드랍 확률 (%) — 던전이 깊을수록 후하다. 최종 보스는 2배
 export const BURIED_UNIQUE_DROP = { labyrinth: 8, ruins: 12, chasm: 16, abyss: 22 };
-export function rollBuriedUniqueDrop({ dungeonId, isFinalBoss, classId, floor, ownedIds = [], guaranteed = false }) {
+export function rollBuriedUniqueDrop({ dungeonId, isFinalBoss, classId, floor, ownedIds = [], guaranteed = false, deep = null }) {
   const base = BURIED_UNIQUE_DROP[dungeonId] || 8;
   const chance = guaranteed ? 100 : base * (isFinalBoss ? 2 : 1);
   if (Math.random() * 100 >= chance) return null;
-  // isFinalBoss = 정복 층 이상 보스 → 심층 판정과 동일 (전용 유니크 풀 개방)
-  return rollBuriedUniqueItem({ classId, floor, excludeIds: ownedIds, dungeonId, deep: !!isFinalBoss });
+  // deep — 정복 층 **이후**만 전용 풀 개방 (1.117.0: 정복 층 당일 포함 off-by-one 픽스).
+  // 미지정 시 기존 isFinalBoss 기준 유지 (재앙 등)
+  return rollBuriedUniqueItem({ classId, floor, excludeIds: ownedIds, dungeonId, deep: deep === null ? !!isFinalBoss : !!deep });
 }
 
 // 층 이동 시 유니크 [u102] 판정 — 25% 확률 무작위 스킬 레벨 +1
@@ -1827,7 +1796,10 @@ export function rollBuriedCurseOffer(char) {
 export function acceptBuriedCurse(char, curseId) {
   const c = getBuriedCurse(curseId);
   if (!c || hasBuriedCurse(char, curseId)) return { char, reward: null };
-  const reward = BURIED_CURSE_REWARD[c.sev];
+  // 1.117.0 — 보상이 마물 레벨을 따라 자란다 (무한층에서 저주가 계속 거래로 남도록)
+  const scale = 1 + Math.max(0, buriedMonsterLevel(char) - 1) * 0.10;
+  const base = BURIED_CURSE_REWARD[c.sev];
+  const reward = { dust: Math.round(base.dust * scale), gold: Math.round(base.gold * scale) };
   return {
     char: { ...char, curses: [...buriedCurseIds(char), curseId], gold: char.gold + reward.gold },
     reward,

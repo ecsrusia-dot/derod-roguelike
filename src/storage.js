@@ -5,7 +5,7 @@
 // 저장되는 것: 영혼, 강화 단계, 해금 항목, 클리어 기록
 // ============================================
 
-import { ENGRAVINGS, ENGRAVING_TIERS, ENEMIES, EVENTS, RELICS, PASSIVE_SKILLS, CODEX_DISCOVERY_REWARD, CODEX_COMPLETE_REWARD, backfillRaidSeries, FEATURE_FLAGS, BURIED_LEGACY_MAX, addBuriedItemToChar, buriedDustValue as buriedDustValueOf, checkBuriedEncounterUnlock } from './data.js';
+import { ENGRAVINGS, ENGRAVING_TIERS, ENEMIES, EVENTS, RELICS, PASSIVE_SKILLS, CODEX_DISCOVERY_REWARD, CODEX_COMPLETE_REWARD, backfillRaidSeries, FEATURE_FLAGS, addBuriedItemToChar, buriedDustValue as buriedDustValueOf, checkBuriedEncounterUnlock } from './data.js';
 
 const DB_NAME = 'derod_meta';
 const DB_VERSION = 1;
@@ -109,8 +109,12 @@ const DEFAULT_META = {
     deaths: 0,
     runs: 0,
     unlockedDungeons: ['labyrinth'],  // 1.104.0~ 해금된 던전 (미궁은 항상 열림)
-    unlockedClasses: [],              // 1.104.0~ 해금된 상위(전직) 직업 id
-    legacySlots: 6,                   // 1.105.0~ 유산 보관함 크기 (먼지로 최대 12칸 확장)
+    unlockedClasses: [],              // 1.104.0~ 해금된 상위(전직)·조우·심층 직업 id
+    killsByEnemy: {},                 // 1.109.0~ 조우 해금 진행
+    contracts: [],                    // 1.111.0~ 마의 계약 (영구)
+    shards: 0,                        // 1.112.0~ ☠ 죽음의 조각
+    parts: [],                        // 1.112.0~ 연구실 부품 (최대 5칸)
+    deepestByDungeon: {},             // 1.113.0~ 던전별 최고 도달 층
   },
   // 진행 중인 런 스냅샷 (맵 화면 진입 시 자동 저장 — 앱 종료/새로고침 후 이어하기 용)
   // null = 진행 중 런 없음. 객체 = 재개 가능한 런 상태.
@@ -267,6 +271,13 @@ export async function loadMeta() {
           delete nc.inventory;
           delete nc.statPoints;
           safe.buried = { ...safe.buried, char: nc, dust: (safe.buried.dust || 0) + bagDust };
+          needsImmediateSave = true;
+        }
+        // 1.117.0 무덤의 유산 — 유산 보관함 폐지 마이그레이션.
+        // 보관함에 남아 있던 장비는 전부 자동 분해해 먼지로 정산 (장비 계승 → 재화 정산 전환)
+        if (Array.isArray(safe.buried?.legacy) && safe.buried.legacy.length > 0) {
+          const legacyDust = safe.buried.legacy.reduce((s, i) => s + buriedDustValueOf(i), 0);
+          safe.buried = { ...safe.buried, legacy: [], dust: (safe.buried.dust || 0) + legacyDust };
           needsImmediateSave = true;
         }
         // 1.35.0 lanthert → wanderer 내부 코드명 변경 마이그레이션
@@ -1476,17 +1487,14 @@ export function saveBuriedChar(meta, char) {
   return { ...meta, buried: { ...b, char, deepest, deepestByDungeon } };
 }
 
-// 새 캐릭터 시작 — 1.113.0: 장착에 실제로 쓰인 유산(legacyUsedIds)만 보관함에서 차감,
-// 못 쓴 유산은 다음 캐릭터를 위해 남는다. 골드는 전액 계승.
+// 새 캐릭터 시작 — 1.117.0: 장비 계승 폐지, 계승 골드만 소비된다
 export function startBuriedChar(meta, char) {
   const b = getBuried(meta);
-  const usedIds = char?.legacyUsedIds || [];
   return {
     ...meta,
     buried: {
       ...b,
       char,
-      legacy: b.legacy.filter(it => !usedIds.includes(it.id)),
       legacyGold: 0,
       runs: (b.runs || 0) + 1,
       deepest: Math.max(b.deepest || 0, char?.floor || 1),
@@ -1494,18 +1502,16 @@ export function startBuriedChar(meta, char) {
   };
 }
 
-// 사망 — 캐릭터 소멸 + 유산 계승 (보관함 초과분은 무덤 먼지로 환산)
-export function recordBuriedDeath(meta, legacy, dustOverflow = 0) {
+// 사망 — 1.117.0: 장비 계승 폐지. 장비는 전부 먼지로 정산(settlement.dust), 골드 30%만 계승
+export function recordBuriedDeath(meta, settlement) {
   const b = getBuried(meta);
-  const merged = [...(legacy?.items || []), ...b.legacy].slice(0, b.legacySlots || BURIED_LEGACY_MAX);
   return {
     ...meta,
     buried: {
       ...b,
       char: null,
-      legacy: merged,
-      legacyGold: (b.legacyGold || 0) + (legacy?.gold || 0),
-      dust: (b.dust || 0) + dustOverflow,
+      legacyGold: (b.legacyGold || 0) + (settlement?.gold || 0),
+      dust: (b.dust || 0) + (settlement?.dust || 0),
       deaths: (b.deaths || 0) + 1,
     },
   };
@@ -1540,40 +1546,26 @@ export function addBuriedDust(meta, amount) {
   return { ...meta, buried: { ...b, dust: (b.dust || 0) + amount } };
 }
 
-// 캐릭터 포기 (로비에서 명시적 은퇴) — 유산은 사망과 동일 규칙으로 남긴다
-export function retireBuriedChar(meta, legacy) {
-  return recordBuriedDeath(meta, legacy, 0);
+// 캐릭터 포기 (로비에서 명시적 은퇴) — 정산은 사망과 동일 규칙
+export function retireBuriedChar(meta, settlement) {
+  return recordBuriedDeath(meta, settlement);
 }
 
 // ============================================
-// 무덤의 유산 1.105.0 — 재련소 + 보관함 확장 (무덤 먼지 소비처)
+// 무덤의 유산 1.105.0 — 재련소 (무덤 먼지 소비처)
 // ============================================
 
 // 재련소 제작 — 먼지를 소모하고 장비를 받는다.
-// 캐릭터가 있으면 캐릭터(스킬 레벨 동반 상승), 없으면 유산 보관함으로 (가득 차면 실패).
+// 1.117.0 — 보관함 폐지: 탐험 중인 캐릭터가 있어야만 제작 가능 ([교체/버리기] 판단으로 간다)
 export function craftBuriedForgeItem(meta, item, cost) {
   const b = getBuried(meta);
   if (!item || (b.dust || 0) < cost) return { meta, ok: false, reason: 'dust' };
-  if (b.char) {
-    const { char, raised, lv } = addBuriedItemToChar(b.char, item);
-    return {
-      meta: { ...meta, buried: { ...b, char, dust: b.dust - cost } },
-      ok: true, toChar: true, raised, lv,
-    };
-  }
-  if (b.legacy.length >= (b.legacySlots || 6)) return { meta, ok: false, reason: 'full' };
+  if (!b.char) return { meta, ok: false, reason: 'nochar' };
+  const { char, raised, lv } = addBuriedItemToChar(b.char, item);
   return {
-    meta: { ...meta, buried: { ...b, legacy: [...b.legacy, item], dust: b.dust - cost } },
-    ok: true, toChar: false,
+    meta: { ...meta, buried: { ...b, char, dust: b.dust - cost } },
+    ok: true, toChar: true, raised, lv,
   };
-}
-
-// 유산 보관함 +1칸 (최대 12)
-export function expandBuriedLegacy(meta, cost) {
-  const b = getBuried(meta);
-  const cur = b.legacySlots || 6;
-  if (cur >= 12 || (b.dust || 0) < cost) return meta;
-  return { ...meta, buried: { ...b, legacySlots: cur + 1, dust: b.dust - cost } };
 }
 
 

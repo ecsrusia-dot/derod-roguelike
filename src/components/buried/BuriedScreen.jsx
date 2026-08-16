@@ -1,31 +1,30 @@
 // ============================================
 // components/buried/BuriedScreen.jsx — 무덤의 유산 로비 (1.104.0)
 // ============================================
-// 던전 선택 / 캐릭터 생성(전직 포함) / 탐험 계속 / 유산 보관함 / 기록.
-// 원작 감성: 캐릭터는 죽어 없어지고, 남는 것은 유산뿐이다.
+// 던전 선택 / 캐릭터 생성(전직 포함) / 탐험 계속 / 재련소·계약·연구실 / 기록.
+// 1.117.0 — 장비 계승 폐지: 죽으면 장비는 전부 먼지로 정산되고, 골드 30%만 넘어간다.
 
 import React, { useState } from 'react';
-import { ChevronLeft, Skull, Package, BarChart3, Lock } from 'lucide-react';
+import { ChevronLeft, Skull, BarChart3, Lock } from 'lucide-react';
 import { PALETTE } from '../../utils/helpers.js';
 import {
   BURIED_CLASSES, BURIED_ADVANCED_CLASSES, BURIED_ENCOUNTER_CLASSES, BURIED_DUNGEONS,
-  BURIED_LEGACY_MAX, BURIED_LEGACY_GOLD_PCT, BURIED_SKILL_MAX_LV,
-  BURIED_SLOTS, BURIED_FORGE, BURIED_LEGACY_CAP_MAX,
-  buriedForgeLevel, buriedLegacyExpandCost,
+  BURIED_LEGACY_GOLD_PCT, BURIED_SKILL_MAX_LV,
+  BURIED_SLOTS, BURIED_FORGE,
+  buriedForgeLevel,
   BURIED_CONTRACTS, BURIED_CONTRACT_COST, BURIED_CONTRACT_CARRY, getBuriedContract, rollBuriedContract,
-  buriedDerived, buriedExpToNext, getBuriedClass, getBuriedDungeon, buildBuriedLegacy,
+  buriedDerived, buriedExpToNext, getBuriedClass, getBuriedDungeon, buriedDeathSettlement,
   buriedTraitIds, getBuriedTrait, buriedMonsterLevel,
   BURIED_PARTS, BURIED_PART_SLOT_COSTS, getBuriedPart, BURIED_SHARD,
   resolveBuriedLoot, buriedCheckpointFloors,
   BURIED_DEPTH_CLASSES, buriedEarnedDepthTraits,
 } from '../../data.js';
-import { BuriedItemCard, BuriedBar, BURIED_DUST_ICON, BuriedTierLegend, BuriedLootModal } from './BuriedCommon.jsx';
+import { BuriedBar, BURIED_DUST_ICON, BuriedTierLegend, BuriedLootModal } from './BuriedCommon.jsx';
 import BuriedManage from './BuriedManage.jsx';
 
-export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateChar, onRetire, onForge, onExpandLegacy, onBuyContract, onBuyPart, onDetachParts, forgeNotice, onBack }) {
+export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateChar, onRetire, onForge, onBuyContract, onBuyPart, onDetachParts, forgeNotice, onBack }) {
   const b = meta?.buried || {};
   const char = b.char || null;
-  const legacy = Array.isArray(b.legacy) ? b.legacy : [];
   const clears = (b.clears && typeof b.clears === 'object') ? b.clears : {};
   const unlockedDungeons = b.unlockedDungeons || ['labyrinth'];
   const unlockedClasses = b.unlockedClasses || [];
@@ -112,7 +111,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
               </div>
               <button onClick={() => setConfirmRetire(true)} className="ui-press w-full mt-1.5 py-2 text-[11px]"
                 style={{ color: PALETTE.textDim }}>
-                은퇴 — 유산만 남기고 이 캐릭터를 묻는다
+                은퇴 — 장비를 먼지로 정산하고 이 캐릭터를 묻는다
               </button>
             </div>
           </div>
@@ -190,7 +189,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
                   </div>
                   {pickStart > 1 && (
                     <div className="text-[11px] mt-1" style={{ color: PALETTE.textDim }}>
-                      그 층 마물 레벨에 맞춘 <b style={{ color: PALETTE.text }}>낡은 장비 6종</b>으로 시작한다 — 유산을 챙겨 가면 그만큼 유리하다.
+                      그 층 마물 레벨에 맞춘 <b style={{ color: PALETTE.text }}>낡은 장비 6종</b>으로 시작한다 — 빠르게 더 좋은 장비를 주워야 산다.
                     </div>
                   )}
                 </div>
@@ -335,7 +334,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
             )}
             <button onClick={() => onStartChar(pickClass, pickDungeon, carryPicks, pickStart)} className="ui-press ui-sheen w-full py-3 text-[13px] font-bold"
               style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.accent, color: '#fff' }}>
-              {getBuriedDungeon(pickDungeon).name}(으)로 내려간다{legacy.length > 0 ? ` — 유산 ${legacy.length}개 계승` : ''}{carryPicks.length > 0 ? ` · 계약 ${carryPicks.length}` : ''}
+              {getBuriedDungeon(pickDungeon).name}(으)로 내려간다{(b.legacyGold || 0) > 0 ? ` — 🪙 ${b.legacyGold} 계승` : ''}{carryPicks.length > 0 ? ` · 계약 ${carryPicks.length}` : ''}
             </button>
           </div>
         )}
@@ -348,7 +347,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
           <div className="px-3 py-2.5 space-y-2" style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panel, border: `1px solid ${PALETTE.panelBorder}` }}>
             <div className="text-[11px] leading-relaxed" style={{ color: PALETTE.textDim }}>
               장비를 분해해 모은 먼지로 새 장비를 벼린다. 제작 레벨은 <b style={{ color: PALETTE.text }}>역대 최고 도달 층({buriedForgeLevel(b.deepest)})</b> 기반 —
-              죽어도 남는 진행도다. {char ? '완성품은 즉시 [교체/버리기]로 판단한다.' : '완성품은 유산 보관함으로 간다.'}
+              죽어도 남는 진행도다. {char ? '완성품은 즉시 [교체/버리기]로 판단한다.' : '탐험 중인 캐릭터가 있어야 벼릴 수 있다.'}
             </div>
             <div className="flex flex-wrap gap-1">
               {BURIED_SLOTS.map(sl => (
@@ -363,26 +362,26 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
             </div>
             <div className="flex gap-2">
               <button onClick={() => onForge(forgeSlot, false, char ? char.classId : pickClass)}
-                disabled={(b.dust || 0) < BURIED_FORGE.randomCost}
+                disabled={(b.dust || 0) < BURIED_FORGE.randomCost || !char}
                 className="ui-press flex-1 py-2 text-[12px] font-bold"
                 style={{
                   borderRadius: 'var(--r-btn, 13px)',
-                  background: (b.dust || 0) >= BURIED_FORGE.randomCost ? PALETTE.panelLight : PALETTE.panel,
+                  background: ((b.dust || 0) >= BURIED_FORGE.randomCost && char) ? PALETTE.panelLight : PALETTE.panel,
                   border: `1px solid ${PALETTE.dawn}55`,
-                  color: (b.dust || 0) >= BURIED_FORGE.randomCost ? PALETTE.dawn : PALETTE.textDim,
-                  opacity: (b.dust || 0) >= BURIED_FORGE.randomCost ? 1 : 0.5,
+                  color: ((b.dust || 0) >= BURIED_FORGE.randomCost && char) ? PALETTE.dawn : PALETTE.textDim,
+                  opacity: ((b.dust || 0) >= BURIED_FORGE.randomCost && char) ? 1 : 0.5,
                 }}>
                 랜덤 제작 {BURIED_DUST_ICON}{BURIED_FORGE.randomCost}
               </button>
               <button onClick={() => onForge(forgeSlot, true, char ? char.classId : pickClass)}
-                disabled={(b.dust || 0) < BURIED_FORGE.epicCost}
+                disabled={(b.dust || 0) < BURIED_FORGE.epicCost || !char}
                 className="ui-press flex-1 py-2 text-[12px] font-bold"
                 style={{
                   borderRadius: 'var(--r-btn, 13px)',
-                  background: (b.dust || 0) >= BURIED_FORGE.epicCost ? PALETTE.panelLight : PALETTE.panel,
+                  background: ((b.dust || 0) >= BURIED_FORGE.epicCost && char) ? PALETTE.panelLight : PALETTE.panel,
                   border: `1px solid ${PALETTE.legendary}66`,
-                  color: (b.dust || 0) >= BURIED_FORGE.epicCost ? PALETTE.legendary : PALETTE.textDim,
-                  opacity: (b.dust || 0) >= BURIED_FORGE.epicCost ? 1 : 0.5,
+                  color: ((b.dust || 0) >= BURIED_FORGE.epicCost && char) ? PALETTE.legendary : PALETTE.textDim,
+                  opacity: ((b.dust || 0) >= BURIED_FORGE.epicCost && char) ? 1 : 0.5,
                 }}>
                 영웅급 확정 {BURIED_DUST_ICON}{BURIED_FORGE.epicCost}
               </button>
@@ -505,36 +504,13 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
           </div>
         </div>
 
-        {/* ===== 유산 보관함 ===== */}
-        <div>
-          <div className="text-[11px] tracking-[0.25em] mb-1.5 flex items-center justify-between" style={{ color: PALETTE.dawn }}>
-            <span className="flex items-center gap-1.5"><Package size={12} /> 유산 보관함 — {legacy.length} / {b.legacySlots || BURIED_LEGACY_MAX}</span>
-            {(b.legacySlots || BURIED_LEGACY_MAX) < BURIED_LEGACY_CAP_MAX && (
-              <button onClick={onExpandLegacy} disabled={(b.dust || 0) < buriedLegacyExpandCost(b.legacySlots || BURIED_LEGACY_MAX)}
-                className="ui-press px-2 py-1 text-[11px]"
-                style={{
-                  borderRadius: 'var(--r-chip, 8px)', border: `1px solid ${PALETTE.dawn}55`,
-                  color: (b.dust || 0) >= buriedLegacyExpandCost(b.legacySlots || BURIED_LEGACY_MAX) ? PALETTE.dawn : PALETTE.textDim,
-                  opacity: (b.dust || 0) >= buriedLegacyExpandCost(b.legacySlots || BURIED_LEGACY_MAX) ? 1 : 0.5,
-                }}>
-                +1칸 {BURIED_DUST_ICON}{buriedLegacyExpandCost(b.legacySlots || BURIED_LEGACY_MAX)}
-              </button>
-            )}
-          </div>
-          <div className="px-3 py-2 mb-1.5 text-[11px] leading-relaxed"
+        {/* ===== 계승 골드 (1.117.0 — 장비 계승 폐지, 사망 시 전 장비 먼지 정산) ===== */}
+        {(b.legacyGold || 0) > 0 && (
+          <div className="px-3 py-2 text-[11px] leading-relaxed"
             style={{ borderRadius: 'var(--r-chip, 8px)', background: PALETTE.panel, border: `1px solid ${PALETTE.panelBorder}`, color: PALETTE.textDim }}>
-            캐릭터가 죽으면 장착 중이던 장비 <b style={{ color: PALETTE.text }}>1~3개</b>(깊이에 비례)와 골드의{' '}
-            <b style={{ color: PALETTE.text }}>{BURIED_LEGACY_GOLD_PCT}%</b>가 여기 남는다. 다음 캐릭터가 시작할 때 자동으로 물려받는다.
-            {(b.legacyGold || 0) > 0 && <> 현재 계승 대기 골드 <b style={{ color: PALETTE.legendary }}>🪙 {b.legacyGold}</b>.</>}
+            🪙 계승 대기 골드 <b style={{ color: PALETTE.legendary }}>{b.legacyGold}</b> — 다음 캐릭터가 시작할 때 자동으로 물려받는다.
           </div>
-          {legacy.length === 0
-            ? <div className="text-[12px] px-3 py-3" style={{ color: PALETTE.textDim, background: PALETTE.panel, borderRadius: 'var(--r-btn, 13px)' }}>
-                아직 아무도 묻히지 않았다.
-              </div>
-            : <div className="space-y-1.5">
-                {legacy.map(i => <BuriedItemCard key={i.id} item={i} showSlot />)}
-              </div>}
-        </div>
+        )}
 
         {/* ===== 기록 ===== */}
         <div>
@@ -544,7 +520,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
           <div className="grid grid-cols-4 gap-1.5">
             {[
               { l: '최고 층', v: b.deepest || 0, c: PALETTE.legendary },
-              { l: '클리어', v: Object.values(clears).reduce((s, n) => s + n, 0), c: PALETTE.green },
+              { l: '정복', v: Object.values(clears).reduce((s, n) => s + n, 0), c: PALETTE.green },
               { l: '사망', v: b.deaths || 0, c: PALETTE.accent },
               { l: '캐릭터', v: b.runs || 0, c: PALETTE.ice },
             ].map(x => (
@@ -594,11 +570,11 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
               <Skull size={14} /> 이 캐릭터를 묻는다
             </div>
             <div className="text-[12px] leading-relaxed mb-3" style={{ color: PALETTE.textDim }}>
-              {cls?.name} Lv.{char.lv}는 사라진다. 사망과 동일하게 장착 장비 일부와 골드 {BURIED_LEGACY_GOLD_PCT}%만 유산으로 남는다.
+              {cls?.name} Lv.{char.lv}는 사라진다. 장착 장비는 전부 분해되어 🕯먼지로 정산되고, 골드 {BURIED_LEGACY_GOLD_PCT}%만 다음 캐릭터에게 넘어간다.
               <b style={{ color: PALETTE.text }}> 되돌릴 수 없다.</b>
             </div>
             <div className="flex gap-2">
-              <button onClick={() => { setConfirmRetire(false); onRetire(buildBuriedLegacy(char)); }}
+              <button onClick={() => { setConfirmRetire(false); onRetire(char); }}
                 className="ui-press flex-1 py-2.5 text-[12px] font-bold"
                 style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.accent, color: '#fff' }}>묻는다</button>
               <button onClick={() => setConfirmRetire(false)} className="ui-press flex-1 py-2.5 text-[12px]"
