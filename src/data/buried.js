@@ -416,12 +416,12 @@ export function createBuriedChar(classId, legacy = { items: [], gold: 0 }, dunge
   return char;
 }
 
-// 1.114.0 — 체크포인트 층 목록. 던전별 최고 도달 층 기준 100층 단위 (100, 200, …)
+// 1.114.0 — 체크포인트 층 목록. 1.120.0 — 100층 수문장을 **격파**(F+1층 도달)해야 그 관문이 열리고,
+// 재출발은 관문 너머(F+1층)부터 시작한다 (수문장 앞 리스폰 데드락 방지)
 export const BURIED_CHECKPOINT_UNIT = 100;
 export function buriedCheckpointFloors(deepestFloor) {
   const out = [];
-  const top = Math.floor((deepestFloor || 0) / BURIED_CHECKPOINT_UNIT) * BURIED_CHECKPOINT_UNIT;
-  for (let f = BURIED_CHECKPOINT_UNIT; f <= top; f += BURIED_CHECKPOINT_UNIT) out.push(f);
+  for (let f = BURIED_CHECKPOINT_UNIT; f + 1 <= (deepestFloor || 0); f += BURIED_CHECKPOINT_UNIT) out.push(f);
   return out;
 }
 
@@ -623,8 +623,279 @@ export const BURIED_ENEMIES = {
       { name: '망자의 군세', kind: 'defend', self: [{ s: 'guard', n: 4 }, { s: 'rage', n: 4 }], weight: 1 },
     ],
   },
+
+  // =========================================================
+  // 1.120.0 — 적 풀 대확장 (PM 지시: 모든 일러 풀 활용). 24종 신규.
+  // dungeons 필드가 있으면 그 던전에서만 등장 (없으면 전 던전 공용) — 던전 정체성 강화
+  // =========================================================
+  // ── 공용 (전 던전) ──
+  paleWraith: {
+    key: 'paleWraith', name: '창백한 원혼', img: { key: 'wraith', chapter: 1 }, color: '#9db8cc',
+    desc: '무덤의 한기에 얼어붙은 원혼.', tier: 'normal', minFloor: 2, maxFloor: 6,
+    hp: 150, atk: 18, def: 2, exp: 30, gold: [26, 48],
+    actions: [
+      { name: '원한의 손길', power: 96, kind: 'attack', apply: [{ s: 'curse', n: 1, p: 70 }], weight: 3 },
+      { name: '한기 서린 절규', power: 60, kind: 'attack', apply: [{ s: 'weaken', n: 2, p: 100 }], weight: 2 },
+    ],
+  },
+  frostShaman: {
+    key: 'frostShaman', name: '언 뼈의 주술사', img: { key: 'iceMage', chapter: 1 }, color: '#7ba3c4',
+    desc: '제 뼈를 얼려 지팡이로 쓰는 망자.', tier: 'normal', minFloor: 3, maxFloor: 7,
+    hp: 165, atk: 21, def: 3, exp: 38, gold: [30, 56],
+    actions: [
+      { name: '얼음 파편', power: 88, kind: 'attack', hits: 2, weight: 3 },
+      { name: '동결 주문', power: 70, kind: 'attack', apply: [{ s: 'bind', n: 2, p: 80 }], weight: 2 },
+      { name: '얼음 장막', kind: 'defend', self: [{ s: 'guard', n: 3 }], weight: 1 },
+    ],
+  },
+  duskChild: {
+    key: 'duskChild', name: '땅거미 아이', img: { key: 'twilightChild', chapter: 2 }, color: '#5c4a8c',
+    desc: '해가 지는 쪽만 바라보는 작은 그림자.', tier: 'normal', minFloor: 4, maxFloor: 8,
+    hp: 185, atk: 22, def: 4, exp: 44, gold: [34, 62],
+    actions: [
+      { name: '그림자 할큄', power: 92, kind: 'attack', hits: 2, weight: 3 },
+      { name: '어리광', power: 55, kind: 'attack', apply: [{ s: 'confuse', n: 1, p: 70 }], weight: 2 },
+    ],
+  },
+  paleElf: {
+    key: 'paleElf', name: '창백한 사수', img: { key: 'fallenElf', chapter: 2 }, color: '#7a9a5e',
+    desc: '활시위를 놓지 못한 채 굳어버린 궁수.', tier: 'normal', minFloor: 5, maxFloor: 9,
+    hp: 200, atk: 25, def: 5, exp: 52, gold: [40, 70],
+    actions: [
+      { name: '연속 사격', power: 74, kind: 'attack', hits: 3, weight: 3 },
+      { name: '심장 조준', power: 150, kind: 'attack', heavy: true, weight: 2 },
+    ],
+  },
+  // ── 🌀 미궁 전용 (석조·봉인) ──
+  stoneServant: {
+    key: 'stoneServant', name: '석조 시종', img: { key: 'brokenGolem', chapter: 3 }, color: '#8b8378',
+    desc: '부서진 채로도 명령을 기다리는 골렘.', tier: 'normal', minFloor: 1, maxFloor: 5, dungeons: ['labyrinth'],
+    hp: 175, atk: 17, def: 7, exp: 32, gold: [26, 48],
+    actions: [
+      { name: '돌주먹', power: 105, kind: 'attack', weight: 3 },
+      { name: '균열 강타', power: 88, kind: 'attack', apply: [{ s: 'shatter', n: 2, p: 100 }], weight: 2 },
+      { name: '석화 자세', kind: 'defend', self: [{ s: 'guard', n: 3 }], weight: 1 },
+    ],
+  },
+  sealPriest: {
+    key: 'sealPriest', name: '봉인 사제', img: { key: 'ancientPriest', chapter: 3 }, color: '#c9a86a',
+    desc: '미궁의 문을 잠근 기도문을 아직 외운다.', tier: 'normal', minFloor: 3, maxFloor: 8, dungeons: ['labyrinth'],
+    hp: 170, atk: 22, def: 4, exp: 42, gold: [34, 60],
+    actions: [
+      { name: '심판의 빛', power: 98, kind: 'attack', weight: 3 },
+      { name: '봉인 기도', power: 58, kind: 'attack', apply: [{ s: 'silence', n: 2, p: 80 }], weight: 2 },
+      { name: '축성', kind: 'defend', self: [{ s: 'regen', n: 4 }], weight: 1 },
+    ],
+  },
+  hourglassKeeper: {
+    key: 'hourglassKeeper', name: '모래시계지기', img: { key: 'timeKeeper', chapter: 3 }, color: '#b8a3d4',
+    desc: '미궁의 시간을 세는 자. 셈이 끝나면 늙는다.', tier: 'normal', minFloor: 5, maxFloor: 10, dungeons: ['labyrinth'],
+    hp: 205, atk: 26, def: 5, exp: 56, gold: [42, 74],
+    actions: [
+      { name: '시간 베기', power: 102, kind: 'attack', apply: [{ s: 'aging', n: 1, p: 80 }], weight: 3 },
+      { name: '모래 폭풍', power: 78, kind: 'attack', hits: 2, apply: [{ s: 'weaken', n: 2, p: 60 }], weight: 2 },
+    ],
+  },
+  oblivionWarden: {
+    key: 'oblivionWarden', name: '망각의 간수', img: { key: 'oblivionSealer', chapter: 3 }, color: '#5c4a8c',
+    desc: '길을 묻는 자의 기억부터 지운다.', tier: 'elite', minFloor: 4, maxFloor: 10, dungeons: ['labyrinth'],
+    hp: 360, atk: 38, def: 13, exp: 168, gold: [120, 200],
+    actions: [
+      { name: '망각의 인장', power: 96, kind: 'attack', apply: [{ s: 'silence', n: 2, p: 100 }, { s: 'curse', n: 2, p: 70 }], weight: 3 },
+      { name: '기억 붕괴', power: 168, kind: 'attack', heavy: true, apply: [{ s: 'confuse', n: 2, p: 60 }], weight: 2 },
+      { name: '봉인 결계', kind: 'defend', self: [{ s: 'guard', n: 4 }, { s: 'wall', n: 1 }], weight: 1 },
+    ],
+  },
+  // ── 🌊 폐허 전용 (물·부패·숲) ──
+  bogHusk: {
+    key: 'bogHusk', name: '늪지 껍데기', img: { key: 'champ_forest_husk', chapter: 'forest_1' }, color: '#7a9a5e',
+    desc: '물을 머금어 퉁퉁 불은 망자.', tier: 'normal', minFloor: 1, maxFloor: 5, dungeons: ['ruins'],
+    hp: 160, atk: 17, def: 4, exp: 30, gold: [24, 46],
+    actions: [
+      { name: '썩은 주먹', power: 100, kind: 'attack', apply: [{ s: 'poison', n: 2, p: 70 }], weight: 3 },
+      { name: '오물 뱉기', power: 62, kind: 'attack', apply: [{ s: 'weaken', n: 2, p: 100 }], weight: 2 },
+    ],
+  },
+  thornCreeper: {
+    key: 'thornCreeper', name: '가시 넝쿨', img: { key: 'champ_forest_thornling', chapter: 'forest_1' }, color: '#5e7a3e',
+    desc: '폐허의 물길을 따라 자란 육식 덩굴.', tier: 'normal', minFloor: 2, maxFloor: 6, dungeons: ['ruins'],
+    hp: 180, atk: 19, def: 5, exp: 36, gold: [28, 52],
+    actions: [
+      { name: '가시 채찍', power: 84, kind: 'attack', hits: 2, apply: [{ s: 'bleed', n: 2, p: 70 }], weight: 3 },
+      { name: '휘감기', power: 55, kind: 'attack', apply: [{ s: 'bind', n: 2, p: 90 }], weight: 2 },
+    ],
+  },
+  mireLeopard: {
+    key: 'mireLeopard', name: '수렁 표범', img: { key: 'champ_forest_leopard', chapter: 'forest_2' }, color: '#8b6f4d',
+    desc: '흙탕물 속에서 숨을 참고 기다린다.', tier: 'normal', minFloor: 4, maxFloor: 8, dungeons: ['ruins'],
+    hp: 195, atk: 26, def: 4, exp: 48, gold: [36, 66],
+    actions: [
+      { name: '기습 도약', power: 118, kind: 'attack', weight: 3 },
+      { name: '물어 찢기', power: 82, kind: 'attack', hits: 2, apply: [{ s: 'bleed', n: 3, p: 80 }], weight: 2 },
+    ],
+  },
+  rotDryad: {
+    key: 'rotDryad', name: '부패한 드라이어드', img: { key: 'champ_forest_dryad', chapter: 'forest_2' }, color: '#7a9a5e',
+    desc: '나무는 죽었지만 정령은 놓아주지 않았다.', tier: 'normal', minFloor: 5, maxFloor: 10, dungeons: ['ruins'],
+    hp: 215, atk: 27, def: 6, exp: 58, gold: [42, 76],
+    actions: [
+      { name: '부패의 포자', power: 88, kind: 'attack', apply: [{ s: 'poison', n: 3, p: 100 }], weight: 3 },
+      { name: '수액 흡수', power: 76, kind: 'attack', drain: 55, weight: 2 },
+      { name: '재생', kind: 'defend', self: [{ s: 'regen', n: 5 }], weight: 1 },
+    ],
+  },
+  fenTiger: {
+    key: 'fenTiger', name: '늪의 맹호', img: { key: 'champ_forest_tiger', chapter: 'forest_3' }, color: '#c47a3d',
+    desc: '폐허의 물가를 다스리던 짐승의 왕.', tier: 'elite', minFloor: 3, maxFloor: 9, dungeons: ['ruins'],
+    hp: 350, atk: 40, def: 11, exp: 160, gold: [115, 195],
+    actions: [
+      { name: '연속 발톱', power: 92, kind: 'attack', hits: 3, weight: 3 },
+      { name: '포효 도약', power: 185, kind: 'attack', heavy: true, apply: [{ s: 'stun', n: 1, p: 25 }], weight: 2 },
+    ],
+  },
+  plagueWitch: {
+    key: 'plagueWitch', name: '역병의 마녀', img: { key: 'champ_forest_witch', chapter: 'forest_3' }, color: '#a8556e',
+    desc: '물에 잠긴 도시에 병을 풀어놓은 장본인.', tier: 'elite', minFloor: 5, maxFloor: 10, dungeons: ['ruins'],
+    hp: 380, atk: 42, def: 12, exp: 180, gold: [130, 215],
+    actions: [
+      { name: '역병 살포', power: 84, kind: 'attack', apply: [{ s: 'poison', n: 4, p: 100 }, { s: 'weaken', n: 2, p: 70 }], weight: 3 },
+      { name: '곪은 저주', power: 66, kind: 'attack', apply: [{ s: 'curse', n: 3, p: 100 }], weight: 2 },
+      { name: '병독 안개', kind: 'defend', self: [{ s: 'evade', n: 3 }, { s: 'regen', n: 4 }], weight: 1 },
+    ],
+  },
+  // ── 🕳 나락 전용 (균열·마족) ──
+  riftScout: {
+    key: 'riftScout', name: '균열 정찰병', img: { key: 'demonScout', chapter: 4 }, color: '#c4453d',
+    desc: '나락의 틈새로 먼저 내려온 마족.', tier: 'normal', minFloor: 1, maxFloor: 5, dungeons: ['chasm'],
+    hp: 165, atk: 19, def: 4, exp: 34, gold: [28, 50],
+    actions: [
+      { name: '균열 단검', power: 102, kind: 'attack', weight: 3 },
+      { name: '표식 새기기', power: 58, kind: 'attack', apply: [{ s: 'weaken', n: 2, p: 100 }], weight: 2 },
+    ],
+  },
+  crevasseImp: {
+    key: 'crevasseImp', name: '틈새 임프', img: { key: 'riftBreach', chapter: 4 }, color: '#8b1f5c',
+    desc: '균열 자체가 의지를 갖고 걸어다닌다.', tier: 'normal', minFloor: 3, maxFloor: 7, dungeons: ['chasm'],
+    hp: 185, atk: 24, def: 4, exp: 44, gold: [34, 62],
+    actions: [
+      { name: '공간 절단', power: 96, kind: 'attack', pierce: true, weight: 3 },
+      { name: '중력 왜곡', power: 60, kind: 'attack', apply: [{ s: 'bind', n: 2, p: 80 }], weight: 2 },
+    ],
+  },
+  abyssApostle: {
+    key: 'abyssApostle', name: '나락의 사도', img: { key: 'demonApostle', chapter: 4 }, color: '#7d2b4a',
+    desc: '떨어지는 자들을 축복하는 검은 사제.', tier: 'normal', minFloor: 5, maxFloor: 10, dungeons: ['chasm'],
+    hp: 210, atk: 28, def: 6, exp: 58, gold: [44, 78],
+    actions: [
+      { name: '타락의 설교', power: 90, kind: 'attack', apply: [{ s: 'curse', n: 2, p: 100 }], weight: 3 },
+      { name: '피의 성찬', power: 80, kind: 'attack', drain: 60, weight: 2 },
+      { name: '검은 축도', kind: 'defend', self: [{ s: 'rage', n: 3 }], weight: 1 },
+    ],
+  },
+  wrathSpawn: {
+    key: 'wrathSpawn', name: '분노의 파생체', img: { key: 'wrathDemon', chapter: 4 }, color: '#c4453d',
+    desc: '분노만 남아 몸을 얻은 것.', tier: 'elite', minFloor: 3, maxFloor: 10, dungeons: ['chasm'],
+    hp: 355, atk: 42, def: 11, exp: 165, gold: [118, 198],
+    actions: [
+      { name: '광란 난타', power: 78, kind: 'attack', hits: 3, weight: 3 },
+      { name: '분노 폭발', power: 195, kind: 'attack', heavy: true, weight: 2 },
+      { name: '피의 격노', kind: 'defend', self: [{ s: 'rage', n: 4 }], weight: 1 },
+    ],
+  },
+  // ── 🌑 심연 전용 (어둠·서리) ──
+  gloomImp: {
+    key: 'gloomImp', name: '어스름 임프', img: { key: 'champ_frost_imp', chapter: 'frost_1' }, color: '#7ba3c4',
+    desc: '어둠 속에서 킬킬대는 작은 것.', tier: 'normal', minFloor: 1, maxFloor: 5, dungeons: ['abyss'],
+    hp: 170, atk: 20, def: 4, exp: 36, gold: [30, 54],
+    actions: [
+      { name: '얼음 발톱', power: 98, kind: 'attack', weight: 3 },
+      { name: '낄낄대기', power: 52, kind: 'attack', apply: [{ s: 'confuse', n: 1, p: 60 }], weight: 2 },
+    ],
+  },
+  nightLurker: {
+    key: 'nightLurker', name: '밤의 잠복자', img: { key: 'champ_frost_lurker', chapter: 'frost_2' }, color: '#5c4a8c',
+    desc: '보이지 않는 곳에서만 숨 쉬는 짐승.', tier: 'normal', minFloor: 3, maxFloor: 7, dungeons: ['abyss'],
+    hp: 190, atk: 26, def: 5, exp: 48, gold: [36, 66],
+    actions: [
+      { name: '암습', power: 122, kind: 'attack', weight: 3 },
+      { name: '어둠 속으로', kind: 'defend', self: [{ s: 'evade', n: 3 }], weight: 1 },
+    ],
+  },
+  frostSeer: {
+    key: 'frostSeer', name: '서리 예언자', img: { key: 'champ_frost_seer', chapter: 'frost_2' }, color: '#9db8cc',
+    desc: '모든 죽음을 미리 봤다고 속삭인다.', tier: 'normal', minFloor: 5, maxFloor: 10, dungeons: ['abyss'],
+    hp: 215, atk: 29, def: 6, exp: 60, gold: [46, 80],
+    actions: [
+      { name: '예언 — 동결', power: 92, kind: 'attack', apply: [{ s: 'bind', n: 2, p: 80 }], weight: 3 },
+      { name: '예언 — 침묵', power: 66, kind: 'attack', apply: [{ s: 'silence', n: 2, p: 70 }], weight: 2 },
+      { name: '운명 왜곡', kind: 'defend', self: [{ s: 'guard', n: 3 }, { s: 'regen', n: 3 }], weight: 1 },
+    ],
+  },
+  voidBrute: {
+    key: 'voidBrute', name: '공허의 만행자', img: { key: 'champ_frost_brute', chapter: 'frost_3' }, color: '#4a5a7a',
+    desc: '어둠을 삼켜 몸집을 불린 거인.', tier: 'elite', minFloor: 3, maxFloor: 9, dungeons: ['abyss'],
+    hp: 370, atk: 41, def: 14, exp: 172, gold: [122, 205],
+    actions: [
+      { name: '어둠 후려치기', power: 128, kind: 'attack', apply: [{ s: 'shatter', n: 3, p: 100 }], weight: 3 },
+      { name: '침묵의 압살', power: 190, kind: 'attack', heavy: true, apply: [{ s: 'silence', n: 1, p: 50 }], weight: 2 },
+      { name: '공허 갑주', kind: 'defend', self: [{ s: 'guard', n: 4 }, { s: 'wall', n: 1 }], weight: 1 },
+    ],
+  },
+  frostRevenant: {
+    key: 'frostRevenant', name: '서리 귀환자', img: { key: 'champ_frost_revenant', chapter: 'frost_3' }, color: '#7ba3c4',
+    desc: '심연에서 얼어 죽고, 얼어붙은 채 되돌아왔다.', tier: 'elite', minFloor: 5, maxFloor: 10, dungeons: ['abyss'],
+    hp: 390, atk: 44, def: 12, exp: 188, gold: [135, 225],
+    actions: [
+      { name: '원귀의 낫', power: 104, kind: 'attack', hits: 2, apply: [{ s: 'bleed', n: 2, p: 70 }], weight: 3 },
+      { name: '동토의 절규', power: 88, kind: 'attack', apply: [{ s: 'weaken', n: 3, p: 100 }, { s: 'aging', n: 1, p: 50 }], weight: 2 },
+      { name: '망자의 인내', kind: 'defend', self: [{ s: 'regen', n: 5 }, { s: 'guard', n: 3 }], weight: 1 },
+    ],
+  },
+
+  // =========================================================
+  // 1.120.0 — 🚪 층계 수문장 (PM 지시: 100층 단위 초강력 플로어 보스, 재앙보다 훨씬 강하게)
+  // 100·200·300…층을 지키며, 격파해야 그 너머 체크포인트가 열린다. 로테이션 3종.
+  // =========================================================
+  gateWraithKing: {
+    key: 'gateWraithKing', name: '수문장 — 무형의 망령왕', img: { key: 'champ_frost_boss4', chapter: 'frost_4' }, color: '#9db8cc',
+    desc: '백 층마다 하나씩, 문이 있다. 이것이 첫 번째 문지기다.',
+    tier: 'boss', minFloor: 10, maxFloor: 10, guardian: true,
+    hp: 1050, atk: 54, def: 20, exp: 2400, gold: [900, 1400],
+    actions: [
+      { name: '망령의 해일', power: 88, kind: 'attack', hits: 3, apply: [{ s: 'curse', n: 2, p: 100 }], weight: 3 },
+      { name: '혼백 찢기', power: 132, kind: 'attack', pierce: true, apply: [{ s: 'silence', n: 2, p: 70 }], weight: 2 },
+      { name: '왕의 종언', power: 235, kind: 'attack', heavy: true, apply: [{ s: 'stun', n: 1, p: 40 }], weight: 2 },
+      { name: '무형화', kind: 'defend', self: [{ s: 'evade', n: 4 }, { s: 'wall', n: 1 }, { s: 'regen', n: 5 }], weight: 1 },
+    ],
+  },
+  gateMaestro: {
+    key: 'gateMaestro', name: '수문장 — 종막의 마에스트로', img: { key: 'champ_forest_boss4', chapter: 'forest_4' }, color: '#a8556e',
+    desc: '두 번째 문지기. 그의 지휘가 끝나면 막이 내린다.',
+    tier: 'boss', minFloor: 10, maxFloor: 10, guardian: true,
+    hp: 1150, atk: 57, def: 22, exp: 3000, gold: [1000, 1600],
+    actions: [
+      { name: '광기의 서곡', power: 92, kind: 'attack', hits: 2, apply: [{ s: 'confuse', n: 2, p: 80 }], weight: 3 },
+      { name: '부패의 간주곡', power: 84, kind: 'attack', apply: [{ s: 'poison', n: 4, p: 100 }, { s: 'bleed', n: 3, p: 100 }], weight: 2 },
+      { name: '종막의 카덴차', power: 250, kind: 'attack', heavy: true, apply: [{ s: 'shatter', n: 5, p: 100 }], weight: 2 },
+      { name: '지휘 — 재생', kind: 'defend', self: [{ s: 'regen', n: 6 }, { s: 'rage', n: 3 }, { s: 'wall', n: 1 }], weight: 1 },
+    ],
+  },
+  gateNakzelion: {
+    key: 'gateNakzelion', name: '수문장 — 낙젤리온', img: { key: 'nakzelionShadow', chapter: 4 }, color: '#4a1f5c',
+    desc: '세 번째 문. 그림자가 아니라, 본체가 기다린다.',
+    tier: 'boss', minFloor: 10, maxFloor: 10, guardian: true,
+    hp: 1250, atk: 61, def: 24, exp: 4000, gold: [1200, 1900],
+    actions: [
+      { name: '심연 발톱', power: 96, kind: 'attack', hits: 3, apply: [{ s: 'bleed', n: 3, p: 100 }], weight: 3 },
+      { name: '지옥의 응시', power: 90, kind: 'attack', apply: [{ s: 'curse', n: 3, p: 100 }, { s: 'aging', n: 2, p: 70 }], weight: 2 },
+      { name: '멸절의 파도', power: 270, kind: 'attack', heavy: true, pierce: true, weight: 2 },
+      { name: '어둠의 육신', kind: 'defend', self: [{ s: 'guard', n: 5 }, { s: 'wall', n: 2 }], weight: 1 },
+    ],
+  },
 };
 export const BURIED_ENEMY_LIST = Object.values(BURIED_ENEMIES);
+// 수문장 로테이션 — 100층 망령왕 → 200층 마에스트로 → 300층 낙젤리온 → 반복
+export const BURIED_GUARDIAN_KEYS = ['gateWraithKing', 'gateMaestro', 'gateNakzelion'];
 
 // =========================================================
 // 9. 던전 — 층 진행 + 방 선택
@@ -735,6 +1006,8 @@ export const BURIED_TUNING = {
   // 점근 비율이 정해져 있어(구조적), 압력 2배 = 실질 벽. 100층(PM 체크포인트 단위)이
   // "엘리트 빌드의 이정표"가 되도록 100층 ≈ ×1.9 / 200층 ≈ ×2.9로 조정 (시뮬 검증)
   depthPressurePerFloor: 0.01,
+  depthStep50: 1.5,   // 1.120.0 — 50층 통과마다 ×1.5 (PM 지시)
+  depthStep100: 2,    // 1.120.0 — 100층 통과마다 ×2 (50층분 대신 — 100층 계단은 1.5가 아니라 2)
 };
 
 const stacksOf = (u, key) => (u?.statuses?.[key] || 0);
@@ -922,6 +1195,10 @@ export function advanceBuriedFloor(char) {
 // 1.113.0 — 무한층 보스 배치. 정복 층까지는 기존 bossFloors, 그 뒤로는 같은 간격으로 보스 로테이션.
 // 예) 미궁(5·10) → 15·20·25…층마다 봉인의 마녀 → 무덤의 폭군 → 반복
 export function buriedBossKeyAt(dg, floor) {
+  // 1.120.0 — 100층 단위 층계 수문장 (일반 보스 로테이션보다 우선)
+  if (floor > 0 && floor % 100 === 0) {
+    return BURIED_GUARDIAN_KEYS[(Math.floor(floor / 100) - 1) % BURIED_GUARDIAN_KEYS.length];
+  }
   if (dg.bossFloors[floor]) return dg.bossFloors[floor];
   if (floor <= dg.floors) return null;
   const bossFloorList = Object.keys(dg.bossFloors).map(Number).sort((a, b) => a - b);
@@ -950,8 +1227,10 @@ export function buildBuriedRoomEnemy(char, roomType, roomEffectId = null) {
   if (!key) {
     const tier = roomType === 'elite' ? 'elite' : 'normal';
     const band = Math.min(10, Math.max(1, Math.round(monLevel * 0.8)));
-    const pool = BURIED_ENEMY_LIST.filter(e => e.tier === tier && band >= e.minFloor && band <= e.maxFloor);
-    const fallback = BURIED_ENEMY_LIST.filter(e => e.tier === tier);
+    // 1.120.0 — dungeons 필드가 있는 적은 그 던전에서만 (던전 정체성 강화)
+    const inDungeon = (e) => !e.dungeons || e.dungeons.includes(dg.id);
+    const pool = BURIED_ENEMY_LIST.filter(e => e.tier === tier && inDungeon(e) && band >= e.minFloor && band <= e.maxFloor);
+    const fallback = BURIED_ENEMY_LIST.filter(e => e.tier === tier && inDungeon(e) && !e.guardian);
     key = pick(pool.length > 0 ? pool : fallback).key;
   }
   let enemy = buriedEnemyAtLevel(key, monLevel);
@@ -963,10 +1242,17 @@ export function buildBuriedRoomEnemy(char, roomType, roomEffectId = null) {
   return { ...enemy, roomType, isBoss: roomType === 'boss' };
 }
 
-// 깊이의 압력 배율 — 정복 층 이후 층당 +1% 선형 (BURIED_TUNING.depthPressurePerFloor)
+// 깊이의 압력 배율 (1.120.0 PM 지시: "난이도가 아직도 너무 낮다")
+//   = 선형(정복 층 이후 층당 +1%) × 계단(50층 통과마다 ×1.5, 100층 통과는 ×2)
+//   예) 50층 ×1.5 / 100층 ×3×선형 / 150층 ×4.5 / 200층 ×9 — 체크포인트 시작 장비는 자동 보정됨
 export function buriedDepthPressure(dg, floor) {
-  const over = Math.max(0, (floor || 1) - dg.floors);
-  return 1 + over * (BURIED_TUNING.depthPressurePerFloor || 0);
+  const f = floor || 1;
+  const over = Math.max(0, f - dg.floors);
+  const linear = 1 + over * (BURIED_TUNING.depthPressurePerFloor || 0);
+  const hundreds = Math.floor(f / 100);
+  const fiftiesOnly = Math.floor(f / 50) - hundreds;
+  const step = Math.pow(BURIED_TUNING.depthStep50 || 1.5, fiftiesOnly) * Math.pow(BURIED_TUNING.depthStep100 || 2, hundreds);
+  return linear * step;
 }
 
 // =========================================================

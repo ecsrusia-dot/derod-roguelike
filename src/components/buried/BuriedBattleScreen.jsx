@@ -265,10 +265,12 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
       const gold = Math.round(rnd(enemy.gold[0], enemy.gold[1]) * goldMult);
       const exp = Math.round(enemy.exp * dungeon.expMult * (uq('u40') ? 2 : 1) * (1 + ((cf.expPct || 0) + (pf.expPct || 0)) / 100));
       const bossy = roomType === 'boss' || roomType === 'calamity';
+      // 1.120.0 — 층계 수문장 (100층 단위): 유니크 확정 + 드랍 운 대폭
+      const guardianFight = roomType === 'boss' && (char.floor || 1) % 100 === 0;
       // [dl4] 유산 도굴사 — 드랍 확률 +20%p
       const dropChance = bossy || roomType === 'elite' ? 100 : Math.min(100, 38 + (uq('dl4') ? 20 : 0));
       const drops = [];
-      const luck = dungeon.dropLuck + (cf.dropLuck || 0) + (pf.dropLuck || 0) + (bossy ? 6 : roomType === 'elite' ? 3 : 0);
+      const luck = dungeon.dropLuck + (cf.dropLuck || 0) + (pf.dropLuck || 0) + (guardianFight ? 12 : bossy ? 6 : roomType === 'elite' ? 3 : 0);
       if (Math.random() * 100 < dropChance) {
         const it = rollBuriedItem({ slot: null, classId: char.classId, floor: enemy.lv || char.floor, luck });
         if (it) drops.push(it);
@@ -288,7 +290,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
           classId: char.classId,
           floor: enemy.lv || char.floor,
           ownedIds: owned,
-          guaranteed: roomType === 'calamity',
+          guaranteed: roomType === 'calamity' || guardianFight,
         });
         if (uniqueDrop) drops.push(uniqueDrop);
       }

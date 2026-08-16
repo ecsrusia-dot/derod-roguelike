@@ -542,8 +542,11 @@ export default function App() {
     // ☠ 죽음의 조각 (1.112.0) — 보스 처치 시 던전별 획득. 정복 층(구 최종층) 이상 보스는 2배
     const dgNow = getBuriedDungeon(char.dungeonId);
     const isDeepBoss = buriedRoom === 'boss' && (char.floor || 1) >= (dgNow?.floors || 10);
+    // 1.120.0 — 층계 수문장(100층 단위): 조각 8배 + 격파 알림
+    const isGuardian = buriedRoom === 'boss' && (char.floor || 1) % 100 === 0;
     const shardBase = buriedRoom === 'boss' ? (BURIED_SHARD_DROP[grown.dungeonId || 'labyrinth'] || 1) : 0;
-    const shardGain = shardBase * (isDeepBoss ? 2 : 1);
+    const shardGain = shardBase * (isGuardian ? 8 : isDeepBoss ? 2 : 1);
+    if (isGuardian) setBuriedForgeNotice(`🚪 ${char.floor}층 수문장 격파 — 관문이 열렸다! ${char.floor}층 돌파 체크포인트에서 재출발할 수 있다.`);
     // 정복 판정 (1.113.0) — 정복 층 보스를 잡는 순간 해금·기록, 런은 계속
     const conquest = buriedRoom === 'boss' && (char.floor || 1) === (dgNow?.floors || 10);
     // 방을 하나 지났으므로 걸음수 +1 + [u102] 층 이동 스킬 레벨 판정

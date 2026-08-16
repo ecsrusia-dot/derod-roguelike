@@ -271,7 +271,8 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
         {wizStep === 2 && (
           <div className="space-y-2 ui-stagger">
             <div className="text-[11px]" style={{ color: PALETTE.textDim }}>
-              {getBuriedDungeon(pickDungeon).name} 최고 기록 <b style={{ color: PALETTE.dawn }}>{b.deepestByDungeon?.[pickDungeon] || 0}층</b> — 100층 단위로 재출발할 수 있다.
+              {getBuriedDungeon(pickDungeon).name} 최고 기록 <b style={{ color: PALETTE.dawn }}>{b.deepestByDungeon?.[pickDungeon] || 0}층</b> —
+              🚪수문장을 격파한 100층 관문 너머에서 재출발할 수 있다.
             </div>
             <div className="grid grid-cols-3 gap-1.5">
               {[1, ...checkpoints].map(f => (
@@ -282,7 +283,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
                     background: pickStart === f ? PALETTE.panelLight : PALETTE.panel,
                     color: pickStart === f ? PALETTE.dawn : PALETTE.textDim,
                   }}>
-                  {f === 1 ? '1층부터' : `${f}층`}
+                  {f === 1 ? '1층부터' : `${f}층 돌파`}
                 </button>
               ))}
             </div>
@@ -371,7 +372,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
               <div className="px-3 py-3 space-y-1.5" style={{ borderRadius: R.panel, background: PALETTE.panel, border: `1px solid ${PALETTE.legendary}44` }}>
                 <div className="text-[11px] tracking-[0.2em]" style={{ color: PALETTE.legendary }}>출정 요약</div>
                 <div className="flex justify-between text-[12px]"><span style={{ color: PALETTE.textDim }}>던전</span><span style={{ color: dg.color }}>{dg.gimmick?.icon} {dg.name}</span></div>
-                <div className="flex justify-between text-[12px]"><span style={{ color: PALETTE.textDim }}>시작 층</span><span style={{ color: PALETTE.text }}>{pickStart}층{pickStart > 1 ? ' (체크포인트)' : ''}</span></div>
+                <div className="flex justify-between text-[12px]"><span style={{ color: PALETTE.textDim }}>시작 층</span><span style={{ color: PALETTE.text }}>{pickStart > 1 ? `${pickStart + 1}층 (${pickStart}층 관문 너머)` : '1층'}</span></div>
                 <div className="flex justify-between text-[12px]"><span style={{ color: PALETTE.textDim }}>직업</span><span style={{ color: c?.color }}>{c?.name}</span></div>
                 {(b.legacyGold || 0) > 0 && <div className="flex justify-between text-[12px]"><span style={{ color: PALETTE.textDim }}>계승 골드</span><span style={{ color: PALETTE.legendary }}>🪙 {b.legacyGold}</span></div>}
                 {earnedDepthTraits.length > 0 && (
@@ -408,10 +409,10 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
                 </div>
               )}
 
-              <button onClick={() => onStartChar(pickClass, pickDungeon, carryPicks, pickStart)}
+              <button onClick={() => onStartChar(pickClass, pickDungeon, carryPicks, pickStart > 1 ? pickStart + 1 : 1)}
                 className="ui-press ui-sheen w-full py-3.5 text-[14px] font-bold"
                 style={{ borderRadius: R.btn, background: PALETTE.accent, color: '#fff' }}>
-                ⚰ {dg.name} {pickStart}층으로 내려간다
+                ⚰ {dg.name} {pickStart > 1 ? pickStart + 1 : 1}층으로 내려간다
               </button>
             </div>
           );
