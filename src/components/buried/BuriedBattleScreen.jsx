@@ -26,7 +26,7 @@ import {
   buriedUniqueIds, getBuriedUnique, rollBuriedUniqueDrop, BURIED_UNDEAD_KEYS,
   buriedModdedSkill, hasBuriedCurse, aggregateBuriedContracts,
 } from '../../data.js';
-import { BuriedBar, BuriedStatusRow, BuriedItemCard, slotMeta, SkillKindBadge } from './BuriedCommon.jsx';
+import { BuriedBar, BuriedStatusRow, BuriedItemCard, slotMeta, SkillKindBadge, BuriedInfoModal } from './BuriedCommon.jsx';
 
 const wait = (ms) => new Promise(r => setTimeout(r, ms));
 const rnd = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
@@ -159,6 +159,23 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
   const [potions, setPotions] = useState(char.potions || 0);
   const [imgFailed, setImgFailed] = useState(false);
   const [detail, setDetail] = useState(null);
+  const [info, setInfo] = useState(null); // 1.117.0 — 상태·효과 칩 탭 시 설명 팝업
+
+  // 상태이상 칩 탭 → 설명 (스택 의미·감소 규칙 포함)
+  const pickStatus = (key, stacks) => {
+    const def = BURIED_STATUS[key];
+    if (!def) return;
+    const decayText = def.decay === 'one' ? '매 턴 1 감소' : def.decay === 'half' ? '매 턴 절반으로 감소' : '스스로 사라지지 않음';
+    setInfo({
+      icon: def.icon, title: `${def.name} ${stacks}`, color: def.color,
+      lines: [
+        { text: def.desc },
+        def.tickDmg ? { text: `현재 스택 기준 턴 종료 시 ${def.tickDmg * stacks} 피해.`, color: def.color } : null,
+        def.tickHeal ? { text: `현재 스택 기준 턴 종료 시 ${def.tickHeal * stacks} 회복.`, color: def.color } : null,
+        { text: `지속 — ${decayText}. (최대 ${def.max}스택)` },
+      ].filter(Boolean),
+    });
+  };
   const floatSeq = useRef(0);
   const logRef = useRef(null);
   const dustGainRef = useRef(0); // [u109] 전투 중 획득한 먼지 — 결과에 실어 보낸다
@@ -790,24 +807,27 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
           </div>
         </div>
         {/* 방·층 효과 배지 */}
-        <div className="absolute left-3 right-3 flex flex-wrap gap-1 pointer-events-none" style={{ top: '48%' }}>
+        <div className="absolute left-3 right-3 flex flex-wrap gap-1" style={{ top: '48%' }}>
           {dungeon.gimmick && (gimmickId === 'flood' || gimmickId === 'dark') && (
-            <span className="px-2 py-0.5 text-[11px]" style={{ borderRadius: 'var(--r-chip, 8px)', background: 'rgba(5,3,4,0.72)', border: `1px solid ${dungeon.color}88`, color: dungeon.color }}>
+            <button className="ui-press px-2 py-0.5 text-[11px]" style={{ borderRadius: 'var(--r-chip, 8px)', background: 'rgba(5,3,4,0.72)', border: `1px solid ${dungeon.color}88`, color: dungeon.color }}
+              onClick={() => setInfo({ icon: dungeon.gimmick.icon, title: `던전 기믹 — ${dungeon.gimmick.name}`, color: dungeon.color, lines: [{ text: dungeon.gimmick.desc }, { text: `${dungeon.name} 전역에 항상 적용된다.` }] })}>
               {dungeon.gimmick.icon} {dungeon.gimmick.name}
-            </span>
+            </button>
           )}
           {floorFx && (
-            <span className="px-2 py-0.5 text-[11px]" style={{ borderRadius: 'var(--r-chip, 8px)', background: 'rgba(5,3,4,0.72)', border: `1px solid ${PALETTE.legendary}88`, color: PALETTE.legendary }}>
+            <button className="ui-press px-2 py-0.5 text-[11px]" style={{ borderRadius: 'var(--r-chip, 8px)', background: 'rgba(5,3,4,0.72)', border: `1px solid ${PALETTE.legendary}88`, color: PALETTE.legendary }}
+              onClick={() => setInfo({ icon: '★', title: `층 효과 — ${floorFx.name}`, color: PALETTE.legendary, lines: [{ text: floorFx.desc }, { text: '이 층의 모든 전투에 적용된다. 다음 층으로 가면 사라진다.' }] })}>
               ★ {floorFx.name}
-            </span>
+            </button>
           )}
           {roomFx && (
-            <span className="px-2 py-0.5 text-[11px]" style={{ borderRadius: 'var(--r-chip, 8px)', background: 'rgba(5,3,4,0.72)', border: `1px solid ${roomColor}88`, color: roomColor }}>
+            <button className="ui-press px-2 py-0.5 text-[11px]" style={{ borderRadius: 'var(--r-chip, 8px)', background: 'rgba(5,3,4,0.72)', border: `1px solid ${roomColor}88`, color: roomColor }}
+              onClick={() => setInfo({ icon: roomFx.both ? '◆' : '◇', title: `방 효과 — ${roomFx.name}`, color: roomColor, lines: [{ text: roomFx.desc }, { text: roomFx.both ? '◆ 붉은 이름 — 나와 적 모두에게 적용된다.' : '◇ 이 전투에만 적용된다.' }] })}>
               {roomFx.both ? '◆' : '◇'} {roomFx.name}
-            </span>
+            </button>
           )}
         </div>
-        <div className="absolute bottom-2 left-3 right-3"><BuriedStatusRow statuses={foe.statuses} /></div>
+        <div className="absolute bottom-2 left-3 right-3"><BuriedStatusRow statuses={foe.statuses} onPick={pickStatus} /></div>
         {floats.filter(f => f.side === 'enemy').map((f, i) => (
           <div key={f.id} className="absolute text-[16px] font-bold tabular-nums pointer-events-none"
             style={{ left: `${38 + (i % 3) * 10}%`, top: '34%', color: f.color, textShadow: '0 2px 6px #000', animation: 'fx-float-up 950ms ease-out forwards' }}>
@@ -837,7 +857,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
           </div>
         )}
         <div className="mt-1"><BuriedBar value={player.sp} max={player.maxSp} color={PALETTE.ice} label="SP" height={7} /></div>
-        <div className="mt-1"><BuriedStatusRow statuses={player.statuses} /></div>
+        <div className="mt-1"><BuriedStatusRow statuses={player.statuses} onPick={pickStatus} /></div>
         {floats.filter(f => f.side === 'player').map((f, i) => (
           <div key={f.id} className="absolute text-[15px] font-bold tabular-nums pointer-events-none"
             style={{ left: `${10 + (i % 3) * 10}%`, top: 0, color: f.color, textShadow: '0 2px 6px #000', animation: 'fx-float-up 950ms ease-out forwards' }}>
@@ -924,6 +944,9 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
       </div>
 
       {/* ===== 스킬 상세 ===== */}
+      {/* 상태·효과 설명 팝업 (1.117.0) */}
+      <BuriedInfoModal info={info} onClose={() => setInfo(null)} />
+
       {detail && (
         <div className="absolute inset-0 z-50 flex items-end" style={{ background: 'rgba(0,0,0,0.7)' }} onClick={() => setDetail(null)}>
           <div className="w-full px-3 py-3" onClick={e => e.stopPropagation()}

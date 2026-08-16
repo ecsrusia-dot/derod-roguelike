@@ -145,7 +145,7 @@ import {
   createBuriedChar,
   grantBuriedExp,
   advanceBuriedFloor,
-  buildBuriedLegacy,
+  buriedDeathSettlement,
   addBuriedItemToChar,
   stepBuriedChar,
   getBuriedDungeon,
@@ -153,7 +153,6 @@ import {
   BURIED_DUNGEONS,
   BURIED_FORGE,
   craftBuriedItem,
-  buriedLegacyExpandCost,
   hasBuriedUnique,
   maybeBuriedFloorSkillUp,
   rollBuriedContract,
@@ -172,7 +171,7 @@ import {
 } from './data.js';
 import { getKstDateKey } from './utils/dailyChallenge.js';
 import { simulateBestEndlessRun } from './utils/endlessSkipSim.js';
-import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, applyEngravingSlot, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear, dismantleRaidItem, dismantleRaidJunk, enhanceRaidItem, claimRaidWeekly, addRaidResources, spendRaidResourcesForItem, resolveRaidSecret, toggleRaidFormation, appendAutoRunLog, getGambleUsed, useGambleEntry, addTwilightCoins, addFateShards, redeemFateShards, buyGambleShopItem, addClassTitle, equipClassTitle, saveHofPatterns, hofLevelUpChar, recordHofClear, recordMastersClearByClass, updateBestRunTime, getBuried, saveBuriedChar, startBuriedChar, recordBuriedDeath, recordBuriedClear, addBuriedDust, craftBuriedForgeItem, expandBuriedLegacy, trackBuriedKill, buyBuriedContract, addBuriedShards, buyBuriedPart, detachBuriedParts } from './storage.js';
+import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, applyEngravingSlot, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear, dismantleRaidItem, dismantleRaidJunk, enhanceRaidItem, claimRaidWeekly, addRaidResources, spendRaidResourcesForItem, resolveRaidSecret, toggleRaidFormation, appendAutoRunLog, getGambleUsed, useGambleEntry, addTwilightCoins, addFateShards, redeemFateShards, buyGambleShopItem, addClassTitle, equipClassTitle, saveHofPatterns, hofLevelUpChar, recordHofClear, recordMastersClearByClass, updateBestRunTime, getBuried, saveBuriedChar, startBuriedChar, recordBuriedDeath, recordBuriedClear, addBuriedDust, craftBuriedForgeItem, trackBuriedKill, buyBuriedContract, addBuriedShards, buyBuriedPart, detachBuriedParts } from './storage.js';
 
 
 
@@ -372,7 +371,7 @@ export default function App() {
   const handleBuriedStart = (classId, dungeonId = 'labyrinth', contracts = [], startFloor = 1) => {
     setMeta(prev => {
       const b = getBuried(prev);
-      const char = createBuriedChar(classId, { items: b.legacy, gold: b.legacyGold }, dungeonId, contracts, aggregateBuriedParts(b.parts), startFloor, buriedEarnedDepthTraits(b.deepestByDungeon));
+      const char = createBuriedChar(classId, { items: [], gold: b.legacyGold }, dungeonId, contracts, aggregateBuriedParts(b.parts), startFloor, buriedEarnedDepthTraits(b.deepestByDungeon));
       if (!char) return prev;
       const next = startBuriedChar(prev, char);
       saveMeta(next);
@@ -391,13 +390,11 @@ export default function App() {
       if (!item) return prev;
       const r = craftBuriedForgeItem(prev, item, cost);
       if (!r.ok) {
-        setBuriedForgeNotice(r.reason === 'full' ? '유산 보관함이 가득 찼다 — 칸을 비우거나 확장하라.' : '먼지가 부족하다.');
+        setBuriedForgeNotice(r.reason === 'nochar' ? '탐험 중인 캐릭터가 있어야 벼릴 수 있다.' : '먼지가 부족하다.');
         return prev;
       }
       setBuriedForgeNotice(
-        r.toChar
-          ? (r.raised ? `${item.name} 완성 — 같은 스킬이라 Lv.${r.lv}이 되었다.` : `${item.name} 완성 — [교체/버리기]를 판단하라.`)
-          : `${item.name} 완성 — 유산 보관함으로. 다음 캐릭터가 물려받는다.`
+        r.raised ? `${item.name} 완성 — 같은 스킬이라 Lv.${r.lv}이 되었다.` : `${item.name} 완성 — [교체/버리기]를 판단하라.`
       );
       saveMeta(r.meta);
       return r.meta;
@@ -440,16 +437,6 @@ export default function App() {
     });
   };
 
-  const handleBuriedExpandLegacy = () => {
-    setMeta(prev => {
-      const b = getBuried(prev);
-      const next = expandBuriedLegacy(prev, buriedLegacyExpandCost(b.legacySlots || 6));
-      if (next === prev) return prev;
-      saveMeta(next);
-      return next;
-    });
-  };
-
   const handleBuriedEnterBattle = (enemy, roomType, roomEffectId = null) => {
     setBuriedEnemy(enemy);
     setBuriedRoom(roomType);
@@ -474,14 +461,15 @@ export default function App() {
     setBuriedForgeNotice(`👑 ${dg?.name} 정복!${nextDungeonId ? ` 다음 던전이 열렸다.` : ''}${advanceClassId ? ` 전직 「${getBuriedClass(advanceClassId)?.name}」 해금.` : ''} 무덤은 더 깊이 이어진다…`);
   };
 
-  // 사망 — 캐릭터 소멸 + 유산 계승
+  // 사망 — 1.117.0: 장비 계승 폐지. 장착 장비 전부 자동 분해 → 먼지 정산 + 골드 30% 계승
   const handleBuriedDeath = (char) => {
-    const legacy = buildBuriedLegacy(char);
+    const settle = buriedDeathSettlement(char);
     setMeta(prev => {
-      const next = recordBuriedDeath(prev, legacy, 0);
+      const next = recordBuriedDeath(prev, settle);
       saveMeta(next);
       return next;
     });
+    setBuriedForgeNotice(`⚰ 정산 — 장비 ${settle.itemCount}개 분해 🕯 +${settle.dust} · 다음 캐릭터에게 🪙 ${settle.gold} 계승`);
     setBuriedEnemy(null); setBuriedRoom(null); setBuriedRoomFx(null);
     setScreen('buried');
   };
@@ -3090,11 +3078,12 @@ export default function App() {
               onStartChar={handleBuriedStart}
               onContinue={() => setScreen('buriedDungeon')}
               onUpdateChar={updateBuriedChar}
-              onRetire={(legacy) => {
-                setMeta(prev => { const next = recordBuriedDeath(prev, legacy, 0); saveMeta(next); return next; });
+              onRetire={(char) => {
+                const settle = buriedDeathSettlement(char);
+                setMeta(prev => { const next = recordBuriedDeath(prev, settle); saveMeta(next); return next; });
+                setBuriedForgeNotice(`⚰ 정산 — 장비 ${settle.itemCount}개 분해 🕯 +${settle.dust} · 다음 캐릭터에게 🪙 ${settle.gold} 계승`);
               }}
               onForge={handleBuriedForge}
-              onExpandLegacy={handleBuriedExpandLegacy}
               onBuyContract={handleBuriedBuyContract}
               onBuyPart={handleBuriedBuyPart}
               onDetachParts={handleBuriedDetachParts}

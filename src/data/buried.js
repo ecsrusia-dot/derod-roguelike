@@ -357,10 +357,10 @@ export function buriedItemStats(item) {
   return out;
 }
 
-// 분해 가치 (무덤 먼지)
+// 분해 가치 (무덤 먼지) — 1.117.0~ 장비 레벨도 반영 (심층 장비 정산이 의미를 갖도록)
 export function buriedDustValue(item) {
   if (!item) return 0;
-  return getBuriedTier(item.tier).dust + (item.plus || 0) * 2;
+  return getBuriedTier(item.tier).dust + (item.plus || 0) * 2 + Math.floor((item.floor || 1) / 3);
 }
 
 // =========================================================
@@ -907,16 +907,25 @@ export function chooseBuriedEnemyAction(enemyUnit, actions) {
 export const BURIED_LEGACY_MAX = 6;       // 보관 가능한 유산 장비 수
 export const BURIED_LEGACY_GOLD_PCT = 30; // 계승 골드 비율
 
-// 사망한 캐릭터에서 계승 대상 산출. 층이 깊을수록 더 많이 남긴다 (1~3개)
-export function buildBuriedLegacy(char) {
-  if (!char) return { items: [], gold: 0 };
-  const equipped = BURIED_SLOT_IDS.map(s => char.equipped?.[s]).filter(Boolean);
-  const count = Math.min(equipped.length, (char.floor || 1) >= 8 ? 3 : (char.floor || 1) >= 4 ? 2 : 1);
-  const shuffled = [...equipped].sort(() => Math.random() - 0.5);
+// 1.117.0 PM 결정 — 장비 계승 폐지. 사망·은퇴 시 장착 장비(+판단 대기 장비)를 전부
+// **자동 분해해 먼지로 정산**한다. 골드 30% 계승(legacyGold)은 유지.
+export function buriedDeathSettlement(char) {
+  if (!char) return { dust: 0, gold: 0, itemCount: 0 };
+  const items = [
+    ...BURIED_SLOT_IDS.map(s => char.equipped?.[s]).filter(Boolean),
+    ...(char.pendingLoot || []),
+  ];
   return {
-    items: shuffled.slice(0, count),
+    dust: items.reduce((s, it) => s + buriedDustValue(it), 0),
     gold: Math.floor((char.gold || 0) * BURIED_LEGACY_GOLD_PCT / 100),
+    itemCount: items.length,
   };
+}
+
+// 하위 호환 별칭 (1.117.0 이전 시그니처 사용처 방지용) — 새 코드는 buriedDeathSettlement 사용
+export function buildBuriedLegacy(char) {
+  const s = buriedDeathSettlement(char);
+  return { items: [], gold: s.gold, dust: s.dust };
 }
 
 // 무덤 먼지 — 유산 보관함이 가득 찼을 때의 대체 보상 + 제단 강화 재료

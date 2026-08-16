@@ -68,7 +68,8 @@ export function BuriedBar({ value, max, color, label, height = 8, showText = tru
 }
 
 // ===== 상태이상 칩 줄 =====
-export function BuriedStatusRow({ statuses, align = 'left' }) {
+// 1.117.0 — onPick(key, stacks) 전달 시 칩이 탭 가능해진다 (전투 화면: 팝업 설명 모달)
+export function BuriedStatusRow({ statuses, align = 'left', onPick = null }) {
   const list = Object.entries(statuses || {}).filter(([, n]) => n > 0);
   if (list.length === 0) return <div style={{ height: 20 }} />;
   return (
@@ -76,14 +77,38 @@ export function BuriedStatusRow({ statuses, align = 'left' }) {
       {list.map(([key, n]) => {
         const def = BURIED_STATUS[key];
         if (!def) return null;
+        const Tag = onPick ? 'button' : 'span';
         return (
-          <span key={key} className="px-1.5 py-0.5 text-[11px] tabular-nums flex items-center gap-0.5"
+          <Tag key={key} onClick={onPick ? () => onPick(key, n) : undefined}
+            className={`px-1.5 py-0.5 text-[11px] tabular-nums flex items-center gap-0.5${onPick ? ' ui-press' : ''}`}
             style={{ borderRadius: 'var(--r-chip, 8px)', background: `${def.color}22`, border: `1px solid ${def.color}66`, color: def.color }}
             title={`${def.name} — ${def.desc}`}>
             <span>{def.icon}</span>{n}
-          </span>
+          </Tag>
         );
       })}
+    </div>
+  );
+}
+
+// ===== 상태·효과 설명 팝업 (1.117.0) — 전투 화면 공용 바텀 시트 =====
+// info: { icon, title, color, lines: [{ text, color? }] }
+export function BuriedInfoModal({ info, onClose }) {
+  if (!info) return null;
+  return (
+    <div className="absolute inset-0 z-50 flex items-end" style={{ background: 'rgba(0,0,0,0.7)' }} onClick={onClose}>
+      <div className="w-full px-4 pb-4 pt-3" onClick={(e) => e.stopPropagation()}
+        style={{ background: PALETTE.bgDeep, borderTop: `1px solid ${info.color || PALETTE.panelBorder}88`, borderRadius: '18px 18px 0 0' }}>
+        <div className="text-[14px] font-bold flex items-center gap-1.5 mb-1.5" style={{ color: info.color || PALETTE.text }}>
+          <span>{info.icon}</span> {info.title}
+        </div>
+        <div className="space-y-1">
+          {(info.lines || []).map((l, i) => (
+            <div key={i} className="text-[12px] leading-relaxed" style={{ color: l.color || PALETTE.textDim }}>{l.text}</div>
+          ))}
+        </div>
+        <button onClick={onClose} className="ui-press w-full mt-2.5 py-2 text-[12px]" style={{ color: PALETTE.textDim }}>닫기</button>
+      </div>
     </div>
   );
 }
