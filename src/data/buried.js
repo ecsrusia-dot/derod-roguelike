@@ -218,7 +218,7 @@ export const BURIED_SKILL_LIST = Object.values(BURIED_SKILLS);
 // 기본 공격 — 장비가 없어도 항상 사용 가능 (SP 0, 사용 시 SP 회복)
 export const BURIED_BASIC = {
   id: 'basic', name: '기본 공격', sp: 0, cd: 0, power: 85, spGain: 14,
-  desc: '무기를 휘두른다. SP +14',
+  desc: '물리·기교·마법 중 가장 높은 공격력으로 후려친다. SP +14',
 };
 
 // 직업이 착용 가능한 스킬인지

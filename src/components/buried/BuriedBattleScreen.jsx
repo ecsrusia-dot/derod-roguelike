@@ -873,8 +873,10 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
           <button onClick={() => act('basic', BURIED_BASIC)} disabled={busy || !!result}
             className="ui-press px-2.5 py-2 text-left"
             style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panel, border: `1px solid ${PALETTE.dawn}66`, opacity: busy || result ? 0.5 : 1 }}>
-            <div className="text-[12px] font-bold" style={{ color: PALETTE.dawn }}>{BURIED_BASIC.name}</div>
-            <div className="text-[11px] tabular-nums" style={{ color: PALETTE.ice }}>SP 0 → +{BURIED_BASIC.spGain}</div>
+            <div className="text-[12px] font-bold flex items-center gap-1" style={{ color: PALETTE.dawn }}>
+              <SkillKindBadge skill={BURIED_BASIC} /> {BURIED_BASIC.name}
+            </div>
+            <div className="text-[11px] tabular-nums" style={{ color: PALETTE.ice }}>SP 0 → +{BURIED_BASIC.spGain} · 최고 스탯 참조</div>
           </button>
 
           <button onClick={usePotion} disabled={busy || !!result || potions <= 0 || potionUsedThisTurn}
