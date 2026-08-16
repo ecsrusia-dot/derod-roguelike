@@ -606,3 +606,83 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .raid-round-pop, .raid-emblem-pulse, .raid-enrage, .raid-wipe-warn { animation: none; }
 }
+
+/* ============================================
+   1.119.0 무덤의 유산 전투 이펙트 (BuriedBattleScreen)
+   ============================================ */
+/* 적 피격 셰이크 */
+@keyframes fx-b-shake {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-7px, 2px); }
+  40% { transform: translate(6px, -3px); }
+  60% { transform: translate(-4px, 2px); }
+  80% { transform: translate(3px, -1px); }
+}
+.fx-b-shake { animation: fx-b-shake 0.32s ease-out; }
+
+/* 물리·기교 — 대각선 슬래시 스윕 */
+@keyframes fx-b-slash {
+  0% { transform: translate(-130%, -130%) rotate(-45deg); opacity: 0; }
+  15% { opacity: 1; }
+  100% { transform: translate(130%, 130%) rotate(-45deg); opacity: 0; }
+}
+.fx-b-slash {
+  position: absolute; left: 50%; top: 50%; width: 180%; height: 3px; margin-left: -90%;
+  background: linear-gradient(90deg, transparent, #fff, transparent);
+  box-shadow: 0 0 14px 3px rgba(255, 255, 255, 0.55);
+  pointer-events: none;
+  animation: fx-b-slash 0.38s ease-in forwards;
+}
+
+/* 마법 — 방사형 버스트 */
+@keyframes fx-b-burst {
+  0% { transform: translate(-50%, -50%) scale(0.25); opacity: 0.95; }
+  100% { transform: translate(-50%, -50%) scale(2.1); opacity: 0; }
+}
+.fx-b-burst {
+  position: absolute; left: 50%; top: 50%; width: 120px; height: 120px;
+  border-radius: 50%; pointer-events: none;
+  animation: fx-b-burst 0.45s ease-out forwards;
+}
+
+/* 치명 — 골든 링 + 화면 펀치 */
+@keyframes fx-b-critring {
+  0% { transform: translate(-50%, -50%) scale(0.3); opacity: 1; border-width: 6px; }
+  100% { transform: translate(-50%, -50%) scale(2.4); opacity: 0; border-width: 1px; }
+}
+.fx-b-critring {
+  position: absolute; left: 50%; top: 50%; width: 110px; height: 110px;
+  border: 4px solid #e8b04a; border-radius: 50%; pointer-events: none;
+  box-shadow: 0 0 22px 4px rgba(232, 176, 74, 0.5);
+  animation: fx-b-critring 0.5s ease-out forwards;
+}
+@keyframes fx-b-punch {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.035); }
+  100% { transform: scale(1); }
+}
+.fx-b-punch { animation: fx-b-punch 0.28s ease-out; }
+
+/* 플레이어 피격 — 붉은 비네트 펄스 */
+@keyframes fx-b-hurt {
+  0% { box-shadow: inset 0 0 64px 18px rgba(196, 69, 61, 0.55); }
+  100% { box-shadow: inset 0 0 0 0 rgba(196, 69, 61, 0); }
+}
+.fx-b-hurt {
+  position: absolute; inset: 0; pointer-events: none; z-index: 30;
+  animation: fx-b-hurt 0.55s ease-out forwards;
+}
+
+/* 회복 — 초록 글로우 상승 */
+@keyframes fx-b-healglow {
+  0% { box-shadow: inset 0 -40px 50px -20px rgba(122, 154, 94, 0.5); opacity: 1; }
+  100% { box-shadow: inset 0 0 0 0 rgba(122, 154, 94, 0); opacity: 0; }
+}
+.fx-b-healglow {
+  position: absolute; inset: 0; pointer-events: none; z-index: 30;
+  animation: fx-b-healglow 0.7s ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fx-b-shake, .fx-b-slash, .fx-b-burst, .fx-b-critring, .fx-b-punch, .fx-b-hurt, .fx-b-healglow { animation: none; opacity: 0; }
+}
