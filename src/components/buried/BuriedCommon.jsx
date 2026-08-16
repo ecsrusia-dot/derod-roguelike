@@ -21,12 +21,14 @@ const SKILL_KIND = {
   str: { label: '물리', icon: '💪', color: '#c4453d', refs: '완력' },
   dex: { label: '기교', icon: '🎯', color: '#7a9a5e', refs: '기교' },
   int: { label: '마법', icon: '📖', color: '#5c4a8c', refs: '지혜' },
+  // 1.118.1 — stat 미지정 공격(기본 공격): 물리·기교·마법 중 **최고 공격력**을 따른다 (1.117.0 로직 변경분 표시 반영)
+  any:  { label: '자유', icon: '✦', color: '#c9a86a', refs: '최고 공격 스탯' },
   none: { label: '보조', icon: '◈', color: '#9b8975', refs: null },
 };
 export function skillKindMeta(skill) {
   if (!skill) return null;
   if (!skill.power) return SKILL_KIND.none;
-  return SKILL_KIND[skill.stat || 'str'] || SKILL_KIND.str;
+  return skill.stat ? (SKILL_KIND[skill.stat] || SKILL_KIND.str) : SKILL_KIND.any;
 }
 export function SkillKindBadge({ skill }) {
   const k = skillKindMeta(skill);
@@ -226,7 +228,7 @@ export function BuriedItemSheet({ item, compare, onEquip, onUnequip, onDismantle
             </div>
             <div className="text-[11px] mt-0.5 tabular-nums" style={{ color: PALETTE.ice }}>
               SP {skill.sp}{skill.cd > 0 ? ` · 쿨다운 ${skill.cd}턴` : ' · 쿨다운 없음'}
-              {skill.power ? ` · 위력 ${skill.power}%${skill.hits ? ` ×${skill.hits}` : ''} (${skillKindMeta(skill).refs} 기반 ${skillKindMeta(skill).label} 공격력 참조)` : ' · 스탯 무관 (보조 스킬)'}
+              {skill.power ? ` · 위력 ${skill.power}%${skill.hits ? ` ×${skill.hits}` : ''} (${skill.stat ? `${skillKindMeta(skill).refs} 기반 ${skillKindMeta(skill).label} 공격력 참조` : '물리·기교·마법 중 최고 공격력 참조'})` : ' · 스탯 무관 (보조 스킬)'}
               {skill.pierce ? ' · 방어 무시' : ''}
             </div>
             <div className="text-[12px] mt-1 leading-relaxed" style={{ color: PALETTE.textDim }}>{skill.desc}</div>
