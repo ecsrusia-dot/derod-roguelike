@@ -48,6 +48,8 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
   // ===== 연구실 부품 (1.112.0) — 캐릭터 생성 시 구운 partsFx.
   // 스탯 키(hp·atk 등)는 buriedDerived가 이미 반영 — 여기서는 전투·전리품 전용 키만 읽는다
   const pf = char.partsFx || {};
+  // ===== 던전 고유 기믹 (1.114.0) — flood(침수): 도트 ×1.5·회복 -25% 양쪽 / dark(어둠): 적 수치 은폐
+  const gimmickId = dungeon.gimmick?.id || null;
   // 스킬 단계 보정 — [u113] 쿨 0 / [u101] 쿨 상한 1 / [u99] 레벨당 위력 +2% / [u94] 2회 시전·위력 절반
   const applyUniqueSkillMods = (sk) => {
     let out = { ...sk };
@@ -174,7 +176,8 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
       mult += (d.healPct || 0) / 100;
       mult += (env.self.healPct || 0) / 100;
     }
-    return Math.round(base * mult);
+    if (gimmickId === 'flood') mult -= 0.25; // 기믹 「침수」 — 회복 -25% (양쪽)
+    return Math.max(0, Math.round(base * mult));
   };
 
   // 회복 적용 — 대여명 특성은 회복량의 50%를 보호막으로 덧입힌다
@@ -578,6 +581,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     // ---------- 3. 라운드 종료 — 상태이상 + 방/층 효과 ----------
     const canP = buriedCanHeal(P) && !env.self.noHeal;
     const pt = tickBuriedStatuses(P, { canHeal: canP });
+    if (gimmickId === 'flood' && pt.dmg > 0) pt.dmg = Math.round(pt.dmg * 1.5); // 기믹 「침수」 — 도트 +50%
     if (cs('paimon') && pt.dmg > 0) pt.dmg *= 2; // 저주 「파이몬」 — 도트 2배
     if (pt.dmg > 0) { hurt(P, pt.dmg, true); pushFloat('player', `-${pt.dmg}`, PALETTE.bleed); pushLog(`상태이상 피해 ${pt.dmg} (${pt.log.filter(x => x.dmg).map(x => x.name).join('·')})`, PALETTE.bleed); }
     if (pt.heal > 0) { const h = applyHeal(P, pt.heal); if (h > 0) { pushFloat('player', `+${h}`, PALETTE.green); pushLog(`재생 ${h} 회복`, PALETTE.green); } }
@@ -585,6 +589,10 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
 
     const canE = buriedCanHeal(E) && !env.foe.noHeal;
     const et = tickBuriedStatuses(E, { canHeal: canE });
+    if (gimmickId === 'flood') { // 기믹 「침수」 — 도트 +50% · 회복 -25% (적도 동일)
+      if (et.dmg > 0) et.dmg = Math.round(et.dmg * 1.5);
+      if (et.heal > 0) et.heal = Math.round(et.heal * 0.75);
+    }
     if (uq('u17') && et.dmg > 0) et.dmg *= 2; // [u17] 아누비스 — 내 도트 2배
     if (et.dmg > 0) { hurt(E, et.dmg, true); pushFloat('enemy', `-${et.dmg}`, PALETTE.bleed); pushLog(`${E.name} 상태이상 피해 ${et.dmg}`, PALETTE.bleed); }
     if (et.heal > 0) {
@@ -718,17 +726,25 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
               {enemy.name} <span style={{ color: PALETTE.textDim }}>Lv.{enemy.lv || 1}</span>
             </span>
             <span className="text-[11px]" style={{ color: PALETTE.textDim }}>
-              {roomType === 'calamity' ? '🌑 ' : roomType === 'boss' ? '👑 ' : roomType === 'elite' ? '☠ ' : ''}방어 {buriedEffDef(foe)} · 회피 {buriedEffDodge(foe)}%
+              {roomType === 'calamity' ? '🌑 ' : roomType === 'boss' ? '👑 ' : roomType === 'elite' ? '☠ ' : ''}
+              {gimmickId === 'dark'
+                ? '방어 ?? · 회피 ??%'
+                : `방어 ${buriedEffDef(foe)} · 회피 ${buriedEffDodge(foe)}%`}
             </span>
           </div>
           <BuriedBar value={foe.hp} max={foe.maxHp} color={PALETTE.accent} height={9} showText={false} />
           <div className="text-[11px] tabular-nums text-right mt-0.5" style={{ color: PALETTE.accent }}>
-            {(foe.barrier || 0) > 0 && <span style={{ color: PALETTE.ice }}>🔷{foe.barrier} · </span>}
-            {Math.max(0, foe.hp)} / {foe.maxHp}
+            {(foe.barrier || 0) > 0 && <span style={{ color: PALETTE.ice }}>🔷{gimmickId === 'dark' ? '??' : foe.barrier} · </span>}
+            {gimmickId === 'dark' ? '?? / ??' : `${Math.max(0, foe.hp)} / ${foe.maxHp}`}
           </div>
         </div>
         {/* 방·층 효과 배지 */}
         <div className="absolute left-3 right-3 flex flex-wrap gap-1 pointer-events-none" style={{ top: '48%' }}>
+          {dungeon.gimmick && (gimmickId === 'flood' || gimmickId === 'dark') && (
+            <span className="px-2 py-0.5 text-[11px]" style={{ borderRadius: 'var(--r-chip, 8px)', background: 'rgba(5,3,4,0.72)', border: `1px solid ${dungeon.color}88`, color: dungeon.color }}>
+              {dungeon.gimmick.icon} {dungeon.gimmick.name}
+            </span>
+          )}
           {floorFx && (
             <span className="px-2 py-0.5 text-[11px]" style={{ borderRadius: 'var(--r-chip, 8px)', background: 'rgba(5,3,4,0.72)', border: `1px solid ${PALETTE.legendary}88`, color: PALETTE.legendary }}>
               ★ {floorFx.name}

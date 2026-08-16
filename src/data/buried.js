@@ -368,22 +368,35 @@ export function buriedDustValue(item) {
 // =========================================================
 export const buriedExpToNext = (lv) => 32 + lv * 20;
 
-export function createBuriedChar(classId, legacy = { items: [], gold: 0 }, dungeonId = 'labyrinth', contracts = [], partsFx = {}) {
+export function createBuriedChar(classId, legacy = { items: [], gold: 0 }, dungeonId = 'labyrinth', contracts = [], partsFx = {}, startFloor = 1) {
   const cls = getBuriedClass(classId);
   if (!cls) return null;
   const equipped = {};
   for (const s of BURIED_SLOT_IDS) equipped[s] = null;
-  // 시작 장비 — 무기 + 방어구는 반드시 지급 (BB: 맨몸 시작 방지)
-  const w = rollBuriedItem({ slot: 'weapon', classId, floor: 1, tier: 'worn' });
-  const a = rollBuriedItem({ slot: 'armor', classId, floor: 1, tier: 'worn' });
-  if (w) equipped.weapon = w;
-  if (a) equipped.armor = a;
+  // 1.114.0 체크포인트 — 100층 단위 재출발. 걸음수는 층 파리티(1방/층).
+  // 시작 장비 레벨 = 마물 레벨 + **깊이의 압력 보정** (압력 ×3.25를 장비 레벨로 환산해 더한다) —
+  // 보정 없이는 낡은 장비가 압력을 못 덮어 체크포인트 시작이 즉사가 된다 (시뮬 검증)
+  const fromFloor = Math.max(1, startFloor || 1);
+  const startSteps = fromFloor - 1;
+  const startGearLv = fromFloor > 1
+    ? buriedMonsterLevel({ dungeonId, steps: startSteps })
+      + Math.round((buriedDepthPressure(getBuriedDungeon(dungeonId), fromFloor) - 1) / 0.14)
+    : 1;
 
   // 1.113.0 — 인벤토리 폐지. 유산은 슬롯이 비어 있을 때만 장착하고,
   // 못 쓴 유산은 **보관함에 그대로 남는다** (legacyUsedIds로 소비분만 차감)
+  // 체크포인트 시작이면 유산을 먼저 채운다 (낡은 지급 장비보다 유산이 우선)
   const legacyUsedIds = [];
   for (const it of (legacy.items || [])) {
     if (it && !equipped[it.slot]) { equipped[it.slot] = it; legacyUsedIds.push(it.id); }
+  }
+
+  // 시작 장비 — 1층 시작: 무기+방어구 낡은 2종 (BB: 맨몸 시작 방지) / 체크포인트: 빈 슬롯 전부 낡은 장비
+  const startSlots = fromFloor > 1 ? BURIED_SLOT_IDS : ['weapon', 'armor'];
+  for (const s of startSlots) {
+    if (equipped[s]) continue;
+    const it = rollBuriedItem({ slot: s, classId, floor: startGearLv, tier: 'worn' });
+    if (it) equipped[s] = it;
   }
 
   const char = {
@@ -398,7 +411,7 @@ export function createBuriedChar(classId, legacy = { items: [], gold: 0 }, dunge
     dungeonId,
     contracts: (contracts || []).slice(0, BURIED_CONTRACT_CARRY),
     partsFx: partsFx || {},  // 1.112.0 — 연구실 부품 효과 (생성 시점에 구움, 소급 없음)
-    floor: 1, steps: 0, room: null, roomEffect: null, floorEffect: null, offers: null, roomDone: false,
+    floor: fromFloor, steps: startSteps, room: null, roomEffect: null, floorEffect: null, offers: null, roomDone: false,
     skillLevels: {},
     potions: 2,
     kills: 0, startedAt: Date.now(),
@@ -411,6 +424,15 @@ export function createBuriedChar(classId, legacy = { items: [], gold: 0 }, dunge
   }
   char.hp = buriedDerived(char).maxHp;
   return char;
+}
+
+// 1.114.0 — 체크포인트 층 목록. 던전별 최고 도달 층 기준 100층 단위 (100, 200, …)
+export const BURIED_CHECKPOINT_UNIT = 100;
+export function buriedCheckpointFloors(deepestFloor) {
+  const out = [];
+  const top = Math.floor((deepestFloor || 0) / BURIED_CHECKPOINT_UNIT) * BURIED_CHECKPOINT_UNIT;
+  for (let f = BURIED_CHECKPOINT_UNIT; f <= top; f += BURIED_CHECKPOINT_UNIT) out.push(f);
+  return out;
 }
 
 // 파생 스탯 — 장비·레벨·스탯·특성 전부 합산
@@ -665,7 +687,10 @@ export function rollBuriedOffers(floor, dungeonId = 'labyrinth') {
   const dg = getBuriedDungeon(dungeonId);
   const bossKey = buriedBossKeyAt(dg, floor);
   if (bossKey) return [{ type: 'boss', enemyKey: bossKey, effect: rollBuriedRoomEffect(dg.roomEffectChance) }];
-  const count = Math.random() < 0.45 ? 2 : 3;
+  // 기믹 「갈림길」(미궁) — 선택지가 항상 3~4개
+  const count = dg.gimmick?.id === 'maze'
+    ? (Math.random() < 0.25 ? 4 : 3)
+    : (Math.random() < 0.45 ? 2 : 3);
   // 1.107.0 — 이벤트 방 5종(묘비·샘·석상·나그네·관)도 선택지 풀에 합류
   const pool = [
     ...Object.values(BURIED_ROOMS).filter(r => r.weight > 0),
@@ -686,10 +711,35 @@ export function rollBuriedOffers(floor, dungeonId = 'labyrinth') {
     const j = Math.floor(Math.random() * (i + 1));
     [offers[i], offers[j]] = [offers[j], offers[i]];
   }
+  // 기믹 「낙하 구멍」(나락) — 20% 확률로 선택지에 구멍 추가 (전투 최소 1칸 규칙과 별개로 덧붙음)
+  if (dg.gimmick?.id === 'chute' && Math.random() < 0.20) offers.push({ type: 'chute' });
   // 방 효과는 전투 계열에만 (비전투 방은 효과 없이 깔끔하게)
   return offers.map(o => (o.type === 'battle' || o.type === 'elite')
     ? { ...o, effect: rollBuriedRoomEffect(dg.roomEffectChance) }
     : o);
+}
+
+// 기믹 「낙하 구멍」 — 표시용 방 정의 + 점프 규칙 (1.114.0)
+export const BURIED_CHUTE_ROOM = { id: 'chute', name: '낙하 구멍', icon: '🕳', color: '#c4453d', weight: 0, desc: '최대 HP 25%를 바치고 3층 아래로 뛰어내린다. 보스 층은 건너뛸 수 없다.' };
+export const BURIED_CHUTE_HP_PCT = 25;
+export const BURIED_CHUTE_FLOORS = 3;
+
+// 낙하 — 3층 아래로, 단 보스 층은 건너뛸 수 없다 (도중에 있으면 그 층에 착지).
+// 걸음수는 +1만 — 마물이 자라기 전에 깊이 닿는 것이 이 기믹의 전략 가치.
+export function buriedChuteJump(char) {
+  const dg = getBuriedDungeon(char?.dungeonId);
+  let land = (char.floor || 1) + BURIED_CHUTE_FLOORS;
+  for (let f = (char.floor || 1) + 1; f < land; f++) {
+    if (buriedBossKeyAt(dg, f)) { land = f; break; }
+  }
+  return {
+    ...char,
+    floor: land,
+    steps: (char.steps || 0) + 1,
+    offers: rollBuriedOffers(land, char.dungeonId),
+    floorEffect: rollBuriedFloorEffect(dg.floorEffectChance),
+    room: null, roomData: null, roomEffect: null,
+  };
 }
 
 // 상점 진열 (장비 3종)
@@ -712,9 +762,12 @@ export const BURIED_POTION_PRICE = 55;
 export const BURIED_TUNING = {
   enemyDmgMult: 1.1,   // 적 화력 체감 조정은 여기 한 곳. 1.113.0 — 레벨 스탯 폐지에도 "너무 쉽다" 응답으로 +10%
   playerDmgMult: 1.0,
-  // 1.113.0 무한층 — 정복 층(dg.floors)을 넘어선 깊이는 층당 +3%씩 적 hp·atk에 복리 압력.
-  // 드랍 장비 레벨은 마물 레벨을 따라가므로(≈파리티) 이 압력이 없으면 무한 스노볼이 된다 (시뮬 검증)
-  depthPressurePerFloor: 0.03,
+  // 1.113.0 무한층 — 정복 층(dg.floors)을 넘어선 깊이는 층당 적 hp·atk에 압력.
+  // 드랍 장비 레벨은 마물 레벨을 따라가므로(≈파리티) 이 압력이 없으면 무한 스노볼이 된다 (시뮬 검증).
+  // 1.114.0 — 복리(1.03^n) → **선형(1 + n×0.01)**: 적 공격력은 레벨 스케일만으로도 장비 HP 성장과
+  // 점근 비율이 정해져 있어(구조적), 압력 2배 = 실질 벽. 100층(PM 체크포인트 단위)이
+  // "엘리트 빌드의 이정표"가 되도록 100층 ≈ ×1.9 / 200층 ≈ ×2.9로 조정 (시뮬 검증)
+  depthPressurePerFloor: 0.01,
   spPerTurn: 0,        // 파생 spRegen에 더해지는 고정값 (SP 압박 조정은 buriedDerived의 spRegen과 함께)
 };
 
@@ -918,13 +971,18 @@ export function buildBuriedRoomEnemy(char, roomType, roomEffectId = null) {
     key = pick(pool.length > 0 ? pool : fallback).key;
   }
   let enemy = buriedEnemyAtLevel(key, monLevel);
-  // 1.113.0 — 깊이의 압력: 정복 층 이후 층당 +3% 복리 (장비는 마물 레벨만 따라가므로 여기서 격차가 벌어진다)
-  const over = Math.max(0, floor - dg.floors);
-  if (over > 0) {
-    const pressure = Math.pow(1 + (BURIED_TUNING.depthPressurePerFloor || 0), over);
+  // 깊이의 압력 — 정복 층 이후 층당 선형 증가 (장비는 마물 레벨만 따라가므로 여기서 격차가 벌어진다)
+  const pressure = buriedDepthPressure(dg, floor);
+  if (pressure > 1) {
     enemy = { ...enemy, hp: Math.round(enemy.hp * pressure), atk: Math.round(enemy.atk * pressure) };
   }
   return { ...enemy, roomType, isBoss: roomType === 'boss' };
+}
+
+// 깊이의 압력 배율 — 정복 층 이후 층당 +2.5% 선형 (1.114.0)
+export function buriedDepthPressure(dg, floor) {
+  const over = Math.max(0, (floor || 1) - dg.floors);
+  return 1 + over * (BURIED_TUNING.depthPressurePerFloor || 0);
 }
 
 // =========================================================
@@ -1216,6 +1274,8 @@ export const BURIED_DUNGEONS = [
     bossFloors: { 5: 'sealWitch', 10: 'tombTyrant' },
     unlock: null,
     desc: '열 개의 층. 바닥에는 먼저 내려간 자들의 유산이 쌓여 있다.',
+    // 1.114.0 — 던전 고유 기믹 (난이도가 아닌 정체성 축)
+    gimmick: { id: 'maze', name: '갈림길', icon: '🌀', desc: '길이 여럿으로 갈라진다 — 방 선택지가 항상 3~4개. 고르는 자에게 유리한 던전.' },
   },
   {
     id: 'ruins', name: '침몰한 폐허', sub: 'The Sunken Ruins', color: '#7a9a5e',
@@ -1224,6 +1284,7 @@ export const BURIED_DUNGEONS = [
     bossFloors: { 6: 'boneGiant', 12: 'tombTyrant' },
     unlock: 'labyrinth',
     desc: '물에 잠긴 층계. 걸음이 빨라질수록 마물도 빨리 자란다.',
+    gimmick: { id: 'flood', name: '침수', icon: '🌊', desc: '물에 잠겨 상처가 곪는다 — 모든 지속피해(중독·출혈·화상) +50%, 회복 -25%. 나와 적 모두. 도트 빌드의 던전.' },
   },
   {
     id: 'chasm', name: '나락의 계단', sub: 'The Chasm Stair', color: '#c4453d',
@@ -1232,6 +1293,7 @@ export const BURIED_DUNGEONS = [
     bossFloors: { 7: 'twilightHusk', 14: 'tombTyrant' },
     unlock: 'ruins',
     desc: '내려갈수록 좁아지는 계단. 한 걸음마다 무언가가 자란다.',
+    gimmick: { id: 'chute', name: '낙하 구멍', icon: '🕳', desc: '가끔 바닥이 꺼져 있다 — 최대 HP 25%를 바치고 3층 아래로 뛰어내린다. 마물이 자라기 전에 깊이 닿는 지름길.' },
   },
   {
     id: 'abyss', name: '심연', sub: 'The Abyss', color: '#5c4a8c',
@@ -1240,6 +1302,7 @@ export const BURIED_DUNGEONS = [
     bossFloors: { 5: 'boneGiant', 10: 'sealWitch', 15: 'twilightHusk', 20: 'tombTyrant' },
     unlock: 'chasm',
     desc: '끝이 있는지 아무도 모른다. 여기서 죽은 자의 장비만이 위로 올라간다.',
+    gimmick: { id: 'dark', name: '어둠', icon: '🌑', desc: '아무것도 보이지 않는다 — 적의 체력·방어·회피 수치가 가려진다. 최고의 보상, 최악의 시야.' },
   },
 ];
 export const getBuriedDungeon = (id) => BURIED_DUNGEONS.find(d => d.id === id) || BURIED_DUNGEONS[0];
