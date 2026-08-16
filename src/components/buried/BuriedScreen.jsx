@@ -17,6 +17,7 @@ import {
   buriedTraitIds, getBuriedTrait, buriedMonsterLevel,
   BURIED_PARTS, BURIED_PART_SLOT_COSTS, getBuriedPart, BURIED_SHARD,
   resolveBuriedLoot, buriedCheckpointFloors,
+  BURIED_DEPTH_CLASSES, buriedEarnedDepthTraits,
 } from '../../data.js';
 import { BuriedItemCard, BuriedBar, BURIED_DUST_ICON, BuriedTierLegend, BuriedLootModal } from './BuriedCommon.jsx';
 import BuriedManage from './BuriedManage.jsx';
@@ -49,7 +50,9 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
     ...BURIED_CLASSES,
     ...BURIED_ADVANCED_CLASSES.filter(c => unlockedClasses.includes(c.id)),
     ...BURIED_ENCOUNTER_CLASSES.filter(c => unlockedClasses.includes(c.id)),
+    ...BURIED_DEPTH_CLASSES.filter(c => unlockedClasses.includes(c.id)), // 1.116.0 — 심층 직업
   ];
+  const earnedDepthTraits = buriedEarnedDepthTraits(b.deepestByDungeon);
   const killsByEnemy = b.killsByEnemy || {};
   const isDungeonUnlocked = (dg) => unlockedDungeons.includes(dg.id);
 
@@ -234,6 +237,19 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
                   아직 잠긴 전직: {BURIED_ADVANCED_CLASSES.filter(c => !unlockedClasses.includes(c.id)).map(c => c.name).join(', ')}
                 </div>
               )}
+              {/* 심층 직업 안내 (1.116.0) */}
+              {BURIED_DEPTH_CLASSES.filter(c => !unlockedClasses.includes(c.id)).length > 0 && (
+                <div className="mt-1.5 px-3 py-2 space-y-1 text-[11px] leading-relaxed"
+                  style={{ borderRadius: 'var(--r-chip, 8px)', background: PALETTE.panel, border: `1px solid ${PALETTE.panelBorder}` }}>
+                  <div style={{ color: PALETTE.text }}>🔒 <b>심층 해금</b> — 각 던전 100층 이상의 보스를 잡으면 그 던전의 직업이 열린다.</div>
+                  {BURIED_DEPTH_CLASSES.filter(c => !unlockedClasses.includes(c.id)).map(c => (
+                    <div key={c.id} style={{ color: PALETTE.textDim }}>
+                      <span style={{ color: c.color }}>{c.name}</span> — {c.unlock.label}
+                      <span className="tabular-nums" style={{ color: PALETTE.textDim }}> (최고 {b.deepestByDungeon?.[c.unlock.dungeonId] || 0}층)</span>
+                    </div>
+                  ))}
+                </div>
+              )}
               {/* 조우 해금 직업 진행도 (1.109.0) */}
               {BURIED_ENCOUNTER_CLASSES.filter(c => !unlockedClasses.includes(c.id)).length > 0 && (
                 <div className="mt-1.5 px-3 py-2 space-y-1 text-[11px] leading-relaxed"
@@ -268,6 +284,21 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
                       </div>
                     );
                   })}
+                  {/* 심층 특성 (1.116.0) — 150층 해금분, 모든 캐릭터에 자동 적용 */}
+                  {earnedDepthTraits.length > 0 && (
+                    <div className="pt-1 space-y-1" style={{ borderTop: `1px solid ${PALETTE.panelBorder}` }}>
+                      <div className="text-[11px] tracking-[0.2em]" style={{ color: '#c48bd4' }}>+ 심층 특성 (150층 기록 — 전 직업 자동 적용)</div>
+                      {earnedDepthTraits.map(id => {
+                        const t = getBuriedTrait(id);
+                        return t ? (
+                          <div key={id} className="text-[12px] leading-relaxed">
+                            <span className="font-bold" style={{ color: '#c48bd4' }}>✦ {t.name}</span>
+                            <span style={{ color: PALETTE.textDim }}> — {t.desc}</span>
+                          </div>
+                        ) : null;
+                      })}
+                    </div>
+                  )}
                   <div className="text-[11px] pt-1" style={{ color: PALETTE.textDim, borderTop: `1px solid ${PALETTE.panelBorder}` }}>
                     장비 계열 — 무기 {c.lines.weapon} / 보조 {c.lines.offhand}
                   </div>

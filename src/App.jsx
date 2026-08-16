@@ -167,6 +167,8 @@ import {
   BURIED_SHARD_DROP,
   BURIED_CALAMITY_REWARD,
   getBuriedPart,
+  buriedEarnedDepthTraits,
+  checkBuriedDepthClassUnlock,
 } from './data.js';
 import { getKstDateKey } from './utils/dailyChallenge.js';
 import { simulateBestEndlessRun } from './utils/endlessSkipSim.js';
@@ -370,7 +372,7 @@ export default function App() {
   const handleBuriedStart = (classId, dungeonId = 'labyrinth', contracts = [], startFloor = 1) => {
     setMeta(prev => {
       const b = getBuried(prev);
-      const char = createBuriedChar(classId, { items: b.legacy, gold: b.legacyGold }, dungeonId, contracts, aggregateBuriedParts(b.parts), startFloor);
+      const char = createBuriedChar(classId, { items: b.legacy, gold: b.legacyGold }, dungeonId, contracts, aggregateBuriedParts(b.parts), startFloor, buriedEarnedDepthTraits(b.deepestByDungeon));
       if (!char) return prev;
       const next = startBuriedChar(prev, char);
       saveMeta(next);
@@ -562,6 +564,18 @@ export default function App() {
     setBuriedEnemy(null); setBuriedRoom(null); setBuriedRoomFx(null);
     if (shardGain) setMeta(prev => { const next = addBuriedShards(prev, shardGain); saveMeta(next); return next; });
     if (conquest) recordBuriedConquest(advanced);
+    // 심층 직업 해금 (1.116.0) — 100층 이상 보스 처치
+    if (buriedRoom === 'boss' && (char.floor || 1) >= 100) {
+      setMeta(prev => {
+        const b = getBuried(prev);
+        const cid = checkBuriedDepthClassUnlock(char.dungeonId || 'labyrinth', char.floor || 1, b.unlockedClasses);
+        if (!cid) return prev;
+        setBuriedForgeNotice(`🔓 심층 직업 해금 — ${getBuriedClass(cid)?.name}! 로비에서 선택할 수 있다.`);
+        const next = { ...prev, buried: { ...b, unlockedClasses: [...b.unlockedClasses, cid] } };
+        saveMeta(next);
+        return next;
+      });
+    }
     // [u109] 저주 포식자 — 전투 중 얻은 먼지 정산
     const dustGain = res.dustGain || 0;
     updateBuriedChar(advanced, dustGain);

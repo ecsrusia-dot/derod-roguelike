@@ -50,9 +50,9 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
   const pf = char.partsFx || {};
   // ===== 던전 고유 기믹 (1.114.0) — flood(침수): 도트 ×1.5·회복 -25% 양쪽 / dark(어둠): 적 수치 은폐
   const gimmickId = dungeon.gimmick?.id || null;
-  // [da1] 심연의 눈 — 어둠을 꿰뚫는다 (수치 은폐 무효)
-  const darkBlind = gimmickId === 'dark' && !buriedUniqueIds(char).includes('da1');
-  // [da2] 어둠에 벼린 칼 — 매 전투 첫 공격 2배 (1회 소비)
+  // [da1] 심연의 눈 / 특성 「공허시」 — 어둠을 꿰뚫는다 (수치 은폐 무효)
+  const darkBlind = gimmickId === 'dark' && !buriedUniqueIds(char).includes('da1') && !traits.includes('voidsight');
+  // [da2] 어둠에 벼린 칼 ×2 / 특성 「공허시」 ×1.5 — 매 전투 첫 공격 (1회 소비)
   const firstStrikeRef = useRef(true);
   // 스킬 단계 보정 — [u113] 쿨 0 / [u101] 쿨 상한 1 / [u99] 레벨당 위력 +2% / [u94] 2회 시전·위력 절반
   const applyUniqueSkillMods = (sk) => {
@@ -89,7 +89,8 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
   const [player, setPlayer] = useState(() => ({
     name: cls?.name || '탐험가',
     hp: char.hp, maxHp: d.maxHp,
-    sp: Math.round(d.maxSp * (uniques.includes('u106') ? 1 : 0.55 + (aggregateBuriedContracts(char).startSpPct || 0) / 100)), maxSp: d.maxSp,
+    sp: Math.round(d.maxSp * (uniques.includes('u106') ? 1
+      : 0.55 + (aggregateBuriedContracts(char).startSpPct || 0) / 100 + (traits.includes('pathfinder') ? 0.25 : 0))), maxSp: d.maxSp,
     barrier: hasBuriedCurse(char, 'alloces') ? 0
       : Math.round(((d.barrier || 0) + (env.self.barrierAdd || 0) + (char.carryBarrier || 0)) * (hasBuriedCurse(char, 'amon') ? 0.5 : 1)),
     // [u107] 물리·기교 += 최대 HP 8% / [u111] 마법 += 보호막 30%
@@ -221,7 +222,8 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
   };
   const dmgText = (r, extra = '') => `-${r.toHp}${r.absorbed > 0 ? ` (🔷${r.absorbed})` : ''}${extra}`;
 
-  const statusOpts = { chancePct: (env.self.statusChancePct || 0) + (uq('u57') ? 100 : 0) + (cf.statusChance || 0) + (pf.statusChance || 0), extra: env.self.statusExtra || 0 };
+  // 특성 「역병」 — 내가 거는 상태이상 스택 +1
+  const statusOpts = { chancePct: (env.self.statusChancePct || 0) + (uq('u57') ? 100 : 0) + (cf.statusChance || 0) + (pf.statusChance || 0), extra: (env.self.statusExtra || 0) + (traits.includes('pestilence') ? 1 : 0) };
   const foeStatusOpts = { chancePct: (env.foe.statusChancePct || 0) - (cf.statusResist || 0), extra: (uq('u113') ? 1 : 0) + (cs('sabnock') ? 1 : 0) };
 
   // ===== 전투 종료 =====
@@ -333,11 +335,18 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
           const mult = 1 + Math.min(40, lostPct * 0.5) / 100;
           res.total = Math.round(res.total * mult); res.chase = Math.round(res.chase * mult);
         }
-        // [da2] 어둠에 벼린 칼 — 매 전투 첫 공격 2배
-        if (uq('da2') && firstStrikeRef.current) {
-          res.total *= 2; res.chase *= 2;
+        // 특성 「자유낙하」 — 잃은 HP 1%당 +0.4% (최대 +32%)
+        if (traits.includes('freefall')) {
+          const lostPct = Math.max(0, (1 - P.hp / P.maxHp) * 100);
+          const mult = 1 + Math.min(32, lostPct * 0.4) / 100;
+          res.total = Math.round(res.total * mult); res.chase = Math.round(res.chase * mult);
+        }
+        // [da2] 어둠에 벼린 칼 ×2 / 특성 「공허시」 ×1.5 — 매 전투 첫 공격
+        if ((uq('da2') || traits.includes('voidsight')) && firstStrikeRef.current) {
+          const fsMult = (uq('da2') ? 2 : 1) * (traits.includes('voidsight') ? 1.5 : 1);
+          res.total = Math.round(res.total * fsMult); res.chase = Math.round(res.chase * fsMult);
           firstStrikeRef.current = false;
-          pushLog('어둠에 벼린 칼 — 어둠 속의 일격, 피해 2배!', PALETTE.legendary);
+          pushLog(`어둠 속의 일격 — 첫 공격 피해 ×${fsMult}!`, PALETTE.legendary);
         }
         // [u87] 도살자의 눈 — 치명타마다 치명 확률 누적
         if (uq('u87') && res.crits > 0) { P.crit += 2 * res.crits; pushLog(`도살자의 눈 — 치명 확률 +${2 * res.crits}% (현재 ${P.crit}%)`, PALETTE.legendary); }
