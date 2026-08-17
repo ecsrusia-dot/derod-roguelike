@@ -245,6 +245,51 @@ export const BURIED_SKILLS = {
   silenceSigil:SK({ id: 'silenceSigil',name: '봉인 인장',  slot: 'acc', line: null, gear: '봉인 목걸이', sp: 18, cd: 3, apply: [{ s: 'silence', n: 2, p: 100 }], desc: '[침묵] 2' }),
   lifeCharm:   SK({ id: 'lifeCharm',   name: '생명의 부적', slot: 'acc', line: null, gear: '생명의 부적', sp: 20, cd: 2, heal: 72, desc: 'HP 72 회복.' }),
   berserkSigil:SK({ id: 'berserkSigil',name: '폭주 인장',  slot: 'acc', line: null, gear: '폭주의 인장', sp: 22, cd: 3, self: [{ s: 'rage', n: 4 }], selfDmg: 12, desc: '[격노] 4. 자해 12' }),
+
+  // ===== 1.126.0 — BB2 공식 데이터시트(スキルSkill 421행) 선별 이식 30종 =====
+  // 검(sword)
+  twinFang:    SK({ id: 'twinFang',    name: '이연격',     slot: 'weapon', line: 'sword', gear: '쌍아검',     sp: 16, cd: 0, stat: 'str', power: 72, hits: 2, desc: '가볍게 두 번 벤다 (타격당 72%).' }),
+  whirlSlash:  SK({ id: 'whirlSlash',  name: '선풍검',     slot: 'weapon', line: 'sword', gear: '선풍검',     sp: 28, cd: 2, stat: 'str', power: 64, hits: 3, desc: '휘몰아치는 3연타 (타격당 64%).' }),
+  // 지팡이(staff)
+  flameWall:   SK({ id: 'flameWall',   name: '업화 방벽',  slot: 'weapon', line: 'staff', gear: '업화 지팡이', sp: 18, cd: 2, stat: 'int', power: 52, apply: [{ s: 'burn', n: 2, p: 100 }], self: [{ s: 'guard', n: 2 }], desc: '[화상] 2 + 자신 [수호] 2' }),
+  thunderBolt: SK({ id: 'thunderBolt', name: '낙뢰',       slot: 'weapon', line: 'staff', gear: '낙뢰의 홀',   sp: 34, cd: 3, stat: 'int', power: 195, desc: '하늘이 내리꽂힌다.' }),
+  // 도끼(axe)
+  earthSplit:  SK({ id: 'earthSplit',  name: '대지 가르기', slot: 'weapon', line: 'axe', gear: '단층 도끼',   sp: 18, cd: 1, stat: 'str', power: 96, apply: [{ s: 'shatter', n: 3, p: 100 }], desc: '[파쇄] 3' }),
+  rampage:     SK({ id: 'rampage',     name: '광란',       slot: 'weapon', line: 'axe', gear: '광란 도끼',   sp: 24, cd: 2, stat: 'str', power: 88, hits: 2, selfDmg: 6, desc: '2연타 (타격당 88%). 자해 6' }),
+  // 활(bow)
+  rapidShot:   SK({ id: 'rapidShot',   name: '속사',       slot: 'weapon', line: 'bow', gear: '속사궁',     sp: 14, cd: 0, stat: 'dex', power: 62, hits: 2, desc: '연달아 쏜다 (타격당 62%).' }),
+  shadowShot:  SK({ id: 'shadowShot',  name: '그림자 사격', slot: 'weapon', line: 'bow', gear: '그림자 궁',   sp: 24, cd: 2, stat: 'dex', power: 165, self: [{ s: 'evade', n: 1 }], desc: '어둠에서 쏜다. 자신 [잔영] 1' }),
+  // 철퇴(mace)
+  holyBolt:    SK({ id: 'holyBolt',    name: '성뢰',       slot: 'weapon', line: 'mace', gear: '성뢰의 철퇴', sp: 16, cd: 1, stat: 'int', power: 112, critBonus: 15, desc: '빛의 화살. 치명 확률 +15%' }),
+  punisher:    SK({ id: 'punisher',    name: '응징',       slot: 'weapon', line: 'mace', gear: '응징의 철퇴', sp: 22, cd: 2, stat: 'int', power: 118, executeBelow: 40, desc: '적 HP 40% 이하면 데미지 2배.' }),
+  // 단검(blade)
+  legSweep:    SK({ id: 'legSweep',    name: '발목 베기',  slot: 'offhand', line: 'blade', gear: '갈고리 단검', sp: 14, cd: 1, stat: 'str', power: 70, apply: [{ s: 'bind', n: 1, p: 100 }], desc: '[속박] 1' }),
+  shuriken:    SK({ id: 'shuriken',    name: '표창 투척',  slot: 'offhand', line: 'blade', gear: '표창 주머니', sp: 18, cd: 1, stat: 'str', power: 38, hits: 3, desc: '3연타 (타격당 38%).' }),
+  // 마도서(tome)
+  darkBolt:    SK({ id: 'darkBolt',    name: '암흑탄',     slot: 'offhand', line: 'tome', gear: '암흑 마도서', sp: 16, cd: 1, stat: 'int', power: 96, apply: [{ s: 'curse', n: 1, p: 100 }], desc: '[저주] 1' }),
+  suddenGust:  SK({ id: 'suddenGust',  name: '돌풍',       slot: 'offhand', line: 'tome', gear: '질풍 마도서', sp: 8, cd: 0, stat: 'int', power: 74, spGain: 6, desc: '빠른 일격. SP +6' }),
+  // 마수의 손톱(claw)
+  rendFlesh:   SK({ id: 'rendFlesh',   name: '찢어발기기', slot: 'offhand', line: 'claw', gear: '갈퀴 손톱',   sp: 20, cd: 1, stat: 'str', power: 54, hits: 2, apply: [{ s: 'bleed', n: 3, p: 100 }], desc: '2연타. [출혈] 3' }),
+  devour:      SK({ id: 'devour',      name: '포식',       slot: 'offhand', line: 'claw', gear: '포식자 발톱', sp: 22, cd: 2, stat: 'str', power: 92, drain: 60, desc: '준 피해의 60% 흡혈.' }),
+  // 화살통(quiver)
+  fireArrow:   SK({ id: 'fireArrow',   name: '화염 화살',  slot: 'offhand', line: 'quiver', gear: '화염 화살통', sp: 14, cd: 1, stat: 'dex', power: 74, apply: [{ s: 'burn', n: 2, p: 100 }], desc: '[화상] 2' }),
+  camouflage:  SK({ id: 'camouflage',  name: '은신',       slot: 'offhand', line: 'quiver', gear: '위장 망토통', sp: 12, cd: 2, self: [{ s: 'evade', n: 2 }, { s: 'guard', n: 2 }], desc: '[잔영] 2 + [수호] 2' }),
+  // 성물(relic)
+  oracle:      SK({ id: 'oracle',      name: '신탁',       slot: 'offhand', line: 'relic', gear: '신탁의 성물', sp: 18, cd: 2, self: [{ s: 'rage', n: 2 }, { s: 'regen', n: 2 }], desc: '[격노] 2 + [재생] 2' }),
+  sanctify:    SK({ id: 'sanctify',    name: '성별',       slot: 'offhand', line: 'relic', gear: '성별의 성물', sp: 22, cd: 2, stat: 'int', power: 66, heal: 40, desc: '빛으로 치고 HP 40 회복.' }),
+  // 방어구 (공용)
+  shieldBash:  SK({ id: 'shieldBash',  name: '방패 강타',  slot: 'armor', line: null, gear: '타워 방패',   sp: 12, cd: 1, stat: 'str', power: 72, apply: [{ s: 'stun', n: 1, p: 30 }], desc: '30% 확률 [기절] 1' }),
+  mirrorPlate: SK({ id: 'mirrorPlate', name: '거울 갑주',  slot: 'armor', line: null, gear: '거울 갑주',   sp: 16, cd: 2, self: [{ s: 'guard', n: 1 }], reflect: 50, desc: '[수호] 1. 2턴간 받은 피해의 50% 반사' }),
+  bulwark:     SK({ id: 'bulwark',     name: '대성벽',     slot: 'armor', line: null, gear: '성채 갑옷',   sp: 20, cd: 3, self: [{ s: 'guard', n: 5 }], desc: '[수호] 5' }),
+  // 투구 (공용)
+  chargeUp:    SK({ id: 'chargeUp',    name: '힘 모으기',  slot: 'helm', line: null, gear: '투사의 투구', sp: 8, cd: 3, self: [{ s: 'rage', n: 3 }], desc: '[격노] 3' }),
+  observe:     SK({ id: 'observe',     name: '관찰',       slot: 'helm', line: null, gear: '감시자의 눈', sp: 6, cd: 1, apply: [{ s: 'weaken', n: 2, p: 100 }], spGain: 8, desc: '[약화] 2, SP +8' }),
+  warHorn:     SK({ id: 'warHorn',     name: '전쟁 나팔',  slot: 'helm', line: null, gear: '전쟁 나팔 투구', sp: 14, cd: 2, self: [{ s: 'rage', n: 1 }], apply: [{ s: 'weaken', n: 2, p: 100 }], desc: '[격노] 1 + 적 [약화] 2' }),
+  // 장신구 (공용)
+  boneGraft:   SK({ id: 'boneGraft',   name: '뼈 접합',    slot: 'acc', line: null, gear: '뼈 목걸이',   sp: 18, cd: 2, heal: 55, self: [{ s: 'guard', n: 1 }], desc: 'HP 55 회복 + [수호] 1' }),
+  grudge:      SK({ id: 'grudge',      name: '원한',       slot: 'acc', line: null, gear: '원한의 인장', sp: 16, cd: 2, stat: 'int', power: 58, apply: [{ s: 'curse', n: 2, p: 100 }], desc: '[저주] 2' }),
+  fairyDust:   SK({ id: 'fairyDust',   name: '요정 가루',  slot: 'acc', line: null, gear: '요정의 병',   sp: 12, cd: 2, apply: [{ s: 'confuse', n: 1, p: 100 }, { s: 'weaken', n: 1, p: 100 }], desc: '[혼란] 1 + [약화] 1' }),
+  dragonFang:  SK({ id: 'dragonFang',  name: '용아',       slot: 'acc', line: null, gear: '용아 목걸이', sp: 24, cd: 2, stat: 'str', power: 128, selfDmg: 8, desc: '용의 이빨로 문다. 자해 8' }),
 };
 export const BURIED_SKILL_LIST = Object.values(BURIED_SKILLS);
 
