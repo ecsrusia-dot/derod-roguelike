@@ -186,6 +186,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
   const [result, setResult] = useState(null);
   const [floats, setFloats] = useState([]);
   const [potionUsedThisTurn, setPotionUsedThisTurn] = useState(false);
+  const [swiftUsedThisTurn, setSwiftUsedThisTurn] = useState(false); // 1.136.0 — ⚡ 신속 (턴당 1회)
   const [spentMap, setSpentMap] = useState({}); // 1.132.0 — 이번 전투에서 슬롯별 스킬 사용 횟수
   const spentMapRef = useRef({});
   useEffect(() => { spentMapRef.current = spentMap; }, [spentMap]);
@@ -588,6 +589,15 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     if (E.hp <= 0 && !eliteRevive(E)) { pushLog(`${E.name} 격파!`, PALETTE.legendary); setFoe({ ...E, hp: 0 }); finish(true, P.hp); setBusy(false); return; }
     if (P.hp <= 0) { finish(false, 0); setBusy(false); return; }
 
+    // ---------- ⚡ 신속 (1.136.0) — 순수 버프·디버프는 턴을 소모하지 않는다 (턴당 1회) ----------
+    // [혼란]으로 행동이 실패하면(skill=null) 신속이라도 턴을 날린다 — 혼란의 정의 그대로.
+    if (kind === 'skill' && skill && skill.swift && !swiftUsedThisTurn) {
+      setSwiftUsedThisTurn(true);
+      pushLog('⚡ 신속 — 턴을 소모하지 않았다. 이어서 행동할 수 있다.', PALETTE.dawn);
+      setBusy(false);
+      return;
+    }
+
     // ---------- 2. 적 행동 ----------
     if ((E.statuses.stun || 0) > 0) {
       pushLog(`${E.name}은(는) 기절해 움직이지 못한다.`, PALETTE.shock);
@@ -816,6 +826,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     settleMichael(E);
     setPlayer(P); setFoe(E);
     setPotionUsedThisTurn(false);
+    setSwiftUsedThisTurn(false);
     await wait(260);
 
     if (E.hp <= 0 && !eliteRevive(E)) { pushLog(`${E.name} 격파!`, PALETTE.legendary); setFoe({ ...E, hp: 0 }); finish(true, P.hp); setBusy(false); return; }
@@ -1001,7 +1012,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
                   <span className="truncate">{eff.name}{lv > 1 && <span style={{ color: PALETTE.legendary }}> Lv.{lv}</span>}</span>
                 </div>
                 <div className="text-[11px] tabular-nums truncate" style={{ color: sealed ? PALETTE.accent : noSp ? PALETTE.accent : PALETTE.ice }}>
-                  {sealed ? '⛓ 봉인 — 새 장비 필요' : `SP ${spCost}${cd > 0 ? ` · 쿨 ${cd}` : ''}${eff.power ? ` · ${eff.power}%${eff.hits ? `×${eff.hits}` : ''}` : ''} · 횟수 ${usesLeft}`}
+                  {sealed ? '⛓ 봉인 — 새 장비 필요' : `SP ${spCost}${cd > 0 ? ` · 쿨 ${cd}` : ''}${eff.power ? ` · ${eff.power}%${eff.hits ? `×${eff.hits}` : ''}` : ''}${eff.swift ? (swiftUsedThisTurn ? ' · ⚡사용됨' : ' · ⚡신속') : ''} · 횟수 ${usesLeft}`}
                 </div>
                 <div className="text-[11px] truncate" style={{ color: PALETTE.textDim }}>{slotMeta(slot).icon} {eff.desc}</div>
               </button>
