@@ -127,10 +127,44 @@ export const BURIED_RACES = [
     desc: '이미 죽은 몸. 적의 상태이상 확률 -20% — 대신 회복량 -25%.' },
 ];
 export const getBuriedRace = (id) => BURIED_RACES.find(r => r.id === id) || null;
-// 종족 fx 뭉치 — 특성·계약·부품과 같은 소비 어휘 (미선택 구 캐릭터는 빈 객체 = 회귀 안전)
+// 종족+출신 fx 뭉치 (1.131.0~ 출신 통합) — 특성·계약·부품과 같은 소비 어휘.
+// 미선택 구 캐릭터는 빈 객체 = 회귀 안전. hpMult는 곱산, 나머지 합산.
 export function buriedRaceFx(char) {
-  return getBuriedRace(char?.raceId)?.fx || {};
+  const bags = [getBuriedRace(char?.raceId)?.fx, getBuriedOrigin(char?.originId)?.fx].filter(Boolean);
+  if (bags.length === 0) return {};
+  if (bags.length === 1) return bags[0];
+  const out = {};
+  for (const bag of bags) for (const [k, v] of Object.entries(bag)) {
+    if (k === 'hpMult') out.hpMult = (out.hpMult || 1) * v;
+    else out[k] = (out[k] || 0) + v;
+  }
+  return out;
 }
+
+// =========================================================
+// 3b-2. 출신 8종 (1.131.0) — BB2 出自Origin 이식 9탄 (생성 3축 완성: 종족 × 직업 × 출신)
+// =========================================================
+// 원작: 종족보다 작은 미세 보정 축. PM 결정: 별도 위저드 단계가 아니라 **종족 화면 하단 통합** 선택.
+// fx는 종족과 같은 어휘 — buriedRaceFx가 종족+출신을 하나의 rf bag으로 합산해 소비 지점 추가 0.
+export const BURIED_ORIGINS = [
+  { id: 'commoner', name: '평범', icon: '🌾', statMods: { str: 1, dex: 1, int: 1, vit: 1 }, fx: { hp: 10 },
+    desc: '무난하게 자랐다. 전 스탯 +1, HP +10.' },
+  { id: 'noble',    name: '고귀', icon: '👑', statMods: { int: 2 }, fx: { barrier: 20 },
+    desc: '귀하게 자랐다. 지능 +2, 시작 보호막 +20.' },
+  { id: 'exile',    name: '추방', icon: '🥀', statMods: { str: 2, int: 2 }, fx: { hp: -15 },
+    desc: '내쫓기며 단련됐다. 힘·지능 +2 — HP -15.' },
+  { id: 'pauper',   name: '빈곤', icon: '🕳', statMods: { dex: 1 }, fx: { barrier: 40, hp: -25 },
+    desc: '몸보다 요령으로 버텼다. 시작 보호막 +40 — HP -25.' },
+  { id: 'drifter',  name: '유랑', icon: '🌬', statMods: { dex: 2 }, fx: {}, startGold: 80,
+    desc: '떠돌며 주워 모았다. 민첩 +2, 시작 골드 +80.' },
+  { id: 'rebel',    name: '반역', icon: '🔥', statMods: { str: 1, dex: 1, int: 1 }, fx: { def: -2 },
+    desc: '맞서며 자랐다. 힘·민·지 +1 — 방어 -2.' },
+  { id: 'success',  name: '성공', icon: '🪙', statMods: {}, fx: { goldPct: 8 },
+    desc: '벌 줄 안다. 골드 획득 +8%.' },
+  { id: 'pacifist', name: '안녕', icon: '🕊', statMods: { vit: 1 }, fx: { healPct: 8 },
+    desc: '평온을 안다. 체력 +1, 회복량 +8%.' },
+];
+export const getBuriedOrigin = (id) => BURIED_ORIGINS.find(o => o.id === id) || null;
 
 // =========================================================
 // 3c. ⚓ 쐐기석 12종 (1.128.0) — BB2 데이터시트(楔石Keystone 121행) 이식 6탄
@@ -508,10 +542,11 @@ export function buriedDustValue(item) {
 // =========================================================
 export const buriedExpToNext = (lv) => 32 + lv * 20;
 
-export function createBuriedChar(classId, legacy = { items: [], gold: 0 }, dungeonId = 'labyrinth', contracts = [], partsFx = {}, startFloor = 1, depthTraits = [], raceId = null, keystones = []) {
+export function createBuriedChar(classId, legacy = { items: [], gold: 0 }, dungeonId = 'labyrinth', contracts = [], partsFx = {}, startFloor = 1, depthTraits = [], raceId = null, keystones = [], originId = null) {
   const cls = getBuriedClass(classId);
   if (!cls) return null;
   const race = getBuriedRace(raceId);
+  const origin = getBuriedOrigin(originId); // 1.131.0 — 출신 (3축)
   const equipped = {};
   for (const s of BURIED_SLOT_IDS) equipped[s] = null;
   // 1.114.0 체크포인트 — 100층 단위 재출발. 걸음수는 층 파리티(1방/층).
@@ -533,9 +568,10 @@ export function createBuriedChar(classId, legacy = { items: [], gold: 0 }, dunge
   const char = {
     classId, lv: 1, exp: 0,
     raceId: race?.id || null, // 1.122.0 — 종족 축 (BB2)
+    originId: origin?.id || null, // 1.131.0 — 출신 축 (BB2, 종족 화면 통합)
     stats: Object.fromEntries(Object.entries(cls.stats).map(([k, v]) =>
-      [k, Math.max(1, v + (race?.statMods?.[k] || 0))])),
-    gold: 80 + (legacy.gold || 0),
+      [k, Math.max(1, v + (race?.statMods?.[k] || 0) + (origin?.statMods?.[k] || 0))])),
+    gold: 80 + (legacy.gold || 0) + (origin?.startGold || 0),
     equipped,
     pendingLoot: [], // 1.113.0 — 획득 즉시 [교체/버리기] 판단 대기열
     runes: [],       // 1.123.0 — ᚱ 룬 주머니 (각인 전 보관)
@@ -627,7 +663,7 @@ export function buriedDerived(char) {
     atk:     Math.round((10 + st.str * 1.6 + (gear.atk || 0) + (pf.atk || 0)) * (1 + ((tf.physPct || 0) + (cf.physPct || 0) + (rf.physPct || 0) + (uf.physPct || 0)) / 100)),
     fin:     Math.round((10 + st.dex * 1.6 + (gear.atk || 0) + (pf.atk || 0)) * (1 + ((tf.physPct || 0) + (cf.physPct || 0) + (rf.physPct || 0) + (uf.physPct || 0)) / 100)),
     mag:     Math.round((10 + st.int * 1.6 + (gear.mag || 0) + (pf.mag || 0)) * (1 + ((tf.magPct || 0) + (cf.magPct || 0) + (rf.magPct || 0) + (uf.magPct || 0)) / 100)),
-    def:     Math.round(4 + st.vit * 0.9 + (gear.def || 0) + (pf.def || 0) + (uf.def || 0)),
+    def:     Math.round(4 + st.vit * 0.9 + (gear.def || 0) + (pf.def || 0) + (uf.def || 0) + (rf.def || 0)),
     crit:    Math.round(5 + st.dex * 0.6 + (gear.crit || 0) + (tf.crit || 0) + (cf.crit || 0) + (pf.crit || 0) + (rf.crit || 0) + (uf.crit || 0)),
     critDmg: 60 + (gear.critDmg || 0),
     dodge:   Math.min(45, Math.round(3 + st.dex * 0.4 + (gear.dodge || 0) + (tf.dodge || 0) + (cf.dodge || 0) + (pf.dodge || 0) + (rf.dodge || 0) + (uf.dodge || 0))),

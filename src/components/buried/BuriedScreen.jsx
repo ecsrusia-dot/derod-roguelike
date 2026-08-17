@@ -14,6 +14,7 @@ import {
   BURIED_SLOTS, BURIED_FORGE,
   buriedForgeLevel,
   BURIED_KEYSTONES, BURIED_KEYSTONE_MAX, getBuriedKeystone,
+  BURIED_ORIGINS, getBuriedOrigin,
   BURIED_CONTRACTS, BURIED_CONTRACT_COST, BURIED_CONTRACT_CARRY, getBuriedContract,
   buriedDerived, buriedExpToNext, getBuriedClass, getBuriedDungeon,
   buriedTraitIds, getBuriedTrait, buriedMonsterLevel,
@@ -40,6 +41,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
   const [pickClass, setPickClass] = useState(BURIED_CLASSES[0].id);
   const [pickRace, setPickRace] = useState('human'); // 1.122.0 — 종족 축
   const [pickKeystones, setPickKeystones] = useState([]); // 1.128.0 — ⚓ 쐐기석 (정복 던전만)
+  const [pickOrigin, setPickOrigin] = useState('commoner'); // 1.131.0 — 출신 (종족 화면 통합)
   const [pickDungeon, setPickDungeon] = useState(unlockedDungeons[unlockedDungeons.length - 1] || 'labyrinth');
   const [pickStart, setPickStart] = useState(1);
   const [carryPicks, setCarryPicks] = useState([]);
@@ -328,6 +330,28 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
                 </button>
               );
             })}
+            {/* ── 출신 (1.131.0 — BB2 3축, 종족 화면 통합) ── */}
+            <div className="text-[11px] pt-2" style={{ color: PALETTE.textDim }}>
+              어떻게 자랐는가 — 출신은 작은 체질 보정이다.
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {BURIED_ORIGINS.map(o => {
+                const on = pickOrigin === o.id;
+                return (
+                  <button key={o.id} onClick={() => setPickOrigin(o.id)} className="ui-press px-2.5 py-1.5 text-[11px]"
+                    style={{
+                      borderRadius: R.chip, background: on ? PALETTE.panelLight : 'transparent',
+                      border: `1px solid ${on ? PALETTE.dawn : PALETTE.panelBorder}`,
+                      color: on ? PALETTE.dawn : PALETTE.textDim,
+                    }}>
+                    {o.icon} {o.name}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="px-3 py-2 text-[11px] leading-relaxed" style={{ borderRadius: R.chip, background: PALETTE.panel, border: `1px solid ${PALETTE.panelBorder}`, color: PALETTE.textDim }}>
+              {getBuriedOrigin(pickOrigin)?.icon} <b style={{ color: PALETTE.text }}>{getBuriedOrigin(pickOrigin)?.name}</b> — {getBuriedOrigin(pickOrigin)?.desc}
+            </div>
           </div>
         )}
 
@@ -449,6 +473,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
                 <div className="flex justify-between text-[12px]"><span style={{ color: PALETTE.textDim }}>던전</span><span style={{ color: dg.color }}>{dg.gimmick?.icon} {dg.name}</span></div>
                 <div className="flex justify-between text-[12px]"><span style={{ color: PALETTE.textDim }}>시작 층</span><span style={{ color: PALETTE.text }}>{pickStart > 1 ? `${pickStart + 1}층 (${pickStart}층 관문 너머)` : '1층'}</span></div>
                 <div className="flex justify-between text-[12px]"><span style={{ color: PALETTE.textDim }}>종족</span><span style={{ color: getBuriedRace(pickRace)?.color }}>{getBuriedRace(pickRace)?.icon} {getBuriedRace(pickRace)?.name}</span></div>
+                <div className="flex justify-between text-[12px]"><span style={{ color: PALETTE.textDim }}>출신</span><span style={{ color: PALETTE.dawn }}>{getBuriedOrigin(pickOrigin)?.icon} {getBuriedOrigin(pickOrigin)?.name}</span></div>
                 <div className="flex justify-between text-[12px]"><span style={{ color: PALETTE.textDim }}>쐐기석</span><span style={{ color: PALETTE.twilight }}>{pickKeystones.length > 0 ? pickKeystones.map(id => getBuriedKeystone(id)?.icon).join(' ') : '없음'}</span></div>
                 <div className="flex justify-between text-[12px]"><span style={{ color: PALETTE.textDim }}>직업</span><span style={{ color: c?.color }}>{c?.name}</span></div>
                 {(b.legacyGold || 0) > 0 && <div className="flex justify-between text-[12px]"><span style={{ color: PALETTE.textDim }}>계승 골드</span><span style={{ color: PALETTE.legendary }}>🪙 {b.legacyGold}</span></div>}
@@ -486,7 +511,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
                 </div>
               )}
 
-              <button onClick={() => onStartChar(pickClass, pickDungeon, carryPicks, pickStart > 1 ? pickStart + 1 : 1, pickRace, pickKeystones)}
+              <button onClick={() => onStartChar(pickClass, pickDungeon, carryPicks, pickStart > 1 ? pickStart + 1 : 1, pickRace, pickKeystones, pickOrigin)}
                 className="ui-press ui-sheen w-full py-3.5 text-[14px] font-bold"
                 style={{ borderRadius: R.btn, background: PALETTE.accent, color: '#fff' }}>
                 ⚰ {dg.name} {pickStart > 1 ? pickStart + 1 : 1}층으로 내려간다
