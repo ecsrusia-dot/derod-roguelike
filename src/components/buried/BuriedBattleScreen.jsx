@@ -24,7 +24,7 @@ import {
   buriedSkillAt, buriedSkillLv, buriedSkillLvNote, buriedTraitIds, getBuriedTrait,
   getBuriedRoomEffect, getBuriedFloorEffect, resolveBuriedEnvFx, getBuriedDungeon,
   buriedUniqueIds, getBuriedUnique, rollBuriedUniqueDrop, BURIED_UNDEAD_KEYS,
-  buriedModdedSkill, hasBuriedCurse, aggregateBuriedContracts,
+  buriedModdedSkill, hasBuriedCurse, aggregateBuriedContracts, buriedLootPower,
 } from '../../data.js';
 import { BuriedBar, BuriedStatusRow, BuriedItemCard, slotMeta, SkillKindBadge, BuriedInfoModal } from './BuriedCommon.jsx';
 
@@ -271,12 +271,13 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
       const dropChance = bossy || roomType === 'elite' ? 100 : Math.min(100, 38 + (uq('dl4') ? 20 : 0));
       const drops = [];
       const luck = dungeon.dropLuck + (cf.dropLuck || 0) + (pf.dropLuck || 0) + (guardianFight ? 12 : bossy ? 6 : roomType === 'elite' ? 3 : 0);
+      const lootPower = buriedLootPower(char); // 1.121.0 — 깊이 위력 배율 (시작 장비와 같은 저울)
       if (Math.random() * 100 < dropChance) {
-        const it = rollBuriedItem({ slot: null, classId: char.classId, floor: enemy.lv || char.floor, luck });
+        const it = rollBuriedItem({ slot: null, classId: char.classId, floor: enemy.lv || char.floor, luck, powerMult: lootPower });
         if (it) drops.push(it);
       }
       if (bossy) {
-        const extra = rollBuriedItem({ slot: null, classId: char.classId, floor: enemy.lv || char.floor, luck: luck + 2 });
+        const extra = rollBuriedItem({ slot: null, classId: char.classId, floor: enemy.lv || char.floor, luck: luck + 2, powerMult: lootPower });
         if (extra) drops.push(extra);
         // ===== 전설의 무구 드랍 (1.106.0, PM 결정: 보스 전용 / 1.112.0 재앙은 확정) =====
         const owned = [
@@ -291,6 +292,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
           floor: enemy.lv || char.floor,
           ownedIds: owned,
           guaranteed: roomType === 'calamity' || guardianFight,
+          powerMult: lootPower,
         });
         if (uniqueDrop) drops.push(uniqueDrop);
       }

@@ -30,7 +30,7 @@ import {
   aggregateBuriedContracts,
   BURIED_CALAMITY_GAUGE_MAX, buildBuriedCalamity,
   resolveBuriedLoot, buriedBossKeyAt,
-  BURIED_CHUTE_ROOM, BURIED_CHUTE_HP_PCT, buriedChuteJump,
+  BURIED_CHUTE_ROOM, BURIED_CHUTE_HP_PCT, buriedChuteJump, buriedLootPower,
 } from '../../data.js';
 import { BuriedItemCard, BuriedBar, BURIED_DUST_ICON, slotMeta, BuriedLootModal } from './BuriedCommon.jsx';
 import BuriedManage from './BuriedManage.jsx';
@@ -96,15 +96,15 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
     }
     let roomData = null;
     if (type === 'shop') {
-      let shop = rollBuriedShop(monLevel, char.classId);
+      let shop = rollBuriedShop(monLevel, char.classId, buriedLootPower(char));
       // [u103] 상인의 인장 — 판매가 40% 할인
       if (hasBuriedUnique(char, 'u103')) shop = shop.map(e => ({ ...e, price: Math.round(e.price * 0.6) }));
       roomData = { shop, bought: [] };
     }
     if (type === 'treasure') {
       // [u110] 도굴왕의 곡괭이 — 부장품 방에서 장비 1개 추가
-      const items = [rollBuriedItem({ slot: null, classId: char.classId, floor: monLevel, luck: 2 + dungeon.dropLuck })];
-      if (hasBuriedUnique(char, 'u110')) items.push(rollBuriedItem({ slot: null, classId: char.classId, floor: monLevel, luck: 2 + dungeon.dropLuck }));
+      const items = [rollBuriedItem({ slot: null, classId: char.classId, floor: monLevel, luck: 2 + dungeon.dropLuck, powerMult: buriedLootPower(char) })];
+      if (hasBuriedUnique(char, 'u110')) items.push(rollBuriedItem({ slot: null, classId: char.classId, floor: monLevel, luck: 2 + dungeon.dropLuck, powerMult: buriedLootPower(char) }));
       roomData = { items: items.filter(Boolean), taken: [] };
     }
     if (type === 'negotiate') roomData = { deal: buildBuriedNegotiation(char), done: false };

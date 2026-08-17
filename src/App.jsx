@@ -388,7 +388,7 @@ export default function App() {
     const cost = epic ? BURIED_FORGE.epicCost : BURIED_FORGE.randomCost;
     if ((b0.dust || 0) < cost) { setBuriedForgeNotice('먼지가 부족하다.'); return; }
     if (!b0.char) { setBuriedForgeNotice('탐험 중인 캐릭터가 있어야 벼릴 수 있다.'); return; }
-    const item = craftBuriedItem({ slot, classId, deepest: b0.deepest, epic });
+    const item = craftBuriedItem({ slot, classId, deepest: b0.deepest, epic, char: b0.char });
     if (!item) return;
     let notice = null;
     setMeta(prev => {
