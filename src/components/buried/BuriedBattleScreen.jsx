@@ -134,22 +134,26 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const eliteFx = enemy.eliteFx || {}; // ☠ 엘리트 변형 판정 플래그 (1.124.0)
   const [foe, setFoe] = useState(() => ({
     name: enemy.name, hp: enemy.hp, maxHp: enemy.hp,
     // 1.106.0 — 강적·보스는 보호막을 두른다 ([u90] 파성추의 3배 조건이 의미를 갖는 지점)
-    barrier: enemy.tier === 'boss' ? Math.round(enemy.hp * 0.15) : enemy.tier === 'elite' ? Math.round(enemy.hp * 0.08) : 0,
+    barrier: (enemy.tier === 'boss' ? Math.round(enemy.hp * 0.15) : enemy.tier === 'elite' ? Math.round(enemy.hp * 0.08) : 0)
+      + (eliteFx.barrierPct ? Math.round(enemy.hp * eliteFx.barrierPct / 100) : 0),
     atk: Math.round(enemy.atk * (hasBuriedCurse(char, 'bathin') ? 1.15 : 1)),
     fin: Math.round(enemy.atk * (hasBuriedCurse(char, 'bathin') ? 1.15 : 1)),
     mag: Math.round(enemy.atk * (hasBuriedCurse(char, 'bathin') ? 1.15 : 1)),
     def: enemy.def, chase: 0,
-    crit: 6, critDmg: 55, dodge: 3,
+    crit: 6 + (eliteFx.critAdd || 0), critDmg: 55, dodge: 3,
+    immuneCrit: !!eliteFx.immuneCrit, enrage: !!eliteFx.enrage,
     statuses: hasBuriedCurse(char, 'berith') ? { wall: 2 } : {},
-    envDmgPct: env.foe.dmgPct || 0, envTakenPct: env.foe.takenPct || 0,
+    envDmgPct: env.foe.dmgPct || 0, envTakenPct: (env.foe.takenPct || 0) + (eliteFx.takenPct || 0),
     envCritAdd: env.foe.critAdd || 0, envMagPct: 0, envDodgeAdd: env.foe.dodgeAdd || 0,
   }));
 
   const [log, setLog] = useState(() => {
     const init = [{ t: `${enemy.name} (Lv.${enemy.lv || 1})이(가) 길을 막아섰다.`, c: PALETTE.textDim }];
+    if (enemy.eliteFx) init.push({ t: `☠ 변형 「${enemy.eliteFx.name}」 — ${enemy.eliteFx.desc}`, c: enemy.eliteFx.color || PALETTE.accent });
     if (floorFx) init.push({ t: `★ ${floorFx.name} — ${floorFx.desc}`, c: PALETTE.legendary });
     if (roomFx) init.push({ t: `${roomFx.both ? '◆' : '◇'} ${roomFx.name} — ${roomFx.desc}`, c: BURIED_ROOM_COLORS[roomFx.color]?.color || PALETTE.dawn });
     return init;
@@ -254,6 +258,17 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     return r;
   };
   const dmgText = (r, extra = '') => `-${r.toHp}${r.absorbed > 0 ? ` (🔷${r.absorbed})` : ''}${extra}`;
+
+  // ☠ 「불멸의」 변형 (1.124.0) — 죽음을 1회 버틴다 (HP 1 생존). true = 되살아났음
+  const eliteRevive = (E) => {
+    if (E.hp <= 0 && eliteFx.undying && !E.undyingUsed) {
+      E.hp = 1; E.undyingUsed = true;
+      pushFloat('enemy', '불멸!', PALETTE.legendary);
+      pushLog(`${E.name}이(가) 죽음을 거부했다 — HP 1로 버틴다!`, PALETTE.legendary);
+      return true;
+    }
+    return false;
+  };
 
   // 특성 「역병」 — 내가 거는 상태이상 스택 +1
   const statusOpts = { chancePct: (env.self.statusChancePct || 0) + (uq('u57') ? 100 : 0) + (cf.statusChance || 0) + (pf.statusChance || 0) + (rf.statusChance || 0), extra: (env.self.statusExtra || 0) + (traits.includes('pestilence') ? 1 : 0) };
@@ -541,7 +556,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     setPlayer(P); setFoe(E);
     await wait(520);
 
-    if (E.hp <= 0) { pushLog(`${E.name} 격파!`, PALETTE.legendary); setFoe({ ...E, hp: 0 }); finish(true, P.hp); setBusy(false); return; }
+    if (E.hp <= 0 && !eliteRevive(E)) { pushLog(`${E.name} 격파!`, PALETTE.legendary); setFoe({ ...E, hp: 0 }); finish(true, P.hp); setBusy(false); return; }
     if (P.hp <= 0) { finish(false, 0); setBusy(false); return; }
 
     // ---------- 2. 적 행동 ----------
@@ -665,7 +680,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
       await wait(520);
     }
 
-    if (E.hp <= 0) { pushLog(`${E.name} 격파!`, PALETTE.legendary); setFoe({ ...E, hp: 0 }); finish(true, P.hp); setBusy(false); return; }
+    if (E.hp <= 0 && !eliteRevive(E)) { pushLog(`${E.name} 격파!`, PALETTE.legendary); setFoe({ ...E, hp: 0 }); finish(true, P.hp); setBusy(false); return; }
     if (P.hp <= 0) { finish(false, 0); setBusy(false); return; }
 
     // ---------- 3. 라운드 종료 — 상태이상 + 방/층 효과 ----------
@@ -774,7 +789,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     setPotionUsedThisTurn(false);
     await wait(260);
 
-    if (E.hp <= 0) { pushLog(`${E.name} 격파!`, PALETTE.legendary); setFoe({ ...E, hp: 0 }); finish(true, P.hp); setBusy(false); return; }
+    if (E.hp <= 0 && !eliteRevive(E)) { pushLog(`${E.name} 격파!`, PALETTE.legendary); setFoe({ ...E, hp: 0 }); finish(true, P.hp); setBusy(false); return; }
     if (P.hp <= 0) { finish(false, 0); setBusy(false); return; }
     setBusy(false);
   };

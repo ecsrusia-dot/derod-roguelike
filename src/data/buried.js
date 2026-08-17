@@ -1086,7 +1086,8 @@ export function resolveBuriedAttack(att, def, skill, { isPlayer = false, traits 
     : statKey === 'str' ? (att.atk || 0)
     : Math.max(att.atk || 0, att.fin || 0, att.mag || 0);
   const hitCount = Math.max(1, skill.hits || 1);
-  const critRate = (att.crit || 0) + (skill.critBonus || 0) + (att.envCritAdd || 0);
+  // ☠ 「강철의」 변형 (1.124.0) — 치명타를 받지 않는다
+  const critRate = def.immuneCrit ? 0 : (att.crit || 0) + (skill.critBonus || 0) + (att.envCritAdd || 0);
   let offense = buriedOffenseMult(att) * (1 + (att.envDmgPct || 0) / 100);
   if (statKey === 'int') offense *= 1 + (att.envMagPct || 0) / 100;
   const taken = buriedTakenMult(def) * (1 + (def.envTakenPct || 0) / 100);
@@ -1101,6 +1102,8 @@ export function resolveBuriedAttack(att, def, skill, { isPlayer = false, traits 
   const lowHp = att.maxHp > 0 && att.hp / att.maxHp <= 0.5;
   if (lowHp && traits.includes('bloodlord')) power *= 1.45;
   else if (lowHp && traits.includes('bloodrush')) power *= 1.25;
+  // ☠ 「격노한」 변형 (1.124.0) — HP 50% 이하에서 공격 +40%
+  if (att.enrage && lowHp) power *= 1.4;
 
   const globalMult = isPlayer ? BURIED_TUNING.playerDmgMult : BURIED_TUNING.enemyDmgMult;
   const hits = [];
@@ -1252,6 +1255,53 @@ export function stepBuriedChar(char, extraSteps = 0) {
   return { ...char, steps: (char.steps || 0) + 1 + extraSteps };
 }
 
+// =========================================================
+// 10b. ☠ 엘리트 변형 (1.124.0) — BB2 데이터시트(エリートElite) 이식 3탄
+// =========================================================
+// 원작 규칙: 강적은 이름 앞에 변형 접두어가 붙고, 그 접두어가 효과 뭉치를 결정한다.
+// 같은 적이라도 만날 때마다 다른 변형 — 강적 방의 리스크·보상이 매번 달라진다.
+// 스탯 변형(hpMult/defMult/atkMult/addApply/extraHit)은 applyBuriedEliteMod가 생성 시점에 굽고,
+// 판정 변형(immuneCrit/enrage/undying/critAdd/takenPct/barrierPct)은 전투가 enemy.eliteFx로 읽는다.
+export const BURIED_ELITE_MODS = {
+  huge:     { id: 'huge',     name: '거대한', color: '#c9a86a', desc: '최대 HP ×2, 공격 +10%',                    hpMult: 2.0, atkMult: 1.1 },
+  steel:    { id: 'steel',    name: '강철의', color: '#8b9bb4', desc: '방어 +60%, 치명타를 받지 않는다',            defMult: 1.6, immuneCrit: true },
+  swift:    { id: 'swift',    name: '신속한', color: '#7ba3c4', desc: '모든 공격이 한 번 더 때린다 (위력 75%)',      extraHit: true },
+  tough:    { id: 'tough',    name: '질긴',   color: '#9b8975', desc: '최대 HP +75%, 받는 피해 -10%',              hpMult: 1.75, takenPct: -10 },
+  reckless: { id: 'reckless', name: '무모한', color: '#c4453d', desc: '치명 +25% — 대신 최대 HP -15%',             hpMult: 0.85, critAdd: 25 },
+  flaming:  { id: 'flaming',  name: '불타는', color: '#ff6b35', desc: '공격 적중 시 [화상] 2 부여',                addApply: { s: 'burn', n: 2, p: 100 } },
+  toxic:    { id: 'toxic',    name: '유독한', color: '#7a9a5e', desc: '공격 적중 시 [중독] 2 부여',                addApply: { s: 'poison', n: 2, p: 100 } },
+  serrated: { id: 'serrated', name: '톱날의', color: '#8b1f1f', desc: '공격 적중 시 [출혈] 2 부여',                addApply: { s: 'bleed', n: 2, p: 100 } },
+  soft:     { id: 'soft',     name: '무른',   color: '#c48bd4', desc: '최대 HP ×2.5 — 대신 받는 피해 +100%',       hpMult: 2.5, takenPct: 100 },
+  immortal: { id: 'immortal', name: '불멸의', color: '#e8b04a', desc: '죽음을 1회 버틴다 (HP 1 생존) — 최대 HP -30%', hpMult: 0.7, undying: true },
+  crystal:  { id: 'crystal',  name: '수정의', color: '#7ba3c4', desc: '시작 보호막 = 최대 HP의 35%',               barrierPct: 35 },
+  wrathful: { id: 'wrathful', name: '격노한', color: '#c4453d', desc: 'HP 50% 이하에서 공격 +40%',                enrage: true },
+};
+export const getBuriedEliteMod = (id) => BURIED_ELITE_MODS[id] || null;
+export const rollBuriedEliteMod = () => pick(Object.keys(BURIED_ELITE_MODS));
+
+// 변형을 적 객체에 굽는다 — 이름 접두 + 스탯 변형 + 보상 ×1.4, 판정 플래그는 eliteFx로 전달
+export function applyBuriedEliteMod(enemy, modId) {
+  const mod = getBuriedEliteMod(modId);
+  if (!enemy || !mod) return enemy;
+  const out = { ...enemy, eliteMod: modId, eliteFx: mod, name: `${mod.name} ${enemy.name}` };
+  if (mod.hpMult) out.hp = Math.round(out.hp * mod.hpMult);
+  if (mod.atkMult) out.atk = Math.round(out.atk * mod.atkMult);
+  if (mod.defMult) out.def = Math.round((out.def || 0) * mod.defMult);
+  if (mod.extraHit || mod.addApply) {
+    out.actions = (out.actions || []).map(a => {
+      if (a.kind === 'defend' || !a.power) return a;
+      let n = { ...a };
+      if (mod.extraHit) n = { ...n, hits: (n.hits || 1) + 1, power: Math.round(n.power * 0.75) };
+      if (mod.addApply) n = { ...n, apply: [...(n.apply || []), mod.addApply] };
+      return n;
+    });
+  }
+  // 리스크에 걸맞은 보상 — 골드·경험치 ×1.4
+  out.exp = Math.round((out.exp || 0) * 1.4);
+  out.gold = [Math.round(out.gold[0] * 1.4), Math.round(out.gold[1] * 1.4)];
+  return out;
+}
+
 // 방 하나에서 만날 적 (전투/강적/보스 공용). 스펙은 **걸음수 기반 마물 레벨**로 정해진다.
 export function buildBuriedRoomEnemy(char, roomType, roomEffectId = null) {
   const dg = getBuriedDungeon(char?.dungeonId);
@@ -1277,6 +1327,8 @@ export function buildBuriedRoomEnemy(char, roomType, roomEffectId = null) {
   if (pressure > 1) {
     enemy = { ...enemy, hp: Math.round(enemy.hp * pressure), atk: Math.round(enemy.atk * pressure) };
   }
+  // ☠ 엘리트 변형 (1.124.0) — 강적 방은 항상 랜덤 변형이 붙는다
+  if (roomType === 'elite') enemy = applyBuriedEliteMod(enemy, rollBuriedEliteMod());
   return { ...enemy, roomType, isBoss: roomType === 'boss' };
 }
 
