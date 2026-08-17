@@ -1307,6 +1307,229 @@ export const BURIED_ENEMIES = {
   },
 
   // =========================================================
+  // 1.139.0 — BB2 몬스터 시트 2차 이식 (+23 = 80종). 일러 재사용, 내성 축 적극 활용.
+  // 공용 11 + 던전 전용 12 (미궁·폐허·나락·심연 각 3)
+  // =========================================================
+  slimeMass: {
+    key: 'slimeMass', name: '고름 슬라임', img: { key: 'champ_forest_husk', chapter: 'forest_1' }, color: '#7a9a5e',
+    desc: '무른 몸이 마법만은 튕겨낸다.', tier: 'normal', minFloor: 1, maxFloor: 4,
+    hp: 105, atk: 15, def: 2, exp: 20, gold: [20, 40], startBarrier: 40, magTakenPct: -20, physTakenPct: 15,
+    actions: [
+      { name: '산성 점액', power: 92, kind: 'attack', apply: [{ s: 'weaken', n: 1, p: 70 }], weight: 3 },
+      { name: '재응집', kind: 'defend', self: [{ s: 'regen', n: 3 }], weight: 1 },
+    ],
+  },
+  graveBandit: {
+    key: 'graveBandit', name: '무덤가 야도', img: { key: 'tundraRaider', chapter: 1 }, color: '#8b6f4d',
+    desc: '산 자도 죽은 자도 가리지 않고 턴다. 주머니가 두둑하다.', tier: 'normal', minFloor: 2, maxFloor: 6,
+    hp: 150, atk: 20, def: 4, exp: 30, gold: [60, 110],
+    actions: [
+      { name: '쌍단검', power: 62, kind: 'attack', hits: 2, weight: 3 },
+      { name: '급소 노리기', power: 120, kind: 'attack', apply: [{ s: 'bleed', n: 2, p: 60 }], weight: 2 },
+    ],
+  },
+  wyvernFledgling: {
+    key: 'wyvernFledgling', name: '어린 와이번', img: { key: 'champ_frost_lurker', chapter: 'frost_2' }, color: '#7ba3c4',
+    desc: '아직 어리다는 게 위안이 되지 않는 덩치.', tier: 'normal', minFloor: 4, maxFloor: 9, dodge: 12,
+    hp: 185, atk: 24, def: 4, exp: 46, gold: [34, 62],
+    actions: [
+      { name: '물어채기', power: 104, kind: 'attack', weight: 3 },
+      { name: '급강하', power: 158, kind: 'attack', heavy: true, weight: 2 },
+    ],
+  },
+  livingStatue: {
+    key: 'livingStatue', name: '살아있는 석상', img: { key: 'brokenGolem', chapter: 3 }, color: '#9b8975',
+    desc: '돌은 칼을 모른다 — 마법만이 틈을 낸다.', tier: 'normal', minFloor: 5, maxFloor: 10,
+    hp: 230, atk: 24, def: 10, exp: 52, gold: [36, 68], physTakenPct: -40, magTakenPct: 30, fullGuardPct: 40,
+    actions: [
+      { name: '석권(石拳)', power: 118, kind: 'attack', weight: 3 },
+      { name: '정지', kind: 'defend', self: [{ s: 'guard', n: 3 }], weight: 1 },
+    ],
+  },
+  shadowLurker: {
+    key: 'shadowLurker', name: '그림자 잠복자', img: { key: 'wraith', chapter: 1 }, color: '#5c4a8c',
+    desc: '베려는 순간 이미 등 뒤에 있다.', tier: 'normal', minFloor: 6, maxFloor: 12, dodge: 20, crit: 15,
+    hp: 175, atk: 27, def: 3, exp: 58, gold: [40, 74],
+    actions: [
+      { name: '그림자 찌르기', power: 112, kind: 'attack', weight: 3 },
+      { name: '암습', power: 150, kind: 'attack', apply: [{ s: 'bleed', n: 2, p: 70 }], heavy: true, weight: 2 },
+    ],
+  },
+  manticore: {
+    key: 'manticore', name: '만티코어', img: { key: 'champ_forest_leopard', chapter: 'forest_2' }, color: '#c4453d',
+    desc: '사자 몸에 전갈 꼬리 — 독침이 비처럼 쏟아진다.', tier: 'elite', minFloor: 6, maxFloor: 12,
+    hp: 380, atk: 38, def: 10, exp: 165, gold: [130, 220],
+    actions: [
+      { name: '독침 세례', power: 70, kind: 'attack', hits: 2, apply: [{ s: 'poison', n: 2, p: 100 }], weight: 3 },
+      { name: '사자 발톱', power: 132, kind: 'attack', weight: 2 },
+      { name: '꼬리 강타', power: 165, kind: 'attack', heavy: true, weight: 1 },
+    ],
+  },
+  vampireNoble: {
+    key: 'vampireNoble', name: '흡혈 귀족', img: { key: 'twilightChild', chapter: 2 }, color: '#8b1f1f',
+    desc: '핏기 없는 미소 — 상처 하나하나가 그의 만찬.', tier: 'elite', minFloor: 7, maxFloor: 14, magTakenPct: -20,
+    hp: 360, atk: 40, def: 9, exp: 175, gold: [140, 230],
+    actions: [
+      { name: '흡혈', power: 110, kind: 'attack', drain: 60, weight: 3 },
+      { name: '귀족의 명령', power: 55, kind: 'attack', apply: [{ s: 'weaken', n: 2, p: 100 }], weight: 2 },
+      { name: '혈무(血霧)', kind: 'defend', self: [{ s: 'evade', n: 2 }], weight: 1 },
+    ],
+  },
+  lichAcolyte: {
+    key: 'lichAcolyte', name: '리치의 사도', img: { key: 'iceMage', chapter: 1 }, color: '#3d1f28',
+    desc: '뼈만 남은 손이 죽음의 인장을 그린다.', tier: 'normal', minFloor: 8, maxFloor: 15,
+    hp: 190, atk: 34, def: 3, exp: 74, gold: [50, 90], physTakenPct: 20, magTakenPct: -35,
+    actions: [
+      { name: '사령탄', power: 118, kind: 'attack', weight: 3 },
+      { name: '죽음의 인장', power: 82, kind: 'attack', apply: [{ s: 'curse', n: 2, p: 80 }], weight: 2 },
+    ],
+  },
+  cyclopsWarden: {
+    key: 'cyclopsWarden', name: '외눈 간수', img: { key: 'frostGiant', chapter: 1 }, color: '#b8a678',
+    desc: '눈은 하나, 몽둥이는 무덤 기둥.', tier: 'elite', minFloor: 8, maxFloor: 16,
+    hp: 460, atk: 44, def: 12, exp: 190, gold: [150, 250],
+    actions: [
+      { name: '기둥 휘두르기', power: 120, kind: 'attack', weight: 3 },
+      { name: '내려찍기', power: 190, kind: 'attack', apply: [{ s: 'stun', n: 1, p: 30 }], heavy: true, weight: 2 },
+    ],
+  },
+  greaterDemon: {
+    key: 'greaterDemon', name: '상급 마족', img: { key: 'wrathDemon', chapter: 4 }, color: '#4a1f5c',
+    desc: '하급이 백 마리 모여도 이 하나를 못 이긴다.', tier: 'elite', minFloor: 10, maxFloor: 20, startBarrier: 180,
+    hp: 420, atk: 45, def: 11, exp: 200, gold: [160, 260],
+    actions: [
+      { name: '마염 발톱', power: 112, kind: 'attack', apply: [{ s: 'burn', n: 2, p: 60 }], weight: 3 },
+      { name: '군림의 포효', power: 60, kind: 'attack', apply: [{ s: 'weaken', n: 2, p: 100 }], weight: 2 },
+      { name: '마계의 불', power: 172, kind: 'attack', heavy: true, weight: 2 },
+    ],
+  },
+  hecaton: {
+    key: 'hecaton', name: '백수(百手) 거인', img: { key: 'champ_frost_brute', chapter: 'frost_3' }, color: '#c9a86a',
+    desc: '백 개의 손이 백 방향에서 날아든다.', tier: 'elite', minFloor: 12, maxFloor: 25,
+    hp: 500, atk: 36, def: 13, exp: 230, gold: [180, 290],
+    actions: [
+      { name: '백수 난타', power: 48, kind: 'attack', hits: 3, weight: 3 },
+      { name: '움켜쥐기', power: 96, kind: 'attack', apply: [{ s: 'bind', n: 2, p: 80 }], weight: 2 },
+    ],
+  },
+  // 미궁 전용 3종
+  janusWarden: {
+    key: 'janusWarden', name: '야누스 문지기', img: { key: 'timeKeeper', chapter: 3 }, color: '#e8b04a',
+    desc: '앞 얼굴이 웃는 동안 뒷 얼굴이 벼른다.', tier: 'normal', minFloor: 5, maxFloor: 12, dungeons: ['labyrinth'],
+    hp: 210, atk: 25, def: 7, exp: 54, gold: [38, 70], fullGuardPct: 40,
+    actions: [
+      { name: '이면 타격', power: 116, kind: 'attack', weight: 3 },
+      { name: '문 닫기', kind: 'defend', self: [{ s: 'guard', n: 3 }], weight: 2 },
+    ],
+  },
+  ancientBishop: {
+    key: 'ancientBishop', name: '고대 주교', img: { key: 'ancientPriest', chapter: 3 }, color: '#d4a574',
+    desc: '봉인된 신에게 아직도 기도를 올린다.', tier: 'normal', minFloor: 6, maxFloor: 13, dungeons: ['labyrinth'], magTakenPct: -30,
+    hp: 205, atk: 28, def: 5, exp: 60, gold: [42, 78],
+    actions: [
+      { name: '신성탄', power: 108, kind: 'attack', apply: [{ s: 'silence', n: 1, p: 40 }], weight: 3 },
+      { name: '축성', kind: 'defend', self: [{ s: 'regen', n: 3 }, { s: 'guard', n: 2 }], weight: 1 },
+    ],
+  },
+  ancientTorturer: {
+    key: 'ancientTorturer', name: '고대 고문관', img: { key: 'oblivionSealer', chapter: 3 }, color: '#8b1f1f',
+    desc: '천 년을 갈고닦은 고통의 기술.', tier: 'elite', minFloor: 8, maxFloor: 16, dungeons: ['labyrinth'],
+    hp: 400, atk: 41, def: 10, exp: 185, gold: [150, 240],
+    actions: [
+      { name: '갈고리 채찍', power: 104, kind: 'attack', apply: [{ s: 'bleed', n: 3, p: 100 }], weight: 3 },
+      { name: '결박', power: 66, kind: 'attack', apply: [{ s: 'bind', n: 2, p: 100 }], weight: 2 },
+      { name: '고문 기구', power: 168, kind: 'attack', heavy: true, weight: 1 },
+    ],
+  },
+  // 폐허 전용 3종
+  giantCrab: {
+    key: 'giantCrab', name: '거대 게', img: { key: 'corruptSpider', chapter: 2 }, color: '#c4453d',
+    desc: '집게가 갑주째 으스러뜨린다 — 껍데기는 칼을 비웃는다.', tier: 'normal', minFloor: 4, maxFloor: 10, dungeons: ['ruins'],
+    hp: 240, atk: 22, def: 12, exp: 50, gold: [34, 66], physTakenPct: -45, magTakenPct: 35,
+    actions: [
+      { name: '집게 절단', power: 122, kind: 'attack', apply: [{ s: 'bleed', n: 2, p: 50 }], weight: 3 },
+      { name: '웅크리기', kind: 'defend', self: [{ s: 'guard', n: 3 }], weight: 1 },
+    ],
+  },
+  deepSeaPriest: {
+    key: 'deepSeaPriest', name: '심해 사제', img: { key: 'fallenElf', chapter: 2 }, color: '#5c4a8c',
+    desc: '가라앉은 신전에서 무언가를 불러 올린다.', tier: 'normal', minFloor: 6, maxFloor: 13, dungeons: ['ruins'], magTakenPct: -25,
+    hp: 210, atk: 29, def: 4, exp: 62, gold: [44, 80],
+    actions: [
+      { name: '심해의 저주', power: 92, kind: 'attack', apply: [{ s: 'curse', n: 1, p: 80 }], weight: 3 },
+      { name: '독수(毒水)', power: 76, kind: 'attack', apply: [{ s: 'poison', n: 3, p: 100 }], weight: 2 },
+    ],
+  },
+  scyllaSpawn: {
+    key: 'scyllaSpawn', name: '스킬라의 촉수', img: { key: 'forestTyrant', chapter: 2 }, color: '#5e7a3e',
+    desc: '본체는 더 깊은 곳에 있다 — 이건 촉수 하나일 뿐.', tier: 'elite', minFloor: 9, maxFloor: 18, dungeons: ['ruins'],
+    hp: 430, atk: 39, def: 9, exp: 195, gold: [155, 250],
+    actions: [
+      { name: '촉수 연타', power: 62, kind: 'attack', hits: 2, weight: 3 },
+      { name: '휘감기', power: 88, kind: 'attack', apply: [{ s: 'bind', n: 2, p: 100 }], weight: 2 },
+      { name: '심연으로 끌기', power: 170, kind: 'attack', heavy: true, weight: 1 },
+    ],
+  },
+  // 나락 전용 3종
+  viperNest: {
+    key: 'viperNest', name: '살무사 둥지', img: { key: 'champ_forest_thornling', chapter: 'forest_1' }, color: '#7a9a5e',
+    desc: '둥지 전체가 한 마리처럼 문다.', tier: 'normal', minFloor: 5, maxFloor: 12, dungeons: ['chasm'],
+    hp: 260, atk: 21, def: 3, exp: 56, gold: [38, 72],
+    actions: [
+      { name: '독니 세례', power: 58, kind: 'attack', hits: 2, apply: [{ s: 'poison', n: 2, p: 100 }], weight: 3 },
+      { name: '똬리 틀기', kind: 'defend', self: [{ s: 'guard', n: 2 }], weight: 1 },
+    ],
+  },
+  masterNinja: {
+    key: 'masterNinja', name: '노련한 닌자', img: { key: 'demonScout', chapter: 4 }, color: '#3d1f28',
+    desc: '나락에 몸을 숨긴 지 오래 — 칼끝만 빛난다.', tier: 'normal', minFloor: 7, maxFloor: 14, dungeons: ['chasm'], dodge: 25, crit: 20,
+    hp: 185, atk: 30, def: 4, exp: 68, gold: [48, 86],
+    actions: [
+      { name: '수리검', power: 52, kind: 'attack', hits: 3, weight: 3 },
+      { name: '일섬', power: 148, kind: 'attack', apply: [{ s: 'bleed', n: 2, p: 70 }], heavy: true, weight: 2 },
+    ],
+  },
+  akaOni: {
+    key: 'akaOni', name: '붉은 뿔귀신', img: { key: 'demonApostle', chapter: 4 }, color: '#c4453d',
+    desc: '분노가 피부색이 된 귀신 — 맞을수록 세진다.', tier: 'elite', minFloor: 8, maxFloor: 16, dungeons: ['chasm'],
+    hp: 440, atk: 42, def: 11, exp: 190, gold: [150, 245],
+    actions: [
+      { name: '철곤 휘두르기', power: 118, kind: 'attack', weight: 3 },
+      { name: '귀신의 분노', kind: 'defend', self: [{ s: 'rage', n: 2 }], weight: 2 },
+      { name: '뿔 들이받기', power: 184, kind: 'attack', heavy: true, weight: 1 },
+    ],
+  },
+  // 심연 전용 3종
+  succubusQueen: {
+    key: 'succubusQueen', name: '몽마 여왕', img: { key: 'champ_forest_witch', chapter: 'forest_3' }, color: '#c48bd4',
+    desc: '꿈결 같은 목소리 — 정신이 들면 이미 늦다.', tier: 'elite', minFloor: 10, maxFloor: 20, dungeons: ['abyss'],
+    hp: 400, atk: 43, def: 8, exp: 210, gold: [170, 270],
+    actions: [
+      { name: '달콤한 속삭임', power: 66, kind: 'attack', apply: [{ s: 'confuse', n: 1, p: 60 }], weight: 3 },
+      { name: '생기 흡수', power: 108, kind: 'attack', drain: 70, weight: 2 },
+      { name: '악몽', power: 84, kind: 'attack', apply: [{ s: 'weaken', n: 2, p: 100 }], weight: 2 },
+    ],
+  },
+  surtr: {
+    key: 'surtr', name: '화염 거인 수르트', img: { key: 'riftBreach', chapter: 4 }, color: '#ff6b35',
+    desc: '심연 밑바닥에도 꺼지지 않는 불이 있다.', tier: 'elite', minFloor: 12, maxFloor: 24, dungeons: ['abyss'], physTakenPct: -20,
+    hp: 480, atk: 46, def: 12, exp: 225, gold: [180, 290],
+    actions: [
+      { name: '화염검', power: 112, kind: 'attack', apply: [{ s: 'burn', n: 3, p: 100 }], weight: 3 },
+      { name: '세계를 태우는 불', power: 186, kind: 'attack', apply: [{ s: 'burn', n: 2, p: 100 }], heavy: true, weight: 2 },
+    ],
+  },
+  catoblepas: {
+    key: 'catoblepas', name: '카토블레파스', img: { key: 'champ_frost_seer', chapter: 'frost_2' }, color: '#8b8378',
+    desc: '고개를 드는 것만으로 시간이 썩는다 — 눈을 마주치지 마라.', tier: 'normal', minFloor: 8, maxFloor: 16, dungeons: ['abyss'],
+    hp: 250, atk: 31, def: 6, exp: 72, gold: [50, 88],
+    actions: [
+      { name: '썩은 입김', power: 96, kind: 'attack', apply: [{ s: 'aging', n: 2, p: 80 }], weight: 3 },
+      { name: '죽음의 시선', power: 78, kind: 'attack', apply: [{ s: 'curse', n: 1, p: 60 }], weight: 2 },
+    ],
+  },
+
+  // =========================================================
   // 1.120.0 — 🚪 층계 수문장 (PM 지시: 100층 단위 초강력 플로어 보스, 재앙보다 훨씬 강하게)
   // 100·200·300…층을 지키며, 격파해야 그 너머 체크포인트가 열린다. 로테이션 3종.
   // =========================================================
