@@ -447,7 +447,7 @@ export const BURIED_ALTAR_BOONS = [
   { id: 'cleanse', icon: '🕯', name: '정화의 봉헌', costBase: 170,
     desc: '짊어진 저주 1개를 무작위로 해제한다' },
   { id: 'resupply', icon: '🔧', name: '보충의 봉헌', costBase: 130,
-    desc: '모든 스킬의 사용 횟수를 만충한다' },
+    desc: '지정한 장비 1개의 스킬 사용 횟수를 만충한다' },
 ];
 export const buriedBoonCost = (boon, monLevel = 1) =>
   Math.round(boon.costBase * (1 + Math.max(0, (monLevel || 1) - 1) * 0.1));
@@ -656,12 +656,14 @@ export function buriedDerived(char) {
   const rf = buriedRaceFx(char);
   // 전설무구 (1.127.0) — 선언형 유니크 fx (fx 없는 구 유니크는 빈 객체)
   const uf = buriedUniqueFx(char);
+  // 1.133.0 — 전설무구 % 개편: barrierHpPct(최대 HP 비례 보호막)가 maxHp를 참조하므로 먼저 계산
+  // 1.113.0 — 레벨당 HP+18 폐지 (성장은 100% 장비)
+  const maxHp = Math.max(1, Math.round((140 + st.vit * 11 + (gear.hp || 0) + (tf.hp || 0) + (pf.hp || 0) + (rf.hp || 0) + (uf.hp || 0)) * (tf.hpMult || 1) * (rf.hpMult || 1) * (uf.hpMult || 1) * (1 + (cf.hpPct || 0) / 100) * (1 - Math.min(50, char.curseHpLossPct || 0) / 100)));
   return {
     stats: st,
     traitFx: tf,
-    // 1.113.0 — 레벨당 HP+18 폐지 (성장은 100% 장비)
-    maxHp:   Math.max(1, Math.round((140 + st.vit * 11 + (gear.hp || 0) + (tf.hp || 0) + (pf.hp || 0) + (rf.hp || 0) + (uf.hp || 0)) * (tf.hpMult || 1) * (rf.hpMult || 1) * (uf.hpMult || 1) * (1 + (cf.hpPct || 0) / 100) * (1 - Math.min(50, char.curseHpLossPct || 0) / 100))),
-    maxSp:   Math.round(38 + st.int * 1.3 + (gear.sp || 0) + (tf.sp || 0) + (rf.sp || 0) + (uf.sp || 0)),
+    maxHp,
+    maxSp:   Math.round((38 + st.int * 1.3 + (gear.sp || 0) + (tf.sp || 0) + (rf.sp || 0) + (uf.sp || 0)) * (uf.spMult || 1)),
     atk:     Math.round((10 + st.str * 1.6 + (gear.atk || 0) + (pf.atk || 0)) * (1 + ((tf.physPct || 0) + (cf.physPct || 0) + (rf.physPct || 0) + (uf.physPct || 0)) / 100)),
     fin:     Math.round((10 + st.dex * 1.6 + (gear.atk || 0) + (pf.atk || 0)) * (1 + ((tf.physPct || 0) + (cf.physPct || 0) + (rf.physPct || 0) + (uf.physPct || 0)) / 100)),
     mag:     Math.round((10 + st.int * 1.6 + (gear.mag || 0) + (pf.mag || 0)) * (1 + ((tf.magPct || 0) + (cf.magPct || 0) + (rf.magPct || 0) + (uf.magPct || 0)) / 100)),
@@ -672,7 +674,7 @@ export function buriedDerived(char) {
     // 1.118.0 — 패시브 회복 9+int/8 → 3+int/12 (PM: SP가 무의미). 이제 SP의 주 엔진은
     // 기본 공격(+14)·마력 흡수·집중이고, 패시브·장비 spRegen은 보조가 된다
     spRegen: Math.round(3 + st.int / 12 + (gear.spRegen || 0) + (pf.spRegen || 0) + (uf.spRegen || 0)),
-    barrier: Math.round(((gear.barrier || 0) + (tf.barrier || 0) + (pf.barrier || 0) + (rf.barrier || 0) + (uf.barrier || 0)) * (1 + (cf.barrierPct || 0) / 100)),
+    barrier: Math.round(((gear.barrier || 0) + (tf.barrier || 0) + (pf.barrier || 0) + (rf.barrier || 0) + (uf.barrier || 0) + maxHp * (uf.barrierHpPct || 0) / 100) * (1 + (cf.barrierPct || 0) / 100)),
     chase:   Math.round((gear.chase || 0) + (tf.chase || 0) + (pf.chase || 0) + (uf.chase || 0)),
     healPct: (tf.healPct || 0) + (cf.healPct || 0) + (pf.healPct || 0) + (rf.healPct || 0) + (uf.healPct || 0),
     drainPct: (tf.drainPct || 0) + (cf.drainPct || 0) + (pf.drainPct || 0) + (rf.drainPct || 0) + (uf.drainPct || 0),
@@ -1946,6 +1948,20 @@ export function rechargeBuriedUses(char, pct = 100) {
   }
   return { ...char, equipped };
 }
+// 1.133.0 — PM 결정: 전 장비 일괄 충전 폐지 → 1장비 단위 충전만
+// 지정 1장비 만충 (제단 「보충의 봉헌」용)
+export function rechargeBuriedSlot(char, slotId) {
+  const it = char?.equipped?.[slotId];
+  if (!it || !(it.usesSpent > 0)) return char;
+  return { ...char, equipped: { ...char.equipped, [slotId]: { ...it, usesSpent: 0 } } };
+}
+// 랜덤 1장비 만충 (야영용) — 소진분이 있는 슬롯 중 하나를 무작위로. 랜덤 롤이므로 setMeta updater 밖에서 호출할 것
+export function rechargeBuriedRandomSlot(char) {
+  const cands = BURIED_SLOT_IDS.filter(s => (char?.equipped?.[s]?.usesSpent || 0) > 0);
+  if (cands.length === 0) return { char, item: null };
+  const slot = cands[Math.floor(Math.random() * cands.length)];
+  return { char: rechargeBuriedSlot(char, slot), item: char.equipped[slot] };
+}
 
 // 장비 획득 시 스킬 레벨 상승 (이미 만렙이면 그대로)
 export function raiseBuriedSkill(char, skillId) {
@@ -2308,7 +2324,7 @@ export const BURIED_UNIQUES = [
   UQ({ id: 'u25',  name: '성스러운 유산',   slot: 'acc',   skillId: 'lifeCharm',   src: 25,  desc: '물리·기교·마법 공격력이 셋 중 가장 높은 값을 따라간다.' }),
   UQ({ id: 'u27',  name: '부(富)',         slot: 'acc',   skillId: 'bloodSigil',  src: 27,  desc: '전투 승리 골드 3배.' }),
   UQ({ id: 'u34',  name: '책사',           slot: 'helm',  skillId: 'insight',     src: 34,  desc: '피격당할 때마다 [격노] 1을 얻는다.' }),
-  UQ({ id: 'u36',  name: '비전',           slot: 'acc',   skillId: 'venomSigil',  src: 36,  desc: '적을 처치할 때마다 모든 공격력 +2 (이번 런 영구).' }),
+  UQ({ id: 'u36',  name: '비전',           slot: 'acc',   skillId: 'venomSigil',  src: 36,  desc: '적을 처치할 때마다 모든 공격력 +0.5% (이번 런 영구 누적).' }),
   UQ({ id: 'u40',  name: '학식',           slot: 'acc',   skillId: 'lifeCharm',   src: 40,  desc: '경험치 2배.' }),
   UQ({ id: 'u41',  name: '왕관',           slot: 'helm',  skillId: 'focusMind',   src: 41,  desc: '방 효과·층 효과를 전부 무시한다.' }),
   UQ({ id: 'u42',  name: '공물',           slot: 'acc',   skillId: 'sunderSigil', src: 42,  desc: '적이 매 턴 최대 HP의 2%를 잃는다.' }),
@@ -2356,8 +2372,8 @@ export const BURIED_UNIQUES = [
     desc: '벼락을 이고 있다. 치명 +8%, 마법 +10% — 「신속의 룬」 내장.' }),
   UQ({ id: 'lg4',  name: '독침',            slot: 'acc',   skillId: 'venomSigil',  src: 0, fx: { statusChance: 20 }, rune: 'rVenom',
     desc: '스치기만 해도 스민다. 상태이상 확률 +20% — 「맹독의 룬」 내장.' }),
-  UQ({ id: 'lg5',  name: '별을 보는 자',    slot: 'helm',  skillId: 'focusMind',   src: 0, fx: { magPct: 18, sp: 10 },
-    desc: '별의 궤적을 읽는다. 마법 +18%, 최대 SP +10.' }),
+  UQ({ id: 'lg5',  name: '별을 보는 자',    slot: 'helm',  skillId: 'focusMind',   src: 0, fx: { magPct: 18, spMult: 1.15 },
+    desc: '별의 궤적을 읽는다. 마법 +18%, 최대 SP +15%.' }),
   UQ({ id: 'lg6',  name: '무라마사',        slot: 'acc',   skillId: 'bloodSigil',  src: 0, fx: { crit: 10, drainPct: 5, healPct: -20 }, rune: 'rRage',
     desc: '저주받은 요도. 치명 +10%, 흡혈 +5% — 대신 회복 -20%. 「격노의 룬」 내장.' }),
   UQ({ id: 'lg7',  name: '그람',            slot: 'acc',   skillId: 'dragonFang',  src: 0, fx: { physPct: 15 }, rune: 'rKing',
@@ -2370,16 +2386,16 @@ export const BURIED_UNIQUES = [
     desc: '하늘의 분노를 흘려보낸다. 마법 +12%, 상태이상 저항 +15%.' }),
   UQ({ id: 'lg11', name: '풀 플레이트',     slot: 'armor', skillId: 'bulwark',     src: 0, fx: { hpMult: 1.15, takenPct: -10 },
     desc: '빈틈없는 강판. 최대 HP +15%, 받는 피해 -10%.' }),
-  UQ({ id: 'lg12', name: '사교의 법의',     slot: 'armor', skillId: 'ironWall',    src: 0, fx: { barrier: 60, magPct: 8 },
-    desc: '믿음이 곧 벽. 전투 시작 보호막 +60, 마법 +8%.' }),
-  UQ({ id: 'lg13', name: '귀족의 예복',     slot: 'armor', skillId: 'regenScale',  src: 0, fx: { hp: 60, barrier: 40, goldPct: 15 },
-    desc: '부는 갑옷이 된다. HP +60, 보호막 +40, 골드 +15%.' }),
-  UQ({ id: 'lg14', name: '만족장의 갑주',   slot: 'armor', skillId: 'shieldBash',  src: 0, fx: { hp: 80, physPct: 10 },
-    desc: '백 번의 전장을 견딘 가죽. HP +80, 물리·기교 +10%.' }),
-  UQ({ id: 'lg15', name: '그리폰의 깃옷',   slot: 'armor', skillId: 'shadowCloak', src: 0, fx: { hp: 50, dodge: 8 },
-    desc: '바람을 두른다. HP +50, 회피 +8%.' }),
-  UQ({ id: 'lg16', name: '야수 가죽',       slot: 'armor', skillId: 'thornMail',   src: 0, fx: { hp: 70, takenPct: -8 },
-    desc: '거친 것일수록 질기다. HP +70, 받는 피해 -8%.' }),
+  UQ({ id: 'lg12', name: '사교의 법의',     slot: 'armor', skillId: 'ironWall',    src: 0, fx: { barrierHpPct: 12, magPct: 8 },
+    desc: '믿음이 곧 벽. 전투 시작 보호막 = 최대 HP의 12%, 마법 +8%.' }),
+  UQ({ id: 'lg13', name: '귀족의 예복',     slot: 'armor', skillId: 'regenScale',  src: 0, fx: { hpMult: 1.08, barrierHpPct: 8, goldPct: 15 },
+    desc: '부는 갑옷이 된다. 최대 HP +8%, 보호막 = 최대 HP의 8%, 골드 +15%.' }),
+  UQ({ id: 'lg14', name: '만족장의 갑주',   slot: 'armor', skillId: 'shieldBash',  src: 0, fx: { hpMult: 1.12, physPct: 10 },
+    desc: '백 번의 전장을 견딘 가죽. 최대 HP +12%, 물리·기교 +10%.' }),
+  UQ({ id: 'lg15', name: '그리폰의 깃옷',   slot: 'armor', skillId: 'shadowCloak', src: 0, fx: { hpMult: 1.08, dodge: 8 },
+    desc: '바람을 두른다. 최대 HP +8%, 회피 +8%.' }),
+  UQ({ id: 'lg16', name: '야수 가죽',       slot: 'armor', skillId: 'thornMail',   src: 0, fx: { hpMult: 1.10, takenPct: -8 },
+    desc: '거친 것일수록 질기다. 최대 HP +10%, 받는 피해 -8%.' }),
   UQ({ id: 'lg17', name: '닌자 장속',       slot: 'armor', skillId: 'shadowCloak', src: 0, fx: { dodge: 10, crit: 5 },
     desc: '그림자 분신의 옷. 회피 +10%, 치명 +5%.' }),
   UQ({ id: 'lg18', name: '근위 기사의 휘장', slot: 'acc',  skillId: 'lifeCharm',   src: 0, fx: { hpMult: 1.1, goldPct: 10 },
@@ -2414,7 +2430,7 @@ export function buriedUniqueFx(char) {
     const u = uid ? getBuriedUnique(uid) : null;
     if (!u?.fx) continue;
     for (const [k, v] of Object.entries(u.fx)) {
-      if (k === 'hpMult') out.hpMult = (out.hpMult || 1) * v;
+      if (k === 'hpMult' || k === 'spMult') out[k] = (out[k] || 1) * v;
       else out[k] = (out[k] || 0) + v;
     }
   }

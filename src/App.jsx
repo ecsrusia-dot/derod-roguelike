@@ -520,8 +520,9 @@ export default function App() {
       }
       c = { ...c, equipped: eq };
     }
-    // [u36] 비전 — 처치마다 모든 공격력 +2 (런 영구)
+    // [u36] 비전 — 처치마다 모든 공격력 누적 (런 영구). 1.133.0 %화: researchPct(+0.5%/처치), 구세이브 researchPower(고정치)도 계속 정산
     if (res.research) c = { ...c, researchPower: (c.researchPower || 0) + res.research };
+    if (res.researchPct) c = { ...c, researchPct: (c.researchPct || 0) + res.researchPct };
     // 저주 「레라지에」 — 처치마다 최대 HP -1% (런 한정, 최대 -50%)
     if ((c.curses || []).includes('leraje')) c = { ...c, curseHpLossPct: Math.min(50, (c.curseHpLossPct || 0) + 1) };
     for (const it of (res.drops || [])) c = addBuriedItemToChar(c, it).char;

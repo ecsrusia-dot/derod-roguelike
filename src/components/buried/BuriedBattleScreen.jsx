@@ -101,9 +101,10 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
       : Math.round(((d.barrier || 0) + (env.self.barrierAdd || 0) + (char.carryBarrier || 0)) * (hasBuriedCurse(char, 'amon') ? 0.5 : 1)),
     noDodge: !!kf.noDodge, noCrit: !!kf.noCrit,
     // [u107] 물리·기교 += 최대 HP 8% / [u111] 마법 += 보호막 30%
-    atk: d.atk + (uniques.includes('u107') ? Math.round(d.maxHp * 0.08) : 0) + (char.researchPower || 0),
-    fin: d.fin + (uniques.includes('u107') ? Math.round(d.maxHp * 0.08) : 0) + (char.researchPower || 0),
-    mag: d.mag + (uniques.includes('u111') ? Math.round((d.barrier || 0) * 0.3) : 0) + (char.researchPower || 0),
+    // [u36] 비전 — 1.133.0 %화: researchPct(처치당 +0.5%) 배율. 구세이브 researchPower(고정치)는 그대로 가산 유지
+    atk: Math.round((d.atk + (uniques.includes('u107') ? Math.round(d.maxHp * 0.08) : 0) + (char.researchPower || 0)) * (1 + (char.researchPct || 0) / 100)),
+    fin: Math.round((d.fin + (uniques.includes('u107') ? Math.round(d.maxHp * 0.08) : 0) + (char.researchPower || 0)) * (1 + (char.researchPct || 0) / 100)),
+    mag: Math.round((d.mag + (uniques.includes('u111') ? Math.round((d.barrier || 0) * 0.3) : 0) + (char.researchPower || 0)) * (1 + (char.researchPct || 0) / 100)),
     def: d.def, chase: d.chase || 0,
     crit: hasBuriedCurse(char, 'gaap') ? 0 : (uniques.includes('u52') ? 100 : d.crit + (uniques.includes('da1') ? 8 : 0)),
     critDmg: d.critDmg,
@@ -360,7 +361,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
         dustGain: dustGainRef.current,
         skillLvUp: uq('u100') && Math.random() < 0.75, // [u100] 수확자의 서
         carryBarrier: uq('u6') ? Math.max(0, playerRef.current?.barrier || 0) : 0, // [u6] 달인
-        research: uq('u36') ? 2 : 0, // [u36] 비전 — 처치마다 공격력 +2 (런 영구)
+        researchPct: uq('u36') ? 0.5 : 0, // [u36] 비전 — 1.133.0 %화: 처치마다 공격력 +0.5% (런 영구)
       });
     } else {
       setResult({ win: false, hp: 0, potions, dustGain: dustGainRef.current });
