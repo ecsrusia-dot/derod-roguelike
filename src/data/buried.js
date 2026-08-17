@@ -1963,6 +1963,46 @@ export function rechargeBuriedRandomSlot(char) {
   return { char: rechargeBuriedSlot(char, slot), item: char.equipped[slot] };
 }
 
+// =========================================================
+// ⛓ 장비 파손 (1.134.0) — PM 지시: 어떤 효과로도 막을 수 없다
+// =========================================================
+// 스킬 사용 횟수가 0이 된 장비는 소진된 층(depletedAt)이 찍히고,
+// BURIED_BREAK_GRACE(5)층 안에 충전하지 못하면 층 이동 시 부서져 사라진다.
+// 층 이동(일반 advance·낙하 구멍 공용) 직후 호출 — 낙하로 건너뛴 층도 그대로 계산된다.
+export const BURIED_BREAK_GRACE = 5;
+function isBuriedSlotDepleted(char, slot) {
+  const it = char?.equipped?.[slot];
+  if (!it || !BURIED_SKILLS[it.skillId]) return false;
+  return (it.usesSpent || 0) > 0 && buriedSkillUsesLeft(char, slot) <= 0;
+}
+export function tickBuriedGearBreak(char) {
+  if (!char) return { char, broken: [], marked: [] };
+  const floor = char.floor || 1;
+  const broken = [];  // 이번 이동으로 부서진 장비
+  const marked = [];  // 이번 이동에 소진이 처음 확인된 장비 (경고용)
+  let changed = false;
+  const equipped = { ...char.equipped };
+  for (const s of BURIED_SLOT_IDS) {
+    const it = equipped[s];
+    if (!it) continue;
+    if (!isBuriedSlotDepleted(char, s)) {
+      // 충전됐으면 파손 카운트 해제
+      if (it.depletedAt != null) { equipped[s] = { ...it, depletedAt: null }; changed = true; }
+      continue;
+    }
+    if (it.depletedAt == null) { equipped[s] = { ...it, depletedAt: floor }; marked.push(it); changed = true; continue; }
+    if (floor - it.depletedAt >= BURIED_BREAK_GRACE) { broken.push(it); equipped[s] = null; changed = true; }
+  }
+  return changed ? { char: { ...char, equipped }, broken, marked } : { char, broken, marked };
+}
+// 파손까지 남은 층 (표시용) — 소진 상태가 아니면 null
+export function buriedBreakIn(char, slot) {
+  if (!isBuriedSlotDepleted(char, slot)) return null;
+  const it = char.equipped[slot];
+  const from = it.depletedAt != null ? it.depletedAt : (char.floor || 1);
+  return Math.max(0, BURIED_BREAK_GRACE - ((char.floor || 1) - from));
+}
+
 // 장비 획득 시 스킬 레벨 상승 (이미 만렙이면 그대로)
 export function raiseBuriedSkill(char, skillId) {
   // 저주 「나베리우스」 — 스킬 레벨 상승 불가
@@ -2627,11 +2667,14 @@ export const BURIED_EVENT_ROOM_IDS = Object.keys(BURIED_EVENT_ROOMS);
 
 // 결과 테이블 — { w: 가중치, run(char, ctx) → { char, text, tone } }  tone: 'good'|'bad'|'neutral'
 const pendStatus = (char, s, n) => ({ ...char, pendingStatuses: [...(char.pendingStatuses || []), { s, n }] });
+// 1.134.0 — 이벤트 보상 심층 스케일 (저주 보상 1.117.0과 동일 공식: 마물 레벨당 +10%)
+// 골드·먼지 고정치가 심층 경제(1.121.0)와 동떨어져 있던 문제 정합
+const evScale = (c) => 1 + Math.max(0, buriedMonsterLevel(c) - 1) * 0.10;
 const EVENT_OUTCOMES = {
   gravestone: [
-    { w: 22, run: (c) => ({ char: { ...c, gold: c.gold + 90 }, text: '관 틈에서 🪙 90을 찾아냈다.', tone: 'good' }) },
-    { w: 18, run: (c, ctx) => ({ char: c, text: `비석의 문양을 읽자 잊힌 자의 기억이 먼지가 되어 흩어진다 — 🕯 +${ctx.dustGain = 20}.`, tone: 'good' }) },
-    { w: 16, run: (c, ctx) => ({ char: c, text: `먼지가 쏟아진다 — 🕯 무덤 먼지 +${ctx.dustGain = 35}.`, tone: 'good' }) },
+    { w: 22, run: (c) => { const g = Math.round(90 * evScale(c)); return { char: { ...c, gold: c.gold + g }, text: `관 틈에서 🪙 ${g}을 찾아냈다.`, tone: 'good' }; } },
+    { w: 18, run: (c, ctx) => ({ char: c, text: `비석의 문양을 읽자 잊힌 자의 기억이 먼지가 되어 흩어진다 — 🕯 +${ctx.dustGain = Math.round(20 * evScale(c))}.`, tone: 'good' }) },
+    { w: 16, run: (c, ctx) => ({ char: c, text: `먼지가 쏟아진다 — 🕯 무덤 먼지 +${ctx.dustGain = Math.round(35 * evScale(c))}.`, tone: 'good' }) },
     { w: 16, run: (c) => { const d = buriedDerived(c); return { char: { ...c, hp: Math.min(d.maxHp, c.hp + Math.round(d.maxHp * 0.35)) }, text: '따뜻한 기운이 감돈다 — HP 35% 회복.', tone: 'good' }; } },
     { w: 14, run: (c) => { const d = buriedDerived(c); return { char: { ...c, hp: Math.max(1, c.hp - Math.round(d.maxHp * 0.25)) }, text: '함정이다! 폭발이 일어났다 — 최대 HP의 25% 피해.', tone: 'bad' }; } },
     { w: 14, run: (c) => ({ char: pendStatus(c, 'poison', 3), text: '독가스가 새어나온다 — 다음 전투를 [중독] 3으로 시작한다.', tone: 'bad' }) },
@@ -2645,10 +2688,10 @@ const EVENT_OUTCOMES = {
     { w: 10, run: (c) => ({ char: c, text: '그냥 물이었다.', tone: 'neutral' }) },
   ],
   statue: [
-    { w: 22, run: (c, ctx) => ({ char: c, text: `석상이 고개를 끄덕이며 손에 든 것을 부수어 준다 — 🕯 +${ctx.dustGain = 30}.`, tone: 'good' }) },
+    { w: 22, run: (c, ctx) => ({ char: c, text: `석상이 고개를 끄덕이며 손에 든 것을 부수어 준다 — 🕯 +${ctx.dustGain = Math.round(30 * evScale(c))}.`, tone: 'good' }) },
     { w: 20, run: (c) => { const d = buriedDerived(c); return { char: { ...c, hp: Math.min(d.maxHp, c.hp + Math.round(d.maxHp * 0.5)) }, text: '석상의 손이 빛난다 — HP 50% 회복.', tone: 'good' }; } },
-    { w: 16, run: (c) => ({ char: { ...c, gold: c.gold + 140 }, text: '석상 밑에서 헌금함을 찾았다 — 🪙 140.', tone: 'good' }) },
-    { w: 22, run: (c) => ({ char: { ...c, exp: Math.max(0, (c.exp || 0) - 30) }, text: '기억이 흐려진다 — 경험치 30을 잃었다.', tone: 'bad' }) },
+    { w: 16, run: (c) => { const g = Math.round(140 * evScale(c)); return { char: { ...c, gold: c.gold + g }, text: `석상 밑에서 헌금함을 찾았다 — 🪙 ${g}.`, tone: 'good' }; } },
+    { w: 22, run: (c) => { const loss = Math.round(buriedExpToNext(c.lv || 1) * 0.35); return { char: { ...c, exp: Math.max(0, (c.exp || 0) - loss) }, text: `기억이 흐려진다 — 경험치 ${loss}을 잃었다 (다음 레벨 필요치의 35%).`, tone: 'bad' }; } },
     { w: 12, run: (c) => ({ char: pendStatus(c, 'confuse', 1), text: '석상의 눈이 빙글 돈다 — 다음 전투를 [혼란] 1로 시작한다.', tone: 'bad' }) },
   ],
   coffin: [
@@ -2656,7 +2699,7 @@ const EVENT_OUTCOMES = {
     { w: 16, run: (c, ctx) => { ctx.item = rollBuriedItem({ slot: null, classId: c.classId, floor: buriedMonsterLevel(c), tier: 'relic', powerMult: buriedLootPower(c) }); return { char: c, text: '유물급 장비가 잠들어 있었다!', tone: 'good' }; } },
     { w: 26, run: (c) => { const d = buriedDerived(c); return { char: { ...c, hp: Math.max(1, c.hp - Math.round(d.maxHp * 0.3)) }, text: '관 속의 것이 손을 뻗는다 — 최대 HP의 30% 피해.', tone: 'bad' }; } },
     { w: 14, run: (c) => ({ char: pendStatus(c, 'silence', 2), text: '봉인 문자가 목에 감긴다 — 다음 전투를 [침묵] 2로 시작한다.', tone: 'bad' }) },
-    { w: 10, run: (c) => ({ char: { ...c, gold: c.gold + 60 }, text: '부장품 몇 닢뿐이었다 — 🪙 60.', tone: 'neutral' }) },
+    { w: 10, run: (c) => { const g = Math.round(60 * evScale(c)); return { char: { ...c, gold: c.gold + g }, text: `부장품 몇 닢뿐이었다 — 🪙 ${g}.`, tone: 'neutral' }; } },
   ],
 };
 
