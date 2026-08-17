@@ -1584,6 +1584,10 @@ export function advanceBuriedFloor(char) {
     offers: rollBuriedOffers(next, char.dungeonId, (hasBuriedUnique(char, 'dl1') || hasBuriedTrait(char, 'pathfinder')) ? 1 : 0),
     floorEffect: rollBuriedFloorEffect(dg.floorEffectChance),
     room: null, roomData: null, roomEffect: null,
+    // [u23] 변모 — 층을 오를 때마다 무작위 버프 2스택으로 다음 전투 시작
+    pendingStatuses: hasBuriedUnique(char, 'u23')
+      ? [...(char.pendingStatuses || []), { s: pick(['rage', 'guard', 'regen', 'evade']), n: 2 }]
+      : char.pendingStatuses,
   };
   // [dl2] 미로 걸음 — 층 이동 시 30% 확률 최대 HP 12% 회복
   if (hasBuriedUnique(char, 'dl2') && Math.random() < 0.30) {
@@ -1620,8 +1624,10 @@ export function buriedBossKeyAt(dg, floor) {
 }
 
 // 방을 하나 지날 때마다 걸음수 +1 (원작: 마물 레벨은 층이 아니라 걸음수로 오른다)
+// [u75] 한달음 — 걸음이 절반만 쌓인다 (기본 걸음 50% 확률 미계상. extraSteps는 그대로)
 export function stepBuriedChar(char, extraSteps = 0) {
-  return { ...char, steps: (char.steps || 0) + 1 + extraSteps };
+  const base = hasBuriedUnique(char, 'u75') && Math.random() < 0.5 ? 0 : 1;
+  return { ...char, steps: (char.steps || 0) + base + extraSteps };
 }
 
 // =========================================================
@@ -2384,6 +2390,66 @@ export const BURIED_UNIQUES = [
   UQ({ id: 'u76',  name: '씨앗',           slot: 'armor', skillId: 'thornMail',   src: 76,  desc: '전투를 🧱방벽 2개로 시작한다.' }),
   UQ({ id: 'u79',  name: '눈보라',         slot: 'acc',   skillId: 'sunderSigil', src: 79,  desc: '치명타마다 30% 확률로 적에게 [기절] 1.' }),
   UQ({ id: 'u83',  name: '수수께끼의 보석', slot: 'acc',   skillId: 'lifeCharm',   src: 83,  desc: '피격당할 때마다 15% 확률로 모든 쿨다운이 초기화된다.' }),
+
+  // ===== 1.137.0 — 원전 도감 [1]~[83] 완성: 잔여 53종 =====
+  // 원전 요약(docs/buried-reference.md)에 효과 기록이 있는 항목은 그대로/각색 이식.
+  // 효과 기록이 없는 번호(13·14·24·29·30·37·39·45·46·47·50·67·70·72·82)는 이름·효과 모두 오리지널 각색.
+  // fx 필드형은 선언형 fx bag(코드 0줄), 나머지는 uq() 분기 — 기존 규칙 동일.
+  // --- 판정형 (전투 분기) ---
+  UQ({ id: 'u4',   name: '카두세우스',      slot: 'acc',   skillId: 'lifeCharm',   src: 4,   desc: '보조(비공격) 스킬을 사용하면 마법 공격력의 25%만큼 적을 타격한다.' }),
+  UQ({ id: 'u5',   name: '틈새경계',        slot: 'armor', skillId: 'mirrorPlate', src: 5,   desc: '쿨다운이 돌고 있는 스킬 1개당 받는 피해 -8% (최대 -32%).' }),
+  UQ({ id: 'u12',  name: '세라핌',          slot: 'acc',   skillId: 'silenceSigil',src: 12,  desc: '보조(비공격) 스킬의 쿨다운 -1.' }),
+  UQ({ id: 'u15',  name: '폭풍',            slot: 'acc',   skillId: 'sunderSigil', src: 15,  desc: '공격 스킬이 적중할 때마다 적에게 [파쇄] 1.' }),
+  UQ({ id: 'u16',  name: '왕녀의 명령',     slot: 'acc',   skillId: 'fairyDust',   src: 16,  desc: '물약을 마시면 적이 현재 HP의 20%를 잃는다 (보스 10%).' }),
+  UQ({ id: 'u19',  name: '부정한 피',       slot: 'armor', skillId: 'regenScale',  src: 19,  desc: '내가 받는 지속피해(출혈·중독·화상)가 같은 양의 회복으로 뒤집힌다.' }),
+  UQ({ id: 'u22',  name: '심판자',          slot: 'helm',  skillId: 'intimidate',  src: 22,  desc: '전투를 시작할 때 적에게 [기절] 1.' }),
+  UQ({ id: 'u23',  name: '변모',            slot: 'helm',  skillId: 'observe',     src: 23,  desc: '층을 오를 때마다 무작위 버프 2스택을 두르고 다음 전투를 시작한다.' }),
+  UQ({ id: 'u28',  name: '합리주의',        slot: 'helm',  skillId: 'observe',     src: 28,  desc: '스킬의 부가 효과 1종당 위력 +25%.' }),
+  UQ({ id: 'u31',  name: '오의',            slot: 'acc',   skillId: 'bloodSigil',  src: 31,  desc: '치명타를 입히면 10% 확률로 적을 즉사시킨다 (보스 면역).' }),
+  UQ({ id: 'u32',  name: '혈기왕성',        slot: 'acc',   skillId: 'berserkSigil',src: 32,  desc: '자해 피해가 같은 양의 회복으로 뒤집힌다.' }),
+  UQ({ id: 'u33',  name: '용신',            slot: 'armor', skillId: 'thornMail',   src: 33,  desc: '반사 스킬의 반사율 2배 + 반사 스킬 없이도 받은 피해의 10%를 반사한다.' }),
+  UQ({ id: 'u35',  name: '사령술',          slot: 'acc',   skillId: 'grudge',      src: 35,  desc: '추격 피해가 2배가 된다.' }),
+  UQ({ id: 'u38',  name: '투명화',          slot: 'armor', skillId: 'shadowCloak', src: 38,  desc: '일반 전투에서 적이 첫 턴에 나를 찾지 못한다 (강적·보스·재앙 제외).' }),
+  UQ({ id: 'u49',  name: '변신',            slot: 'armor', skillId: 'bulwark',     src: 49,  desc: '보스·재앙 전투를 [격노] 2 + [수호] 2로 시작한다.' }),
+  UQ({ id: 'u51',  name: '탐식자',          slot: 'helm',  skillId: 'warHorn',     src: 51,  desc: '전투를 시작할 때 적에게 [약화] 2.' }),
+  UQ({ id: 'u54',  name: '건강한 잠',       slot: 'armor', skillId: 'regenScale',  src: 54,  desc: '야영의 휴식 회복량이 2배가 된다.' }),
+  UQ({ id: 'u55',  name: '군림',            slot: 'helm',  skillId: 'chargeUp',    src: 55,  desc: '전투를 시작할 때 적에게 [파쇄] 2.' }),
+  UQ({ id: 'u58',  name: '무념무상',        slot: 'helm',  skillId: 'focusMind',   src: 58,  desc: '피격당할 때마다 이 전투 동안 받는 피해 -3% (최대 -30%).' }),
+  UQ({ id: 'u59',  name: '간계',            slot: 'acc',   skillId: 'venomSigil',  src: 59,  desc: '내가 부여하는 상태이상 스택이 2배가 된다. (「균일한 저주」 보유 시 그쪽 우선)' }),
+  UQ({ id: 'u60',  name: '강령술',          slot: 'acc',   skillId: 'grudge',      src: 60,  desc: '모든 공격에 준 피해의 15%만큼 추격 피해가 붙는다.' }),
+  UQ({ id: 'u61',  name: '휘황찬란',        slot: 'helm',  skillId: 'insight',     src: 61,  fx: { dodge: 8 }, desc: '적의 치명타를 무효화하고 회피율 +8%.' }),
+  UQ({ id: 'u62',  name: '근심',            slot: 'armor', skillId: 'ironWall',    src: 62,  desc: '🧱방벽이 소모될 때 40% 확률로 소모되지 않는다.' }),
+  UQ({ id: 'u63',  name: '스탬피드',        slot: 'acc',   skillId: 'sunderSigil', src: 63,  desc: '공격 스킬이 적중할 때마다 적 최대 HP -2%.' }),
+  UQ({ id: 'u64',  name: '일그러진 사랑',   slot: 'acc',   skillId: 'fairyDust',   src: 64,  desc: '적에게 걸린 디버프 종류 1개당 주는 피해 +6%.' }),
+  UQ({ id: 'u65',  name: '폭풍우',          slot: 'acc',   skillId: 'dragonFang',  src: 65,  desc: '스킬을 사용해도 30% 확률로 쿨다운이 시작되지 않는다.' }),
+  UQ({ id: 'u68',  name: '끝없이 깊은 물',  slot: 'acc',   skillId: 'boneGraft',   src: 68,  desc: '쿨다운 2 이상의 스킬을 사용하면 최대 HP의 12%를 회복한다.' }),
+  UQ({ id: 'u74',  name: '금줄',            slot: 'helm',  skillId: 'helmBash',    src: 74,  desc: '쿨다운을 늘리는 모든 효과(쐐기석·저주 등)를 무시한다.' }),
+  UQ({ id: 'u75',  name: '한달음',          slot: 'acc',   skillId: 'lifeCharm',   src: 75,  desc: '이동해도 걸음이 절반만 쌓인다 — 마물 레벨이 느리게 오른다.' }),
+  UQ({ id: 'u77',  name: '공허',            slot: 'acc',   skillId: 'silenceSigil',src: 77,  desc: '스킬 사용 횟수가 소모되지 않는다.' }),
+  UQ({ id: 'u78',  name: '강인',            slot: 'armor', skillId: 'shieldBash',  src: 78,  desc: '받는 피해의 30%를 나중으로 미룬다 — 매 턴 종료 시 절반씩 청구된다 (보호막 무시).' }),
+  UQ({ id: 'u80',  name: '빙벽',            slot: 'armor', skillId: 'ironWall',    src: 80,  desc: '전투를 🧱방벽 1개 + 보호막 30을 추가로 얻고 시작한다.' }),
+  // --- 선언형 (fx bag — 코드 0줄) ---
+  UQ({ id: 'u13',  name: '발키리의 깃털',   slot: 'armor', skillId: 'shadowCloak', src: 13,  fx: { dodge: 10, physPct: 8 },  desc: '전장을 굽어본다. 회피 +10%, 물리·기교 +8%.' }),
+  UQ({ id: 'u14',  name: '거인의 힘줄',     slot: 'acc',   skillId: 'bloodSigil',  src: 14,  fx: { physPct: 15, hpMult: 1.08 }, desc: '태고의 근력. 물리·기교 +15%, 최대 HP +8%.' }),
+  UQ({ id: 'u24',  name: '세이렌의 노래',   slot: 'helm',  skillId: 'warHorn',     src: 24,  fx: { statusChance: 15, magPct: 10 }, desc: '홀리는 선율. 상태이상 확률 +15%, 마법 +10%.' }),
+  UQ({ id: 'u26',  name: '달콤한 향기',     slot: 'acc',   skillId: 'fairyDust',   src: 26,  fx: { healPct: 25, statusResist: 10 }, desc: '상처가 아무는 향. 회복 +25%, 상태이상 저항 +10%.' }),
+  UQ({ id: 'u29',  name: '피의 성배',       slot: 'acc',   skillId: 'bloodSigil',  src: 29,  fx: { drainPct: 6 }, desc: '모든 공격에 흡혈 +6%.' }),
+  UQ({ id: 'u30',  name: '운명의 실',       slot: 'acc',   skillId: 'lifeCharm',   src: 30,  fx: { expPct: 20, dropLuck: 1 }, desc: '실이 이끄는 길. 경험치 +20%, 드랍 운 +1.' }),
+  UQ({ id: 'u37',  name: '신기루 외투',     slot: 'armor', skillId: 'shadowCloak', src: 37,  fx: { dodge: 12 }, desc: '있는 듯 없는 몸. 회피 +12%.' }),
+  UQ({ id: 'u39',  name: '이지스의 파편',   slot: 'armor', skillId: 'bulwark',     src: 39,  fx: { takenPct: -12 }, desc: '신방패의 조각. 받는 피해 -12%.' }),
+  UQ({ id: 'u43',  name: '보호막 전문가',   slot: 'armor', skillId: 'mirrorPlate', src: 43,  fx: { barrierHpPct: 30 }, desc: '전투 시작 보호막 = 최대 HP의 30%.' }),
+  UQ({ id: 'u44',  name: '연구실의 후원',   slot: 'acc',   skillId: 'lifeCharm',   src: 44,  fx: { goldPct: 40, dropLuck: 2 }, desc: '후원이 닿는다. 골드 +40%, 드랍 운 +2.' }),
+  UQ({ id: 'u45',  name: '여신의 눈물',     slot: 'acc',   skillId: 'boneGraft',   src: 45,  fx: { healPct: 30 }, desc: '모든 회복 +30%.' }),
+  UQ({ id: 'u46',  name: '현자의 두루마리', slot: 'helm',  skillId: 'focusMind',   src: 46,  fx: { magPct: 15, spMult: 1.1 }, desc: '지혜의 기록. 마법 +15%, 최대 SP +10%.' }),
+  UQ({ id: 'u47',  name: '불굴의 낙인',     slot: 'acc',   skillId: 'berserkSigil',src: 47,  fx: { physPct: 10, statusResist: 20 }, desc: '꺾이지 않는다. 물리·기교 +10%, 상태이상 저항 +20%.' }),
+  UQ({ id: 'u50',  name: '늑대왕의 이빨',   slot: 'acc',   skillId: 'dragonFang',  src: 50,  fx: { crit: 8, physPct: 8 }, desc: '사냥의 본능. 치명 +8%, 물리·기교 +8%.' }),
+  UQ({ id: 'u66',  name: '영원한 어둠',     slot: 'acc',   skillId: 'grudge',      src: 66,  fx: { physPct: 10, magPct: 10, healPct: -15 }, desc: '어둠이 힘을 준다. 모든 공격 +10% — 대신 회복 -15%.' }),
+  UQ({ id: 'u67',  name: '쓰나미',          slot: 'acc',   skillId: 'venomSigil',  src: 67,  fx: { magPct: 20, spRegen: -1 }, desc: '삼키는 물결. 마법 +20% — 대신 SP 회복 -1.' }),
+  UQ({ id: 'u69',  name: '견고',            slot: 'armor', skillId: 'ironWall',    src: 69,  fx: { takenPct: -15, dodge: -5 }, desc: '묵직하게 버틴다. 받는 피해 -15% — 대신 회피 -5%.' }),
+  UQ({ id: 'u70',  name: '별의 너머',       slot: 'helm',  skillId: 'insight',     src: 70,  fx: { magPct: 12, crit: 6, expPct: 10 }, desc: '별 너머를 본 자. 마법 +12%, 치명 +6%, 경험치 +10%.' }),
+  UQ({ id: 'u72',  name: '세계수의 가지',   slot: 'armor', skillId: 'regenScale',  src: 72,  fx: { hpMult: 1.12, healPct: 15 }, desc: '뿌리내린 생명. 최대 HP +12%, 회복 +15%.' }),
+  UQ({ id: 'u81',  name: '고고학',          slot: 'helm',  skillId: 'observe',     src: 81,  fx: { expPct: -100, dropLuck: 6, goldPct: 50 }, desc: '성장을 멈추고 유물을 좇는다. 경험치 0 — 대신 드랍 운 +6, 골드 +50%.' }),
+  UQ({ id: 'u82',  name: '육체의 변질',     slot: 'armor', skillId: 'shieldBash',  src: 82,  fx: { hpMult: 1.25, dodge: -8 }, desc: '몸이 부풀어 오른다. 최대 HP +25% — 대신 회피 -8%.' }),
 
   // ===== 던전 전용 유니크 16종 (1.115.0) — 그 던전의 **심층 보스**(정복 층 이후)만 떨어뜨린다 =====
   // 각 던전의 기믹 정체성을 강화하는 방향으로 설계 (PM 결정: 공략 요소)

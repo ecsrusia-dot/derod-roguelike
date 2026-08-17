@@ -252,7 +252,8 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onLogEvent, on
       setNotice(`그레모리의 저주 — 잠들지 못했다. 물약 하나와 ${rcMsg}만 마쳤다.`);
       return;
     }
-    const amount = Math.round(d.maxHp * 0.45 * (1 + (aggregateBuriedContracts(char).campPct || 0) / 100));
+    // [u54] 건강한 잠 — 야영 회복 2배
+    const amount = Math.round(d.maxHp * 0.45 * (1 + (aggregateBuriedContracts(char).campPct || 0) / 100) * (hasBuriedUnique(char, 'u54') ? 2 : 1));
     onUpdateChar({ ...rc.char, hp: Math.min(d.maxHp, char.hp + amount), potions: (char.potions || 0) + 1, ...mark }, 0);
     setNotice(`야영 — HP ${amount} 회복, 물약 +1, 무작위 ${rcMsg}.`);
   };
