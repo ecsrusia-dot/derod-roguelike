@@ -2928,8 +2928,11 @@ export function buriedEarnedDepthTraits(deepestByDungeon) {
 // =========================================================
 // 원작: 마의 계약 상점(500마석 랜덤 구입) + 출정 시 지참. 각색: 먼지로 구입, 지참 최대 2개.
 // 스탯형은 aggregateBuriedContracts가 fx 뭉치로 합산 → 파생 스탯·전투·던전이 나눠 읽는다.
-export const BURIED_CONTRACT_COST = 60;      // 랜덤 1개 구입 (미보유 풀에서)
+export const BURIED_CONTRACT_COST = 60;      // 기본 단가 — 1.135.0부터 buriedContractCost 누진의 1계약 가격
 export const BURIED_CONTRACT_CARRY = 2;      // 출정 시 지참 한도
+// 1.135.0 — PM 지시: 계약 완주가 너무 이르다 → 이중 게이트 (누진 비용 + 진행도 보유 한도)
+// n+1번째 계약 가격 = 60 × (n+1). 1번째 60 → 28번째 1,680 (전종 총 🕯23,520)
+export const buriedContractCost = (ownedCount) => BURIED_CONTRACT_COST * ((ownedCount || 0) + 1);
 export const BURIED_CONTRACTS = [
   { id: 'c_vitality', name: '활력의 계약',   desc: '최대 HP +15%',                        fx: { hpPct: 15 } },
   { id: 'c_might',    name: '완력의 계약',   desc: '물리·기교 공격력 +12%',                fx: { physPct: 12 } },
@@ -2964,6 +2967,13 @@ export const BURIED_CONTRACTS = [
   { id: 's_forbidden', name: '보급 · 금서',       desc: '[연구소] 출정 시작 시 ᚱ룬 1개 (★★★~★★★★)',       fx: {}, supply: { rune: [3, 4] } },
 ];
 export const getBuriedContract = (id) => BURIED_CONTRACTS.find(c => c.id === id) || null;
+// 1.135.0 — 보유 한도 (진행도 연동): 기본 6 + 던전 정복당 +4 + 최고 100층 +3 + 200층 +3.
+// 4던전 정복(+16) + 200층(+6) = 28 = 전종 — 풀 컬렉션은 엔드 콘텐츠 도달의 증표
+export function buriedContractCap(b) {
+  const conquered = Object.keys(b?.clears || {}).filter(k => (b.clears?.[k] || 0) > 0).length;
+  const deepest = b?.deepest || 0;
+  return Math.min(BURIED_CONTRACTS.length, 6 + conquered * 4 + (deepest >= 100 ? 3 : 0) + (deepest >= 200 ? 3 : 0));
+}
 export function rollBuriedContract(ownedIds) {
   const pool = BURIED_CONTRACTS.filter(c => !ownedIds.includes(c.id));
   return pool.length > 0 ? pick(pool).id : null;
