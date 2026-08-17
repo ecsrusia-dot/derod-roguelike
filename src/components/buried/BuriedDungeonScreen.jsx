@@ -34,16 +34,18 @@ import {
   BURIED_CALAMITY_GAUGE_MAX, buildBuriedCalamity,
   resolveBuriedLoot, buriedBossKeyAt,
   BURIED_CHUTE_ROOM, BURIED_CHUTE_HP_PCT, buriedChuteJump, buriedLootPower,
+  tickBuriedGearBreak, BURIED_BREAK_GRACE,
 } from '../../data.js';
 import { BuriedItemCard, BuriedBar, BURIED_DUST_ICON, slotMeta, BuriedLootModal } from './BuriedCommon.jsx';
 import BuriedManage from './BuriedManage.jsx';
 
-export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle, onLeave, notice: extNotice, onClearNotice }) {
+export default function BuriedDungeonScreen({ meta, onUpdateChar, onLogEvent, onEnterBattle, onLeave, notice: extNotice, onClearNotice }) {
   const b = meta?.buried || {};
   const char = b.char || null;
   const [manage, setManage] = useState(false);
   const [notice, setNotice] = useState(null);
   const [resupplyOpen, setResupplyOpen] = useState(false); // 1.133.0 — 보충의 봉헌 슬롯 지정 피커
+  const [eventLogOpen, setEventLogOpen] = useState(false); // 1.134.0 — 이벤트 지난 기록 모달
 
   // 이번 층의 방 선택지가 없으면 생성 (새로고침 후에도 그대로 이어진다).
   // 1.117.0 — 첫 층에도 [dl1] 실타래 / 「길잡이」 선택지 +1 적용 (advance와 동일 규칙)
@@ -76,8 +78,15 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
     // [u102] 순례자의 성표 — 층 이동 시 25% 확률 무작위 스킬 레벨 +1
     const { char: blessed, raised } = maybeBuriedFloorSkillUp(stepBuriedChar(char));
     const { char: next } = advanceBuriedFloor(blessed);
-    onUpdateChar(next, 0);
-    setNotice(raised ? `순례자의 성표 — 오르는 길에 [${raised.id}] 스킬이 Lv.${raised.lv}이 되었다.` : null);
+    // ⛓ 장비 파손 (1.134.0) — 소진 후 5층 안에 충전 못 하면 파괴. 어떤 효과로도 막을 수 없다
+    const tick = tickBuriedGearBreak(next);
+    const msgs = [];
+    if (raised) msgs.push(`순례자의 성표 — 오르는 길에 [${raised.id}] 스킬이 Lv.${raised.lv}이 되었다.`);
+    for (const it of tick.broken) msgs.push(`⛓ «${it.name}»이(가) 부서져 사라졌다 — 소진된 채 ${BURIED_BREAK_GRACE}층이 지났다.`);
+    for (const it of tick.marked) msgs.push(`⚠ «${it.name}» 스킬 소진 — ${BURIED_BREAK_GRACE}층 안에 충전하지 못하면 부서진다!`);
+    setEventLogOpen(false);
+    onUpdateChar(tick.char, 0);
+    setNotice(msgs.length > 0 ? msgs.join(' ') : null);
   };
 
   // ===== 방 진입 =====
@@ -88,8 +97,14 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
       const cost = Math.round(d.maxHp * BURIED_CHUTE_HP_PCT / (hasBuriedUnique(char, 'dc1') ? 200 : 100));
       if (char.hp <= cost) { setNotice('HP가 부족해 뛰어내릴 수 없다.'); return; }
       const jumped = buriedChuteJump({ ...char, hp: char.hp - cost });
-      onUpdateChar(jumped, 0);
-      setNotice(`🕳 어둠 속으로 낙하 — HP ${cost}을 바치고 ${jumped.floor}층에 착지했다.`);
+      // ⛓ 장비 파손 (1.134.0) — 낙하로 건너뛴 층도 그대로 계산된다
+      const tick = tickBuriedGearBreak(jumped);
+      const extra = [
+        ...tick.broken.map(it => ` ⛓ «${it.name}» 파손!`),
+        ...tick.marked.map(it => ` ⚠ «${it.name}» 소진 — ${BURIED_BREAK_GRACE}층 내 충전 필요!`),
+      ].join('');
+      onUpdateChar(tick.char, 0);
+      setNotice(`🕳 어둠 속으로 낙하 — HP ${cost}을 바치고 ${jumped.floor}층에 착지했다.${extra}`);
       return;
     }
     if (type === 'battle' || type === 'elite' || type === 'boss') {
@@ -282,12 +297,15 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
       const added = addBuriedItemToChar(next, r.item);
       next = { ...added.char, roomData: next.roomData };
     }
+    // 1.134.0 — 선택 결과 영구 기록 (지난 기록 모달용)
+    onLogEvent?.(roomId, { text: r.text, tone: r.tone, floor: char.floor, dungeonId: char.dungeonId, at: Date.now() });
     onUpdateChar(bumpGauge(next), r.dustGain || 0);
   };
   const runWanderer = (kind) => {
     if (char.roomData?.done) return;
     const fn = kind === 'option' ? wandererAddOption : kind === 'mod' ? wandererApplyMod : wandererReroll;
     const r = fn(char);
+    onLogEvent?.('wanderer', { text: r.text, tone: 'good', floor: char.floor, dungeonId: char.dungeonId, at: Date.now() });
     onUpdateChar(bumpGauge({ ...r.char, roomData: { done: true, text: r.text, tone: 'good' } }), 0);
   };
 
@@ -701,6 +719,12 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
             <div className="space-y-2">
               <div className="text-[12px] font-bold" style={{ color: ev.color }}>{ev.icon} {ev.name}</div>
               <div className="text-[12px] leading-relaxed" style={{ color: PALETTE.textDim }}>{ev.desc}</div>
+              {(b.eventLog?.[room] || []).length > 0 && (
+                <button onClick={() => setEventLogOpen(true)} className="ui-press w-full py-2 text-[11px]"
+                  style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panel, border: `1px solid ${ev.color}44`, color: PALETTE.textDim }}>
+                  📜 지난 선택 기록 {(b.eventLog[room] || []).length}건 — 전에 여기서 무슨 일이 있었나
+                </button>
+              )}
               {rd.text && (
                 <div className="px-3 py-2.5 text-[12px] leading-relaxed"
                   style={{
@@ -742,6 +766,40 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
           );
         })()}
       </div>
+
+      {/* 1.134.0 — 이벤트 지난 기록 모달 (선택 전 과거 결과 확인) */}
+      {eventLogOpen && BURIED_EVENT_ROOM_IDS.includes(room) && (() => {
+        const ev = BURIED_EVENT_ROOMS[room];
+        const hist = b.eventLog?.[room] || [];
+        return (
+          <div className="absolute inset-0 z-50 flex items-end" style={{ background: 'rgba(0,0,0,0.7)' }} onClick={() => setEventLogOpen(false)}>
+            <div className="w-full px-4 pb-4 pt-3 max-h-[70%] overflow-y-auto" onClick={(e) => e.stopPropagation()}
+              style={{ background: PALETTE.bgDeep, borderTop: `1px solid ${ev.color}88`, borderRadius: '18px 18px 0 0' }}>
+              <div className="text-[14px] font-bold mb-1" style={{ color: ev.color }}>{ev.icon} {ev.name} — 지난 선택 기록</div>
+              <div className="text-[11px] mb-2" style={{ color: PALETTE.textDim }}>
+                최근 {hist.length}건 (이전 런 포함). 결과는 매번 새로 굴려진다 — 기록은 확률 감각을 잡는 참고용.
+              </div>
+              <div className="space-y-1.5">
+                {hist.map((h, i) => (
+                  <div key={i} className="px-2.5 py-2 text-[11px] leading-relaxed"
+                    style={{
+                      borderRadius: 'var(--r-chip, 8px)',
+                      background: h.tone === 'bad' ? `${PALETTE.accent}15` : h.tone === 'good' ? `${PALETTE.green}12` : PALETTE.panel,
+                      border: `1px solid ${h.tone === 'bad' ? PALETTE.accent : h.tone === 'good' ? PALETTE.green : PALETTE.panelBorder}44`,
+                      color: PALETTE.text,
+                    }}>
+                    <span style={{ color: PALETTE.textDim }}>{getBuriedDungeon(h.dungeonId)?.name || '?'} {h.floor}층 — </span>{h.text}
+                  </div>
+                ))}
+              </div>
+              <button onClick={() => setEventLogOpen(false)} className="ui-press w-full py-2.5 text-[12px] mt-2"
+                style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panelLight, color: PALETTE.text, border: `1px solid ${PALETTE.panelBorder}` }}>
+                닫기
+              </button>
+            </div>
+          </div>
+        );
+      })()}
 
       {manage && (
         <BuriedManage char={char} dust={b.dust || 0}

@@ -1455,6 +1455,7 @@ const EMPTY_BURIED = {
   shards: 0,        // 1.112.0~ ☠ 죽음의 조각 (보스·재앙 처치 획득, 연구실 재화)
   parts: [],        // 1.112.0~ 연구실 부품 id 목록 (영구, 최대 5칸)
   deepestByDungeon: {}, // 1.113.0~ 던전별 최고 도달 층 (무한층 기록)
+  eventLog: {},     // 1.134.0~ 이벤트 방 선택 결과 기록 (roomId → 최근 12건, 런 간 영속)
 };
 // 1.131.1 — 무덤의 유산 전체 초기화 (PM 요청: 업데이트를 처음부터 온전히 체험).
 // meta.buried만 백지화 — 본편·레이드·HOF 등 다른 메타는 건드리지 않는다.
@@ -1478,7 +1479,15 @@ export function getBuried(meta) {
     shards: Math.max(0, b.shards || 0),
     parts: Array.isArray(b.parts) ? b.parts : [],
     deepestByDungeon: (b.deepestByDungeon && typeof b.deepestByDungeon === 'object') ? b.deepestByDungeon : {},
+    eventLog: (b.eventLog && typeof b.eventLog === 'object') ? b.eventLog : {},
   };
+}
+
+// 1.134.0 — 이벤트 방 선택 결과 기록 (선택 전 「지난 기록」 모달용). 이벤트당 최근 12건 유지
+export function logBuriedEvent(meta, roomId, entry) {
+  const b = getBuried(meta);
+  const list = [entry, ...(b.eventLog[roomId] || [])].slice(0, 12);
+  return { ...meta, buried: { ...b, eventLog: { ...b.eventLog, [roomId]: list } } };
 }
 
 // 진행 중 캐릭터 스냅샷 저장 (층 이동·장비 변경·전투 종료마다 호출)

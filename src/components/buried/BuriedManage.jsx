@@ -12,7 +12,7 @@ import {
   BURIED_SLOTS, BURIED_SLOT_IDS, BURIED_STATS, BURIED_SKILLS, BURIED_SKILL_MAX_LV,
   buriedDerived, buriedDustValue, getBuriedClass,
   buriedTraitIds, getBuriedTrait, buriedSkillLv, buriedSkillRank, BURIED_SKILL_RANKS,
-  getBuriedRune, BURIED_RUNE_RARITIES, socketBuriedRune, buriedSkillUsesLeft,
+  getBuriedRune, BURIED_RUNE_RARITIES, socketBuriedRune, buriedSkillUsesLeft, buriedBreakIn,
 } from '../../data.js';
 import { BuriedItemCard, BuriedItemSheet, BURIED_DUST_ICON } from './BuriedCommon.jsx';
 
@@ -116,11 +116,12 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose }) {
                         Lv.{lv}
                       </div>
                       <div className="text-[11px]" style={{ color: BURIED_SKILL_RANKS[rank]?.color }}>{rank}급</div>
-                      {(() => { // 1.132.0 — 스킬 사용 횟수
+                      {(() => { // 1.132.0 — 스킬 사용 횟수 / 1.134.0 — 파손 카운트다운
                         const left = buriedSkillUsesLeft(char, s.id);
+                        const brk = left <= 0 ? buriedBreakIn(char, s.id) : null;
                         return (
                           <div className="text-[11px] tabular-nums" style={{ color: left <= 0 ? PALETTE.accent : PALETTE.textDim }}>
-                            {left <= 0 ? '⛓ 봉인' : `횟수 ${left}`}
+                            {left <= 0 ? `⛓ 봉인${brk != null ? ` · ${brk}층 후 파손` : ''}` : `횟수 ${left}`}
                           </div>
                         );
                       })()}
