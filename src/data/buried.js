@@ -750,6 +750,184 @@ export const BURIED_ENEMIES = {
       { name: '한기 폭발', power: 140, kind: 'attack', heavy: true, apply: [{ s: 'weaken', n: 3, p: 100 }], weight: 2 },
     ],
   },
+  // ===== 1.130.0 — BB2 몬스터 시트 이식 20종 (일러 재사용 + 내성 프로필) =====
+  // 공용 6종
+  tombSlime: {
+    key: 'tombSlime', name: '무덤 슬라임', img: { key: 'champ_forest_husk', chapter: 'forest_1' }, color: '#7a9a5e',
+    desc: '삼킨 것을 천천히 녹인다. 뭉툭한 것은 잘 안 통한다.', tier: 'normal', minFloor: 2, maxFloor: 6,
+    hp: 140, atk: 18, def: 3, exp: 34, gold: [26, 52], startBarrier: 60, physTakenPct: -25, magTakenPct: 25,
+    actions: [
+      { name: '산성 점액', power: 96, kind: 'attack', apply: [{ s: 'shatter', n: 1, p: 70 }], weight: 3 },
+      { name: '삼키기', power: 118, kind: 'attack', weight: 2 },
+    ],
+  },
+  ancientSoldier: {
+    key: 'ancientSoldier', name: '고대 병사', img: { key: 'tundraRaider', chapter: 1 }, color: '#9b8975',
+    desc: '수천 년을 선 채로 죽었다. 첫 합이 가장 단단하다.', tier: 'normal', minFloor: 1, maxFloor: 4,
+    hp: 150, atk: 17, def: 5, exp: 28, gold: [22, 44], fullGuardPct: 40,
+    actions: [
+      { name: '녹슨 창격', power: 108, kind: 'attack', weight: 3 },
+      { name: '방진', kind: 'defend', self: [{ s: 'guard', n: 3 }], weight: 1 },
+    ],
+  },
+  boneWalker: {
+    key: 'boneWalker', name: '백골 보행자', img: { key: 'wraith', chapter: 1 }, color: '#c9c4b8',
+    desc: '뼈에는 찌르기가 통하지 않는다 — 마법이 답이다.', tier: 'normal', minFloor: 2, maxFloor: 6,
+    hp: 165, atk: 20, def: 4, exp: 36, gold: [28, 54], physTakenPct: -30, magTakenPct: 30,
+    actions: [
+      { name: '뼈칼 베기', power: 105, kind: 'attack', apply: [{ s: 'bleed', n: 1, p: 60 }], weight: 3 },
+      { name: '재조립', kind: 'defend', self: [{ s: 'regen', n: 3 }], weight: 1 },
+    ],
+  },
+  gargoyleWatch: {
+    key: 'gargoyleWatch', name: '가고일 감시자', img: { key: 'brokenGolem', chapter: 3 }, color: '#8b8378',
+    desc: '온전할 때는 석상이다 — 깨져야 피가 돈다.', tier: 'normal', minFloor: 4, maxFloor: 8,
+    hp: 210, atk: 25, def: 9, exp: 54, gold: [40, 76], fullGuardPct: 60,
+    actions: [
+      { name: '석화 발톱', power: 112, kind: 'attack', apply: [{ s: 'bind', n: 1, p: 50 }], weight: 3 },
+      { name: '급강하', power: 138, kind: 'attack', heavy: true, weight: 2 },
+    ],
+  },
+  wailingBanshee: {
+    key: 'wailingBanshee', name: '통곡하는 원혼', img: { key: 'wraith', chapter: 1 }, color: '#7ba3c4',
+    desc: '몸이 없다 — 칼은 헛돌고, 울음은 저주가 된다.', tier: 'normal', minFloor: 3, maxFloor: 8,
+    hp: 90, atk: 24, def: 2, exp: 48, gold: [34, 66], startBarrier: 150, physTakenPct: -50, magTakenPct: 35,
+    actions: [
+      { name: '통곡', power: 66, kind: 'attack', apply: [{ s: 'weaken', n: 2, p: 100 }, { s: 'curse', n: 1, p: 50 }], weight: 3 },
+      { name: '한기의 손길', power: 118, kind: 'attack', weight: 2 },
+    ],
+  },
+  mandragora: {
+    key: 'mandragora', name: '만드라고라', img: { key: 'forestSpirit', chapter: 2 }, color: '#7a9a5e',
+    desc: '비명이 정신을 흔든다. 주문은 뿌리에 스며 사라진다.', tier: 'normal', minFloor: 2, maxFloor: 6,
+    hp: 155, atk: 18, def: 4, exp: 34, gold: [26, 52], magTakenPct: -30,
+    actions: [
+      { name: '찢어지는 비명', power: 72, kind: 'attack', apply: [{ s: 'confuse', n: 1, p: 60 }], weight: 3 },
+      { name: '뿌리 후려치기', power: 112, kind: 'attack', weight: 2 },
+    ],
+  },
+  graveMimic: {
+    key: 'graveMimic', name: '무덤 미믹', img: { key: 'champ_frost_imp', chapter: 'frost_1' }, color: '#e8b04a',
+    desc: '보물인 척하는 이빨. 배 속에 삼킨 골드가 가득하다.', tier: 'elite', minFloor: 3, maxFloor: 9,
+    hp: 330, atk: 38, def: 10, exp: 150, gold: [320, 520],
+    actions: [
+      { name: '기습 물기', power: 142, kind: 'attack', heavy: true, weight: 3 },
+      { name: '동전 뱉기', power: 92, kind: 'attack', hits: 2, weight: 2 },
+    ],
+  },
+  // 미궁 전용 3종
+  runeSentinel: {
+    key: 'runeSentinel', name: '룬 파수병', img: { key: 'brokenGolem', chapter: 3 }, color: '#7ba3c4',
+    desc: '봉인 룬이 도는 동안은 흠집도 나지 않는다.', tier: 'normal', minFloor: 2, maxFloor: 7, dungeons: ['labyrinth'],
+    hp: 180, atk: 21, def: 7, exp: 40, gold: [30, 58], fullGuardPct: 50,
+    actions: [
+      { name: '룬 절단', power: 110, kind: 'attack', weight: 3 },
+      { name: '경계 태세', kind: 'defend', self: [{ s: 'guard', n: 3 }], weight: 1 },
+    ],
+  },
+  sandWisp: {
+    key: 'sandWisp', name: '모래 위습', img: { key: 'oblivionSealer', chapter: 3 }, color: '#d4a574',
+    desc: '시간의 모래가 뭉친 불꽃 — 스치면 늙는다.', tier: 'normal', minFloor: 4, maxFloor: 9, dungeons: ['labyrinth'],
+    hp: 160, atk: 26, def: 3, exp: 52, gold: [38, 70], physTakenPct: -40, magTakenPct: 40,
+    actions: [
+      { name: '모래 불꽃', power: 98, kind: 'attack', apply: [{ s: 'aging', n: 2, p: 70 }], weight: 3 },
+      { name: '시간 흩뿌리기', power: 126, kind: 'attack', weight: 2 },
+    ],
+  },
+  vaultKeeper: {
+    key: 'vaultKeeper', name: '금고지기', img: { key: 'ancientPriest', chapter: 3 }, color: '#e8b04a',
+    desc: '신전의 보물을 지키다 보물이 된 자.', tier: 'elite', minFloor: 5, maxFloor: 10, dungeons: ['labyrinth'],
+    hp: 350, atk: 39, def: 13, exp: 170, gold: [260, 430], startBarrier: 200, fullGuardPct: 30,
+    actions: [
+      { name: '봉인구 강타', power: 128, kind: 'attack', apply: [{ s: 'silence', n: 1, p: 50 }], weight: 3 },
+      { name: '금고 폐쇄', kind: 'defend', self: [{ s: 'guard', n: 4 }], weight: 1 },
+    ],
+  },
+  // 폐허 전용 3종
+  sludgeMass: {
+    key: 'sludgeMass', name: '오니 덩어리', img: { key: 'champ_forest_husk', chapter: 'forest_1' }, color: '#5e7a3e',
+    desc: '베어도 흘러내려 다시 붙는다.', tier: 'normal', minFloor: 3, maxFloor: 8, dungeons: ['ruins'],
+    hp: 200, atk: 22, def: 4, exp: 46, gold: [34, 64], physTakenPct: -35, magTakenPct: 20,
+    actions: [
+      { name: '부패 점액', power: 92, kind: 'attack', apply: [{ s: 'poison', n: 2, p: 80 }], weight: 3 },
+      { name: '재응집', kind: 'defend', self: [{ s: 'regen', n: 4 }], weight: 1 },
+    ],
+  },
+  plagueRats: {
+    key: 'plagueRats', name: '역병 쥐떼', img: { key: 'corruptSpider', chapter: 2 }, color: '#8b6f4d',
+    desc: '한 마리가 아니다. 물릴수록 병이 깊어진다.', tier: 'normal', minFloor: 2, maxFloor: 6, dungeons: ['ruins'],
+    hp: 150, atk: 16, def: 2, exp: 34, gold: [24, 50], dodge: 12,
+    actions: [
+      { name: '떼 물기', power: 52, kind: 'attack', hits: 3, apply: [{ s: 'poison', n: 1, p: 60 }], weight: 3 },
+      { name: '흩어지기', kind: 'defend', self: [{ s: 'evade', n: 3 }], weight: 1 },
+    ],
+  },
+  drownedKnight: {
+    key: 'drownedKnight', name: '익사한 기사', img: { key: 'tundraRaider', chapter: 1 }, color: '#5c7a8c',
+    desc: '물에 잠긴 갑주는 더 무거워졌을 뿐, 뚫리지 않는다.', tier: 'elite', minFloor: 4, maxFloor: 10, dungeons: ['ruins'],
+    hp: 360, atk: 40, def: 14, exp: 165, gold: [120, 200], startBarrier: 150, fullGuardPct: 40,
+    actions: [
+      { name: '침수된 대검', power: 130, kind: 'attack', weight: 3 },
+      { name: '수장의 일격', power: 168, kind: 'attack', heavy: true, apply: [{ s: 'bind', n: 1, p: 40 }], weight: 2 },
+    ],
+  },
+  // 나락 전용 3종
+  hellHornet: {
+    key: 'hellHornet', name: '지옥 말벌', img: { key: 'riftBreach', chapter: 4 }, color: '#c4453d',
+    desc: '침이 스치기만 해도 피가 마른다. 잡으려면 먼저 맞혀야 한다.', tier: 'normal', minFloor: 2, maxFloor: 6, dungeons: ['chasm'],
+    hp: 145, atk: 21, def: 2, exp: 40, gold: [28, 56], dodge: 18,
+    actions: [
+      { name: '2연침', power: 62, kind: 'attack', hits: 2, apply: [{ s: 'bleed', n: 1, p: 70 }], weight: 3 },
+      { name: '급습', power: 120, kind: 'attack', weight: 2 },
+    ],
+  },
+  bladetooth: {
+    key: 'bladetooth', name: '칼이빨', img: { key: 'wrathDemon', chapter: 4 }, color: '#8b1f1f',
+    desc: '이빨 하나하나가 단검이다 — 급소만 노린다.', tier: 'normal', minFloor: 4, maxFloor: 9, dungeons: ['chasm'],
+    hp: 200, atk: 27, def: 5, exp: 54, gold: [38, 72], crit: 22,
+    actions: [
+      { name: '급소 물기', power: 108, kind: 'attack', apply: [{ s: 'bleed', n: 2, p: 80 }], weight: 3 },
+      { name: '살점 뜯기', power: 132, kind: 'attack', drain: 30, weight: 2 },
+    ],
+  },
+  voidMaw: {
+    key: 'voidMaw', name: '공허의 아가리', img: { key: 'demonApostle', chapter: 4 }, color: '#3d1f28',
+    desc: '마법을 먹고 자란 입 — 주문이 절반은 삼켜진다.', tier: 'elite', minFloor: 5, maxFloor: 10, dungeons: ['chasm'],
+    hp: 370, atk: 43, def: 11, exp: 178, gold: [130, 210], magTakenPct: -25,
+    actions: [
+      { name: '집어삼키기', power: 126, kind: 'attack', drain: 40, weight: 3 },
+      { name: '허무의 포효', power: 96, kind: 'attack', apply: [{ s: 'silence', n: 1, p: 60 }], weight: 2 },
+    ],
+  },
+  // 심연 전용 3종
+  frostbiteShade: {
+    key: 'frostbiteShade', name: '동상 그림자', img: { key: 'champ_frost_lurker', chapter: 'frost_2' }, color: '#7ba3c4',
+    desc: '닿은 자리부터 얼어붙는다. 그림자엔 칼이 안 박힌다.', tier: 'normal', minFloor: 2, maxFloor: 7, dungeons: ['abyss'],
+    hp: 175, atk: 23, def: 4, exp: 44, gold: [32, 60], physTakenPct: -30,
+    actions: [
+      { name: '얼어붙는 접촉', power: 100, kind: 'attack', apply: [{ s: 'bind', n: 1, p: 60 }], weight: 3 },
+      { name: '그림자 스침', power: 122, kind: 'attack', weight: 2 },
+    ],
+  },
+  mirrorPhantom: {
+    key: 'mirrorPhantom', name: '거울 환영', img: { key: 'champ_frost_seer', chapter: 'frost_2' }, color: '#c48bd4',
+    desc: '어느 쪽이 진짜인지 칼이 먼저 헤맨다.', tier: 'normal', minFloor: 4, maxFloor: 9, dungeons: ['abyss'],
+    hp: 185, atk: 27, def: 4, exp: 56, gold: [40, 74], dodge: 22, magTakenPct: -30,
+    actions: [
+      { name: '환영 찌르기', power: 106, kind: 'attack', weight: 3 },
+      { name: '상 흩뜨리기', kind: 'defend', self: [{ s: 'evade', n: 3 }], weight: 1 },
+    ],
+  },
+  abyssalTitan: {
+    key: 'abyssalTitan', name: '심연의 거신', img: { key: 'champ_frost_brute', chapter: 'frost_3' }, color: '#2f3a4d',
+    desc: '어둠을 눌러 굳힌 몸 — 온전한 동안은 산이다.', tier: 'elite', minFloor: 6, maxFloor: 10, dungeons: ['abyss'],
+    hp: 420, atk: 45, def: 15, exp: 195, gold: [140, 230], fullGuardPct: 50,
+    actions: [
+      { name: '짓뭉개기', power: 134, kind: 'attack', apply: [{ s: 'shatter', n: 2, p: 100 }], weight: 3 },
+      { name: '심연 낙하', power: 176, kind: 'attack', heavy: true, apply: [{ s: 'stun', n: 1, p: 35 }], weight: 2 },
+    ],
+  },
+
   // ===== 강적 =====
   boneGiant: {
     key: 'boneGiant', name: '무덤지기 거인', img: { key: 'frostGiant', chapter: 1 }, color: '#8b8378',
@@ -1230,7 +1408,12 @@ export function resolveBuriedAttack(att, def, skill, { isPlayer = false, traits 
   const critRate = def.immuneCrit || att.noCrit ? 0 : (att.crit || 0) + (skill.critBonus || 0) + (att.envCritAdd || 0);
   let offense = buriedOffenseMult(att) * (1 + (att.envDmgPct || 0) / 100);
   if (statKey === 'int') offense *= 1 + (att.envMagPct || 0) / 100;
-  const taken = buriedTakenMult(def) * (1 + (def.envTakenPct || 0) / 100);
+  let taken = buriedTakenMult(def) * (1 + (def.envTakenPct || 0) / 100);
+  // 1.130.0 — 몬스터 내성 프로필 (BB2 시트 이식): 물리/마법 내성·전쾌시 방어
+  const isMagAtk = statKey === 'int' || (!statKey && (att.mag || 0) >= Math.max(att.atk || 0, att.fin || 0));
+  if (def.physTakenPct && !isMagAtk) taken *= 1 + def.physTakenPct / 100;
+  if (def.magTakenPct && isMagAtk) taken *= 1 + def.magTakenPct / 100;
+  if (def.fullGuardPct && def.maxHp > 0 && def.hp >= def.maxHp) taken *= Math.max(0, 1 - def.fullGuardPct / 100);
   const effDef = skill.pierce ? 0 : buriedEffDef(def);
   // 1.121.0 — 감쇠 하한 25%: 방어가 아무리 높아도 피해의 1/4은 통과 (심층 "안 아픔" 붕괴 픽스)
   const defMult = Math.max(0.25, 100 / (100 + effDef));
@@ -1851,6 +2034,7 @@ export function buriedEnemyAtLevel(key, monLevel) {
     hp: Math.round(base.hp * m),
     atk: Math.round(base.atk * m),
     def: Math.round(base.def * (1 + (lv - 1) * 0.08)),
+    ...(base.startBarrier ? { startBarrier: Math.round(base.startBarrier * m) } : {}),
     exp: Math.round(base.exp * (1 + (lv - 1) * 0.1)),
     gold: [Math.round(base.gold[0] * m * (BURIED_TUNING.goldEarnMult || 1)), Math.round(base.gold[1] * m * (BURIED_TUNING.goldEarnMult || 1))], // 1.117.0 레벨 스케일 + 1.125.0 수입 -30%
   };
