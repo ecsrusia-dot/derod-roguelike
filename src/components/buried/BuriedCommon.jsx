@@ -24,9 +24,12 @@ const SKILL_KIND = {
   // 1.118.1 — stat 미지정 공격(기본 공격): 물리·기교·마법 중 **최고 공격력**을 따른다 (1.117.0 로직 변경분 표시 반영)
   any:  { label: '자유', icon: '✦', color: '#c9a86a', refs: '최고 공격 스탯' },
   none: { label: '보조', icon: '◈', color: '#9b8975', refs: null },
+  // 1.136.1 — ⚡ 신속 스킬(턴 미소모)은 '보조' 대신 전용 배지로 한눈에 구분
+  swift: { label: '신속', icon: '⚡', color: '#e8c8a0', refs: null },
 };
 export function skillKindMeta(skill) {
   if (!skill) return null;
+  if (skill.swift) return SKILL_KIND.swift;
   if (!skill.power) return SKILL_KIND.none;
   return skill.stat ? (SKILL_KIND[skill.stat] || SKILL_KIND.str) : SKILL_KIND.any;
 }
