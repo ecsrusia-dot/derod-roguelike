@@ -555,8 +555,30 @@ export function createBuriedChar(classId, legacy = { items: [], gold: 0 }, dunge
     const it = equipped[s];
     if (it?.skillId) char.skillLevels[it.skillId] = Math.min(BURIED_SKILL_MAX_LV, (char.skillLevels[it.skillId] || 0) + 1);
   }
-  char.hp = buriedDerived(char).maxHp;
-  return char;
+  // 보급 계약 (1.129.0) — 지참한 supply 계약의 시작 지급을 적용
+  let out = char;
+  for (const cid of out.contracts) {
+    const sup = getBuriedContract(cid)?.supply;
+    if (!sup) continue;
+    if (sup.potions) out = { ...out, potions: (out.potions || 0) + sup.potions };
+    if (sup.gold) out = { ...out, gold: (out.gold || 0) + sup.gold };
+    if (sup.rune) {
+      const runeId = rollBuriedRuneIn(sup.rune[0], sup.rune[1]);
+      if (runeId) out = { ...out, runes: [...(out.runes || []), runeId] };
+    }
+    if (sup.item) {
+      const it = rollBuriedItem({ slot: null, classId, floor: startGearLv, tier: sup.item, powerMult: startPower });
+      if (it) out = addBuriedItemToChar(out, it).char;
+    }
+    if (sup.skillLv) {
+      for (let i = 0; i < sup.skillLv; i++) {
+        const ids = buriedEquippedSkills(out).map(x => x.skill.id).filter(id => (out.skillLevels?.[id] || 1) < BURIED_SKILL_MAX_LV);
+        if (ids.length > 0) out = raiseBuriedSkill(out, pick(ids)).char;
+      }
+    }
+  }
+  out.hp = buriedDerived(out).maxHp;
+  return out;
 }
 
 // 1.114.0 — 체크포인트 층 목록. 1.120.0 — 100층 수문장을 **격파**(F+1층 도달)해야 그 관문이 열리고,
@@ -2276,6 +2298,12 @@ export function rollBuriedRune(luck = 0) {
   return pick(pool).id;
 }
 
+// 등급 범위 지정 룬 굴림 — 보급 계약(1.129.0) 등 지급처용
+export function rollBuriedRuneIn(minRar, maxRar) {
+  const pool = Object.values(BURIED_RUNES).filter(r => r.rarity >= minRar && r.rarity <= maxRar);
+  return pool.length > 0 ? pick(pool).id : null;
+}
+
 // 소켓 각인 (순수 함수) — 성공 시 주머니에서 제거 + 장비에 영구 각인
 export function socketBuriedRune(char, runeIdx, slot) {
   const runeId = (char.runes || [])[runeIdx];
@@ -2589,6 +2617,19 @@ export const BURIED_CONTRACTS = [
   { id: 'c_guts',     name: '근성의 계약',   desc: 'HP가 0이 될 피해를 전투당 1회, 25% 확률로 HP 1로 버틴다', fx: { guts: 25 } },
   { id: 'c_calm',     name: '유유자적의 계약', desc: '마물 레벨이 1레벨 오르는 데 필요한 걸음 +1', fx: { stepBonus: 1 } },
   { id: 'c_camp',     name: '야영의 계약',   desc: '제단·야영지 회복량 +25%',             fx: { campPct: 25 } },
+  // ===== 1.129.0 — 보급 계약 10종 (BB2 契約Contract 이식 7탄) =====
+  // 원작: 유니온(진영)에게서 스킬·룬·장비를 지급받는 지원 계약. 각색: 지참하면 **출정 시작 시 실물 지급**.
+  // fx는 비워두고 supply만 갖는다 — 리스크·리턴 계약과 지참 2칸을 두고 경쟁하는 보급형.
+  { id: 's_masses',    name: '보급 · 유상무상',   desc: '[전사단] 출정 시작 시 물약 +2',                      fx: {}, supply: { potions: 2 } },
+  { id: 's_patrol',    name: '보급 · 순찰대',     desc: '[결사단] 출정 시작 시 골드 +200',                    fx: {}, supply: { gold: 200 } },
+  { id: 's_collect',   name: '보급 · 수집품',     desc: '[오물 구덩이] 출정 시작 시 ᚱ룬 1개 (★~★★)',        fx: {}, supply: { rune: [1, 2] } },
+  { id: 's_mentor',    name: '보급 · 견습 지도',  desc: '[연구소] 출정 시작 시 무작위 장착 스킬 Lv +1',        fx: {}, supply: { skillLv: 1 } },
+  { id: 's_firesup',   name: '보급 · 사격 지원',  desc: '[전사단] 출정 시작 시 ᚱ룬 1개 (★★~★★★)',          fx: {}, supply: { rune: [2, 3] } },
+  { id: 's_library',   name: '보급 · 장서 제공',  desc: '[연구소] 출정 시작 시 희귀 장비 1개 지급',            fx: {}, supply: { item: 'rare' } },
+  { id: 's_liveaid',   name: '보급 · 생활 지원',  desc: '[결사단] 출정 시작 시 물약 +1, 골드 +120',           fx: {}, supply: { potions: 1, gold: 120 } },
+  { id: 's_labpass',   name: '보급 · 실험실 개방', desc: '[연구소] 출정 시작 시 무작위 장착 스킬 Lv +2',       fx: {}, supply: { skillLv: 2 } },
+  { id: 's_blackmkt',  name: '보급 · 어둠 거래',  desc: '[암월 상회] 출정 시작 시 영웅 장비 1개 지급',         fx: {}, supply: { item: 'epic' } },
+  { id: 's_forbidden', name: '보급 · 금서',       desc: '[연구소] 출정 시작 시 ᚱ룬 1개 (★★★~★★★★)',       fx: {}, supply: { rune: [3, 4] } },
 ];
 export const getBuriedContract = (id) => BURIED_CONTRACTS.find(c => c.id === id) || null;
 export function rollBuriedContract(ownedIds) {
