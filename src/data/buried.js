@@ -100,6 +100,39 @@ export const BURIED_CLASSES = [
 export const getBuriedClass = (id) => buriedAllClasses().find(c => c.id === id) || null;
 
 // =========================================================
+// 3b. 종족 10종 (1.122.0) — BB2 모티브: 종족 × 직업 2축 생성
+// =========================================================
+// statMods: 기본 스탯 가감 / fx: 특성·계약과 같은 어휘 (buriedDerived + 전투가 소비)
+// 시트 업로드 시 수치 정밀 보정 예정 — 현재는 오리지널 밸런스 (합계가 0에 가깝게, 개성은 fx로)
+export const BURIED_RACES = [
+  { id: 'human',    name: '인간',     icon: '🧑', color: '#c9a86a', statMods: { str: 1, dex: 1, int: 1, vit: 1 }, fx: { expPct: 15 },
+    desc: '무난한 전 스탯 +1. 배움이 빠르다 — 경험치 +15%.' },
+  { id: 'lycan',    name: '수인',     icon: '🐺', color: '#c4453d', statMods: { str: 5, vit: 2, int: -3 }, fx: { physPct: 8 },
+    desc: '짐승의 완력. 물리·기교 공격력 +8%.' },
+  { id: 'elfkin',   name: '엘프',     icon: '🍃', color: '#7a9a5e', statMods: { dex: 4, int: 2, vit: -2 }, fx: { dodge: 5 },
+    desc: '가벼운 몸놀림. 회피율 +5%.' },
+  { id: 'halfling', name: '하플링',   icon: '🍀', color: '#d4a574', statMods: { dex: 3, vit: 1, str: -2 }, fx: { dropLuck: 1, goldPct: 12 },
+    desc: '행운의 손. 드랍 운 +1, 골드 +12%.' },
+  { id: 'lizard',   name: '리자드맨', icon: '🦎', color: '#5e7a3e', statMods: { vit: 5, str: 2, dex: -2 }, fx: { hp: 40, healPct: 10 },
+    desc: '재생하는 비늘. 최대 HP +40, 회복량 +10%.' },
+  { id: 'drakan',   name: '용인',     icon: '🐉', color: '#8b1f1f', statMods: { str: 4, int: 3, dex: -3 }, fx: { barrier: 45 },
+    desc: '용의 비늘. 전투 시작 보호막 +45.' },
+  { id: 'fairykin', name: '페어리',   icon: '🦋', color: '#c48bd4', statMods: { int: 5, vit: -4 }, fx: { sp: 15, magPct: 10, hpMult: 0.85 },
+    desc: '정신체에 가깝다. 마법 +10%, 최대 SP +15 — 대신 최대 HP -15%.' },
+  { id: 'darkelf',  name: '다크엘프', icon: '🌙', color: '#5c4a8c', statMods: { dex: 4, int: 3, vit: -3 }, fx: { crit: 6, statusChance: 12 },
+    desc: '그늘의 사냥꾼. 치명 +6%, 상태이상 확률 +12%.' },
+  { id: 'vampkin',  name: '뱀파이어', icon: '🩸', color: '#7d2b4a', statMods: { str: 3, int: 3, vit: -1 }, fx: { drainPct: 5, healPct: -15 },
+    desc: '피로 산다. 흡혈 +5% — 대신 일반 회복량 -15%.' },
+  { id: 'revenant', name: '굴레망자', icon: '💀', color: '#8b8378', statMods: { vit: 4, str: 2, dex: -3 }, fx: { statusResist: 20, healPct: -25 },
+    desc: '이미 죽은 몸. 적의 상태이상 확률 -20% — 대신 회복량 -25%.' },
+];
+export const getBuriedRace = (id) => BURIED_RACES.find(r => r.id === id) || null;
+// 종족 fx 뭉치 — 특성·계약·부품과 같은 소비 어휘 (미선택 구 캐릭터는 빈 객체 = 회귀 안전)
+export function buriedRaceFx(char) {
+  return getBuriedRace(char?.raceId)?.fx || {};
+}
+
+// =========================================================
 // 4. 상태이상 13종 — 전부 스택형
 // =========================================================
 // kind: 'debuff' | 'buff'
@@ -367,9 +400,10 @@ export function buriedDustValue(item) {
 // =========================================================
 export const buriedExpToNext = (lv) => 32 + lv * 20;
 
-export function createBuriedChar(classId, legacy = { items: [], gold: 0 }, dungeonId = 'labyrinth', contracts = [], partsFx = {}, startFloor = 1, depthTraits = []) {
+export function createBuriedChar(classId, legacy = { items: [], gold: 0 }, dungeonId = 'labyrinth', contracts = [], partsFx = {}, startFloor = 1, depthTraits = [], raceId = null) {
   const cls = getBuriedClass(classId);
   if (!cls) return null;
+  const race = getBuriedRace(raceId);
   const equipped = {};
   for (const s of BURIED_SLOT_IDS) equipped[s] = null;
   // 1.114.0 체크포인트 — 100층 단위 재출발. 걸음수는 층 파리티(1방/층).
@@ -390,7 +424,9 @@ export function createBuriedChar(classId, legacy = { items: [], gold: 0 }, dunge
 
   const char = {
     classId, lv: 1, exp: 0,
-    stats: { ...cls.stats },
+    raceId: race?.id || null, // 1.122.0 — 종족 축 (BB2)
+    stats: Object.fromEntries(Object.entries(cls.stats).map(([k, v]) =>
+      [k, Math.max(1, v + (race?.statMods?.[k] || 0))])),
     gold: 80 + (legacy.gold || 0),
     equipped,
     pendingLoot: [], // 1.113.0 — 획득 즉시 [교체/버리기] 판단 대기열
@@ -444,26 +480,28 @@ export function buriedDerived(char) {
   const cf = aggregateBuriedContracts(char);
   // 연구실 부품 (1.112.0) — 생성 시점에 구워진 fx
   const pf = char.partsFx || {};
+  // 종족 (1.122.0) — 특성과 같은 어휘의 fx
+  const rf = buriedRaceFx(char);
   return {
     stats: st,
     traitFx: tf,
     // 1.113.0 — 레벨당 HP+18 폐지 (성장은 100% 장비)
-    maxHp:   Math.max(1, Math.round((140 + st.vit * 11 + (gear.hp || 0) + (tf.hp || 0) + (pf.hp || 0)) * (tf.hpMult || 1) * (1 + (cf.hpPct || 0) / 100) * (1 - Math.min(50, char.curseHpLossPct || 0) / 100))),
-    maxSp:   Math.round(38 + st.int * 1.3 + (gear.sp || 0) + (tf.sp || 0)),
-    atk:     Math.round((10 + st.str * 1.6 + (gear.atk || 0) + (pf.atk || 0)) * (1 + ((tf.physPct || 0) + (cf.physPct || 0)) / 100)),
-    fin:     Math.round((10 + st.dex * 1.6 + (gear.atk || 0) + (pf.atk || 0)) * (1 + ((tf.physPct || 0) + (cf.physPct || 0)) / 100)),
-    mag:     Math.round((10 + st.int * 1.6 + (gear.mag || 0) + (pf.mag || 0)) * (1 + ((tf.magPct || 0) + (cf.magPct || 0)) / 100)),
+    maxHp:   Math.max(1, Math.round((140 + st.vit * 11 + (gear.hp || 0) + (tf.hp || 0) + (pf.hp || 0) + (rf.hp || 0)) * (tf.hpMult || 1) * (rf.hpMult || 1) * (1 + (cf.hpPct || 0) / 100) * (1 - Math.min(50, char.curseHpLossPct || 0) / 100))),
+    maxSp:   Math.round(38 + st.int * 1.3 + (gear.sp || 0) + (tf.sp || 0) + (rf.sp || 0)),
+    atk:     Math.round((10 + st.str * 1.6 + (gear.atk || 0) + (pf.atk || 0)) * (1 + ((tf.physPct || 0) + (cf.physPct || 0) + (rf.physPct || 0)) / 100)),
+    fin:     Math.round((10 + st.dex * 1.6 + (gear.atk || 0) + (pf.atk || 0)) * (1 + ((tf.physPct || 0) + (cf.physPct || 0) + (rf.physPct || 0)) / 100)),
+    mag:     Math.round((10 + st.int * 1.6 + (gear.mag || 0) + (pf.mag || 0)) * (1 + ((tf.magPct || 0) + (cf.magPct || 0) + (rf.magPct || 0)) / 100)),
     def:     Math.round(4 + st.vit * 0.9 + (gear.def || 0) + (pf.def || 0)),
-    crit:    Math.round(5 + st.dex * 0.6 + (gear.crit || 0) + (tf.crit || 0) + (cf.crit || 0) + (pf.crit || 0)),
+    crit:    Math.round(5 + st.dex * 0.6 + (gear.crit || 0) + (tf.crit || 0) + (cf.crit || 0) + (pf.crit || 0) + (rf.crit || 0)),
     critDmg: 60 + (gear.critDmg || 0),
-    dodge:   Math.min(45, Math.round(3 + st.dex * 0.4 + (gear.dodge || 0) + (tf.dodge || 0) + (cf.dodge || 0) + (pf.dodge || 0))),
+    dodge:   Math.min(45, Math.round(3 + st.dex * 0.4 + (gear.dodge || 0) + (tf.dodge || 0) + (cf.dodge || 0) + (pf.dodge || 0) + (rf.dodge || 0))),
     // 1.118.0 — 패시브 회복 9+int/8 → 3+int/12 (PM: SP가 무의미). 이제 SP의 주 엔진은
     // 기본 공격(+14)·마력 흡수·집중이고, 패시브·장비 spRegen은 보조가 된다
     spRegen: Math.round(3 + st.int / 12 + (gear.spRegen || 0) + (pf.spRegen || 0)),
-    barrier: Math.round(((gear.barrier || 0) + (tf.barrier || 0) + (pf.barrier || 0)) * (1 + (cf.barrierPct || 0) / 100)),
+    barrier: Math.round(((gear.barrier || 0) + (tf.barrier || 0) + (pf.barrier || 0) + (rf.barrier || 0)) * (1 + (cf.barrierPct || 0) / 100)),
     chase:   Math.round((gear.chase || 0) + (tf.chase || 0) + (pf.chase || 0)),
-    healPct: (tf.healPct || 0) + (cf.healPct || 0) + (pf.healPct || 0),
-    drainPct: (tf.drainPct || 0) + (cf.drainPct || 0) + (pf.drainPct || 0),
+    healPct: (tf.healPct || 0) + (cf.healPct || 0) + (pf.healPct || 0) + (rf.healPct || 0),
+    drainPct: (tf.drainPct || 0) + (cf.drainPct || 0) + (pf.drainPct || 0) + (rf.drainPct || 0),
   };
 }
 

@@ -24,7 +24,7 @@ import {
   buriedSkillAt, buriedSkillLv, buriedSkillLvNote, buriedTraitIds, getBuriedTrait,
   getBuriedRoomEffect, getBuriedFloorEffect, resolveBuriedEnvFx, getBuriedDungeon,
   buriedUniqueIds, getBuriedUnique, rollBuriedUniqueDrop, BURIED_UNDEAD_KEYS,
-  buriedModdedSkill, hasBuriedCurse, aggregateBuriedContracts, buriedLootPower,
+  buriedModdedSkill, hasBuriedCurse, aggregateBuriedContracts, buriedLootPower, buriedRaceFx,
 } from '../../data.js';
 import { BuriedBar, BuriedStatusRow, BuriedItemCard, slotMeta, SkillKindBadge, BuriedInfoModal } from './BuriedCommon.jsx';
 
@@ -48,6 +48,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
   // ===== 연구실 부품 (1.112.0) — 캐릭터 생성 시 구운 partsFx.
   // 스탯 키(hp·atk 등)는 buriedDerived가 이미 반영 — 여기서는 전투·전리품 전용 키만 읽는다
   const pf = char.partsFx || {};
+  const rf = buriedRaceFx(char); // 1.122.0 — 종족 fx
   // ===== 던전 고유 기믹 (1.114.0) — flood(침수): 도트 ×1.5·회복 -25% 양쪽 / dark(어둠): 적 수치 은폐
   const gimmickId = dungeon.gimmick?.id || null;
   // [da1] 심연의 눈 / 특성 「공허시」 — 어둠을 꿰뚫는다 (수치 은폐 무효)
@@ -254,23 +255,23 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
   const dmgText = (r, extra = '') => `-${r.toHp}${r.absorbed > 0 ? ` (🔷${r.absorbed})` : ''}${extra}`;
 
   // 특성 「역병」 — 내가 거는 상태이상 스택 +1
-  const statusOpts = { chancePct: (env.self.statusChancePct || 0) + (uq('u57') ? 100 : 0) + (cf.statusChance || 0) + (pf.statusChance || 0), extra: (env.self.statusExtra || 0) + (traits.includes('pestilence') ? 1 : 0) };
-  const foeStatusOpts = { chancePct: (env.foe.statusChancePct || 0) - (cf.statusResist || 0), extra: (uq('u113') ? 1 : 0) + (cs('sabnock') ? 1 : 0) };
+  const statusOpts = { chancePct: (env.self.statusChancePct || 0) + (uq('u57') ? 100 : 0) + (cf.statusChance || 0) + (pf.statusChance || 0) + (rf.statusChance || 0), extra: (env.self.statusExtra || 0) + (traits.includes('pestilence') ? 1 : 0) };
+  const foeStatusOpts = { chancePct: (env.foe.statusChancePct || 0) - (cf.statusResist || 0) - (rf.statusResist || 0), extra: (uq('u113') ? 1 : 0) + (cs('sabnock') ? 1 : 0) };
 
   // ===== 전투 종료 =====
   const finish = (win, finalHp) => {
     if (win) {
       // [u112] 전당의 휘장 — 승리 골드 +50%
-      const goldMult = dungeon.goldMult * (1 + (env.meta.goldPct || 0) / 100) * (uq('u112') ? 1.5 : 1) * (uq('u27') ? 3 : 1) * (uq('dc4') ? 1.5 : 1) * (1 + ((cf.goldPct || 0) + (pf.goldPct || 0)) / 100);
+      const goldMult = dungeon.goldMult * (1 + (env.meta.goldPct || 0) / 100) * (uq('u112') ? 1.5 : 1) * (uq('u27') ? 3 : 1) * (uq('dc4') ? 1.5 : 1) * (1 + ((cf.goldPct || 0) + (pf.goldPct || 0) + (rf.goldPct || 0)) / 100);
       const gold = Math.round(rnd(enemy.gold[0], enemy.gold[1]) * goldMult);
-      const exp = Math.round(enemy.exp * dungeon.expMult * (uq('u40') ? 2 : 1) * (1 + ((cf.expPct || 0) + (pf.expPct || 0)) / 100));
+      const exp = Math.round(enemy.exp * dungeon.expMult * (uq('u40') ? 2 : 1) * (1 + ((cf.expPct || 0) + (pf.expPct || 0) + (rf.expPct || 0)) / 100));
       const bossy = roomType === 'boss' || roomType === 'calamity';
       // 1.120.0 — 층계 수문장 (100층 단위): 유니크 확정 + 드랍 운 대폭
       const guardianFight = roomType === 'boss' && (char.floor || 1) % 100 === 0;
       // [dl4] 유산 도굴사 — 드랍 확률 +20%p
       const dropChance = bossy || roomType === 'elite' ? 100 : Math.min(100, 38 + (uq('dl4') ? 20 : 0));
       const drops = [];
-      const luck = dungeon.dropLuck + (cf.dropLuck || 0) + (pf.dropLuck || 0) + (guardianFight ? 12 : bossy ? 6 : roomType === 'elite' ? 3 : 0);
+      const luck = dungeon.dropLuck + (cf.dropLuck || 0) + (pf.dropLuck || 0) + (rf.dropLuck || 0) + (guardianFight ? 12 : bossy ? 6 : roomType === 'elite' ? 3 : 0);
       const lootPower = buriedLootPower(char); // 1.121.0 — 깊이 위력 배율 (시작 장비와 같은 저울)
       if (Math.random() * 100 < dropChance) {
         const it = rollBuriedItem({ slot: null, classId: char.classId, floor: enemy.lv || char.floor, luck, powerMult: lootPower });

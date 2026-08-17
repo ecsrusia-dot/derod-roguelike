@@ -19,6 +19,7 @@ import {
   BURIED_PARTS, BURIED_PART_SLOT_COSTS, getBuriedPart, BURIED_SHARD,
   resolveBuriedLoot, buriedCheckpointFloors,
   BURIED_DEPTH_CLASSES, buriedEarnedDepthTraits,
+  BURIED_RACES, getBuriedRace,
 } from '../../data.js';
 import { BuriedBar, BURIED_DUST_ICON, BuriedTierLegend, BuriedLootModal } from './BuriedCommon.jsx';
 import BuriedManage from './BuriedManage.jsx';
@@ -34,8 +35,9 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
 
   // 화면 상태 — 허브 / 출정 위저드(1~4) / 시설 서브뷰
   const [view, setView] = useState('home'); // home | wizard | forge | contracts | lab | records
-  const [wizStep, setWizStep] = useState(1); // 1 던전 → 2 시작 층 → 3 직업 → 4 최종
+  const [wizStep, setWizStep] = useState(1); // 1 던전 → 2 시작 층 → 3 종족 → 4 직업 → 5 최종
   const [pickClass, setPickClass] = useState(BURIED_CLASSES[0].id);
+  const [pickRace, setPickRace] = useState('human'); // 1.122.0 — 종족 축
   const [pickDungeon, setPickDungeon] = useState(unlockedDungeons[unlockedDungeons.length - 1] || 'labyrinth');
   const [pickStart, setPickStart] = useState(1);
   const [carryPicks, setCarryPicks] = useState([]);
@@ -65,7 +67,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
   // 위저드 이동 — 체크포인트 없는 던전은 층 단계 자동 스킵
   const wizNext = () => {
     if (wizStep === 1 && checkpoints.length === 0) { setWizStep(3); return; }
-    setWizStep(st => Math.min(4, st + 1));
+    setWizStep(st => Math.min(5, st + 1));
   };
   const wizPrev = () => {
     if (wizStep === 3 && checkpoints.length === 0) { setWizStep(1); return; }
@@ -123,7 +125,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
               </div>
               <div className="flex-1 min-w-0">
                 <div className="text-[13px] font-bold" style={{ color: cls?.color }}>
-                  {cls?.name} <span style={{ color: PALETTE.text }}>Lv.{char.lv}</span>
+                  {getBuriedRace(char.raceId)?.icon} {cls?.name} <span style={{ color: PALETTE.text }}>Lv.{char.lv}</span>
                   {cls?.advanced && <span className="text-[11px] ml-1" style={{ color: PALETTE.legendary }}>전직</span>}
                 </div>
                 <div className="text-[11px] tabular-nums mb-1.5" style={{ color: PALETTE.textDim }}>
@@ -210,7 +212,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
   // ============================================
   // 출정 위저드 (4단계)
   // ============================================
-  const WIZ_STEPS = ['던전', '시작 층', '직업', '최종 확인'];
+  const WIZ_STEPS = ['던전', '시작 층', '종족', '직업', '최종 확인'];
   const renderWizard = () => (
     <>
       <div className="px-3 pt-5 pb-3 border-b" style={{ borderColor: PALETTE.panelBorder }}>
@@ -295,8 +297,35 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
           </div>
         )}
 
-        {/* ── 3. 직업 ── */}
+        {/* ── 3. 종족 (1.122.0 — BB2 모티브 종족 × 직업 2축) ── */}
         {wizStep === 3 && (
+          <div className="space-y-1.5 ui-stagger">
+            <div className="text-[11px]" style={{ color: PALETTE.textDim }}>
+              시체의 뼈대를 고른다 — 종족은 기본 스탯과 체질을 바꾼다.
+            </div>
+            {BURIED_RACES.map(r => {
+              const on = pickRace === r.id;
+              return (
+                <button key={r.id} onClick={() => setPickRace(r.id)} className="ui-press w-full flex items-start gap-2.5 px-3 py-2 text-left"
+                  style={{ borderRadius: R.btn, background: on ? PALETTE.panelLight : PALETTE.panel, border: `1px solid ${on ? r.color : PALETTE.panelBorder}` }}>
+                  <span className="text-[16px] mt-0.5">{r.icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[12px] font-bold" style={{ color: r.color }}>
+                      {r.name}
+                      <span className="text-[11px] ml-1.5 font-normal tabular-nums" style={{ color: PALETTE.textDim }}>
+                        {Object.entries(r.statMods).map(([k, v]) => `${{ str: '완력', dex: '기교', int: '지혜', vit: '체력' }[k]}${v > 0 ? '+' : ''}${v}`).join(' ')}
+                      </span>
+                    </div>
+                    <div className="text-[11px]" style={{ color: PALETTE.textDim }}>{r.desc}</div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── 4. 직업 ── */}
+        {wizStep === 4 && (
           <div className="space-y-1.5 ui-stagger">
             {selectable.map(c => {
               const on = pickClass === c.id;
@@ -363,8 +392,8 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
           </div>
         )}
 
-        {/* ── 4. 최종 확인 ── */}
-        {wizStep === 4 && (() => {
+        {/* ── 5. 최종 확인 ── */}
+        {wizStep === 5 && (() => {
           const dg = getBuriedDungeon(pickDungeon);
           const c = getBuriedClass(pickClass);
           return (
@@ -373,6 +402,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
                 <div className="text-[11px] tracking-[0.2em]" style={{ color: PALETTE.legendary }}>출정 요약</div>
                 <div className="flex justify-between text-[12px]"><span style={{ color: PALETTE.textDim }}>던전</span><span style={{ color: dg.color }}>{dg.gimmick?.icon} {dg.name}</span></div>
                 <div className="flex justify-between text-[12px]"><span style={{ color: PALETTE.textDim }}>시작 층</span><span style={{ color: PALETTE.text }}>{pickStart > 1 ? `${pickStart + 1}층 (${pickStart}층 관문 너머)` : '1층'}</span></div>
+                <div className="flex justify-between text-[12px]"><span style={{ color: PALETTE.textDim }}>종족</span><span style={{ color: getBuriedRace(pickRace)?.color }}>{getBuriedRace(pickRace)?.icon} {getBuriedRace(pickRace)?.name}</span></div>
                 <div className="flex justify-between text-[12px]"><span style={{ color: PALETTE.textDim }}>직업</span><span style={{ color: c?.color }}>{c?.name}</span></div>
                 {(b.legacyGold || 0) > 0 && <div className="flex justify-between text-[12px]"><span style={{ color: PALETTE.textDim }}>계승 골드</span><span style={{ color: PALETTE.legendary }}>🪙 {b.legacyGold}</span></div>}
                 {earnedDepthTraits.length > 0 && (
@@ -409,7 +439,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
                 </div>
               )}
 
-              <button onClick={() => onStartChar(pickClass, pickDungeon, carryPicks, pickStart > 1 ? pickStart + 1 : 1)}
+              <button onClick={() => onStartChar(pickClass, pickDungeon, carryPicks, pickStart > 1 ? pickStart + 1 : 1, pickRace)}
                 className="ui-press ui-sheen w-full py-3.5 text-[14px] font-bold"
                 style={{ borderRadius: R.btn, background: PALETTE.accent, color: '#fff' }}>
                 ⚰ {dg.name} {pickStart > 1 ? pickStart + 1 : 1}층으로 내려간다
@@ -420,7 +450,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
       </div>
 
       {/* 위저드 하단 다음 버튼 (1~3단계) */}
-      {wizStep < 4 && (
+      {wizStep < 5 && (
         <div className="px-3 pb-4 pt-2">
           <button onClick={wizNext} className="ui-press w-full py-3 text-[13px] font-bold"
             style={{ borderRadius: R.btn, background: PALETTE.panelLight, color: PALETTE.legendary, border: `1px solid ${PALETTE.legendary}66` }}>
