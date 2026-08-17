@@ -12,15 +12,26 @@ import {
   BURIED_SLOTS, BURIED_SLOT_IDS, BURIED_STATS, BURIED_SKILLS, BURIED_SKILL_MAX_LV,
   buriedDerived, buriedDustValue, getBuriedClass,
   buriedTraitIds, getBuriedTrait, buriedSkillLv, buriedSkillRank, BURIED_SKILL_RANKS,
+  getBuriedRune, BURIED_RUNE_RARITIES, socketBuriedRune,
 } from '../../data.js';
 import { BuriedItemCard, BuriedItemSheet, BURIED_DUST_ICON } from './BuriedCommon.jsx';
 
 export default function BuriedManage({ char, dust = 0, onUpdate, onClose }) {
   const [sheet, setSheet] = useState(null); // { item, slot }
+  const [runePick, setRunePick] = useState(null); // ᚱ 각인할 룬 index (1.123.0)
 
   if (!char) return null;
   const cls = getBuriedClass(char.classId);
   const d = buriedDerived(char);
+  const runes = char.runes || [];
+
+  // ᚱ 룬 각인 — 영구 (제거 불가 도박 룰). 소켓 빈 장착 장비만 후보
+  const socketRune = (slot) => {
+    const { char: next, text } = socketBuriedRune(char, runePick, slot);
+    if (next !== char) onUpdate(next, 0);
+    setRunePick(null);
+    void text;
+  };
 
   // 장착 장비 분해 — 슬롯이 비면 그 스킬도 못 쓴다 (신중히)
   const dismantle = (item) => {
@@ -113,6 +124,35 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose }) {
           </div>
         </div>
 
+        {/* ᚱ 룬 주머니 (1.123.0) — 각인은 영구, 장비를 버리면 소멸 */}
+        {runes.length > 0 && (
+          <div className="px-3 py-2.5" style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panel, border: `1px solid ${PALETTE.legendary}44` }}>
+            <div className="text-[11px] tracking-[0.2em] mb-1.5" style={{ color: PALETTE.legendary }}>
+              ᚱ 룬 주머니 {runes.length}개 — 장비 스킬에 영구 각인 (장비당 1칸 · 제거 불가)
+            </div>
+            <div className="space-y-1.5">
+              {runes.map((id, i) => {
+                const r = getBuriedRune(id);
+                if (!r) return null;
+                const rar = BURIED_RUNE_RARITIES[r.rarity];
+                return (
+                  <div key={`${id}-${i}`} className="flex items-center gap-2 px-2.5 py-2"
+                    style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panelLight, border: `1px solid ${rar.color}55` }}>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[12px] font-bold" style={{ color: rar.color }}>ᚱ {r.name} <span className="font-normal">{rar.stars}</span></div>
+                      <div className="text-[11px] break-keep" style={{ color: PALETTE.textDim }}>{r.desc}</div>
+                    </div>
+                    <button onClick={() => setRunePick(i)} className="ui-press shrink-0 px-2.5 py-1.5 text-[11px] font-bold"
+                      style={{ borderRadius: 'var(--r-chip, 8px)', background: `${rar.color}22`, border: `1px solid ${rar.color}66`, color: rar.color }}>
+                      각인
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* 특성 3개 — 원작 규칙: 첫 번째가 직업 전용 */}
         <div className="px-3 py-2.5 space-y-2" style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panelLight, border: `1px solid ${cls?.color}55` }}>
           <div className="text-[11px] tracking-[0.2em]" style={{ color: cls?.color }}>영구 특성 — 3개 (첫 번째는 직업 전용)</div>
@@ -138,6 +178,39 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose }) {
           onClose={() => setSheet(null)}
         />
       )}
+
+      {/* ᚱ 각인 대상 선택 (1.123.0) — 소켓이 빈 장착 장비만 */}
+      {runePick !== null && getBuriedRune(runes[runePick]) && (() => {
+        const r = getBuriedRune(runes[runePick]);
+        const rar = BURIED_RUNE_RARITIES[r.rarity];
+        const targets = BURIED_SLOTS.filter(s => char.equipped?.[s.id] && !char.equipped[s.id].rune);
+        return (
+          <div className="absolute inset-0 z-50 flex items-end" style={{ background: 'rgba(0,0,0,0.72)' }} onClick={() => setRunePick(null)}>
+            <div className="w-full px-3 pb-4 pt-3" onClick={(e) => e.stopPropagation()}
+              style={{ background: PALETTE.bgDeep, borderTop: `1px solid ${rar.color}66`, borderRadius: '18px 18px 0 0', maxHeight: '80%', overflowY: 'auto' }}>
+              <div className="text-[13px] font-bold mb-0.5" style={{ color: rar.color }}>ᚱ {r.name} {rar.stars} — 어디에 각인할까</div>
+              <div className="text-[11px] mb-2 leading-relaxed" style={{ color: PALETTE.textDim }}>
+                {r.desc}. <b style={{ color: PALETTE.accent }}>각인은 영구</b> — 떼어낼 수 없고, 그 장비를 버리거나 분해하면 룬도 함께 소멸한다.
+              </div>
+              {targets.length === 0 ? (
+                <div className="px-3 py-3 text-[12px]" style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panel, color: PALETTE.textDim }}>
+                  각인할 수 있는 장비가 없다 — 모든 장착 장비에 이미 룬이 있거나, 슬롯이 비어 있다.
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  {targets.map(s => (
+                    <BuriedItemCard key={s.id} item={char.equipped[s.id]} slotId={s.id} onClick={() => socketRune(s.id)} />
+                  ))}
+                </div>
+              )}
+              <button onClick={() => setRunePick(null)} className="ui-press w-full py-2.5 mt-2 text-[12px]"
+                style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panel, border: `1px solid ${PALETTE.panelBorder}`, color: PALETTE.textDim }}>
+                취소
+              </button>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

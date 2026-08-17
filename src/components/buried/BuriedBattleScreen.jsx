@@ -25,6 +25,7 @@ import {
   getBuriedRoomEffect, getBuriedFloorEffect, resolveBuriedEnvFx, getBuriedDungeon,
   buriedUniqueIds, getBuriedUnique, rollBuriedUniqueDrop, BURIED_UNDEAD_KEYS,
   buriedModdedSkill, hasBuriedCurse, aggregateBuriedContracts, buriedLootPower, buriedRaceFx,
+  rollBuriedRune, getBuriedRune, BURIED_RUNE_RARITIES,
 } from '../../data.js';
 import { BuriedBar, BuriedStatusRow, BuriedItemCard, slotMeta, SkillKindBadge, BuriedInfoModal } from './BuriedCommon.jsx';
 
@@ -297,6 +298,9 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
         });
         if (uniqueDrop) drops.push(uniqueDrop);
       }
+      // ᚱ 룬 드랍 (1.123.0) — 소켓용 룬. 보스·강적일수록 잘 나온다
+      const runeChance = guardianFight || roomType === 'calamity' ? 100 : bossy ? 40 : roomType === 'elite' ? 22 : 6;
+      const runeDrop = Math.random() * 100 < runeChance ? rollBuriedRune(luck) : null;
       // [u91] 망자 사냥꾼 — 망령·정령·잔재 처치 시 최대 HP 15% 회복
       let hp = Math.max(1, Math.round(finalHp));
       if (uq('u91') && BURIED_UNDEAD_KEYS.includes(enemy.key)) {
@@ -308,7 +312,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
       // [dc4] 바닥 없는 주머니 — 승리 시 최대 HP 8% 회복
       if (uq('dc4')) hp = Math.min(d.maxHp, hp + Math.round(d.maxHp * 0.08));
       setResult({
-        win: true, gold, exp, drops,
+        win: true, gold, exp, drops, rune: runeDrop,
         hp: cs('balam') ? 1 : hp, // 저주 「발람」 — 승리해도 HP 1
         potions,
         dustGain: dustGainRef.current,
@@ -932,7 +936,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
           {/* 장착 장비 6칸 = 스킬 6개 (스킬 레벨 반영) */}
           {equipped.map(({ slot, item, skill }) => {
             const lv = Math.min(8, buriedSkillLv(char, skill.id) + (uq('u71') ? 1 : 0)); // [u71] 후손
-            const eff = applyUniqueSkillMods(buriedModdedSkill(buriedSkillAt(skill, lv), item.mod));
+            const eff = applyUniqueSkillMods(buriedModdedSkill(buriedSkillAt(skill, lv), item.mod, item.rune));
             const cd = player.cds[eff.id] || 0;
             const spCost = Math.round(eff.sp * (1 + (env.self.spCostPct || 0) / 100));
             const noSp = spCost > player.sp;
@@ -1019,6 +1023,15 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
                   <div className="space-y-1.5 mb-3">
                     <div className="text-[11px] tracking-[0.2em]" style={{ color: PALETTE.dawn }}>전리품</div>
                     {result.drops.map(it => <BuriedItemCard key={it.id} item={it} showSlot />)}
+                  </div>
+                )}
+                {result.rune && getBuriedRune(result.rune) && (
+                  <div className="px-3 py-2 mb-3 text-[12px]"
+                    style={{ borderRadius: 'var(--r-chip, 8px)', background: `${BURIED_RUNE_RARITIES[getBuriedRune(result.rune).rarity].color}18`, border: `1px solid ${BURIED_RUNE_RARITIES[getBuriedRune(result.rune).rarity].color}66` }}>
+                    <span style={{ color: BURIED_RUNE_RARITIES[getBuriedRune(result.rune).rarity].color }}>
+                      ᚱ {getBuriedRune(result.rune).name} {BURIED_RUNE_RARITIES[getBuriedRune(result.rune).rarity].stars}
+                    </span>
+                    <span style={{ color: PALETTE.textDim }}> — {getBuriedRune(result.rune).desc}. 장비 화면에서 각인할 수 있다.</span>
                   </div>
                 )}
                 <button onClick={() => onFinish(result)} className="ui-press w-full py-3 text-[13px] font-bold"

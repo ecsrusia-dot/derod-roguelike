@@ -8,7 +8,7 @@ import { PALETTE } from '../../utils/helpers.js';
 import {
   BURIED_SKILLS, BURIED_STATUS, BURIED_SLOTS, BURIED_TIERS,
   getBuriedTier, buriedItemStats, buriedDustValue, buriedEnhanceMult,
-  buriedSkillEffectLines, getBuriedUnique, getBuriedMod,
+  buriedSkillEffectLines, getBuriedUnique, getBuriedMod, getBuriedRune, BURIED_RUNE_RARITIES,
 } from '../../data.js';
 
 export const slotMeta = (slotId) => BURIED_SLOTS.find(s => s.id === slotId) || { name: slotId, icon: '◆' };
@@ -170,6 +170,12 @@ export function BuriedItemCard({ item, slotId, onClick, right, dim = false, show
             ◈ {getBuriedMod(item.mod).name} — {getBuriedMod(item.mod).desc}
           </div>
         )}
+        {/* ᚱ 룬 각인 (1.123.0) */}
+        {item.rune && getBuriedRune(item.rune) && (
+          <div className={`text-[11px] ${wrap}`} style={{ color: BURIED_RUNE_RARITIES[getBuriedRune(item.rune).rarity]?.color }}>
+            ᚱ {getBuriedRune(item.rune).name} {BURIED_RUNE_RARITIES[getBuriedRune(item.rune).rarity]?.stars} — {getBuriedRune(item.rune).desc}
+          </div>
+        )}
       </div>
       {right}
     </button>
@@ -218,6 +224,17 @@ export function BuriedItemSheet({ item, compare, onEquip, onUnequip, onDismantle
             <div className="text-[11px] tracking-[0.2em] mb-1" style={{ color: tier.color }}>✦ 전설의 무구 — 고유 효과</div>
             <div className="text-[12px] leading-relaxed" style={{ color: PALETTE.text }}>{getBuriedUnique(item.unique).desc}</div>
             <div className="text-[11px] mt-1" style={{ color: PALETTE.textDim }}>장착 중일 때만 발동한다. 보스만 떨어뜨리는 장비.</div>
+          </div>
+        )}
+
+        {/* ᚱ 룬 각인 (1.123.0) — 제거 불가, 장비를 버리면 소멸 */}
+        {item.rune && getBuriedRune(item.rune) && (
+          <div className="px-3 py-2.5 mb-2" style={{ borderRadius: 'var(--r-panel, 18px)', background: `${BURIED_RUNE_RARITIES[getBuriedRune(item.rune).rarity].color}14`, border: `1px solid ${BURIED_RUNE_RARITIES[getBuriedRune(item.rune).rarity].color}66` }}>
+            <div className="text-[11px] tracking-[0.2em] mb-1" style={{ color: BURIED_RUNE_RARITIES[getBuriedRune(item.rune).rarity].color }}>
+              ᚱ 룬 각인 — {getBuriedRune(item.rune).name} {BURIED_RUNE_RARITIES[getBuriedRune(item.rune).rarity].stars}
+            </div>
+            <div className="text-[12px] leading-relaxed" style={{ color: PALETTE.text }}>{getBuriedRune(item.rune).desc}</div>
+            <div className="text-[11px] mt-1" style={{ color: PALETTE.textDim }}>각인은 영구 — 떼어낼 수 없고, 장비를 버리면 룬도 소멸한다.</div>
           </div>
         )}
 
