@@ -442,22 +442,6 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
                   onClick={sold || !afford ? null : () => buy(entry, i)} />
               );
             })}
-            <button onClick={() => {
-                const cost = Math.round(70 * (1 + Math.max(0, monLevel - 1) * 0.08));
-                if (char.gold < cost || char.roomData?.serviced) return;
-                onUpdateChar({ ...rechargeBuriedUses(char, 100), gold: char.gold - cost, roomData: { ...char.roomData, serviced: true } }, 0);
-                setNotice('상인이 장비를 손봐 줬다 — 모든 스킬 사용 횟수 만충.');
-              }}
-              disabled={char.gold < Math.round(70 * (1 + Math.max(0, monLevel - 1) * 0.08)) || char.roomData?.serviced}
-              className="ui-press w-full py-2.5 text-[12px]"
-              style={{
-                borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panel,
-                border: `1px solid ${PALETTE.green}55`,
-                color: char.roomData?.serviced ? PALETTE.textDim : char.gold >= Math.round(70 * (1 + Math.max(0, monLevel - 1) * 0.08)) ? PALETTE.green : PALETTE.textDim,
-                opacity: char.roomData?.serviced ? 0.5 : 1,
-              }}>
-              🔧 정비 — 🪙{Math.round(70 * (1 + Math.max(0, monLevel - 1) * 0.08))} (스킬 사용 횟수 전부 만충{char.roomData?.serviced ? ' · 완료' : ''})
-            </button>
             <button onClick={rerollShop} disabled={char.gold < buriedShopRerollCost(monLevel, char.roomData?.rerolls || 0)}
               className="ui-press w-full py-2.5 text-[12px]"
               style={{
