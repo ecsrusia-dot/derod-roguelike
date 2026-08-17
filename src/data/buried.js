@@ -377,9 +377,67 @@ export const BURIED_SKILLS = {
   grudge:      SK({ id: 'grudge',      name: '원한',       slot: 'acc', line: null, gear: '원한의 인장', sp: 16, cd: 2, stat: 'int', power: 58, apply: [{ s: 'curse', n: 2, p: 100 }], desc: '[저주] 2' }),
   fairyDust:   SK({ id: 'fairyDust',   name: '요정 가루',  slot: 'acc', line: null, gear: '요정의 병',   sp: 12, cd: 2, apply: [{ s: 'confuse', n: 1, p: 100 }, { s: 'weaken', n: 1, p: 100 }], desc: '[혼란] 1 + [약화] 1' }),
   dragonFang:  SK({ id: 'dragonFang',  name: '용아',       slot: 'acc', line: null, gear: '용아 목걸이', sp: 24, cd: 2, stat: 'str', power: 128, selfDmg: 8, desc: '용의 이빨로 문다. 자해 8' }),
+
+  // ===== 1.138.0 — BB2 스킬 시트 2차 이식 (+40 = 119종) =====
+  // 원전 スキルSkill 421행에서 선별. 기존 필드 어휘만 사용 — 신규 메커니즘 0.
+  // ⚡신속 정합: 원전 Quick 플래그의 **공격 스킬**은 명시 swift(저위력 속공기) — 자동 파생 규칙과 별개.
+  // --- 검(sword) ---
+  jabStrike:   SK({ id: 'jabStrike',   name: '잽',         slot: 'weapon', line: 'sword', gear: '경량 세검',   sp: 10, cd: 1, stat: 'str', power: 42, hits: 2, swift: true, desc: '⚡신속 2연타 — 턴을 소모하지 않는 속공.' }),
+  overheadCut: SK({ id: 'overheadCut', name: '대상단',     slot: 'weapon', line: 'sword', gear: '대상단 태도', sp: 26, cd: 2, stat: 'str', power: 150, critBonus: 25, apply: [{ s: 'bleed', n: 2, p: 100 }], desc: '치명 확률 +25%. [출혈] 2' }),
+  // --- 단검(blade) ---
+  shurikenToss:SK({ id: 'shurikenToss',name: '수리검 투척', slot: 'offhand', line: 'blade', gear: '수리검 주머니', sp: 12, cd: 1, stat: 'str', power: 28, hits: 3, swift: true, desc: '⚡신속 3연투 — 턴을 소모하지 않는다.' }),
+  hazyTwoStep: SK({ id: 'hazyTwoStep', name: '농무 이단',  slot: 'offhand', line: 'blade', gear: '박무 단검',   sp: 20, cd: 2, stat: 'str', power: 55, hits: 2, critBonus: 40, desc: '안개 속 2연격. 치명 확률 +40%' }),
+  // --- 지팡이(staff) ---
+  gustBolt:    SK({ id: 'gustBolt',    name: '서든 거스트', slot: 'weapon', line: 'staff', gear: '돌풍 지팡이', sp: 16, cd: 1, stat: 'int', power: 88, swift: true, desc: '⚡신속 마법 일격 — 턴을 소모하지 않는다.' }),
+  thunderbolt: SK({ id: 'thunderbolt', name: '선더볼트',   slot: 'weapon', line: 'staff', gear: '낙뢰 지팡이', sp: 24, cd: 2, stat: 'int', power: 132, apply: [{ s: 'stun', n: 1, p: 30 }], desc: '30% 확률 [기절] 1' }),
+  // --- 마도서(tome) ---
+  plagueWind:  SK({ id: 'plagueWind',  name: '역병 바람',  slot: 'offhand', line: 'tome', gear: '역병 마도서', sp: 18, cd: 1, stat: 'int', power: 62, hits: 2, apply: [{ s: 'poison', n: 2, p: 100 }], desc: '2연타. [중독] 2' }),
+  drainLife:   SK({ id: 'drainLife',   name: '생명 흡수',  slot: 'offhand', line: 'tome', gear: '흡정 마도서', sp: 22, cd: 2, stat: 'int', power: 105, drain: 60, desc: '준 피해의 60% 흡혈' }),
+  // --- 도끼(axe) ---
+  daredevil:   SK({ id: 'daredevil',   name: '막무가내',   slot: 'weapon', line: 'axe', gear: '무모한 도끼',   sp: 22, cd: 1, stat: 'str', power: 55, hits: 3, desc: '앞뒤 없이 3연타.' }),
+  breaker:     SK({ id: 'breaker',     name: '브레이커',   slot: 'weapon', line: 'axe', gear: '파괴자의 대부', sp: 24, cd: 2, stat: 'str', power: 128, apply: [{ s: 'bind', n: 1, p: 100 }, { s: 'shatter', n: 1, p: 100 }], desc: '[속박] 1 + [파쇄] 1' }),
+  // --- 손톱(claw) ---
+  corrosiveTouch: SK({ id: 'corrosiveTouch', name: '부식의 손길', slot: 'offhand', line: 'claw', gear: '부식 발톱', sp: 14, cd: 1, apply: [{ s: 'poison', n: 2, p: 100 }, { s: 'shatter', n: 1, p: 100 }], desc: '[중독] 2 + [파쇄] 1' }),
+  tormentHit:  SK({ id: 'tormentHit',  name: '고통의 일격', slot: 'offhand', line: 'claw', gear: '고문 갈고리', sp: 20, cd: 2, stat: 'str', power: 118, apply: [{ s: 'curse', n: 1, p: 100 }], desc: '[저주] 1' }),
+  // --- 활(bow) ---
+  quickShot:   SK({ id: 'quickShot',   name: '퀵 샷',      slot: 'weapon', line: 'bow', gear: '속사 단궁',     sp: 12, cd: 1, stat: 'dex', power: 66, critBonus: 25, swift: true, desc: '⚡신속 속사 — 턴을 소모하지 않는다. 치명 +25%' }),
+  sniperShot:  SK({ id: 'sniperShot',  name: '저격',       slot: 'weapon', line: 'bow', gear: '저격 장궁',     sp: 26, cd: 2, stat: 'dex', power: 135, critBonus: 50, desc: '숨을 고르고 쏜다. 치명 확률 +50%' }),
+  // --- 화살통(quiver) ---
+  venomShot:   SK({ id: 'venomShot',   name: '베놈 샷',    slot: 'offhand', line: 'quiver', gear: '독액 화살통', sp: 14, cd: 1, stat: 'dex', power: 58, apply: [{ s: 'poison', n: 2, p: 100 }], swift: true, desc: '⚡신속 독화살 — 턴을 소모하지 않는다. [중독] 2' }),
+  stoneBullet: SK({ id: 'stoneBullet', name: '스톤 바렛',  slot: 'offhand', line: 'quiver', gear: '석화 화살통', sp: 18, cd: 2, stat: 'dex', power: 92, apply: [{ s: 'stun', n: 1, p: 25 }], desc: '25% 확률 [기절] 1' }),
+  // --- 철퇴(mace) ---
+  holyDescent: SK({ id: 'holyDescent', name: '홀리 스마이트', slot: 'weapon', line: 'mace', gear: '성징의 철퇴', sp: 28, cd: 2, stat: 'int', power: 165, desc: '성광이 내리꽂힌다.' }),
+  shockwave:   SK({ id: 'shockwave',   name: '충격파',     slot: 'weapon', line: 'mace', gear: '충파 망치',     sp: 18, cd: 1, stat: 'int', power: 70, barrierGain: 10, desc: '보호막 +10' }),
+  // --- 성물(relic) ---
+  firstAid:    SK({ id: 'firstAid',    name: '응급 처치',  slot: 'offhand', line: 'relic', gear: '응급 성물',   sp: 16, cd: 1, heal: 58, desc: 'HP 58 회복.' }),
+  sunlight:    SK({ id: 'sunlight',    name: '선라이트',   slot: 'offhand', line: 'relic', gear: '햇살 성물',   sp: 16, cd: 2, self: [{ s: 'regen', n: 3 }], barrierGain: 15, desc: '[재생] 3 + 보호막 +15' }),
+  // --- 방어구 공용 ---
+  holyAura:    SK({ id: 'holyAura',    name: '홀리 오라',  slot: 'armor', line: null, gear: '성광 갑주',   sp: 22, cd: 3, barrierGain: 45, desc: '보호막 +45' }),
+  passiveStance: SK({ id: 'passiveStance', name: '수세 태세', slot: 'armor', line: null, gear: '수세 갑주', sp: 12, cd: 2, self: [{ s: 'guard', n: 3 }], reflect: 25, desc: '[수호] 3. 2턴간 받은 피해의 25% 반사' }),
+  steelBody:   SK({ id: 'steelBody',   name: '강철 육체',  slot: 'armor', line: null, gear: '강체 갑옷',   sp: 16, cd: 2, self: [{ s: 'guard', n: 2 }], barrierGain: 20, desc: '[수호] 2 + 보호막 +20' }),
+  shadowForm:  SK({ id: 'shadowForm',  name: '그림자 태세', slot: 'armor', line: null, gear: '야행 갑주',   sp: 14, cd: 2, self: [{ s: 'evade', n: 2 }, { s: 'rage', n: 1 }], desc: '[잔영] 2 + [격노] 1' }),
+  selfHarmRite:SK({ id: 'selfHarmRite',name: '자해 의식',  slot: 'armor', line: null, gear: '고행 갑주',   sp: 6, cd: 1, selfDmg: 8, spGain: 20, desc: '자해 8, SP +20' }),
+  lastStand:   SK({ id: 'lastStand',   name: '결사 항전',  slot: 'armor', line: null, gear: '결사 갑주',   sp: 18, cd: 3, self: [{ s: 'guard', n: 2 }, { s: 'rage', n: 2 }], desc: '[수호] 2 + [격노] 2' }),
+  // --- 투구 공용 ---
+  acrobatics:  SK({ id: 'acrobatics',  name: '아크로바틱', slot: 'helm', line: null, gear: '곡예사의 두건', sp: 12, cd: 2, self: [{ s: 'evade', n: 3 }], desc: '[잔영] 3' }),
+  overdrive:   SK({ id: 'overdrive',   name: '오버드라이브', slot: 'helm', line: null, gear: '과부하 투구', sp: 20, cd: 3, self: [{ s: 'rage', n: 2 }, { s: 'evade', n: 1 }], selfDmg: 6, desc: '[격노] 2 + [잔영] 1. 자해 6' }),
+  fearMask:    SK({ id: 'fearMask',    name: '피어',       slot: 'helm', line: null, gear: '공포 가면',     sp: 16, cd: 2, apply: [{ s: 'confuse', n: 1, p: 100 }, { s: 'curse', n: 1, p: 100 }], desc: '[혼란] 1 + [저주] 1' }),
+  steadyEffort:SK({ id: 'steadyEffort',name: '꾸준한 노력', slot: 'helm', line: null, gear: '수행자의 관', sp: 8, cd: 2, spGain: 14, self: [{ s: 'rage', n: 1 }], desc: 'SP +14, [격노] 1' }),
+  shieldBreak: SK({ id: 'shieldBreak', name: '실드 브레이크', slot: 'helm', line: null, gear: '파성 투구',  sp: 14, cd: 2, apply: [{ s: 'shatter', n: 3, p: 100 }, { s: 'bind', n: 1, p: 100 }], desc: '[파쇄] 3 + [속박] 1' }),
+  planExecution: SK({ id: 'planExecution', name: '계획적 실행', slot: 'helm', line: null, gear: '책략가의 관', sp: 14, cd: 3, self: [{ s: 'rage', n: 2 }], spGain: 10, desc: '[격노] 2, SP +10' }),
+  // --- 장신구 공용 ---
+  blindSigil:  SK({ id: 'blindSigil',  name: '블라인드',   slot: 'acc', line: null, gear: '실명의 인장',   sp: 16, cd: 3, apply: [{ s: 'confuse', n: 2, p: 100 }], desc: '[혼란] 2' }),
+  ninjutsu:    SK({ id: 'ninjutsu',    name: '인술',       slot: 'acc', line: null, gear: '인술 두루마리', sp: 18, cd: 3, self: [{ s: 'evade', n: 2 }], spGain: 12, desc: '[잔영] 2, SP +12' }),
+  poisonHazard:SK({ id: 'poisonHazard',name: '포이즌 해저드', slot: 'acc', line: null, gear: '독무 병',    sp: 16, cd: 2, apply: [{ s: 'poison', n: 4, p: 100 }], desc: '[중독] 4' }),
+  leechSigil:  SK({ id: 'leechSigil',  name: '흡혈귀의 이빨', slot: 'acc', line: null, gear: '흡혈귀의 인장', sp: 20, cd: 2, stat: 'str', power: 96, drain: 50, desc: '준 피해의 50% 흡혈' }),
+  voidForm:    SK({ id: 'voidForm',    name: '보이드 폼',  slot: 'acc', line: null, gear: '공허의 인장',   sp: 14, cd: 2, self: [{ s: 'guard', n: 1 }, { s: 'evade', n: 1 }, { s: 'regen', n: 1 }], desc: '[수호] 1 + [잔영] 1 + [재생] 1' }),
+  eldritchTouch: SK({ id: 'eldritchTouch', name: '이형의 촉수', slot: 'acc', line: null, gear: '촉수 부적', sp: 18, cd: 1, stat: 'int', power: 44, hits: 3, apply: [{ s: 'confuse', n: 1, p: 30 }], desc: '3연타. 30% 확률 [혼란] 1' }),
+  thunderGlyph:SK({ id: 'thunderGlyph',name: '뇌문 각인',  slot: 'acc', line: null, gear: '뇌문 부적',     sp: 16, cd: 2, stat: 'int', power: 88, apply: [{ s: 'stun', n: 1, p: 20 }], desc: '20% 확률 [기절] 1' }),
+  balancedStance: SK({ id: 'balancedStance', name: '정안 자세', slot: 'acc', line: null, gear: '정안의 인장', sp: 10, cd: 2, self: [{ s: 'rage', n: 1 }, { s: 'guard', n: 1 }], desc: '[격노] 1 + [수호] 1' }),
 };
 // ⚡ 신속 (1.136.0) — 데미지·회복이 없고 SP 순증도 아닌 순수 버프·디버프 스킬은
 // 턴을 소모하지 않는다 (전투에서 턴당 1회). 데이터에서 자동 파생 — 신규 스킬도 규칙만 지키면 자동 적용.
+// 1.138.0 — 원전 Quick 플래그 정합: 공격 스킬도 명시 `swift: true`로 신속이 될 수 있다 (잽·퀵 샷 등 저위력 속공기).
 for (const s of Object.values(BURIED_SKILLS)) {
   if (!s.power && !s.heal && (s.spGain || 0) <= (s.sp || 0)) s.swift = true;
 }

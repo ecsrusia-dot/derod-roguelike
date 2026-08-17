@@ -1144,7 +1144,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
                   <span className="truncate">{eff.name}{lv > 1 && <span style={{ color: PALETTE.legendary }}> Lv.{lv}</span>}</span>
                 </div>
                 <div className="text-[11px] tabular-nums truncate" style={{ color: sealed ? PALETTE.accent : noSp ? PALETTE.accent : PALETTE.ice }}>
-                  {sealed ? '⛓ 봉인 — 새 장비 필요' : `SP ${spCost}${cd > 0 ? ` · 쿨 ${cd}` : ''}${eff.power ? ` · ${eff.power}%${eff.hits ? `×${eff.hits}` : ''}` : ''}${eff.swift && swiftUsedThisTurn ? ' · ⚡사용됨' : ''} · 횟수 ${usesLeft}`}
+                  {sealed ? '⛓ 봉인 — 새 장비 필요' : `SP ${spCost}${cd > 0 ? ` · 쿨 ${cd}` : ''}${eff.power ? ` · ${eff.power}%${eff.hits ? `×${eff.hits}` : ''}` : ''}${eff.swift ? (swiftUsedThisTurn ? ' · ⚡사용됨' : ' · ⚡신속') : ''} · 횟수 ${usesLeft}`}
                 </div>
                 <div className="text-[11px] truncate" style={{ color: PALETTE.textDim }}>{slotMeta(slot).icon} {eff.desc}</div>
               </button>
