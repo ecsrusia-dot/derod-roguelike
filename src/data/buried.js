@@ -299,8 +299,8 @@ function tierWeightAt(tier, floor) {
 }
 
 // 장비 1개 생성.
-// opts: { slot, classId, floor, tier(강제), luck(등급 가중 보정) }
-export function rollBuriedItem({ slot, classId, floor = 1, tier = null, luck = 0 } = {}) {
+// opts: { slot, classId, floor, tier(강제), luck(등급 가중 보정), powerMult(1.121.0 — 깊이 위력 배율) }
+export function rollBuriedItem({ slot, classId, floor = 1, tier = null, luck = 0, powerMult = 1 } = {}) {
   const slotId = slot || pick(BURIED_SLOT_IDS);
   const pool = slotPool(slotId);
   const candidates = BURIED_SKILL_LIST.filter(s => s.slot === pool && canClassUseSkill(classId, s));
@@ -312,7 +312,7 @@ export function rollBuriedItem({ slot, classId, floor = 1, tier = null, luck = 0
   // 1.113.0 — 장비 레벨(floor) 체계.
   //   기본 스탯: 레벨당 +14% × 랜덤 굴림. 일반 장비 굴림 폭 0.75~1.20 (더 좋은 굴림 사냥 동기),
   //   전설(legend)은 **고정 굴림 1.0** — 유니크는 레벨 배율만 다르다 (PM 결정)
-  const floorMult = 1 + Math.max(0, (floor || 1) - 1) * 0.14;
+  const floorMult = (1 + Math.max(0, (floor || 1) - 1) * 0.14) * Math.max(1, powerMult || 1);
   const roll = t.id === 'legend' ? 1 : (0.75 + Math.random() * 0.45);
   const base = SLOT_BASE[pool] || {};
   const stats = {};
@@ -327,13 +327,14 @@ export function rollBuriedItem({ slot, classId, floor = 1, tier = null, luck = 0
   // 1.113.0 — 랜덤 옵션도 장비 레벨 배율 적용 → 고층 낡은 장비가 저층 유물급을 역전할 수 있다.
   //   확률형(crit·dodge)·치명 피해는 폭주 방지 상한 ×2.2, 나머지는 기본 스탯과 같은 배율.
   //   전설은 옵션 값도 고정 굴림(중앙값)
+  // 확률형 옵션(crit·dodge 등)은 powerMult 미적용 — 확률이 위력 배율로 폭주하면 안 된다
   const optPool = [...BURIED_OPTIONS];
   const options = [];
   const pctMult = Math.min(2.2, 1 + Math.max(0, (floor || 1) - 1) * 0.05);
   for (let i = 0; i < t.opts && optPool.length > 0; i++) {
     const o = optPool.splice(Math.floor(Math.random() * optPool.length), 1)[0];
     const baseVal = t.id === 'legend' ? Math.round((o.min + o.max) / 2) : rnd(o.min, o.max);
-    const scaled = Math.max(1, Math.round(baseVal * (o.pct ? pctMult : floorMult)));
+    const scaled = Math.max(1, Math.round(baseVal * (o.pct ? pctMult : floorMult)));  // floorMult에 powerMult 포함
     options.push({ key: o.key, name: o.name, pct: !!o.pct, affix: o.affix, value: scaled });
   }
   const affix = options.length > 0 ? options[0].affix : null;
@@ -372,22 +373,18 @@ export function createBuriedChar(classId, legacy = { items: [], gold: 0 }, dunge
   const equipped = {};
   for (const s of BURIED_SLOT_IDS) equipped[s] = null;
   // 1.114.0 체크포인트 — 100층 단위 재출발. 걸음수는 층 파리티(1방/층).
-  // 시작 장비 레벨 = 마물 레벨 + **깊이의 압력 보정**. 1.117.0 — 보정식 수정:
-  // 장비 배율의 기저는 1이 아니라 (1+(L-1)×0.14)이므로 그 배수만큼 환산해야 압력을 실제로 덮는다.
-  // 계약(유유자적)도 마물 레벨 계산에 반영해 장비-마물 파리티를 유지한다.
+  // 1.121.0 — 장비 레벨 = 마물 레벨 (레벨 환산 폐지, Lv.1532 사태 픽스),
+  // 깊이 압력은 buriedGearPower **위력 배율**로 스탯에만 반영 — 드랍·상점과 같은 저울
   const fromFloor = Math.max(1, startFloor || 1);
   const startSteps = fromFloor - 1;
-  const startMonLv = fromFloor > 1 ? buriedMonsterLevel({ dungeonId, steps: startSteps, contracts }) : 1;
-  const startPressure = buriedDepthPressure(getBuriedDungeon(dungeonId), fromFloor);
-  const startGearLv = fromFloor > 1
-    ? startMonLv + Math.round((startPressure - 1) * (1 + (startMonLv - 1) * 0.14) / 0.14)
-    : 1;
+  const startGearLv = fromFloor > 1 ? buriedMonsterLevel({ dungeonId, steps: startSteps, contracts }) : 1;
+  const startPower = fromFloor > 1 ? buriedGearPower(getBuriedDungeon(dungeonId), fromFloor) : 1;
 
   // 시작 장비 — 1층 시작: 무기+방어구 낡은 2종 (BB: 맨몸 시작 방지) / 체크포인트: 빈 슬롯 전부 낡은 장비
   const startSlots = fromFloor > 1 ? BURIED_SLOT_IDS : ['weapon', 'armor'];
   for (const s of startSlots) {
     if (equipped[s]) continue;
-    const it = rollBuriedItem({ slot: s, classId, floor: startGearLv, tier: 'worn' });
+    const it = rollBuriedItem({ slot: s, classId, floor: startGearLv, tier: 'worn', powerMult: startPower });
     if (it) equipped[s] = it;
   }
 
@@ -979,10 +976,10 @@ export function buriedChuteJump(char) {
 }
 
 // 상점 진열 (장비 3종)
-export function rollBuriedShop(floor, classId) {
+export function rollBuriedShop(floor, classId, powerMult = 1) {
   const slots = [...BURIED_SLOT_IDS].sort(() => Math.random() - 0.5).slice(0, 3);
   return slots.map(slot => {
-    const item = rollBuriedItem({ slot, classId, floor, luck: 2 });
+    const item = rollBuriedItem({ slot, classId, floor, luck: 2, powerMult });
     if (!item) return null;
     const t = getBuriedTier(item.tier);
     return { item, price: Math.round((45 + floor * 22) * t.mult) };
@@ -1008,6 +1005,7 @@ export const BURIED_TUNING = {
   depthPressurePerFloor: 0.01,
   depthStep50: 1.5,   // 1.120.0 — 50층 통과마다 ×1.5 (PM 지시)
   depthStep100: 2,    // 1.120.0 — 100층 통과마다 ×2 (50층분 대신 — 100층 계단은 1.5가 아니라 2)
+  depthEdgePerFloor: 0.008, // 1.121.0 — 적이 장비 대비 앞서가는 격차 (층당 +0.8%). 깊이 난이도의 실체
 };
 
 const stacksOf = (u, key) => (u?.statuses?.[key] || 0);
@@ -1054,7 +1052,8 @@ export function resolveBuriedAttack(att, def, skill, { isPlayer = false, traits 
   if (statKey === 'int') offense *= 1 + (att.envMagPct || 0) / 100;
   const taken = buriedTakenMult(def) * (1 + (def.envTakenPct || 0) / 100);
   const effDef = skill.pierce ? 0 : buriedEffDef(def);
-  const defMult = 100 / (100 + effDef);
+  // 1.121.0 — 감쇠 하한 25%: 방어가 아무리 높아도 피해의 1/4은 통과 (심층 "안 아픔" 붕괴 픽스)
+  const defMult = Math.max(0.25, 100 / (100 + effDef));
 
   let power = skill.power || 0;
   if (skill.executeBelow && def.maxHp > 0 && (def.hp / def.maxHp) * 100 <= skill.executeBelow) power *= 2;
@@ -1241,6 +1240,17 @@ export function buildBuriedRoomEnemy(char, roomType, roomEffectId = null) {
   }
   return { ...enemy, roomType, isBoss: roomType === 'boss' };
 }
+
+// 1.121.0 — 장비 위력 배율: 압력을 "레벨"이 아니라 **스탯 배율**로 환산해 모든 장비 생성처가 공유한다.
+// (1532레벨 사태 픽스 — 레벨 인플레·드랍 무쓸모·방어 감쇠 붕괴의 뿌리였음)
+// 적은 압력 전액을 받고 장비는 (압력 ÷ 깊이 격차)만 받는다 — 깊을수록 적이 앞서간다.
+export function buriedGearPower(dg, floor) {
+  const f = floor || 1;
+  const edge = 1 + f * (BURIED_TUNING.depthEdgePerFloor || 0);
+  return Math.max(1, buriedDepthPressure(dg, f) / edge);
+}
+export const buriedLootPower = (char) =>
+  buriedGearPower(getBuriedDungeon(char?.dungeonId), char?.floor || 1);
 
 // 깊이의 압력 배율 (1.120.0 PM 지시: "난이도가 아직도 너무 낮다")
 //   = 선형(정복 층 이후 층당 +1%) × 계단(50층 통과마다 ×1.5, 100층 통과는 ×2)
@@ -1657,7 +1667,7 @@ export function buildBuriedNegotiation(char) {
   return {
     price,
     // 지불하면 전투 없이 통과 + 장비 1개. 거절하면 강적과 싸운다.
-    reward: rollBuriedItem({ slot: null, classId: char.classId, floor: lv, luck: 4 }),
+    reward: rollBuriedItem({ slot: null, classId: char.classId, floor: lv, luck: 4, powerMult: buriedLootPower(char) }),
   };
 }
 
@@ -1682,11 +1692,13 @@ export const BURIED_FORGE = {
 // 층수를 그대로 장비 레벨로 쓰면 드랍(마물 레벨 기준) 대비 3.7배 파워 브레이크가 난다 (감사 픽스)
 export const buriedForgeLevel = (deepest) => Math.max(3, 1 + Math.floor(Math.max(0, (deepest || 0) - 1) / 4));
 
-export function craftBuriedItem({ slot, classId, deepest, epic = false }) {
-  const floor = buriedForgeLevel(deepest);
-  if (!epic) return rollBuriedItem({ slot, classId, floor, luck: 3 });
+export function craftBuriedItem({ slot, classId, deepest, epic = false, char = null }) {
+  // 1.121.0 — 탐험 중이면 현재 깊이 기준으로 벼린다 (심층에서도 재련소가 의미를 갖도록)
+  const floor = char ? buriedMonsterLevel(char) : buriedForgeLevel(deepest);
+  const powerMult = char ? buriedLootPower(char) : 1;
+  if (!epic) return rollBuriedItem({ slot, classId, floor, luck: 3, powerMult });
   const tier = Math.random() < 0.75 ? 'epic' : 'relic';
-  return rollBuriedItem({ slot, classId, floor, tier });
+  return rollBuriedItem({ slot, classId, floor, tier, powerMult });
 }
 
 // =========================================================
@@ -1842,7 +1854,7 @@ export const hasBuriedUnique = (char, id) => buriedUniqueIds(char).includes(id);
 // 유니크 장비 생성 — 스탯은 전설 등급 배율, 이름·스킬·효과 고정.
 // 1.115.0 — dungeonId·deep: 던전 전용 유니크는 그 던전 심층에서만 풀에 들어오고,
 // 미보유 전용이 남아 있으면 50% 확률로 전용 쪽을 우선 뽑는다 (공략 목적지 역할)
-export function rollBuriedUniqueItem({ classId, floor = 1, excludeIds = [], dungeonId = null, deep = false } = {}) {
+export function rollBuriedUniqueItem({ classId, floor = 1, excludeIds = [], dungeonId = null, deep = false, powerMult = 1 } = {}) {
   const generic = BURIED_UNIQUES.filter(u => !u.dungeon && !excludeIds.includes(u.id));
   const exclusive = (deep && dungeonId)
     ? BURIED_UNIQUES.filter(u => u.dungeon === dungeonId && !excludeIds.includes(u.id))
@@ -1851,7 +1863,7 @@ export function rollBuriedUniqueItem({ classId, floor = 1, excludeIds = [], dung
   if (pool.length === 0) return null;
   const def = pick(pool);
   const slotId = def.slot === 'acc' ? (Math.random() < 0.5 ? 'acc1' : 'acc2') : def.slot;
-  const base = rollBuriedItem({ slot: slotId, classId, floor, tier: 'legend' });
+  const base = rollBuriedItem({ slot: slotId, classId, floor, tier: 'legend', powerMult });
   if (!base) return null;
   return {
     ...base,
@@ -1863,13 +1875,13 @@ export function rollBuriedUniqueItem({ classId, floor = 1, excludeIds = [], dung
 
 // 보스 유니크 드랍 확률 (%) — 던전이 깊을수록 후하다. 최종 보스는 2배
 export const BURIED_UNIQUE_DROP = { labyrinth: 8, ruins: 12, chasm: 16, abyss: 22 };
-export function rollBuriedUniqueDrop({ dungeonId, isFinalBoss, classId, floor, ownedIds = [], guaranteed = false, deep = null }) {
+export function rollBuriedUniqueDrop({ dungeonId, isFinalBoss, classId, floor, ownedIds = [], guaranteed = false, deep = null, powerMult = 1 }) {
   const base = BURIED_UNIQUE_DROP[dungeonId] || 8;
   const chance = guaranteed ? 100 : base * (isFinalBoss ? 2 : 1);
   if (Math.random() * 100 >= chance) return null;
   // deep — 정복 층 **이후**만 전용 풀 개방 (1.117.0: 정복 층 당일 포함 off-by-one 픽스).
   // 미지정 시 기존 isFinalBoss 기준 유지 (재앙 등)
-  return rollBuriedUniqueItem({ classId, floor, excludeIds: ownedIds, dungeonId, deep: deep === null ? !!isFinalBoss : !!deep });
+  return rollBuriedUniqueItem({ classId, floor, excludeIds: ownedIds, dungeonId, deep: deep === null ? !!isFinalBoss : !!deep, powerMult });
 }
 
 // 층 이동 시 유니크 [u102] 판정 — 25% 확률 무작위 스킬 레벨 +1
@@ -1979,8 +1991,8 @@ const EVENT_OUTCOMES = {
     { w: 12, run: (c) => ({ char: pendStatus(c, 'confuse', 1), text: '석상의 눈이 빙글 돈다 — 다음 전투를 [혼란] 1로 시작한다.', tone: 'bad' }) },
   ],
   coffin: [
-    { w: 34, run: (c, ctx) => { ctx.item = rollBuriedItem({ slot: null, classId: c.classId, floor: buriedMonsterLevel(c), tier: 'epic' }); return { char: c, text: '영웅의 장비가 잠들어 있었다!', tone: 'good' }; } },
-    { w: 16, run: (c, ctx) => { ctx.item = rollBuriedItem({ slot: null, classId: c.classId, floor: buriedMonsterLevel(c), tier: 'relic' }); return { char: c, text: '유물급 장비가 잠들어 있었다!', tone: 'good' }; } },
+    { w: 34, run: (c, ctx) => { ctx.item = rollBuriedItem({ slot: null, classId: c.classId, floor: buriedMonsterLevel(c), tier: 'epic', powerMult: buriedLootPower(c) }); return { char: c, text: '영웅의 장비가 잠들어 있었다!', tone: 'good' }; } },
+    { w: 16, run: (c, ctx) => { ctx.item = rollBuriedItem({ slot: null, classId: c.classId, floor: buriedMonsterLevel(c), tier: 'relic', powerMult: buriedLootPower(c) }); return { char: c, text: '유물급 장비가 잠들어 있었다!', tone: 'good' }; } },
     { w: 26, run: (c) => { const d = buriedDerived(c); return { char: { ...c, hp: Math.max(1, c.hp - Math.round(d.maxHp * 0.3)) }, text: '관 속의 것이 손을 뻗는다 — 최대 HP의 30% 피해.', tone: 'bad' }; } },
     { w: 14, run: (c) => ({ char: pendStatus(c, 'silence', 2), text: '봉인 문자가 목에 감긴다 — 다음 전투를 [침묵] 2로 시작한다.', tone: 'bad' }) },
     { w: 10, run: (c) => ({ char: { ...c, gold: c.gold + 60 }, text: '부장품 몇 닢뿐이었다 — 🪙 60.', tone: 'neutral' }) },
