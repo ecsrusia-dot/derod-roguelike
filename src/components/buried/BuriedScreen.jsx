@@ -16,6 +16,7 @@ import {
   BURIED_KEYSTONES, BURIED_KEYSTONE_MAX, getBuriedKeystone,
   BURIED_ORIGINS, getBuriedOrigin,
   BURIED_CONTRACTS, BURIED_CONTRACT_COST, BURIED_CONTRACT_CARRY, getBuriedContract,
+  buriedContractCost, buriedContractCap,
   buriedDerived, buriedExpToNext, getBuriedClass, getBuriedDungeon,
   buriedTraitIds, getBuriedTrait, buriedMonsterLevel,
   BURIED_PARTS, BURIED_PART_SLOT_COSTS, getBuriedPart, BURIED_SHARD,
@@ -183,7 +184,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
           <div className="grid grid-cols-2 gap-1.5">
             {[
               { id: 'forge', icon: <Hammer size={15} />, name: '무덤 재련소', sub: `${BURIED_DUST_ICON}${b.dust || 0} · 제작 Lv.${buriedForgeLevel(b.deepest)}`, c: PALETTE.dawn },
-              { id: 'contracts', icon: <ScrollText size={15} />, name: '마의 계약', sub: `보유 ${ownedContracts.length}/${BURIED_CONTRACTS.length}`, c: PALETTE.twilight },
+              { id: 'contracts', icon: <ScrollText size={15} />, name: '마의 계약', sub: `보유 ${ownedContracts.length}/${BURIED_CONTRACTS.length} · 한도 ${buriedContractCap(b)}`, c: PALETTE.twilight },
               { id: 'lab', icon: <FlaskConical size={15} />, name: '연구실', sub: `${BURIED_SHARD.icon}${b.shards || 0} · 부품 ${(b.parts || []).length}/5`, c: '#c48bd4' },
               { id: 'records', icon: <BarChart3 size={15} />, name: '기록 · 규칙', sub: `최고 ${b.deepest || 0}층 · 사망 ${b.deaths || 0}`, c: PALETTE.ice },
             ].map(m => (
@@ -575,7 +576,14 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
   // ============================================
   // 시설 서브뷰 — 마의 계약
   // ============================================
-  const renderContracts = () => (
+  const renderContracts = () => {
+    // 1.135.0 — 이중 게이트: 누진 비용 + 진행도 보유 한도
+    const cCap = buriedContractCap(b);
+    const cCost = buriedContractCost(ownedContracts.length);
+    const complete = ownedContracts.length >= BURIED_CONTRACTS.length;
+    const atCap = !complete && ownedContracts.length >= cCap;
+    const canBuy = !complete && !atCap && (b.dust || 0) >= cCost;
+    return (
     <>
       <SubHeader title="📜 마의 계약" color={PALETTE.twilight} onPrev={() => setView('home')} />
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2 ui-screen-enter">
@@ -583,19 +591,26 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
         <div className="px-3 py-2.5 space-y-2" style={{ borderRadius: R.panel, background: PALETTE.panel, border: `1px solid ${PALETTE.panelBorder}` }}>
           <div className="text-[11px] leading-relaxed" style={{ color: PALETTE.textDim }}>
             출정 시 <b style={{ color: PALETTE.text }}>최대 {BURIED_CONTRACT_CARRY}개</b>를 지참하는 영구 패시브.
-            먼지로 미보유 계약 중 하나를 무작위로 얻는다. 보유 {ownedContracts.length} / {BURIED_CONTRACTS.length}
+            먼지로 미보유 계약 중 하나를 무작위로 얻는다 — <b style={{ color: PALETTE.text }}>살수록 비싸진다</b>.
+            보유 <b style={{ color: PALETTE.twilight }}>{ownedContracts.length}</b> / 한도 <b style={{ color: PALETTE.text }}>{cCap}</b> (전체 {BURIED_CONTRACTS.length})
+          </div>
+          <div className="text-[11px] leading-relaxed" style={{ color: PALETTE.textDim }}>
+            한도 = 기본 6 + <b style={{ color: PALETTE.text }}>던전 정복당 +4</b> + 최고 <b style={{ color: PALETTE.text }}>100층 +3</b> · <b style={{ color: PALETTE.text }}>200층 +3</b>.
+            전종 수집은 4던전 정복 + 200층의 증표다.
           </div>
           <button onClick={onBuyContract}
-            disabled={(b.dust || 0) < BURIED_CONTRACT_COST || ownedContracts.length >= BURIED_CONTRACTS.length}
+            disabled={!canBuy}
             className="ui-press w-full py-2 text-[12px] font-bold"
             style={{
               borderRadius: R.btn,
-              background: (b.dust || 0) >= BURIED_CONTRACT_COST && ownedContracts.length < BURIED_CONTRACTS.length ? PALETTE.panelLight : PALETTE.panel,
+              background: canBuy ? PALETTE.panelLight : PALETTE.panel,
               border: `1px solid ${PALETTE.twilight}66`,
-              color: (b.dust || 0) >= BURIED_CONTRACT_COST && ownedContracts.length < BURIED_CONTRACTS.length ? PALETTE.twilight : PALETTE.textDim,
-              opacity: (b.dust || 0) >= BURIED_CONTRACT_COST && ownedContracts.length < BURIED_CONTRACTS.length ? 1 : 0.5,
+              color: canBuy ? PALETTE.twilight : PALETTE.textDim,
+              opacity: canBuy ? 1 : 0.5,
             }}>
-            {ownedContracts.length >= BURIED_CONTRACTS.length ? '모든 계약 수집 완료' : `랜덤 계약 체결 — ${BURIED_DUST_ICON}${BURIED_CONTRACT_COST}`}
+            {complete ? '모든 계약 수집 완료'
+              : atCap ? `보유 한도 ${cCap}개 도달 — 던전 정복·심층 도달로 확장`
+              : `랜덤 계약 체결 — ${BURIED_DUST_ICON}${cCost}`}
           </button>
           {ownedContracts.length > 0 && (
             <div className="space-y-0.5">
@@ -612,7 +627,8 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
         </div>
       </div>
     </>
-  );
+    );
+  };
 
   // ============================================
   // 시설 서브뷰 — 연구실

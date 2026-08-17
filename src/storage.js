@@ -5,7 +5,7 @@
 // 저장되는 것: 영혼, 강화 단계, 해금 항목, 클리어 기록
 // ============================================
 
-import { ENGRAVINGS, ENGRAVING_TIERS, ENEMIES, EVENTS, RELICS, PASSIVE_SKILLS, CODEX_DISCOVERY_REWARD, CODEX_COMPLETE_REWARD, backfillRaidSeries, FEATURE_FLAGS, addBuriedItemToChar, buriedDustValue as buriedDustValueOf, checkBuriedEncounterUnlock } from './data.js';
+import { ENGRAVINGS, ENGRAVING_TIERS, ENEMIES, EVENTS, RELICS, PASSIVE_SKILLS, CODEX_DISCOVERY_REWARD, CODEX_COMPLETE_REWARD, backfillRaidSeries, FEATURE_FLAGS, addBuriedItemToChar, buriedDustValue as buriedDustValueOf, checkBuriedEncounterUnlock, buriedContractCap, BURIED_CONTRACT_COST } from './data.js';
 
 const DB_NAME = 'derod_meta';
 const DB_VERSION = 1;
@@ -279,6 +279,19 @@ export async function loadMeta() {
           const legacyDust = safe.buried.legacy.reduce((s, i) => s + buriedDustValueOf(i), 0);
           safe.buried = { ...safe.buried, legacy: [], dust: (safe.buried.dust || 0) + legacyDust };
           needsImmediateSave = true;
+        }
+        // 1.135.0 마의 계약 이중 게이트 마이그레이션 (PM 결정: 초과분 회수 + 먼지 환불).
+        // 진행도 한도를 넘는 보유 계약은 무작위 회수하고 구매가(60/개)를 환불한다.
+        // 한도는 진행도로만 늘어나고 구매는 한도에서 막히므로 멱등 — 별도 플래그 불필요
+        if (Array.isArray(safe.buried?.contracts)) {
+          const cap = buriedContractCap(safe.buried);
+          const owned = safe.buried.contracts;
+          if (owned.length > cap) {
+            const kept = [...owned].sort(() => Math.random() - 0.5).slice(0, cap);
+            const removed = owned.length - cap;
+            safe.buried = { ...safe.buried, contracts: kept, dust: (safe.buried.dust || 0) + removed * BURIED_CONTRACT_COST };
+            needsImmediateSave = true;
+          }
         }
         // 1.35.0 lanthert → wanderer 내부 코드명 변경 마이그레이션
         // 기존 사용자의 lanthert 키 데이터를 wanderer로 자동 이전. 멱등성 보장 (이미 이전했으면 스킵)
@@ -1604,9 +1617,11 @@ export function trackBuriedKill(meta, enemyKey) {
 }
 
 // 1.111.0 — 마의 계약 랜덤 구입 (먼지 소모, 미보유 풀에서)
+// 1.135.0 — 진행도 보유 한도(buriedContractCap) 초과 구매 차단
 export function buyBuriedContract(meta, contractId, cost) {
   const b = getBuried(meta);
   if (!contractId || (b.dust || 0) < cost || b.contracts.includes(contractId)) return meta;
+  if (b.contracts.length >= buriedContractCap(b)) return meta;
   return { ...meta, buried: { ...b, dust: b.dust - cost, contracts: [...b.contracts, contractId] } };
 }
 

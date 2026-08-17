@@ -158,6 +158,7 @@ import {
   rollBuriedContract,
   getBuriedContract,
   BURIED_CONTRACT_COST,
+  buriedContractCost, buriedContractCap,
   raiseBuriedSkill,
   buriedEquippedSkills,
   BURIED_SKILL_MAX_LV,
@@ -419,12 +420,15 @@ export default function App() {
     setTimeout(() => notice && setBuriedForgeNotice(notice), 0);
   };
 
-  // 마의 계약 랜덤 구입 (1.111.0)
+  // 마의 계약 랜덤 구입 (1.111.0) / 1.135.0 — 누진 비용 + 진행도 보유 한도
   const handleBuriedBuyContract = () => {
-    const id = rollBuriedContract(getBuried(meta).contracts); // 롤은 updater 밖 (이중 실행 방지)
+    const b0 = getBuried(meta);
+    if ((b0.contracts || []).length >= buriedContractCap(b0)) return;
+    const id = rollBuriedContract(b0.contracts); // 롤은 updater 밖 (이중 실행 방지)
     if (!id) return;
+    const cost = buriedContractCost(b0.contracts.length);
     setMeta(prev => {
-      const next = buyBuriedContract(prev, id, BURIED_CONTRACT_COST);
+      const next = buyBuriedContract(prev, id, cost);
       if (next === prev) return prev;
       saveMeta(next);
       return next;
