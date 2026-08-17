@@ -133,6 +133,59 @@ export function buriedRaceFx(char) {
 }
 
 // =========================================================
+// 3c. ⚓ 쐐기석 12종 (1.128.0) — BB2 데이터시트(楔石Keystone 121행) 이식 6탄
+// =========================================================
+// 원작 규칙: 스스로 박는 저주의 쐐기 — 영구 디버프를 대가로 보상이 커진다.
+// PM 결정 3건: ①정복한 던전에서만 개방 ②재화 +12%/P + 드랍 운 +P÷3 ③최대 3개.
+// pts = 쐐기 포인트 (★). fx는 전투·던전이 kf bag으로 소비 — 전부 캐릭터 생성 시 구움.
+export const BURIED_KEYSTONES = [
+  { id: 'ksFrail', name: '취약의 쐐기',   icon: '🩸', pts: 1, fx: { takenPct: 20 },     src: 'Marbas',
+    desc: '받는 피해 +20%.' },
+  { id: 'ksSlow',  name: '둔족의 쐐기',   icon: '🦶', pts: 1, fx: { noDodge: true },    src: 'Caim',
+    desc: '회피할 수 없다 ([잔영]도 무효).' },
+  { id: 'ksBlunt', name: '무딘 날의 쐐기', icon: '🗡', pts: 1, fx: { noCrit: true },     src: 'Furfur',
+    desc: '치명타가 터지지 않는다.' },
+  { id: 'ksVigil', name: '불면의 쐐기',   icon: '🌙', pts: 1, fx: { noCampHeal: true }, src: 'Malphas',
+    desc: '야영과 제단에서 HP를 회복할 수 없다.' },
+  { id: 'ksMist',  name: '미혹의 쐐기',   icon: '🌀', pts: 2, fx: { startConfuse: 1 },  src: 'Morax',
+    desc: '매 전투를 [혼란] 1로 시작한다.' },
+  { id: 'ksStall', name: '정체의 쐐기',   icon: '⏳', pts: 2, fx: { cdAdd: 1 },         src: 'Orias',
+    desc: '모든 장비 스킬 쿨다운 +1 (기본 공격 제외).' },
+  { id: 'ksBare',  name: '나신의 쐐기',   icon: '🔻', pts: 2, fx: { noBarrier: true },  src: 'Sabnock',
+    desc: '보호막을 얻을 수 없다.' },
+  { id: 'ksDry',   name: '금주의 쐐기',   icon: '🚱', pts: 2, fx: { noPotion: true },   src: 'Forneus',
+    desc: '물약을 마실 수 없다.' },
+  { id: 'ksDark',  name: '암흑의 쐐기',   icon: '🌑', pts: 2, fx: { darkAll: true },    src: 'Shax',
+    desc: '모든 전투에서 적의 수치가 보이지 않는다.' },
+  { id: 'ksRuin',  name: '대취약의 쐐기', icon: '💥', pts: 3, fx: { takenPct: 50 },     src: 'Gusion',
+    desc: '받는 피해 +50%.' },
+  { id: 'ksFast',  name: '고행의 쐐기',   icon: '⛓', pts: 3, fx: { noHeal: true },     src: 'Andrealphus',
+    desc: '전투 중·야영·제단에서 HP를 회복할 수 없다 (레벨업 회복만 예외).' },
+  { id: 'ksVoid',  name: '공허의 쐐기',   icon: '⭕', pts: 3, fx: { noAcc: true },      src: 'Vepar',
+    desc: '장신구 2슬롯이 완전히 무효가 된다 (스킬·스탯·전설무구 효과 전부).' },
+];
+export const BURIED_KEYSTONE_MAX = 3;
+export const getBuriedKeystone = (id) => BURIED_KEYSTONES.find(k => k.id === id) || null;
+// kf bag — 채택한 쐐기 fx 합산 (숫자 합산, 불린 OR). 구 캐릭터는 빈 객체 = 회귀 안전
+export function buriedKeystoneFx(char) {
+  const out = {};
+  for (const id of char?.keystones || []) {
+    const k = getBuriedKeystone(id);
+    if (!k) continue;
+    for (const [key, v] of Object.entries(k.fx)) {
+      if (typeof v === 'boolean') out[key] = out[key] || v;
+      else out[key] = (out[key] || 0) + v;
+    }
+  }
+  return out;
+}
+// 보상 — 포인트 합계 P: 골드·경험치·먼지 +12%/P, 드랍 운 +P÷3
+export function buriedKeystoneBonus(char) {
+  const pts = (char?.keystones || []).reduce((s, id) => s + (getBuriedKeystone(id)?.pts || 0), 0);
+  return { pts, rewardPct: pts * 12, luck: Math.floor(pts / 3) };
+}
+
+// =========================================================
 // 4. 상태이상 13종 — 전부 스택형
 // =========================================================
 // kind: 'debuff' | 'buff'
@@ -455,7 +508,7 @@ export function buriedDustValue(item) {
 // =========================================================
 export const buriedExpToNext = (lv) => 32 + lv * 20;
 
-export function createBuriedChar(classId, legacy = { items: [], gold: 0 }, dungeonId = 'labyrinth', contracts = [], partsFx = {}, startFloor = 1, depthTraits = [], raceId = null) {
+export function createBuriedChar(classId, legacy = { items: [], gold: 0 }, dungeonId = 'labyrinth', contracts = [], partsFx = {}, startFloor = 1, depthTraits = [], raceId = null, keystones = []) {
   const cls = getBuriedClass(classId);
   if (!cls) return null;
   const race = getBuriedRace(raceId);
@@ -486,6 +539,7 @@ export function createBuriedChar(classId, legacy = { items: [], gold: 0 }, dunge
     equipped,
     pendingLoot: [], // 1.113.0 — 획득 즉시 [교체/버리기] 판단 대기열
     runes: [],       // 1.123.0 — ᚱ 룬 주머니 (각인 전 보관)
+    keystones: (keystones || []).slice(0, BURIED_KEYSTONE_MAX), // 1.128.0 — ⚓ 쐐기석 (생성 시 구움)
     // 1.104.0 — 던전 선택 / 걸음수 기반 마물 레벨 / 스킬 레벨 / 방·층 효과
     dungeonId,
     contracts: (contracts || []).slice(0, BURIED_CONTRACT_CARRY),
@@ -518,8 +572,10 @@ export function buriedCheckpointFloors(deepestFloor) {
 // 1.104.0~ barrier(보호막)·chase(추격 피해) 추가 — 원작의 핵심 2축
 export function buriedDerived(char) {
   if (!char) return { maxHp: 1, maxSp: 1, atk: 1, mag: 1, fin: 1, def: 0, crit: 0, critDmg: 60, dodge: 0, spRegen: 12, barrier: 0, chase: 0, healPct: 0, drainPct: 0, stats: { str: 0, dex: 0, int: 0, vit: 0 } };
+  const noAcc = buriedKeystoneFx(char).noAcc; // ⚓ 공허의 쐐기 (1.128.0) — 장신구 2슬롯 무효
   const gear = {};
   for (const s of BURIED_SLOT_IDS) {
+    if (noAcc && (s === 'acc1' || s === 'acc2')) continue;
     const st = buriedItemStats(char.equipped?.[s]);
     for (const [k, v] of Object.entries(st)) gear[k] = (gear[k] || 0) + v;
   }
@@ -566,7 +622,9 @@ export function buriedDerived(char) {
 // 장착 중인 6슬롯의 스킬 목록 (빈 슬롯은 제외)
 export function buriedEquippedSkills(char) {
   if (!char) return [];
+  const noAcc = buriedKeystoneFx(char).noAcc; // ⚓ 공허의 쐐기 — 장신구 스킬도 봉인
   return BURIED_SLOT_IDS
+    .filter(s => !(noAcc && (s === 'acc1' || s === 'acc2')))
     .map(s => ({ slot: s, item: char.equipped?.[s] || null }))
     .filter(x => x.item && BURIED_SKILLS[x.item.skillId])
     .map(x => ({ slot: x.slot, item: x.item, skill: BURIED_SKILLS[x.item.skillId] }));
@@ -1123,6 +1181,7 @@ export function buriedEffDef(u) {
 }
 // 실효 회피율 (잔영 ↑, 속박이면 0, 방 효과 반영)
 export function buriedEffDodge(u) {
+  if (u?.noDodge) return 0; // ⚓ 둔족의 쐐기 (1.128.0)
   if (stacksOf(u, 'bind') > 0) return 0;
   return Math.min(70, (u?.dodge || 0) + stacksOf(u, 'evade') * 15 + (u?.envDodgeAdd || 0));
 }
@@ -1146,7 +1205,7 @@ export function resolveBuriedAttack(att, def, skill, { isPlayer = false, traits 
     : Math.max(att.atk || 0, att.fin || 0, att.mag || 0);
   const hitCount = Math.max(1, skill.hits || 1);
   // ☠ 「강철의」 변형 (1.124.0) — 치명타를 받지 않는다
-  const critRate = def.immuneCrit ? 0 : (att.crit || 0) + (skill.critBonus || 0) + (att.envCritAdd || 0);
+  const critRate = def.immuneCrit || att.noCrit ? 0 : (att.crit || 0) + (skill.critBonus || 0) + (att.envCritAdd || 0);
   let offense = buriedOffenseMult(att) * (1 + (att.envDmgPct || 0) / 100);
   if (statKey === 'int') offense *= 1 + (att.envMagPct || 0) / 100;
   const taken = buriedTakenMult(def) * (1 + (def.envTakenPct || 0) / 100);
@@ -1252,8 +1311,9 @@ export function buriedDeathSettlement(char) {
     ...BURIED_SLOT_IDS.map(s => char.equipped?.[s]).filter(Boolean),
     ...(char.pendingLoot || []),
   ];
+  const ksMult = 1 + buriedKeystoneBonus(char).rewardPct / 100; // ⚓ 쐐기 보상 (1.128.0)
   return {
-    dust: items.reduce((s, it) => s + buriedDustValue(it), 0),
+    dust: Math.round(items.reduce((s, it) => s + buriedDustValue(it), 0) * ksMult),
     gold: 0, // 소멸 — 무덤에 흩어진다
     itemCount: items.length,
   };
@@ -1801,13 +1861,14 @@ export function resolveBuriedLoot(char, replace) {
   if (queue.length === 0) return { char, dustGain: 0, dismantled: null };
   const item = queue[0];
   const rest = queue.slice(1);
+  const ksMult = 1 + buriedKeystoneBonus(char).rewardPct / 100; // ⚓ 쐐기 보상 (1.128.0)
   if (!replace) {
-    return { char: { ...char, pendingLoot: rest }, dustGain: buriedDustValue(item), dismantled: item };
+    return { char: { ...char, pendingLoot: rest }, dustGain: Math.round(buriedDustValue(item) * ksMult), dismantled: item };
   }
   const prev = char.equipped?.[item.slot] || null;
   let next = { ...char, pendingLoot: rest, equipped: { ...char.equipped, [item.slot]: item } };
   next.hp = Math.min(next.hp, buriedDerived(next).maxHp);
-  return { char: next, dustGain: prev ? buriedDustValue(prev) : 0, dismantled: prev };
+  return { char: next, dustGain: prev ? Math.round(buriedDustValue(prev) * ksMult) : 0, dismantled: prev };
 }
 
 // 협상 방 — 지불액과 보상. 마물 레벨이 높을수록 비싸고 크다.
@@ -2038,7 +2099,9 @@ export const getBuriedUnique = (id) => BURIED_UNIQUES.find(u => u.id === id) || 
 // 장착 중인 유니크 효과 보유 여부 — 전투·던전·App이 이것 하나로 분기
 export function buriedUniqueIds(char) {
   if (!char) return [];
+  const noAcc = buriedKeystoneFx(char).noAcc; // ⚓ 공허의 쐐기 — 장신구 유니크 효과도 봉인
   return BURIED_SLOT_IDS
+    .filter(s => !(noAcc && (s === 'acc1' || s === 'acc2')))
     .map(s => char.equipped?.[s]?.unique)
     .filter(Boolean);
 }
@@ -2049,7 +2112,9 @@ export const hasBuriedUnique = (char, id) => buriedUniqueIds(char).includes(id);
 // 어휘는 종족·특성·계약과 동일 — buriedDerived와 전투가 uf로 병합한다.
 export function buriedUniqueFx(char) {
   const out = {};
+  const noAcc = buriedKeystoneFx(char).noAcc;
   for (const s of BURIED_SLOT_IDS) {
+    if (noAcc && (s === 'acc1' || s === 'acc2')) continue;
     const uid = char?.equipped?.[s]?.unique;
     const u = uid ? getBuriedUnique(uid) : null;
     if (!u?.fx) continue;
