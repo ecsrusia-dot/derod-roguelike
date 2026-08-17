@@ -103,25 +103,25 @@ export const getBuriedClass = (id) => buriedAllClasses().find(c => c.id === id) 
 // 3b. 종족 10종 (1.122.0) — BB2 모티브: 종족 × 직업 2축 생성
 // =========================================================
 // statMods: 기본 스탯 가감 / fx: 특성·계약과 같은 어휘 (buriedDerived + 전투가 소비)
-// 시트 업로드 시 수치 정밀 보정 예정 — 현재는 오리지널 밸런스 (합계가 0에 가깝게, 개성은 fx로)
+// 1.123.0 — BB2 공식 데이터시트(種族Race) 기준 statMods 정밀 보정 완료 (엘프 실드17→보호막15, 하플링 INT 0, 용인 6/2/-/-, 페어리 STR 0, 뱀파이어 DEX·HP형)
 export const BURIED_RACES = [
   { id: 'human',    name: '인간',     icon: '🧑', color: '#c9a86a', statMods: { str: 1, dex: 1, int: 1, vit: 1 }, fx: { expPct: 15 },
     desc: '무난한 전 스탯 +1. 배움이 빠르다 — 경험치 +15%.' },
   { id: 'lycan',    name: '수인',     icon: '🐺', color: '#c4453d', statMods: { str: 5, vit: 2, int: -3 }, fx: { physPct: 8 },
     desc: '짐승의 완력. 물리·기교 공격력 +8%.' },
-  { id: 'elfkin',   name: '엘프',     icon: '🍃', color: '#7a9a5e', statMods: { dex: 4, int: 2, vit: -2 }, fx: { dodge: 5 },
-    desc: '가벼운 몸놀림. 회피율 +5%.' },
-  { id: 'halfling', name: '하플링',   icon: '🍀', color: '#d4a574', statMods: { dex: 3, vit: 1, str: -2 }, fx: { dropLuck: 1, goldPct: 12 },
+  { id: 'elfkin',   name: '엘프',     icon: '🍃', color: '#7a9a5e', statMods: { dex: 4, int: 2, str: -1, vit: -2 }, fx: { dodge: 5, barrier: 15 },
+    desc: '가벼운 몸놀림. 회피율 +5%, 전투 시작 보호막 +15.' },
+  { id: 'halfling', name: '하플링',   icon: '🍀', color: '#d4a574', statMods: { dex: 3, vit: 2, int: -4 }, fx: { dropLuck: 1, goldPct: 12 },
     desc: '행운의 손. 드랍 운 +1, 골드 +12%.' },
   { id: 'lizard',   name: '리자드맨', icon: '🦎', color: '#5e7a3e', statMods: { vit: 5, str: 2, dex: -2 }, fx: { hp: 40, healPct: 10 },
     desc: '재생하는 비늘. 최대 HP +40, 회복량 +10%.' },
-  { id: 'drakan',   name: '용인',     icon: '🐉', color: '#8b1f1f', statMods: { str: 4, int: 3, dex: -3 }, fx: { barrier: 45 },
+  { id: 'drakan',   name: '용인',     icon: '🐉', color: '#8b1f1f', statMods: { str: 5, vit: 2, dex: -4 }, fx: { barrier: 45 },
     desc: '용의 비늘. 전투 시작 보호막 +45.' },
-  { id: 'fairykin', name: '페어리',   icon: '🦋', color: '#c48bd4', statMods: { int: 5, vit: -4 }, fx: { sp: 15, magPct: 10, hpMult: 0.85 },
+  { id: 'fairykin', name: '페어리',   icon: '🦋', color: '#c48bd4', statMods: { int: 5, str: -3, vit: -4 }, fx: { sp: 15, magPct: 10, hpMult: 0.85 },
     desc: '정신체에 가깝다. 마법 +10%, 최대 SP +15 — 대신 최대 HP -15%.' },
   { id: 'darkelf',  name: '다크엘프', icon: '🌙', color: '#5c4a8c', statMods: { dex: 4, int: 3, vit: -3 }, fx: { crit: 6, statusChance: 12 },
     desc: '그늘의 사냥꾼. 치명 +6%, 상태이상 확률 +12%.' },
-  { id: 'vampkin',  name: '뱀파이어', icon: '🩸', color: '#7d2b4a', statMods: { str: 3, int: 3, vit: -1 }, fx: { drainPct: 5, healPct: -15 },
+  { id: 'vampkin',  name: '뱀파이어', icon: '🩸', color: '#7d2b4a', statMods: { dex: 2, int: 2, vit: 1 }, fx: { drainPct: 5, healPct: -15 },
     desc: '피로 산다. 흡혈 +5% — 대신 일반 회복량 -15%.' },
   { id: 'revenant', name: '굴레망자', icon: '💀', color: '#8b8378', statMods: { vit: 4, str: 2, dex: -3 }, fx: { statusResist: 20, healPct: -25 },
     desc: '이미 죽은 몸. 적의 상태이상 확률 -20% — 대신 회복량 -25%.' },
@@ -430,6 +430,7 @@ export function createBuriedChar(classId, legacy = { items: [], gold: 0 }, dunge
     gold: 80 + (legacy.gold || 0),
     equipped,
     pendingLoot: [], // 1.113.0 — 획득 즉시 [교체/버리기] 판단 대기열
+    runes: [],       // 1.123.0 — ᚱ 룬 주머니 (각인 전 보관)
     // 1.104.0 — 던전 선택 / 걸음수 기반 마물 레벨 / 스킬 레벨 / 방·층 효과
     dungeonId,
     contracts: (contracts || []).slice(0, BURIED_CONTRACT_CARRY),
@@ -1961,11 +1962,8 @@ export const getBuriedMod = (id) => BURIED_MODS[id] || null;
 export const rollBuriedMod = () => pick(Object.keys(BURIED_MODS));
 
 // 접두어를 실효 스킬에 반영 — buriedSkillAt 결과에 이어 적용한다
-export function buriedModdedSkill(skill, modId) {
-  const mod = getBuriedMod(modId);
-  if (!skill || !mod) return skill;
-  const fx = mod.fx;
-  const out = { ...skill, modId };
+// 접두어·룬 공용 fx 적용기 — 같은 어휘를 쓴다 (1.123.0에서 분리)
+function applyBuriedSkillFx(out, fx) {
   if (fx.powerPct && out.power) out.power = Math.max(1, Math.round(out.power * (1 + fx.powerPct / 100)));
   if (fx.spPct) out.sp = Math.max(0, Math.round(out.sp * (1 + fx.spPct / 100)));
   if (fx.cdMult) out.cd = Math.max(2, (out.cd || 0) * fx.cdMult);
@@ -1977,9 +1975,78 @@ export function buriedModdedSkill(skill, modId) {
   if (fx.barrierGain) out.barrierGain = (out.barrierGain || 0) + fx.barrierGain;
   if (fx.selfDmg) out.selfDmg = (out.selfDmg || 0) + fx.selfDmg;
   if (fx.addApply && out.power) out.apply = [...(out.apply || []), fx.addApply];
-  if (fx.wallChance) out.wallChance = fx.wallChance;   // 전투 화면이 판정
-  if (fx.cdrOnHit) out.cdrOnHit = fx.cdrOnHit;         // 전투 화면이 판정
+  if (fx.wallChance) out.wallChance = Math.max(out.wallChance || 0, fx.wallChance); // 전투 화면이 판정
+  if (fx.cdrOnHit) out.cdrOnHit = (out.cdrOnHit || 0) + fx.cdrOnHit;               // 전투 화면이 판정
   return out;
+}
+
+export function buriedModdedSkill(skill, modId, runeId = null) {
+  const mod = getBuriedMod(modId);
+  const rune = getBuriedRune(runeId);
+  if (!skill || (!mod && !rune)) return skill;
+  let out = { ...skill };
+  if (mod) { out.modId = modId; out = applyBuriedSkillFx(out, mod.fx); }
+  if (rune) { out.runeId = runeId; out = applyBuriedSkillFx(out, rune.fx); }
+  return out;
+}
+
+// =========================================================
+// 21b. ᚱ 룬 소켓 (1.123.0) — BB2 데이터시트 이식 2탄
+// =========================================================
+// 원작 규칙(도박 룰): 룬은 장비의 스킬에 영구 각인된다 — 제거·교체 불가.
+// 그 장비를 버리거나 분해하면 룬도 함께 소멸한다. 장비당 소켓 1칸.
+// fx 어휘는 접두어(BURIED_MODS)와 100% 동일 — applyBuriedSkillFx가 공용 적용.
+export const BURIED_RUNE_RARITIES = {
+  1: { stars: '★',     color: '#9b8975' },
+  2: { stars: '★★',    color: '#7ba3c4' },
+  3: { stars: '★★★',   color: '#c48bd4' },
+  4: { stars: '★★★★', color: '#e8b04a' },
+};
+export const BURIED_RUNES = {
+  // 1★ — 기본기 (시트: パワー弱·コスト弱·シールダー·ヒーラー)
+  rPower1: { id: 'rPower1', name: '힘의 룬',   rarity: 1, desc: '위력 +12%',                fx: { powerPct: 12 } },
+  rSave1:  { id: 'rSave1',  name: '절약의 룬', rarity: 1, desc: 'SP 소모 -25%',             fx: { spPct: -25 } },
+  rGuard1: { id: 'rGuard1', name: '수호의 룬', rarity: 1, desc: '사용 시 보호막 +12',        fx: { barrierGain: 12 } },
+  rMend1:  { id: 'rMend1',  name: '치유의 룬', rarity: 1, desc: '사용 시 HP 10 회복',        fx: { heal: 10 } },
+  // 2★ — 전술 (시트: スピード弱·クリティカル中·ステイン·パリィ 계열)
+  rSpeed:  { id: 'rSpeed',  name: '신속의 룬', rarity: 2, desc: '쿨다운 -1',                fx: { cdAdd: -1 } },
+  rKeen:   { id: 'rKeen',   name: '예리한 룬', rarity: 2, desc: '이 스킬 치명 확률 +12%',    fx: { critBonus: 12 } },
+  rVenom:  { id: 'rVenom',  name: '맹독의 룬', rarity: 2, desc: '적중 시 [중독] 2 부여',     fx: { addApply: { s: 'poison', n: 2, p: 100 } } },
+  rBind:   { id: 'rBind',   name: '결박의 룬', rarity: 2, desc: '적중 시 [속박] 1 부여',     fx: { addApply: { s: 'bind', n: 1, p: 100 } } },
+  rWall:   { id: 'rWall',   name: '방벽의 룬', rarity: 2, desc: '사용 시 25% 확률 🧱방벽 +1', fx: { wallChance: 25 } },
+  // 3★ — 강력 (시트: パワー中·レイジ弱·エンチャント 계열)
+  rRage:   { id: 'rRage',   name: '격노의 룬', rarity: 3, desc: '위력 +30%, 사용 시 자해 6',  fx: { powerPct: 30, selfDmg: 6 } },
+  rDrain:  { id: 'rDrain',  name: '흡혈의 룬', rarity: 3, desc: '준 피해의 20% 흡혈',        fx: { drain: 20 } },
+  rPierce: { id: 'rPierce', name: '관통의 룬', rarity: 3, desc: '방어·보호막 무시',          fx: { pierce: true } },
+  rChain:  { id: 'rChain',  name: '연쇄의 룬', rarity: 3, desc: '적중 시 다른 스킬 쿨다운 -1', fx: { cdrOnHit: 1 } },
+  // 4★ — 유일급 (시트: 상위 희귀 룬 포지션)
+  rDoom:   { id: 'rDoom',   name: '파멸의 룬', rarity: 4, desc: '위력 +65%, 쿨다운 2배(최소 2)', fx: { powerPct: 65, cdMult: 2 } },
+  rKing:   { id: 'rKing',   name: '군주의 룬', rarity: 4, desc: '위력 +20%, 쿨다운 -1, 치명 +8%', fx: { powerPct: 20, cdAdd: -1, critBonus: 8 } },
+  rDawn:   { id: 'rDawn',   name: '여명의 룬', rarity: 4, desc: '사용 시 HP 15 회복 + 보호막 +15', fx: { heal: 15, barrierGain: 15 } },
+};
+export const getBuriedRune = (id) => BURIED_RUNES[id] || null;
+
+// 룬 드랍 굴림 — 등급 가중치(운이 상위 등급을 밀어 올린다) → 등급 내 균등
+export function rollBuriedRune(luck = 0) {
+  const w = { 1: 54, 2: 30, 3: 13 + luck, 4: 3 + luck / 2 };
+  const total = w[1] + w[2] + w[3] + w[4];
+  let roll = Math.random() * total;
+  let rarity = 1;
+  for (const r of [1, 2, 3, 4]) { roll -= w[r]; if (roll <= 0) { rarity = r; break; } }
+  const pool = Object.values(BURIED_RUNES).filter(x => x.rarity === rarity);
+  return pick(pool).id;
+}
+
+// 소켓 각인 (순수 함수) — 성공 시 주머니에서 제거 + 장비에 영구 각인
+export function socketBuriedRune(char, runeIdx, slot) {
+  const runeId = (char.runes || [])[runeIdx];
+  const rune = getBuriedRune(runeId);
+  const item = char.equipped?.[slot];
+  if (!rune || !item) return { char, text: '각인할 수 없다.' };
+  if (item.rune) return { char, text: '이미 룬이 각인된 장비다 — 소켓은 장비당 1칸.' };
+  const runes = (char.runes || []).filter((_, i) => i !== runeIdx);
+  const next = { ...char, runes, equipped: { ...char.equipped, [slot]: { ...item, rune: runeId } } };
+  return { char: next, text: `${item.name}에 「${rune.name}」 각인 — ${rune.desc}` };
 }
 
 // =========================================================

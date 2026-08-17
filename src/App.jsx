@@ -507,6 +507,8 @@ export default function App() {
     // 저주 「레라지에」 — 처치마다 최대 HP -1% (런 한정, 최대 -50%)
     if ((c.curses || []).includes('leraje')) c = { ...c, curseHpLossPct: Math.min(50, (c.curseHpLossPct || 0) + 1) };
     for (const it of (res.drops || [])) c = addBuriedItemToChar(c, it).char;
+    // ᚱ 룬 획득 (1.123.0) — 주머니에 쌓고, 각인은 장비 화면에서
+    if (res.rune) c = { ...c, runes: [...(c.runes || []), res.rune] };
     // [u100] 수확자의 서 — 처치 시 75% 확률 무작위 스킬 레벨 +1 (전투 화면이 판정, 여기서 적용)
     if (res.skillLvUp) {
       const ids = buriedEquippedSkills(c).map(x => x.skill.id)
