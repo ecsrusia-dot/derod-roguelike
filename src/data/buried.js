@@ -378,6 +378,11 @@ export const BURIED_SKILLS = {
   fairyDust:   SK({ id: 'fairyDust',   name: '요정 가루',  slot: 'acc', line: null, gear: '요정의 병',   sp: 12, cd: 2, apply: [{ s: 'confuse', n: 1, p: 100 }, { s: 'weaken', n: 1, p: 100 }], desc: '[혼란] 1 + [약화] 1' }),
   dragonFang:  SK({ id: 'dragonFang',  name: '용아',       slot: 'acc', line: null, gear: '용아 목걸이', sp: 24, cd: 2, stat: 'str', power: 128, selfDmg: 8, desc: '용의 이빨로 문다. 자해 8' }),
 };
+// ⚡ 신속 (1.136.0) — 데미지·회복이 없고 SP 순증도 아닌 순수 버프·디버프 스킬은
+// 턴을 소모하지 않는다 (전투에서 턴당 1회). 데이터에서 자동 파생 — 신규 스킬도 규칙만 지키면 자동 적용.
+for (const s of Object.values(BURIED_SKILLS)) {
+  if (!s.power && !s.heal && (s.spGain || 0) <= (s.sp || 0)) s.swift = true;
+}
 export const BURIED_SKILL_LIST = Object.values(BURIED_SKILLS);
 
 // 기본 공격 — 장비가 없어도 항상 사용 가능 (SP 0, 사용 시 SP 회복)
@@ -2272,6 +2277,7 @@ export function buriedSkillEffectLines(skill) {
   if (!skill) return [];
   const lines = [];
   const push = (text, color = null) => lines.push({ text, color });
+  if (skill.swift) push('⚡ 신속 — 사용해도 턴을 소모하지 않는다 (턴당 1회)', '#e8c8a0');
   if (skill.power) {
     if (skill.hits > 1) push(`${skill.hits}회 연속 타격 — 타격마다 위력 ${skill.power}% 적용`);
     if (skill.pierce) push('방어 무시 — 적 방어력을 계산하지 않는다');
