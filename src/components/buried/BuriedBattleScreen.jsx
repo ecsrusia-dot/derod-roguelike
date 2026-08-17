@@ -26,7 +26,7 @@ import {
   buriedUniqueIds, getBuriedUnique, rollBuriedUniqueDrop, BURIED_UNDEAD_KEYS,
   buriedModdedSkill, hasBuriedCurse, aggregateBuriedContracts, buriedLootPower, buriedRaceFx,
   rollBuriedRune, getBuriedRune, BURIED_RUNE_RARITIES,
-  buriedUniqueFx,
+  buriedUniqueFx, buriedKeystoneFx, buriedKeystoneBonus, getBuriedKeystone,
 } from '../../data.js';
 import { BuriedBar, BuriedStatusRow, BuriedItemCard, slotMeta, SkillKindBadge, BuriedInfoModal } from './BuriedCommon.jsx';
 
@@ -52,10 +52,11 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
   const pf = char.partsFx || {};
   const rf = buriedRaceFx(char); // 1.122.0 — 종족 fx
   const ufx = buriedUniqueFx(char); // 1.127.0 — 전설무구 선언형 fx
+  const kf = buriedKeystoneFx(char); // 1.128.0 — ⚓ 쐐기석 (자가 디버프)
   // ===== 던전 고유 기믹 (1.114.0) — flood(침수): 도트 ×1.5·회복 -25% 양쪽 / dark(어둠): 적 수치 은폐
   const gimmickId = dungeon.gimmick?.id || null;
   // [da1] 심연의 눈 / 특성 「공허시」 — 어둠을 꿰뚫는다 (수치 은폐 무효)
-  const darkBlind = gimmickId === 'dark' && !buriedUniqueIds(char).includes('da1') && !traits.includes('voidsight');
+  const darkBlind = (gimmickId === 'dark' || buriedKeystoneFx(char).darkAll) && !buriedUniqueIds(char).includes('da1') && !traits.includes('voidsight');
   // [da2] 어둠에 벼린 칼 ×2 / 특성 「공허시」 ×1.5 — 매 전투 첫 공격 (1회 소비)
   const firstStrikeRef = useRef(true);
   // 스킬 단계 보정 — [u113] 쿨 0 / [u101] 쿨 상한 1 / [u99] 레벨당 위력 +2% / [u94] 2회 시전·위력 절반
@@ -95,8 +96,9 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     hp: char.hp, maxHp: d.maxHp,
     sp: Math.round(d.maxSp * (uniques.includes('u106') ? 1
       : 0.55 + (aggregateBuriedContracts(char).startSpPct || 0) / 100 + (traits.includes('pathfinder') ? 0.25 : 0))), maxSp: d.maxSp,
-    barrier: hasBuriedCurse(char, 'alloces') ? 0
+    barrier: hasBuriedCurse(char, 'alloces') || kf.noBarrier ? 0
       : Math.round(((d.barrier || 0) + (env.self.barrierAdd || 0) + (char.carryBarrier || 0)) * (hasBuriedCurse(char, 'amon') ? 0.5 : 1)),
+    noDodge: !!kf.noDodge, noCrit: !!kf.noCrit,
     // [u107] 물리·기교 += 최대 HP 8% / [u111] 마법 += 보호막 30%
     atk: d.atk + (uniques.includes('u107') ? Math.round(d.maxHp * 0.08) : 0) + (char.researchPower || 0),
     fin: d.fin + (uniques.includes('u107') ? Math.round(d.maxHp * 0.08) : 0) + (char.researchPower || 0),
@@ -120,12 +122,12 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
             if (uniques.includes('dl3') && (char.offers || []).length >= 3) init.rage = (init.rage || 0) + 2;
             return init;
           })() : {},
-      char.pendingStatuses || []
+      [...(char.pendingStatuses || []), ...(kf.startConfuse ? [{ s: 'confuse', n: kf.startConfuse }] : [])]
     ),
     cds: {}, reflect: 0, reflectTurns: 0,
     // [u21] 모리건 — 주고받는 피해 절반 / [u52] 결전 — 받는 피해 +15
     envDmgPct: (env.self.dmgPct || 0) + (uniques.includes('u21') ? -50 : 0),
-    envTakenPct: (env.self.takenPct || 0) + (uniques.includes('u21') ? -50 : 0) + (uniques.includes('u52') ? 15 : 0) + (ufx.takenPct || 0),
+    envTakenPct: (env.self.takenPct || 0) + (uniques.includes('u21') ? -50 : 0) + (uniques.includes('u52') ? 15 : 0) + (ufx.takenPct || 0) + (kf.takenPct || 0),
     envCritAdd: env.self.critAdd || 0, envMagPct: env.self.magPct || 0,
     envDodgeAdd: env.self.dodgeAdd || 0,
   }));
@@ -156,6 +158,10 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
   const [log, setLog] = useState(() => {
     const init = [{ t: `${enemy.name} (Lv.${enemy.lv || 1})이(가) 길을 막아섰다.`, c: PALETTE.textDim }];
     if (enemy.eliteFx) init.push({ t: `☠ 변형 「${enemy.eliteFx.name}」 — ${enemy.eliteFx.desc}`, c: enemy.eliteFx.color || PALETTE.accent });
+    for (const kid of char.keystones || []) {
+      const k = getBuriedKeystone(kid);
+      if (k) init.push({ t: `⚓ ${k.name} — ${k.desc}`, c: PALETTE.twilight });
+    }
     if (floorFx) init.push({ t: `★ ${floorFx.name} — ${floorFx.desc}`, c: PALETTE.legendary });
     if (roomFx) init.push({ t: `${roomFx.both ? '◆' : '◇'} ${roomFx.name} — ${roomFx.desc}`, c: BURIED_ROOM_COLORS[roomFx.color]?.color || PALETTE.dawn });
     return init;
@@ -236,6 +242,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
   // [u8] 미카엘 — 회복량만큼 적 피해 (healedRef에 누적, 각 처리 지점에서 정산)
   const healedRef = useRef(0);
   const applyHeal = (P, base) => {
+    if (kf.noHeal) return 0; // ⚓ 고행의 쐐기 — 전투 중 회복 봉인
     const h = healAmount(P, base, true);
     if (h <= 0) return 0;
     P.hp = Math.min(P.maxHp, P.hp + h);
@@ -280,16 +287,16 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
   const finish = (win, finalHp) => {
     if (win) {
       // [u112] 전당의 휘장 — 승리 골드 +50%
-      const goldMult = dungeon.goldMult * (1 + (env.meta.goldPct || 0) / 100) * (uq('u112') ? 1.5 : 1) * (uq('u27') ? 3 : 1) * (uq('dc4') ? 1.5 : 1) * (1 + ((cf.goldPct || 0) + (pf.goldPct || 0) + (rf.goldPct || 0) + (ufx.goldPct || 0)) / 100);
+      const goldMult = dungeon.goldMult * (1 + (env.meta.goldPct || 0) / 100) * (uq('u112') ? 1.5 : 1) * (uq('u27') ? 3 : 1) * (uq('dc4') ? 1.5 : 1) * (1 + ((cf.goldPct || 0) + (pf.goldPct || 0) + (rf.goldPct || 0) + (ufx.goldPct || 0) + buriedKeystoneBonus(char).rewardPct) / 100);
       const gold = Math.round(rnd(enemy.gold[0], enemy.gold[1]) * goldMult);
-      const exp = Math.round(enemy.exp * dungeon.expMult * (uq('u40') ? 2 : 1) * (1 + ((cf.expPct || 0) + (pf.expPct || 0) + (rf.expPct || 0) + (ufx.expPct || 0)) / 100));
+      const exp = Math.round(enemy.exp * dungeon.expMult * (uq('u40') ? 2 : 1) * (1 + ((cf.expPct || 0) + (pf.expPct || 0) + (rf.expPct || 0) + (ufx.expPct || 0) + buriedKeystoneBonus(char).rewardPct) / 100));
       const bossy = roomType === 'boss' || roomType === 'calamity';
       // 1.120.0 — 층계 수문장 (100층 단위): 유니크 확정 + 드랍 운 대폭
       const guardianFight = roomType === 'boss' && (char.floor || 1) % 100 === 0;
       // [dl4] 유산 도굴사 — 드랍 확률 +20%p
       const dropChance = bossy || roomType === 'elite' ? 100 : Math.min(100, 38 + (uq('dl4') ? 20 : 0));
       const drops = [];
-      const luck = dungeon.dropLuck + (cf.dropLuck || 0) + (pf.dropLuck || 0) + (rf.dropLuck || 0) + (ufx.dropLuck || 0) + (guardianFight ? 12 : bossy ? 6 : roomType === 'elite' ? 3 : 0);
+      const luck = dungeon.dropLuck + (cf.dropLuck || 0) + (pf.dropLuck || 0) + (rf.dropLuck || 0) + (ufx.dropLuck || 0) + buriedKeystoneBonus(char).luck + (guardianFight ? 12 : bossy ? 6 : roomType === 'elite' ? 3 : 0);
       const lootPower = buriedLootPower(char); // 1.121.0 — 깊이 위력 배율 (시작 장비와 같은 저울)
       if (Math.random() * 100 < dropChance) {
         const it = rollBuriedItem({ slot: null, classId: char.classId, floor: enemy.lv || char.floor, luck, powerMult: lootPower });
@@ -532,7 +539,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
       if (h > 0) { pushFloat('player', `+${h}`, PALETTE.green); pushLog(`HP ${h} 회복`, PALETTE.green); }
       else pushLog('회복이 봉쇄되어 있다.', PALETTE.textDim);
     }
-    if (skill && skill.barrierGain) {
+    if (skill && skill.barrierGain && !kf.noBarrier) {
       P.barrier = (P.barrier || 0) + skill.barrierGain;
       pushFloat('player', `🔷+${skill.barrierGain}`, PALETTE.ice);
       pushLog(`보호막 +${skill.barrierGain}`, PALETTE.ice);
@@ -798,6 +805,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
 
   // 물약 — 턴을 소모하지 않지만 한 턴에 하나만
   const usePotion = () => {
+    if (kf.noPotion) { pushLog('🚱 금주의 쐐기 — 물약이 재로 변한다.', PALETTE.textDim); return; }
     if (busy || result || potions <= 0 || potionUsedThisTurn) return;
     if (cs('malphas')) { pushLog('말파스의 저주 — 물약이 목을 넘어가지 않는다.', '#c9a86a'); return; }
     const P = { ...player };
@@ -937,7 +945,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
             <div className="text-[11px] tabular-nums" style={{ color: PALETTE.ice }}>SP 0 → +{BURIED_BASIC.spGain} · 최고 스탯 참조</div>
           </button>
 
-          <button onClick={usePotion} disabled={busy || !!result || potions <= 0 || potionUsedThisTurn}
+          <button onClick={usePotion} disabled={busy || !!result || potions <= 0 || potionUsedThisTurn || kf.noPotion}
             className="ui-press px-2.5 py-2 text-left"
             style={{
               borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panel,
@@ -953,7 +961,8 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
           {/* 장착 장비 6칸 = 스킬 6개 (스킬 레벨 반영) */}
           {equipped.map(({ slot, item, skill }) => {
             const lv = Math.min(8, buriedSkillLv(char, skill.id) + (uq('u71') ? 1 : 0)); // [u71] 후손
-            const eff = applyUniqueSkillMods(buriedModdedSkill(buriedSkillAt(skill, lv), item.mod, item.rune));
+            const eff0 = applyUniqueSkillMods(buriedModdedSkill(buriedSkillAt(skill, lv), item.mod, item.rune));
+            const eff = kf.cdAdd ? { ...eff0, cd: (eff0.cd || 0) + kf.cdAdd } : eff0; // ⚓ 정체의 쐐기
             const cd = player.cds[eff.id] || 0;
             const spCost = Math.round(eff.sp * (1 + (env.self.spCostPct || 0) / 100));
             const noSp = spCost > player.sp;

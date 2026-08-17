@@ -13,6 +13,7 @@ import {
   BURIED_SKILL_MAX_LV,
   BURIED_SLOTS, BURIED_FORGE,
   buriedForgeLevel,
+  BURIED_KEYSTONES, BURIED_KEYSTONE_MAX, getBuriedKeystone,
   BURIED_CONTRACTS, BURIED_CONTRACT_COST, BURIED_CONTRACT_CARRY, getBuriedContract,
   buriedDerived, buriedExpToNext, getBuriedClass, getBuriedDungeon,
   buriedTraitIds, getBuriedTrait, buriedMonsterLevel,
@@ -38,6 +39,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
   const [wizStep, setWizStep] = useState(1); // 1 던전 → 2 시작 층 → 3 종족 → 4 직업 → 5 최종
   const [pickClass, setPickClass] = useState(BURIED_CLASSES[0].id);
   const [pickRace, setPickRace] = useState('human'); // 1.122.0 — 종족 축
+  const [pickKeystones, setPickKeystones] = useState([]); // 1.128.0 — ⚓ 쐐기석 (정복 던전만)
   const [pickDungeon, setPickDungeon] = useState(unlockedDungeons[unlockedDungeons.length - 1] || 'labyrinth');
   const [pickStart, setPickStart] = useState(1);
   const [carryPicks, setCarryPicks] = useState([]);
@@ -63,18 +65,23 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
   const killsByEnemy = b.killsByEnemy || {};
   const isDungeonUnlocked = (dg) => unlockedDungeons.includes(dg.id);
   const checkpoints = buriedCheckpointFloors(b.deepestByDungeon?.[pickDungeon] || 0);
+  const dungeonConquered = (b.clears?.[pickDungeon] || 0) > 0; // ⚓ 쐐기석 개방 조건
+  const toggleKeystone = (id) => setPickKeystones(p =>
+    p.includes(id) ? p.filter(x => x !== id) : (p.length < BURIED_KEYSTONE_MAX ? [...p, id] : p));
 
   // 위저드 이동 — 체크포인트 없는 던전은 층 단계 자동 스킵
   const wizNext = () => {
     if (wizStep === 1 && checkpoints.length === 0) { setWizStep(3); return; }
-    setWizStep(st => Math.min(5, st + 1));
+    if (wizStep === 4 && !dungeonConquered) { setWizStep(6); return; } // ⚓ 미정복 던전은 쐐기 단계 스킵
+    setWizStep(st => Math.min(6, st + 1));
   };
   const wizPrev = () => {
     if (wizStep === 3 && checkpoints.length === 0) { setWizStep(1); return; }
+    if (wizStep === 6 && !dungeonConquered) { setWizStep(4); return; }
     if (wizStep === 1) { setView('home'); return; }
     setWizStep(st => st - 1);
   };
-  const openWizard = () => { setWizStep(1); setPickStart(1); setCarryPicks([]); setView('wizard'); };
+  const openWizard = () => { setWizStep(1); setPickStart(1); setCarryPicks([]); setPickKeystones([]); setView('wizard'); };
 
   // ===== 공용 부품 =====
   const SectionTitle = ({ children, color = PALETTE.dawn }) => (
@@ -212,7 +219,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
   // ============================================
   // 출정 위저드 (4단계)
   // ============================================
-  const WIZ_STEPS = ['던전', '시작 층', '종족', '직업', '최종 확인'];
+  const WIZ_STEPS = ['던전', '시작 층', '종족', '직업', '쐐기석', '최종 확인'];
   const renderWizard = () => (
     <>
       <div className="px-3 pt-5 pb-3 border-b" style={{ borderColor: PALETTE.panelBorder }}>
@@ -393,7 +400,46 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
         )}
 
         {/* ── 5. 최종 확인 ── */}
-        {wizStep === 5 && (() => {
+        {wizStep === 5 && (
+          <div className="space-y-2">
+            <div className="text-[11px] leading-relaxed px-1" style={{ color: PALETTE.textDim }}>
+              ⚓ <b style={{ color: PALETTE.twilight }}>쐐기석</b> — 스스로 박는 저주. 채택한 쐐기 포인트(★)만큼
+              <b style={{ color: PALETTE.legendary }}> 골드·경험치·먼지 +12%/P</b>, P 3마다 드랍 운 +1.
+              최대 {BURIED_KEYSTONE_MAX}개. 안 박아도 된다.
+            </div>
+            {BURIED_KEYSTONES.map(k => {
+              const on = pickKeystones.includes(k.id);
+              const full = !on && pickKeystones.length >= BURIED_KEYSTONE_MAX;
+              return (
+                <button key={k.id} onClick={() => toggleKeystone(k.id)} disabled={full}
+                  className="ui-press w-full flex items-center gap-2.5 px-3 py-2.5 text-left"
+                  style={{
+                    borderRadius: R.btn, background: on ? PALETTE.panelLight : PALETTE.panel,
+                    border: `1px solid ${on ? PALETTE.twilight : PALETTE.panelBorder}`, opacity: full ? 0.45 : 1,
+                  }}>
+                  <span className="text-[15px]">{k.icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[12px] font-bold" style={{ color: on ? PALETTE.twilight : PALETTE.text }}>
+                      {k.name} <span style={{ color: PALETTE.legendary }}>{'★'.repeat(k.pts)}</span>
+                    </div>
+                    <div className="text-[11px] break-keep leading-relaxed" style={{ color: PALETTE.textDim }}>{k.desc}</div>
+                  </div>
+                  {on && <span className="text-[12px] shrink-0" style={{ color: PALETTE.twilight }}>박음</span>}
+                </button>
+              );
+            })}
+            {pickKeystones.length > 0 && (() => {
+              const pts = pickKeystones.reduce((s, id) => s + (getBuriedKeystone(id)?.pts || 0), 0);
+              return (
+                <div className="px-3 py-2 text-[12px]" style={{ borderRadius: R.chip, background: `${PALETTE.legendary}14`, border: `1px solid ${PALETTE.legendary}55`, color: PALETTE.legendary }}>
+                  ⚓ {pts}P — 골드·경험치·먼지 +{pts * 12}%{Math.floor(pts / 3) > 0 ? ` · 드랍 운 +${Math.floor(pts / 3)}` : ''}
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {wizStep === 6 && (() => {
           const dg = getBuriedDungeon(pickDungeon);
           const c = getBuriedClass(pickClass);
           return (
@@ -403,6 +449,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
                 <div className="flex justify-between text-[12px]"><span style={{ color: PALETTE.textDim }}>던전</span><span style={{ color: dg.color }}>{dg.gimmick?.icon} {dg.name}</span></div>
                 <div className="flex justify-between text-[12px]"><span style={{ color: PALETTE.textDim }}>시작 층</span><span style={{ color: PALETTE.text }}>{pickStart > 1 ? `${pickStart + 1}층 (${pickStart}층 관문 너머)` : '1층'}</span></div>
                 <div className="flex justify-between text-[12px]"><span style={{ color: PALETTE.textDim }}>종족</span><span style={{ color: getBuriedRace(pickRace)?.color }}>{getBuriedRace(pickRace)?.icon} {getBuriedRace(pickRace)?.name}</span></div>
+                <div className="flex justify-between text-[12px]"><span style={{ color: PALETTE.textDim }}>쐐기석</span><span style={{ color: PALETTE.twilight }}>{pickKeystones.length > 0 ? pickKeystones.map(id => getBuriedKeystone(id)?.icon).join(' ') : '없음'}</span></div>
                 <div className="flex justify-between text-[12px]"><span style={{ color: PALETTE.textDim }}>직업</span><span style={{ color: c?.color }}>{c?.name}</span></div>
                 {(b.legacyGold || 0) > 0 && <div className="flex justify-between text-[12px]"><span style={{ color: PALETTE.textDim }}>계승 골드</span><span style={{ color: PALETTE.legendary }}>🪙 {b.legacyGold}</span></div>}
                 {earnedDepthTraits.length > 0 && (
@@ -439,7 +486,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
                 </div>
               )}
 
-              <button onClick={() => onStartChar(pickClass, pickDungeon, carryPicks, pickStart > 1 ? pickStart + 1 : 1, pickRace)}
+              <button onClick={() => onStartChar(pickClass, pickDungeon, carryPicks, pickStart > 1 ? pickStart + 1 : 1, pickRace, pickKeystones)}
                 className="ui-press ui-sheen w-full py-3.5 text-[14px] font-bold"
                 style={{ borderRadius: R.btn, background: PALETTE.accent, color: '#fff' }}>
                 ⚰ {dg.name} {pickStart > 1 ? pickStart + 1 : 1}층으로 내려간다
@@ -450,7 +497,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
       </div>
 
       {/* 위저드 하단 다음 버튼 (1~3단계) */}
-      {wizStep < 5 && (
+      {wizStep < 6 && (
         <div className="px-3 pb-4 pt-2">
           <button onClick={wizNext} className="ui-press w-full py-3 text-[13px] font-bold"
             style={{ borderRadius: R.btn, background: PALETTE.panelLight, color: PALETTE.legendary, border: `1px solid ${PALETTE.legendary}66` }}>

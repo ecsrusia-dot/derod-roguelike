@@ -16,6 +16,7 @@ import { PALETTE } from '../../utils/helpers.js';
 import {
   BURIED_ROOMS, BURIED_SLOT_IDS, BURIED_ROOM_COLORS,
   BURIED_ALTAR_BOONS, buriedBoonCost, buriedShopRerollCost,
+  buriedKeystoneFx,
   BURIED_POTION_HEAL_PCT, buriedPotionPrice, BURIED_SKILL_MAX_LV,
   buriedDerived, buriedExpToNext,
   getBuriedClass, getBuriedTier, getBuriedDungeon, buriedMonsterLevel,
@@ -151,6 +152,8 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
   };
 
   const shrineHeal = () => {
+    const kf = buriedKeystoneFx(char);
+    if (kf.noCampHeal || kf.noHeal) { setNotice('⚓ 쐐기의 저주 — 제단의 빛이 닿지 않는다.'); return; }
     if (hasBuriedCurse(char, 'gremory')) { setNotice('그레모리의 저주 — 제단의 빛이 닿지 않는다.'); return; }
     const amount = Math.round(d.maxHp * 0.6 * (1 + (aggregateBuriedContracts(char).campPct || 0) / 100));
     onUpdateChar({ ...char, hp: Math.min(d.maxHp, char.hp + amount) }, 0);
@@ -190,6 +193,13 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
   };
 
   const rest = () => {
+    const kfR = buriedKeystoneFx(char);
+    if (kfR.noCampHeal || kfR.noHeal) {
+      // 회복만 봉인 — 물약 제작은 유지 (방이 헛걸음이 되지 않게)
+      onUpdateChar({ ...char, potions: (char.potions || 0) + 1 }, 0);
+      setNotice('⚓ 쐐기의 저주 — 잠들어도 상처가 아물지 않는다. 물약만 하나 만들었다.');
+      return;
+    }
     if (hasBuriedCurse(char, 'gremory')) {
       onUpdateChar({ ...char, potions: (char.potions || 0) + 1 }, 0);
       setNotice('그레모리의 저주 — 잠들지 못했다. 물약만 하나 만들었다.');
