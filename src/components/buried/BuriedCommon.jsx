@@ -29,7 +29,8 @@ const SKILL_KIND = {
 };
 export function skillKindMeta(skill) {
   if (!skill) return null;
-  if (skill.swift) return SKILL_KIND.swift;
+  // 1.138.0 — 신속 공격 스킬은 공격 계열 배지 유지 (⚡ 표기는 버튼·설명 라인이 담당)
+  if (skill.swift && !skill.power) return SKILL_KIND.swift;
   if (!skill.power) return SKILL_KIND.none;
   return skill.stat ? (SKILL_KIND[skill.stat] || SKILL_KIND.str) : SKILL_KIND.any;
 }
