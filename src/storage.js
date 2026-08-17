@@ -1456,6 +1456,12 @@ const EMPTY_BURIED = {
   parts: [],        // 1.112.0~ 연구실 부품 id 목록 (영구, 최대 5칸)
   deepestByDungeon: {}, // 1.113.0~ 던전별 최고 도달 층 (무한층 기록)
 };
+// 1.131.1 — 무덤의 유산 전체 초기화 (PM 요청: 업데이트를 처음부터 온전히 체험).
+// meta.buried만 백지화 — 본편·레이드·HOF 등 다른 메타는 건드리지 않는다.
+export function resetBuried(meta) {
+  return { ...meta, buried: { ...EMPTY_BURIED } };
+}
+
 export function getBuried(meta) {
   const b = meta?.buried || EMPTY_BURIED;
   return {

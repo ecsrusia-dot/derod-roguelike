@@ -28,7 +28,7 @@ import BuriedManage from './BuriedManage.jsx';
 
 const R = { chip: 'var(--r-chip, 8px)', btn: 'var(--r-btn, 13px)', panel: 'var(--r-panel, 18px)' };
 
-export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateChar, onRetire, onForge, onBuyContract, onBuyPart, onDetachParts, forgeNotice, onBack }) {
+export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateChar, onRetire, onForge, onBuyContract, onBuyPart, onDetachParts, onResetAll, forgeNotice, onBack }) {
   const b = meta?.buried || {};
   const char = b.char || null;
   const clears = (b.clears && typeof b.clears === 'object') ? b.clears : {};
@@ -47,6 +47,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
   const [carryPicks, setCarryPicks] = useState([]);
   const [manage, setManage] = useState(false);
   const [confirmRetire, setConfirmRetire] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(0); // 1.131.1 — 전체 초기화 2단 확인 (0 없음/1 1차/2 최종)
   const [forgeSlot, setForgeSlot] = useState('weapon');
 
   const ownedContracts = b.contracts || [];
@@ -722,6 +723,36 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
             죽으면 장비는 전부 🕯먼지로 정산되고 골드는 사라진다.
           </div>
           <BuriedTierLegend />
+        </div>
+
+        {/* ⚠ 전체 초기화 (1.131.1) — 업데이트를 처음부터 온전히 체험하고 싶을 때 */}
+        <div className="px-3 py-2.5 space-y-2" style={{ borderRadius: R.panel, background: `${PALETTE.accent}0d`, border: `1px solid ${PALETTE.accent}44` }}>
+          <div className="text-[11px] tracking-[0.2em]" style={{ color: PALETTE.accent }}>⚠ 위험 구역</div>
+          {confirmReset === 0 && (
+            <button onClick={() => setConfirmReset(1)} className="ui-press w-full py-2.5 text-[12px] font-bold"
+              style={{ borderRadius: R.btn, background: PALETTE.panel, border: `1px solid ${PALETTE.accent}66`, color: PALETTE.accent }}>
+              무덤의 유산 플레이 이력 전체 초기화
+            </button>
+          )}
+          {confirmReset === 1 && (
+            <>
+              <div className="text-[11px] leading-relaxed" style={{ color: PALETTE.textDim }}>
+                정말 지울까? <b style={{ color: PALETTE.accent }}>진행 중 캐릭터 · 던전 정복 · 체크포인트 · 해금 직업(전직/조우/심층) ·
+                🕯먼지 · ☠조각 · 마의 계약 · 연구실 부품</b>이 전부 사라지고 첫 시작 상태로 돌아간다.
+                본편·레이드·명예의 전당에는 영향 없다. <b style={{ color: PALETTE.accent }}>되돌릴 수 없다.</b>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => setConfirmReset(0)} className="ui-press flex-1 py-2.5 text-[12px]"
+                  style={{ borderRadius: R.btn, background: PALETTE.panelLight, border: `1px solid ${PALETTE.panelBorder}`, color: PALETTE.text }}>
+                  취소
+                </button>
+                <button onClick={() => { setConfirmReset(0); setView('home'); onResetAll?.(); }} className="ui-press flex-1 py-2.5 text-[12px] font-bold"
+                  style={{ borderRadius: R.btn, background: PALETTE.accent, color: '#fff' }}>
+                  전부 지우고 처음부터
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </>
