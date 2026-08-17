@@ -512,6 +512,14 @@ export default function App() {
       pendingStatuses: null, // 1.107.0 — 이벤트 함정의 지연 상태이상은 1회 적용 후 소거
       carryBarrier: res.carryBarrier || 0, // [u6] 달인 — 남은 보호막을 다음 전투로
     };
+    // 1.132.0 — 전투에서 쓴 스킬 사용 횟수 정산 (소진 시 봉인 — 새 장비를 주워야 해제)
+    if (res.usesSpent && Object.keys(res.usesSpent).length > 0) {
+      const eq = { ...c.equipped };
+      for (const [slot, n] of Object.entries(res.usesSpent)) {
+        if (eq[slot]) eq[slot] = { ...eq[slot], usesSpent: (eq[slot].usesSpent || 0) + n };
+      }
+      c = { ...c, equipped: eq };
+    }
     // [u36] 비전 — 처치마다 모든 공격력 +2 (런 영구)
     if (res.research) c = { ...c, researchPower: (c.researchPower || 0) + res.research };
     // 저주 「레라지에」 — 처치마다 최대 HP -1% (런 한정, 최대 -50%)
