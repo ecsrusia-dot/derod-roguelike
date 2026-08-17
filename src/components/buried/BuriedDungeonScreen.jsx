@@ -45,7 +45,10 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onLogEvent, on
   const [manage, setManage] = useState(false);
   const [notice, setNotice] = useState(null);
   const [resupplyOpen, setResupplyOpen] = useState(false); // 1.133.0 — 보충의 봉헌 슬롯 지정 피커
+<<<<<<< HEAD
   const [eventLogOpen, setEventLogOpen] = useState(false); // 1.134.0 — 이벤트 지난 기록 모달
+=======
+>>>>>>> origin/main
 
   // 이번 층의 방 선택지가 없으면 생성 (새로고침 후에도 그대로 이어진다).
   // 1.117.0 — 첫 층에도 [dl1] 실타래 / 「길잡이」 선택지 +1 적용 (advance와 동일 규칙)
