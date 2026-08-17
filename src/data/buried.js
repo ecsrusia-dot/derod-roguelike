@@ -1962,7 +1962,6 @@ export function rechargeBuriedRandomSlot(char) {
   const slot = cands[Math.floor(Math.random() * cands.length)];
   return { char: rechargeBuriedSlot(char, slot), item: char.equipped[slot] };
 }
-<<<<<<< HEAD
 
 // =========================================================
 // ⛓ 장비 파손 (1.134.0) — PM 지시: 어떤 효과로도 막을 수 없다
@@ -2003,8 +2002,6 @@ export function buriedBreakIn(char, slot) {
   const from = it.depletedAt != null ? it.depletedAt : (char.floor || 1);
   return Math.max(0, BURIED_BREAK_GRACE - ((char.floor || 1) - from));
 }
-=======
->>>>>>> origin/main
 
 // 장비 획득 시 스킬 레벨 상승 (이미 만렙이면 그대로)
 export function raiseBuriedSkill(char, skillId) {
