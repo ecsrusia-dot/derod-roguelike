@@ -446,6 +446,8 @@ export const BURIED_ALTAR_BOONS = [
     desc: '다음 전투 시작 시 [재생] 5 + [수호] 3을 얻는다' },
   { id: 'cleanse', icon: '🕯', name: '정화의 봉헌', costBase: 170,
     desc: '짊어진 저주 1개를 무작위로 해제한다' },
+  { id: 'resupply', icon: '🔧', name: '보충의 봉헌', costBase: 130,
+    desc: '모든 스킬의 사용 횟수를 만충한다' },
 ];
 export const buriedBoonCost = (boon, monLevel = 1) =>
   Math.round(boon.costBase * (1 + Math.max(0, (monLevel || 1) - 1) * 0.1));
@@ -1866,32 +1868,83 @@ export function buriedSkillRank(skill) {
 //   - Lv.3   : 부여 상태이상 +1스택 (비공격기는 자기 강화 +1), SP -2
 //   - Lv.8   : 위력 +10% 추가, 추격 피해 +20%, 상태이상 +1스택 더
 // 스킬 데이터에 lv3 / lv8 오브젝트가 있으면 그쪽이 우선한다 (개별 개성 부여용).
+// 1.132.0 — 스킬 종류별 레벨 효과 (PM 지적: 공통 공식은 절반의 스킬에 무의미했음)
+//   공격기: 위력 +8%/Lv (상태이상 동반 시 +4%) · Lv.8 위력 +15%·추격 +20%
+//   상태이상·버프기: Lv.3·Lv.8 스택 +1씩
+//   회복·보호막기: +10%/Lv / SP기: 획득 +8%/Lv
+//   전 스킬 공통: Lv.3 SP -2, 최대 사용 횟수 +8%/Lv (buriedSkillMaxUses)
 export function buriedSkillAt(skill, lv = 1) {
   if (!skill) return skill;
   const L = Math.min(BURIED_SKILL_MAX_LV, Math.max(1, lv));
   if (L === 1) return skill;
   const out = { ...skill, lv: L };
-  let mult = 1 + (L - 1) * 0.07;
-  let stackBonus = 0;
-  if (L >= 3) { stackBonus += 1; out.sp = Math.max(0, skill.sp - 2); }
-  if (L >= 8) { mult += 0.10; stackBonus += 1; out.chaseBonusPct = (out.chaseBonusPct || 0) + 20; }
-  if (out.power) out.power = Math.round(skill.power * mult);
-  if (out.heal) out.heal = Math.round(skill.heal * mult);
-  if (out.barrierGain) out.barrierGain = Math.round(skill.barrierGain * mult);
-  if (stackBonus > 0) {
-    if (skill.apply) out.apply = skill.apply.map(a => ({ ...a, n: (a.n || 1) + stackBonus }));
-    if (skill.self) out.self = skill.self.map(a => ({ ...a, n: (a.n || 1) + stackBonus }));
+  const steps = L - 1;
+  const hasStatus = !!skill.apply;
+  if (out.power) {
+    const per = hasStatus ? 0.04 : 0.08;
+    out.power = Math.round(skill.power * (1 + steps * per + (L >= 8 && !hasStatus ? 0.15 : 0)));
+    if (L >= 8) out.chaseBonusPct = (out.chaseBonusPct || 0) + 20;
   }
+  const stack = (L >= 3 ? 1 : 0) + (L >= 8 ? 1 : 0);
+  if (stack > 0) {
+    if (skill.apply) out.apply = skill.apply.map(a => ({ ...a, n: (a.n || 1) + stack }));
+    if (skill.self) out.self = skill.self.map(a => ({ ...a, n: (a.n || 1) + stack }));
+  }
+  if (out.heal) out.heal = Math.round(skill.heal * (1 + steps * 0.10));
+  if (out.barrierGain) out.barrierGain = Math.round(skill.barrierGain * (1 + steps * 0.10));
+  if (out.spGain) out.spGain = Math.round(skill.spGain * (1 + steps * 0.08));
+  if (L >= 3) out.sp = Math.max(0, out.sp - 2);
   if (skill.lv3 && L >= 3) Object.assign(out, skill.lv3);
   if (skill.lv8 && L >= 8) Object.assign(out, skill.lv8);
   return out;
 }
-// Lv.3 / Lv.8에서 무엇이 열리는지 안내 문구 (UI 표시용)
+// Lv.3 / Lv.8에서 무엇이 열리는지 안내 문구 (UI 표시용) — 1.132.0 스킬 종류별
 export function buriedSkillLvNote(skill, lv) {
-  const notes = [];
-  notes.push(lv >= 3 ? '✓ Lv.3 — 상태이상 +1스택 · SP -2' : '· Lv.3 — 상태이상 +1스택 · SP -2');
-  notes.push(lv >= 8 ? '✓ Lv.8 — 위력 +10% · 추격 +20% · 상태이상 +1' : '· Lv.8 — 위력 +10% · 추격 +20% · 상태이상 +1');
-  return notes;
+  const hasStatus = !!skill?.apply, hasSelf = !!skill?.self;
+  const l3 = [hasStatus || hasSelf ? '스택 +1' : null, 'SP -2'].filter(Boolean).join(' · ');
+  const l8 = [
+    skill?.power ? (hasStatus ? '스택 +1' : '위력 +15% · 추격 +20%') : null,
+    !skill?.power && (hasStatus || hasSelf) ? '스택 +1' : null,
+  ].filter(Boolean).join(' · ') || '횟수 보너스';
+  return [
+    `${lv >= 3 ? '✓' : '·'} Lv.3 — ${l3}`,
+    `${lv >= 8 ? '✓' : '·'} Lv.8 — ${l8}`,
+    `· 레벨당 위력·회복 계열 강화 + 최대 사용 횟수 +8%`,
+  ];
+}
+
+// =========================================================
+// 스킬 사용 횟수 (1.132.0) — BB2 원작의 Remaining Uses
+// =========================================================
+// PM 결정: 빡빡하게(D30/C22/B15/A10) + 소진 시 스킬만 봉인(장비 스탯 유지).
+// 잔여 = 최대(등급·레벨) - item.usesSpent — 레벨이 오르면 최대가 늘어 잔여도 함께 늘어난다.
+// 구 세이브 장비는 usesSpent 없음 = 만충 (자연 호환). 기본 공격은 무제한.
+export const BURIED_SKILL_USES = { D: 30, C: 22, B: 15, A: 10 };
+export function buriedSkillMaxUses(skill, lv = 1) {
+  const base = BURIED_SKILL_USES[buriedSkillRank(skill)] || 30;
+  return Math.round(base * (1 + (Math.max(1, lv) - 1) * 0.08));
+}
+export function buriedSkillUsesLeft(char, slot) {
+  const item = char?.equipped?.[slot];
+  if (!item) return 0;
+  const skill = BURIED_SKILLS[item.skillId];
+  if (!skill) return 0;
+  const max = buriedSkillMaxUses(skill, buriedSkillLv(char, item.skillId));
+  return Math.max(0, max - (item.usesSpent || 0));
+}
+// 충전 (순수 함수) — pct 100 = 만충, 그 외엔 최대치의 pct%만큼 usesSpent 감소
+export function rechargeBuriedUses(char, pct = 100) {
+  if (!char) return char;
+  const equipped = { ...char.equipped };
+  for (const s of BURIED_SLOT_IDS) {
+    const it = equipped[s];
+    if (!it || !(it.usesSpent > 0)) continue;
+    if (pct >= 100) { equipped[s] = { ...it, usesSpent: 0 }; continue; }
+    const skill = BURIED_SKILLS[it.skillId];
+    const max = buriedSkillMaxUses(skill, buriedSkillLv(char, it.skillId));
+    equipped[s] = { ...it, usesSpent: Math.max(0, (it.usesSpent || 0) - Math.ceil(max * pct / 100)) };
+  }
+  return { ...char, equipped };
 }
 
 // 장비 획득 시 스킬 레벨 상승 (이미 만렙이면 그대로)

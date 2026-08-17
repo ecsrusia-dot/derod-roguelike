@@ -27,6 +27,7 @@ import {
   buriedModdedSkill, hasBuriedCurse, aggregateBuriedContracts, buriedLootPower, buriedRaceFx,
   rollBuriedRune, getBuriedRune, BURIED_RUNE_RARITIES,
   buriedUniqueFx, buriedKeystoneFx, buriedKeystoneBonus, getBuriedKeystone,
+  buriedSkillMaxUses,
 } from '../../data.js';
 import { BuriedBar, BuriedStatusRow, BuriedItemCard, slotMeta, SkillKindBadge, BuriedInfoModal } from './BuriedCommon.jsx';
 
@@ -184,6 +185,9 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
   const [result, setResult] = useState(null);
   const [floats, setFloats] = useState([]);
   const [potionUsedThisTurn, setPotionUsedThisTurn] = useState(false);
+  const [spentMap, setSpentMap] = useState({}); // 1.132.0 — 이번 전투에서 슬롯별 스킬 사용 횟수
+  const spentMapRef = useRef({});
+  useEffect(() => { spentMapRef.current = spentMap; }, [spentMap]);
   const [potions, setPotions] = useState(char.potions || 0);
   const [imgFailed, setImgFailed] = useState(false);
   const [detail, setDetail] = useState(null);
@@ -350,7 +354,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
       // [dc4] 바닥 없는 주머니 — 승리 시 최대 HP 8% 회복
       if (uq('dc4')) hp = Math.min(d.maxHp, hp + Math.round(d.maxHp * 0.08));
       setResult({
-        win: true, gold, exp, drops, rune: runeDrop,
+        win: true, gold, exp, drops, rune: runeDrop, usesSpent: spentMapRef.current,
         hp: cs('balam') ? 1 : hp, // 저주 「발람」 — 승리해도 HP 1
         potions,
         dustGain: dustGainRef.current,
@@ -364,8 +368,9 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
   };
 
   // ===== 라운드 진행 =====
-  const act = async (kind, payload) => {
+  const act = async (kind, payload, slotUsed = null) => {
     if (busy || result) return;
+    if (kind === 'skill' && slotUsed) setSpentMap(m => ({ ...m, [slotUsed]: (m[slotUsed] || 0) + 1 })); // 1.132.0 — 횟수 차감
     setBusy(true);
     let P = { ...player, statuses: { ...player.statuses }, cds: { ...player.cds } };
     let E = { ...foe, statuses: { ...foe.statuses } };
@@ -980,10 +985,13 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
             const cd = player.cds[eff.id] || 0;
             const spCost = Math.round(eff.sp * (1 + (env.self.spCostPct || 0) / 100));
             const noSp = spCost > player.sp;
-            const off = busy || !!result || cd > 0 || noSp || silenced;
+            // 1.132.0 — 사용 횟수: 잔여 0이면 봉인 (새 장비를 주워야 다시 쓴다)
+            const usesLeft = buriedSkillMaxUses(skill, lv) - (item.usesSpent || 0) - (spentMap[slot] || 0);
+            const sealed = usesLeft <= 0;
+            const off = busy || !!result || cd > 0 || noSp || silenced || sealed;
             const tier = getBuriedTier(item.tier);
             return (
-              <button key={slot} onClick={() => act('skill', eff)} disabled={off}
+              <button key={slot} onClick={() => act('skill', eff, slot)} disabled={off}
                 onContextMenu={(e) => { e.preventDefault(); setDetail({ item, skill: eff, slot, lv }); }}
                 className="ui-press px-2.5 py-2 text-left"
                 style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panel, border: `1px solid ${tier.color}66`, opacity: off ? 0.42 : 1 }}>
@@ -991,8 +999,8 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
                   <SkillKindBadge skill={eff} />
                   <span className="truncate">{eff.name}{lv > 1 && <span style={{ color: PALETTE.legendary }}> Lv.{lv}</span>}</span>
                 </div>
-                <div className="text-[11px] tabular-nums truncate" style={{ color: noSp ? PALETTE.accent : PALETTE.ice }}>
-                  SP {spCost}{cd > 0 ? ` · 쿨 ${cd}` : ''}{eff.power ? ` · ${eff.power}%${eff.hits ? `×${eff.hits}` : ''}` : ''}
+                <div className="text-[11px] tabular-nums truncate" style={{ color: sealed ? PALETTE.accent : noSp ? PALETTE.accent : PALETTE.ice }}>
+                  {sealed ? '⛓ 봉인 — 새 장비 필요' : `SP ${spCost}${cd > 0 ? ` · 쿨 ${cd}` : ''}${eff.power ? ` · ${eff.power}%${eff.hits ? `×${eff.hits}` : ''}` : ''} · 횟수 ${usesLeft}`}
                 </div>
                 <div className="text-[11px] truncate" style={{ color: PALETTE.textDim }}>{slotMeta(slot).icon} {eff.desc}</div>
               </button>

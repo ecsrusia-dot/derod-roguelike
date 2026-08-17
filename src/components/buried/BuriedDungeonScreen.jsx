@@ -17,6 +17,7 @@ import {
   BURIED_ROOMS, BURIED_SLOT_IDS, BURIED_ROOM_COLORS,
   BURIED_ALTAR_BOONS, buriedBoonCost, buriedShopRerollCost,
   buriedKeystoneFx,
+  rechargeBuriedUses,
   BURIED_POTION_HEAL_PCT, buriedPotionPrice, BURIED_SKILL_MAX_LV,
   buriedDerived, buriedExpToNext,
   getBuriedClass, getBuriedTier, getBuriedDungeon, buriedMonsterLevel,
@@ -177,6 +178,10 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
       const idx = Math.floor(Math.random() * curses.length);
       patch.curses = curses.filter((_, i) => i !== idx);
       setNotice('정화의 봉헌 — 저주 하나가 재로 흩어졌다.');
+    } else if (boon.id === 'resupply') {
+      // 1.132.0 — 스킬 사용 횟수 만충
+      patch.equipped = rechargeBuriedUses(char, 100).equipped;
+      setNotice('보충의 봉헌 — 모든 스킬의 사용 횟수가 만충됐다.');
     }
     onUpdateChar({ ...char, ...patch }, 0);
   };
@@ -192,22 +197,25 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
     setNotice('상인이 다른 물건을 꺼내 보인다.');
   };
 
+  // 1.132.0 — 방당 1회 (PM 제보: 무한 휴식 익스플로잇 픽스) + 스킬 횟수 30% 충전 (야영의 새 역할)
   const rest = () => {
+    if (char.roomData?.rested) return;
+    const mark = { roomData: { ...char.roomData, rested: true } };
     const kfR = buriedKeystoneFx(char);
     if (kfR.noCampHeal || kfR.noHeal) {
-      // 회복만 봉인 — 물약 제작은 유지 (방이 헛걸음이 되지 않게)
-      onUpdateChar({ ...char, potions: (char.potions || 0) + 1 }, 0);
-      setNotice('⚓ 쐐기의 저주 — 잠들어도 상처가 아물지 않는다. 물약만 하나 만들었다.');
+      // 회복만 봉인 — 물약 제작·횟수 충전은 유지 (방이 헛걸음이 되지 않게)
+      onUpdateChar({ ...rechargeBuriedUses(char, 30), potions: (char.potions || 0) + 1, ...mark }, 0);
+      setNotice('⚓ 쐐기의 저주 — 상처는 아물지 않았지만, 물약 하나와 스킬 정비(30%)는 마쳤다.');
       return;
     }
     if (hasBuriedCurse(char, 'gremory')) {
-      onUpdateChar({ ...char, potions: (char.potions || 0) + 1 }, 0);
-      setNotice('그레모리의 저주 — 잠들지 못했다. 물약만 하나 만들었다.');
+      onUpdateChar({ ...rechargeBuriedUses(char, 30), potions: (char.potions || 0) + 1, ...mark }, 0);
+      setNotice('그레모리의 저주 — 잠들지 못했다. 물약 하나와 스킬 정비(30%)만 마쳤다.');
       return;
     }
     const amount = Math.round(d.maxHp * 0.45 * (1 + (aggregateBuriedContracts(char).campPct || 0) / 100));
-    onUpdateChar({ ...char, hp: Math.min(d.maxHp, char.hp + amount), potions: (char.potions || 0) + 1 }, 0);
-    setNotice(`야영으로 HP ${amount} 회복. 물약도 하나 만들었다.`);
+    onUpdateChar({ ...rechargeBuriedUses(char, 30), hp: Math.min(d.maxHp, char.hp + amount), potions: (char.potions || 0) + 1, ...mark }, 0);
+    setNotice(`야영 — HP ${amount} 회복, 물약 +1, 스킬 사용 횟수 30% 충전.`);
   };
 
   // 협상 — 지불하면 전투 없이 통과 + 장비. 거절하면 강적과 싸운다.
@@ -434,6 +442,22 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
                   onClick={sold || !afford ? null : () => buy(entry, i)} />
               );
             })}
+            <button onClick={() => {
+                const cost = Math.round(70 * (1 + Math.max(0, monLevel - 1) * 0.08));
+                if (char.gold < cost || char.roomData?.serviced) return;
+                onUpdateChar({ ...rechargeBuriedUses(char, 100), gold: char.gold - cost, roomData: { ...char.roomData, serviced: true } }, 0);
+                setNotice('상인이 장비를 손봐 줬다 — 모든 스킬 사용 횟수 만충.');
+              }}
+              disabled={char.gold < Math.round(70 * (1 + Math.max(0, monLevel - 1) * 0.08)) || char.roomData?.serviced}
+              className="ui-press w-full py-2.5 text-[12px]"
+              style={{
+                borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panel,
+                border: `1px solid ${PALETTE.green}55`,
+                color: char.roomData?.serviced ? PALETTE.textDim : char.gold >= Math.round(70 * (1 + Math.max(0, monLevel - 1) * 0.08)) ? PALETTE.green : PALETTE.textDim,
+                opacity: char.roomData?.serviced ? 0.5 : 1,
+              }}>
+              🔧 정비 — 🪙{Math.round(70 * (1 + Math.max(0, monLevel - 1) * 0.08))} (스킬 사용 횟수 전부 만충{char.roomData?.serviced ? ' · 완료' : ''})
+            </button>
             <button onClick={rerollShop} disabled={char.gold < buriedShopRerollCost(monLevel, char.roomData?.rerolls || 0)}
               className="ui-press w-full py-2.5 text-[12px]"
               style={{
@@ -512,9 +536,10 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
           <div className="space-y-2">
             <div className="text-[12px] font-bold" style={{ color: PALETTE.green }}>🔥 야영지</div>
             <div className="text-[12px]" style={{ color: PALETTE.textDim }}>불을 피우면 몸이 조금 낫는다. 남은 재료로 물약도 하나 만들 수 있다.</div>
-            <button onClick={rest} className="ui-press w-full py-2.5 text-[12px] font-bold"
-              style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.green, color: '#0a0608' }}>
-              쉰다 — HP 45% 회복 + 물약 +1
+            <button onClick={rest} disabled={!!char.roomData?.rested}
+              className="ui-press w-full py-2.5 text-[12px] font-bold"
+              style={{ borderRadius: 'var(--r-btn, 13px)', background: char.roomData?.rested ? PALETTE.panel : PALETTE.green, color: char.roomData?.rested ? PALETTE.textDim : '#0a0608', opacity: char.roomData?.rested ? 0.55 : 1 }}>
+              {char.roomData?.rested ? '이미 쉬었다 — 불이 꺼져 간다' : '쉰다 — HP 45% 회복 + 물약 +1 + 스킬 횟수 30% 충전 (1회)'}
             </button>
             <button onClick={advance} className="ui-press w-full py-2.5 text-[12px]"
               style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panelLight, color: PALETTE.text, border: `1px solid ${PALETTE.panelBorder}` }}>
