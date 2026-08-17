@@ -7,7 +7,7 @@ import React from 'react';
 import { PALETTE } from '../../utils/helpers.js';
 import {
   BURIED_SKILLS, BURIED_STATUS, BURIED_SLOTS, BURIED_TIERS,
-  getBuriedTier, buriedItemStats, buriedDustValue, buriedEnhanceMult,
+  getBuriedTier, buriedItemStats, buriedDustValue,
   buriedSkillEffectLines, getBuriedUnique, getBuriedMod, getBuriedRune, BURIED_RUNE_RARITIES,
 } from '../../data.js';
 
@@ -148,7 +148,7 @@ export function BuriedItemCard({ item, slotId, onClick, right, dim = false, show
       <div className="flex-1 min-w-0">
         <div className={`text-[12px] font-bold ${wrap}`} style={{ color: tier.color }}>
           <span className="tabular-nums font-normal" style={{ color: PALETTE.textDim }}>Lv.{item.floor || 1} </span>
-          {item.name}{item.plus > 0 && <span style={{ color: PALETTE.legendary }}> +{item.plus}</span>}
+          {item.name}
         </div>
         <div className={`text-[11px] ${full ? '' : 'truncate'} flex items-center gap-1 flex-wrap`} style={{ color: PALETTE.dawn }}>
           {skill && <SkillKindBadge skill={skill} />}
@@ -198,11 +198,10 @@ export function BuriedItemSheet({ item, compare, onEquip, onUnequip, onDismantle
         <div className="flex items-start gap-2 mb-2">
           <div className="flex-1">
             <div className="text-[14px] font-bold" style={{ color: tier.color }}>
-              {item.name}{item.plus > 0 && <span style={{ color: PALETTE.legendary }}> +{item.plus}</span>}
+              {item.name}
             </div>
             <div className="text-[11px] mt-0.5" style={{ color: PALETTE.textDim }}>
               {slotMeta(item.slot).name} · {tier.name} 등급 · <b style={{ color: PALETTE.text }}>장비 Lv.{item.floor || 1}</b>
-              {item.plus > 0 && ` · 강화 배율 ×${buriedEnhanceMult(item.plus).toFixed(2)}`}
             </div>
           </div>
           <button onClick={onClose} className="ui-press text-[12px] px-2 py-1" style={{ color: PALETTE.textDim }}>닫기</button>

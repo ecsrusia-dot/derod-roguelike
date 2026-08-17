@@ -305,11 +305,21 @@ export const BURIED_OPTIONS = [
   { key: 'vit',    name: '체력',     min: 1,  max: 3,  affix: '불굴의' },
 ];
 
-// 강화 — 제단에서 +1씩. 단계당 스탯 +12%. 1.117.0 — 비용이 마물 레벨을 따라 자란다 (심층 골드 싱크)
-export const BURIED_ENHANCE_MAX = 5;
-export const buriedEnhanceMult = (plus) => 1 + (plus || 0) * 0.12;
-export const buriedEnhanceCost = (plus, monLevel = 1) =>
-  Math.round((60 + (plus || 0) * 55) * (1 + Math.max(0, (monLevel || 1) - 1) * 0.06));
+// 1.125.0 — 강화 시스템 폐지 (PM 결정: 풀강 +60% = 무적 루트). 구 장비의 plus 필드는 무시된다.
+// 골드 용처는 제단 「봉헌」 + 상점 「리롤」로 대체 — 일회성 소비라 영구 파워 인플레가 없다.
+export const BURIED_ALTAR_BOONS = [
+  { id: 'guard',   icon: '🔷', name: '수호의 봉헌', costBase: 90,
+    desc: '다음 전투를 시작 보호막(최대 HP 35%)과 함께 시작한다' },
+  { id: 'bless',   icon: '✨', name: '축복의 봉헌', costBase: 110,
+    desc: '다음 전투 시작 시 [재생] 5 + [수호] 3을 얻는다' },
+  { id: 'cleanse', icon: '🕯', name: '정화의 봉헌', costBase: 170,
+    desc: '짊어진 저주 1개를 무작위로 해제한다' },
+];
+export const buriedBoonCost = (boon, monLevel = 1) =>
+  Math.round(boon.costBase * (1 + Math.max(0, (monLevel || 1) - 1) * 0.1));
+// 상점 리롤 — 진열 전체를 다시 굴린다. 같은 상점에서 반복할수록 2배씩
+export const buriedShopRerollCost = (monLevel = 1, count = 0) =>
+  Math.round(50 * (1 + Math.max(0, (monLevel || 1) - 1) * 0.08) * Math.pow(2, count || 0));
 
 const rnd = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
@@ -382,9 +392,8 @@ export function rollBuriedItem({ slot, classId, floor = 1, tier = null, luck = 0
 // 장비의 최종 스탯 (기본 + 옵션 + 강화)
 export function buriedItemStats(item) {
   if (!item) return {};
-  const mult = buriedEnhanceMult(item.plus);
   const out = {};
-  for (const [k, v] of Object.entries(item.stats || {})) out[k] = Math.round(v * mult);
+  for (const [k, v] of Object.entries(item.stats || {})) out[k] = v;
   for (const o of item.options || []) out[o.key] = (out[o.key] || 0) + o.value;
   return out;
 }
@@ -392,7 +401,8 @@ export function buriedItemStats(item) {
 // 분해 가치 (무덤 먼지) — 1.117.0~ 장비 레벨도 반영 (심층 장비 정산이 의미를 갖도록)
 export function buriedDustValue(item) {
   if (!item) return 0;
-  return getBuriedTier(item.tier).dust + (item.plus || 0) * 2 + Math.floor((item.floor || 1) / 3);
+  const raw = getBuriedTier(item.tier).dust + Math.floor((item.floor || 1) / 3);
+  return Math.max(1, Math.round(raw * (BURIED_TUNING.dustEarnMult || 1)));
 }
 
 // =========================================================
@@ -1036,6 +1046,8 @@ export const buriedPotionPrice = (monLevel = 1) =>
 export const BURIED_TUNING = {
   enemyDmgMult: 1.1,   // 적 화력 체감 조정은 여기 한 곳. 1.113.0 — 레벨 스탯 폐지에도 "너무 쉽다" 응답으로 +10%
   playerDmgMult: 1.0,
+  goldEarnMult: 0.7,   // 1.125.0 — 재화 인플레 픽스 (PM: 골드 9만 사례). 적 골드 -30%
+  dustEarnMult: 0.65,  // 1.125.0 — 분해·사망 정산 먼지 -35%
   // 1.113.0 무한층 — 정복 층(dg.floors)을 넘어선 깊이는 층당 적 hp·atk에 압력.
   // 드랍 장비 레벨은 마물 레벨을 따라가므로(≈파리티) 이 압력이 없으면 무한 스노볼이 된다 (시뮬 검증).
   // 1.114.0 — 복리(1.03^n) → **선형(1 + n×0.01)**: 적 공격력은 레벨 스케일만으로도 장비 HP 성장과
@@ -1711,7 +1723,7 @@ export function buriedEnemyAtLevel(key, monLevel) {
     atk: Math.round(base.atk * m),
     def: Math.round(base.def * (1 + (lv - 1) * 0.08)),
     exp: Math.round(base.exp * (1 + (lv - 1) * 0.1)),
-    gold: [Math.round(base.gold[0] * m), Math.round(base.gold[1] * m)], // 1.117.0 — 골드도 레벨 스케일 (상점·강화 경제 유지)
+    gold: [Math.round(base.gold[0] * m * (BURIED_TUNING.goldEarnMult || 1)), Math.round(base.gold[1] * m * (BURIED_TUNING.goldEarnMult || 1))], // 1.117.0 레벨 스케일 + 1.125.0 수입 -30%
   };
 }
 
@@ -1776,8 +1788,8 @@ export function buriedLibraryChoices(char) {
 //   ① 재련소 — 슬롯을 골라 장비 제작. 레벨은 역대 최고 도달 층 기반 (죽어도 남는 진행도).
 //   ② 유산 보관함 확장 — 6칸 → 최대 12칸.
 export const BURIED_FORGE = {
-  randomCost: 40,    // 랜덤 등급 제작
-  epicCost: 180,     // 영웅의 이상 확정 제작 (영웅 75% / 유물급 25%)
+  randomCost: 60,    // 랜덤 등급 제작 (1.125.0 — 40 → 60)
+  epicCost: 400,     // 영웅의 이상 확정 제작 (1.125.0 — 180 → 400, 영웅 92% / 유물급 8%)
 };
 // 제작 장비 레벨 — 1.117.0: 역대 최고 도달 '층'을 **마물 레벨로 환산** (미궁 기준 4걸음/Lv).
 // 층수를 그대로 장비 레벨로 쓰면 드랍(마물 레벨 기준) 대비 3.7배 파워 브레이크가 난다 (감사 픽스)
@@ -1788,7 +1800,7 @@ export function craftBuriedItem({ slot, classId, deepest, epic = false, char = n
   const floor = char ? buriedMonsterLevel(char) : buriedForgeLevel(deepest);
   const powerMult = char ? buriedLootPower(char) : 1;
   if (!epic) return rollBuriedItem({ slot, classId, floor, luck: 3, powerMult });
-  const tier = Math.random() < 0.75 ? 'epic' : 'relic';
+  const tier = Math.random() < 0.92 ? 'epic' : 'relic'; // 1.125.0 — 유물급 25% → 8% (등급 희소성 복원)
   return rollBuriedItem({ slot, classId, floor, tier, powerMult });
 }
 
