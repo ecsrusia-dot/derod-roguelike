@@ -171,7 +171,7 @@ import {
 } from './data.js';
 import { getKstDateKey } from './utils/dailyChallenge.js';
 import { simulateBestEndlessRun } from './utils/endlessSkipSim.js';
-import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, applyEngravingSlot, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear, dismantleRaidItem, dismantleRaidJunk, enhanceRaidItem, claimRaidWeekly, addRaidResources, spendRaidResourcesForItem, resolveRaidSecret, toggleRaidFormation, appendAutoRunLog, getGambleUsed, useGambleEntry, addTwilightCoins, addFateShards, redeemFateShards, buyGambleShopItem, addClassTitle, equipClassTitle, saveHofPatterns, hofLevelUpChar, recordHofClear, recordMastersClearByClass, updateBestRunTime, getBuried, saveBuriedChar, startBuriedChar, recordBuriedDeath, recordBuriedClear, addBuriedDust, craftBuriedForgeItem, trackBuriedKill, buyBuriedContract, addBuriedShards, buyBuriedPart, detachBuriedParts } from './storage.js';
+import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, applyEngravingSlot, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear, dismantleRaidItem, dismantleRaidJunk, enhanceRaidItem, claimRaidWeekly, addRaidResources, spendRaidResourcesForItem, resolveRaidSecret, toggleRaidFormation, appendAutoRunLog, getGambleUsed, useGambleEntry, addTwilightCoins, addFateShards, redeemFateShards, buyGambleShopItem, addClassTitle, equipClassTitle, saveHofPatterns, hofLevelUpChar, recordHofClear, recordMastersClearByClass, updateBestRunTime, getBuried, saveBuriedChar, startBuriedChar, recordBuriedDeath, resetBuried, recordBuriedClear, addBuriedDust, craftBuriedForgeItem, trackBuriedKill, buyBuriedContract, addBuriedShards, buyBuriedPart, detachBuriedParts } from './storage.js';
 
 
 
@@ -368,6 +368,16 @@ export default function App() {
 
   // 새 캐릭터 — 1.113.0: 유산은 빈 슬롯에 장착된 것만 소비, 나머지는 보관함에 남는다.
   // 1.114.0: startFloor — 100층 단위 체크포인트 재출발 (그 층 마물 레벨의 낡은 장비 6종 지급)
+  // 1.131.1 — 무덤의 유산 전체 초기화 (기록 화면 위험 구역, 2단 확인 후)
+  const handleBuriedReset = () => {
+    setBuriedForgeNotice('⚰ 무덤이 백지로 돌아갔다 — 처음부터 다시 시작한다.');
+    setMeta(prev => {
+      const next = resetBuried(prev);
+      saveMeta(next);
+      return next;
+    });
+  };
+
   const handleBuriedStart = (classId, dungeonId = 'labyrinth', contracts = [], startFloor = 1, raceId = null, keystones = [], originId = null) => {
     setBuriedForgeNotice(null); // 이전 캐릭터의 정산·해금 알림 제거 (1.117.0)
     setMeta(prev => {
@@ -3089,7 +3099,7 @@ export default function App() {
                 setMeta(prev => { const next = recordBuriedDeath(prev, settle); saveMeta(next); return next; });
                 setBuriedForgeNotice(`⚰ 정산 — 장비 ${settle.itemCount}개 분해 🕯 +${settle.dust} · 골드는 무덤에 흩어졌다`);
               }}
-              onForge={handleBuriedForge}
+              onForge={handleBuriedForge} onResetAll={handleBuriedReset}
               onBuyContract={handleBuriedBuyContract}
               onBuyPart={handleBuriedBuyPart}
               onDetachParts={handleBuriedDetachParts}
