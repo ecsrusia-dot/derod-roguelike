@@ -14,9 +14,10 @@ import React, { useEffect, useState } from 'react';
 import { ChevronLeft, Package } from 'lucide-react';
 import { PALETTE } from '../../utils/helpers.js';
 import {
-  BURIED_ROOMS, BURIED_ENHANCE_MAX, BURIED_SLOT_IDS, BURIED_ROOM_COLORS,
+  BURIED_ROOMS, BURIED_SLOT_IDS, BURIED_ROOM_COLORS,
+  BURIED_ALTAR_BOONS, buriedBoonCost, buriedShopRerollCost,
   BURIED_POTION_HEAL_PCT, buriedPotionPrice, BURIED_SKILL_MAX_LV,
-  buriedDerived, buriedExpToNext, buriedEnhanceCost,
+  buriedDerived, buriedExpToNext,
   getBuriedClass, getBuriedTier, getBuriedDungeon, buriedMonsterLevel,
   rollBuriedOffers, rollBuriedItem, rollBuriedShop,
   advanceBuriedFloor, buildBuriedRoomEnemy, addBuriedItemToChar, stepBuriedChar,
@@ -156,17 +157,36 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
     setNotice(`제단의 빛이 HP ${amount}을(를) 되돌렸다.`);
   };
 
-  const enhance = (slot) => {
-    const item = char.equipped?.[slot];
-    if (!item || item.plus >= BURIED_ENHANCE_MAX) return;
-    const cost = buriedEnhanceCost(item.plus, monLevel);
+  // 1.125.0 — 강화 폐지 → 봉헌 (골드 일회성 소비: 영구 파워 인플레 없음)
+  const buyBoon = (boon) => {
+    const cost = buriedBoonCost(boon, monLevel);
+    if (char.gold < cost || (char.roomData?.boons || []).includes(boon.id)) return;
+    let patch = { gold: char.gold - cost, roomData: { ...char.roomData, boons: [...(char.roomData?.boons || []), boon.id] } };
+    if (boon.id === 'guard') {
+      patch.carryBarrier = (char.carryBarrier || 0) + Math.round(d.maxHp * 0.35);
+      setNotice(`수호의 봉헌 — 다음 전투를 보호막 ${Math.round(d.maxHp * 0.35)}과 함께 시작한다.`);
+    } else if (boon.id === 'bless') {
+      patch.pendingStatuses = [...(char.pendingStatuses || []), { s: 'regen', n: 5 }, { s: 'guard', n: 3 }];
+      setNotice('축복의 봉헌 — 다음 전투 시작 시 [재생] 5 + [수호] 3.');
+    } else if (boon.id === 'cleanse') {
+      const curses = char.curses || [];
+      if (curses.length === 0) { setNotice('해제할 저주가 없다.'); return; }
+      const idx = Math.floor(Math.random() * curses.length);
+      patch.curses = curses.filter((_, i) => i !== idx);
+      setNotice('정화의 봉헌 — 저주 하나가 재로 흩어졌다.');
+    }
+    onUpdateChar({ ...char, ...patch }, 0);
+  };
+
+  // 1.125.0 — 상점 리롤 (골드 싱크: 반복할수록 2배)
+  const rerollShop = () => {
+    const count = char.roomData?.rerolls || 0;
+    const cost = buriedShopRerollCost(monLevel, count);
     if (char.gold < cost) return;
-    onUpdateChar({
-      ...char,
-      gold: char.gold - cost,
-      equipped: { ...char.equipped, [slot]: { ...item, plus: (item.plus || 0) + 1 } },
-    }, 0);
-    setNotice(`${item.name} +${(item.plus || 0) + 1} 강화 성공.`);
+    let shop = rollBuriedShop(monLevel, char.classId, buriedLootPower(char));
+    if (hasBuriedUnique(char, 'u103')) shop = shop.map(e => ({ ...e, price: Math.round(e.price * 0.6) }));
+    onUpdateChar({ ...char, gold: char.gold - cost, roomData: { ...char.roomData, shop, bought: [], rerolls: count + 1 } }, 0);
+    setNotice('상인이 다른 물건을 꺼내 보인다.');
   };
 
   const rest = () => {
@@ -404,6 +424,16 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
                   onClick={sold || !afford ? null : () => buy(entry, i)} />
               );
             })}
+            <button onClick={rerollShop} disabled={char.gold < buriedShopRerollCost(monLevel, char.roomData?.rerolls || 0)}
+              className="ui-press w-full py-2.5 text-[12px]"
+              style={{
+                borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panel,
+                border: `1px solid ${PALETTE.dawn}55`,
+                color: char.gold >= buriedShopRerollCost(monLevel, char.roomData?.rerolls || 0) ? PALETTE.dawn : PALETTE.textDim,
+                opacity: char.gold >= buriedShopRerollCost(monLevel, char.roomData?.rerolls || 0) ? 1 : 0.5,
+              }}>
+              🎲 진열 리롤 — 🪙{buriedShopRerollCost(monLevel, char.roomData?.rerolls || 0)} (반복할수록 2배)
+            </button>
             <button onClick={buyPotion} disabled={char.gold < potionPrice}
               className="ui-press w-full py-2.5 text-[12px]"
               style={{
@@ -424,7 +454,7 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
         {/* ===== 제단 ===== */}
         {room === 'shrine' && (
           <div className="space-y-2">
-            <div className="text-[12px] font-bold" style={{ color: PALETTE.ice }}>⛩ 제단 — 회복하거나 장비를 벼린다</div>
+            <div className="text-[12px] font-bold" style={{ color: PALETTE.ice }}>⛩ 제단 — 회복하거나 봉헌을 바친다</div>
             <button onClick={shrineHeal} disabled={char.hp >= d.maxHp}
               className="ui-press w-full py-2.5 text-[12px]"
               style={{
@@ -434,29 +464,28 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onEnterBattle,
               }}>
               🩹 HP 60% 회복 {char.hp >= d.maxHp ? '(이미 최대)' : ''}
             </button>
-            <div className="text-[11px] mt-1" style={{ color: PALETTE.textDim }}>장착 중인 장비 강화 (최대 +{BURIED_ENHANCE_MAX}, 단계당 능력치 +12%)</div>
-            {BURIED_SLOT_IDS.map(slot => {
-              const item = char.equipped?.[slot];
-              if (!item) return null;
-              const maxed = item.plus >= BURIED_ENHANCE_MAX;
-              const cost = buriedEnhanceCost(item.plus, monLevel);
+            <div className="text-[11px] mt-1" style={{ color: PALETTE.textDim }}>🪙 골드를 바쳐 봉헌을 받는다 (제단당 각 1회)</div>
+            {BURIED_ALTAR_BOONS.map(boon => {
+              const cost = buriedBoonCost(boon, monLevel);
+              const used = (char.roomData?.boons || []).includes(boon.id);
               const afford = char.gold >= cost;
-              const tier = getBuriedTier(item.tier);
+              const off = used || !afford || (boon.id === 'cleanse' && (char.curses || []).length === 0);
               return (
-                <button key={slot} onClick={maxed || !afford ? null : () => enhance(slot)} disabled={maxed || !afford}
+                <button key={boon.id} onClick={off ? null : () => buyBoon(boon)} disabled={off}
                   className="ui-press w-full flex items-center gap-2 px-3 py-2.5 text-left"
                   style={{
                     borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panel,
-                    border: `1px solid ${PALETTE.panelBorder}`, opacity: maxed || !afford ? 0.5 : 1,
+                    border: `1px solid ${PALETTE.panelBorder}`, opacity: off ? 0.5 : 1,
                   }}>
-                  <span className="text-[13px]" style={{ color: tier.color }}>{slotMeta(slot).icon}</span>
+                  <span className="text-[13px]">{boon.icon}</span>
                   <div className="flex-1 min-w-0">
-                    <div className="text-[12px] truncate" style={{ color: tier.color }}>
-                      {item.name} <span style={{ color: PALETTE.legendary }}>+{item.plus}</span>
+                    <div className="text-[12px] font-bold" style={{ color: PALETTE.text }}>{boon.name}</div>
+                    <div className="text-[11px] break-keep leading-relaxed" style={{ color: PALETTE.textDim }}>
+                      {boon.id === 'cleanse' && (char.curses || []).length === 0 ? '해제할 저주가 없다' : boon.desc}
                     </div>
                   </div>
-                  <span className="text-[12px] tabular-nums shrink-0" style={{ color: maxed ? PALETTE.textDim : afford ? PALETTE.legendary : PALETTE.accent }}>
-                    {maxed ? 'MAX' : `🪙${cost}`}
+                  <span className="text-[12px] tabular-nums shrink-0" style={{ color: used ? PALETTE.textDim : afford ? PALETTE.legendary : PALETTE.accent }}>
+                    {used ? '봉헌함' : `🪙${cost}`}
                   </span>
                 </button>
               );
