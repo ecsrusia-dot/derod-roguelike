@@ -143,12 +143,15 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     name: enemy.name, hp: enemy.hp, maxHp: enemy.hp,
     // 1.106.0 — 강적·보스는 보호막을 두른다 ([u90] 파성추의 3배 조건이 의미를 갖는 지점)
     barrier: (enemy.tier === 'boss' ? Math.round(enemy.hp * 0.15) : enemy.tier === 'elite' ? Math.round(enemy.hp * 0.08) : 0)
-      + (eliteFx.barrierPct ? Math.round(enemy.hp * eliteFx.barrierPct / 100) : 0),
+      + (eliteFx.barrierPct ? Math.round(enemy.hp * eliteFx.barrierPct / 100) : 0)
+      + (enemy.startBarrier || 0), // 1.130.0 — 실드형 몬스터
     atk: Math.round(enemy.atk * (hasBuriedCurse(char, 'bathin') ? 1.15 : 1)),
     fin: Math.round(enemy.atk * (hasBuriedCurse(char, 'bathin') ? 1.15 : 1)),
     mag: Math.round(enemy.atk * (hasBuriedCurse(char, 'bathin') ? 1.15 : 1)),
     def: enemy.def, chase: 0,
-    crit: 6 + (eliteFx.critAdd || 0), critDmg: 55, dodge: 3,
+    crit: (enemy.crit ?? 6) + (eliteFx.critAdd || 0), critDmg: 55, dodge: enemy.dodge ?? 3,
+    // 1.130.0 — 내성 프로필 (resolveBuriedAttack def-side가 읽는다)
+    physTakenPct: enemy.physTakenPct || 0, magTakenPct: enemy.magTakenPct || 0, fullGuardPct: enemy.fullGuardPct || 0,
     immuneCrit: !!eliteFx.immuneCrit, enrage: !!eliteFx.enrage,
     statuses: hasBuriedCurse(char, 'berith') ? { wall: 2 } : {},
     envDmgPct: env.foe.dmgPct || 0, envTakenPct: (env.foe.takenPct || 0) + (eliteFx.takenPct || 0),
@@ -158,6 +161,17 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
   const [log, setLog] = useState(() => {
     const init = [{ t: `${enemy.name} (Lv.${enemy.lv || 1})이(가) 길을 막아섰다.`, c: PALETTE.textDim }];
     if (enemy.eliteFx) init.push({ t: `☠ 변형 「${enemy.eliteFx.name}」 — ${enemy.eliteFx.desc}`, c: enemy.eliteFx.color || PALETTE.accent });
+    // 1.130.0 — 내성 프로필 힌트 (어둠에서는 은폐)
+    if (!darkBlind) {
+      const hints = [];
+      if ((enemy.physTakenPct || 0) < 0) hints.push(`물리 내성 ${-enemy.physTakenPct}%`);
+      if ((enemy.physTakenPct || 0) > 0) hints.push(`물리 약점 +${enemy.physTakenPct}%`);
+      if ((enemy.magTakenPct || 0) < 0) hints.push(`마법 내성 ${-enemy.magTakenPct}%`);
+      if ((enemy.magTakenPct || 0) > 0) hints.push(`마법 약점 +${enemy.magTakenPct}%`);
+      if (enemy.fullGuardPct) hints.push(`온전할 때 피해 -${enemy.fullGuardPct}%`);
+      if (enemy.dodge > 3) hints.push(`회피 ${enemy.dodge}%`);
+      if (hints.length > 0) init.push({ t: `⚠ ${hints.join(' · ')}`, c: PALETTE.dawn });
+    }
     for (const kid of char.keystones || []) {
       const k = getBuriedKeystone(kid);
       if (k) init.push({ t: `⚓ ${k.name} — ${k.desc}`, c: PALETTE.twilight });
