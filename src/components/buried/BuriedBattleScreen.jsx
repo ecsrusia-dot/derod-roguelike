@@ -60,6 +60,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
   const darkBlind = (gimmickId === 'dark' || buriedKeystoneFx(char).darkAll) && !buriedUniqueIds(char).includes('da1') && !traits.includes('voidsight');
   // [da2] 어둠에 벼린 칼 ×2 / 특성 「공허시」 ×1.5 — 매 전투 첫 공격 (1회 소비)
   const firstStrikeRef = useRef(true);
+  const foeFirstTurnRef = useRef(true); // [u38] 투명화 — 일반 전투 첫 턴 적 행동 스킵
   // 스킬 단계 보정 — [u113] 쿨 0 / [u101] 쿨 상한 1 / [u99] 레벨당 위력 +2% / [u94] 2회 시전·위력 절반
   const applyUniqueSkillMods = (sk) => {
     let out = { ...sk };
@@ -71,16 +72,24 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
       if (uq('u94')) { out.hits = Math.max(1, (out.hits || 1)) * 2; mult *= 0.5; }
       out.power = Math.max(1, Math.round(out.power * mult));
     }
-    // [u53] 바쥬라 — 전 스킬 쿨 -1 / [u9][u10][u11] 극의 — 해당 계열 쿨 -1
+    // [u53] 바쥬라 — 전 스킬 쿨 -1 / [u9][u10][u11] 극의 — 해당 계열 쿨 -1 / [u12] 세라핌 — 보조 쿨 -1
     if (uq('u53')) out.cd = Math.max(0, (out.cd || 0) - 1);
     if (out.power) {
       const lineU = { str: 'u9', dex: 'u10', int: 'u11' }[out.stat || 'str'];
       if (lineU && uq(lineU)) out.cd = Math.max(0, (out.cd || 0) - 1);
+    } else if (uq('u12')) {
+      out.cd = Math.max(0, (out.cd || 0) - 1);
     }
-    // 저주 「부알」 — 쿨다운 +1 (폭주 기관의 쿨 0에는 못 이긴다)
-    if (!uq('u113') && cs('vual') && out.cd > 0) out.cd += 1;
+    // 저주 「부알」 — 쿨다운 +1 (폭주 기관의 쿨 0에는 못 이긴다 / [u74] 금줄이 무시)
+    if (!uq('u113') && !uq('u74') && cs('vual') && out.cd > 0) out.cd += 1;
     // [dr1] 가라앉은 왕의 창 — 공격 스킬 적중 시 [중독] 2 추가
     if (uq('dr1') && out.power) out.apply = [...(out.apply || []), { s: 'poison', n: 2, p: 100 }];
+    // [u28] 합리주의 — 부가 효과 1종당 위력 +25%
+    if (uq('u28') && out.power) {
+      const n = (out.apply?.length || 0) + (out.self?.length || 0) + (out.heal ? 1 : 0)
+        + (out.barrierGain ? 1 : 0) + (out.spGain ? 1 : 0) + (out.reflect ? 1 : 0);
+      if (n > 0) out.power = Math.round(out.power * (1 + 0.25 * n));
+    }
     return out;
   };
 
@@ -98,7 +107,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     sp: Math.round(d.maxSp * (uniques.includes('u106') ? 1
       : 0.55 + (aggregateBuriedContracts(char).startSpPct || 0) / 100 + (traits.includes('pathfinder') ? 0.25 : 0))), maxSp: d.maxSp,
     barrier: hasBuriedCurse(char, 'alloces') || kf.noBarrier ? 0
-      : Math.round(((d.barrier || 0) + (env.self.barrierAdd || 0) + (char.carryBarrier || 0)) * (hasBuriedCurse(char, 'amon') ? 0.5 : 1)),
+      : Math.round(((d.barrier || 0) + (env.self.barrierAdd || 0) + (char.carryBarrier || 0) + (uniques.includes('u80') ? 30 : 0)) * (hasBuriedCurse(char, 'amon') ? 0.5 : 1)),
     noDodge: !!kf.noDodge, noCrit: !!kf.noCrit,
     // [u107] 물리·기교 += 최대 HP 8% / [u111] 마법 += 보호막 30%
     // [u36] 비전 — 1.133.0 %화: researchPct(처치당 +0.5%) 배율. 구세이브 researchPower(고정치)는 그대로 가산 유지
@@ -118,15 +127,21 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
               + (uniques.includes('u76') ? 2 : 0)
               + (aggregateBuriedContracts(char).startWall || 0) // 「방벽의 계약」
               + (char.partsFx?.startWall || 0) // 부품 「증축 골조」
-              + (uniques.includes('da3') ? 1 : 0); // [da3] 그림자 장막
+              + (uniques.includes('da3') ? 1 : 0) // [da3] 그림자 장막
+              + (uniques.includes('u80') ? 1 : 0); // [u80] 빙벽
             const init = w > 0 ? { wall: w } : {};
             // [dl3] 선택자의 낫 — 방 선택지 3개 이상이던 층은 [격노] 2로 시작
             if (uniques.includes('dl3') && (char.offers || []).length >= 3) init.rage = (init.rage || 0) + 2;
+            // [u49] 변신 — 보스·재앙 전투를 [격노] 2 + [수호] 2로 시작
+            if (uniques.includes('u49') && (roomType === 'boss' || roomType === 'calamity')) {
+              init.rage = (init.rage || 0) + 2; init.guard = (init.guard || 0) + 2;
+            }
             return init;
           })() : {},
       [...(char.pendingStatuses || []), ...(kf.startConfuse ? [{ s: 'confuse', n: kf.startConfuse }] : [])]
     ),
     cds: {}, reflect: 0, reflectTurns: 0,
+    immuneCrit: uniques.includes('u61'), // [u61] 휘황찬란 — 적 치명타 무효 (resolveBuriedAttack def-side)
     // [u21] 모리건 — 주고받는 피해 절반 / [u52] 결전 — 받는 피해 +15
     envDmgPct: (env.self.dmgPct || 0) + (uniques.includes('u21') ? -50 : 0),
     envTakenPct: (env.self.takenPct || 0) + (uniques.includes('u21') ? -50 : 0) + (uniques.includes('u52') ? 15 : 0) + (ufx.takenPct || 0) + (kf.takenPct || 0),
@@ -155,7 +170,13 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     // 1.130.0 — 내성 프로필 (resolveBuriedAttack def-side가 읽는다)
     physTakenPct: enemy.physTakenPct || 0, magTakenPct: enemy.magTakenPct || 0, fullGuardPct: enemy.fullGuardPct || 0,
     immuneCrit: !!eliteFx.immuneCrit, enrage: !!eliteFx.enrage,
-    statuses: hasBuriedCurse(char, 'berith') ? { wall: 2 } : {},
+    statuses: (() => {
+      const s = hasBuriedCurse(char, 'berith') ? { wall: 2 } : {};
+      if (uniques.includes('u22')) s.stun = (s.stun || 0) + 1; // [u22] 심판자
+      if (uniques.includes('u51')) s.weaken = (s.weaken || 0) + 2; // [u51] 탐식자
+      if (uniques.includes('u55')) s.shatter = (s.shatter || 0) + 2; // [u55] 군림
+      return s;
+    })(),
     envDmgPct: env.foe.dmgPct || 0, envTakenPct: (env.foe.takenPct || 0) + (eliteFx.takenPct || 0),
     envCritAdd: env.foe.critAdd || 0, envMagPct: 0, envDodgeAdd: env.foe.dodgeAdd || 0,
   }));
@@ -309,7 +330,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
       // [u112] 전당의 휘장 — 승리 골드 +50%
       const goldMult = dungeon.goldMult * (1 + (env.meta.goldPct || 0) / 100) * (uq('u112') ? 1.5 : 1) * (uq('u27') ? 3 : 1) * (uq('dc4') ? 1.5 : 1) * (1 + ((cf.goldPct || 0) + (pf.goldPct || 0) + (rf.goldPct || 0) + (ufx.goldPct || 0) + buriedKeystoneBonus(char).rewardPct) / 100);
       const gold = Math.round(rnd(enemy.gold[0], enemy.gold[1]) * goldMult);
-      const exp = Math.round(enemy.exp * dungeon.expMult * (uq('u40') ? 2 : 1) * (1 + ((cf.expPct || 0) + (pf.expPct || 0) + (rf.expPct || 0) + (ufx.expPct || 0) + buriedKeystoneBonus(char).rewardPct) / 100));
+      const exp = Math.max(0, Math.round(enemy.exp * dungeon.expMult * (uq('u40') ? 2 : 1) * (1 + ((cf.expPct || 0) + (pf.expPct || 0) + (rf.expPct || 0) + (ufx.expPct || 0) + buriedKeystoneBonus(char).rewardPct) / 100))); // [u81] 고고학 expPct -100 → 0 하한
       const bossy = roomType === 'boss' || roomType === 'calamity';
       // 1.120.0 — 층계 수문장 (100층 단위): 유니크 확정 + 드랍 운 대폭
       const guardianFight = roomType === 'boss' && (char.floor || 1) % 100 === 0;
@@ -372,7 +393,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
   // ===== 라운드 진행 =====
   const act = async (kind, payload, slotUsed = null) => {
     if (busy || result) return;
-    if (kind === 'skill' && slotUsed) setSpentMap(m => ({ ...m, [slotUsed]: (m[slotUsed] || 0) + 1 })); // 1.132.0 — 횟수 차감
+    if (kind === 'skill' && slotUsed && !uq('u77')) setSpentMap(m => ({ ...m, [slotUsed]: (m[slotUsed] || 0) + 1 })); // 1.132.0 — 횟수 차감 ([u77] 공허는 미소모)
     setBusy(true);
     let P = { ...player, statuses: { ...player.statuses }, cds: { ...player.cds } };
     let E = { ...foe, statuses: { ...foe.statuses } };
@@ -390,8 +411,17 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
       const spCost = Math.round(skill.sp * (1 + (env.self.spCostPct || 0) / 100));
       if (spCost > P.sp) { setBusy(false); return; }
       P.sp -= spCost;
-      if (skill.cd > 0) P.cds[skill.id] = skill.cd + 1; // 이번 턴 종료 시 1 감소하므로 +1
+      // [u65] 폭풍우 — 30% 확률 쿨다운 미등록
+      if (skill.cd > 0) {
+        if (uq('u65') && Math.random() < 0.3) pushLog('폭풍우 — 쿨다운이 일지 않는다.', PALETTE.ice);
+        else P.cds[skill.id] = skill.cd + 1; // 이번 턴 종료 시 1 감소하므로 +1
+      }
       pushLog(`▶ ${skill.name}${skill.lv > 1 ? ` Lv.${skill.lv}` : ''}`, PALETTE.dawn);
+      // [u68] 끝없이 깊은 물 — 쿨 2 이상 스킬 사용 시 최대 HP 12% 회복
+      if (uq('u68') && (skill.cd || 0) >= 2) {
+        const h = applyHeal(P, Math.round(P.maxHp * 0.12));
+        if (h > 0) { pushFloat('player', `+${h}`, PALETTE.green); pushLog(`끝없이 깊은 물 — 심연이 상처를 적신다. +${h}`, PALETTE.green); }
+      }
     }
 
     if (skill && skill.power && (E.statuses.wall || 0) > 0) {
@@ -415,6 +445,14 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
         if (uq('dr4') && ((E.statuses.poison || 0) + (E.statuses.bleed || 0) + (E.statuses.burn || 0)) > 0) {
           res.total = Math.round(res.total * 1.25); res.chase = Math.round(res.chase * 1.25);
         }
+        // [u64] 일그러진 사랑 — 적 디버프 종류당 +6%
+        if (uq('u64')) {
+          const n = Object.keys(E.statuses).filter(k => (E.statuses[k] || 0) > 0 && BURIED_STATUS[k]?.kind === 'debuff').length;
+          if (n > 0) { res.total = Math.round(res.total * (1 + 0.06 * n)); res.chase = Math.round(res.chase * (1 + 0.06 * n)); }
+        }
+        // [u60] 강령술 — 준 피해의 15% 추격 추가 / [u35] 사령술 — 추격 2배
+        if (uq('u60')) res.chase += Math.max(1, Math.round(res.total * 0.15));
+        if (uq('u35') && res.chase > 0) res.chase = Math.round(res.chase * 2);
         // [dc3] 심락의 대검 — 잃은 HP 1%당 +0.5% (최대 +40%)
         if (uq('dc3')) {
           const lostPct = Math.max(0, (1 - P.hp / P.maxHp) * 100);
@@ -480,6 +518,21 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
           E.statuses = applyBuriedStatuses(E.statuses, [{ s: 'stun', n: 1 }]);
           pushLog('눈보라 — 적이 얼어붙었다. [기절] 1', PALETTE.ice);
         }
+        // [u15] 폭풍 — 공격 적중마다 [파쇄] 1
+        if (uq('u15')) {
+          E.statuses = applyBuriedStatuses(E.statuses, [{ s: 'shatter', n: 1 }], statusOpts);
+        }
+        // [u63] 스탬피드 — 적중마다 적 최대 HP -2%
+        if (uq('u63')) {
+          E.maxHp = Math.max(1, Math.round(E.maxHp * 0.98));
+          if (E.hp > E.maxHp) E.hp = E.maxHp;
+        }
+        // [u31] 오의 — 치명타 시 10% 즉사 (보스 면역)
+        if (uq('u31') && res.crits > 0 && E.hp > 0 && enemy.tier !== 'boss' && Math.random() < 0.1) {
+          E.hp = 0;
+          pushFloat('enemy', '오의!', PALETTE.legendary);
+          pushLog('오의 — 일격에 숨이 끊겼다. 즉사!', PALETTE.legendary);
+        }
         // 특성 — 질풍/폭풍 (치명 시 SP)
         if ((traits.includes('gale') || traits.includes('tempest')) && res.crits > 0) {
           P.sp = Math.min(P.maxSp, P.sp + 12 * res.crits);
@@ -516,7 +569,10 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
         }
         if (skill.apply) {
           const before = { ...E.statuses };
-          const list = uq('u95') ? skill.apply.map(a => ({ ...a, n: 5 })) : skill.apply;
+          // [u95] 균일한 저주(항상 5) > [u59] 간계(2배) > 원본
+          const list = uq('u95') ? skill.apply.map(a => ({ ...a, n: 5 }))
+            : uq('u59') ? skill.apply.map(a => ({ ...a, n: (a.n || 1) * 2 }))
+            : skill.apply;
           E.statuses = applyBuriedStatuses(E.statuses, list, statusOpts);
           const added = Object.keys(E.statuses).filter(k => (E.statuses[k] || 0) > (before[k] || 0));
           if (added.length > 0) pushLog(`${E.name}에게 ${added.map(k => `[${BURIED_STATUS[k].name}]`).join(' ')}`, PALETTE.twilight);
@@ -534,8 +590,20 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
         }
       }
     } else if (skill && skill.apply) {
-      E.statuses = applyBuriedStatuses(E.statuses, skill.apply, statusOpts);
-      pushLog(`${E.name}에게 ${skill.apply.map(a => `[${BURIED_STATUS[a.s]?.name}]`).join(' ')}`, PALETTE.twilight);
+      // 보조 디버프 스킬도 [u95] 균일한 저주 / [u59] 간계 적용 (공격 스킬 경로와 동일)
+      const list = uq('u95') ? skill.apply.map(a => ({ ...a, n: 5 }))
+        : uq('u59') ? skill.apply.map(a => ({ ...a, n: (a.n || 1) * 2 }))
+        : skill.apply;
+      E.statuses = applyBuriedStatuses(E.statuses, list, statusOpts);
+      pushLog(`${E.name}에게 ${list.map(a => `[${BURIED_STATUS[a.s]?.name}]`).join(' ')}`, PALETTE.twilight);
+    }
+
+    // [u4] 카두세우스 — 보조(비공격) 스킬 사용 시 마법 공격력 25% 타격
+    if (skill && !skill.power && uq('u4') && E.hp > 0) {
+      const dmg = Math.max(1, Math.round(P.mag * 0.25));
+      const cr = hurt(E, dmg, false);
+      pushFloat('enemy', dmgText(cr), PALETTE.twilight);
+      pushLog(`카두세우스 — 마력이 흘러넘쳐 ${dmg} 피해`, PALETTE.twilight);
     }
 
     if (skill && skill.self) {
@@ -567,7 +635,13 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     }
     if (skill && skill.spGain) { P.sp = Math.min(P.maxSp, P.sp + skill.spGain); pushLog(`SP +${skill.spGain}`, PALETTE.ice); }
     if (skill && skill.selfDmg) {
-      hurt(P, skill.selfDmg, true); pushFloat('player', `-${skill.selfDmg}`, PALETTE.blood); pushLog(`자해 ${skill.selfDmg}`, PALETTE.blood);
+      // [u32] 혈기왕성 — 자해가 같은 양의 회복으로 뒤집힌다
+      if (uq('u32')) {
+        const h = applyHeal(P, skill.selfDmg);
+        if (h > 0) { pushFloat('player', `+${h}`, PALETTE.green); pushLog(`혈기왕성 — 흘린 피가 되돌아온다. +${h}`, PALETTE.green); }
+      } else {
+        hurt(P, skill.selfDmg, true); pushFloat('player', `-${skill.selfDmg}`, PALETTE.blood); pushLog(`자해 ${skill.selfDmg}`, PALETTE.blood);
+      }
       // 특성 「혈류」 (마검사) — 자해 스킬마다 이 전투 동안 데미지 +15% (최대 +150%)
       if (traits.includes('bloodflow') && (P.bloodflowStacks || 0) < 10) {
         P.bloodflowStacks = (P.bloodflowStacks || 0) + 1;
@@ -575,7 +649,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
         pushLog(`혈류 — 피가 칼날을 벼린다. 데미지 +15% (누적 +${P.bloodflowStacks * 15}%)`, '#a8556e');
       }
     }
-    if (skill && skill.reflect) { P.reflect = skill.reflect; P.reflectTurns = 2; }
+    if (skill && skill.reflect) { P.reflect = skill.reflect * (uq('u33') ? 2 : 1); P.reflectTurns = 2; } // [u33] 용신 — 반사율 2배
     // 접두어 「수호하는」 — 사용 시 확률 방벽
     if (skill && skill.wallChance && Math.random() * 100 < skill.wallChance) {
       P.statuses = applyBuriedStatuses(P.statuses, [{ s: 'wall', n: 1 }]);
@@ -602,15 +676,26 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     if ((E.statuses.stun || 0) > 0) {
       pushLog(`${E.name}은(는) 기절해 움직이지 못한다.`, PALETTE.shock);
       await wait(420);
+    } else if (uq('u38') && foeFirstTurnRef.current && roomType !== 'boss' && roomType !== 'elite' && roomType !== 'calamity' && enemy.tier !== 'boss') {
+      // [u38] 투명화 — 일반 전투 첫 턴, 적이 나를 찾지 못한다
+      foeFirstTurnRef.current = false;
+      pushLog(`투명화 — ${E.name}이(가) 나를 찾지 못하고 두리번거린다.`, PALETTE.textDim);
+      await wait(420);
     } else {
+      foeFirstTurnRef.current = false;
       const action = chooseBuriedEnemyAction(E, enemy.actions);
       pushLog(`◀ ${E.name} — ${action.name}${action.heavy ? ' (강공격)' : ''}`, action.heavy ? PALETTE.legendary : PALETTE.textDim);
       if (action.kind === 'defend') {
         if (action.self) { E.statuses = applyBuriedStatuses(E.statuses, action.self, foeStatusOpts); pushLog(`${E.name}에게 ${action.self.map(a => `[${BURIED_STATUS[a.s]?.name}]`).join(' ')}`, PALETTE.ice); }
       } else if ((P.statuses.wall || 0) > 0) {
         // ===== 🧱 방벽 (1.106.0) — 적의 공격 행동 1회를 통째로 무효화하고 1개 소모 =====
-        P.statuses = { ...P.statuses, wall: P.statuses.wall - 1 };
-        if (P.statuses.wall <= 0) delete P.statuses.wall;
+        // [u62] 근심 — 40% 확률로 소모되지 않는다
+        if (uq('u62') && Math.random() < 0.4) {
+          pushLog('근심 — 방벽이 소모되지 않았다.', PALETTE.ice);
+        } else {
+          P.statuses = { ...P.statuses, wall: P.statuses.wall - 1 };
+          if (P.statuses.wall <= 0) delete P.statuses.wall;
+        }
         pushFloat('player', '🧱 방벽!', PALETTE.ice);
         pushLog(`🧱 방벽이 ${action.name}을(를) 완전히 막았다. (남은 방벽 ${P.statuses.wall || 0})`, PALETTE.ice);
       } else {
@@ -634,8 +719,24 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
             }
           }
         } else {
+          // [u5] 틈새경계 — 쿨다운 도는 스킬 1개당 받는 피해 -8% (최대 -32%)
+          if (uq('u5')) {
+            const n = Math.min(4, Object.keys(P.cds).length);
+            if (n > 0) res.total = Math.max(0, Math.round(res.total * (1 - n * 0.08)));
+          }
+          // [u58] 무념무상 — 피격 누적당 받는 피해 -3% (최대 -30%)
+          if (uq('u58') && (P.serenity || 0) > 0) {
+            res.total = Math.max(0, Math.round(res.total * (1 - Math.min(30, P.serenity * 3) / 100)));
+          }
+          // [u78] 강인 — 받는 피해의 30%를 뒤로 미룬다
+          if (uq('u78') && res.total > 3) {
+            const defer = Math.round(res.total * 0.3);
+            res.total -= defer;
+            P.delayedDmg = (P.delayedDmg || 0) + defer;
+          }
           const hadBarrier = (P.barrier || 0) > 0;
           const r = hurt(P, res.total, !!action.pierce);
+          if (uq('u58')) P.serenity = (P.serenity || 0) + 1;
           pushFloat('player', dmgText(r, res.crits > 0 ? ' 치명!' : ''), res.crits > 0 ? PALETTE.legendary : PALETTE.blood);
           pushLog(`${res.total} 피해를 입었다${r.absorbed > 0 ? ` (보호막 ${r.absorbed} 흡수)` : ''}${res.crits > 0 ? ' · 치명타' : ''}`, PALETTE.blood);
           // [u18] 바빌론 — 25% 확률 같은 피해 반사
@@ -668,8 +769,10 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
             pushFloat('player', '근성!', PALETTE.legendary);
             pushLog('근성의 계약 — 이를 악물고 버텼다. HP 1', PALETTE.legendary);
           }
-          if (P.reflectTurns > 0 && P.reflect > 0) {
-            const back = Math.max(1, Math.round(res.total * P.reflect / 100));
+          // [u33] 용신 — 반사 스킬 없이도 기본 10% 반사
+          const effReflect = Math.max(P.reflectTurns > 0 ? (P.reflect || 0) : 0, uq('u33') ? 10 : 0);
+          if (effReflect > 0 && res.total > 0) {
+            const back = Math.max(1, Math.round(res.total * effReflect / 100));
             const br = hurt(E, back, false);
             pushFloat('enemy', dmgText(br), PALETTE.ice);
             pushLog(`가시 반사 — ${back} 피해`, PALETTE.ice);
@@ -727,7 +830,21 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     const pt = tickBuriedStatuses(P, { canHeal: canP });
     if (gimmickId === 'flood' && pt.dmg > 0) pt.dmg = Math.round(pt.dmg * 1.5); // 기믹 「침수」 — 도트 +50%
     if (cs('paimon') && pt.dmg > 0) pt.dmg *= 2; // 저주 「파이몬」 — 도트 2배
+    // [u19] 부정한 피 — 내 도트 피해가 같은 양의 회복으로 뒤집힌다
+    if (uq('u19') && pt.dmg > 0) {
+      const h = applyHeal(P, pt.dmg);
+      if (h > 0) { pushFloat('player', `+${h}`, PALETTE.green); pushLog(`부정한 피 — 썩은 피가 살이 된다. +${h}`, PALETTE.green); }
+      pt.dmg = 0;
+    }
     if (pt.dmg > 0) { hurt(P, pt.dmg, true); pushFloat('player', `-${pt.dmg}`, PALETTE.bleed); pushLog(`상태이상 피해 ${pt.dmg} (${pt.log.filter(x => x.dmg).map(x => x.name).join('·')})`, PALETTE.bleed); }
+    // [u78] 강인 — 미뤄둔 피해를 절반씩 청구 (보호막 무시)
+    if ((P.delayedDmg || 0) > 0) {
+      const take = P.delayedDmg > 12 ? Math.round(P.delayedDmg / 2) : P.delayedDmg;
+      P.delayedDmg -= take;
+      hurt(P, take, true);
+      pushFloat('player', `-${take}`, PALETTE.blood);
+      pushLog(`강인 — 미뤄둔 고통 ${take}`, PALETTE.blood);
+    }
     if (pt.heal > 0) { const h = applyHeal(P, pt.heal); if (h > 0) { pushFloat('player', `+${h}`, PALETTE.green); pushLog(`재생 ${h} 회복`, PALETTE.green); } }
     P.statuses = pt.statuses;
 
@@ -847,6 +964,21 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     setPotionUsedThisTurn(true);
     pushFloat('player', `+${h}`, PALETTE.green);
     pushLog(`물약 — HP ${h} 회복`, PALETTE.green);
+    // [u16] 왕녀의 명령 — 물약을 마시면 적이 현재 HP의 20%를 잃는다 (보스 10%)
+    if (uq('u16') && foe.hp > 0 && !result) {
+      const E2 = { ...foe, statuses: { ...foe.statuses } };
+      const dmg = Math.max(1, Math.round(E2.hp * (enemy.tier === 'boss' ? 0.10 : 0.20)));
+      const r = hurt(E2, dmg, true);
+      pushFloat('enemy', dmgText(r), PALETTE.legendary);
+      pushLog(`왕녀의 명령 — 독배가 뒤바뀌었다. ${E2.name}에게 ${dmg} 피해`, PALETTE.legendary);
+      if (E2.hp <= 0 && !eliteRevive(E2)) {
+        setFoe({ ...E2, hp: 0 });
+        pushLog(`${E2.name} 격파!`, PALETTE.legendary);
+        finish(true, P.hp);
+        return;
+      }
+      setFoe(E2);
+    }
   };
 
   const imgSrc = getEnemyImageSrc(enemy.img.key, { chapter: enemy.img.chapter }, 'combat');
@@ -993,7 +1125,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
           {equipped.map(({ slot, item, skill }) => {
             const lv = Math.min(8, buriedSkillLv(char, skill.id) + (uq('u71') ? 1 : 0)); // [u71] 후손
             const eff0 = applyUniqueSkillMods(buriedModdedSkill(buriedSkillAt(skill, lv), item.mod, item.rune));
-            const eff = kf.cdAdd ? { ...eff0, cd: (eff0.cd || 0) + kf.cdAdd } : eff0; // ⚓ 정체의 쐐기
+            const eff = kf.cdAdd && !uq('u74') ? { ...eff0, cd: (eff0.cd || 0) + kf.cdAdd } : eff0; // ⚓ 정체의 쐐기 ([u74] 금줄이 무시)
             const cd = player.cds[eff.id] || 0;
             const spCost = Math.round(eff.sp * (1 + (env.self.spCostPct || 0) / 100));
             const noSp = spCost > player.sp;
