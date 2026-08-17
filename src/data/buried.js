@@ -538,26 +538,28 @@ export function buriedDerived(char) {
   const pf = char.partsFx || {};
   // 종족 (1.122.0) — 특성과 같은 어휘의 fx
   const rf = buriedRaceFx(char);
+  // 전설무구 (1.127.0) — 선언형 유니크 fx (fx 없는 구 유니크는 빈 객체)
+  const uf = buriedUniqueFx(char);
   return {
     stats: st,
     traitFx: tf,
     // 1.113.0 — 레벨당 HP+18 폐지 (성장은 100% 장비)
-    maxHp:   Math.max(1, Math.round((140 + st.vit * 11 + (gear.hp || 0) + (tf.hp || 0) + (pf.hp || 0) + (rf.hp || 0)) * (tf.hpMult || 1) * (rf.hpMult || 1) * (1 + (cf.hpPct || 0) / 100) * (1 - Math.min(50, char.curseHpLossPct || 0) / 100))),
-    maxSp:   Math.round(38 + st.int * 1.3 + (gear.sp || 0) + (tf.sp || 0) + (rf.sp || 0)),
-    atk:     Math.round((10 + st.str * 1.6 + (gear.atk || 0) + (pf.atk || 0)) * (1 + ((tf.physPct || 0) + (cf.physPct || 0) + (rf.physPct || 0)) / 100)),
-    fin:     Math.round((10 + st.dex * 1.6 + (gear.atk || 0) + (pf.atk || 0)) * (1 + ((tf.physPct || 0) + (cf.physPct || 0) + (rf.physPct || 0)) / 100)),
-    mag:     Math.round((10 + st.int * 1.6 + (gear.mag || 0) + (pf.mag || 0)) * (1 + ((tf.magPct || 0) + (cf.magPct || 0) + (rf.magPct || 0)) / 100)),
-    def:     Math.round(4 + st.vit * 0.9 + (gear.def || 0) + (pf.def || 0)),
-    crit:    Math.round(5 + st.dex * 0.6 + (gear.crit || 0) + (tf.crit || 0) + (cf.crit || 0) + (pf.crit || 0) + (rf.crit || 0)),
+    maxHp:   Math.max(1, Math.round((140 + st.vit * 11 + (gear.hp || 0) + (tf.hp || 0) + (pf.hp || 0) + (rf.hp || 0) + (uf.hp || 0)) * (tf.hpMult || 1) * (rf.hpMult || 1) * (uf.hpMult || 1) * (1 + (cf.hpPct || 0) / 100) * (1 - Math.min(50, char.curseHpLossPct || 0) / 100))),
+    maxSp:   Math.round(38 + st.int * 1.3 + (gear.sp || 0) + (tf.sp || 0) + (rf.sp || 0) + (uf.sp || 0)),
+    atk:     Math.round((10 + st.str * 1.6 + (gear.atk || 0) + (pf.atk || 0)) * (1 + ((tf.physPct || 0) + (cf.physPct || 0) + (rf.physPct || 0) + (uf.physPct || 0)) / 100)),
+    fin:     Math.round((10 + st.dex * 1.6 + (gear.atk || 0) + (pf.atk || 0)) * (1 + ((tf.physPct || 0) + (cf.physPct || 0) + (rf.physPct || 0) + (uf.physPct || 0)) / 100)),
+    mag:     Math.round((10 + st.int * 1.6 + (gear.mag || 0) + (pf.mag || 0)) * (1 + ((tf.magPct || 0) + (cf.magPct || 0) + (rf.magPct || 0) + (uf.magPct || 0)) / 100)),
+    def:     Math.round(4 + st.vit * 0.9 + (gear.def || 0) + (pf.def || 0) + (uf.def || 0)),
+    crit:    Math.round(5 + st.dex * 0.6 + (gear.crit || 0) + (tf.crit || 0) + (cf.crit || 0) + (pf.crit || 0) + (rf.crit || 0) + (uf.crit || 0)),
     critDmg: 60 + (gear.critDmg || 0),
-    dodge:   Math.min(45, Math.round(3 + st.dex * 0.4 + (gear.dodge || 0) + (tf.dodge || 0) + (cf.dodge || 0) + (pf.dodge || 0) + (rf.dodge || 0))),
+    dodge:   Math.min(45, Math.round(3 + st.dex * 0.4 + (gear.dodge || 0) + (tf.dodge || 0) + (cf.dodge || 0) + (pf.dodge || 0) + (rf.dodge || 0) + (uf.dodge || 0))),
     // 1.118.0 — 패시브 회복 9+int/8 → 3+int/12 (PM: SP가 무의미). 이제 SP의 주 엔진은
     // 기본 공격(+14)·마력 흡수·집중이고, 패시브·장비 spRegen은 보조가 된다
-    spRegen: Math.round(3 + st.int / 12 + (gear.spRegen || 0) + (pf.spRegen || 0)),
-    barrier: Math.round(((gear.barrier || 0) + (tf.barrier || 0) + (pf.barrier || 0) + (rf.barrier || 0)) * (1 + (cf.barrierPct || 0) / 100)),
-    chase:   Math.round((gear.chase || 0) + (tf.chase || 0) + (pf.chase || 0)),
-    healPct: (tf.healPct || 0) + (cf.healPct || 0) + (pf.healPct || 0) + (rf.healPct || 0),
-    drainPct: (tf.drainPct || 0) + (cf.drainPct || 0) + (pf.drainPct || 0) + (rf.drainPct || 0),
+    spRegen: Math.round(3 + st.int / 12 + (gear.spRegen || 0) + (pf.spRegen || 0) + (uf.spRegen || 0)),
+    barrier: Math.round(((gear.barrier || 0) + (tf.barrier || 0) + (pf.barrier || 0) + (rf.barrier || 0) + (uf.barrier || 0)) * (1 + (cf.barrierPct || 0) / 100)),
+    chase:   Math.round((gear.chase || 0) + (tf.chase || 0) + (pf.chase || 0) + (uf.chase || 0)),
+    healPct: (tf.healPct || 0) + (cf.healPct || 0) + (pf.healPct || 0) + (rf.healPct || 0) + (uf.healPct || 0),
+    drainPct: (tf.drainPct || 0) + (cf.drainPct || 0) + (pf.drainPct || 0) + (rf.drainPct || 0) + (uf.drainPct || 0),
   };
 }
 
@@ -1987,6 +1989,49 @@ export const BURIED_UNIQUES = [
   UQ({ id: 'da2', dungeon: 'abyss', name: '어둠에 벼린 칼',      slot: 'weapon', skillId: 'executioner', src: 0, desc: '[심연 심층] 매 전투 첫 공격의 피해가 2배가 된다.' }),
   UQ({ id: 'da3', dungeon: 'abyss', name: '그림자 장막',         slot: 'armor',  skillId: 'shadowCloak', src: 0, desc: '[심연 심층] 전투를 🧱방벽 1로 시작하고, 회피율 +8%.' }),
   UQ({ id: 'da4', dungeon: 'abyss', name: '종언의 낫',           slot: 'acc',    skillId: 'berserkSigil',src: 0, desc: '[심연 심층] HP 30% 이하의 적을 공격하면 20% 확률로 즉사시킨다 (보스 제외).' }),
+
+  // ===== 1.127.0 — BB2 공식 데이터시트(伝説の武具 215행) 선별 이식 20종 =====
+  // 선언형: fx bag(buriedUniqueFx)이 자동 합산 — 개별 분기 코드 0줄. rune/mod는 내장 각인.
+  UQ({ id: 'lg1',  name: '미스릴의 문장',   slot: 'acc',   skillId: 'sunderSigil', src: 0, fx: { physPct: 12, crit: 5 }, rune: 'rKeen',
+    desc: '장인의 물건. 물리·기교 +12%, 치명 +5% — 「예리한 룬」 내장.' }),
+  UQ({ id: 'lg2',  name: '염무의 인장',     slot: 'acc',   skillId: 'dragonFang',  src: 0, fx: { physPct: 8, magPct: 8, statusChance: 10 },
+    desc: '춤추는 불꽃. 모든 공격 +8%, 상태이상 확률 +10%.' }),
+  UQ({ id: 'lg3',  name: '천뢰의 관',       slot: 'helm',  skillId: 'warHorn',     src: 0, fx: { crit: 8, magPct: 10 }, rune: 'rSpeed',
+    desc: '벼락을 이고 있다. 치명 +8%, 마법 +10% — 「신속의 룬」 내장.' }),
+  UQ({ id: 'lg4',  name: '독침',            slot: 'acc',   skillId: 'venomSigil',  src: 0, fx: { statusChance: 20 }, rune: 'rVenom',
+    desc: '스치기만 해도 스민다. 상태이상 확률 +20% — 「맹독의 룬」 내장.' }),
+  UQ({ id: 'lg5',  name: '별을 보는 자',    slot: 'helm',  skillId: 'focusMind',   src: 0, fx: { magPct: 18, sp: 10 },
+    desc: '별의 궤적을 읽는다. 마법 +18%, 최대 SP +10.' }),
+  UQ({ id: 'lg6',  name: '무라마사',        slot: 'acc',   skillId: 'bloodSigil',  src: 0, fx: { crit: 10, drainPct: 5, healPct: -20 }, rune: 'rRage',
+    desc: '저주받은 요도. 치명 +10%, 흡혈 +5% — 대신 회복 -20%. 「격노의 룬」 내장.' }),
+  UQ({ id: 'lg7',  name: '그람',            slot: 'acc',   skillId: 'dragonFang',  src: 0, fx: { physPct: 15 }, rune: 'rKing',
+    desc: '용을 벤 검의 파편. 물리·기교 +15% — 「군주의 룬」 내장.' }),
+  UQ({ id: 'lg8',  name: '거인의 망치',     slot: 'acc',   skillId: 'sunderSigil', src: 0, fx: { physPct: 20, dodge: -5 },
+    desc: '들 수 있다는 게 기적. 물리·기교 +20% — 대신 회피 -5%.' }),
+  UQ({ id: 'lg9',  name: '대지의 쐐기',     slot: 'acc',   skillId: 'fairyDust',   src: 0, fx: { statusChance: 25, magPct: 6 },
+    desc: '박히면 굳는다. 상태이상 확률 +25%, 마법 +6%.' }),
+  UQ({ id: 'lg10', name: '피뢰강주',        slot: 'helm',  skillId: 'observe',     src: 0, fx: { magPct: 12, statusResist: 15 },
+    desc: '하늘의 분노를 흘려보낸다. 마법 +12%, 상태이상 저항 +15%.' }),
+  UQ({ id: 'lg11', name: '풀 플레이트',     slot: 'armor', skillId: 'bulwark',     src: 0, fx: { hpMult: 1.15, takenPct: -10 },
+    desc: '빈틈없는 강판. 최대 HP +15%, 받는 피해 -10%.' }),
+  UQ({ id: 'lg12', name: '사교의 법의',     slot: 'armor', skillId: 'ironWall',    src: 0, fx: { barrier: 60, magPct: 8 },
+    desc: '믿음이 곧 벽. 전투 시작 보호막 +60, 마법 +8%.' }),
+  UQ({ id: 'lg13', name: '귀족의 예복',     slot: 'armor', skillId: 'regenScale',  src: 0, fx: { hp: 60, barrier: 40, goldPct: 15 },
+    desc: '부는 갑옷이 된다. HP +60, 보호막 +40, 골드 +15%.' }),
+  UQ({ id: 'lg14', name: '만족장의 갑주',   slot: 'armor', skillId: 'shieldBash',  src: 0, fx: { hp: 80, physPct: 10 },
+    desc: '백 번의 전장을 견딘 가죽. HP +80, 물리·기교 +10%.' }),
+  UQ({ id: 'lg15', name: '그리폰의 깃옷',   slot: 'armor', skillId: 'shadowCloak', src: 0, fx: { hp: 50, dodge: 8 },
+    desc: '바람을 두른다. HP +50, 회피 +8%.' }),
+  UQ({ id: 'lg16', name: '야수 가죽',       slot: 'armor', skillId: 'thornMail',   src: 0, fx: { hp: 70, takenPct: -8 },
+    desc: '거친 것일수록 질기다. HP +70, 받는 피해 -8%.' }),
+  UQ({ id: 'lg17', name: '닌자 장속',       slot: 'armor', skillId: 'shadowCloak', src: 0, fx: { dodge: 10, crit: 5 },
+    desc: '그림자 분신의 옷. 회피 +10%, 치명 +5%.' }),
+  UQ({ id: 'lg18', name: '근위 기사의 휘장', slot: 'acc',  skillId: 'lifeCharm',   src: 0, fx: { hpMult: 1.1, goldPct: 10 },
+    desc: '왕가의 문양. 최대 HP +10%, 골드 +10%.' }),
+  UQ({ id: 'lg19', name: '프레그런스',      slot: 'acc',   skillId: 'fairyDust',   src: 0, fx: { dropLuck: 2, goldPct: 12, expPct: 10 },
+    desc: '행운의 향. 드랍 운 +2, 골드 +12%, 경험치 +10%.' }),
+  UQ({ id: 'lg20', name: '탐험가의 나침반', slot: 'acc',   skillId: 'boneGraft',   src: 0, fx: { expPct: 15, dropLuck: 1, spRegen: 2 },
+    desc: '길을 아는 자의 바늘. 경험치 +15%, 드랍 운 +1, SP 회복 +2.' }),
 ];
 export const getBuriedUnique = (id) => BURIED_UNIQUES.find(u => u.id === id) || null;
 
@@ -1998,6 +2043,23 @@ export function buriedUniqueIds(char) {
     .filter(Boolean);
 }
 export const hasBuriedUnique = (char, id) => buriedUniqueIds(char).includes(id);
+
+// ⚔ 선언형 유니크 fx bag (1.127.0) — BB2 전설무구 이식용.
+// fx 필드를 가진 유니크만 합산 (구 유니크 76종은 fx 없음 → 기존 분기 그대로, 회귀 0).
+// 어휘는 종족·특성·계약과 동일 — buriedDerived와 전투가 uf로 병합한다.
+export function buriedUniqueFx(char) {
+  const out = {};
+  for (const s of BURIED_SLOT_IDS) {
+    const uid = char?.equipped?.[s]?.unique;
+    const u = uid ? getBuriedUnique(uid) : null;
+    if (!u?.fx) continue;
+    for (const [k, v] of Object.entries(u.fx)) {
+      if (k === 'hpMult') out.hpMult = (out.hpMult || 1) * v;
+      else out[k] = (out[k] || 0) + v;
+    }
+  }
+  return out;
+}
 
 // 유니크 장비 생성 — 스탯은 전설 등급 배율, 이름·스킬·효과 고정.
 // 1.115.0 — dungeonId·deep: 던전 전용 유니크는 그 던전 심층에서만 풀에 들어오고,
@@ -2018,6 +2080,9 @@ export function rollBuriedUniqueItem({ classId, floor = 1, excludeIds = [], dung
     skillId: def.skillId,
     unique: def.id,
     name: def.name,
+    // 1.127.0 — 전설무구는 접두어·룬을 내장한 채 떨어질 수 있다 (시트의 고정 효과 뭉치)
+    ...(def.mod ? { mod: def.mod } : {}),
+    ...(def.rune ? { rune: def.rune } : {}),
   };
 }
 
