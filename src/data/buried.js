@@ -1870,6 +1870,19 @@ export const buriedCanHeal = (u) => stacksOf(u, 'curse') === 0;
 // traits: 공격자가 가진 특성 id 배열 (트리거형 판정용).
 // 반환: { dodged, hits:[{dmg,crit}], total, crits, chase }
 //   chase = 추격 피해 (원작의 추격 데미지). 보호막 처리 규칙이 본체와 달라 따로 돌려준다.
+// 1.144.1 — 스킬 예상 데미지 (PM: 위력% 옆에 현 스탯 기준 수치 — 물·기·마 장비 비교용).
+// 기준: 현재 파생 공격력 × 위력%. 적 방어·전투 중 버프 적용 전의 기준치.
+export function buriedSkillDmgPreview(skill, char) {
+  if (!skill?.power || !char) return null;
+  const d = buriedDerived(char);
+  const statKey = skill.stat || null;
+  const base = statKey === 'int' ? d.mag : statKey === 'dex' ? d.fin : statKey === 'str' ? d.atk
+    : Math.max(d.atk, d.fin, d.mag);
+  const per = Math.max(1, Math.round(base * (skill.power || 0) / 100));
+  const hits = Math.max(1, skill.hits || 1);
+  return { per, hits, total: per * hits };
+}
+
 export function resolveBuriedAttack(att, def, skill, { isPlayer = false, traits = [] } = {}) {
   const dodgeRoll = Math.random() * 100 < buriedEffDodge(def);
   if (dodgeRoll) return { dodged: true, hits: [], total: 0, crits: 0, chase: 0 };

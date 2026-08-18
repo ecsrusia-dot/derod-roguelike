@@ -10,6 +10,7 @@ import {
   getBuriedTier, buriedItemStats, buriedDustValue,
   buriedSkillEffectLines, getBuriedUnique, getBuriedMod, getBuriedRune, BURIED_RUNE_RARITIES,
   buriedSkillMaxUses, buriedSkillLv,
+  buriedSkillAt, buriedModdedSkill, buriedSkillDmgPreview,
 } from '../../data.js';
 
 // 1.143.0 — ⛓ 스킬 사용 가능 횟수 (장비 카드·상세·획득 판단 공용).
@@ -176,12 +177,17 @@ export function BuriedItemCard({ item, slotId, onClick, right, dim = false, show
             {(() => { const u = buriedItemUses(item, char); return u ? <span className="tabular-nums" style={{ color: usesColor(u) }}> · ⛓ {u.left}/{u.max}</span> : null; })()}
           </span>
         </div>
-        {/* 1.142.2 — full 모드(획득 판단·상점·부장품·상세 비교)에서는 스킬이 무엇을 하는지 처음부터 보여준다 (PM 지시) */}
-        {full && skill && (
-          <div className="text-[11px] leading-relaxed break-keep" style={{ color: PALETTE.ice }}>
-            ▸ {skill.power ? `위력 ${skill.power}%${skill.hits ? ` ×${skill.hits}` : ''}${skill.pierce ? ' · 방어 무시' : ''}${skill.drain ? ` · 흡혈 ${skill.drain}%` : ''}${skill.critBonus ? ` · 치명 +${skill.critBonus}%` : ''} — ` : ''}{skill.desc}
-          </div>
-        )}
+        {/* 1.142.2 — full 모드(획득 판단·상점·부장품·상세 비교)에서는 스킬이 무엇을 하는지 처음부터 보여준다 (PM 지시)
+            1.144.1 — 위력% 옆에 현 스탯 기준 예상 데미지 (물·기·마 장비 비교용, 스킬 레벨·접두어·룬 반영) */}
+        {full && skill && (() => {
+          const eff = char ? buriedModdedSkill(buriedSkillAt(skill, buriedSkillLv(char, item.skillId)), item.mod, item.rune) : skill;
+          const pv = char ? buriedSkillDmgPreview(eff, char) : null;
+          return (
+            <div className="text-[11px] leading-relaxed break-keep" style={{ color: PALETTE.ice }}>
+              ▸ {eff.power ? `위력 ${eff.power}%${(eff.hits || 1) > 1 ? ` ×${eff.hits}` : ''}${pv ? ` (예상 ${pv.hits > 1 ? `${pv.per}×${pv.hits} = ` : ''}` + `${pv.total} 피해)` : ''}${eff.pierce ? ' · 방어 무시' : ''}${eff.drain ? ` · 흡혈 ${eff.drain}%` : ''}${eff.critBonus ? ` · 치명 +${eff.critBonus}%` : ''} — ` : ''}{skill.desc}
+            </div>
+          );
+        })()}
         <div className={`text-[11px] ${wrap}`} style={{ color: PALETTE.textDim }}>
           {showSlot && <span>{meta.name} · </span>}
           {Object.entries(st).map(([k, v]) => `${statLabel(k)} ${statText(k, v)}`).join(' · ') || '옵션 없음'}
@@ -215,6 +221,9 @@ export function BuriedItemSheet({ item, compare, onEquip, onUnequip, onDismantle
   if (!item) return null;
   const tier = getBuriedTier(item.tier);
   const skill = BURIED_SKILLS[item.skillId];
+  // 1.144.1 — 예상 데미지 (스킬 레벨·접두어·룬 반영, 적 방어 적용 전)
+  const effSkill = (skill && char) ? buriedModdedSkill(buriedSkillAt(skill, buriedSkillLv(char, item.skillId)), item.mod, item.rune) : skill;
+  const dmgPv = char ? buriedSkillDmgPreview(effSkill, char) : null;
   const st = buriedItemStats(item);
   const cmp = compare ? buriedItemStats(compare) : null;
   const keys = [...new Set([...Object.keys(st), ...Object.keys(cmp || {})])];
@@ -274,7 +283,7 @@ export function BuriedItemSheet({ item, compare, onEquip, onUnequip, onDismantle
             </div>
             <div className="text-[11px] mt-0.5 tabular-nums" style={{ color: PALETTE.ice }}>
               SP {skill.sp}{skill.cd > 0 ? ` · 쿨다운 ${skill.cd}턴` : ' · 쿨다운 없음'}
-              {skill.power ? ` · 위력 ${skill.power}%${skill.hits ? ` ×${skill.hits}` : ''} (${skill.stat ? `${skillKindMeta(skill).refs} 기반 ${skillKindMeta(skill).label} 공격력 참조` : '물리·기교·마법 중 최고 공격력 참조'})` : ' · 스탯 무관 (보조 스킬)'}
+              {skill.power ? ` · 위력 ${skill.power}%${skill.hits ? ` ×${skill.hits}` : ''}${dmgPv ? ` ≈ ${dmgPv.hits > 1 ? `${dmgPv.per}×${dmgPv.hits} = ` : ''}${dmgPv.total} 피해` : ''} (${skill.stat ? `${skillKindMeta(skill).refs} 기반 ${skillKindMeta(skill).label} 공격력 참조` : '물리·기교·마법 중 최고 공격력 참조'})` : ' · 스탯 무관 (보조 스킬)'}
               {skill.pierce ? ' · 방어 무시' : ''}
             </div>
             {/* 1.143.0 — ⛓ 사용 가능 횟수 */}
