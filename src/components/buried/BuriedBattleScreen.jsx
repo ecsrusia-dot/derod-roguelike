@@ -1187,7 +1187,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
         <div className="absolute inset-0 z-50 flex items-end" style={{ background: 'rgba(0,0,0,0.7)' }} onClick={() => setDetail(null)}>
           <div className="w-full px-3 py-3" onClick={e => e.stopPropagation()}
             style={{ background: PALETTE.bgDeep, borderTop: `1px solid ${PALETTE.panelBorder}`, borderRadius: '18px 18px 0 0' }}>
-            <BuriedItemCard item={detail.item} slotId={detail.slot} showSlot />
+            <BuriedItemCard item={detail.item} slotId={detail.slot} showSlot char={char} />
             <div className="text-[12px] mt-2 leading-relaxed" style={{ color: PALETTE.textDim }}>{detail.skill.desc}</div>
             <div className="mt-1.5 space-y-0.5">
               {buriedSkillLvNote(detail.skill, detail.lv).map((n, i) => (
@@ -1214,7 +1214,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
                 {result.drops.length > 0 && (
                   <div className="space-y-1.5 mb-3">
                     <div className="text-[11px] tracking-[0.2em]" style={{ color: PALETTE.dawn }}>전리품</div>
-                    {result.drops.map(it => <BuriedItemCard key={it.id} item={it} showSlot />)}
+                    {result.drops.map(it => <BuriedItemCard key={it.id} item={it} showSlot char={char} />)}
                   </div>
                 )}
                 {result.rune && getBuriedRune(result.rune) && (

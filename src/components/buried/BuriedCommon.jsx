@@ -9,7 +9,22 @@ import {
   BURIED_SKILLS, BURIED_STATUS, BURIED_SLOTS, BURIED_TIERS,
   getBuriedTier, buriedItemStats, buriedDustValue,
   buriedSkillEffectLines, getBuriedUnique, getBuriedMod, getBuriedRune, BURIED_RUNE_RARITIES,
+  buriedSkillMaxUses, buriedSkillLv,
 } from '../../data.js';
+
+// 1.143.0 — ⛓ 스킬 사용 가능 횟수 (장비 카드·상세·획득 판단 공용).
+// char가 있으면 스킬 레벨 보정 최대치, 없으면 Lv.1 기준. usesSpent 없는 신품·구세이브 = 만충.
+export function buriedItemUses(item, char = null) {
+  const skill = item ? BURIED_SKILLS[item.skillId] : null;
+  if (!skill) return null;
+  const lv = char ? buriedSkillLv(char, item.skillId) : 1;
+  const max = buriedSkillMaxUses(skill, lv);
+  return { max, left: Math.max(0, max - (item.usesSpent || 0)) };
+}
+export function usesColor(u) {
+  if (!u) return PALETTE.textDim;
+  return u.left <= 0 ? PALETTE.accent : u.left <= Math.ceil(u.max * 0.25) ? PALETTE.legendary : PALETTE.textDim;
+}
 
 export const slotMeta = (slotId) => BURIED_SLOTS.find(s => s.id === slotId) || { name: slotId, icon: '◆' };
 
@@ -122,7 +137,7 @@ export function BuriedInfoModal({ info, onClose }) {
 // ===== 장비 카드 =====
 // mode: 'row'(목록) | 'slot'(장착 슬롯)
 // full=true — 말줄임 없이 전체 표시 (획득 판단 모달·상세 비교용, 1.120.1)
-export function BuriedItemCard({ item, slotId, onClick, right, dim = false, showSlot = false, full = false }) {
+export function BuriedItemCard({ item, slotId, onClick, right, dim = false, showSlot = false, full = false, char = null }) {
   const meta = slotMeta(slotId || item?.slot);
   const wrap = full ? 'break-keep leading-relaxed' : 'truncate';
   if (!item) {
@@ -156,7 +171,10 @@ export function BuriedItemCard({ item, slotId, onClick, right, dim = false, show
         </div>
         <div className={`text-[11px] ${full ? '' : 'truncate'} flex items-center gap-1 flex-wrap`} style={{ color: PALETTE.dawn }}>
           {skill && <SkillKindBadge skill={skill} />}
-          <span className={wrap}>◆ {skill ? skill.name : '스킬 없음'}{skill && <span style={{ color: PALETTE.textDim }}> · SP {skill.sp}{skill.cd > 0 ? ` · CD ${skill.cd}` : ''}</span>}</span>
+          <span className={wrap}>◆ {skill ? skill.name : '스킬 없음'}{skill && <span style={{ color: PALETTE.textDim }}> · SP {skill.sp}{skill.cd > 0 ? ` · CD ${skill.cd}` : ''}</span>}
+            {/* 1.143.0 — ⛓ 사용 가능 횟수 (소진 시 스킬 봉인) */}
+            {(() => { const u = buriedItemUses(item, char); return u ? <span className="tabular-nums" style={{ color: usesColor(u) }}> · ⛓ {u.left}/{u.max}</span> : null; })()}
+          </span>
         </div>
         <div className={`text-[11px] ${wrap}`} style={{ color: PALETTE.textDim }}>
           {showSlot && <span>{meta.name} · </span>}
@@ -187,7 +205,7 @@ export function BuriedItemCard({ item, slotId, onClick, right, dim = false, show
 }
 
 // ===== 장비 상세 시트 (장착·분해·비교) =====
-export function BuriedItemSheet({ item, compare, onEquip, onUnequip, onDismantle, onClose, extra }) {
+export function BuriedItemSheet({ item, compare, onEquip, onUnequip, onDismantle, onClose, extra, char = null }) {
   if (!item) return null;
   const tier = getBuriedTier(item.tier);
   const skill = BURIED_SKILLS[item.skillId];
@@ -215,9 +233,9 @@ export function BuriedItemSheet({ item, compare, onEquip, onUnequip, onDismantle
         {compare && (
           <div className="mb-2 space-y-1">
             <div className="text-[11px] tracking-[0.2em]" style={{ color: PALETTE.textDim }}>지금 장착 중</div>
-            <BuriedItemCard item={compare} dim full />
+            <BuriedItemCard item={compare} dim full char={char} />
             <div className="text-center text-[13px] leading-none" style={{ color: PALETTE.dawn }}>▼ 교체 후보</div>
-            <BuriedItemCard item={item} full />
+            <BuriedItemCard item={item} full char={char} />
           </div>
         )}
 
@@ -253,6 +271,15 @@ export function BuriedItemSheet({ item, compare, onEquip, onUnequip, onDismantle
               {skill.power ? ` · 위력 ${skill.power}%${skill.hits ? ` ×${skill.hits}` : ''} (${skill.stat ? `${skillKindMeta(skill).refs} 기반 ${skillKindMeta(skill).label} 공격력 참조` : '물리·기교·마법 중 최고 공격력 참조'})` : ' · 스탯 무관 (보조 스킬)'}
               {skill.pierce ? ' · 방어 무시' : ''}
             </div>
+            {/* 1.143.0 — ⛓ 사용 가능 횟수 */}
+            {(() => {
+              const u = buriedItemUses(item, char);
+              return u ? (
+                <div className="text-[11px] mt-0.5 tabular-nums" style={{ color: usesColor(u) }}>
+                  ⛓ 사용 가능 횟수 <b>{u.left}/{u.max}</b>{u.left <= 0 ? ' — 소진: 스킬 봉인 상태 (야영·봉헌·상점 정비로 충전)' : ' — 소진 시 스킬 봉인, 야영·봉헌·상점 정비로 충전'}
+                </div>
+              ) : null;
+            })()}
             <div className="text-[12px] mt-1 leading-relaxed" style={{ color: PALETTE.textDim }}>{skill.desc}</div>
             {/* 1.105.0 — 효과 풀이: "[파쇄] 2"가 정확히 무엇인지 그 자리에서 설명 */}
             {buriedSkillEffectLines(skill).length > 0 && (
@@ -336,13 +363,13 @@ export function BuriedLootModal({ char, onResolve }) {
           {cur ? (
             <>
               <div className="text-[11px]" style={{ color: PALETTE.textDim }}>지금 장착 중</div>
-              <BuriedItemCard item={cur} dim full />
+              <BuriedItemCard item={cur} dim full char={char} />
               <div className="text-center text-[13px] leading-none" style={{ color: PALETTE.dawn }}>▼ 새 장비</div>
             </>
           ) : (
             <div className="text-[11px]" style={{ color: PALETTE.textDim }}>{slotMeta(item.slot).name} 슬롯 — 비어 있음</div>
           )}
-          <BuriedItemCard item={item} full />
+          <BuriedItemCard item={item} full char={char} />
         </div>
         {/* 스탯 증감 비교 */}
         {cur && keys.length > 0 && (
