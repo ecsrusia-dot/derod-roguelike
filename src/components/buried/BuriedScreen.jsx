@@ -25,13 +25,14 @@ import {
   BURIED_RACES, getBuriedRace,
   BURIED_UNIONS, BURIED_UNION_CLASSES, getBuriedUnion, buriedUnionLevel, BURIED_UNION_LEVELS, BURIED_UNION_REWARDS,
   BURIED_SIGILS, BURIED_ZONES,
+  BURIED_GHOSTS, BURIED_GHOST_RANKS, buriedGhostKit,
 } from '../../data.js';
 import { BuriedBar, BURIED_DUST_ICON, BuriedTierLegend, BuriedLootModal } from './BuriedCommon.jsx';
 import BuriedManage from './BuriedManage.jsx';
 
 const R = { chip: 'var(--r-chip, 8px)', btn: 'var(--r-btn, 13px)', panel: 'var(--r-panel, 18px)' };
 
-export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateChar, onRetire, onForge, onBuyContract, onBuyPart, onDetachParts, onResetAll, forgeNotice, onBack }) {
+export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateChar, onRetire, onForge, onBuyContract, onBuyPart, onDetachParts, onResetAll, onSetCompanion, forgeNotice, onBack }) {
   const b = meta?.buried || {};
   const char = b.char || null;
   const clears = (b.clears && typeof b.clears === 'object') ? b.clears : {};
@@ -190,6 +191,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
               { id: 'contracts', icon: <ScrollText size={15} />, name: '마의 계약', sub: `보유 ${ownedContracts.length}/${BURIED_CONTRACTS.length} · 한도 ${buriedContractCap(b)}`, c: PALETTE.twilight },
               { id: 'lab', icon: <FlaskConical size={15} />, name: '연구실', sub: `${BURIED_SHARD.icon}${b.shards || 0} · 부품 ${(b.parts || []).length}/5`, c: '#c48bd4' },
               { id: 'unions', icon: <span className="text-[13px]">🏛</span>, name: '조직', sub: `평판 Lv 합 ${BURIED_UNIONS.reduce((s, u) => s + buriedUnionLevel(b.unionRep?.[u.id] || 0), 0)}/${BURIED_UNIONS.length * 8}`, c: PALETTE.dawn },
+              { id: 'ghosts', icon: <span className="text-[13px]">🕯</span>, name: '사역각', sub: `괴이 ${Object.keys(b.ghosts || {}).length}/${BURIED_GHOSTS.length} · 동행 ${b.companion ? BURIED_GHOSTS.find(g => g.id === b.companion)?.name || '-' : '없음'}`, c: '#c48bd4' },
               { id: 'records', icon: <BarChart3 size={15} />, name: '기록 · 규칙', sub: `최고 ${b.deepest || 0}층 · 사망 ${b.deaths || 0}`, c: PALETTE.ice },
             ].map(m => (
               <button key={m.id} onClick={() => setView(m.id)} className="ui-press px-3 py-3 text-left"
@@ -274,6 +276,66 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
                       style={{ borderRadius: 'var(--r-chip, 8px)', border: `1px solid ${got ? u.color : PALETTE.panelBorder}`, color: got ? u.color : PALETTE.textDim, opacity: got ? 1 : 0.7 }}>
                       {got ? '✓' : `Lv.${rwLv}`} {label}
                     </span>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+
+  // ============================================
+  // 🕯 사역각 (1.144.0) — 제령한 괴이 목록·동행 지정·도감
+  // ============================================
+  const renderGhosts = () => (
+    <>
+      <SubHeader title="🕯 사역각(使役閣)" color="#c48bd4" onPrev={() => setView('home')} />
+      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2 ui-stagger">
+        <div className="px-3 py-2 text-[11px] leading-relaxed" style={{ borderRadius: R.chip, background: PALETTE.panel, border: `1px solid ${PALETTE.panelBorder}`, color: PALETTE.textDim }}>
+          원혼형 괴이를 <b style={{ color: PALETTE.text }}>HP 25% 이하</b>로 몰아넣고 등급에 맞는 <b style={{ color: PALETTE.text }}>제령부</b>(보스가 10% 확률로 떨어뜨림)를 태우면 사역할 수 있다.
+          동행은 <b style={{ color: PALETTE.text }}>1체</b> — 패시브 + 내 턴 종료 시 자동 발동기. <b style={{ color: PALETTE.dawn }}>다음 출정부터 적용</b>.
+          동행 중인 괴이와 <b style={{ color: PALETTE.text }}>동일 개체를 다시 제령</b>하면 한계돌파(%형 +20%p·스택 +1).
+          {char && <b style={{ color: PALETTE.legendary }}> (탐험 진행 중 — 동행 변경은 다음 캐릭터부터)</b>}
+        </div>
+        {Object.values(BURIED_GHOST_RANKS).map(rank => {
+          const list = BURIED_GHOSTS.filter(g => g.rank === rank.id);
+          return (
+            <div key={rank.id}>
+              <div className="text-[11px] tracking-[0.2em] font-bold mb-1" style={{ color: rank.color }}>
+                {rank.name}({rank.hanja}) — 기본 제령 {rank.baseTame}% · 부적 상한 {rank.cap} · 돌파 {rank.breakMax}회
+              </div>
+              <div className="space-y-1">
+                {list.map(g => {
+                  const rec = (b.ghosts || {})[g.id];
+                  const owned = !!rec;
+                  const isCompanion = b.companion === g.id;
+                  const kit = owned ? buriedGhostKit(g, rec.breaks || 0) : null;
+                  return (
+                    <div key={g.id} className="px-2.5 py-2 flex items-start gap-2" style={{ borderRadius: R.btn, background: PALETTE.panel, border: `1px solid ${owned ? rank.color + '66' : PALETTE.panelBorder}`, opacity: owned ? 1 : 0.55 }}>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[12px] font-bold" style={{ color: owned ? rank.color : PALETTE.textDim }}>
+                          {owned ? '🕯' : '🔒'} {g.name}
+                          {owned && rank.breakMax > 0 && <span className="text-[11px] font-normal tabular-nums" style={{ color: PALETTE.legendary }}> 돌파 {rec.breaks || 0}/{rank.breakMax}</span>}
+                        </div>
+                        {owned ? (
+                          <div className="text-[11px]" style={{ color: PALETTE.textDim }}>
+                            패시브: {Object.entries(kit.passive).map(([k, v]) => `${k} ${v > 0 ? '+' : ''}${v}`).join(' · ')}
+                            <br />액티브(쿨 {kit.active.cd}턴): {g.aDesc}
+                          </div>
+                        ) : (
+                          <div className="text-[11px]" style={{ color: PALETTE.textDim }}>미제령 — {g.aDesc} (제령 시)</div>
+                        )}
+                      </div>
+                      {owned && (
+                        <button onClick={() => onSetCompanion?.(isCompanion ? null : g.id)}
+                          className="ui-press px-2.5 py-1.5 text-[11px] font-bold shrink-0"
+                          style={{ borderRadius: R.chip, background: isCompanion ? rank.color : PALETTE.panelLight, color: isCompanion ? '#0a0608' : PALETTE.text, border: `1px solid ${rank.color}88` }}>
+                          {isCompanion ? '동행 중' : '동행'}
+                        </button>
+                      )}
+                    </div>
                   );
                 })}
               </div>
@@ -894,6 +956,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
     <div className="absolute inset-0 flex flex-col" style={{ background: PALETTE.bgDeep }}>
       {view === 'home' && renderHome()}
       {view === 'unions' && renderUnions()}
+      {view === 'ghosts' && renderGhosts()}
       {view === 'wizard' && renderWizard()}
       {view === 'forge' && renderForge()}
       {view === 'contracts' && renderContracts()}

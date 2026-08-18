@@ -1473,6 +1473,8 @@ const EMPTY_BURIED = {
   unlockedRaces: [],// 1.141.0~ 해금된 조직 전속 종족 id 목록
   gateSigils: [],   // 1.143.0~ 🗝 수문장의 인장 — 첫 격파한 관문 층 목록 (100~500, 계정 영구)
   apexClears: 0,    // 1.143.0~ 👑 묘주(500층 최종 보스) 격파 횟수
+  ghosts: {},       // 1.144.0~ 🕯 제령한 괴이 (ghostId → { breaks }) — 계정 영구
+  companion: null,  // 1.144.0~ 동행 괴이 ghostId (다음 출정부터 적용)
 };
 // 1.131.1 — 무덤의 유산 전체 초기화 (PM 요청: 업데이트를 처음부터 온전히 체험).
 // meta.buried만 백지화 — 본편·레이드·HOF 등 다른 메타는 건드리지 않는다.
@@ -1501,7 +1503,28 @@ export function getBuried(meta) {
     unlockedRaces: Array.isArray(b.unlockedRaces) ? b.unlockedRaces : [],
     gateSigils: Array.isArray(b.gateSigils) ? b.gateSigils : [],
     apexClears: Math.max(0, b.apexClears || 0),
+    ghosts: (b.ghosts && typeof b.ghosts === 'object') ? b.ghosts : {},
+    companion: b.companion || null,
   };
+}
+
+// 1.144.0 — 🕯 괴이 제령 성공 기록. 신규 = 소장 / 이미 소장 + 동행 동일 개체 = 한계돌파 (호출부가 조건 판정)
+export function tameBuriedGhost(meta, ghostId, breakMax = 0) {
+  const b = getBuried(meta);
+  const cur = b.ghosts[ghostId];
+  const ghosts = {
+    ...b.ghosts,
+    [ghostId]: cur
+      ? { breaks: Math.min(breakMax, (cur.breaks || 0) + 1) }
+      : { breaks: 0 },
+  };
+  return { ...meta, buried: { ...b, ghosts } };
+}
+
+// 동행 괴이 지정 — 다음 캐릭터 생성부터 적용 (진행 중 런은 생성 시점 값 유지)
+export function setBuriedCompanion(meta, ghostId) {
+  const b = getBuried(meta);
+  return { ...meta, buried: { ...b, companion: ghostId || null } };
 }
 
 // 1.134.0 — 이벤트 방 선택 결과 기록 (선택 전 「지난 기록」 모달용). 이벤트당 최근 12건 유지

@@ -1628,6 +1628,104 @@ export const buriedZoneAt = (floor) => BURIED_ZONES.find(z => (floor || 1) >= z.
 export const BURIED_SIGILS = { dmgPct: 8, takenPct: 4, max: 5 };
 
 // =========================================================
+// 🕯 괴이(怪異) 사역 (1.144.0) — 괴력난신 원혼 설정 (PM 5차 승인, docs/pet-system-design.md)
+// =========================================================
+// 원혼형 적 26종을 「제령」해 부하로 사역한다. 조건: 적 HP 25% 이하 + 해당 등급 제령부 1장.
+// 성공률 = 등급 기본치 + (25 − HP%) × 0.5%p. 실패: 부적 소진 + 턴 소모 + 적 [격노] 3 + 그 전투 제령 잠금.
+// 제령부: 보스 처치 시 10% 고정 드랍(⚠️ 보상 버프 완전 무관) → 등급 배분 60/25/9/5/1.
+//   보유 상한 초과분은 먼지로 분해. **런 한정** — 사망 시 전량 소멸.
+// 한계돌파: 이번 런의 동행 괴이와 동일 개체를 다시 제령하면 돌파 (등급별 상한 1/2/3/4/5회).
+//   규칙(PM): %형 수치는 %증감(돌파당 기본치의 +20%), 스택형(상태이상·방벽)은 스택 +1 — 버프·디버프 스택에 % 적용 금지.
+export const BURIED_GHOST_RANKS = {
+  red:    { id: 'red',    name: '적령', hanja: '赤靈', color: '#c4453d', dropShare: 60, cap: 10, baseTame: 45, breakMax: 1, cd: 4, dust: 20 },
+  green:  { id: 'green',  name: '녹령', hanja: '綠靈', color: '#7a9a5e', dropShare: 25, cap: 5,  baseTame: 25, breakMax: 2, cd: 4, dust: 60 },
+  cyan:   { id: 'cyan',   name: '청령', hanja: '靑靈', color: '#7ba3c4', dropShare: 9,  cap: 3,  baseTame: 12, breakMax: 3, cd: 3, dust: 150 },
+  indigo: { id: 'indigo', name: '남령', hanja: '藍靈', color: '#5c4a8c', dropShare: 5,  cap: 2,  baseTame: 6,  breakMax: 4, cd: 3, dust: 400 },
+  violet: { id: 'violet', name: '자령', hanja: '紫靈', color: '#c48bd4', dropShare: 1,  cap: 1,  baseTame: 2,  breakMax: 5, cd: 3, dust: 1000 },
+};
+export const BURIED_TALISMAN_DROP_PCT = 10; // 보스 처치 시 제령부 자체 드랍율 (버프 무관 고정)
+
+// 괴이 26종 — enemyKey = 대응하는 기존 적 (일러 재사용). passive는 계약 fx 어휘(소비 지점 공짜).
+// active: 내 턴 종료 시 자동 발동(적 행동보다 우선), 쿨은 등급 공통(rank.cd).
+//   power {stat, pct}: 내 캐릭터 공격력 참조 타격 / apply·self: 상태이상 / healPct: 최대 HP % 회복 / barrier / drainPct: 타격 피해의 % 회복
+const GH = (o) => o;
+export const BURIED_GHOSTS = [
+  // ── 적령 8 ──
+  GH({ id: 'gh_banshee',  enemyKey: 'wailingBanshee', rank: 'red', name: '통곡하는 원혼', passive: { statusChance: 5 },  active: { apply: [{ s: 'weaken', n: 1 }] },  aDesc: '적 [약화] 1' }),
+  GH({ id: 'gh_pale',     enemyKey: 'paleWraith',     rank: 'red', name: '창백한 원혼',   passive: { dodge: 3 },          active: { self: [{ s: 'evade', n: 1 }] },    aDesc: '자신 [잔영] 1' }),
+  GH({ id: 'gh_wisp',     enemyKey: 'sandWisp',       rank: 'red', name: '모래 위습',     passive: { startSpPct: 10 },    active: { apply: [{ s: 'aging', n: 1 }] },   aDesc: '적 [노화] 1' }),
+  GH({ id: 'gh_shade',    enemyKey: 'frostbiteShade', rank: 'red', name: '동상 그림자',   passive: { takenPct: -3 },      active: { self: [{ s: 'guard', n: 1 }] },    aDesc: '자신 [수호] 1' }),
+  GH({ id: 'gh_wraith',   enemyKey: 'graveWraith',    rank: 'red', name: '묘지 망령',     passive: { physPct: 4 },        active: { power: { stat: 'str', pct: 15 } }, aDesc: '완력 15% 타격' }),
+  GH({ id: 'gh_dusk',     enemyKey: 'duskChild',      rank: 'red', name: '땅거미 아이',   passive: { expPct: 8 },         active: { healPct: 3 },                      aDesc: 'HP 3% 회복' }),
+  GH({ id: 'gh_mirror',   enemyKey: 'mirrorPhantom',  rank: 'red', name: '거울 환영',     passive: { crit: 3 },           active: { power: { stat: 'dex', pct: 15 } }, aDesc: '기교 15% 타격' }),
+  GH({ id: 'gh_lurker',   enemyKey: 'shadowLurker',   rank: 'red', name: '그림자 잠복자', passive: { dropLuck: 1 },       active: { apply: [{ s: 'shatter', n: 1 }] }, aDesc: '적 [파쇄] 1' }),
+  // ── 녹령 8 ──
+  GH({ id: 'gh_rotted',   enemyKey: 'rottedSpirit',   rank: 'green', name: '썩은 정령',    passive: { statusChance: 10 }, active: { apply: [{ s: 'poison', n: 2 }] },  aDesc: '적 [중독] 2' }),
+  GH({ id: 'gh_lich',     enemyKey: 'lichAcolyte',    rank: 'green', name: '리치의 사도',  passive: { magPct: 8 },        active: { power: { stat: 'int', pct: 25 } }, aDesc: '지혜 25% 타격' }),
+  GH({ id: 'gh_night',    enemyKey: 'nightLurker',    rank: 'green', name: '밤의 잠복자',  passive: { crit: 5 },          active: { power: { stat: 'dex', pct: 25 }, apply: [{ s: 'bleed', n: 2 }] }, aDesc: '기교 25% 타격 + [출혈] 2' }),
+  GH({ id: 'gh_priest',   enemyKey: 'sealPriest',     rank: 'green', name: '봉인 사제',    passive: { healPct: 12 },      active: { healPct: 5 },                      aDesc: 'HP 5% 회복' }),
+  GH({ id: 'gh_husk',     enemyKey: 'twilightHusk',   rank: 'green', name: '황혼의 잔재',  passive: { takenPct: -5 },     active: { self: [{ s: 'guard', n: 2 }] },    aDesc: '자신 [수호] 2' }),
+  GH({ id: 'gh_revenant', enemyKey: 'frostRevenant',  rank: 'green', name: '서리 귀환자',  passive: { physPct: 8 },       active: { apply: [{ s: 'bind', n: 1 }] },    aDesc: '적 [속박] 1' }),
+  GH({ id: 'gh_drowned',  enemyKey: 'drownedKnight',  rank: 'green', name: '익사한 기사',  passive: { barrierPct: 15 },   active: { barrier: 15 },                     aDesc: '보호막 +15' }),
+  GH({ id: 'gh_warden',   enemyKey: 'oblivionWarden', rank: 'green', name: '망각의 간수',  passive: { goldPct: 12 },      active: { apply: [{ s: 'silence', n: 1 }] }, aDesc: '적 [침묵] 1' }),
+  // ── 청령 4 ──
+  GH({ id: 'gh_succubus', enemyKey: 'succubusQueen',  rank: 'cyan', name: '몽마 여왕',     passive: { drainPct: 4 },      active: { apply: [{ s: 'confuse', n: 1 }] }, aDesc: '적 [혼란] 1' }),
+  GH({ id: 'gh_plague',   enemyKey: 'plagueWitch',    rank: 'cyan', name: '역병의 마녀',   passive: { statusChance: 15 }, active: { apply: [{ s: 'poison', n: 3 }, { s: 'weaken', n: 1 }] }, aDesc: '적 [중독] 3 + [약화] 1' }),
+  GH({ id: 'gh_sealw',    enemyKey: 'sealWitch',      rank: 'cyan', name: '봉인의 마녀',   passive: { magPct: 12 },       active: { power: { stat: 'int', pct: 40 }, apply: [{ s: 'shatter', n: 1 }] }, aDesc: '지혜 40% 타격 + [파쇄] 1' }),
+  GH({ id: 'gh_cato',     enemyKey: 'catoblepas',     rank: 'cyan', name: '카토블레파스',  passive: { takenPct: -8 },     active: { apply: [{ s: 'aging', n: 2 }, { s: 'curse', n: 1 }] }, aDesc: '적 [노화] 2 + [저주] 1' }),
+  // ── 남령 3 ──
+  GH({ id: 'gh_tyrant',   enemyKey: 'tombTyrant',     rank: 'indigo', name: '무덤의 폭군',      passive: { physPct: 12, hpPct: 8 },  active: { power: { stat: 'str', pct: 40 }, apply: [{ s: 'shatter', n: 2 }] }, aDesc: '완력 40% 타격 + [파쇄] 2' }),
+  GH({ id: 'gh_wking',    enemyKey: 'gateWraithKing', rank: 'indigo', name: '무형의 망령왕',    passive: { dodge: 8, crit: 5 },      active: { power: { stat: 'dex', pct: 40 }, self: [{ s: 'evade', n: 2 }] }, aDesc: '기교 40% 타격 + 자신 [잔영] 2' }),
+  GH({ id: 'gh_maestro',  enemyKey: 'gateMaestro',    rank: 'indigo', name: '종막의 마에스트로', passive: { magPct: 10, startSpPct: 15 }, active: { power: { stat: 'int', pct: 40 }, self: [{ s: 'rage', n: 1 }] }, aDesc: '지혜 40% 타격 + 자신 [격노] 1' }),
+  // ── 자령 3 (전설 포지션) ──
+  GH({ id: 'gh_nakzel',   enemyKey: 'gateNakzelion',  rank: 'violet', name: '낙젤리온',        passive: { physPct: 12, magPct: 12, crit: 6 }, active: { power: { stat: 'int', pct: 50 }, apply: [{ s: 'bleed', n: 3 }] }, aDesc: '지혜 50% 타격 + [출혈] 3' }),
+  GH({ id: 'gh_devourer', enemyKey: 'gatePrimordial', rank: 'violet', name: '태초의 포식자',    passive: { drainPct: 6, hpPct: 12 }, active: { power: { stat: 'str', pct: 50 }, drainPct: 50 }, aDesc: '완력 50% 타격 + 피해의 50% 회복' }),
+  GH({ id: 'gh_tomblord', enemyKey: 'gateTombLord',   rank: 'violet', name: '묘주(墓主)',       passive: { physPct: 15, magPct: 15, takenPct: -8 }, active: { power: { stat: 'int', pct: 60 }, self: [{ s: 'wall', n: 1 }] }, aDesc: '지혜 60% 대타격 + 🧱방벽 1' }),
+];
+export const getBuriedGhost = (id) => BURIED_GHOSTS.find(g => g.id === id) || null;
+export const buriedGhostForEnemy = (enemyKey) => BURIED_GHOSTS.find(g => g.enemyKey === enemyKey) || null;
+
+// 제령 성공률 (PM 공식) — HP 25% 이하에서만 호출된다
+export function buriedTameChance(rankId, hpPct) {
+  const base = BURIED_GHOST_RANKS[rankId]?.baseTame || 0;
+  return Math.max(0, Math.min(100, base + Math.max(0, 25 - hpPct) * 0.5));
+}
+
+// 제령부 드랍 (보스 처치 시) — ⚠️ 보상 버프(드랍 운·골드 배율 등) 완전 무관 (PM 지정)
+export function rollBuriedTalisman() {
+  if (Math.random() * 100 >= BURIED_TALISMAN_DROP_PCT) return null;
+  let roll = Math.random() * 100;
+  for (const r of Object.values(BURIED_GHOST_RANKS)) {
+    roll -= r.dropShare;
+    if (roll < 0) return r.id;
+  }
+  return 'red';
+}
+
+// 한계돌파 실효 킷 (PM 규칙): %형 수치 = 기본치 × (1 + 0.2×돌파) / 스택형(상태이상·방벽) = +1스택/돌파
+export function buriedGhostKit(ghost, breaks = 0) {
+  const rank = BURIED_GHOST_RANKS[ghost.rank];
+  const b = Math.max(0, Math.min(rank.breakMax, breaks || 0));
+  const pctMult = 1 + 0.2 * b;
+  const passive = {};
+  for (const [k, v] of Object.entries(ghost.passive || {})) {
+    // dropLuck은 %가 아닌 정수형 — 돌파 미적용 (스택도 아님)
+    passive[k] = k === 'dropLuck' ? v : Math.round(v * pctMult * 10) / 10;
+  }
+  const a = ghost.active || {};
+  const active = {
+    power: a.power ? { stat: a.power.stat, pct: Math.round(a.power.pct * pctMult) } : null,
+    apply: (a.apply || []).map(x => ({ s: x.s, n: x.n + b })),
+    self: (a.self || []).map(x => ({ s: x.s, n: x.n + b })),
+    healPct: a.healPct ? Math.round(a.healPct * pctMult * 10) / 10 : 0,
+    barrier: a.barrier ? a.barrier + b * 5 : 0, // 방벽·보호막 수치형은 돌파당 +5
+    drainPct: a.drainPct ? Math.round(a.drainPct * pctMult) : 0,
+    cd: rank.cd,
+  };
+  return { passive, active, breaks: b, rank };
+}
+
+// =========================================================
 // 9. 던전 — 층 진행 + 방 선택
 // =========================================================
 export const BURIED_ROOMS = {
@@ -3562,8 +3660,16 @@ export function rollBuriedContract(ownedIds, unionRep = {}) {
   return pool.length > 0 ? pick(pool).id : null;
 }
 // 지참 중인 계약의 fx 합산 — 전투·던전·파생 스탯이 이 뭉치를 나눠 읽는다
+// 1.144.0 — 🕯 동행 괴이의 패시브도 같은 어휘로 여기에 합산 (파생·전투·보상 전 소비 지점 공짜)
 export function aggregateBuriedContracts(char) {
   const out = {};
+  if (char?.ghost?.id) {
+    const g = getBuriedGhost(char.ghost.id);
+    if (g) {
+      const kit = buriedGhostKit(g, char.ghost.breaks || 0);
+      for (const [k, v] of Object.entries(kit.passive)) out[k] = (out[k] || 0) + v;
+    }
+  }
   for (const id of char?.contracts || []) {
     const c = getBuriedContract(id);
     if (!c) continue;

@@ -171,10 +171,11 @@ import {
   checkBuriedDepthClassUnlock,
   BURIED_UNION_REP_GAIN, getBuriedUnion,
   BURIED_SIGILS, rollBuriedUniqueItem, buriedMonsterLevel, buriedLootPower,
+  BURIED_GHOST_RANKS, getBuriedGhost, rollBuriedTalisman,
 } from './data.js';
 import { getKstDateKey } from './utils/dailyChallenge.js';
 import { simulateBestEndlessRun } from './utils/endlessSkipSim.js';
-import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, applyEngravingSlot, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear, dismantleRaidItem, dismantleRaidJunk, enhanceRaidItem, claimRaidWeekly, addRaidResources, spendRaidResourcesForItem, resolveRaidSecret, toggleRaidFormation, appendAutoRunLog, getGambleUsed, useGambleEntry, addTwilightCoins, addFateShards, redeemFateShards, buyGambleShopItem, addClassTitle, equipClassTitle, saveHofPatterns, hofLevelUpChar, recordHofClear, recordMastersClearByClass, updateBestRunTime, getBuried, saveBuriedChar, startBuriedChar, recordBuriedDeath, resetBuried, recordBuriedClear, addBuriedDust, craftBuriedForgeItem, trackBuriedKill, buyBuriedContract, addBuriedShards, buyBuriedPart, detachBuriedParts, logBuriedEvent, addBuriedUnionRep } from './storage.js';
+import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, applyEngravingSlot, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear, dismantleRaidItem, dismantleRaidJunk, enhanceRaidItem, claimRaidWeekly, addRaidResources, spendRaidResourcesForItem, resolveRaidSecret, toggleRaidFormation, appendAutoRunLog, getGambleUsed, useGambleEntry, addTwilightCoins, addFateShards, redeemFateShards, buyGambleShopItem, addClassTitle, equipClassTitle, saveHofPatterns, hofLevelUpChar, recordHofClear, recordMastersClearByClass, updateBestRunTime, getBuried, saveBuriedChar, startBuriedChar, recordBuriedDeath, resetBuried, recordBuriedClear, addBuriedDust, craftBuriedForgeItem, trackBuriedKill, buyBuriedContract, addBuriedShards, buyBuriedPart, detachBuriedParts, logBuriedEvent, addBuriedUnionRep, tameBuriedGhost, setBuriedCompanion } from './storage.js';
 
 
 
@@ -396,6 +397,10 @@ export default function App() {
       const char = createBuriedChar(classId, { items: [], gold: b.legacyGold }, dungeonId, contracts, aggregateBuriedParts(b.parts), startFloor, buriedEarnedDepthTraits(b.deepestByDungeon), raceId, keystones, originId);
       if (!char) return prev;
       char.sigils = (b.gateSigils || []).length; // 🗝 수문장의 인장 (1.143.0) — 생성 시 계정 인장 수를 굽는다
+      // 🕯 괴이 사역 (1.144.0) — 제령부는 런 한정(빈손 시작), 소장 목록·동행은 생성 시 굽는다
+      char.talismans = {};
+      char.ownedGhosts = Object.keys(b.ghosts || {});
+      if (b.companion && b.ghosts?.[b.companion]) char.ghost = { id: b.companion, breaks: b.ghosts[b.companion].breaks || 0 };
       const next = startBuriedChar(prev, char);
       saveMeta(next);
       return next;
@@ -538,6 +543,12 @@ export default function App() {
       pendingStatuses: null, // 1.107.0 — 이벤트 함정의 지연 상태이상은 1회 적용 후 소거
       carryBarrier: res.carryBarrier || 0, // [u6] 달인 — 남은 보호막을 다음 전투로
     };
+    // 🧿 제령부 소모 정산 (1.144.0) — 실패 포함 이번 전투에서 태운 부적
+    if (res.talismansSpent && Object.keys(res.talismansSpent).length > 0) {
+      const t = { ...(c.talismans || {}) };
+      for (const [r, n] of Object.entries(res.talismansSpent)) t[r] = Math.max(0, (t[r] || 0) - n);
+      c = { ...c, talismans: t };
+    }
     // 1.132.0 — 전투에서 쓴 스킬 사용 횟수 정산 (소진 시 봉인 — 새 장비를 주워야 해제)
     if (res.usesSpent && Object.keys(res.usesSpent).length > 0) {
       const eq = { ...c.equipped };
@@ -638,6 +649,37 @@ export default function App() {
     // 🗝 인장은 이번 런에도 즉시 반영 / 👑 묘주의 관은 획득 판단 대기열로
     if (sigilEarned) advanced = { ...advanced, sigils: (advanced.sigils || 0) + 1 };
     if (apexCrown) advanced = addBuriedItemToChar(advanced, apexCrown).char;
+    // 🕯 제령 성공 (1.144.0) — 신규 소장 or 한계돌파. 계정(meta)과 이번 런(char) 동시 반영
+    if (res.tamed) {
+      const g = getBuriedGhost(res.tamed.ghostId);
+      const rk = g ? BURIED_GHOST_RANKS[g.rank] : null;
+      if (g && rk) {
+        setMeta(prev => { const next = tameBuriedGhost(prev, g.id, rk.breakMax); saveMeta(next); return next; });
+        if (res.tamed.breakUp) {
+          const nb = Math.min(rk.breakMax, (advanced.ghost?.breaks || 0) + 1);
+          advanced = { ...advanced, ghost: { ...(advanced.ghost || { id: g.id }), breaks: nb } };
+          setBuriedForgeNotice(`🕯 한계돌파! ${rk.name} 「${g.name}」 +${nb}/${rk.breakMax} — 사역귀가 강해졌다 (%형 수치 +20%p·스택 +1)`);
+        } else {
+          advanced = { ...advanced, ownedGhosts: [...(advanced.ownedGhosts || []), g.id] };
+          setBuriedForgeNotice(`🕯 제령 성공 — ${rk.name}(${rk.hanja}) 「${g.name}」이(가) 사역각에 들어왔다! 동행 지정은 로비 사역각에서`);
+        }
+      }
+    }
+    // 🧿 제령부 드랍 (1.144.0) — 보스 처치 시 10% 고정 → 등급 배분 60/25/9/5/1. ⚠️ 보상 버프 완전 무관 (PM 지정)
+    if (buriedRoom === 'boss') {
+      const tal = rollBuriedTalisman();
+      if (tal) {
+        const rk = BURIED_GHOST_RANKS[tal];
+        const have = (advanced.talismans || {})[tal] || 0;
+        if (have >= rk.cap) {
+          setMeta(prev => { const next = addBuriedDust(prev, rk.dust); saveMeta(next); return next; });
+          setBuriedForgeNotice(`🧿 ${rk.name}부 — 보유 상한(${rk.cap}) 초과, 🕯 먼지 ${rk.dust}(으)로 흩어졌다`);
+        } else {
+          advanced = { ...advanced, talismans: { ...(advanced.talismans || {}), [tal]: have + 1 } };
+          setBuriedForgeNotice(`🧿 제령부 획득 — ${rk.name}부(${rk.hanja}) ×${have + 1}/${rk.cap}. ${rk.name} 괴이를 HP 25% 이하에서 제령할 수 있다`);
+        }
+      }
+    }
     setBuriedEnemy(null); setBuriedRoom(null); setBuriedRoomFx(null);
     if (shardGain) setMeta(prev => { const next = addBuriedShards(prev, shardGain); saveMeta(next); return next; });
     if (conquest) recordBuriedConquest(advanced);
@@ -3180,6 +3222,7 @@ export default function App() {
                 setBuriedForgeNotice(`⚰ 정산 — 장비 ${settle.itemCount}개 분해 🕯 +${settle.dust} · 골드는 무덤에 흩어졌다`);
               }}
               onForge={handleBuriedForge} onResetAll={handleBuriedReset}
+              onSetCompanion={(gid) => setMeta(prev => { const next = setBuriedCompanion(prev, gid); saveMeta(next); return next; })}
               onBuyContract={handleBuriedBuyContract}
               onBuyPart={handleBuriedBuyPart}
               onDetachParts={handleBuriedDetachParts}
