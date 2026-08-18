@@ -3455,6 +3455,41 @@ export const BURIED_CONTRACTS = [
   { id: 's_labpass',   name: '보급 · 실험실 개방', desc: '[연구소] 출정 시작 시 무작위 장착 스킬 Lv +2',       fx: {}, supply: { skillLv: 2 } },
   { id: 's_blackmkt',  name: '보급 · 어둠 거래',  desc: '[암월 상회] 출정 시작 시 영웅 장비 1개 지급',         fx: {}, supply: { item: 'epic' } },
   { id: 's_forbidden', name: '보급 · 금서',       desc: '[연구소] 출정 시작 시 ᚱ룬 1개 (★★★~★★★★)',       fx: {}, supply: { rune: [3, 4] } },
+
+  // ===== 1.142.0 — 계약 2차 (BB2 契約 시트 기반 +30 = 58종) =====
+  // ── 일반 계약 10종 (복합·페널티형 포함) ──
+  { id: 'c_precision', name: '정밀의 계약',   desc: '치명 확률 +6%, 물리·기교 +5%',          fx: { crit: 6, physPct: 5 } },
+  { id: 'c_focus',     name: '집중의 계약',   desc: '시작 SP +15%p, 마법 +5%',               fx: { startSpPct: 15, magPct: 5 } },
+  { id: 'c_scaven',    name: '수습의 계약',   desc: '골드 +15%, 드랍 운 +1',                 fx: { goldPct: 15, dropLuck: 1 } },
+  { id: 'c_ward',      name: '결계의 계약',   desc: '보호막 +20%, 상태이상 저항 +10%',        fx: { barrierPct: 20, statusResist: 10 } },
+  { id: 'c_frenzy',    name: '광란의 계약',   desc: '물리·기교 +18% — 대신 회피 -4%',        fx: { physPct: 18, dodge: -4 } },
+  { id: 'c_gloom',     name: '그늘의 계약',   desc: '마법 +18% — 대신 회복 -10%',            fx: { magPct: 18, healPct: -10 } },
+  { id: 'c_pilgrim',   name: '순례의 계약',   desc: '경험치 +15%, 야영 회복 +15%',           fx: { expPct: 15, campPct: 15 } },
+  { id: 'c_ironhide',  name: '철피의 계약',   desc: '최대 HP +12%, 상태이상 저항 +15%',      fx: { hpPct: 12, statusResist: 15 } },
+  { id: 'c_hunter',    name: '사냥꾼의 계약', desc: '치명 확률 +8%, 흡혈 +3%',               fx: { crit: 8, drainPct: 3 } },
+  { id: 'c_slowstep',  name: '느긋한 걸음의 계약', desc: '마물 레벨업 필요 걸음 +1, 야영 회복 +10%', fx: { stepBonus: 1, campPct: 10 } },
+  // ── 보급 계약 8종 ──
+  { id: 's_scoutkit',  name: '보급 · 정찰 꾸러미', desc: '출정 시작 시 물약 +1, 골드 +150',            fx: {}, supply: { potions: 1, gold: 150 } },
+  { id: 's_fieldkit',  name: '보급 · 야전 배낭',   desc: '출정 시작 시 물약 +3',                       fx: {}, supply: { potions: 3 } },
+  { id: 's_warchest',  name: '보급 · 군자금',      desc: '출정 시작 시 골드 +400',                     fx: {}, supply: { gold: 400 } },
+  { id: 's_armory',    name: '보급 · 무기고 열쇠', desc: '출정 시작 시 희귀 장비 1개 지급',             fx: {}, supply: { item: 'rare' } },
+  { id: 's_relicbox',  name: '보급 · 유물 상자',   desc: '출정 시작 시 영웅 장비 1개 지급',             fx: {}, supply: { item: 'epic' } },
+  { id: 's_runecase',  name: '보급 · 룬 상자',     desc: '출정 시작 시 ᚱ룬 1개 (★~★★★)',             fx: {}, supply: { rune: [1, 3] } },
+  { id: 's_drillbook', name: '보급 · 조련 교본',   desc: '출정 시작 시 무작위 장착 스킬 Lv +1, 물약 +1', fx: {}, supply: { skillLv: 1, potions: 1 } },
+  { id: 's_fullpack',  name: '보급 · 완전 군장',   desc: '출정 시작 시 골드 +250, ᚱ룬 1개 (★★)',       fx: {}, supply: { gold: 250, rune: [2, 2] } },
+  // ── 🏛 조직 상급 계약 12종 (1.141.0 조직 평판 게이트 — 해당 조직 Lv 도달 시 랜덤 풀에 들어온다) ──
+  { id: 'u_seal1', union: 'sealwatch', unionLv: 3, name: '감시단 · 파수의 인장',   desc: '[봉인 감시단 Lv.3] 보호막 +25%, 상태이상 저항 +10%', fx: { barrierPct: 25, statusResist: 10 } },
+  { id: 'u_seal2', union: 'sealwatch', unionLv: 5, name: '감시단 · 봉인 기사단',   desc: '[봉인 감시단 Lv.5] 최대 HP +15%, 회복 +15%',        fx: { hpPct: 15, healPct: 15 } },
+  { id: 'u_seal3', union: 'sealwatch', unionLv: 7, name: '감시단 · 대봉인 서약',   desc: '[봉인 감시단 Lv.7] 시작 🧱방벽 +1, 보호막 +20%',     fx: { startWall: 1, barrierPct: 20 } },
+  { id: 'u_mour1', union: 'mourners', unionLv: 3, name: '상조회 · 곡소리',        desc: '[침묵의 상조회 Lv.3] 상태이상 확률 +20%, 마법 +8%',  fx: { statusChance: 20, magPct: 8 } },
+  { id: 'u_mour2', union: 'mourners', unionLv: 5, name: '상조회 · 방부 처리',     desc: '[침묵의 상조회 Lv.5] 회복 +25%, 상태이상 저항 +15%', fx: { healPct: 25, statusResist: 15 } },
+  { id: 'u_mour3', union: 'mourners', unionLv: 7, name: '상조회 · 망자의 계(契)', desc: '[침묵의 상조회 Lv.7] 흡혈 +6%, 최대 HP +10%',       fx: { drainPct: 6, hpPct: 10 } },
+  { id: 'u_dark1', union: 'darkmoon', unionLv: 3, name: '상회 · 뒷돈',            desc: '[암월상회 Lv.3] 골드 +25%, 드랍 운 +1',             fx: { goldPct: 25, dropLuck: 1 } },
+  { id: 'u_dark2', union: 'darkmoon', unionLv: 5, name: '상회 · 밀수로',          desc: '[암월상회 Lv.5] 드랍 운 +2, 경험치 +10%',           fx: { dropLuck: 2, expPct: 10 } },
+  { id: 'u_dark3', union: 'darkmoon', unionLv: 7, name: '상회 · 달빛 금고',       desc: '[암월상회 Lv.7] 골드 +40%, 치명 +5%',               fx: { goldPct: 40, crit: 5 } },
+  { id: 'u_abys1', union: 'abyssorder', unionLv: 3, name: '교단 · 어둠 세례',     desc: '[무저갱 교단 Lv.3] 마법 +15%, 상태이상 확률 +10%',   fx: { magPct: 15, statusChance: 10 } },
+  { id: 'u_abys2', union: 'abyssorder', unionLv: 5, name: '교단 · 피의 기도',     desc: '[무저갱 교단 Lv.5] 물리·기교 +12%, 흡혈 +4%',       fx: { physPct: 12, drainPct: 4 } },
+  { id: 'u_abys3', union: 'abyssorder', unionLv: 7, name: '교단 · 무저갱 강림',   desc: '[무저갱 교단 Lv.7] 모든 공격 +10%, 치명 +5%',       fx: { physPct: 10, magPct: 10, crit: 5 } },
 ];
 export const getBuriedContract = (id) => BURIED_CONTRACTS.find(c => c.id === id) || null;
 // 1.135.0 — 보유 한도 (진행도 연동): 기본 6 + 던전 정복당 +4 + 최고 100층 +3 + 200층 +3.
@@ -3462,10 +3497,17 @@ export const getBuriedContract = (id) => BURIED_CONTRACTS.find(c => c.id === id)
 export function buriedContractCap(b) {
   const conquered = Object.keys(b?.clears || {}).filter(k => (b.clears?.[k] || 0) > 0).length;
   const deepest = b?.deepest || 0;
-  return Math.min(BURIED_CONTRACTS.length, 6 + conquered * 4 + (deepest >= 100 ? 3 : 0) + (deepest >= 200 ? 3 : 0));
+  // 1.142.0 — 조직 평판도 한도를 늘린다: 조직당 Lv.4 도달 +4, Lv.8 도달 +4 (최대 +32)
+  const unionCap = BURIED_UNIONS.reduce((s, u) => {
+    const lv = buriedUnionLevel(b?.unionRep?.[u.id] || 0);
+    return s + (lv >= 4 ? 4 : 0) + (lv >= 8 ? 4 : 0);
+  }, 0);
+  return Math.min(BURIED_CONTRACTS.length, 6 + conquered * 4 + (deepest >= 100 ? 3 : 0) + (deepest >= 200 ? 3 : 0) + unionCap);
 }
-export function rollBuriedContract(ownedIds) {
-  const pool = BURIED_CONTRACTS.filter(c => !ownedIds.includes(c.id));
+// 1.142.0 — 조직 상급 계약(union 필드)은 해당 조직 평판 레벨 도달 전엔 풀에서 제외
+export function rollBuriedContract(ownedIds, unionRep = {}) {
+  const pool = BURIED_CONTRACTS.filter(c => !ownedIds.includes(c.id)
+    && (!c.union || buriedUnionLevel(unionRep[c.union] || 0) >= (c.unionLv || 3)));
   return pool.length > 0 ? pick(pool).id : null;
 }
 // 지참 중인 계약의 fx 합산 — 전투·던전·파생 스탯이 이 뭉치를 나눠 읽는다

@@ -425,7 +425,7 @@ export default function App() {
   const handleBuriedBuyContract = () => {
     const b0 = getBuried(meta);
     if ((b0.contracts || []).length >= buriedContractCap(b0)) return;
-    const id = rollBuriedContract(b0.contracts); // 롤은 updater 밖 (이중 실행 방지)
+    const id = rollBuriedContract(b0.contracts, b0.unionRep); // 롤은 updater 밖 (이중 실행 방지). 1.142.0 — 조직 게이트
     if (!id) return;
     const cost = buriedContractCost(b0.contracts.length);
     setMeta(prev => {
