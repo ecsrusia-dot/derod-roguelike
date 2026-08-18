@@ -169,10 +169,11 @@ import {
   getBuriedPart,
   buriedEarnedDepthTraits,
   checkBuriedDepthClassUnlock,
+  BURIED_UNION_REP_GAIN, getBuriedUnion,
 } from './data.js';
 import { getKstDateKey } from './utils/dailyChallenge.js';
 import { simulateBestEndlessRun } from './utils/endlessSkipSim.js';
-import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, applyEngravingSlot, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear, dismantleRaidItem, dismantleRaidJunk, enhanceRaidItem, claimRaidWeekly, addRaidResources, spendRaidResourcesForItem, resolveRaidSecret, toggleRaidFormation, appendAutoRunLog, getGambleUsed, useGambleEntry, addTwilightCoins, addFateShards, redeemFateShards, buyGambleShopItem, addClassTitle, equipClassTitle, saveHofPatterns, hofLevelUpChar, recordHofClear, recordMastersClearByClass, updateBestRunTime, getBuried, saveBuriedChar, startBuriedChar, recordBuriedDeath, resetBuried, recordBuriedClear, addBuriedDust, craftBuriedForgeItem, trackBuriedKill, buyBuriedContract, addBuriedShards, buyBuriedPart, detachBuriedParts, logBuriedEvent } from './storage.js';
+import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, applyEngravingSlot, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear, dismantleRaidItem, dismantleRaidJunk, enhanceRaidItem, claimRaidWeekly, addRaidResources, spendRaidResourcesForItem, resolveRaidSecret, toggleRaidFormation, appendAutoRunLog, getGambleUsed, useGambleEntry, addTwilightCoins, addFateShards, redeemFateShards, buyGambleShopItem, addClassTitle, equipClassTitle, saveHofPatterns, hofLevelUpChar, recordHofClear, recordMastersClearByClass, updateBestRunTime, getBuried, saveBuriedChar, startBuriedChar, recordBuriedDeath, resetBuried, recordBuriedClear, addBuriedDust, craftBuriedForgeItem, trackBuriedKill, buyBuriedContract, addBuriedShards, buyBuriedPart, detachBuriedParts, logBuriedEvent, addBuriedUnionRep } from './storage.js';
 
 
 
@@ -495,6 +496,17 @@ export default function App() {
     setScreen('buried');
   };
 
+  // 1.141.0 — 🏛 조직 평판 적립 (전투 승리 정산에서 호출). 레벨 도달 보상은 storage가 원자 처리
+  const grantBuriedUnionRep = (dungeonId, points) => {
+    if (!points) return;
+    const peek = addBuriedUnionRep(meta, dungeonId, points); // 알림용 판정 (결정론 함수)
+    if (peek.gains.length > 0) {
+      const u = getBuriedUnion(peek.gains[0].unionId);
+      setBuriedForgeNotice(`🏛 ${u?.icon} ${u?.name} 평판 Lv.${peek.gains[peek.gains.length - 1].lv} 도달 — ${peek.gains.map(g => g.label).join(' · ')}`);
+    }
+    setMeta(prev => { const r = addBuriedUnionRep(prev, dungeonId, points); saveMeta(r.meta); return r.meta; });
+  };
+
   const handleBuriedBattleFinish = (res) => {
     const char = meta?.buried?.char;
     if (!char) { setBuriedEnemy(null); setScreen('buried'); return; }
@@ -568,6 +580,7 @@ export default function App() {
         return next;
       });
       setBuriedForgeNotice(`🌑 재앙 격퇴 — ☠ 죽음의 조각 +${shardGain} · 🕯 먼지 +${BURIED_CALAMITY_REWARD.dust}`);
+      grantBuriedUnionRep(dId, BURIED_UNION_REP_GAIN.calamity); // 🏛 조직 평판
       updateBuriedChar(grown, 0);
       setScreen('buriedDungeon');
       return;
@@ -601,6 +614,12 @@ export default function App() {
         return next;
       });
     }
+    // 🏛 조직 평판 (1.141.0) — 승리 종류별 적립 + 정복 보너스. 레벨 도달 시 보상 자동 지급
+    const repPts = (isGuardian ? BURIED_UNION_REP_GAIN.guardian
+      : buriedRoom === 'boss' ? BURIED_UNION_REP_GAIN.boss
+      : buriedRoom === 'elite' ? BURIED_UNION_REP_GAIN.elite
+      : BURIED_UNION_REP_GAIN.normal) + (conquest ? BURIED_UNION_REP_GAIN.conquest : 0);
+    grantBuriedUnionRep(char.dungeonId || 'labyrinth', repPts);
     // [u109] 저주 포식자 — 전투 중 얻은 먼지 정산
     const dustGain = res.dustGain || 0;
     updateBuriedChar(advanced, dustGain);

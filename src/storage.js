@@ -5,7 +5,7 @@
 // 저장되는 것: 영혼, 강화 단계, 해금 항목, 클리어 기록
 // ============================================
 
-import { ENGRAVINGS, ENGRAVING_TIERS, ENEMIES, EVENTS, RELICS, PASSIVE_SKILLS, CODEX_DISCOVERY_REWARD, CODEX_COMPLETE_REWARD, backfillRaidSeries, FEATURE_FLAGS, addBuriedItemToChar, buriedDustValue as buriedDustValueOf, checkBuriedEncounterUnlock, buriedContractCap, BURIED_CONTRACT_COST } from './data.js';
+import { ENGRAVINGS, ENGRAVING_TIERS, ENEMIES, EVENTS, RELICS, PASSIVE_SKILLS, CODEX_DISCOVERY_REWARD, CODEX_COMPLETE_REWARD, backfillRaidSeries, FEATURE_FLAGS, addBuriedItemToChar, buriedDustValue as buriedDustValueOf, checkBuriedEncounterUnlock, buriedContractCap, BURIED_CONTRACT_COST, getBuriedUnionByDungeon, buriedUnionLevel, BURIED_UNION_REWARDS } from './data.js';
 
 const DB_NAME = 'derod_meta';
 const DB_VERSION = 1;
@@ -1469,6 +1469,8 @@ const EMPTY_BURIED = {
   parts: [],        // 1.112.0~ 연구실 부품 id 목록 (영구, 최대 5칸)
   deepestByDungeon: {}, // 1.113.0~ 던전별 최고 도달 층 (무한층 기록)
   eventLog: {},     // 1.134.0~ 이벤트 방 선택 결과 기록 (roomId → 최근 12건, 런 간 영속)
+  unionRep: {},     // 1.141.0~ 🏛 조직 평판 (조직 id → 누적 평판, 일일 리셋 없음)
+  unlockedRaces: [],// 1.141.0~ 해금된 조직 전속 종족 id 목록
 };
 // 1.131.1 — 무덤의 유산 전체 초기화 (PM 요청: 업데이트를 처음부터 온전히 체험).
 // meta.buried만 백지화 — 본편·레이드·HOF 등 다른 메타는 건드리지 않는다.
@@ -1493,6 +1495,8 @@ export function getBuried(meta) {
     parts: Array.isArray(b.parts) ? b.parts : [],
     deepestByDungeon: (b.deepestByDungeon && typeof b.deepestByDungeon === 'object') ? b.deepestByDungeon : {},
     eventLog: (b.eventLog && typeof b.eventLog === 'object') ? b.eventLog : {},
+    unionRep: (b.unionRep && typeof b.unionRep === 'object') ? b.unionRep : {},
+    unlockedRaces: Array.isArray(b.unlockedRaces) ? b.unlockedRaces : [],
   };
 }
 
@@ -1613,6 +1617,44 @@ export function trackBuriedKill(meta, enemyKey) {
       },
     },
     unlocked,
+  };
+}
+
+// 1.141.0 — 🏛 조직 평판 적립 + 레벨 도달 보상 자동 지급.
+// 반환: { meta, gains: [{ unionId, lv, label }] } — gains는 이번 호출로 새로 도달한 레벨의 보상 알림용.
+// 보상 지급(먼지·조각·전속 직업/종족 해금)은 이 함수 안에서 원자적으로 처리한다.
+export function addBuriedUnionRep(meta, dungeonId, points) {
+  const b = getBuried(meta);
+  const union = getBuriedUnionByDungeon(dungeonId);
+  if (!union || !points || points <= 0) return { meta, gains: [] };
+  const before = b.unionRep[union.id] || 0;
+  const after = before + points;
+  const lvBefore = buriedUnionLevel(before);
+  const lvAfter = buriedUnionLevel(after);
+  let dust = b.dust || 0;
+  let shards = b.shards || 0;
+  const unlockedClasses = [...b.unlockedClasses];
+  const unlockedRaces = [...b.unlockedRaces];
+  const gains = [];
+  for (let lv = lvBefore + 1; lv <= lvAfter; lv++) {
+    const rw = BURIED_UNION_REWARDS[lv];
+    if (!rw) continue;
+    if (rw.dust) dust += rw.dust;
+    if (rw.shards) shards += rw.shards;
+    if (rw.race && union.raceId && !unlockedRaces.includes(union.raceId)) unlockedRaces.push(union.raceId);
+    if (rw.clazz && union.classId && !unlockedClasses.includes(union.classId)) unlockedClasses.push(union.classId);
+    gains.push({ unionId: union.id, lv, label: rw.label });
+  }
+  return {
+    meta: {
+      ...meta,
+      buried: {
+        ...b,
+        unionRep: { ...b.unionRep, [union.id]: after },
+        dust, shards, unlockedClasses, unlockedRaces,
+      },
+    },
+    gains,
   };
 }
 
