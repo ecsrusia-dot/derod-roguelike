@@ -1253,6 +1253,9 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
             // 1.132.0 — 사용 횟수: 잔여 0이면 봉인 (새 장비를 주워야 다시 쓴다)
             const usesLeft = buriedSkillMaxUses(skill, lv) - (item.usesSpent || 0) - (spentMap[slot] || 0);
             const sealed = usesLeft <= 0;
+            // 1.144.1 — 현재(버프 포함) 공격력 기준 예상 데미지 (적 방어 적용 전)
+            const pvBase = eff.power ? ({ str: player.atk, dex: player.fin, int: player.mag }[eff.stat] ?? Math.max(player.atk, player.fin, player.mag)) : 0;
+            const pvDmg = eff.power ? Math.max(1, Math.round(pvBase * eff.power / 100)) * Math.max(1, eff.hits || 1) : 0;
             const off = busy || !!result || cd > 0 || noSp || silenced || sealed;
             const tier = getBuriedTier(item.tier);
             return (
@@ -1265,7 +1268,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
                   <span className="truncate">{eff.name}{lv > 1 && <span style={{ color: PALETTE.legendary }}> Lv.{lv}</span>}</span>
                 </div>
                 <div className="text-[11px] tabular-nums truncate" style={{ color: sealed ? PALETTE.accent : noSp ? PALETTE.accent : PALETTE.ice }}>
-                  {sealed ? '⛓ 봉인 — 새 장비 필요' : `SP ${spCost}${cd > 0 ? ` · 쿨 ${cd}` : ''}${eff.power ? ` · ${eff.power}%${eff.hits ? `×${eff.hits}` : ''}` : ''}${eff.swift ? (swiftUsedThisTurn ? ' · ⚡사용됨' : ' · ⚡신속') : ''} · 횟수 ${usesLeft}`}
+                  {sealed ? '⛓ 봉인 — 새 장비 필요' : `SP ${spCost}${cd > 0 ? ` · 쿨 ${cd}` : ''}${eff.power ? ` · ${eff.power}%${eff.hits ? `×${eff.hits}` : ''} ≈${pvDmg}` : ''}${eff.swift ? (swiftUsedThisTurn ? ' · ⚡사용됨' : ' · ⚡신속') : ''} · 횟수 ${usesLeft}`}
                 </div>
                 <div className="text-[11px] truncate" style={{ color: PALETTE.textDim }}>{slotMeta(slot).icon} {eff.desc}</div>
               </button>
