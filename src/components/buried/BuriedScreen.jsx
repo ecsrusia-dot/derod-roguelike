@@ -621,6 +621,23 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
                 <div className="flex justify-between text-[12px]"><span style={{ color: PALETTE.textDim }}>출신</span><span style={{ color: PALETTE.dawn }}>{getBuriedOrigin(pickOrigin)?.icon} {getBuriedOrigin(pickOrigin)?.name}</span></div>
                 <div className="flex justify-between text-[12px]"><span style={{ color: PALETTE.textDim }}>쐐기석</span><span style={{ color: PALETTE.twilight }}>{pickKeystones.length > 0 ? pickKeystones.map(id => getBuriedKeystone(id)?.icon).join(' ') : '없음'}</span></div>
                 <div className="flex justify-between text-[12px]"><span style={{ color: PALETTE.textDim }}>직업</span><span style={{ color: c?.color }}>{c?.name}</span></div>
+                {/* 1.145.0 — 시작 능력치 합계 (직업+종족+출신) — 결정 전 숫자 확인 */}
+                {c && (() => {
+                  const race = getBuriedRace(pickRace);
+                  const origin = getBuriedOrigin(pickOrigin);
+                  const stat = (k) => Math.max(1, (c.stats?.[k] || 0) + (race?.statMods?.[k] || 0) + (origin?.statMods?.[k] || 0));
+                  return (
+                    <div className="flex justify-between text-[12px]"><span style={{ color: PALETTE.textDim }}>시작 능력치</span>
+                      <span className="tabular-nums" style={{ color: PALETTE.text }}>완력 {stat('str')} · 기교 {stat('dex')} · 지혜 {stat('int')} · 체력 {stat('vit')}</span></div>
+                  );
+                })()}
+                {b.companion && b.ghosts?.[b.companion] && (() => {
+                  const g = BURIED_GHOSTS.find(x => x.id === b.companion);
+                  return g ? (
+                    <div className="flex justify-between text-[12px]"><span style={{ color: PALETTE.textDim }}>동행 괴이</span>
+                      <span style={{ color: BURIED_GHOST_RANKS[g.rank].color }}>🕯 {g.name}{(b.ghosts[b.companion].breaks || 0) > 0 ? ` +${b.ghosts[b.companion].breaks}` : ''}</span></div>
+                  ) : null;
+                })()}
                 {(b.legacyGold || 0) > 0 && <div className="flex justify-between text-[12px]"><span style={{ color: PALETTE.textDim }}>계승 골드</span><span style={{ color: PALETTE.legendary }}>🪙 {b.legacyGold}</span></div>}
                 {earnedDepthTraits.length > 0 && (
                   <div className="flex justify-between text-[12px]"><span style={{ color: PALETTE.textDim }}>심층 특성</span>

@@ -35,7 +35,7 @@ import {
   resolveBuriedLoot, buriedBossKeyAt,
   BURIED_CHUTE_ROOM, BURIED_CHUTE_HP_PCT, buriedChuteJump, buriedLootPower,
   tickBuriedGearBreak, BURIED_BREAK_GRACE,
-  buriedZoneAt,
+  buriedZoneAt, buriedRoomThreat,
 } from '../../data.js';
 import { BuriedItemCard, BuriedBar, BURIED_DUST_ICON, slotMeta, BuriedLootModal } from './BuriedCommon.jsx';
 import BuriedManage from './BuriedManage.jsx';
@@ -436,6 +436,17 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onLogEvent, on
                     <div className="flex-1 min-w-0">
                       <div className="text-[13px] font-bold" style={{ color: r.color }}>{r.name}</div>
                       <div className="text-[12px]" style={{ color: PALETTE.textDim }}>{r.desc}</div>
+                      {/* 1.145.0 — 위협 미리보기: 적 평타 일격 ≈ 내 HP % (PM: 결정 전 필요한 숫자) */}
+                      {(o.type === 'battle' || o.type === 'elite' || o.type === 'boss') && (() => {
+                        const th = buriedRoomThreat(char, o.type);
+                        if (!th) return null;
+                        const danger = th.hiPct >= 40 ? PALETTE.accent : th.hiPct >= 20 ? PALETTE.legendary : PALETTE.textDim;
+                        return (
+                          <div className="mt-0.5 text-[11px] tabular-nums" style={{ color: danger }}>
+                            ⚔ 적 일격 ≈ HP {th.loPct === th.hiPct ? `${th.hiPct}%` : `${th.loPct}~${th.hiPct}%`} <span style={{ color: PALETTE.textDim }}>(평타 기준)</span>
+                          </div>
+                        );
+                      })()}
                       {fx && (
                         <div className="mt-1 text-[11px]" style={{ color: fxColor }}>
                           {fx.both ? '◆' : '◇'} {fx.name} — {fx.desc}

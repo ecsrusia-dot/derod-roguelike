@@ -1870,6 +1870,38 @@ export const buriedCanHeal = (u) => stacksOf(u, 'curse') === 0;
 // traits: 공격자가 가진 특성 id 배열 (트리거형 판정용).
 // 반환: { dodged, hits:[{dmg,crit}], total, crits, chase }
 //   chase = 추격 피해 (원작의 추격 데미지). 보호막 처리 규칙이 본체와 달라 따로 돌려준다.
+// 1.145.0 — 방 위협 미리보기 (PM: 결정 전 필요한 숫자): 이 전투 방에서 나올 수 있는 적의
+// 평타 일격이 내 HP의 몇 %인가. buildBuriedRoomEnemy와 같은 풀·레벨·압력 규칙으로 범위 계산.
+export function buriedRoomThreat(char, roomType) {
+  const dg = getBuriedDungeon(char?.dungeonId);
+  const floor = char?.floor || 1;
+  const monLevel = buriedMonsterLevel(char);
+  const d = buriedDerived(char);
+  let keys = [];
+  if (roomType === 'boss') { const k = buriedBossKeyAt(dg, floor); if (k) keys = [k]; }
+  if (keys.length === 0) {
+    const tier = roomType === 'elite' ? 'elite' : 'normal';
+    const band = Math.min(10, Math.max(1, Math.round(monLevel * 0.8)));
+    const inDungeon = (e) => !e.dungeons || e.dungeons.includes(dg.id);
+    const pool = BURIED_ENEMY_LIST.filter(e => e.tier === tier && inDungeon(e) && band >= e.minFloor && band <= e.maxFloor);
+    keys = (pool.length > 0 ? pool : BURIED_ENEMY_LIST.filter(e => e.tier === tier && inDungeon(e) && !e.guardian)).map(e => e.key);
+  }
+  if (keys.length === 0) return null;
+  const pressure = Math.max(1, buriedDepthPressure(dg, floor));
+  const defMult = Math.max(0.25, 100 / (100 + (d.def || 0)));
+  let lo = Infinity, hi = 0;
+  for (const k of keys) {
+    const e = buriedEnemyAtLevel(k, monLevel);
+    if (!e) continue;
+    const hit = Math.max(1, Math.round(e.atk * pressure * defMult));
+    if (hit < lo) lo = hit;
+    if (hit > hi) hi = hit;
+  }
+  if (!isFinite(lo)) return null;
+  const pct = (v) => Math.min(999, Math.round((v / Math.max(1, d.maxHp)) * 100));
+  return { lo, hi, loPct: pct(lo), hiPct: pct(hi) };
+}
+
 // 1.144.1 — 스킬 예상 데미지 (PM: 위력% 옆에 현 스탯 기준 수치 — 물·기·마 장비 비교용).
 // 기준: 현재 파생 공격력 × 위력%. 적 방어·전투 중 버프 적용 전의 기준치.
 export function buriedSkillDmgPreview(skill, char) {
@@ -2737,15 +2769,20 @@ export function buriedSkillEffectLines(skill) {
     if (skill.berserk) push('잃은 HP 비율만큼 위력 증가 (최대 2배)');
     if (skill.drain) push(`준 피해의 ${skill.drain}%만큼 HP 회복`);
   }
+  // 1.145.0 — 스택 환산치 (PM: 암산 없이 바로 보이게). 도트는 턴당 피해/회복, %형은 합산 %
+  const STACK_PCT = { weaken: [-6, '주는 피해'], shatter: [-10, '적 방어'], bind: [20, '받는 피해'], curse: [15, '받는 피해'], rage: [10, '주는 피해'], guard: [-12, '받는 피해'], evade: [15, '회피'], aging: [-4, '주는 피해'] };
+  const conv = (st, n) => st.tickDmg ? ` = 턴당 ${st.tickDmg * n} 피해`
+    : st.tickHeal ? ` = 턴당 ${st.tickHeal * n} 회복`
+    : STACK_PCT[st.id] ? ` = ${st.id === 'shatter' || st.id === 'guard' || st.id === 'weaken' || st.id === 'aging' ? '' : '+'}${STACK_PCT[st.id][0] * n}% ${STACK_PCT[st.id][1]}` : '';
   for (const a of skill.apply || []) {
     const st = BURIED_STATUS[a.s];
     if (!st) continue;
-    push(`적에게 ${st.icon}[${st.name}] ${a.n}${a.p != null && a.p < 100 ? ` (${a.p}% 확률)` : ''} — ${st.desc}`, st.color);
+    push(`적에게 ${st.icon}[${st.name}] ${a.n}${a.p != null && a.p < 100 ? ` (${a.p}% 확률)` : ''}${conv(st, a.n)} — ${st.desc}`, st.color);
   }
   for (const a of skill.self || []) {
     const st = BURIED_STATUS[a.s];
     if (!st) continue;
-    push(`자신에게 ${st.icon}[${st.name}] ${a.n} — ${st.desc}`, st.color);
+    push(`자신에게 ${st.icon}[${st.name}] ${a.n}${conv(st, a.n)} — ${st.desc}`, st.color);
   }
   if (skill.heal) push(`자신 HP ${skill.heal} 회복`);
   if (skill.barrierGain) push(`보호막 +${skill.barrierGain} — HP보다 먼저 깎이는 추가 내구`);
