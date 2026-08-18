@@ -176,6 +176,12 @@ export function BuriedItemCard({ item, slotId, onClick, right, dim = false, show
             {(() => { const u = buriedItemUses(item, char); return u ? <span className="tabular-nums" style={{ color: usesColor(u) }}> · ⛓ {u.left}/{u.max}</span> : null; })()}
           </span>
         </div>
+        {/* 1.142.2 — full 모드(획득 판단·상점·부장품·상세 비교)에서는 스킬이 무엇을 하는지 처음부터 보여준다 (PM 지시) */}
+        {full && skill && (
+          <div className="text-[11px] leading-relaxed break-keep" style={{ color: PALETTE.ice }}>
+            ▸ {skill.power ? `위력 ${skill.power}%${skill.hits ? ` ×${skill.hits}` : ''}${skill.pierce ? ' · 방어 무시' : ''}${skill.drain ? ` · 흡혈 ${skill.drain}%` : ''}${skill.critBonus ? ` · 치명 +${skill.critBonus}%` : ''} — ` : ''}{skill.desc}
+          </div>
+        )}
         <div className={`text-[11px] ${wrap}`} style={{ color: PALETTE.textDim }}>
           {showSlot && <span>{meta.name} · </span>}
           {Object.entries(st).map(([k, v]) => `${statLabel(k)} ${statText(k, v)}`).join(' · ') || '옵션 없음'}
