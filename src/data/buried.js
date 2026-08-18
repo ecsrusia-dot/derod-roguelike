@@ -587,11 +587,15 @@ export function rollBuriedItem({ slot, classId, floor = 1, tier = null, luck = 0
     options.push({ key: o.key, name: o.name, pct: !!o.pct, affix: o.affix, value: scaled });
   }
   const affix = options.length > 0 ? options[0].affix : null;
+  // 1.146.0 — ᚱ 랜덤 소켓 (PM 지시): 등급이 높을수록 소켓이 많다. 소켓 수만큼 룬 각인 가능
+  const SOCKET_RANGE = { worn: [0, 1], fine: [0, 1], rare: [1, 2], epic: [1, 2], relic: [1, 3], legend: [2, 3] };
+  const [sMin, sMax] = SOCKET_RANGE[t.id] || [0, 1];
+  const sockets = rnd(sMin, sMax);
   return {
     id: nextItemId(),
     slot: slotId, pool, tier: t.id, skillId: skill.id,
     name: `${t.name} ${affix ? affix + ' ' : ''}${skill.gear}`,
-    stats, options, plus: 0, floor: floor || 1,
+    stats, options, plus: 0, floor: floor || 1, sockets, runes: [],
   };
 }
 
@@ -1978,7 +1982,7 @@ export function resolveBuriedAttack(att, def, skill, { isPlayer = false, traits 
 // 상태이상 부여 — 확률·최대 스택 + 방/층 효과 반영. 새 statuses 객체 반환
 //   chancePct: 부여 확률 가감 (방 효과 「고요의 방」 등)
 //   extra    : 스택 가산 (층 효과 「정적의 층」)
-export function applyBuriedStatuses(statuses, list, { chancePct = 0, extra = 0 } = {}) {
+export function applyBuriedStatuses(statuses, list, { chancePct = 0, extra = 0, uncap = false } = {}) {
   if (!list || list.length === 0) return statuses;
   const next = { ...statuses };
   for (const a of list) {
@@ -1986,7 +1990,8 @@ export function applyBuriedStatuses(statuses, list, { chancePct = 0, extra = 0 }
     if (!def) continue;
     const chance = a.p != null ? a.p + chancePct : 100 + chancePct;
     if (chance < 100 && Math.random() * 100 >= chance) continue;
-    next[a.s] = Math.min(def.max, (next[a.s] || 0) + (a.n || 1) + extra);
+    // 1.146.0 — uncap: ⟪만개⟫ 룬워드·「백화의 낙인」 등 상한 해제 (폭주 방지 절대 상한 99)
+    next[a.s] = Math.min(uncap ? 99 : def.max, (next[a.s] || 0) + (a.n || 1) + extra);
   }
   return next;
 }
@@ -3041,6 +3046,9 @@ export const BURIED_UNIQUES = [
     desc: '지친 몸을 스치는 바람. SP 회복 +3, 회피 +6%.' }),
   UQ({ id: 'lg40', name: '이력(理力)의 인장', slot: 'acc',  skillId: 'silenceSigil', src: 0, fx: { spMult: 1.2, spRegen: 2, magPct: 8 },
     desc: '이성이 곧 힘. 최대 SP +20%, SP 회복 +2, 마법 +8%.' }),
+  // 1.146.0 — 스택 상한 해제 전설무구 (PM 지시: 특정 조건으로 상한을 풀 수 있게)
+  UQ({ id: 'lg41', name: '백화(百花)의 낙인', slot: 'acc', skillId: 'venomSigil', src: 0, fx: { statusChance: 15, statusUncap: 1 },
+    desc: '고통이 만개한다 — 내가 거는 상태이상의 **스택 상한이 사라진다**. 상태이상 확률 +15%.' }),
 
   // ===== 1.143.0 — 👑 정점 유니크 (묘주 첫 격파 확정 지급 전용 — dungeon: 'apex'라 어떤 드랍 풀에도 안 들어간다) =====
   UQ({ id: 'tomb1', dungeon: 'apex', name: '묘주의 관(冠)', slot: 'helm', skillId: 'chargeUp', src: 0,
@@ -3101,8 +3109,9 @@ export function rollBuriedUniqueItem({ classId, floor = 1, excludeIds = [], dung
     unique: def.id,
     name: def.name,
     // 1.127.0 — 전설무구는 접두어·룬을 내장한 채 떨어질 수 있다 (시트의 고정 효과 뭉치)
+    // 1.146.0 — 다중 소켓: 내장 룬은 runes 배열 첫 칸, 소켓은 최소 1 보장
     ...(def.mod ? { mod: def.mod } : {}),
-    ...(def.rune ? { rune: def.rune } : {}),
+    ...(def.rune ? { runes: [def.rune], sockets: Math.max(1, base.sockets || 0) } : {}),
   };
 }
 
@@ -3174,13 +3183,19 @@ function applyBuriedSkillFx(out, fx) {
   return out;
 }
 
-export function buriedModdedSkill(skill, modId, runeId = null) {
+// 1.146.0 — 다중 룬: runeIds는 단일 id(구 호환) 또는 배열. 룬워드 완성 시 fx 추가 적용
+export function buriedModdedSkill(skill, modId, runeIds = null) {
+  const runes = Array.isArray(runeIds) ? runeIds : runeIds ? [runeIds] : [];
   const mod = getBuriedMod(modId);
-  const rune = getBuriedRune(runeId);
-  if (!skill || (!mod && !rune)) return skill;
+  if (!skill || (!mod && runes.length === 0)) return skill;
   let out = { ...skill };
   if (mod) { out.modId = modId; out = applyBuriedSkillFx(out, mod.fx); }
-  if (rune) { out.runeId = runeId; out = applyBuriedSkillFx(out, rune.fx); }
+  for (const rid of runes) {
+    const rune = getBuriedRune(rid);
+    if (rune) { out.runeId = rid; out = applyBuriedSkillFx(out, rune.fx); }
+  }
+  const rw = buriedRunewordOf(runes);
+  if (rw?.fx) { out.runewordId = rw.id; out = applyBuriedSkillFx(out, rw.fx); }
   return out;
 }
 
@@ -3238,15 +3253,51 @@ export function rollBuriedRuneIn(minRar, maxRar) {
 }
 
 // 소켓 각인 (순수 함수) — 성공 시 주머니에서 제거 + 장비에 영구 각인
+// 1.146.0 — 다중 소켓 헬퍼. 구세이브 장비(sockets 없음)는 1칸으로 취급 (기존 rune 1칸과 호환)
+export const buriedItemSockets = (item) => item?.sockets ?? 1;
+export const buriedItemRunes = (item) => (item?.runes && item.runes.length > 0) ? item.runes : (item?.rune ? [item.rune] : []);
+
+// ⟪룬워드⟫ (1.146.0, PM 지시 — 디아블로 모티브): 소켓에 박은 룬의 **순서**가 조합과 정확히 일치하면 발동.
+// fx = 그 장비 스킬에 추가 적용 (applyBuriedSkillFx 어휘) / charFx = 캐릭터 단위 특수 효과 (전투가 소비)
+export const BURIED_RUNEWORDS = [
+  { id: 'rwSlaughter', name: '살육(殺戮)',   runes: ['rKeen', 'rRage'],            fx: { powerPct: 12, critBonus: 6 },  desc: '위력 +12%, 치명 +6%' },
+  { id: 'rwGale',      name: '질풍(疾風)',   runes: ['rSpeed', 'rPierce'],         fx: { cdAdd: -1, pierce: true },     desc: '쿨다운 -1, 방어 무시' },
+  { id: 'rwLeech',     name: '흡귀(吸鬼)',   runes: ['rDrain', 'rDoom'],           fx: { drain: 10, powerPct: 6 },      desc: '흡혈 +10%, 위력 +6%' },
+  { id: 'rwAegis',     name: '수호자',       runes: ['rGuard1', 'rWall'],          fx: { barrierGain: 15, wallChance: 25 }, desc: '보호막 +15, 사용 시 25% 🧱방벽' },
+  { id: 'rwDawnsong',  name: '여명의 노래',  runes: ['rMend1', 'rDawn'],           fx: { heal: 25 },                    desc: '사용 시 HP 25 회복 추가' },
+  { id: 'rwBloom',     name: '만개(滿開)',   runes: ['rVenom', 'rChain', 'rDoom'], fx: { powerPct: 5 }, charFx: { statusUncap: true }, desc: '⚠ 내가 거는 상태이상의 스택 상한 해제 + 위력 +5%' },
+  { id: 'rwMajesty',   name: '군주의 위엄',  runes: ['rKing', 'rPower1'],          fx: { powerPct: 15 },                desc: '위력 +15%' },
+  { id: 'rwNether',    name: '명적(冥籍)',   runes: ['rBind', 'rSave1', 'rKing'],  fx: { spPct: -30, cdAdd: -1 },       desc: 'SP 소모 -30%, 쿨다운 -1' },
+];
+export function buriedRunewordOf(runes) {
+  const list = runes || [];
+  return BURIED_RUNEWORDS.find(rw => rw.runes.length === list.length && rw.runes.every((r, i) => list[i] === r)) || null;
+}
+// 장착 6칸의 완성 룬워드 charFx 합산 — 전투가 소비 (statusUncap 등)
+export function buriedRunewordCharFx(char) {
+  const out = {};
+  for (const s of BURIED_SLOT_IDS) {
+    const rw = buriedRunewordOf(buriedItemRunes(char?.equipped?.[s]));
+    if (rw?.charFx) for (const [k, v] of Object.entries(rw.charFx)) out[k] = out[k] || v;
+  }
+  return out;
+}
+
 export function socketBuriedRune(char, runeIdx, slot) {
   const runeId = (char.runes || [])[runeIdx];
   const rune = getBuriedRune(runeId);
   const item = char.equipped?.[slot];
   if (!rune || !item) return { char, text: '각인할 수 없다.' };
-  if (item.rune) return { char, text: '이미 룬이 각인된 장비다 — 소켓은 장비당 1칸.' };
+  const cur = buriedItemRunes(item);
+  const sockets = buriedItemSockets(item);
+  if (cur.length >= sockets) return { char, text: `소켓이 가득 찼다 (${cur.length}/${sockets}) — 소켓 수만큼만 각인할 수 있다.` };
   const runes = (char.runes || []).filter((_, i) => i !== runeIdx);
-  const next = { ...char, runes, equipped: { ...char.equipped, [slot]: { ...item, rune: runeId } } };
-  return { char: next, text: `${item.name}에 「${rune.name}」 각인 — ${rune.desc}` };
+  const nextRunes = [...cur, runeId];
+  const nextItem = { ...item, runes: nextRunes };
+  delete nextItem.rune; // 구필드 → 배열 승격
+  const rw = buriedRunewordOf(nextRunes);
+  const next = { ...char, runes, equipped: { ...char.equipped, [slot]: nextItem } };
+  return { char: next, text: `${item.name}에 「${rune.name}」 각인 (${nextRunes.length}/${sockets})${rw ? ` — ⟪${rw.name}⟫ 룬워드 완성! ${rw.desc}` : ''}` };
 }
 
 // =========================================================

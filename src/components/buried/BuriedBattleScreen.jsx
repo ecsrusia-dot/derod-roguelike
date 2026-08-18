@@ -30,6 +30,7 @@ import {
   buriedSkillMaxUses,
   BURIED_SIGILS, buriedZoneAt,
   BURIED_GHOST_RANKS, getBuriedGhost, buriedGhostForEnemy, buriedGhostKit, buriedTameChance,
+  buriedItemRunes, buriedRunewordCharFx,
 } from '../../data.js';
 import { BuriedBar, BuriedStatusRow, BuriedItemCard, slotMeta, SkillKindBadge, BuriedInfoModal } from './BuriedCommon.jsx';
 
@@ -336,7 +337,9 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
   };
 
   // 특성 「역병」 — 내가 거는 상태이상 스택 +1
-  const statusOpts = { chancePct: (env.self.statusChancePct || 0) + (uq('u57') ? 100 : 0) + (cf.statusChance || 0) + (pf.statusChance || 0) + (rf.statusChance || 0) + (ufx.statusChance || 0), extra: (env.self.statusExtra || 0) + (traits.includes('pestilence') ? 1 : 0) };
+  const statusOpts = { chancePct: (env.self.statusChancePct || 0) + (uq('u57') ? 100 : 0) + (cf.statusChance || 0) + (pf.statusChance || 0) + (rf.statusChance || 0) + (ufx.statusChance || 0), extra: (env.self.statusExtra || 0) + (traits.includes('pestilence') ? 1 : 0),
+    // 1.146.0 — 상한 해제: ⟪만개⟫ 룬워드 또는 「백화의 낙인」 (절대 상한 99)
+    uncap: !!((ufx.statusUncap || 0) || buriedRunewordCharFx(char).statusUncap) };
   const foeStatusOpts = { chancePct: (env.foe.statusChancePct || 0) - (cf.statusResist || 0) - (rf.statusResist || 0) - (ufx.statusResist || 0), extra: (uq('u113') ? 1 : 0) + (cs('sabnock') ? 1 : 0) };
 
   // ===== 전투 종료 =====
@@ -616,9 +619,12 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
         if (skill.apply) {
           const before = { ...E.statuses };
           // [u95] 균일한 저주(항상 5) > [u59] 간계(2배) > 원본
-          const list = uq('u95') ? skill.apply.map(a => ({ ...a, n: 5 }))
+          let list = uq('u95') ? skill.apply.map(a => ({ ...a, n: 5 }))
             : uq('u59') ? skill.apply.map(a => ({ ...a, n: (a.n || 1) * 2 }))
             : skill.apply;
+          // 1.146.0 — 다중 타격 중복 (PM 지시): N연격이면 타격 시 부여 상태이상도 ×N (2연격 [중독]2 → 4)
+          const hitMul = Math.max(1, skill.hits || 1);
+          if (hitMul > 1) list = list.map(a => ({ ...a, n: (a.n || 1) * hitMul }));
           E.statuses = applyBuriedStatuses(E.statuses, list, statusOpts);
           const added = Object.keys(E.statuses).filter(k => (E.statuses[k] || 0) > (before[k] || 0));
           if (added.length > 0) pushLog(`${E.name}에게 ${added.map(k => `[${BURIED_STATUS[k].name}]`).join(' ')}`, PALETTE.twilight);
@@ -654,6 +660,9 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
 
     if (skill && skill.self) {
       let selfList = uq('u95') ? skill.self.map(a => ({ ...a, n: 5 })) : skill.self;
+      // 1.146.0 — 다중 타격 중복: 공격 스킬의 자가 버프도 타격 수만큼 (PM 지시 "버프·흡혈·디버프 등")
+      const selfHitMul = skill.power ? Math.max(1, skill.hits || 1) : 1;
+      if (selfHitMul > 1) selfList = selfList.map(a => ({ ...a, n: (a.n || 1) * selfHitMul }));
       // 저주 「마르코시아스」 — 버프 획득 불가 (디버프성 self는 통과)
       if (cs('marchosias')) {
         const before = selfList.length;
@@ -1245,7 +1254,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
           {/* 장착 장비 6칸 = 스킬 6개 (스킬 레벨 반영) */}
           {equipped.map(({ slot, item, skill }) => {
             const lv = Math.min(8, buriedSkillLv(char, skill.id) + (uq('u71') ? 1 : 0)); // [u71] 후손
-            const eff0 = applyUniqueSkillMods(buriedModdedSkill(buriedSkillAt(skill, lv), item.mod, item.rune));
+            const eff0 = applyUniqueSkillMods(buriedModdedSkill(buriedSkillAt(skill, lv), item.mod, buriedItemRunes(item)));
             const eff = kf.cdAdd && !uq('u74') ? { ...eff0, cd: (eff0.cd || 0) + kf.cdAdd } : eff0; // ⚓ 정체의 쐐기 ([u74] 금줄이 무시)
             const cd = player.cds[eff.id] || 0;
             const spCost = Math.round(eff.sp * (1 + (env.self.spCostPct || 0) / 100));
