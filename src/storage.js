@@ -1471,6 +1471,8 @@ const EMPTY_BURIED = {
   eventLog: {},     // 1.134.0~ 이벤트 방 선택 결과 기록 (roomId → 최근 12건, 런 간 영속)
   unionRep: {},     // 1.141.0~ 🏛 조직 평판 (조직 id → 누적 평판, 일일 리셋 없음)
   unlockedRaces: [],// 1.141.0~ 해금된 조직 전속 종족 id 목록
+  gateSigils: [],   // 1.143.0~ 🗝 수문장의 인장 — 첫 격파한 관문 층 목록 (100~500, 계정 영구)
+  apexClears: 0,    // 1.143.0~ 👑 묘주(500층 최종 보스) 격파 횟수
 };
 // 1.131.1 — 무덤의 유산 전체 초기화 (PM 요청: 업데이트를 처음부터 온전히 체험).
 // meta.buried만 백지화 — 본편·레이드·HOF 등 다른 메타는 건드리지 않는다.
@@ -1497,6 +1499,8 @@ export function getBuried(meta) {
     eventLog: (b.eventLog && typeof b.eventLog === 'object') ? b.eventLog : {},
     unionRep: (b.unionRep && typeof b.unionRep === 'object') ? b.unionRep : {},
     unlockedRaces: Array.isArray(b.unlockedRaces) ? b.unlockedRaces : [],
+    gateSigils: Array.isArray(b.gateSigils) ? b.gateSigils : [],
+    apexClears: Math.max(0, b.apexClears || 0),
   };
 }
 

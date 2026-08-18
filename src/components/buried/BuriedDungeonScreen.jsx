@@ -35,6 +35,7 @@ import {
   resolveBuriedLoot, buriedBossKeyAt,
   BURIED_CHUTE_ROOM, BURIED_CHUTE_HP_PCT, buriedChuteJump, buriedLootPower,
   tickBuriedGearBreak, BURIED_BREAK_GRACE,
+  buriedZoneAt,
 } from '../../data.js';
 import { BuriedItemCard, BuriedBar, BURIED_DUST_ICON, slotMeta, BuriedLootModal } from './BuriedCommon.jsx';
 import BuriedManage from './BuriedManage.jsx';
@@ -345,6 +346,12 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onLogEvent, on
             <div className="text-[12px] tracking-[0.25em] font-bold" style={{ color: dungeon.color }}>
               {dungeon.name} · {char.floor}층{char.floor <= dungeon.floors ? ` (정복 ${dungeon.floors}층)` : ' · ∞'}
             </div>
+            {/* 🕳 심층 대역 (1.143.0) — 100층부터 대역 이름 표시 */}
+            {char.floor >= 100 && (() => { const z = buriedZoneAt(char.floor); return (
+              <div className="text-[11px] font-bold tracking-[0.15em]" style={{ color: z.color }}>
+                {z.icon} {z.name} · 보상 +{z.rewardPct}%
+              </div>
+            ); })()}
             <div className="text-[11px]" style={{ color: PALETTE.textDim }}>
               {cls?.name} Lv.{char.lv} · 🪙 {char.gold} · 🧪 {char.potions || 0} · 마물 Lv.{monLevel}
               {(char.calamityGauge || 0) > 0 && <span style={{ color: '#c48bd4' }}> · 🌑 {char.calamityGauge}/{BURIED_CALAMITY_GAUGE_MAX}</span>}

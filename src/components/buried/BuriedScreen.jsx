@@ -24,6 +24,7 @@ import {
   BURIED_DEPTH_CLASSES, buriedEarnedDepthTraits,
   BURIED_RACES, getBuriedRace,
   BURIED_UNIONS, BURIED_UNION_CLASSES, getBuriedUnion, buriedUnionLevel, BURIED_UNION_LEVELS, BURIED_UNION_REWARDS,
+  BURIED_SIGILS, BURIED_ZONES,
 } from '../../data.js';
 import { BuriedBar, BURIED_DUST_ICON, BuriedTierLegend, BuriedLootModal } from './BuriedCommon.jsx';
 import BuriedManage from './BuriedManage.jsx';
@@ -806,6 +807,31 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
               <div className="text-[14px] font-bold tabular-nums" style={{ color: x.c }}>{x.v}</div>
             </div>
           ))}
+        </div>
+        {/* 🕳 정점을 향한 길 (1.143.0) — 대역·인장·묘주 */}
+        <div className="px-3 py-2.5 space-y-1.5" style={{ borderRadius: R.panel, background: PALETTE.panel, border: `1px solid ${PALETTE.legendary}44` }}>
+          <div className="text-[11px] tracking-[0.2em] font-bold" style={{ color: PALETTE.legendary }}>👑 정점을 향한 길</div>
+          <div className="text-[12px] tabular-nums" style={{ color: PALETTE.text }}>
+            🗝 수문장의 인장 <b style={{ color: PALETTE.legendary }}>{(b.gateSigils || []).length}/{BURIED_SIGILS.max}</b>
+            <span className="text-[11px]" style={{ color: PALETTE.textDim }}> (개당 위력 +{BURIED_SIGILS.dmgPct}% · 받는 피해 -{BURIED_SIGILS.takenPct}%, 전 캐릭터 영구)</span>
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {BURIED_ZONES.filter(z => z.from >= 100).map(z => {
+              const gate = z.from;
+              const got = (b.gateSigils || []).includes(gate);
+              return (
+                <span key={z.id} className="px-1.5 py-0.5 text-[11px]"
+                  style={{ borderRadius: 'var(--r-chip, 8px)', border: `1px solid ${got ? z.color : PALETTE.panelBorder}`, color: got ? z.color : PALETTE.textDim, opacity: got ? 1 : 0.7 }}>
+                  {got ? '✓' : '🔒'} {z.icon} {z.name} ({gate}층)
+                </span>
+              );
+            })}
+          </div>
+          <div className="text-[12px]" style={{ color: (b.apexClears || 0) > 0 ? PALETTE.legendary : PALETTE.textDim }}>
+            {(b.apexClears || 0) > 0
+              ? `👑 묘주 격파 ${b.apexClears}회 — 무덤의 정점에 선 자`
+              : '👑 500층, 묘주(무덤 그 자체)가 마지막 문을 지킨다 — 아직 아무도 정점에 서지 못했다'}
+          </div>
         </div>
         <div>
           <SectionTitle>던전별 최고 도달</SectionTitle>
