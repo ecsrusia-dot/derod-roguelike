@@ -10,6 +10,7 @@ import { X } from 'lucide-react';
 import { PALETTE } from '../../utils/helpers.js';
 import {
   BURIED_SLOTS, BURIED_SLOT_IDS, BURIED_STATS, BURIED_SKILLS, BURIED_SKILL_MAX_LV,
+  buriedItemRunes, buriedItemSockets,
   buriedDerived, buriedDustValue, getBuriedClass,
   buriedTraitIds, getBuriedTrait, buriedSkillLv, buriedSkillRank, BURIED_SKILL_RANKS,
   getBuriedRune, BURIED_RUNE_RARITIES, socketBuriedRune, buriedSkillUsesLeft, buriedBreakIn,
@@ -193,7 +194,7 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose }) {
       {runePick !== null && getBuriedRune(runes[runePick]) && (() => {
         const r = getBuriedRune(runes[runePick]);
         const rar = BURIED_RUNE_RARITIES[r.rarity];
-        const targets = BURIED_SLOTS.filter(s => char.equipped?.[s.id] && !char.equipped[s.id].rune);
+        const targets = BURIED_SLOTS.filter(s => char.equipped?.[s.id] && buriedItemRunes(char.equipped[s.id]).length < buriedItemSockets(char.equipped[s.id]));
         return (
           <div className="absolute inset-0 z-50 flex items-end" style={{ background: 'rgba(0,0,0,0.72)' }} onClick={() => setRunePick(null)}>
             <div className="w-full px-3 pb-4 pt-3" onClick={(e) => e.stopPropagation()}
@@ -204,7 +205,7 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose }) {
               </div>
               {targets.length === 0 ? (
                 <div className="px-3 py-3 text-[12px]" style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panel, color: PALETTE.textDim }}>
-                  각인할 수 있는 장비가 없다 — 모든 장착 장비에 이미 룬이 있거나, 슬롯이 비어 있다.
+                  각인할 수 있는 장비가 없다 — 모든 장착 장비의 소켓이 가득 찼거나, 슬롯이 비어 있다.
                 </div>
               ) : (
                 <div className="space-y-1.5">

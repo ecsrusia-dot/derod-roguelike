@@ -11,6 +11,7 @@ import {
   buriedSkillEffectLines, getBuriedUnique, getBuriedMod, getBuriedRune, BURIED_RUNE_RARITIES,
   buriedSkillMaxUses, buriedSkillLv,
   buriedSkillAt, buriedModdedSkill, buriedSkillDmgPreview,
+  buriedItemRunes, buriedItemSockets, buriedRunewordOf,
 } from '../../data.js';
 
 // 1.143.0 — ⛓ 스킬 사용 가능 횟수 (장비 카드·상세·획득 판단 공용).
@@ -180,7 +181,7 @@ export function BuriedItemCard({ item, slotId, onClick, right, dim = false, show
         {/* 1.142.2 — full 모드(획득 판단·상점·부장품·상세 비교)에서는 스킬이 무엇을 하는지 처음부터 보여준다 (PM 지시)
             1.144.1 — 위력% 옆에 현 스탯 기준 예상 데미지 (물·기·마 장비 비교용, 스킬 레벨·접두어·룬 반영) */}
         {full && skill && (() => {
-          const eff = char ? buriedModdedSkill(buriedSkillAt(skill, buriedSkillLv(char, item.skillId)), item.mod, item.rune) : skill;
+          const eff = char ? buriedModdedSkill(buriedSkillAt(skill, buriedSkillLv(char, item.skillId)), item.mod, buriedItemRunes(item)) : skill;
           const pv = char ? buriedSkillDmgPreview(eff, char) : null;
           return (
             <div className="text-[11px] leading-relaxed break-keep" style={{ color: PALETTE.ice }}>
@@ -204,12 +205,22 @@ export function BuriedItemCard({ item, slotId, onClick, right, dim = false, show
             ◈ {getBuriedMod(item.mod).name} — {getBuriedMod(item.mod).desc}
           </div>
         )}
-        {/* ᚱ 룬 각인 (1.123.0) */}
-        {item.rune && getBuriedRune(item.rune) && (
-          <div className={`text-[11px] ${wrap}`} style={{ color: BURIED_RUNE_RARITIES[getBuriedRune(item.rune).rarity]?.color }}>
-            ᚱ {getBuriedRune(item.rune).name} {BURIED_RUNE_RARITIES[getBuriedRune(item.rune).rarity]?.stars} — {getBuriedRune(item.rune).desc}
-          </div>
-        )}
+        {/* ᚱ 룬 각인 (1.123.0 → 1.146.0 다중 소켓 + 룬워드) */}
+        {(() => {
+          const rs = buriedItemRunes(item);
+          const sk = buriedItemSockets(item);
+          const rw = buriedRunewordOf(rs);
+          if (rs.length === 0 && sk === 0) return null;
+          return (
+            <>
+              <div className={`text-[11px] ${wrap}`} style={{ color: PALETTE.twilight }}>
+                {rs.map(id => { const r = getBuriedRune(id); return r ? `ᚱ${r.name}${BURIED_RUNE_RARITIES[r.rarity]?.stars || ''}` : null; }).filter(Boolean).join(' · ')}
+                {sk > rs.length ? `${rs.length > 0 ? ' · ' : ''}◇빈 소켓 ×${sk - rs.length}` : ''}
+              </div>
+              {rw && <div className={`text-[11px] font-bold ${wrap}`} style={{ color: PALETTE.legendary }}>⟪{rw.name}⟫ — {rw.desc}</div>}
+            </>
+          );
+        })()}
       </div>
       {right}
     </button>
@@ -222,7 +233,7 @@ export function BuriedItemSheet({ item, compare, onEquip, onUnequip, onDismantle
   const tier = getBuriedTier(item.tier);
   const skill = BURIED_SKILLS[item.skillId];
   // 1.144.1 — 예상 데미지 (스킬 레벨·접두어·룬 반영, 적 방어 적용 전)
-  const effSkill = (skill && char) ? buriedModdedSkill(buriedSkillAt(skill, buriedSkillLv(char, item.skillId)), item.mod, item.rune) : skill;
+  const effSkill = (skill && char) ? buriedModdedSkill(buriedSkillAt(skill, buriedSkillLv(char, item.skillId)), item.mod, buriedItemRunes(item)) : skill;
   const dmgPv = char ? buriedSkillDmgPreview(effSkill, char) : null;
   const st = buriedItemStats(item);
   const cmp = compare ? buriedItemStats(compare) : null;
@@ -264,15 +275,36 @@ export function BuriedItemSheet({ item, compare, onEquip, onUnequip, onDismantle
         )}
 
         {/* ᚱ 룬 각인 (1.123.0) — 제거 불가, 장비를 버리면 소멸 */}
-        {item.rune && getBuriedRune(item.rune) && (
-          <div className="px-3 py-2.5 mb-2" style={{ borderRadius: 'var(--r-panel, 18px)', background: `${BURIED_RUNE_RARITIES[getBuriedRune(item.rune).rarity].color}14`, border: `1px solid ${BURIED_RUNE_RARITIES[getBuriedRune(item.rune).rarity].color}66` }}>
-            <div className="text-[11px] tracking-[0.2em] mb-1" style={{ color: BURIED_RUNE_RARITIES[getBuriedRune(item.rune).rarity].color }}>
-              ᚱ 룬 각인 — {getBuriedRune(item.rune).name} {BURIED_RUNE_RARITIES[getBuriedRune(item.rune).rarity].stars}
+        {(() => {
+          const rs = buriedItemRunes(item);
+          const sk = buriedItemSockets(item);
+          const rw = buriedRunewordOf(rs);
+          if (rs.length === 0 && sk === 0) return null;
+          return (
+            <div className="px-3 py-2.5 mb-2" style={{ borderRadius: 'var(--r-panel, 18px)', background: `${PALETTE.twilight}14`, border: `1px solid ${PALETTE.twilight}66` }}>
+              <div className="text-[11px] tracking-[0.2em] mb-1" style={{ color: PALETTE.twilight }}>
+                ᚱ 룬 소켓 — {rs.length}/{sk}칸
+              </div>
+              {rs.map((id, i) => {
+                const r = getBuriedRune(id);
+                return r ? (
+                  <div key={i} className="text-[12px] leading-relaxed" style={{ color: BURIED_RUNE_RARITIES[r.rarity]?.color }}>
+                    {i + 1}. {r.name} {BURIED_RUNE_RARITIES[r.rarity]?.stars} — <span style={{ color: PALETTE.text }}>{r.desc}</span>
+                  </div>
+                ) : null;
+              })}
+              {sk > rs.length && <div className="text-[12px]" style={{ color: PALETTE.textDim }}>◇ 빈 소켓 ×{sk - rs.length}</div>}
+              {rw && (
+                <div className="text-[12px] font-bold mt-1" style={{ color: PALETTE.legendary }}>
+                  ⟪{rw.name}⟫ 룬워드 완성 — {rw.desc}
+                </div>
+              )}
+              <div className="text-[11px] mt-1" style={{ color: PALETTE.textDim }}>
+                각인은 영구 — 떼어낼 수 없고, 장비를 버리면 룬도 소멸한다. 룬 **순서**가 조합과 일치하면 ⟪룬워드⟫가 발동한다.
+              </div>
             </div>
-            <div className="text-[12px] leading-relaxed" style={{ color: PALETTE.text }}>{getBuriedRune(item.rune).desc}</div>
-            <div className="text-[11px] mt-1" style={{ color: PALETTE.textDim }}>각인은 영구 — 떼어낼 수 없고, 장비를 버리면 룬도 소멸한다.</div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* 내장 스킬 — 원작의 핵심: 이 장비를 껴야만 이 스킬을 쓴다 */}
         {skill && (
