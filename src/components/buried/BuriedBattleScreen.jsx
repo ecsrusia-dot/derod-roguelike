@@ -29,6 +29,7 @@ import {
   buriedUniqueFx, buriedKeystoneFx, buriedKeystoneBonus, getBuriedKeystone,
   buriedSkillMaxUses,
   BURIED_SIGILS, buriedZoneAt,
+  BURIED_GHOST_RANKS, getBuriedGhost, buriedGhostForEnemy, buriedGhostKit, buriedTameChance,
 } from '../../data.js';
 import { BuriedBar, BuriedStatusRow, BuriedItemCard, slotMeta, SkillKindBadge, BuriedInfoModal } from './BuriedCommon.jsx';
 
@@ -145,7 +146,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     immuneCrit: uniques.includes('u61'), // [u61] 휘황찬란 — 적 치명타 무효 (resolveBuriedAttack def-side)
     // [u21] 모리건 — 주고받는 피해 절반 / [u52] 결전 — 받는 피해 +15 / 🗝 인장 (1.143.0) — 개당 위력 +8·받피 -4
     envDmgPct: (env.self.dmgPct || 0) + (uniques.includes('u21') ? -50 : 0) + (char.sigils || 0) * BURIED_SIGILS.dmgPct,
-    envTakenPct: (env.self.takenPct || 0) + (uniques.includes('u21') ? -50 : 0) + (uniques.includes('u52') ? 15 : 0) + (ufx.takenPct || 0) + (kf.takenPct || 0) - (char.sigils || 0) * BURIED_SIGILS.takenPct,
+    envTakenPct: (env.self.takenPct || 0) + (uniques.includes('u21') ? -50 : 0) + (uniques.includes('u52') ? 15 : 0) + (ufx.takenPct || 0) + (kf.takenPct || 0) + (cf.takenPct || 0) - (char.sigils || 0) * BURIED_SIGILS.takenPct, // cf.takenPct = 🕯 동행 괴이 패시브 (1.144.0)
     envCritAdd: env.self.critAdd || 0, envMagPct: env.self.magPct || 0,
     envDodgeAdd: env.self.dodgeAdd || 0,
   }));
@@ -215,6 +216,15 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
   const [swiftUsedThisTurn, setSwiftUsedThisTurn] = useState(false); // 1.136.0 — ⚡ 신속 (턴당 1회)
   const [spentMap, setSpentMap] = useState({}); // 1.132.0 — 이번 전투에서 슬롯별 스킬 사용 횟수
   const spentMapRef = useRef({});
+  // 🕯 괴이 사역 (1.144.0)
+  const tameTarget = buriedGhostForEnemy(enemy.key); // 이 적이 괴이인가
+  const companion = char.ghost?.id ? getBuriedGhost(char.ghost.id) : null; // 동행 괴이
+  const companionKit = companion ? buriedGhostKit(companion, char.ghost?.breaks || 0) : null;
+  const [ghostCd, setGhostCd] = useState(0); // 동행 액티브 쿨 (0 = 이번 턴 종료 시 발동)
+  const [tameLocked, setTameLocked] = useState(false); // 실패 시 이 전투 제령 잠금
+  const [talismanSpent, setTalismanSpent] = useState({}); // 이번 전투 소모 제령부 (rank → n)
+  const talismanSpentRef = useRef({});
+  const tameRef = useRef(null); // 제령 성공 결과 { ghostId, breakUp }
   useEffect(() => { spentMapRef.current = spentMap; }, [spentMap]);
   const [potions, setPotions] = useState(char.potions || 0);
   const [imgFailed, setImgFailed] = useState(false);
@@ -390,6 +400,8 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
         skillLvUp: uq('u100') && Math.random() < 0.75, // [u100] 수확자의 서
         carryBarrier: uq('u6') ? Math.max(0, playerRef.current?.barrier || 0) : 0, // [u6] 달인
         researchPct: uq('u36') ? 0.5 : 0, // [u36] 비전 — 1.133.0 %화: 처치마다 공격력 +0.5% (런 영구)
+        tamed: tameRef.current, // 🕯 제령 성공 (1.144.0) — { ghostId, breakUp }
+        talismansSpent: talismanSpentRef.current, // 이번 전투 소모 제령부
       });
     } else {
       setResult({ win: false, hp: 0, potions, dustGain: dustGainRef.current });
@@ -406,7 +418,35 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
 
     // ---------- 1. 플레이어 행동 ----------
     // kind === 'skip' — [기절]로 행동을 건너뛴다 (적 턴과 상태이상 처리만 진행)
-    let skill = kind === 'skip' ? null : (kind === 'basic' ? BURIED_BASIC : payload);
+    // kind === 'tame' — 🕯 제령 시도 (1.144.0): 성공 시 즉시 종전, 실패 시 턴 소모 + 적 광포화
+    let skill = (kind === 'skip' || kind === 'tame') ? null : (kind === 'basic' ? BURIED_BASIC : payload);
+
+    if (kind === 'tame' && tameTarget) {
+      const rank = BURIED_GHOST_RANKS[tameTarget.rank];
+      talismanSpentRef.current = { ...talismanSpentRef.current, [tameTarget.rank]: (talismanSpentRef.current[tameTarget.rank] || 0) + 1 };
+      setTalismanSpent(talismanSpentRef.current);
+      const hpPct = (E.hp / E.maxHp) * 100;
+      const chance = buriedTameChance(tameTarget.rank, hpPct);
+      pushLog(`🧿 ${rank.name}부(${rank.hanja})를 태운다 — 제령 시도 (성공률 ${Math.round(chance * 10) / 10}%)`, PALETTE.legendary);
+      await wait(420);
+      if (Math.random() * 100 < chance) {
+        const owned = (char.ownedGhosts || []).includes(tameTarget.id);
+        tameRef.current = { ghostId: tameTarget.id, breakUp: owned };
+        pushFloat('enemy', '🕯 제령!', PALETTE.legendary);
+        pushLog(owned
+          ? `${tameTarget.name}의 원혼이 다시 굴복했다 — 한계돌파!`
+          : `${tameTarget.name}이(가) 굴복해 사역에 들어왔다!`, PALETTE.legendary);
+        setFoe({ ...E, hp: 0 });
+        finish(true, P.hp);
+        setBusy(false);
+        return;
+      }
+      pushFloat('enemy', '제령 실패!', PALETTE.accent);
+      pushLog('제령 실패 — 원혼이 광포해진다! [격노] 3 · 이번 전투에서는 다시 시도할 수 없다.', PALETTE.accent);
+      E.statuses = applyBuriedStatuses(E.statuses, [{ s: 'rage', n: 3 }]);
+      setTameLocked(true);
+      // 턴 소모 — skill=null 그대로 적 행동·라운드 종료로 진행
+    }
     // [혼란] — 스택×30% 확률로 행동 실패 ([u97] 광인의 벽은 면제)
     if (skill && !uq('u97') && (P.statuses.confuse || 0) > 0 && Math.random() < P.statuses.confuse * 0.3) {
       pushLog('🌀 혼란에 빠져 허우적거렸다 — 행동 실패!', '#c48bd4');
@@ -676,6 +716,47 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
       pushLog('⚡ 신속 — 턴을 소모하지 않았다. 이어서 행동할 수 있다.', PALETTE.dawn);
       setBusy(false);
       return;
+    }
+
+    // ---------- 🕯 동행 괴이 액티브 (1.144.0) — 내 턴 종료 시 자동 발동, 적 행동보다 우선 ----------
+    if (companionKit && E.hp > 0 && P.hp > 0) {
+      if (ghostCd > 0) {
+        setGhostCd(ghostCd - 1);
+      } else {
+        setGhostCd(companionKit.active.cd - 1);
+        const ga = companionKit.active;
+        pushLog(`🕯 사역귀 ${companion.name}${(char.ghost?.breaks || 0) > 0 ? ` +${char.ghost.breaks}` : ''}이(가) 움직인다`, BURIED_GHOST_RANKS[companion.rank].color);
+        if (ga.power) {
+          const base = { str: P.atk, dex: P.fin, int: P.mag }[ga.power.stat] || P.atk;
+          const dmg = Math.max(1, Math.round(base * ga.power.pct / 100));
+          const gr = hurt(E, dmg, false);
+          pushFloat('enemy', dmgText(gr), BURIED_GHOST_RANKS[companion.rank].color);
+          pushLog(`괴이의 일격 — ${dmg} 피해`, BURIED_GHOST_RANKS[companion.rank].color);
+          if (ga.drainPct > 0) {
+            const h = applyHeal(P, Math.round(dmg * ga.drainPct / 100));
+            if (h > 0) pushFloat('player', `+${h}`, PALETTE.green);
+          }
+        }
+        if (ga.apply.length > 0 && E.hp > 0) {
+          E.statuses = applyBuriedStatuses(E.statuses, ga.apply.map(x => ({ ...x, p: 100 })), statusOpts);
+          pushLog(`${E.name}에게 ${ga.apply.map(x => `[${BURIED_STATUS[x.s]?.name}] ${x.n}`).join(' ')}`, PALETTE.twilight);
+        }
+        if (ga.self.length > 0) {
+          P.statuses = applyBuriedStatuses(P.statuses, ga.self);
+          pushLog(`자신에게 ${ga.self.map(x => `[${BURIED_STATUS[x.s]?.name}] ${x.n}`).join(' ')}`, PALETTE.ice);
+        }
+        if (ga.healPct > 0) {
+          const h = applyHeal(P, Math.max(1, Math.round(P.maxHp * ga.healPct / 100)));
+          if (h > 0) { pushFloat('player', `+${h}`, PALETTE.green); pushLog(`괴이의 가호 — HP ${h} 회복`, PALETTE.green); }
+        }
+        if (ga.barrier > 0 && !kf.noBarrier) {
+          P.barrier = (P.barrier || 0) + ga.barrier;
+          pushLog(`보호막 +${ga.barrier}`, PALETTE.ice);
+        }
+        setPlayer(P); setFoe(E);
+        await wait(380);
+        if (E.hp <= 0 && !eliteRevive(E)) { pushLog(`${E.name} 격파!`, PALETTE.legendary); setFoe({ ...E, hp: 0 }); finish(true, P.hp); setBusy(false); return; }
+      }
     }
 
     // ---------- 2. 적 행동 ----------
@@ -1094,6 +1175,13 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
         )}
         <div className="mt-1"><BuriedBar value={player.sp} max={player.maxSp} color={PALETTE.ice} label="SP" height={7} /></div>
         <div className="mt-1"><BuriedStatusRow statuses={player.statuses} onPick={pickStatus} /></div>
+        {/* 🕯 동행 괴이 칩 (1.144.0) */}
+        {companion && (
+          <div className="mt-1 text-[11px] tabular-nums flex items-center gap-1" style={{ color: BURIED_GHOST_RANKS[companion.rank].color }}>
+            🕯 {companion.name}{(char.ghost?.breaks || 0) > 0 ? ` +${char.ghost.breaks}` : ''}
+            <span style={{ color: PALETTE.textDim }}>— {companionKit.active.cd > 0 && ghostCd > 0 ? `발동까지 ${ghostCd}턴` : '이번 턴 종료 시 발동'} · {companion.aDesc}</span>
+          </div>
+        )}
         {floats.filter(f => f.side === 'player').map((f, i) => (
           <div key={f.id} className="absolute text-[15px] font-bold tabular-nums pointer-events-none"
             style={{ left: `${10 + (i % 3) * 10}%`, top: 0, color: f.color, textShadow: '0 2px 6px #000', animation: 'fx-float-up 950ms ease-out forwards' }}>
@@ -1126,6 +1214,33 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
               {potionUsedThisTurn ? '이번 턴 사용함' : `HP ${BURIED_POTION_HEAL_PCT}% · 턴 소모 없음`}
             </div>
           </button>
+
+          {/* 🕯 제령 (1.144.0) — 이 적이 괴이일 때만. HP 25% 이하 + 등급 제령부 필요 */}
+          {tameTarget && (() => {
+            const tRank = BURIED_GHOST_RANKS[tameTarget.rank];
+            const left = Math.max(0, (char.talismans?.[tameTarget.rank] || 0) - (talismanSpent[tameTarget.rank] || 0));
+            const owned = (char.ownedGhosts || []).includes(tameTarget.id);
+            const canBreak = owned && char.ghost?.id === tameTarget.id && (char.ghost?.breaks || 0) < tRank.breakMax;
+            if (owned && !canBreak) return null; // 재제령 불가 (동행 동일 개체 한계돌파만 예외)
+            const hpPctNow = foe.maxHp > 0 ? (foe.hp / foe.maxHp) * 100 : 100;
+            const ready = !tameLocked && hpPctNow <= 25 && left > 0 && foe.hp > 0 && !busy && !result;
+            const chance = buriedTameChance(tameTarget.rank, hpPctNow);
+            return (
+              <button onClick={() => ready && act('tame', tameTarget)} disabled={!ready}
+                className="ui-press col-span-2 px-2.5 py-2 text-left"
+                style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panel, border: `1px solid ${tRank.color}88`, opacity: ready ? 1 : 0.45 }}>
+                <div className="text-[12px] font-bold" style={{ color: tRank.color }}>
+                  🧿 제령 — {tRank.name}({tRank.hanja}) {canBreak ? '한계돌파' : ''} · 부적 ×{left}
+                </div>
+                <div className="text-[11px] tabular-nums" style={{ color: PALETTE.textDim }}>
+                  {tameLocked ? '광포화 — 이 전투에서는 다시 시도할 수 없다'
+                    : hpPctNow > 25 ? `적 HP 25% 이하에서 가능 (현재 ${Math.round(hpPctNow)}%)`
+                    : left <= 0 ? `${tRank.name}부가 없다 — 보스가 낮은 확률로 떨어뜨린다`
+                    : `성공률 ${Math.round(chance * 10) / 10}% · 실패 시 부적 소진 + 턴 소모 + 적 광포화`}
+                </div>
+              </button>
+            );
+          })()}
 
           {/* 장착 장비 6칸 = 스킬 6개 (스킬 레벨 반영) */}
           {equipped.map(({ slot, item, skill }) => {
