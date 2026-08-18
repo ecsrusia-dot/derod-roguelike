@@ -1578,10 +1578,54 @@ export const BURIED_ENEMIES = {
       { name: '어둠의 육신', kind: 'defend', self: [{ s: 'guard', n: 5 }, { s: 'wall', n: 2 }], weight: 1 },
     ],
   },
+  // ===== 1.143.0 — 신규 수문장 2종 (400층 / 500층 최종 보스) =====
+  gatePrimordial: {
+    key: 'gatePrimordial', name: '수문장 — 태초의 포식자', img: { key: 'champ_frost_brute', chapter: 'frost_3' }, color: '#3d1f28',
+    desc: '네 번째 문. 빛이 태어나기 전부터 굶주려 있었다.',
+    tier: 'boss', minFloor: 10, maxFloor: 10, guardian: true,
+    hp: 1420, atk: 67, def: 27, exp: 5200, gold: [1500, 2300], startBarrier: 300,
+    actions: [
+      { name: '태초의 아귀', power: 104, kind: 'attack', hits: 3, drain: 40, weight: 3 },
+      { name: '어둠 삼키기', power: 88, kind: 'attack', apply: [{ s: 'weaken', n: 3, p: 100 }, { s: 'shatter', n: 2, p: 100 }], weight: 2 },
+      { name: '포식', power: 290, kind: 'attack', heavy: true, drain: 60, weight: 2 },
+      { name: '태고의 껍질', kind: 'defend', self: [{ s: 'guard', n: 5 }, { s: 'regen', n: 5 }], weight: 1 },
+    ],
+  },
+  gateTombLord: {
+    key: 'gateTombLord', name: '묘주(墓主) — 무덤 그 자체', img: { key: 'champ_forest_boss4', chapter: 'forest_4' }, color: '#e8b04a',
+    desc: '다섯 번째 문이자 마지막 문. 무덤은 파인 것이 아니라, 스스로 자란 것이다.',
+    tier: 'boss', minFloor: 10, maxFloor: 10, guardian: true,
+    hp: 1680, atk: 74, def: 30, exp: 8000, gold: [2400, 3600], startBarrier: 500, fullGuardPct: 30,
+    actions: [
+      { name: '묘비 강타', power: 112, kind: 'attack', pierce: true, weight: 3 },
+      { name: '망자의 손아귀', power: 84, kind: 'attack', apply: [{ s: 'bind', n: 2, p: 100 }, { s: 'curse', n: 2, p: 100 }], weight: 2 },
+      { name: '매장(埋葬)', power: 320, kind: 'attack', heavy: true, pierce: true, weight: 2 },
+      { name: '무덤의 포옹', power: 96, kind: 'attack', drain: 80, apply: [{ s: 'aging', n: 3, p: 80 }], weight: 2 },
+      { name: '대지가 곧 갑주', kind: 'defend', self: [{ s: 'guard', n: 6 }, { s: 'wall', n: 3 }], weight: 1 },
+    ],
+  },
 };
 export const BURIED_ENEMY_LIST = Object.values(BURIED_ENEMIES);
 // 수문장 로테이션 — 100층 망령왕 → 200층 마에스트로 → 300층 낙젤리온 → 반복
-export const BURIED_GUARDIAN_KEYS = ['gateWraithKing', 'gateMaestro', 'gateNakzelion'];
+// 1.143.0 — 수문장 5종 고정 배치 (PM 결정: 500층 엔드콘텐츠).
+// 100=망령왕 / 200=마에스트로 / 300=낙젤리온 / 400=태초의 포식자 / 500=묘주(최종 보스).
+// 600층 이후(정점 너머)는 묘주가 계속 지킨다 — buriedBossKeyAt이 clamp.
+export const BURIED_GUARDIAN_KEYS = ['gateWraithKing', 'gateMaestro', 'gateNakzelion', 'gatePrimordial', 'gateTombLord'];
+
+// 🕳 심층 대역 (1.143.0) — 100층 단위 테마. rewardPct는 그 대역 전투 골드·경험치 보너스.
+export const BURIED_ZONES = [
+  { id: 'surface',    from: 1,   to: 99,       name: '표층',        icon: '🪦', color: '#9b8975', rewardPct: 0,  desc: '무덤의 살갗 — 아직 빛의 기억이 남아 있다.' },
+  { id: 'corridor',   from: 100, to: 199,      name: '망각의 회랑', icon: '🕯', color: '#7ba3c4', rewardPct: 10, desc: '이름을 잃은 자들이 걷는 긴 복도.' },
+  { id: 'threshold',  from: 200, to: 299,      name: '명계의 문턱', icon: '⚱', color: '#5c4a8c', rewardPct: 20, desc: '산 자의 법이 여기서 끝난다.' },
+  { id: 'primordial', from: 300, to: 399,      name: '태초의 어둠', icon: '🌑', color: '#3d1f28', rewardPct: 30, desc: '빛보다 먼저 있던 것이 아직 살아 있다.' },
+  { id: 'root',       from: 400, to: 499,      name: '무덤의 근원', icon: '💀', color: '#c4453d', rewardPct: 40, desc: '모든 무덤이 여기서 자라났다 — 묘주가 기다린다.' },
+  { id: 'beyond',     from: 500, to: Infinity, name: '정점 너머',   icon: '👑', color: '#e8b04a', rewardPct: 50, desc: '묘주조차 알지 못하는 깊이.' },
+];
+export const buriedZoneAt = (floor) => BURIED_ZONES.find(z => (floor || 1) >= z.from && (floor || 1) <= z.to) || BURIED_ZONES[0];
+
+// 🗝 수문장의 인장 (1.143.0) — 관문(100~500층) 첫 격파마다 계정 영구 인장 1개 (PM 결정: 성장 반등축).
+// 인장 1개당 전투 위력 +8% · 받는 피해 -4% (최대 5개 = +40% / -20%). 전투는 char.sigils로 읽는다.
+export const BURIED_SIGILS = { dmgPct: 8, takenPct: 4, max: 5 };
 
 // =========================================================
 // 9. 던전 — 층 진행 + 방 선택
@@ -1899,9 +1943,9 @@ export function advanceBuriedFloor(char) {
 // 1.113.0 — 무한층 보스 배치. 정복 층까지는 기존 bossFloors, 그 뒤로는 같은 간격으로 보스 로테이션.
 // 예) 미궁(5·10) → 15·20·25…층마다 봉인의 마녀 → 무덤의 폭군 → 반복
 export function buriedBossKeyAt(dg, floor) {
-  // 1.120.0 — 100층 단위 층계 수문장 (일반 보스 로테이션보다 우선)
+  // 1.120.0 — 100층 단위 층계 수문장. 1.143.0 — 고정 배치 (100~500 각자의 문, 600+는 묘주가 계속 지킨다)
   if (floor > 0 && floor % 100 === 0) {
-    return BURIED_GUARDIAN_KEYS[(Math.floor(floor / 100) - 1) % BURIED_GUARDIAN_KEYS.length];
+    return BURIED_GUARDIAN_KEYS[Math.min(Math.floor(floor / 100), BURIED_GUARDIAN_KEYS.length) - 1];
   }
   if (dg.bossFloors[floor]) return dg.bossFloors[floor];
   if (floor <= dg.floors) return null;
@@ -2849,6 +2893,11 @@ export const BURIED_UNIQUES = [
     desc: '지친 몸을 스치는 바람. SP 회복 +3, 회피 +6%.' }),
   UQ({ id: 'lg40', name: '이력(理力)의 인장', slot: 'acc',  skillId: 'silenceSigil', src: 0, fx: { spMult: 1.2, spRegen: 2, magPct: 8 },
     desc: '이성이 곧 힘. 최대 SP +20%, SP 회복 +2, 마법 +8%.' }),
+
+  // ===== 1.143.0 — 👑 정점 유니크 (묘주 첫 격파 확정 지급 전용 — dungeon: 'apex'라 어떤 드랍 풀에도 안 들어간다) =====
+  UQ({ id: 'tomb1', dungeon: 'apex', name: '묘주의 관(冠)', slot: 'helm', skillId: 'chargeUp', src: 0,
+    fx: { physPct: 15, magPct: 15, hpMult: 1.15, takenPct: -10, dropLuck: 3 },
+    desc: '[정점] 묘주를 꺾은 자만이 쓴다. 모든 공격 +15%, 최대 HP +15%, 받는 피해 -10%, 드랍 운 +3.' }),
 ];
 export const getBuriedUnique = (id) => BURIED_UNIQUES.find(u => u.id === id) || null;
 
@@ -2885,14 +2934,16 @@ export function buriedUniqueFx(char) {
 // 유니크 장비 생성 — 스탯은 전설 등급 배율, 이름·스킬·효과 고정.
 // 1.115.0 — dungeonId·deep: 던전 전용 유니크는 그 던전 심층에서만 풀에 들어오고,
 // 미보유 전용이 남아 있으면 50% 확률로 전용 쪽을 우선 뽑는다 (공략 목적지 역할)
-export function rollBuriedUniqueItem({ classId, floor = 1, excludeIds = [], dungeonId = null, deep = false, powerMult = 1 } = {}) {
+export function rollBuriedUniqueItem({ classId, floor = 1, excludeIds = [], dungeonId = null, deep = false, powerMult = 1, forceId = null } = {}) {
+  // 1.143.0 — forceId: 특정 유니크 확정 생성 (묘주의 관 등 정점 보상)
   const generic = BURIED_UNIQUES.filter(u => !u.dungeon && !excludeIds.includes(u.id));
   const exclusive = (deep && dungeonId)
     ? BURIED_UNIQUES.filter(u => u.dungeon === dungeonId && !excludeIds.includes(u.id))
     : [];
   const pool = exclusive.length > 0 && Math.random() < 0.5 ? exclusive : [...generic, ...exclusive];
-  if (pool.length === 0) return null;
-  const def = pick(pool);
+  const forced = forceId ? BURIED_UNIQUES.find(u => u.id === forceId) : null;
+  if (!forced && pool.length === 0) return null;
+  const def = forced || pick(pool);
   const slotId = def.slot === 'acc' ? (Math.random() < 0.5 ? 'acc1' : 'acc2') : def.slot;
   const base = rollBuriedItem({ slot: slotId, classId, floor, tier: 'legend', powerMult });
   if (!base) return null;

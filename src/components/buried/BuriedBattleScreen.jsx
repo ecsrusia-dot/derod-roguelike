@@ -28,6 +28,7 @@ import {
   rollBuriedRune, getBuriedRune, BURIED_RUNE_RARITIES,
   buriedUniqueFx, buriedKeystoneFx, buriedKeystoneBonus, getBuriedKeystone,
   buriedSkillMaxUses,
+  BURIED_SIGILS, buriedZoneAt,
 } from '../../data.js';
 import { BuriedBar, BuriedStatusRow, BuriedItemCard, slotMeta, SkillKindBadge, BuriedInfoModal } from './BuriedCommon.jsx';
 
@@ -142,9 +143,9 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     ),
     cds: {}, reflect: 0, reflectTurns: 0,
     immuneCrit: uniques.includes('u61'), // [u61] 휘황찬란 — 적 치명타 무효 (resolveBuriedAttack def-side)
-    // [u21] 모리건 — 주고받는 피해 절반 / [u52] 결전 — 받는 피해 +15
-    envDmgPct: (env.self.dmgPct || 0) + (uniques.includes('u21') ? -50 : 0),
-    envTakenPct: (env.self.takenPct || 0) + (uniques.includes('u21') ? -50 : 0) + (uniques.includes('u52') ? 15 : 0) + (ufx.takenPct || 0) + (kf.takenPct || 0),
+    // [u21] 모리건 — 주고받는 피해 절반 / [u52] 결전 — 받는 피해 +15 / 🗝 인장 (1.143.0) — 개당 위력 +8·받피 -4
+    envDmgPct: (env.self.dmgPct || 0) + (uniques.includes('u21') ? -50 : 0) + (char.sigils || 0) * BURIED_SIGILS.dmgPct,
+    envTakenPct: (env.self.takenPct || 0) + (uniques.includes('u21') ? -50 : 0) + (uniques.includes('u52') ? 15 : 0) + (ufx.takenPct || 0) + (kf.takenPct || 0) - (char.sigils || 0) * BURIED_SIGILS.takenPct,
     envCritAdd: env.self.critAdd || 0, envMagPct: env.self.magPct || 0,
     envDodgeAdd: env.self.dodgeAdd || 0,
   }));
@@ -194,6 +195,10 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
       if (enemy.fullGuardPct) hints.push(`온전할 때 피해 -${enemy.fullGuardPct}%`);
       if (enemy.dodge > 3) hints.push(`회피 ${enemy.dodge}%`);
       if (hints.length > 0) init.push({ t: `⚠ ${hints.join(' · ')}`, c: PALETTE.dawn });
+    }
+    // 🗝 수문장의 인장 (1.143.0)
+    if ((char.sigils || 0) > 0) {
+      init.push({ t: `🗝 수문장의 인장 ×${char.sigils} — 위력 +${char.sigils * BURIED_SIGILS.dmgPct}% · 받는 피해 -${char.sigils * BURIED_SIGILS.takenPct}%`, c: PALETTE.legendary });
     }
     for (const kid of char.keystones || []) {
       const k = getBuriedKeystone(kid);
@@ -328,9 +333,10 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
   const finish = (win, finalHp) => {
     if (win) {
       // [u112] 전당의 휘장 — 승리 골드 +50%
-      const goldMult = dungeon.goldMult * (1 + (env.meta.goldPct || 0) / 100) * (uq('u112') ? 1.5 : 1) * (uq('u27') ? 3 : 1) * (uq('dc4') ? 1.5 : 1) * (1 + ((cf.goldPct || 0) + (pf.goldPct || 0) + (rf.goldPct || 0) + (ufx.goldPct || 0) + buriedKeystoneBonus(char).rewardPct) / 100);
+      const zoneMult = 1 + (buriedZoneAt(char.floor).rewardPct || 0) / 100; // 🕳 심층 대역 보상 (1.143.0)
+      const goldMult = dungeon.goldMult * zoneMult * (1 + (env.meta.goldPct || 0) / 100) * (uq('u112') ? 1.5 : 1) * (uq('u27') ? 3 : 1) * (uq('dc4') ? 1.5 : 1) * (1 + ((cf.goldPct || 0) + (pf.goldPct || 0) + (rf.goldPct || 0) + (ufx.goldPct || 0) + buriedKeystoneBonus(char).rewardPct) / 100);
       const gold = Math.round(rnd(enemy.gold[0], enemy.gold[1]) * goldMult);
-      const exp = Math.max(0, Math.round(enemy.exp * dungeon.expMult * (uq('u40') ? 2 : 1) * (1 + ((cf.expPct || 0) + (pf.expPct || 0) + (rf.expPct || 0) + (ufx.expPct || 0) + buriedKeystoneBonus(char).rewardPct) / 100))); // [u81] 고고학 expPct -100 → 0 하한
+      const exp = Math.max(0, Math.round(enemy.exp * dungeon.expMult * zoneMult * (uq('u40') ? 2 : 1) * (1 + ((cf.expPct || 0) + (pf.expPct || 0) + (rf.expPct || 0) + (ufx.expPct || 0) + buriedKeystoneBonus(char).rewardPct) / 100))); // [u81] 고고학 expPct -100 → 0 하한
       const bossy = roomType === 'boss' || roomType === 'calamity';
       // 1.120.0 — 층계 수문장 (100층 단위): 유니크 확정 + 드랍 운 대폭
       const guardianFight = roomType === 'boss' && (char.floor || 1) % 100 === 0;

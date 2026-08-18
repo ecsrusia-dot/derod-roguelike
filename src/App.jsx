@@ -170,6 +170,7 @@ import {
   buriedEarnedDepthTraits,
   checkBuriedDepthClassUnlock,
   BURIED_UNION_REP_GAIN, getBuriedUnion,
+  BURIED_SIGILS, rollBuriedUniqueItem, buriedMonsterLevel, buriedLootPower,
 } from './data.js';
 import { getKstDateKey } from './utils/dailyChallenge.js';
 import { simulateBestEndlessRun } from './utils/endlessSkipSim.js';
@@ -394,6 +395,7 @@ export default function App() {
       const b = getBuried(prev);
       const char = createBuriedChar(classId, { items: [], gold: b.legacyGold }, dungeonId, contracts, aggregateBuriedParts(b.parts), startFloor, buriedEarnedDepthTraits(b.deepestByDungeon), raceId, keystones, originId);
       if (!char) return prev;
+      char.sigils = (b.gateSigils || []).length; // 🗝 수문장의 인장 (1.143.0) — 생성 시 계정 인장 수를 굽는다
       const next = startBuriedChar(prev, char);
       saveMeta(next);
       return next;
@@ -593,11 +595,49 @@ export default function App() {
     const shardBase = buriedRoom === 'boss' ? (BURIED_SHARD_DROP[grown.dungeonId || 'labyrinth'] || 1) : 0;
     const shardGain = shardBase * (isGuardian ? 8 : isDeepBoss ? 2 : 1);
     if (isGuardian) setBuriedForgeNotice(`🚪 ${char.floor}층 수문장 격파 — 관문이 열렸다! ${char.floor}층 돌파 체크포인트에서 재출발할 수 있다.`);
+    // 🗝 수문장의 인장 (1.143.0) — 관문(100~500층) 첫 격파 시 계정 영구 인장. 이번 런에도 즉시 적용
+    let sigilEarned = false;
+    if (isGuardian && (char.floor || 1) <= 100 * BURIED_SIGILS.max) {
+      const gateFloor = char.floor;
+      if (!(getBuried(meta).gateSigils || []).includes(gateFloor)) {
+        sigilEarned = true;
+        setBuriedForgeNotice(`🗝 수문장의 인장 획득! (${(getBuried(meta).gateSigils || []).length + 1}/${BURIED_SIGILS.max}) — 전 캐릭터 영구: 위력 +${BURIED_SIGILS.dmgPct}% · 받는 피해 -${BURIED_SIGILS.takenPct}%`);
+        setMeta(prev => {
+          const bp = getBuried(prev);
+          if ((bp.gateSigils || []).includes(gateFloor)) return prev;
+          const next = { ...prev, buried: { ...bp, gateSigils: [...bp.gateSigils, gateFloor] } };
+          saveMeta(next);
+          return next;
+        });
+      }
+    }
+    // 👑 묘주 격파 (1.143.0) — 500층 최종 보스. 첫 격파: 「묘주의 관」 확정 + 대량 보상 + 정점 기록
+    let apexCrown = null;
+    if (isGuardian && buriedEnemy?.key === 'gateTombLord') {
+      const firstApex = (getBuried(meta).apexClears || 0) === 0;
+      if (firstApex) {
+        apexCrown = rollBuriedUniqueItem({ classId: char.classId, floor: buriedMonsterLevel(char), powerMult: buriedLootPower(char), forceId: 'tomb1' });
+      }
+      setMeta(prev => {
+        const bp = getBuried(prev);
+        let next = { ...prev, buried: { ...bp, apexClears: (bp.apexClears || 0) + 1 } };
+        next = addBuriedDust(next, firstApex ? 2000 : 500);
+        next = addBuriedShards(next, firstApex ? 50 : 15);
+        saveMeta(next);
+        return next;
+      });
+      setBuriedForgeNotice(firstApex
+        ? '👑 묘주 격파 — 무덤의 정점에 섰다! 「묘주의 관」 + 🕯 2,000 + ☠ 50. 이 기록은 영원히 남는다.'
+        : '👑 묘주 재격파 — 🕯 500 + ☠ 15. 무덤은 다시 자라난다.');
+    }
     // 정복 판정 (1.113.0) — 정복 층 보스를 잡는 순간 해금·기록, 런은 계속
     const conquest = buriedRoom === 'boss' && (char.floor || 1) === (dgNow?.floors || 10);
     // 방을 하나 지났으므로 걸음수 +1 + [u102] 층 이동 스킬 레벨 판정
     const { char: blessed } = maybeBuriedFloorSkillUp(stepBuriedChar(grown));
-    const { char: advanced } = advanceBuriedFloor(blessed);
+    let { char: advanced } = advanceBuriedFloor(blessed);
+    // 🗝 인장은 이번 런에도 즉시 반영 / 👑 묘주의 관은 획득 판단 대기열로
+    if (sigilEarned) advanced = { ...advanced, sigils: (advanced.sigils || 0) + 1 };
+    if (apexCrown) advanced = addBuriedItemToChar(advanced, apexCrown).char;
     setBuriedEnemy(null); setBuriedRoom(null); setBuriedRoomFx(null);
     if (shardGain) setMeta(prev => { const next = addBuriedShards(prev, shardGain); saveMeta(next); return next; });
     if (conquest) recordBuriedConquest(advanced);
