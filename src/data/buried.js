@@ -125,6 +125,15 @@ export const BURIED_RACES = [
     desc: '피로 산다. 흡혈 +5% — 대신 일반 회복량 -15%.' },
   { id: 'revenant', name: '굴레망자', icon: '💀', color: '#8b8378', statMods: { vit: 4, str: 2, dex: -3 }, fx: { statusResist: 20, healPct: -25 },
     desc: '이미 죽은 몸. 적의 상태이상 확률 -20% — 대신 회복량 -25%.' },
+  // ===== 1.141.0 — 🏛 조직 전속 종족 4종 (union 필드 = 해당 조직 Lv.5 해금, 위저드가 게이트) =====
+  { id: 'angelkin', name: '반천사',   icon: '🕊', color: '#e8d8a8', union: 'sealwatch', statMods: { int: 2, vit: 1, str: -2 }, fx: { healPct: 20, statusResist: 10, barrier: 10 },
+    desc: '[봉인 감시단 전속] 타락하다 만 피. 회복 +20%, 상태이상 저항 +10%, 시작 보호막 +10.' },
+  { id: 'ghoulkin', name: '구울',     icon: '🧟', color: '#5e7a3e', union: 'mourners', statMods: { vit: 3, int: -2 }, fx: { drainPct: 5, hp: 10 },
+    desc: '[침묵의 상조회 전속] 굶주림이 무기다. 모든 공격에 흡혈 +5%, 최대 HP +10.' },
+  { id: 'dwarfkin', name: '드워프',   icon: '⛏', color: '#c9a86a', union: 'darkmoon', statMods: { str: 2, vit: 2, dex: -2 }, fx: { goldPct: 15, def: 2 },
+    desc: '[암월상회 전속] 값을 아는 눈. 골드 +15%, 방어력 +2.' },
+  { id: 'onikin',   name: '오니',     icon: '👹', color: '#c4453d', union: 'abyssorder', statMods: { str: 3, dex: -1, int: -1 }, fx: { physPct: 10, crit: 4 },
+    desc: '[무저갱 교단 전속] 심연이 기른 귀신. 물리·기교 +10%, 치명 +4%.' },
 ];
 export const getBuriedRace = (id) => BURIED_RACES.find(r => r.id === id) || null;
 // 종족+출신 fx 뭉치 (1.131.0~ 출신 통합) — 특성·계약·부품과 같은 소비 어휘.
@@ -2129,7 +2138,7 @@ export const BURIED_ADVANCED_CLASSES = [
   },
 ];
 // 전 직업 목록 — 조우 직업(파일 하단 정의)까지 포함해야 하므로 호출 시점에 평가 (TDZ 회피)
-export const buriedAllClasses = () => [...BURIED_CLASSES, ...BURIED_ADVANCED_CLASSES, ...BURIED_ENCOUNTER_CLASSES, ...BURIED_DEPTH_CLASSES];
+export const buriedAllClasses = () => [...BURIED_CLASSES, ...BURIED_ADVANCED_CLASSES, ...BURIED_ENCOUNTER_CLASSES, ...BURIED_DEPTH_CLASSES, ...BURIED_UNION_CLASSES];
 
 // =========================================================
 // 14. 스킬 레벨 1~8 (1.104.0)
@@ -3302,6 +3311,91 @@ export function checkBuriedDepthClassUnlock(dungeonId, floor, alreadyUnlocked) {
   if (!c || alreadyUnlocked.includes(c.id) || (floor || 1) < c.unlock.floor) return null;
   return c.id;
 }
+
+// =========================================================
+// 26d. 🏛 조직 (1.141.0) — BB2 유니온의 솔로 각색 (PM 결정: 평판형)
+// =========================================================
+// 원전 유니온은 온라인 공동 오더(일일 퀘스트) 구조 — 솔로에선 무의미해 재설계.
+// ① 전 조직 동시 개방 (가입 없음) ② 플레이 실적이 평판으로 자동 적립 (일일 리셋 없음)
+// ③ 조직 = 던전 1:1 — 그 던전에서의 전투 승리·보스 격파·정복이 곧 그 조직 평판
+// ④ 보상은 레벨 도달 시 자동 지급 (storage.addBuriedUnionRep) — 먼지·조각·전속 종족(Lv5)·전속 직업(Lv7)
+export const BURIED_UNIONS = [
+  { id: 'sealwatch',  dungeon: 'labyrinth', name: '봉인 감시단',   icon: '🏛', color: '#7ba3c4',
+    desc: '미궁의 봉인이 풀리지 않게 지키는 기사단. 미궁에서의 전과가 곧 신임이다.',
+    classId: 'paladin', raceId: 'angelkin' },
+  { id: 'mourners',   dungeon: 'ruins',     name: '침묵의 상조회', icon: '🕯', color: '#7a9a5e',
+    desc: '가라앉은 자들을 거두는 장의 조합. 폐허의 망자를 잠재울수록 빚이 쌓인다.',
+    classId: 'necroseer', raceId: 'ghoulkin' },
+  { id: 'darkmoon',   dungeon: 'chasm',     name: '암월상회',      icon: '🌘', color: '#c9a86a',
+    desc: '나락 밑바닥까지 물건을 대는 암시장. 깊이 내려가는 자만이 단골이 된다.',
+    classId: 'ronin', raceId: 'dwarfkin' },
+  { id: 'abyssorder', dungeon: 'abyss',     name: '무저갱 교단',   icon: '🕳', color: '#5c4a8c',
+    desc: '심연 그 자체를 섬기는 이단. 어둠 속의 살육이 곧 기도다.',
+    classId: 'darkknight', raceId: 'onikin' },
+];
+export const getBuriedUnion = (id) => BURIED_UNIONS.find(u => u.id === id) || null;
+export const getBuriedUnionByDungeon = (dungeonId) => BURIED_UNIONS.find(u => u.dungeon === dungeonId) || null;
+
+// 누적 평판 → 레벨 (Lv1~8). 임계는 공통.
+export const BURIED_UNION_LEVELS = [0, 30, 80, 160, 280, 450, 700, 1000];
+export function buriedUnionLevel(rep) {
+  let lv = 1;
+  for (let i = 1; i < BURIED_UNION_LEVELS.length; i++) if ((rep || 0) >= BURIED_UNION_LEVELS[i]) lv = i + 1;
+  return lv;
+}
+// 평판 획득 — 그 던전에서의 전투 승리 종류별 (App이 승리 정산에서 호출)
+export const BURIED_UNION_REP_GAIN = { normal: 1, elite: 3, boss: 10, guardian: 30, calamity: 15, conquest: 50 };
+// 레벨 도달 보상 (인덱스 = 레벨). race/clazz는 그 조직의 전속 id를 해금.
+export const BURIED_UNION_REWARDS = [
+  null, null,                                        // (미사용) / Lv1 기본
+  { dust: 300, label: '🕯 먼지 300' },               // Lv2
+  { shards: 3, label: '☠ 죽음의 조각 3' },           // Lv3
+  { dust: 600, label: '🕯 먼지 600' },               // Lv4
+  { race: true, label: '전속 종족 해금' },            // Lv5
+  { shards: 8, label: '☠ 죽음의 조각 8' },           // Lv6
+  { clazz: true, label: '전속 직업 해금' },           // Lv7
+  { dust: 1500, shards: 10, label: '🕯 먼지 1,500 + ☠ 조각 10' }, // Lv8
+];
+
+// 조직 전속 직업 4종 — 기존 특성 재사용 (전투 코드 0줄), 해금은 unlockedClasses로 기존 위저드 흐름 그대로
+export const BURIED_UNION_CLASSES = [
+  {
+    id: 'paladin', name: '성기사', sub: 'Paladin', color: '#e8d8a8',
+    image: './classes/priest.jpg', unionOnly: true,
+    desc: '봉인 감시단의 수호 기사. 빛과 강철로 벽이 된다.',
+    lines: { weapon: 'mace', offhand: 'relic' },
+    stats: { str: 10, dex: 5, int: 9, vit: 12 },
+    traits: ['faith', 'toughness', 'wardstone'],
+    unlock: { union: 'sealwatch', label: '봉인 감시단 평판 Lv.7' },
+  },
+  {
+    id: 'necroseer', name: '강령술사', sub: 'Necroseer', color: '#5e7a3e',
+    image: './classes/sage.jpg', unionOnly: true,
+    desc: '상조회가 거둔 망자의 목소리를 듣는 자. 병과 저주가 도구다.',
+    lines: { weapon: 'staff', offhand: 'tome' },
+    stats: { str: 4, dex: 6, int: 14, vit: 8 },
+    traits: ['pestilence', 'arcana', 'willpower'],
+    unlock: { union: 'mourners', label: '침묵의 상조회 평판 Lv.7' },
+  },
+  {
+    id: 'ronin', name: '떠돌이 사무라이', sub: 'Ronin', color: '#c9a86a',
+    image: './classes/wanderer.jpg', unionOnly: true,
+    desc: '암월상회의 해결사. 칼값은 선불이다.',
+    lines: { weapon: 'sword', offhand: 'blade' },
+    stats: { str: 12, dex: 11, int: 4, vit: 7 },
+    traits: ['swordmastery', 'precision', 'gale'],
+    unlock: { union: 'darkmoon', label: '암월상회 평판 Lv.7' },
+  },
+  {
+    id: 'darkknight', name: '암흑기사', sub: 'Dark Knight', color: '#5c4a8c',
+    image: './classes/demonblood.jpg', unionOnly: true,
+    desc: '무저갱 교단의 성전 기사. 어둠을 갑주처럼 두른다.',
+    lines: { weapon: 'axe', offhand: 'tome' },
+    stats: { str: 12, dex: 4, int: 9, vit: 10 },
+    traits: ['cursedblood', 'sanguine', 'toughness'],
+    unlock: { union: 'abyssorder', label: '무저갱 교단 평판 Lv.7' },
+  },
+];
 
 // =========================================================
 // 26c. 던전 심층 특성 4종 (1.116.0) — 150층 도달 해금, 전 캐릭터 자동 적용

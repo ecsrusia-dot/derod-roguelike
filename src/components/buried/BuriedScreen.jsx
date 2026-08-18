@@ -23,6 +23,7 @@ import {
   resolveBuriedLoot, buriedCheckpointFloors,
   BURIED_DEPTH_CLASSES, buriedEarnedDepthTraits,
   BURIED_RACES, getBuriedRace,
+  BURIED_UNIONS, BURIED_UNION_CLASSES, getBuriedUnion, buriedUnionLevel, BURIED_UNION_LEVELS, BURIED_UNION_REWARDS,
 } from '../../data.js';
 import { BuriedBar, BURIED_DUST_ICON, BuriedTierLegend, BuriedLootModal } from './BuriedCommon.jsx';
 import BuriedManage from './BuriedManage.jsx';
@@ -64,6 +65,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
     ...BURIED_ADVANCED_CLASSES.filter(c => unlockedClasses.includes(c.id)),
     ...BURIED_ENCOUNTER_CLASSES.filter(c => unlockedClasses.includes(c.id)),
     ...BURIED_DEPTH_CLASSES.filter(c => unlockedClasses.includes(c.id)),
+    ...BURIED_UNION_CLASSES.filter(c => unlockedClasses.includes(c.id)), // 1.141.0 — 조직 전속 직업
   ];
   const earnedDepthTraits = buriedEarnedDepthTraits(b.deepestByDungeon);
   const killsByEnemy = b.killsByEnemy || {};
@@ -186,6 +188,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
               { id: 'forge', icon: <Hammer size={15} />, name: '무덤 재련소', sub: `${BURIED_DUST_ICON}${b.dust || 0} · 제작 Lv.${buriedForgeLevel(b.deepest)}`, c: PALETTE.dawn },
               { id: 'contracts', icon: <ScrollText size={15} />, name: '마의 계약', sub: `보유 ${ownedContracts.length}/${BURIED_CONTRACTS.length} · 한도 ${buriedContractCap(b)}`, c: PALETTE.twilight },
               { id: 'lab', icon: <FlaskConical size={15} />, name: '연구실', sub: `${BURIED_SHARD.icon}${b.shards || 0} · 부품 ${(b.parts || []).length}/5`, c: '#c48bd4' },
+              { id: 'unions', icon: <span className="text-[13px]">🏛</span>, name: '조직', sub: `평판 Lv 합 ${BURIED_UNIONS.reduce((s, u) => s + buriedUnionLevel(b.unionRep?.[u.id] || 0), 0)}/${BURIED_UNIONS.length * 8}`, c: PALETTE.dawn },
               { id: 'records', icon: <BarChart3 size={15} />, name: '기록 · 규칙', sub: `최고 ${b.deepest || 0}층 · 사망 ${b.deaths || 0}`, c: PALETTE.ice },
             ].map(m => (
               <button key={m.id} onClick={() => setView(m.id)} className="ui-press px-3 py-3 text-left"
@@ -216,6 +219,66 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
             })}
           </div>
         </div>
+      </div>
+    </>
+  );
+
+  // ============================================
+  // 🏛 조직 (1.141.0) — 평판형 유니온 (솔로 각색)
+  // ============================================
+  const renderUnions = () => (
+    <>
+      <SubHeader title="🏛 조직 — 평판" color={PALETTE.dawn} onPrev={() => setView('home')} />
+      <div className="px-3 py-3 space-y-2 overflow-y-auto ui-stagger">
+        <div className="px-3 py-2 text-[11px] leading-relaxed" style={{ borderRadius: R.chip, background: PALETTE.panel, border: `1px solid ${PALETTE.panelBorder}`, color: PALETTE.textDim }}>
+          조직은 던전과 한 몸이다 — <b style={{ color: PALETTE.text }}>그 던전에서 싸울수록 평판이 쌓이고</b>, 레벨마다 보상이 자동 지급된다.
+          <br />적립: 일반 +1 · 강적 +3 · 보스 +10 · 수문장 +30 · 재앙 +15 · 정복 +50
+        </div>
+        {BURIED_UNIONS.map(u => {
+          const rep = b.unionRep?.[u.id] || 0;
+          const lv = buriedUnionLevel(rep);
+          const maxLv = BURIED_UNION_LEVELS.length;
+          const nextNeed = lv < maxLv ? BURIED_UNION_LEVELS[lv] : null;
+          const prevNeed = BURIED_UNION_LEVELS[lv - 1] || 0;
+          const pct = nextNeed ? Math.min(100, Math.round(((rep - prevNeed) / (nextNeed - prevNeed)) * 100)) : 100;
+          const dg = BURIED_DUNGEONS.find(d => d.id === u.dungeon);
+          return (
+            <div key={u.id} className="px-3 py-2.5" style={{ borderRadius: R.btn, background: PALETTE.panel, border: `1px solid ${u.color}55` }}>
+              <div className="flex items-center gap-2">
+                <span className="text-[16px]">{u.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[12px] font-bold" style={{ color: u.color }}>
+                    {u.name} <span className="text-[11px] font-normal" style={{ color: PALETTE.textDim }}>— {dg?.name}</span>
+                  </div>
+                  <div className="text-[11px]" style={{ color: PALETTE.textDim }}>{u.desc}</div>
+                </div>
+                <div className="text-right shrink-0">
+                  <div className="text-[13px] font-bold tabular-nums" style={{ color: lv >= maxLv ? PALETTE.legendary : PALETTE.text }}>Lv.{lv}</div>
+                  <div className="text-[11px] tabular-nums" style={{ color: PALETTE.textDim }}>{nextNeed ? `${rep}/${nextNeed}` : `${rep} (만렙)`}</div>
+                </div>
+              </div>
+              <div className="mt-1.5 h-[5px] rounded-full overflow-hidden" style={{ background: PALETTE.panelBorder }}>
+                <div className="h-full rounded-full" style={{ width: `${pct}%`, background: u.color }} />
+              </div>
+              {/* 보상 트랙 — 도달 여부 칩 */}
+              <div className="flex flex-wrap gap-1 mt-2">
+                {BURIED_UNION_REWARDS.map((rw, rwLv) => {
+                  if (!rw) return null;
+                  const got = lv >= rwLv;
+                  const label = rw.race ? `${getBuriedRace(u.raceId)?.icon} ${getBuriedRace(u.raceId)?.name}`
+                    : rw.clazz ? `⚔ ${BURIED_UNION_CLASSES.find(c => c.id === u.classId)?.name}`
+                    : rw.label;
+                  return (
+                    <span key={rwLv} className="px-1.5 py-0.5 text-[11px] tabular-nums"
+                      style={{ borderRadius: 'var(--r-chip, 8px)', border: `1px solid ${got ? u.color : PALETTE.panelBorder}`, color: got ? u.color : PALETTE.textDim, opacity: got ? 1 : 0.7 }}>
+                      {got ? '✓' : `Lv.${rwLv}`} {label}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </>
   );
@@ -314,7 +377,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
             <div className="text-[11px]" style={{ color: PALETTE.textDim }}>
               시체의 뼈대를 고른다 — 종족은 기본 스탯과 체질을 바꾼다.
             </div>
-            {BURIED_RACES.map(r => {
+            {BURIED_RACES.filter(r => !r.union || (b.unlockedRaces || []).includes(r.id)).map(r => {
               const on = pickRace === r.id;
               return (
                 <button key={r.id} onClick={() => setPickRace(r.id)} className="ui-press w-full flex items-start gap-2.5 px-3 py-2 text-left"
@@ -332,6 +395,17 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
                 </button>
               );
             })}
+            {/* 🏛 조직 전속 종족 — 미해금은 잠금 힌트 (1.141.0) */}
+            {BURIED_RACES.filter(r => r.union && !(b.unlockedRaces || []).includes(r.id)).length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {BURIED_RACES.filter(r => r.union && !(b.unlockedRaces || []).includes(r.id)).map(r => (
+                  <span key={r.id} className="px-2 py-1 text-[11px] flex items-center gap-1"
+                    style={{ borderRadius: R.chip, border: `1px solid ${PALETTE.panelBorder}`, color: PALETTE.textDim, opacity: 0.75 }}>
+                    <Lock size={10} /> {r.icon} {r.name} — {getBuriedUnion(r.union)?.name} 평판 Lv.5
+                  </span>
+                ))}
+              </div>
+            )}
             {/* ── 출신 (1.131.0 — BB2 3축, 종족 화면 통합) ── */}
             <div className="text-[11px] pt-2" style={{ color: PALETTE.textDim }}>
               어떻게 자랐는가 — 출신은 작은 체질 보정이다.
@@ -418,6 +492,12 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
                   <div key={c.id} style={{ color: PALETTE.textDim }}>
                     <span style={{ color: c.color }}>{c.name}</span> — {c.unlock.label}
                     <span className="tabular-nums"> (최고 {b.deepestByDungeon?.[c.unlock.dungeonId] || 0}층)</span>
+                  </div>
+                ))}
+                {BURIED_UNION_CLASSES.filter(c => !unlockedClasses.includes(c.id)).map(c => (
+                  <div key={c.id} style={{ color: PALETTE.textDim }}>
+                    <span style={{ color: c.color }}>{c.name}</span> — {c.unlock.label}
+                    <span className="tabular-nums"> (현재 Lv.{buriedUnionLevel(b.unionRep?.[c.unlock.union] || 0)})</span>
                   </div>
                 ))}
               </div>
@@ -777,6 +857,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
   return (
     <div className="absolute inset-0 flex flex-col" style={{ background: PALETTE.bgDeep }}>
       {view === 'home' && renderHome()}
+      {view === 'unions' && renderUnions()}
       {view === 'wizard' && renderWizard()}
       {view === 'forge' && renderForge()}
       {view === 'contracts' && renderContracts()}
