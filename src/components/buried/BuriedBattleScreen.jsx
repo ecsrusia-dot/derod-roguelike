@@ -1211,7 +1211,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
             }}>
             <div className="text-[12px] font-bold" style={{ color: PALETTE.green }}>🧪 물약 ×{potions}</div>
             <div className="text-[11px]" style={{ color: PALETTE.textDim }}>
-              {potionUsedThisTurn ? '이번 턴 사용함' : `HP ${BURIED_POTION_HEAL_PCT}% · 턴 소모 없음`}
+              {potionUsedThisTurn ? '이번 턴 사용함' : `HP ${BURIED_POTION_HEAL_PCT}% (≈${Math.round(player.maxHp * BURIED_POTION_HEAL_PCT / 100)}) · 턴 소모 없음`}
             </div>
           </button>
 
