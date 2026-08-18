@@ -675,9 +675,19 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
             보유 <b style={{ color: PALETTE.twilight }}>{ownedContracts.length}</b> / 한도 <b style={{ color: PALETTE.text }}>{cCap}</b> (전체 {BURIED_CONTRACTS.length})
           </div>
           <div className="text-[11px] leading-relaxed" style={{ color: PALETTE.textDim }}>
-            한도 = 기본 6 + <b style={{ color: PALETTE.text }}>던전 정복당 +4</b> + 최고 <b style={{ color: PALETTE.text }}>100층 +3</b> · <b style={{ color: PALETTE.text }}>200층 +3</b>.
-            전종 수집은 4던전 정복 + 200층의 증표다.
+            한도 = 기본 6 + <b style={{ color: PALETTE.text }}>던전 정복당 +4</b> + 최고 <b style={{ color: PALETTE.text }}>100층 +3</b> · <b style={{ color: PALETTE.text }}>200층 +3</b> + <b style={{ color: PALETTE.dawn }}>조직 평판 Lv.4/Lv.8당 +4</b>.
           </div>
+          {/* 1.142.0 — 조직 상급 계약 게이트 안내 */}
+          {(() => {
+            const locked = BURIED_CONTRACTS.filter(c => c.union && !ownedContracts.includes(c.id)
+              && buriedUnionLevel(b.unionRep?.[c.union] || 0) < (c.unionLv || 3));
+            return locked.length > 0 ? (
+              <div className="text-[11px] leading-relaxed" style={{ color: PALETTE.textDim }}>
+                🏛 조직 상급 계약 <b style={{ color: PALETTE.dawn }}>{locked.length}종</b>은 해당 조직 평판 도달 시 랜덤 풀에 들어온다 —{' '}
+                {locked.slice(0, 3).map(c => `${c.name}(Lv.${c.unionLv})`).join(' · ')}{locked.length > 3 ? ' …' : ''}
+              </div>
+            ) : null;
+          })()}
           <button onClick={onBuyContract}
             disabled={!canBuy}
             className="ui-press w-full py-2 text-[12px] font-bold"
