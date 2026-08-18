@@ -109,7 +109,7 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose }) {
               const lv = item ? buriedSkillLv(char, item.skillId) : 1;
               const rank = item ? buriedSkillRank(BURIED_SKILLS[item.skillId]) : null;
               return (
-                <BuriedItemCard key={s.id} item={item} slotId={s.id}
+                <BuriedItemCard key={s.id} item={item} slotId={s.id} char={char}
                   right={item ? (
                     <div className="text-right shrink-0">
                       <div className="text-[11px] font-bold tabular-nums" style={{ color: lv >= BURIED_SKILL_MAX_LV ? PALETTE.legendary : PALETTE.text }}>
@@ -182,6 +182,7 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose }) {
 
       {sheet && (
         <BuriedItemSheet
+          char={char}
           item={sheet.item}
           onDismantle={() => dismantle(sheet.item)}
           onClose={() => setSheet(null)}
@@ -208,7 +209,7 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose }) {
               ) : (
                 <div className="space-y-1.5">
                   {targets.map(s => (
-                    <BuriedItemCard key={s.id} item={char.equipped[s.id]} slotId={s.id} onClick={() => socketRune(s.id)} />
+                    <BuriedItemCard key={s.id} item={char.equipped[s.id]} slotId={s.id} char={char} onClick={() => socketRune(s.id)} />
                   ))}
                 </div>
               )}

@@ -455,7 +455,7 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onLogEvent, on
             {(char.roomData?.items?.length || 0) === 0 && <div className="text-[12px]" style={{ color: PALETTE.textDim }}>관은 비어 있었다.</div>}
             {(char.roomData?.items || []).map((it, idx) => (
               <div key={it.id} className="space-y-1">
-                <BuriedItemCard item={it} showSlot dim={char.roomData?.taken?.includes(idx)} />
+                <BuriedItemCard item={it} showSlot char={char} dim={char.roomData?.taken?.includes(idx)} />
                 {!char.roomData?.taken?.includes(idx) && (
                   <button onClick={() => takeTreasure(idx)} className="ui-press w-full py-2 text-[12px] font-bold"
                     style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.accent, color: '#fff' }}>가져간다</button>
@@ -477,7 +477,7 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onLogEvent, on
               const sold = char.roomData?.bought?.includes(i);
               const afford = char.gold >= entry.price;
               return (
-                <BuriedItemCard key={i} item={entry.item} showSlot dim={sold}
+                <BuriedItemCard key={i} item={entry.item} showSlot char={char} dim={sold}
                   right={<span className="text-[12px] tabular-nums font-bold shrink-0"
                     style={{ color: sold ? PALETTE.textDim : afford ? PALETTE.legendary : PALETTE.accent }}>
                     {sold ? '판매됨' : `🪙${entry.price}`}
@@ -610,7 +610,7 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onLogEvent, on
             {char.roomData?.deal?.reward && !char.roomData?.done && (
               <>
                 <div className="text-[11px] tracking-[0.2em]" style={{ color: PALETTE.dawn }}>내놓은 물건</div>
-                <BuriedItemCard item={char.roomData.deal.reward} showSlot />
+                <BuriedItemCard item={char.roomData.deal.reward} showSlot char={char} />
               </>
             )}
             {!char.roomData?.done && (
