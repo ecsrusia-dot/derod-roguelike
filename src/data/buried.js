@@ -2182,7 +2182,11 @@ export function buildBuriedRoomEnemy(char, roomType, roomEffectId = null) {
   // 깊이의 압력 — 정복 층 이후 층당 선형 증가 (장비는 마물 레벨만 따라가므로 여기서 격차가 벌어진다)
   const pressure = buriedDepthPressure(dg, floor);
   if (pressure > 1) {
-    enemy = { ...enemy, hp: Math.round(enemy.hp * pressure), atk: Math.round(enemy.atk * pressure) };
+    // 1.146.1 — A안 (PM 채택): 수문장은 base가 이미 절대치 설계(일반 보스의 2~3배)인데
+    // 레벨 스케일 ×압력이 중첩돼 100층에서 관통 원킬(플레이어 HP 150%)이 나오던 문제.
+    // 수문장 한정 압력을 √로 완화 — 100층 ×5.7 → ×2.39. 여전히 최강이지만 "대응 가능한 강함"으로.
+    const effPressure = enemy.guardian ? Math.sqrt(pressure) : pressure;
+    enemy = { ...enemy, hp: Math.round(enemy.hp * effPressure), atk: Math.round(enemy.atk * effPressure) };
   }
   // ☠ 엘리트 변형 (1.124.0) — 강적 방은 항상 랜덤 변형이 붙는다
   if (roomType === 'elite') enemy = applyBuriedEliteMod(enemy, rollBuriedEliteMod());

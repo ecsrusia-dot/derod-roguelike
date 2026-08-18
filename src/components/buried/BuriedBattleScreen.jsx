@@ -779,9 +779,27 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
       await wait(420);
     } else {
       foeFirstTurnRef.current = false;
-      const action = chooseBuriedEnemyAction(E, enemy.actions);
-      pushLog(`◀ ${E.name} — ${action.name}${action.heavy ? ' (강공격)' : ''}`, action.heavy ? PALETTE.legendary : PALETTE.textDim);
-      if (action.kind === 'defend') {
+      // 1.146.1 — A안 (PM 채택): 수문장의 대기술(heavy)은 1턴 충전 예고 후 발동.
+      // 예고 턴에 방어·🧱방벽·회복을 준비할 수 있다 — "무대응 원킬"을 "대응 가능한 원킬"로.
+      let action;
+      if (E.charging) {
+        action = E.charging;
+        E.charging = null;
+        pushLog(`◀ ${E.name} — 충전된 「${action.name}」 발동!`, PALETTE.accent);
+      } else {
+        action = chooseBuriedEnemyAction(E, enemy.actions);
+        if (enemy.guardian && action.heavy) {
+          E.charging = action;
+          pushFloat('enemy', '⚠ 충전', PALETTE.legendary);
+          pushLog(`⚠ ${E.name}이(가) 「${action.name}」을(를) 그러모은다 — 다음 턴 발동! 방어·🧱방벽을 준비하라.`, PALETTE.legendary);
+          action = null;
+        } else {
+          pushLog(`◀ ${E.name} — ${action.name}${action.heavy ? ' (강공격)' : ''}`, action.heavy ? PALETTE.legendary : PALETTE.textDim);
+        }
+      }
+      if (!action) {
+        // 충전 턴 — 적은 이번 턴 행동하지 않는다
+      } else if (action.kind === 'defend') {
         if (action.self) { E.statuses = applyBuriedStatuses(E.statuses, action.self, foeStatusOpts); pushLog(`${E.name}에게 ${action.self.map(a => `[${BURIED_STATUS[a.s]?.name}]`).join(' ')}`, PALETTE.ice); }
       } else if ((P.statuses.wall || 0) > 0) {
         // ===== 🧱 방벽 (1.106.0) — 적의 공격 행동 1회를 통째로 무효화하고 1개 소모 =====
@@ -1134,6 +1152,11 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
         </div>
         {/* 방·층 효과 배지 */}
         <div className="absolute left-3 right-3 flex flex-wrap gap-1" style={{ top: '48%' }}>
+          {foe.charging && foe.hp > 0 && (
+            <span className="animate-pulse px-2 py-0.5 text-[11px] font-bold" style={{ borderRadius: 'var(--r-chip, 8px)', background: 'rgba(5,3,4,0.85)', border: `1px solid ${PALETTE.legendary}`, color: PALETTE.legendary }}>
+              ⚠ 「{foe.charging.name}」 충전 중 — 다음 턴 발동
+            </span>
+          )}
           {dungeon.gimmick && (gimmickId === 'flood' || gimmickId === 'dark') && (
             <button className="ui-press px-2 py-0.5 text-[11px]" style={{ borderRadius: 'var(--r-chip, 8px)', background: 'rgba(5,3,4,0.72)', border: `1px solid ${dungeon.color}88`, color: dungeon.color }}
               onClick={() => setInfo({ icon: dungeon.gimmick.icon, title: `던전 기믹 — ${dungeon.gimmick.name}`, color: dungeon.color, lines: [{ text: dungeon.gimmick.desc }, { text: `${dungeon.name} 전역에 항상 적용된다.` }] })}>
