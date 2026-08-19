@@ -204,6 +204,10 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     // 🗝 수문장의 인장 (1.143.0)
     if ((char.sigils || 0) > 0) {
       init.push({ t: `🗝 수문장의 인장 ×${char.sigils} — 위력 +${char.sigils * BURIED_SIGILS.dmgPct}% · 받는 피해 -${char.sigils * BURIED_SIGILS.takenPct}%`, c: PALETTE.legendary });
+    // ⚔ 난입 (1.153.0) — 일반 적인 줄 알았는데 다른 등반자다
+    if (enemy.rival) {
+      init.unshift({ t: `⚔ 난입! 같은 무덤을 오르던 등반자 「${enemy.rival.name}」이(가) 길을 막는다 — 쓰러뜨리면 상대의 힘을 빼앗는다.`, c: PALETTE.legendary });
+    }
     }
     for (const kid of char.keystones || []) {
       const k = getBuriedKeystone(kid);
@@ -1110,7 +1114,9 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     }
   };
 
-  const imgSrc = getEnemyImageSrc(enemy.img.key, { chapter: enemy.img.chapter }, 'combat');
+  // ⚔ 난입 (1.153.0) — 상대 등반자는 그 직업의 일러스트로
+  const imgSrc = enemy.rival ? enemy.rival.image
+    : getEnemyImageSrc(enemy.img.key, { chapter: enemy.img.chapter }, 'combat');
   const silenced = (player.statuses.silence || 0) > 0;
   const stunned = (player.statuses.stun || 0) > 0;
 

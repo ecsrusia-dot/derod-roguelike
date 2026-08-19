@@ -1475,6 +1475,7 @@ const EMPTY_BURIED = {
   apexClears: 0,    // 1.143.0~ 👑 묘주(500층 최종 보스) 격파 횟수
   ghosts: {},       // 1.144.0~ 🕯 제령한 괴이 (ghostId → { breaks }) — 계정 영구
   companion: null,  // 1.144.0~ 동행 괴이 ghostId (다음 출정부터 적용)
+  rivalTicks: 0,    // 1.153.0~ ⚔ 난입 — 라이벌 세계의 시계 (내 누적 걸음. 더미 등반은 이 값으로 결정론 계산)
 };
 // 1.131.1 — 무덤의 유산 전체 초기화 (PM 요청: 업데이트를 처음부터 온전히 체험).
 // meta.buried만 백지화 — 본편·레이드·HOF 등 다른 메타는 건드리지 않는다.
@@ -1505,6 +1506,7 @@ export function getBuried(meta) {
     apexClears: Math.max(0, b.apexClears || 0),
     ghosts: (b.ghosts && typeof b.ghosts === 'object') ? b.ghosts : {},
     companion: b.companion || null,
+    rivalTicks: Math.max(0, b.rivalTicks || 0),
   };
 }
 
@@ -1538,12 +1540,17 @@ export function logBuriedEvent(meta, roomId, entry) {
 export function saveBuriedChar(meta, char) {
   const b = getBuried(meta);
   const deepest = Math.max(b.deepest || 0, char?.floor || 0);
+  // 1.153.0 — ⚔ 난입: 내가 걸은 만큼 라이벌 세계의 시간이 흐른다.
+  // 같은 런(startedAt 동일)의 걸음 증가분만 적립 — 새 캐릭터의 시작 걸음(체크포인트)은 시간이 아니다.
+  const sameRun = b.char && char && b.char.startedAt === char.startedAt;
+  const tickGain = sameRun ? Math.max(0, (char.steps || 0) - (b.char.steps || 0)) : 0;
+  const rivalTicks = (b.rivalTicks || 0) + tickGain;
   // 1.113.0 — 던전별 최고 도달 층 (무한층 기록)
   const dId = char?.dungeonId;
   const deepestByDungeon = dId
     ? { ...b.deepestByDungeon, [dId]: Math.max(b.deepestByDungeon[dId] || 0, char?.floor || 0) }
     : b.deepestByDungeon;
-  return { ...meta, buried: { ...b, char, deepest, deepestByDungeon } };
+  return { ...meta, buried: { ...b, char, deepest, deepestByDungeon, rivalTicks } };
 }
 
 // 새 캐릭터 시작 — 1.117.0: 장비 계승 폐지, 계승 골드만 소비된다

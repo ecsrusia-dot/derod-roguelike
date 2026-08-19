@@ -27,6 +27,7 @@ import {
   BURIED_SIGILS, BURIED_ZONES,
   BURIED_GHOSTS, BURIED_GHOST_RANKS, buriedGhostKit,
   BURIED_CLASS_BASICS, describeBuriedFx,
+  buriedRivalRanking, BURIED_RIVAL_TUNING,
 } from '../../data.js';
 import { BuriedBar, BURIED_DUST_ICON, BuriedTierLegend, BuriedLootModal } from './BuriedCommon.jsx';
 import BuriedManage from './BuriedManage.jsx';
@@ -928,6 +929,46 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
                 <span className="tabular-nums" style={{ color: PALETTE.text }}>최고 {b.deepestByDungeon?.[dg.id] || 0}층 · 정복 {clears[dg.id] || 0}</span>
               </div>
             ))}
+          </div>
+        </div>
+
+        {/* ⚔ 등반 랭킹 (1.153.0) — 라이벌 100인과 던전별 TOP 10. 내 걸음만큼 저들도 오른다 */}
+        <div>
+          <SectionTitle>🏆 등반 랭킹 — 라이벌 {BURIED_RIVAL_TUNING.count}인</SectionTitle>
+          <div className="text-[11px] leading-relaxed mb-1.5" style={{ color: PALETTE.textDim }}>
+            같은 무덤을 오르는 등반자들. <b style={{ color: PALETTE.dawn }}>내가 방을 하나 지날 때마다 저들의 시간도 흐른다</b> —
+            전투 방에서 낮은 확률로 난입해 오며, 쓰러뜨리면 상대의 주 능력치를 영구히 빼앗는다.
+          </div>
+          <div className="space-y-2">
+            {BURIED_DUNGEONS.map(dg => {
+              const rk = buriedRivalRanking(dg.id, b.rivalTicks || 0, b.deepestByDungeon?.[dg.id] || 0, 10);
+              return (
+                <details key={dg.id} className="px-3 py-2" style={{ borderRadius: R.panel, background: PALETTE.panel, border: `1px solid ${dg.color}44` }}>
+                  <summary className="text-[12px] font-bold cursor-pointer flex justify-between" style={{ color: dg.color }}>
+                    <span>{dg.gimmick?.icon} {dg.name} TOP 10</span>
+                    <span className="tabular-nums" style={{ color: rk.myRank && rk.myRank <= 10 ? PALETTE.legendary : PALETTE.textDim }}>
+                      {rk.myRank ? `내 순위 ${rk.myRank}/${rk.total}` : '기록 없음'}
+                    </span>
+                  </summary>
+                  <div className="mt-1.5 space-y-0.5">
+                    {rk.rows.map((r, i) => {
+                      const rc = r.classId ? getBuriedClass(r.classId) : null;
+                      return (
+                        <div key={i} className="flex items-center gap-2 text-[12px] tabular-nums px-1 py-0.5"
+                          style={{ borderRadius: 'var(--r-chip, 8px)', background: r.isMe ? `${PALETTE.legendary}18` : 'transparent' }}>
+                          <span className="w-6 text-right shrink-0" style={{ color: i < 3 ? PALETTE.legendary : PALETTE.textDim }}>{i + 1}위</span>
+                          <span className="flex-1 truncate" style={{ color: r.isMe ? PALETTE.legendary : (rc?.color || PALETTE.text) }}>
+                            {r.isMe ? '★ 나' : r.name}
+                            {rc && <span className="text-[11px]" style={{ color: PALETTE.textDim }}> · {rc.name}</span>}
+                          </span>
+                          <span style={{ color: PALETTE.text }}>{r.best}층</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </details>
+              );
+            })}
           </div>
         </div>
         <div className="px-3 py-2.5 space-y-1.5" style={{ borderRadius: R.panel, background: PALETTE.panel, border: `1px solid ${PALETTE.panelBorder}` }}>
