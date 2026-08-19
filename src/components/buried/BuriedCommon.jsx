@@ -12,6 +12,7 @@ import {
   buriedSkillMaxUses, buriedSkillLv,
   buriedSkillAt, buriedModdedSkill, buriedSkillDmgPreview,
   buriedItemRunes, buriedItemSockets, buriedRunewordOf,
+  buriedMonsterLevel, applyBuriedGearDecay, buriedModTransferCost,
 } from '../../data.js';
 
 // 1.143.0 — ⛓ 스킬 사용 가능 횟수 (장비 카드·상세·획득 판단 공용).
@@ -181,11 +182,12 @@ export function BuriedItemCard({ item, slotId, onClick, right, dim = false, show
         {/* 1.142.2 — full 모드(획득 판단·상점·부장품·상세 비교)에서는 스킬이 무엇을 하는지 처음부터 보여준다 (PM 지시)
             1.144.1 — 위력% 옆에 현 스탯 기준 예상 데미지 (물·기·마 장비 비교용, 스킬 레벨·접두어·룬 반영) */}
         {full && skill && (() => {
-          const eff = char ? buriedModdedSkill(buriedSkillAt(skill, buriedSkillLv(char, item.skillId)), item.mod, buriedItemRunes(item)) : skill;
+          // 1.160.0 — ⚙ 장비 레벨 감쇠 반영: 카드의 위력·예상 피해가 전투 실효치와 같아진다
+          const eff = char ? applyBuriedGearDecay(buriedModdedSkill(buriedSkillAt(skill, buriedSkillLv(char, item.skillId)), item.mod, buriedItemRunes(item)), item, buriedMonsterLevel(char)) : skill;
           const pv = char ? buriedSkillDmgPreview(eff, char) : null;
           return (
             <div className="text-[11px] leading-relaxed break-keep" style={{ color: PALETTE.ice }}>
-              ▸ {eff.power ? `위력 ${eff.power}%${(eff.hits || 1) > 1 ? ` ×${eff.hits}` : ''}${pv ? ` (예상 ${pv.hits > 1 ? `${pv.per}×${pv.hits} = ` : ''}` + `${pv.total} 피해)` : ''}${eff.pierce ? ' · 방어 무시' : ''}${eff.drain ? ` · 흡혈 ${eff.drain}%` : ''}${eff.critBonus ? ` · 치명 +${eff.critBonus}%` : ''} — ` : ''}{skill.desc}
+              ▸ {eff.power ? `위력 ${eff.power}%${(eff.hits || 1) > 1 ? ` ×${eff.hits}` : ''}${pv ? ` (예상 ${pv.hits > 1 ? `${pv.per}×${pv.hits} = ` : ''}` + `${pv.total} 피해)` : ''}${eff.decayPct ? ` · ⚙감쇠 -${eff.decayPct}% (Lv.${item.floor || 1} 장비 vs 마물 Lv.${buriedMonsterLevel(char)})` : ''}${eff.pierce ? ' · 방어 무시' : ''}${eff.drain ? ` · 흡혈 ${eff.drain}%` : ''}${eff.critBonus ? ` · 치명 +${eff.critBonus}%` : ''} — ` : ''}{skill.desc}
             </div>
           );
         })()}
@@ -232,8 +234,8 @@ export function BuriedItemSheet({ item, compare, onEquip, onUnequip, onDismantle
   if (!item) return null;
   const tier = getBuriedTier(item.tier);
   const skill = BURIED_SKILLS[item.skillId];
-  // 1.144.1 — 예상 데미지 (스킬 레벨·접두어·룬 반영, 적 방어 적용 전)
-  const effSkill = (skill && char) ? buriedModdedSkill(buriedSkillAt(skill, buriedSkillLv(char, item.skillId)), item.mod, buriedItemRunes(item)) : skill;
+  // 1.144.1 — 예상 데미지 (스킬 레벨·접두어·룬 반영, 적 방어 적용 전) / 1.160.0 — ⚙ 감쇠 반영
+  const effSkill = (skill && char) ? applyBuriedGearDecay(buriedModdedSkill(buriedSkillAt(skill, buriedSkillLv(char, item.skillId)), item.mod, buriedItemRunes(item)), item, buriedMonsterLevel(char)) : skill;
   const dmgPv = char ? buriedSkillDmgPreview(effSkill, char) : null;
   const st = buriedItemStats(item);
   const cmp = compare ? buriedItemStats(compare) : null;
@@ -300,7 +302,7 @@ export function BuriedItemSheet({ item, compare, onEquip, onUnequip, onDismantle
                 </div>
               )}
               <div className="text-[11px] mt-1" style={{ color: PALETTE.textDim }}>
-                각인은 영구 — 떼어낼 수 없고, 장비를 버리면 룬도 소멸한다. 룬 **순서**가 조합과 일치하면 ⟪룬워드⟫가 발동한다.
+                각인은 영구 — 장착 중엔 떼어낼 수 없다. 장비를 분해하면 룬은 <b style={{ color: PALETTE.text }}>주머니로 회수</b>된다. 룬 **순서**가 조합과 일치하면 ⟪룬워드⟫가 발동한다.
               </div>
             </div>
           );
@@ -317,6 +319,7 @@ export function BuriedItemSheet({ item, compare, onEquip, onUnequip, onDismantle
               SP {skill.sp}{skill.cd > 0 ? ` · 쿨다운 ${skill.cd}턴` : ' · 쿨다운 없음'}
               {skill.power ? ` · 위력 ${skill.power}%${skill.hits ? ` ×${skill.hits}` : ''}${dmgPv ? ` ≈ ${dmgPv.hits > 1 ? `${dmgPv.per}×${dmgPv.hits} = ` : ''}${dmgPv.total} 피해` : ''} (${skill.stat ? `${skillKindMeta(skill).refs} 기반 ${skillKindMeta(skill).label} 공격력 참조` : '물리·기교·마법 중 최고 공격력 참조'})` : ' · 스탯 무관 (보조 스킬)'}
               {skill.pierce ? ' · 방어 무시' : ''}
+              {effSkill?.decayPct ? <span style={{ color: PALETTE.accent }}> · ⚙ 위력 감쇠 -{effSkill.decayPct}% — 장비 Lv.{item.floor || 1}이(가) 마물 레벨보다 낡았다</span> : null}
             </div>
             {/* 1.143.0 — ⛓ 사용 가능 횟수 */}
             {(() => {
@@ -389,8 +392,9 @@ export function BuriedItemSheet({ item, compare, onEquip, onUnequip, onDismantle
 export const BURIED_DUST_ICON = '🕯';
 
 // ===== 획득 판단 모달 (1.113.0) — 인벤토리 폐지: 획득 즉시 [교체] or [버리기] =====
-// 어느 쪽이든 밀려난/버려진 장비는 자동 분해 → 먼지. onResolve(replace: boolean)
-export function BuriedLootModal({ char, onResolve }) {
+// 어느 쪽이든 밀려난/버려진 장비는 자동 분해 → 먼지. onResolve(replace: boolean, transferMod?: boolean)
+// 1.160.0 「순환 패키지」 — 분해되는 장비의 룬은 주머니로 회수 + ◈접두어 전승 버튼 (dust prop 필요)
+export function BuriedLootModal({ char, onResolve, dust = 0 }) {
   const item = char?.pendingLoot?.[0];
   if (!item) return null;
   const tier = getBuriedTier(item.tier);
@@ -399,6 +403,10 @@ export function BuriedLootModal({ char, onResolve }) {
   const cmp = cur ? buriedItemStats(cur) : {};
   const keys = [...new Set([...Object.keys(st), ...Object.keys(cmp)])];
   const queueLeft = (char.pendingLoot || []).length - 1;
+  // ◈ 접두어 전승 — 기존 장비에 접두어가 있고 새 장비에 없을 때만 제안
+  const curMod = cur?.mod ? getBuriedMod(cur.mod) : null;
+  const transferCost = curMod && !item.mod ? buriedModTransferCost(item) : null;
+  const curRunesBack = cur ? buriedItemRunes(cur).length : 0;
   return (
     <div className="absolute inset-0 z-50 flex items-end" style={{ background: 'rgba(0,0,0,0.78)' }}>
       <div className="w-full px-3 pb-4 pt-3"
@@ -435,6 +443,23 @@ export function BuriedLootModal({ char, onResolve }) {
             })}
           </div>
         )}
+        {/* 1.160.0 — 분해되는 장비의 룬은 주머니로 회수된다 (교체·버리기 공통 안내) */}
+        {curRunesBack > 0 && (
+          <div className="mb-1.5 text-[11px]" style={{ color: PALETTE.twilight }}>
+            ᚱ 교체하면 기존 장비의 룬 {curRunesBack}개는 주머니로 회수된다 — 새 장비에 다시 각인 가능.
+          </div>
+        )}
+        {/* ◈ 접두어 전승 (1.160.0) — 기존 장비의 접두어를 새 장비로 옮기고 교체 */}
+        {transferCost !== null && (
+          <button onClick={() => dust >= transferCost && onResolve(true, true)} disabled={dust < transferCost}
+            className="ui-press w-full mb-1.5 py-2.5 text-[12px] font-bold"
+            style={{
+              borderRadius: 'var(--r-btn, 13px)', background: `${PALETTE.twilight}22`, color: PALETTE.twilight,
+              border: `1px solid ${PALETTE.twilight}88`, opacity: dust >= transferCost ? 1 : 0.45,
+            }}>
+            ◈ 「{curMod.name}」 전승 + 교체 — {BURIED_DUST_ICON} {transferCost}{dust < transferCost ? ` (보유 ${dust})` : ''}
+          </button>
+        )}
         <div className="flex gap-2">
           <button onClick={() => onResolve(true)} className="ui-press flex-1 py-2.5 text-[12px] font-bold"
             style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.accent, color: '#fff' }}>
@@ -445,6 +470,11 @@ export function BuriedLootModal({ char, onResolve }) {
             버리기 ({BURIED_DUST_ICON}{buriedDustValue(item)})
           </button>
         </div>
+        {transferCost !== null && curMod && (
+          <div className="mt-1.5 text-[11px]" style={{ color: PALETTE.textDim }}>
+            ◈ 전승 없이 그냥 교체하면 「{curMod.name}」 접두어는 기존 장비와 함께 분해되어 사라진다.
+          </div>
+        )}
       </div>
     </div>
   );

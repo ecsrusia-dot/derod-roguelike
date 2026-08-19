@@ -61,11 +61,13 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose, readOn
   };
 
   // 장착 장비 분해 — 슬롯이 비면 그 스킬도 못 쓴다 (신중히)
+  // 1.160.0 「순환 패키지」 — 각인된 룬은 전량 주머니로 회수
   const dismantle = (item) => {
     if (readOnly) return;
     const gain = buriedDustValue(item);
     const slot = BURIED_SLOT_IDS.find(s => char.equipped?.[s]?.id === item.id);
-    const next = { ...char, equipped: { ...char.equipped, [slot]: null } };
+    const back = buriedItemRunes(item);
+    const next = { ...char, equipped: { ...char.equipped, [slot]: null }, runes: [...(char.runes || []), ...back] };
     next.hp = Math.min(next.hp, buriedDerived(next).maxHp);
     onUpdate(next, gain);
     setSheet(null);
@@ -254,11 +256,11 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose, readOn
           </div>
         </div>
 
-        {/* ᚱ 룬 주머니 (1.123.0) — 각인은 영구, 장비를 버리면 소멸 */}
+        {/* ᚱ 룬 주머니 (1.123.0) — 각인은 영구, 1.160.0~ 장비 분해 시 주머니로 회수 */}
         {!readOnly && runes.length > 0 && (
           <div className="px-3 py-2.5" style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panel, border: `1px solid ${PALETTE.legendary}44` }}>
             <div className="text-[11px] tracking-[0.2em] mb-1.5" style={{ color: PALETTE.legendary }}>
-              ᚱ 룬 주머니 {runes.length}개 — 장비 스킬에 영구 각인 (장비당 1칸 · 제거 불가)
+              ᚱ 룬 주머니 {runes.length}개 — 각인은 영구 · 장비 분해 시 회수
             </div>
             <div className="space-y-1.5">
               {runes.map((id, i) => {
@@ -380,7 +382,7 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose, readOn
               style={{ background: PALETTE.bgDeep, borderTop: `1px solid ${rar.color}66`, borderRadius: '18px 18px 0 0', maxHeight: '80%', overflowY: 'auto' }}>
               <div className="text-[13px] font-bold mb-0.5" style={{ color: rar.color }}>ᚱ {r.name} {rar.stars} — 어디에 각인할까</div>
               <div className="text-[11px] mb-2 leading-relaxed" style={{ color: PALETTE.textDim }}>
-                {r.desc}. <b style={{ color: PALETTE.accent }}>각인은 영구</b> — 떼어낼 수 없고, 그 장비를 버리거나 분해하면 룬도 함께 소멸한다.
+                {r.desc}. <b style={{ color: PALETTE.accent }}>각인은 영구</b> — 장착 중엔 떼어낼 수 없다. 그 장비를 분해하면 룬은 <b style={{ color: PALETTE.text }}>주머니로 회수</b>된다.
               </div>
               {targets.length === 0 ? (
                 <div className="px-3 py-3 text-[12px]" style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panel, color: PALETTE.textDim }}>
