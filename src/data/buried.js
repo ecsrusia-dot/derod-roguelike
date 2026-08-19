@@ -2154,7 +2154,7 @@ export function buriedDamageFormula(char) {
     { n: '＝', label: '내 공격력', value: `물리 ${d.atk} · 기교 ${d.fin} · 마법 ${d.mag}`,
       note: '스킬의 참조 능력치에 따라 셋 중 하나를 쓴다. 기본기는 셋 중 가장 높은 값' },
     { n: '④', label: '× 스킬 위력%', value: '스킬마다 상이',
-      note: '연격(N회 타격)은 위력%를 매 타마다 따로 굴린다 — 상태이상·자가 버프도 ×N' },
+      note: `연격(N회 타격)은 위력%를 매 타마다 따로 굴린다 — 상태이상·자가 버프도 ×N. ⚙ 발동 장비가 마물 레벨보다 ${BURIED_GEAR_DECAY.graceLv}Lv 넘게 낡으면 위력이 깎인다 (하한 ${BURIED_GEAR_DECAY.floorPct}% — 장비 카드에 감쇠율 표시)` },
     { n: '⑤', label: '× 주는 피해 보정', value: '[격노] +10%/스택 · [약화] -6%/스택',
       note: '방·층 효과, 인장, 수문장의 인장, 동행 괴이도 여기에 곱해진다' },
     { n: '⑥', label: '× 적의 받는 피해 보정', value: '[속박] +20%/스택 · [저주] +15%/스택',
@@ -2806,7 +2806,12 @@ export function tickBuriedGearBreak(char) {
     if (it.depletedAt == null) { equipped[s] = { ...it, depletedAt: floor }; marked.push(it); changed = true; continue; }
     if (floor - it.depletedAt >= BURIED_BREAK_GRACE) { broken.push(it); equipped[s] = null; changed = true; }
   }
-  return changed ? { char: { ...char, equipped }, broken, marked } : { char, broken, marked };
+  if (!changed) return { char, broken, marked };
+  // 1.160.0 — 부서진 장비의 룬도 주머니로 회수 (파손 벌칙은 장비·스킬·스탯 상실로 충분하다)
+  const runesBack = broken.flatMap(it => buriedItemRunes(it));
+  const next = { ...char, equipped };
+  if (runesBack.length > 0) next.runes = [...(char.runes || []), ...runesBack];
+  return { char: next, broken, marked };
 }
 // 파손까지 남은 층 (표시용) — 소진 상태가 아니면 null
 export function buriedBreakIn(char, slot) {
@@ -3019,20 +3024,37 @@ export function addBuriedItemToChar(char, item) {
 }
 
 // 1.113.0 — pendingLoot 첫 항목 판단. replace=true면 기존 장비를 밀어내고 장착.
-// 밀려나거나 버려진 장비는 자동 분해 → 먼지 반환. 반환: { char, dustGain, dismantled }
-export function resolveBuriedLoot(char, replace) {
+// 밀려나거나 버려진 장비는 자동 분해 → 먼지 반환. 반환: { char, dustGain, dismantled, runesBack, modMoved }
+// 1.160.0 「순환 패키지」 — ② 분해되는 장비의 룬은 전량 주머니로 회수 (도박 룰 폐지)
+//                          ③ opts.transferMod: 기존 장비의 접두어를 새 장비로 전승 (비용은 호출자가 먼지로 정산)
+export function resolveBuriedLoot(char, replace, opts = {}) {
   const queue = char?.pendingLoot || [];
-  if (queue.length === 0) return { char, dustGain: 0, dismantled: null };
+  if (queue.length === 0) return { char, dustGain: 0, dismantled: null, runesBack: 0, modMoved: null };
   const item = queue[0];
   const rest = queue.slice(1);
   const ksMult = 1 + buriedKeystoneBonus(char).rewardPct / 100; // ⚓ 쐐기 보상 (1.128.0)
   if (!replace) {
-    return { char: { ...char, pendingLoot: rest }, dustGain: Math.round(buriedDustValue(item) * ksMult), dismantled: item };
+    const back = buriedItemRunes(item);
+    return {
+      char: { ...char, pendingLoot: rest, runes: [...(char.runes || []), ...back] },
+      dustGain: Math.round(buriedDustValue(item) * ksMult), dismantled: item, runesBack: back.length, modMoved: null,
+    };
   }
   const prev = char.equipped?.[item.slot] || null;
-  let next = { ...char, pendingLoot: rest, equipped: { ...char.equipped, [item.slot]: item } };
+  // ◈ 접두어 전승 — 기존 장비에 접두어가 있고 새 장비에 없을 때만
+  let equipItem = item, modMoved = null;
+  if (opts.transferMod && prev?.mod && !item.mod) {
+    const mod = getBuriedMod(prev.mod);
+    if (mod) { equipItem = { ...item, mod: prev.mod, name: `${mod.name} ${item.name}` }; modMoved = mod.name; }
+  }
+  const back = prev ? buriedItemRunes(prev) : [];
+  let next = {
+    ...char, pendingLoot: rest,
+    equipped: { ...char.equipped, [item.slot]: equipItem },
+    runes: [...(char.runes || []), ...back],
+  };
   next.hp = Math.min(next.hp, buriedDerived(next).maxHp);
-  return { char: next, dustGain: prev ? Math.round(buriedDustValue(prev) * ksMult) : 0, dismantled: prev };
+  return { char: next, dustGain: prev ? Math.round(buriedDustValue(prev) * ksMult) : 0, dismantled: prev, runesBack: back.length, modMoved };
 }
 
 // 협상 방 — 지불액과 보상. 마물 레벨이 높을수록 비싸고 크다.
@@ -3510,6 +3532,37 @@ function applyBuriedSkillFx(out, fx) {
   return out;
 }
 
+// =========================================================
+// ⚙ 장비 레벨 감쇠 (1.160.0) — PM 결정 「순환 패키지」 ①
+// =========================================================
+// 문제: 데미지 = 공격 스탯(6슬롯 합산) × 스킬 위력% — 발동 장비의 레벨을 아무도 안 읽어서
+//       Lv.11 무기(접두어+룬 패키지)가 600층까지 최적이었다.
+// 해법: 발동 장비가 현재 마물 레벨보다 **graceLv(마물 Lv 단위, ≈유예 100층)** 이상 낡으면
+//       그 장비의 스킬 위력이 깎인다. 하한 floorPct% — 낡아도 절반 밑으로는 안 떨어진다.
+// 감쇠 곡선은 장비 레벨 배율(rollBuriedItem의 +14%/Lv)과 같은 저울을 쓴다.
+// power만 깎는다 — 회복·보호막·버프 스킬은 감쇠하지 않는다 (보조 장비는 오래 써도 된다).
+// ⚠ 밸런스 체감 조정은 이 상수 한 곳
+export const BURIED_GEAR_DECAY = { graceLv: 30, floorPct: 45 };
+export function buriedGearDecayMult(itemFloor, monLevel) {
+  const fm = (lv) => 1 + Math.max(0, (lv || 1) - 1) * 0.14;
+  const r = fm((itemFloor || 1) + BURIED_GEAR_DECAY.graceLv) / fm(monLevel || 1);
+  return Math.min(1, Math.max(BURIED_GEAR_DECAY.floorPct / 100, r));
+}
+// 실효 스킬에 감쇠 적용 — buriedModdedSkill 결과에 마지막으로 씌운다.
+// 감쇠가 없으면 원본 그대로 반환 (회귀 0). decayPct는 UI 표시용.
+export function applyBuriedGearDecay(skill, item, monLevel) {
+  if (!skill?.power || !item) return skill;
+  const m = buriedGearDecayMult(item.floor || 1, monLevel);
+  if (m >= 0.999) return skill;
+  return { ...skill, power: Math.max(1, Math.round(skill.power * m)), decayPct: Math.round((1 - m) * 100) };
+}
+
+// ◈ 접두어 전승 (1.160.0) — 「순환 패키지」 ③: 교체 시 먼지를 내고 기존 장비의 접두어를
+// 새 장비로 옮긴다. 비용은 새 장비 레벨 비례. ⚠ 밸런스는 이 상수 한 곳
+export const BURIED_MOD_TRANSFER = { base: 60, perLv: 1.2 };
+export const buriedModTransferCost = (item) =>
+  Math.round(BURIED_MOD_TRANSFER.base + (item?.floor || 1) * BURIED_MOD_TRANSFER.perLv);
+
 // 1.146.0 — 다중 룬: runeIds는 단일 id(구 호환) 또는 배열. 룬워드 완성 시 fx 추가 적용
 export function buriedModdedSkill(skill, modId, runeIds = null) {
   const runes = Array.isArray(runeIds) ? runeIds : runeIds ? [runeIds] : [];
@@ -3529,8 +3582,9 @@ export function buriedModdedSkill(skill, modId, runeIds = null) {
 // =========================================================
 // 21b. ᚱ 룬 소켓 (1.123.0) — BB2 데이터시트 이식 2탄
 // =========================================================
-// 원작 규칙(도박 룰): 룬은 장비의 스킬에 영구 각인된다 — 제거·교체 불가.
-// 그 장비를 버리거나 분해하면 룬도 함께 소멸한다. 장비당 소켓 1칸.
+// 원작 규칙: 룬은 장비의 스킬에 영구 각인된다 — 장착 중엔 제거·교체 불가.
+// 1.160.0 「순환 패키지」 — 장비를 분해하면 룬은 **전량 주머니로 회수**된다 (구 도박 룰 폐지.
+// 룬 소멸이 무서워 순환 장비에 각인을 못 해 룬워드 활용이 0이던 문제의 픽스).
 // fx 어휘는 접두어(BURIED_MODS)와 100% 동일 — applyBuriedSkillFx가 공용 적용.
 export const BURIED_RUNE_RARITIES = {
   1: { stars: '★',      color: '#9b8975', name: '평범' },

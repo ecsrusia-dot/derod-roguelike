@@ -32,7 +32,7 @@ import {
   rollBuriedCurseOffer, acceptBuriedCurse, hasBuriedCurse, BURIED_CURSE_REWARD, buriedCurseRewardChoices,
   aggregateBuriedContracts,
   BURIED_CALAMITY_GAUGE_MAX, buildBuriedCalamity,
-  resolveBuriedLoot, buriedBossKeyAt,
+  resolveBuriedLoot, buriedBossKeyAt, buriedModTransferCost,
   BURIED_CHUTE_ROOM, BURIED_CHUTE_HP_PCT, buriedChuteJump, buriedLootPower,
   tickBuriedGearBreak, BURIED_BREAK_GRACE,
   buriedZoneAt, buriedRoomThreat,
@@ -891,12 +891,19 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onLogEvent, on
           onClose={() => setManage(false)} />
       )}
 
-      {/* 획득 판단 (1.113.0) — 인벤토리 폐지: 대기열이 빌 때까지 차례로 [교체/버리기] */}
+      {/* 획득 판단 (1.113.0) — 인벤토리 폐지: 대기열이 빌 때까지 차례로 [교체/버리기]
+          1.160.0 「순환 패키지」 — 룬 회수 + ◈접두어 전승 (먼지 지불) */}
       {(char.pendingLoot || []).length > 0 && (
-        <BuriedLootModal char={char} onResolve={(replace) => {
-          const r = resolveBuriedLoot(char, replace);
-          onUpdateChar(r.char, r.dustGain);
-          if (r.dismantled) setNotice(`${r.dismantled.name} 자동 분해 — ${BURIED_DUST_ICON} +${r.dustGain}`);
+        <BuriedLootModal char={char} dust={b.dust || 0} onResolve={(replace, transferMod) => {
+          const pending = char.pendingLoot?.[0];
+          const cost = replace && transferMod && pending ? buriedModTransferCost(pending) : 0;
+          const r = resolveBuriedLoot(char, replace, { transferMod });
+          onUpdateChar(r.char, r.dustGain - cost);
+          const bits = [];
+          if (r.dismantled) bits.push(`${r.dismantled.name} 자동 분해 — ${BURIED_DUST_ICON} +${r.dustGain}`);
+          if (r.runesBack > 0) bits.push(`ᚱ 룬 ${r.runesBack}개 주머니로 회수`);
+          if (r.modMoved) bits.push(`◈ 「${r.modMoved}」 전승 완료 (${BURIED_DUST_ICON} -${cost})`);
+          if (bits.length > 0) setNotice(bits.join(' · '));
         }} />
       )}
     </div>

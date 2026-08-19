@@ -31,6 +31,7 @@ import {
   BURIED_SIGILS, buriedZoneAt,
   BURIED_GHOST_RANKS, getBuriedGhost, buriedGhostForEnemy, buriedGhostKit, buriedTameChance,
   buriedItemRunes, buriedRunewordCharFx,
+  buriedMonsterLevel, applyBuriedGearDecay,
 } from '../../data.js';
 import { BuriedBar, BuriedStatusRow, BuriedItemCard, slotMeta, SkillKindBadge, BuriedInfoModal } from './BuriedCommon.jsx';
 
@@ -43,6 +44,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
   const d = buriedDerived(char);
   const equipped = buriedEquippedSkills(char);
   const dungeon = getBuriedDungeon(char.dungeonId);
+  const monLevel = buriedMonsterLevel(char); // 1.160.0 — ⚙ 장비 레벨 감쇠 기준
 
   // ===== 전설의 무구 (1.106.0) — 장착 중 유니크 효과 =====
   const uniques = buriedUniqueIds(char);
@@ -1316,7 +1318,8 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
           {/* 장착 장비 6칸 = 스킬 6개 (스킬 레벨 반영) */}
           {equipped.map(({ slot, item, skill }) => {
             const lv = Math.min(8, buriedSkillLv(char, skill.id) + (uq('u71') ? 1 : 0)); // [u71] 후손
-            const eff0 = applyUniqueSkillMods(buriedModdedSkill(buriedSkillAt(skill, lv), item.mod, buriedItemRunes(item)));
+            // 1.160.0 — ⚙ 장비 레벨 감쇠: 발동 장비가 마물 레벨보다 낡으면 위력이 깎인다 (마지막에 씌운다)
+            const eff0 = applyBuriedGearDecay(applyUniqueSkillMods(buriedModdedSkill(buriedSkillAt(skill, lv), item.mod, buriedItemRunes(item))), item, monLevel);
             const eff = kf.cdAdd && !uq('u74') ? { ...eff0, cd: (eff0.cd || 0) + kf.cdAdd } : eff0; // ⚓ 정체의 쐐기 ([u74] 금줄이 무시)
             const cd = player.cds[eff.id] || 0;
             const spCost = Math.round(eff.sp * (1 + (env.self.spCostPct || 0) / 100));
@@ -1339,7 +1342,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
                   <span className="truncate">{eff.name}{lv > 1 && <span style={{ color: PALETTE.legendary }}> Lv.{lv}</span>}</span>
                 </div>
                 <div className="text-[11px] tabular-nums truncate" style={{ color: sealed ? PALETTE.accent : noSp ? PALETTE.accent : PALETTE.ice }}>
-                  {sealed ? '⛓ 봉인 — 새 장비 필요' : `SP ${spCost}${cd > 0 ? ` · 쿨 ${cd}` : ''}${eff.power ? ` · ${eff.power}%${eff.hits ? `×${eff.hits}` : ''} ≈${pvDmg}` : ''}${eff.swift ? (swiftUsedThisTurn ? ' · ⚡사용됨' : ' · ⚡신속') : ''} · 횟수 ${usesLeft}`}
+                  {sealed ? '⛓ 봉인 — 새 장비 필요' : `SP ${spCost}${cd > 0 ? ` · 쿨 ${cd}` : ''}${eff.power ? ` · ${eff.power}%${eff.hits ? `×${eff.hits}` : ''} ≈${pvDmg}` : ''}${eff.decayPct ? ` · ⚙감쇠 -${eff.decayPct}%` : ''}${eff.swift ? (swiftUsedThisTurn ? ' · ⚡사용됨' : ' · ⚡신속') : ''} · 횟수 ${usesLeft}`}
                 </div>
                 <div className="text-[11px] truncate" style={{ color: PALETTE.textDim }}>{slotMeta(slot).icon} {eff.desc}</div>
               </button>

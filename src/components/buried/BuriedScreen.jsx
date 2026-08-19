@@ -20,7 +20,7 @@ import {
   buriedDerived, buriedExpToNext, getBuriedClass, getBuriedDungeon, getBuriedTier,
   buriedTraitIds, getBuriedTrait, buriedMonsterLevel,
   BURIED_PARTS, BURIED_PART_SLOT_COSTS, getBuriedPart, BURIED_SHARD,
-  resolveBuriedLoot, buriedCheckpointFloors,
+  resolveBuriedLoot, buriedCheckpointFloors, buriedModTransferCost,
   BURIED_DEPTH_CLASSES, buriedEarnedDepthTraits,
   BURIED_RACES, getBuriedRace,
   BURIED_UNIONS, BURIED_UNION_CLASSES, getBuriedUnion, buriedUnionLevel, BURIED_UNION_LEVELS, BURIED_UNION_REWARDS,
@@ -1224,11 +1224,13 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
           onClose={() => setManage(false)} />
       )}
 
-      {/* 획득 판단 (1.113.0) — 재련소 제작품 등, 로비에서도 대기열을 비운다 */}
+      {/* 획득 판단 (1.113.0) — 재련소 제작품 등, 로비에서도 대기열을 비운다. 1.160.0 — 룬 회수 + ◈전승 */}
       {char && (char.pendingLoot || []).length > 0 && (
-        <BuriedLootModal char={char} onResolve={(replace) => {
-          const r = resolveBuriedLoot(char, replace);
-          onUpdateChar(r.char, r.dustGain);
+        <BuriedLootModal char={char} dust={b.dust || 0} onResolve={(replace, transferMod) => {
+          const pending = char.pendingLoot?.[0];
+          const cost = replace && transferMod && pending ? buriedModTransferCost(pending) : 0;
+          const r = resolveBuriedLoot(char, replace, { transferMod });
+          onUpdateChar(r.char, r.dustGain - cost);
         }} />
       )}
 
