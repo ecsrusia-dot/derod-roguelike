@@ -26,7 +26,7 @@ import {
   getBuriedRoomEffect, getBuriedFloorEffect,
   buildBuriedNegotiation, buriedLibraryChoices, raiseBuriedSkill, buriedSkillLv, buriedTraitIds,
   hasBuriedUnique, maybeBuriedFloorSkillUp,
-  BURIED_EVENT_ROOMS, BURIED_EVENT_ROOM_IDS, resolveBuriedEvent,
+  BURIED_EVENT_ROOMS, BURIED_EVENT_ROOM_IDS, resolveBuriedEvent, buriedEventChoices,
   buriedWandererOffers, wandererAddOption, wandererApplyMod, wandererReroll,
   BURIED_SKULL_ROOM, BURIED_CURSE_MAX, getBuriedCurse, buriedCurseIds,
   rollBuriedCurseOffer, acceptBuriedCurse, hasBuriedCurse, BURIED_CURSE_REWARD,
@@ -292,9 +292,9 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onLogEvent, on
   };
 
   // ===== 이벤트 방 (1.107.0) — 도박: 영구 보너스와 함정이 한 테이블에 =====
-  const runEvent = (roomId) => {
+  const runEvent = (roomId, choiceId = null) => {
     if (char.roomData?.done) return;
-    const r = resolveBuriedEvent(roomId, char);
+    const r = resolveBuriedEvent(roomId, char, choiceId);
     let next = { ...r.char, roomData: { done: true, text: r.text, tone: r.tone } };
     if (r.item) {
       const added = addBuriedItemToChar(next, r.item);
@@ -768,12 +768,40 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onLogEvent, on
                   {rd.text}
                 </div>
               )}
-              {!rd.done && room !== 'wanderer' && (
-                <button onClick={() => runEvent(room)} className="ui-press w-full py-2.5 text-[12px] font-bold"
-                  style={{ borderRadius: 'var(--r-btn, 13px)', background: ev.color, color: '#0a0608' }}>
-                  {room === 'gravestone' ? '파헤친다' : room === 'spring' ? '마신다' : room === 'statue' ? '손을 댄다' : '연다'} — 무슨 일이 생길지 모른다
-                </button>
-              )}
+              {/* 1.151.0 — 선택지 방식 (PM 지시 A안). 방마다 성격이 하나이고, 리스크는 내가 고른다 */}
+              {!rd.done && room !== 'wanderer' && (() => {
+                const cs = buriedEventChoices(room, char);
+                if (!cs) return null;
+                const riskMeta = {
+                  high: { tag: '⚠ 도박', color: PALETTE.accent },
+                  cost: { tag: '💰 대가', color: PALETTE.legendary },
+                  safe: { tag: '✔ 안전', color: PALETTE.green },
+                };
+                return (
+                  <div className="space-y-1.5">
+                    <div className="text-[11px] tracking-[0.15em]" style={{ color: ev.color }}>◆ {cs.theme}</div>
+                    {cs.list.map(ch => {
+                      const rm = riskMeta[ch.risk] || riskMeta.safe;
+                      return (
+                        <button key={ch.id} onClick={() => runEvent(room, ch.id)} disabled={ch.disabled}
+                          className="ui-press w-full px-3 py-2.5 text-left"
+                          style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panel,
+                            border: `1px solid ${rm.color}55`, opacity: ch.disabled ? 0.4 : 1 }}>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[12px] font-bold" style={{ color: PALETTE.text }}>{ch.label}</span>
+                            <span className="text-[11px] shrink-0" style={{ color: rm.color }}>
+                              {ch.costText ? `${rm.tag} · ${ch.costText}` : rm.tag}
+                            </span>
+                          </div>
+                          <div className="text-[11px] leading-relaxed" style={{ color: PALETTE.textDim }}>
+                            {ch.desc}{ch.disabled ? ' — 대가를 치를 수 없다' : ''}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
               {!rd.done && room === 'wanderer' && (
                 <div className="space-y-1.5">
                   <button disabled={!wOffers.canAddOption} onClick={() => runWanderer('option')} className="ui-press w-full py-2.5 text-[12px] text-left px-3"

@@ -3704,52 +3704,151 @@ export const BURIED_EVENT_ROOMS = {
 };
 export const BURIED_EVENT_ROOM_IDS = Object.keys(BURIED_EVENT_ROOMS);
 
-// 결과 테이블 — { w: 가중치, run(char, ctx) → { char, text, tone } }  tone: 'good'|'bad'|'neutral'
+// 1.151.0 전면 재설계 (PM 지시 A안) — 「선택권 + 성격 분리」
+// 진단: PM이 야영·제단·상점·서고만 가던 이유는 **그쪽만 내가 고르고, 이벤트는 버튼 하나 = 랜덤**이었기 때문.
+//       게다가 묘비/석상은 「재화·HP ↔ HP손실·디버프」로 성격이 겹쳐 실질 2종이었다.
+// 해법: 방마다 **성격 1개**를 못 박고, **선택지 2~3개**로 리스크·리턴을 플레이어가 고르게 한다.
+//       🪦 도굴=재화 / ⛲ 샘=영구 성장 / 🗿 석상=대가 지불(확정) / ⚱ 관=장비 도박 / 🧙 나그네=장비 개조
+// 결과 테이블 키는 `방id:선택지id`. { w: 가중치, run(char, ctx) → { char, text, tone } }
 const pendStatus = (char, s, n) => ({ ...char, pendingStatuses: [...(char.pendingStatuses || []), { s, n }] });
 // 1.134.0 — 이벤트 보상 심층 스케일 (저주 보상 1.117.0과 동일 공식: 마물 레벨당 +10%)
-// 골드·먼지 고정치가 심층 경제(1.121.0)와 동떨어져 있던 문제 정합
 const evScale = (c) => 1 + Math.max(0, buriedMonsterLevel(c) - 1) * 0.10;
+// 1.151.0 — 영구 스탯 보상도 깊이를 탄다 (고정 +2는 심층에서 무의미했다)
+const evStatGain = (c) => 2 + Math.floor(buriedMonsterLevel(c) / 25);
+const evGold = (c, base) => Math.round(base * evScale(c));
+const evHeal = (c, pct) => { const d = buriedDerived(c); return { ...c, hp: Math.min(d.maxHp, c.hp + Math.round(d.maxHp * pct / 100)) }; };
+const evHurt = (c, pct) => { const d = buriedDerived(c); return { ...c, hp: Math.max(1, c.hp - Math.round(d.maxHp * pct / 100)) }; };
+
+// 선택지 정의 — cost가 있으면 지불 가능할 때만 활성화된다
+export const BURIED_EVENT_CHOICES = {
+  gravestone: {
+    theme: '도굴 — 골드와 먼지',
+    list: [
+      { id: 'dig',   label: '파헤친다',       risk: 'high', desc: '고위험 고보상 — 큰 재화, 아니면 함정' },
+      { id: 'mourn', label: '조의를 표한다',   risk: 'safe', desc: '위험 없음 — 소액 확정 + HP 15% 회복' },
+    ],
+  },
+  spring: {
+    theme: '영구 성장 — 능력치',
+    list: [
+      { id: 'drink', label: '들이켠다',       risk: 'high', desc: '능력치 영구 상승 도박 — 실패하면 [저주]' },
+      { id: 'bottle',label: '병에 담는다',     risk: 'safe', desc: '위험 없음 — 🧪 물약 +2 확정' },
+      { id: 'wash',  label: '몸을 씻는다',     risk: 'safe', desc: '위험 없음 — HP 완전 회복 + 예약된 디버프 정화' },
+    ],
+  },
+  statue: {
+    theme: '대가 지불 — 바친 만큼 확정',
+    list: [
+      { id: 'coin',  label: '골드를 바친다',   risk: 'cost', desc: '골드 지불 → 먼지 대량 + HP 40% 확정', cost: { gold: 120 } },
+      { id: 'blood', label: '피를 바친다',     risk: 'cost', desc: '최대 HP 25% 지불 → 영구 성장 확정', cost: { hpPct: 25 } },
+      { id: 'break', label: '부순다',          risk: 'high', desc: '무료 — 먼지 특대, 대신 신벌을 각오하라' },
+    ],
+  },
+  coffin: {
+    theme: '장비 — 고위험 고보상',
+    list: [
+      { id: 'open',  label: '연다',            risk: 'high', desc: '영웅~유물 장비 60% / 함정 40%' },
+      { id: 'seal',  label: '봉인을 덧댄다',   risk: 'safe', desc: '위험 없음 — 🕯 먼지 확정' },
+    ],
+  },
+};
+export function buriedEventChoices(roomId, char) {
+  const def = BURIED_EVENT_CHOICES[roomId];
+  if (!def) return null;
+  const d = buriedDerived(char);
+  return {
+    theme: def.theme,
+    list: def.list.map(c => {
+      const goldCost = c.cost?.gold ? evGold(char, c.cost.gold) : 0;
+      const hpCost = c.cost?.hpPct ? Math.round(d.maxHp * c.cost.hpPct / 100) : 0;
+      return {
+        ...c, goldCost, hpCost,
+        costText: goldCost ? `🪙 ${goldCost}` : hpCost ? `HP ${hpCost}` : null,
+        disabled: (goldCost > 0 && char.gold < goldCost) || (hpCost > 0 && char.hp <= hpCost),
+      };
+    }),
+  };
+}
+
 const EVENT_OUTCOMES = {
-  gravestone: [
-    { w: 22, run: (c) => { const g = Math.round(90 * evScale(c)); return { char: { ...c, gold: c.gold + g }, text: `관 틈에서 🪙 ${g}을 찾아냈다.`, tone: 'good' }; } },
-    { w: 18, run: (c, ctx) => ({ char: c, text: `비석의 문양을 읽자 잊힌 자의 기억이 먼지가 되어 흩어진다 — 🕯 +${ctx.dustGain = Math.round(20 * evScale(c))}.`, tone: 'good' }) },
-    { w: 16, run: (c, ctx) => ({ char: c, text: `먼지가 쏟아진다 — 🕯 무덤 먼지 +${ctx.dustGain = Math.round(35 * evScale(c))}.`, tone: 'good' }) },
-    { w: 16, run: (c) => { const d = buriedDerived(c); return { char: { ...c, hp: Math.min(d.maxHp, c.hp + Math.round(d.maxHp * 0.35)) }, text: '따뜻한 기운이 감돈다 — HP 35% 회복.', tone: 'good' }; } },
-    { w: 14, run: (c) => { const d = buriedDerived(c); return { char: { ...c, hp: Math.max(1, c.hp - Math.round(d.maxHp * 0.25)) }, text: '함정이다! 폭발이 일어났다 — 최대 HP의 25% 피해.', tone: 'bad' }; } },
-    { w: 14, run: (c) => ({ char: pendStatus(c, 'poison', 3), text: '독가스가 새어나온다 — 다음 전투를 [중독] 3으로 시작한다.', tone: 'bad' }) },
+  // ===== 🪦 묘비 — 재화 =====
+  'gravestone:dig': [
+    { w: 26, run: (c) => { const g = evGold(c, 260); return { char: { ...c, gold: c.gold + g }, text: `관 밑바닥까지 파냈다 — 🪙 ${g}.`, tone: 'good' }; } },
+    { w: 22, run: (c, ctx) => ({ char: c, text: `유골이 바스러지며 먼지가 쏟아진다 — 🕯 +${ctx.dustGain = Math.round(95 * evScale(c))}.`, tone: 'good' }) },
+    { w: 10, run: (c, ctx) => { const g = evGold(c, 300); ctx.dustGain = Math.round(110 * evScale(c)); return { char: { ...c, gold: c.gold + g }, text: `무덤 주인은 부자였다 — 🪙 ${g} · 🕯 +${ctx.dustGain}.`, tone: 'good' }; } },
+    { w: 24, run: (c) => ({ char: evHurt(c, 35), text: '함정이다! 폭발이 일어났다 — 최대 HP의 35% 피해.', tone: 'bad' }) },
+    { w: 18, run: (c) => ({ char: pendStatus(c, 'poison', 4), text: '독가스가 새어나온다 — 다음 전투를 [중독] 4로 시작한다.', tone: 'bad' }) },
   ],
-  spring: [
-    { w: 20, run: (c) => { const k = pick(['str', 'dex', 'int', 'vit']); const nm = BURIED_STATS.find(s => s.id === k)?.name; return { char: { ...c, stats: { ...c.stats, [k]: (c.stats[k] || 0) + 2 } }, text: `힘이 차오른다 — ${nm} +2 (영구).`, tone: 'good' }; } },
-    { w: 22, run: (c) => { const d = buriedDerived(c); return { char: { ...c, hp: d.maxHp }, text: '몸의 상처가 전부 아문다 — HP 완전 회복.', tone: 'good' }; } },
-    { w: 16, run: (c) => ({ char: { ...c, potions: (c.potions || 0) + 1 }, text: '샘물을 병에 담았다 — 🧪 물약 +1.', tone: 'good' }) },
-    { w: 20, run: (c) => { const d = buriedDerived(c); return { char: { ...c, hp: Math.max(1, c.hp - Math.round(d.maxHp * 0.25)) }, text: '물이 시커멓게 변한다 — 최대 HP의 25% 피해.', tone: 'bad' }; } },
-    { w: 12, run: (c) => ({ char: pendStatus(c, 'curse', 2), text: '샘 바닥의 눈과 마주쳤다 — 다음 전투를 [저주] 2로 시작한다.', tone: 'bad' }) },
-    { w: 10, run: (c) => ({ char: c, text: '그냥 물이었다.', tone: 'neutral' }) },
+  'gravestone:mourn': [
+    { w: 100, run: (c) => { const g = evGold(c, 70); return { char: evHeal({ ...c, gold: c.gold + g }, 15), text: `잠시 고개를 숙였다. 발치에 놓인 공물을 챙긴다 — 🪙 ${g} · HP 15% 회복.`, tone: 'good' }; } },
   ],
-  statue: [
-    { w: 22, run: (c, ctx) => ({ char: c, text: `석상이 고개를 끄덕이며 손에 든 것을 부수어 준다 — 🕯 +${ctx.dustGain = Math.round(30 * evScale(c))}.`, tone: 'good' }) },
-    { w: 20, run: (c) => { const d = buriedDerived(c); return { char: { ...c, hp: Math.min(d.maxHp, c.hp + Math.round(d.maxHp * 0.5)) }, text: '석상의 손이 빛난다 — HP 50% 회복.', tone: 'good' }; } },
-    { w: 16, run: (c) => { const g = Math.round(140 * evScale(c)); return { char: { ...c, gold: c.gold + g }, text: `석상 밑에서 헌금함을 찾았다 — 🪙 ${g}.`, tone: 'good' }; } },
-    { w: 22, run: (c) => { const loss = Math.round(buriedExpToNext(c.lv || 1) * 0.35); return { char: { ...c, exp: Math.max(0, (c.exp || 0) - loss) }, text: `기억이 흐려진다 — 경험치 ${loss}을 잃었다 (다음 레벨 필요치의 35%).`, tone: 'bad' }; } },
-    { w: 12, run: (c) => ({ char: pendStatus(c, 'confuse', 1), text: '석상의 눈이 빙글 돈다 — 다음 전투를 [혼란] 1로 시작한다.', tone: 'bad' }) },
+  // ===== ⛲ 샘 — 영구 성장 =====
+  'spring:drink': [
+    { w: 42, run: (c) => { const n = evStatGain(c); const k = pick(['str', 'dex', 'int', 'vit']); const nm = BURIED_STATS.find(s => s.id === k)?.name;
+      return { char: { ...c, stats: { ...c.stats, [k]: (c.stats[k] || 0) + n } }, text: `힘이 차오른다 — ${nm} +${n} (영구).`, tone: 'good' }; } },
+    { w: 20, run: (c) => { const n = evStatGain(c) * 2; const k = pick(['str', 'dex', 'int', 'vit']); const nm = BURIED_STATS.find(s => s.id === k)?.name;
+      return { char: { ...c, stats: { ...c.stats, [k]: (c.stats[k] || 0) + n } }, text: `샘이 응답했다! ${nm} +${n} (영구).`, tone: 'good' }; } },
+    { w: 22, run: (c) => ({ char: pendStatus(c, 'curse', 3), text: '샘 바닥의 눈과 마주쳤다 — 다음 전투를 [저주] 3으로 시작한다.', tone: 'bad' }) },
+    { w: 16, run: (c) => ({ char: evHurt(c, 30), text: '물이 시커멓게 변한다 — 최대 HP의 30% 피해.', tone: 'bad' }) },
   ],
-  coffin: [
-    { w: 34, run: (c, ctx) => { ctx.item = rollBuriedItem({ slot: null, classId: c.classId, floor: buriedMonsterLevel(c), tier: 'epic', powerMult: buriedLootPower(c) }); return { char: c, text: '영웅의 장비가 잠들어 있었다!', tone: 'good' }; } },
-    { w: 16, run: (c, ctx) => { ctx.item = rollBuriedItem({ slot: null, classId: c.classId, floor: buriedMonsterLevel(c), tier: 'relic', powerMult: buriedLootPower(c) }); return { char: c, text: '유물급 장비가 잠들어 있었다!', tone: 'good' }; } },
-    { w: 26, run: (c) => { const d = buriedDerived(c); return { char: { ...c, hp: Math.max(1, c.hp - Math.round(d.maxHp * 0.3)) }, text: '관 속의 것이 손을 뻗는다 — 최대 HP의 30% 피해.', tone: 'bad' }; } },
-    { w: 14, run: (c) => ({ char: pendStatus(c, 'silence', 2), text: '봉인 문자가 목에 감긴다 — 다음 전투를 [침묵] 2로 시작한다.', tone: 'bad' }) },
-    { w: 10, run: (c) => { const g = Math.round(60 * evScale(c)); return { char: { ...c, gold: c.gold + g }, text: `부장품 몇 닢뿐이었다 — 🪙 ${g}.`, tone: 'neutral' }; } },
+  'spring:bottle': [
+    { w: 100, run: (c) => ({ char: { ...c, potions: (c.potions || 0) + 2 }, text: '맑은 샘물을 병에 담았다 — 🧪 물약 +2.', tone: 'good' }) },
+  ],
+  'spring:wash': [
+    { w: 100, run: (c) => { const had = (c.pendingStatuses || []).length;
+      return { char: { ...evHeal(c, 100), pendingStatuses: [] }, text: `상처를 씻어낸다 — HP 완전 회복${had > 0 ? ` · 예약된 디버프 ${had}건 정화` : ''}.`, tone: 'good' }; } },
+  ],
+  // ===== 🗿 석상 — 대가 지불 (확정 보상) =====
+  'statue:coin': [
+    { w: 100, run: (c, ctx) => { ctx.dustGain = Math.round(140 * evScale(c));
+      return { char: evHeal(c, 40), text: `석상이 헌금을 받아들인다 — 🕯 +${ctx.dustGain} · HP 40% 회복.`, tone: 'good' }; } },
+  ],
+  'statue:blood': [
+    { w: 55, run: (c) => { const n = evStatGain(c); const k = pick(['str', 'dex', 'int', 'vit']); const nm = BURIED_STATS.find(s => s.id === k)?.name;
+      return { char: { ...c, stats: { ...c.stats, [k]: (c.stats[k] || 0) + n } }, text: `피를 받아 마신 석상이 축복을 내린다 — ${nm} +${n} (영구).`, tone: 'good' }; } },
+    { w: 45, run: (c) => { const ids = buriedEquippedSkills(c).map(x => x.skill.id).filter(id => (c.skillLevels?.[id] || 1) < BURIED_SKILL_MAX_LV);
+      if (ids.length === 0) { const n = evStatGain(c); const k = pick(['str', 'dex', 'int', 'vit']);
+        return { char: { ...c, stats: { ...c.stats, [k]: (c.stats[k] || 0) + n } }, text: `올릴 스킬이 없어 힘으로 갚는다 — ${BURIED_STATS.find(s => s.id === k)?.name} +${n}.`, tone: 'good' }; }
+      const r = raiseBuriedSkill(c, pick(ids));
+      return { char: r.char, text: `석상이 기억을 되돌려준다 — 스킬 하나가 Lv.${r.lv}이 되었다.`, tone: 'good' }; } },
+  ],
+  'statue:break': [
+    { w: 40, run: (c, ctx) => ({ char: c, text: `석상이 산산조각 났다 — 🕯 +${ctx.dustGain = Math.round(220 * evScale(c))}.`, tone: 'good' }) },
+    { w: 22, run: (c, ctx) => { const g = evGold(c, 180); ctx.dustGain = Math.round(120 * evScale(c));
+      return { char: { ...c, gold: c.gold + g }, text: `속이 비어 있었다 — 🪙 ${g} · 🕯 +${ctx.dustGain}.`, tone: 'good' }; } },
+    { w: 22, run: (c) => { const loss = Math.round(buriedExpToNext(c.lv || 1) * 0.40);
+      return { char: { ...c, exp: Math.max(0, (c.exp || 0) - loss) }, text: `신벌 — 기억이 흐려진다. 경험치 ${loss}을 잃었다.`, tone: 'bad' }; } },
+    { w: 16, run: (c) => ({ char: pendStatus(pendStatus(c, 'confuse', 2), 'curse', 2), text: '신벌 — 다음 전투를 [혼란] 2 · [저주] 2로 시작한다.', tone: 'bad' }) },
+  ],
+  // ===== ⚱ 관 — 장비 도박 =====
+  'coffin:open': [
+    { w: 38, run: (c, ctx) => { ctx.item = rollBuriedItem({ slot: null, classId: c.classId, floor: buriedMonsterLevel(c), tier: 'epic', powerMult: buriedLootPower(c) }); return { char: c, text: '영웅의 장비가 잠들어 있었다!', tone: 'good' }; } },
+    { w: 22, run: (c, ctx) => { ctx.item = rollBuriedItem({ slot: null, classId: c.classId, floor: buriedMonsterLevel(c), tier: 'relic', powerMult: buriedLootPower(c) }); return { char: c, text: '유물급 장비가 잠들어 있었다!', tone: 'good' }; } },
+    { w: 24, run: (c) => ({ char: evHurt(c, 35), text: '관 속의 것이 손을 뻗는다 — 최대 HP의 35% 피해.', tone: 'bad' }) },
+    { w: 16, run: (c) => ({ char: pendStatus(c, 'silence', 2), text: '봉인 문자가 목에 감긴다 — 다음 전투를 [침묵] 2로 시작한다.', tone: 'bad' }) },
+  ],
+  'coffin:seal': [
+    { w: 100, run: (c, ctx) => ({ char: c, text: `관을 덧대어 봉인했다. 떨어진 봉인재를 챙긴다 — 🕯 +${ctx.dustGain = Math.round(110 * evScale(c))}.`, tone: 'neutral' }) },
   ],
 };
 
 // 이벤트 실행 — 반환 { char, text, tone, item(관 전용), dustGain }
-export function resolveBuriedEvent(roomId, char) {
-  const table = EVENT_OUTCOMES[roomId];
+export function resolveBuriedEvent(roomId, char, choiceId = null) {
+  const def = BURIED_EVENT_CHOICES[roomId];
+  const cid = choiceId || def?.list?.[0]?.id;
+  const table = EVENT_OUTCOMES[`${roomId}:${cid}`];
   if (!table) return { char, text: '아무 일도 일어나지 않았다.', tone: 'neutral' };
+  // 선택지 비용 선지불 (골드·HP) — buriedEventChoices가 이미 지불 가능 여부를 걸러준다
+  let c = char;
+  const info = buriedEventChoices(roomId, char)?.list.find(x => x.id === cid);
+  if (info?.disabled) return { char, text: '대가를 치를 수 없다.', tone: 'neutral' };
+  if (info?.goldCost) c = { ...c, gold: c.gold - info.goldCost };
+  if (info?.hpCost) c = { ...c, hp: Math.max(1, c.hp - info.hpCost) };
   const ctx = { dustGain: 0, item: null };
   const picked = weightedPick(table, (o) => o.w);
-  const r = picked.run(char, ctx);
-  return { char: r.char, text: r.text, tone: r.tone, item: ctx.item, dustGain: ctx.dustGain };
+  const r = picked.run(c, ctx);
+  const paid = info?.costText ? `(${info.costText} 지불) ` : '';
+  return { char: r.char, text: paid + r.text, tone: r.tone, item: ctx.item, dustGain: ctx.dustGain, choiceId: cid };
 }
 
 // 수상한 나그네 — 세 가지 제안 (원작 그대로: 옵션 추가 / 스킬 변화 / 수치 재조정)
