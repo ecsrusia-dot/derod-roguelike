@@ -36,6 +36,7 @@ import {
   BURIED_CHUTE_ROOM, BURIED_CHUTE_HP_PCT, buriedChuteJump, buriedLootPower,
   tickBuriedGearBreak, BURIED_BREAK_GRACE,
   buriedZoneAt, buriedRoomThreat,
+  BURIED_GHOST_RANKS,
 } from '../../data.js';
 import { BuriedItemCard, BuriedBar, BURIED_DUST_ICON, slotMeta, BuriedLootModal } from './BuriedCommon.jsx';
 import BuriedManage from './BuriedManage.jsx';
@@ -355,6 +356,15 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onLogEvent, on
             <div className="text-[11px]" style={{ color: PALETTE.textDim }}>
               {cls?.name} Lv.{char.lv} · 🪙 {char.gold} · 🧪 {char.potions || 0} · 마물 Lv.{monLevel}
               {(char.calamityGauge || 0) > 0 && <span style={{ color: '#c48bd4' }}> · 🌑 {char.calamityGauge}/{BURIED_CALAMITY_GAUGE_MAX}</span>}
+              {/* 🧿 보유 제령부 (1.147.2) — 등반 내내 유지된다. 전에는 제령 버튼에서만 보여 "사라진 것처럼" 보이던 문제 */}
+              {Object.entries(char.talismans || {}).filter(([, n]) => n > 0).length > 0 && (
+                <span title={Object.entries(char.talismans).filter(([, n]) => n > 0)
+                  .map(([r, n]) => `${BURIED_GHOST_RANKS[r]?.name}부(${BURIED_GHOST_RANKS[r]?.hanja}) ×${n}`)
+                  .join(' · ') + ' — 이번 등반 동안 유지 · 사망 시 소멸'}>
+                  {' · '}🧿{Object.entries(char.talismans).filter(([, n]) => n > 0)
+                    .map(([r, n]) => <span key={r} style={{ color: BURIED_GHOST_RANKS[r]?.color }}>{BURIED_GHOST_RANKS[r]?.hanja}{n}</span>)}
+                </span>
+              )}
             </div>
           </div>
           <button onClick={() => setManage(true)} className="ui-press p-1.5 relative" style={{ color: PALETTE.dawn }}>
