@@ -3297,6 +3297,13 @@ function applyBuriedSkillFx(out, fx) {
   if (fx.addApply && out.power) out.apply = [...(out.apply || []), fx.addApply];
   if (fx.wallChance) out.wallChance = Math.max(out.wallChance || 0, fx.wallChance); // 전투 화면이 판정
   if (fx.cdrOnHit) out.cdrOnHit = (out.cdrOnHit || 0) + fx.cdrOnHit;               // 전투 화면이 판정
+  // 1.149.0 — 룬·룬워드 신규 어휘. 전부 기존 소비 지점이 이미 읽는 필드만 쓴다 (전투 코드 추가 0줄)
+  if (fx.hitsAdd && out.power) out.hits = Math.max(1, (out.hits || 1) + fx.hitsAdd); // resolveBuriedAttack
+  if (fx.executeBelow) out.executeBelow = Math.max(out.executeBelow || 0, fx.executeBelow); // resolveBuriedAttack
+  if (fx.berserk) out.berserk = true;                                              // resolveBuriedAttack
+  if (fx.reflect) out.reflect = (out.reflect || 0) + fx.reflect;                   // 전투 화면이 판정
+  if (fx.spGain) out.spGain = (out.spGain || 0) + fx.spGain;                       // 전투 화면이 판정
+  if (fx.swift) out.swift = true;                                                  // ⚡ 턴 미소모 (턴당 1회)
   return out;
 }
 
@@ -3323,32 +3330,54 @@ export function buriedModdedSkill(skill, modId, runeIds = null) {
 // 그 장비를 버리거나 분해하면 룬도 함께 소멸한다. 장비당 소켓 1칸.
 // fx 어휘는 접두어(BURIED_MODS)와 100% 동일 — applyBuriedSkillFx가 공용 적용.
 export const BURIED_RUNE_RARITIES = {
-  1: { stars: '★',     color: '#9b8975' },
-  2: { stars: '★★',    color: '#7ba3c4' },
-  3: { stars: '★★★',   color: '#c48bd4' },
-  4: { stars: '★★★★', color: '#e8b04a' },
+  1: { stars: '★',      color: '#9b8975', name: '평범' },
+  2: { stars: '★★',     color: '#7ba3c4', name: '전술' },
+  3: { stars: '★★★',    color: '#c48bd4', name: '강력' },
+  4: { stars: '★★★★',   color: '#e8b04a', name: '유일' },
+  // 1.149.0 — ★5 전승급. **드랍되지 않는다** — 룬 융합으로만 얻는다 (rollBuriedRune은 1~4만 굴린다)
+  5: { stars: '★★★★★', color: '#ff6b35', name: '전승' },
 };
 export const BURIED_RUNES = {
-  // 1★ — 기본기 (시트: パワー弱·コスト弱·シールダー·ヒーラー)
+  // ★1 — 평범 (시트: パワー弱·コスト弱·シールダー·ヒーラー)
   rPower1: { id: 'rPower1', name: '힘의 룬',   rarity: 1, desc: '위력 +12%',                fx: { powerPct: 12 } },
   rSave1:  { id: 'rSave1',  name: '절약의 룬', rarity: 1, desc: 'SP 소모 -25%',             fx: { spPct: -25 } },
   rGuard1: { id: 'rGuard1', name: '수호의 룬', rarity: 1, desc: '사용 시 보호막 +12',        fx: { barrierGain: 12 } },
   rMend1:  { id: 'rMend1',  name: '치유의 룬', rarity: 1, desc: '사용 시 HP 10 회복',        fx: { heal: 10 } },
-  // 2★ — 전술 (시트: スピード弱·クリティカル中·ステイン·パリィ 계열)
+  rWhet1:  { id: 'rWhet1',  name: '숫돌의 룬', rarity: 1, desc: '이 스킬 치명 확률 +6%',     fx: { critBonus: 6 } },
+  rSpark1: { id: 'rSpark1', name: '불씨의 룬', rarity: 1, desc: '적중 시 [화상] 1 부여',     fx: { addApply: { s: 'burn', n: 1, p: 100 } } },
+  rBreath1:{ id: 'rBreath1',name: '호흡의 룬', rarity: 1, desc: '사용 시 SP +8 회수',        fx: { spGain: 8 } },
+  // ★2 — 전술 (시트: スピード弱·クリティカル中·ステイン·パリィ 계열)
   rSpeed:  { id: 'rSpeed',  name: '신속의 룬', rarity: 2, desc: '쿨다운 -1',                fx: { cdAdd: -1 } },
   rKeen:   { id: 'rKeen',   name: '예리한 룬', rarity: 2, desc: '이 스킬 치명 확률 +12%',    fx: { critBonus: 12 } },
   rVenom:  { id: 'rVenom',  name: '맹독의 룬', rarity: 2, desc: '적중 시 [중독] 2 부여',     fx: { addApply: { s: 'poison', n: 2, p: 100 } } },
   rBind:   { id: 'rBind',   name: '결박의 룬', rarity: 2, desc: '적중 시 [속박] 1 부여',     fx: { addApply: { s: 'bind', n: 1, p: 100 } } },
   rWall:   { id: 'rWall',   name: '방벽의 룬', rarity: 2, desc: '사용 시 25% 확률 🧱방벽 +1', fx: { wallChance: 25 } },
-  // 3★ — 강력 (시트: パワー中·レイジ弱·エンチャント 계열)
+  rFrost:  { id: 'rFrost',  name: '서리의 룬', rarity: 2, desc: '적중 시 [약화] 2 부여',     fx: { addApply: { s: 'weaken', n: 2, p: 100 } } },
+  rGash:   { id: 'rGash',   name: '열상의 룬', rarity: 2, desc: '적중 시 [출혈] 2 부여',     fx: { addApply: { s: 'bleed', n: 2, p: 100 } } },
+  rGrind:  { id: 'rGrind',  name: '분쇄의 룬', rarity: 2, desc: '적중 시 [파쇄] 2 부여',     fx: { addApply: { s: 'shatter', n: 2, p: 100 } } },
+  rFocus:  { id: 'rFocus',  name: '집중의 룬', rarity: 2, desc: '사용 시 SP +16 회수',       fx: { spGain: 16 } },
+  // ★3 — 강력 (시트: パワー中·レイジ弱·エンチャント 계열)
   rRage:   { id: 'rRage',   name: '격노의 룬', rarity: 3, desc: '위력 +30%, 사용 시 자해 6',  fx: { powerPct: 30, selfDmg: 6 } },
   rDrain:  { id: 'rDrain',  name: '흡혈의 룬', rarity: 3, desc: '준 피해의 20% 흡혈',        fx: { drain: 20 } },
   rPierce: { id: 'rPierce', name: '관통의 룬', rarity: 3, desc: '방어·보호막 무시',          fx: { pierce: true } },
   rChain:  { id: 'rChain',  name: '연쇄의 룬', rarity: 3, desc: '적중 시 다른 스킬 쿨다운 -1', fx: { cdrOnHit: 1 } },
-  // 4★ — 유일급 (시트: 상위 희귀 룬 포지션)
+  rTwin:   { id: 'rTwin',   name: '쌍격의 룬', rarity: 3, desc: '타격 +1회 — 대신 위력 -25%', fx: { hitsAdd: 1, powerPct: -25 } },
+  rThunder:{ id: 'rThunder',name: '뇌명의 룬', rarity: 3, desc: '적중 시 35% [기절] 1',       fx: { addApply: { s: 'stun', n: 1, p: 35 } } },
+  rWard:   { id: 'rWard',   name: '결계의 룬', rarity: 3, desc: '사용 시 보호막 +30',        fx: { barrierGain: 30 } },
+  rEcho:   { id: 'rEcho',   name: '반향의 룬', rarity: 3, desc: '2턴간 받은 피해의 25% 반사',  fx: { reflect: 25 } },
+  // ★4 — 유일급 (시트: 상위 희귀 룬 포지션)
   rDoom:   { id: 'rDoom',   name: '파멸의 룬', rarity: 4, desc: '위력 +65%, 쿨다운 2배(최소 2)', fx: { powerPct: 65, cdMult: 2 } },
   rKing:   { id: 'rKing',   name: '군주의 룬', rarity: 4, desc: '위력 +20%, 쿨다운 -1, 치명 +8%', fx: { powerPct: 20, cdAdd: -1, critBonus: 8 } },
   rDawn:   { id: 'rDawn',   name: '여명의 룬', rarity: 4, desc: '사용 시 HP 15 회복 + 보호막 +15', fx: { heal: 15, barrierGain: 15 } },
+  rReaper: { id: 'rReaper', name: '사신의 룬', rarity: 4, desc: '적 HP 30% 이하면 위력 2배',   fx: { executeBelow: 30 } },
+  rBlood:  { id: 'rBlood',  name: '광혈의 룬', rarity: 4, desc: '잃은 HP에 비례해 위력 증가',   fx: { berserk: true } },
+  rTide:   { id: 'rTide',   name: '격류의 룬', rarity: 4, desc: '타격 +2회 — 대신 위력 -35%',  fx: { hitsAdd: 2, powerPct: -35 } },
+  // ★5 — 전승급 (1.149.0). 드랍 없음 — ★4 융합으로만 얻는다
+  rGenesis:  { id: 'rGenesis',  name: '태초의 룬', rarity: 5, desc: '위력 +40%, 치명 +15%',            fx: { powerPct: 40, critBonus: 15 } },
+  rEternity: { id: 'rEternity', name: '영겁의 룬', rarity: 5, desc: '쿨다운 -2, SP 소모 -40%',         fx: { cdAdd: -2, spPct: -40 } },
+  rApex:     { id: 'rApex',     name: '정점의 룬', rarity: 5, desc: '타격 +1회, 위력 +25% (감소 없음)', fx: { hitsAdd: 1, powerPct: 25 } },
+  rOblivion: { id: 'rOblivion', name: '망각의 룬', rarity: 5, desc: '방어 무시, 위력 +30%, [저주] 1',  fx: { pierce: true, powerPct: 30, addApply: { s: 'curse', n: 1, p: 100 } } },
+  rImmortal: { id: 'rImmortal', name: '불멸의 룬', rarity: 5, desc: '사용 시 HP 30 회복 + 보호막 +60', fx: { heal: 30, barrierGain: 60 } },
 };
 export const getBuriedRune = (id) => BURIED_RUNES[id] || null;
 
@@ -3361,6 +3390,72 @@ export function rollBuriedRune(luck = 0) {
   for (const r of [1, 2, 3, 4]) { roll -= w[r]; if (roll <= 0) { rarity = r; break; } }
   const pool = Object.values(BURIED_RUNES).filter(x => x.rarity === rarity);
   return pick(pool).id;
+}
+
+// =========================================================
+// ᚱ 룬 융합 (1.149.0) — PM 지시 "룬끼리 조합해서 상위 룬, 성공확률 포함"
+// =========================================================
+// 규칙: **같은 등급 룬 3개 → 한 등급 위의 룬 1개** (무작위).
+//   성공 → 재료 3개 전부 소모 + 상위 룬 1개 획득
+//   실패 → 재료 **1개만** 소실 (2개는 돌아온다). 먼지 비용은 성패 무관 선지불.
+// ★5는 드랍되지 않으므로 융합이 유일한 획득 경로다 (rollBuriedRune은 1~4만 굴린다).
+// ⚠ 밸런스 조정은 이 표 한 곳.
+export const BURIED_RUNE_FUSION = {
+  1: { need: 3, rate: 80, dust: 0,   to: 2 },
+  2: { need: 3, rate: 62, dust: 60,  to: 3 },
+  3: { need: 3, rate: 42, dust: 150, to: 4 },
+  4: { need: 3, rate: 22, dust: 400, to: 5 },
+};
+export const BURIED_RUNE_MAX_RARITY = 5;
+
+// 융합 가능 여부·비용·확률 조회 (UI 표시 + 실행 전 검사 공용)
+export function buriedFusionInfo(char, rarity, dust = 0) {
+  const rule = BURIED_RUNE_FUSION[rarity];
+  if (!rule) return null;
+  const have = (char?.runes || []).filter(id => BURIED_RUNES[id]?.rarity === rarity).length;
+  return {
+    ...rule, rarity, have,
+    enoughRunes: have >= rule.need,
+    enoughDust: dust >= rule.dust,
+    ok: have >= rule.need && dust >= rule.dust,
+  };
+}
+
+// 융합 실행 — runeIdxs는 주머니에서 고른 재료 3개의 index (전부 같은 등급이어야 한다).
+// 순수 함수가 아니다(Math.random) — 호출부는 setMeta updater **밖**에서 부를 것 (StrictMode 이중 실행 방지).
+export function fuseBuriedRunes(char, runeIdxs, dust = 0) {
+  const idxs = [...new Set(runeIdxs || [])];
+  const pouch = char?.runes || [];
+  const picked = idxs.map(i => BURIED_RUNES[pouch[i]]).filter(Boolean);
+  if (picked.length !== idxs.length || picked.length === 0) return { char, ok: false, dustCost: 0, text: '재료를 다시 고르시오.' };
+  const rarity = picked[0].rarity;
+  if (picked.some(r => r.rarity !== rarity)) return { char, ok: false, dustCost: 0, text: '같은 등급의 룬만 융합할 수 있다.' };
+  const rule = BURIED_RUNE_FUSION[rarity];
+  if (!rule) return { char, ok: false, dustCost: 0, text: '★5는 더 위가 없다.' };
+  if (picked.length !== rule.need) return { char, ok: false, dustCost: 0, text: `재료 ${rule.need}개를 골라야 한다.` };
+  if (dust < rule.dust) return { char, ok: false, dustCost: 0, text: `먼지가 부족하다 (${rule.dust} 필요).` };
+
+  const success = Math.random() * 100 < rule.rate;
+  const sorted = [...idxs].sort((a, b) => b - a); // 뒤에서부터 지워야 index가 안 밀린다
+  const next = [...pouch];
+  if (success) {
+    for (const i of sorted) next.splice(i, 1);
+    const pool = Object.values(BURIED_RUNES).filter(r => r.rarity === rule.to);
+    const got = pick(pool);
+    next.push(got.id);
+    return {
+      char: { ...char, runes: next }, ok: true, dustCost: rule.dust, gained: got.id,
+      text: `융합 성공! ${BURIED_RUNE_RARITIES[rule.to].stars} 「${got.name}」을(를) 얻었다.`,
+    };
+  }
+  // 실패 — 재료 1개만 소실
+  const lostIdx = sorted[Math.floor(Math.random() * sorted.length)];
+  const lost = BURIED_RUNES[pouch[lostIdx]];
+  next.splice(lostIdx, 1);
+  return {
+    char: { ...char, runes: next }, ok: false, dustCost: rule.dust, gained: null,
+    text: `융합 실패 — 「${lost?.name}」이(가) 재로 흩어졌다. (나머지 2개는 남았다)`,
+  };
 }
 
 // 등급 범위 지정 룬 굴림 — 보급 계약(1.129.0) 등 지급처용
@@ -3376,16 +3471,104 @@ export const buriedItemRunes = (item) => (item?.runes && item.runes.length > 0) 
 
 // ⟪룬워드⟫ (1.146.0, PM 지시 — 디아블로 모티브): 소켓에 박은 룬의 **순서**가 조합과 정확히 일치하면 발동.
 // fx = 그 장비 스킬에 추가 적용 (applyBuriedSkillFx 어휘) / charFx = 캐릭터 단위 특수 효과 (전투가 소비)
+// ⟪룬워드⟫ (1.146.0 신설 / 1.149.0 전면 재설계 — PM 지적: 「질풍」의 방어 무시가 관통의 룬과 순수 중복이었다)
+// 🔒 설계 원칙: **룬워드 효과는 구성 룬의 합으로는 절대 만들 수 없는 것이어야 한다.**
+//    ① 불린 플래그(pierce·berserk·swift·statusUncap)는 구성 룬이 이미 주면 넣지 말 것 — 켜져 있는 걸 또 켜면 무효과다.
+//    ② 수치는 겹쳐도 되지만(합산되어 실제로 오른다), 그것만 있으면 "그냥 더 센 룬"이라 재미가 없다.
+//    ③ 가능하면 신규 메커니즘을 준다 — ⚡신속화 / 연격화(hitsAdd) / 처형(executeBelow) / 광폭(berserk) / 상한 해제.
+//    검증: scripts 없이 node로 buriedRunewordAudit()를 돌리면 ①번 위반이 전부 잡힌다.
 export const BURIED_RUNEWORDS = [
-  { id: 'rwSlaughter', name: '살육(殺戮)',   runes: ['rKeen', 'rRage'],            fx: { powerPct: 12, critBonus: 6 },  desc: '위력 +12%, 치명 +6%' },
-  { id: 'rwGale',      name: '질풍(疾風)',   runes: ['rSpeed', 'rPierce'],         fx: { cdAdd: -1, pierce: true },     desc: '쿨다운 -1, 방어 무시' },
-  { id: 'rwLeech',     name: '흡귀(吸鬼)',   runes: ['rDrain', 'rDoom'],           fx: { drain: 10, powerPct: 6 },      desc: '흡혈 +10%, 위력 +6%' },
-  { id: 'rwAegis',     name: '수호자',       runes: ['rGuard1', 'rWall'],          fx: { barrierGain: 15, wallChance: 25 }, desc: '보호막 +15, 사용 시 25% 🧱방벽' },
-  { id: 'rwDawnsong',  name: '여명의 노래',  runes: ['rMend1', 'rDawn'],           fx: { heal: 25 },                    desc: '사용 시 HP 25 회복 추가' },
-  { id: 'rwBloom',     name: '만개(滿開)',   runes: ['rVenom', 'rChain', 'rDoom'], fx: { powerPct: 5 }, charFx: { statusUncap: true }, desc: '⚠ 내가 거는 상태이상의 스택 상한 해제 + 위력 +5%' },
-  { id: 'rwMajesty',   name: '군주의 위엄',  runes: ['rKing', 'rPower1'],          fx: { powerPct: 15 },                desc: '위력 +15%' },
-  { id: 'rwNether',    name: '명적(冥籍)',   runes: ['rBind', 'rSave1', 'rKing'],  fx: { spPct: -30, cdAdd: -1 },       desc: 'SP 소모 -30%, 쿨다운 -1' },
+  // ===== 2룬 — 접근성 (초·중반에 노려볼 만하다) =====
+  { id: 'rwSlaughter', name: '살육(殺戮)',   runes: ['rKeen', 'rRage'],        fx: { powerPct: 12, critBonus: 6 },
+    desc: '위력 +12%, 치명 +6%' },
+  { id: 'rwGale',      name: '질풍(疾風)',   runes: ['rSpeed', 'rPierce'],     fx: { cdAdd: -1, hitsAdd: 1 },
+    desc: '쿨다운 -1 추가, 타격 +1회' },
+  { id: 'rwFlash',     name: '섬광검(閃光劍)', runes: ['rSpeed', 'rKeen'],     fx: { swift: true },
+    desc: '⚡ 이 스킬이 턴을 소모하지 않는다 (턴당 1회)' },
+  { id: 'rwLeech',     name: '흡귀(吸鬼)',   runes: ['rDrain', 'rDoom'],       fx: { drain: 25, cdAdd: -2 },
+    desc: '흡혈 +25%, 쿨다운 -2 (파멸의 2배 쿨을 상쇄한다)' },
+  { id: 'rwAegis',     name: '수호자',       runes: ['rGuard1', 'rWall'],      fx: { barrierGain: 15, wallChance: 25 }, charFx: { takenPct: -6 },
+    desc: '보호막 +15, 🧱방벽 확률 +25% · 받는 피해 -6%' },
+  { id: 'rwDawnsong',  name: '여명의 노래',  runes: ['rMend1', 'rDawn'],       fx: { heal: 25, swift: true },
+    desc: 'HP +25 회복 · ⚡ 턴을 소모하지 않는다' },
+  { id: 'rwMajesty',   name: '군주의 위엄',  runes: ['rKing', 'rPower1'],      fx: { powerPct: 15, executeBelow: 25 },
+    desc: '위력 +15% · 적 HP 25% 이하면 위력 2배' },
+  { id: 'rwHemorrhage',name: '실혈(失血)',   runes: ['rGash', 'rVenom'],       fx: { hitsAdd: 1 },
+    desc: '타격 +1회 — 출혈·중독도 타격 수만큼 겹겹이 박힌다' },
+  { id: 'rwFrostbite', name: '동상(凍傷)',   runes: ['rFrost', 'rGrind'],      fx: { addApply: { s: 'stun', n: 1, p: 40 } },
+    desc: '적중 시 40% [기절] 1 — 약화·파쇄가 얼어붙는다' },
+  { id: 'rwIronwall',  name: '철벽(鐵壁)',   runes: ['rGuard1', 'rWard'],      fx: { barrierGain: 40 }, charFx: { takenPct: -8 },
+    desc: '보호막 +40 · 받는 피해 -8%' },
+  { id: 'rwBloodpact', name: '혈약(血約)',   runes: ['rRage', 'rDrain'],       fx: { berserk: true, drain: 20 },
+    desc: '잃은 HP에 비례해 위력 증가 · 흡혈 +20%' },
+  { id: 'rwThunder',   name: '뇌명(雷鳴)',   runes: ['rThunder', 'rChain'],    fx: { addApply: { s: 'stun', n: 1, p: 35 }, cdAdd: -1 },
+    desc: '[기절] 확률 +35% (총 70%), 쿨다운 -1' },
+  { id: 'rwSoulfeast', name: '혼찬(魂餐)',   runes: ['rDrain', 'rReaper'],     fx: { executeBelow: 40, drain: 15 },
+    desc: '처형 임계 30%→40% · 흡혈 +15%' },
+  { id: 'rwTempest',   name: '폭풍(暴風)',   runes: ['rTwin', 'rSpeed'],       fx: { hitsAdd: 1, powerPct: 25 },
+    desc: '타격 +1회 (총 3연격), 위력 +25% — 쌍격의 손실을 메운다' },
+  { id: 'rwMirror',    name: '경상(鏡像)',   runes: ['rEcho', 'rWard'],        fx: { reflect: 30, barrierGain: 20 },
+    desc: '반사 +30% (총 55%), 보호막 +20' },
+  { id: 'rwBreath',    name: '심호흡(深呼吸)', runes: ['rBreath1', 'rSave1'],  fx: { spGain: 14, swift: true },
+    desc: 'SP 회수 +14 · ⚡ 턴을 소모하지 않는다' },
+  { id: 'rwWhetstone', name: '연마(硏磨)',   runes: ['rWhet1', 'rGrind'],      fx: { critBonus: 14, executeBelow: 20 },
+    desc: '치명 +14% · 적 HP 20% 이하면 위력 2배' },
+  { id: 'rwPlague',    name: '역병(疫病)',   runes: ['rVenom', 'rSpark1'],     charFx: { statusUncap: true }, fx: { powerPct: 8 },
+    desc: '⚠ 내가 거는 상태이상의 스택 상한 해제 · 위력 +8%' },
+  { id: 'rwEclipse',   name: '식(蝕)',       runes: ['rOblivion', 'rDoom'],    fx: { powerPct: 35, cdAdd: -2 },
+    desc: '위력 +35%, 쿨다운 -2' },
+  { id: 'rwAscension', name: '승천(昇天)',   runes: ['rGenesis', 'rApex'],     fx: { hitsAdd: 1, powerPct: 30, critBonus: 10 },
+    desc: '타격 +1회, 위력 +30%, 치명 +10%' },
+
+  // ===== 3룬 — 심층 목표 (소켓 3칸 = 유물·전설 장비에만) =====
+  { id: 'rwNether',    name: '명적(冥籍)',   runes: ['rBind', 'rSave1', 'rKing'],        fx: { spPct: -30, cdAdd: -1 },
+    desc: 'SP 소모 -30% 추가, 쿨다운 -1 추가' },
+  { id: 'rwBloom',     name: '만개(滿開)',   runes: ['rVenom', 'rChain', 'rDoom'],       fx: { powerPct: 5 }, charFx: { statusUncap: true },
+    desc: '⚠ 상태이상 스택 상한 해제 · 위력 +5%' },
+  { id: 'rwCarnage',   name: '학살(虐殺)',   runes: ['rKeen', 'rRage', 'rTwin'],         fx: { hitsAdd: 1, critBonus: 15, powerPct: 15 },
+    desc: '타격 +1회 (총 3연격), 치명 +15%, 위력 +15%' },
+  { id: 'rwPurgatory', name: '연옥(煉獄)',   runes: ['rSpark1', 'rVenom', 'rGash'],      fx: { hitsAdd: 1 }, charFx: { statusUncap: true },
+    desc: '⚠ 상태이상 상한 해제 + 타격 +1회 — 도트 3종이 두 배로 쌓인다' },
+  { id: 'rwSanctuary', name: '성역(聖域)',   runes: ['rMend1', 'rGuard1', 'rDawn'],      fx: { heal: 40, barrierGain: 40, swift: true },
+    desc: 'HP +40, 보호막 +40 · ⚡ 턴을 소모하지 않는다' },
+  { id: 'rwRuin',      name: '파멸의 전조',  runes: ['rDoom', 'rPierce', 'rRage'],       fx: { powerPct: 45, cdAdd: -2 },
+    desc: '위력 +45%, 쿨다운 -2' },
+  { id: 'rwPhantom',   name: '환영(幻影)',   runes: ['rSpeed', 'rChain', 'rKeen'],       fx: { swift: true, cdrOnHit: 1 },
+    desc: '⚡ 턴 미소모 · 적중 시 다른 스킬 쿨다운 -1 추가' },
+  { id: 'rwGluttony',  name: '폭식(暴食)',   runes: ['rDrain', 'rTide', 'rReaper'],      fx: { drain: 30, executeBelow: 35, powerPct: 20 },
+    desc: '흡혈 +30%, 처형 35%, 위력 +20% (격류의 손실 보전)' },
+  { id: 'rwJudgment',  name: '심판(審判)',   runes: ['rKing', 'rReaper', 'rPierce'],     fx: { executeBelow: 45, powerPct: 30 },
+    desc: '처형 임계 45%, 위력 +30%' },
+  { id: 'rwCataclysm', name: '재앙(災殃)',   runes: ['rDoom', 'rTide', 'rBlood'],        fx: { hitsAdd: 1, powerPct: 35 },
+    desc: '타격 +1회 (총 4연격), 위력 +35%' },
+  { id: 'rwImmortal',  name: '불사(不死)',   runes: ['rDawn', 'rWard', 'rImmortal'],     fx: { heal: 50, barrierGain: 60, swift: true }, charFx: { takenPct: -10 },
+    desc: 'HP +50, 보호막 +60 · ⚡ 턴 미소모 · 받는 피해 -10%' },
+  { id: 'rwOmega',     name: '종언(終焉)',   runes: ['rGenesis', 'rEternity', 'rOblivion'], fx: { powerPct: 50, hitsAdd: 1, swift: true }, charFx: { dmgPct: 10 },
+    desc: '위력 +50%, 타격 +1회 · ⚡ 턴 미소모 · 주는 피해 +10% (최종 룬워드)' },
 ];
+
+// 🔍 룬워드 감사 (1.149.0) — 「구성 룬이 이미 주는 불린 플래그를 또 준다」를 전부 잡아낸다.
+// node로 호출해 빈 배열이 나오는지 확인할 것. 신규 룬워드 추가 시 반드시 재실행.
+export function buriedRunewordAudit() {
+  const FLAGS = ['pierce', 'berserk', 'swift'];
+  const bad = [];
+  for (const rw of BURIED_RUNEWORDS) {
+    const from = {};
+    for (const rid of rw.runes) {
+      const f = BURIED_RUNES[rid]?.fx || {};
+      for (const k of FLAGS) if (f[k]) from[k] = rid;
+    }
+    for (const k of FLAGS) {
+      if (rw.fx?.[k] && from[k]) bad.push(`${rw.name}: ${k}는 ${BURIED_RUNES[from[k]].name}이(가) 이미 준다 (무효과)`);
+    }
+    if (rw.charFx?.statusUncap) { /* charFx는 룬이 주지 않는 축이라 중복 불가 */ }
+    if (!rw.fx && !rw.charFx) bad.push(`${rw.name}: 효과가 비어 있다`);
+    const unknown = rw.runes.filter(r => !BURIED_RUNES[r]);
+    if (unknown.length) bad.push(`${rw.name}: 미존재 룬 ${unknown.join(',')}`);
+  }
+  return bad;
+}
+
 export function buriedRunewordOf(runes) {
   const list = runes || [];
   return BURIED_RUNEWORDS.find(rw => rw.runes.length === list.length && rw.runes.every((r, i) => list[i] === r)) || null;
