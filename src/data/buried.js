@@ -458,6 +458,55 @@ export const BURIED_BASIC = {
   desc: '물리·기교·마법 중 가장 높은 공격력으로 후려친다. SP +14',
 };
 
+// =========================================================
+// 직업별 기본 공격 (1.147.0) — PM 지시 "각 직업별 기본공격에 특색"
+// =========================================================
+// 기본기는 SP 엔진이라 턴의 절반 가까이 쓰인다 (1.118.0 시뮬 가동률 ~50%) —
+// 효과는 반드시 "작게" 유지할 것. 필드 어휘는 일반 스킬과 100% 동일
+// (apply/drain/critBonus/spGain/berserk/power)이라 전투 파이프라인 코드 변경 0줄.
+// %형 3종(healPctOfMax/barrierPctOfMax/selfDmgPctOfMax)만 buriedClassBasic이 maxHp로 환산.
+// flavor는 UI 표시용 한 줄 (전투 버튼·출정 위저드 공용).
+export const BURIED_CLASS_BASICS = {
+  // --- 기본 5직업 ---
+  wanderer:       { name: '응수의 검',       flavor: '25% 확률 [출혈] 1',                 apply: [{ s: 'bleed', n: 1, p: 25 }] },
+  sage:           { name: '잿불 손짓',       flavor: '25% 확률 [화상] 1',                 apply: [{ s: 'burn', n: 1, p: 25 }] },
+  demonblood:     { name: '피의 미각',       flavor: '피해의 12% 흡혈',                   drain: 12 },
+  elf:            { name: '정조준',          flavor: '치명 확률 +12%',                    critBonus: 12 },
+  priest:         { name: '여명의 손길',     flavor: '사용 시 최대 HP 2.5% 회복',         healPctOfMax: 2.5 },
+  // --- 전직 5직업 (기본형의 강화판 — 계열 정체성 유지) ---
+  wanderer_adv:   { name: '되돌아오는 칼날', flavor: '50% 확률 [출혈] 1',                 apply: [{ s: 'bleed', n: 1, p: 50 }] },
+  sage_adv:       { name: '겁화의 불씨',     flavor: '45% 확률 [화상] 1',                 apply: [{ s: 'burn', n: 1, p: 45 }] },
+  demonblood_adv: { name: '군주의 미각',     flavor: '피해의 20% 흡혈',                   drain: 20 },
+  elf_adv:        { name: '이중 조준',       flavor: '치명 확률 +18%',                    critBonus: 18 },
+  priest_adv:     { name: '여명의 축도',     flavor: '사용 시 최대 HP 4% 회복',           healPctOfMax: 4 },
+  // --- 조우 3직업 ---
+  magiblade:      { name: '혈인검(血刃劍)',  flavor: '위력 100% · 최대 HP 2% 자해 (혈류 발동)', power: 100, selfDmgPctOfMax: 2 },
+  vampire:        { name: '흡혈',            flavor: '피해의 25% 흡혈',                   drain: 25 },
+  fairy:          { name: '요정의 가루',     flavor: '20% 확률 [약화] 1',                 apply: [{ s: 'weaken', n: 1, p: 20 }] },
+  // --- 심층 4직업 ---
+  mazewarden:     { name: '지리 감각',       flavor: 'SP 회수 +4 (총 +18)',               spGain: 18 },
+  plaguedoc:      { name: '곪은 손길',       flavor: '25% 확률 [중독] 1',                 apply: [{ s: 'poison', n: 1, p: 25 }] },
+  chasmrager:     { name: '나락의 완력',     flavor: '잃은 HP에 비례해 위력 증가',        berserk: true },
+  voidwalker:     { name: '공허 찌르기',     flavor: '20% 확률 [파쇄] 1',                 apply: [{ s: 'shatter', n: 1, p: 20 }] },
+  // --- 조직 전속 4직업 ---
+  paladin:        { name: '수호의 타격',     flavor: '사용 시 🔷보호막 +최대 HP 3%',      barrierPctOfMax: 3 },
+  necroseer:      { name: '망자의 속삭임',   flavor: '25% 확률 [저주] 1',                 apply: [{ s: 'curse', n: 1, p: 25 }] },
+  ronin:          { name: '발도(拔刀)',      flavor: '치명 확률 +15%',                    critBonus: 15 },
+  darkknight:     { name: '어둠 물기',       flavor: '피해의 8% 흡혈 · 20% 확률 [약화] 1', drain: 8, apply: [{ s: 'weaken', n: 1, p: 20 }] },
+};
+
+// 직업 기본기 실효 스킬 — maxHp를 받아 %형 필드를 실수치로 환산. 미정의 직업은 공용 기본기.
+export function buriedClassBasic(classId, maxHp = 0) {
+  const mod = BURIED_CLASS_BASICS[classId];
+  if (!mod) return BURIED_BASIC;
+  const { healPctOfMax, barrierPctOfMax, selfDmgPctOfMax, ...rest } = mod;
+  const out = { ...BURIED_BASIC, ...rest };
+  if (healPctOfMax) out.heal = Math.max(1, Math.round(maxHp * healPctOfMax / 100));
+  if (barrierPctOfMax) out.barrierGain = Math.max(1, Math.round(maxHp * barrierPctOfMax / 100));
+  if (selfDmgPctOfMax) out.selfDmg = Math.max(1, Math.round(maxHp * selfDmgPctOfMax / 100));
+  return out;
+}
+
 // 직업이 착용 가능한 스킬인지
 export function canClassUseSkill(classId, skill) {
   if (!skill) return false;

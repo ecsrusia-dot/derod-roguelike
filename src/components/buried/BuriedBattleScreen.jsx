@@ -16,7 +16,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { PALETTE, getEnemyImageSrc } from '../../utils/helpers.js';
 import {
-  BURIED_STATUS, BURIED_BASIC, BURIED_SLOT_IDS, BURIED_POTION_HEAL_PCT,
+  BURIED_STATUS, BURIED_BASIC, buriedClassBasic, BURIED_SLOT_IDS, BURIED_POTION_HEAL_PCT,
   BURIED_ROOM_COLORS,
   buriedDerived, buriedEquippedSkills, getBuriedClass, getBuriedTier,
   resolveBuriedAttack, applyBuriedStatuses, tickBuriedStatuses, applyBuriedDamage,
@@ -422,7 +422,8 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     // ---------- 1. 플레이어 행동 ----------
     // kind === 'skip' — [기절]로 행동을 건너뛴다 (적 턴과 상태이상 처리만 진행)
     // kind === 'tame' — 🕯 제령 시도 (1.144.0): 성공 시 즉시 종전, 실패 시 턴 소모 + 적 광포화
-    let skill = (kind === 'skip' || kind === 'tame') ? null : (kind === 'basic' ? BURIED_BASIC : payload);
+    // 1.147.0 — 직업별 기본기: %형 효과(회복·보호막·자해)는 현재 최대 HP로 환산해 굽는다
+    let skill = (kind === 'skip' || kind === 'tame') ? null : (kind === 'basic' ? buriedClassBasic(char?.classId, P.maxHp) : payload);
 
     if (kind === 'tame' && tameTarget) {
       const rank = BURIED_GHOST_RANKS[tameTarget.rank];
@@ -1225,14 +1226,22 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
       {/* ===== 행동 ===== */}
       <div className="flex-1 overflow-y-auto px-3 pb-3 pt-1">
         <div className="grid grid-cols-2 gap-1.5">
-          <button onClick={() => act('basic', BURIED_BASIC)} disabled={busy || !!result}
-            className="ui-press px-2.5 py-2 text-left"
-            style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panel, border: `1px solid ${PALETTE.dawn}66`, opacity: busy || result ? 0.5 : 1 }}>
-            <div className="text-[12px] font-bold flex items-center gap-1" style={{ color: PALETTE.dawn }}>
-              <SkillKindBadge skill={BURIED_BASIC} /> {BURIED_BASIC.name}
-            </div>
-            <div className="text-[11px] tabular-nums" style={{ color: PALETTE.ice }}>SP 0 → +{BURIED_BASIC.spGain} · 최고 스탯 참조</div>
-          </button>
+          {(() => {
+            // 1.147.0 — 직업별 기본기 표시 (효과 한 줄 = flavor)
+            const cb = buriedClassBasic(char?.classId, player.maxHp);
+            return (
+              <button onClick={() => act('basic', cb)} disabled={busy || !!result}
+                className="ui-press px-2.5 py-2 text-left"
+                style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panel, border: `1px solid ${PALETTE.dawn}66`, opacity: busy || result ? 0.5 : 1 }}>
+                <div className="text-[12px] font-bold flex items-center gap-1" style={{ color: PALETTE.dawn }}>
+                  <SkillKindBadge skill={cb} /> {cb.name}
+                </div>
+                <div className="text-[11px] tabular-nums" style={{ color: PALETTE.ice }}>
+                  SP 0 → +{cb.spGain}{cb.flavor ? ` · ${cb.flavor}` : ' · 최고 스탯 참조'}
+                </div>
+              </button>
+            );
+          })()}
 
           <button onClick={usePotion} disabled={busy || !!result || potions <= 0 || potionUsedThisTurn || kf.noPotion}
             className="ui-press px-2.5 py-2 text-left"

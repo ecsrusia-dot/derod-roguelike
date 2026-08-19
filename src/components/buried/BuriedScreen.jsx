@@ -26,6 +26,7 @@ import {
   BURIED_UNIONS, BURIED_UNION_CLASSES, getBuriedUnion, buriedUnionLevel, BURIED_UNION_LEVELS, BURIED_UNION_REWARDS,
   BURIED_SIGILS, BURIED_ZONES,
   BURIED_GHOSTS, BURIED_GHOST_RANKS, buriedGhostKit,
+  BURIED_CLASS_BASICS,
 } from '../../data.js';
 import { BuriedBar, BURIED_DUST_ICON, BuriedTierLegend, BuriedLootModal } from './BuriedCommon.jsx';
 import BuriedManage from './BuriedManage.jsx';
@@ -535,6 +536,12 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
                       </div>
                     ) : null;
                   })}
+                  {BURIED_CLASS_BASICS[c.id] && (
+                    <div className="text-[12px] leading-relaxed pt-1" style={{ borderTop: `1px solid ${PALETTE.panelBorder}` }}>
+                      <span className="font-bold" style={{ color: PALETTE.dawn }}>⚔ 기본기 「{BURIED_CLASS_BASICS[c.id].name}」</span>
+                      <span style={{ color: PALETTE.textDim }}> — {BURIED_CLASS_BASICS[c.id].flavor}</span>
+                    </div>
+                  )}
                 </div>
               );
             })()}
