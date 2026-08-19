@@ -4514,7 +4514,11 @@ export const BURIED_CALAMITY_REWARD = {
 
 export const BURIED_RIVAL_TUNING = {
   count: 100,          // 더미 수
-  intrusionPct: 1,     // 일반 전투 방에서 난입으로 바뀔 확률 (%) — 1.154.0 PM 지시 「100층에 1번 수준」
+  // 1.158.0 — PM: 500층 동안 난입 0회. 함수는 1%로 정확히 동작했지만(시뮬 500층 4.9회 기대)
+  // ①난입은 전투방을 골랐을 때만 굴려져 실효가 절반 이하 ②순수 확률이라 불운 보장이 없었다.
+  // → 기본 확률 인상 + **천장**: 난입 없이 전투방을 지날 때마다 확률이 누적돼 결국 반드시 만난다.
+  intrusionPct: 4,       // 기본 확률 (%) — 전투방 진입 시
+  intrusionPity: 0.6,    // 난입 없이 지나간 전투방 1개당 확률 가산 (%p) — 난입을 만나면 0부터 다시
   hpMult: 1.7,         // 난입 적 HP = 파리티 유저 최대 HP × 이 값 (유저전 특유의 "질긴" 감각)
   hitPct: 27,          // 난입 적 일반타 = 내 최대 HP의 이 % (내 방어를 반영해 역산 — 전 층 일정한 위협)
   defMult: 0.55,       // 방어·회피는 절반 수준 — 유저전이 수문장보다 아프면 안 된다
@@ -4637,7 +4641,9 @@ export function buriedRivalNews(prevTicks, ticks, limit = 2, gen = 0) {
 // 전투 방 난입 판정 — 내 층 근처(±40%)를 오르는 중인 더미를 상대로 고른다.
 // Math.random 사용 — 반드시 이벤트 핸들러(enterRoom)에서만 부를 것 (setMeta updater 금지).
 export function rollBuriedIntrusion(char, ticks, gen = 0) {
-  if (Math.random() * 100 >= BURIED_RIVAL_TUNING.intrusionPct) return null;
+  // 천장 (1.158.0) — char.intrusionDry = 난입 없이 지나온 전투방 수 (enterRoom이 갱신)
+  const chance = BURIED_RIVAL_TUNING.intrusionPct + (char.intrusionDry || 0) * BURIED_RIVAL_TUNING.intrusionPity;
+  if (Math.random() * 100 >= chance) return null;
   const myFloor = char.floor || 1;
   const beaten = char.beatenRivals || [];
   const near = BURIED_RIVALS.filter(r => {

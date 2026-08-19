@@ -114,7 +114,9 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onLogEvent, on
       // ⚔ 난입 (1.153.0) — 일반 전투 방인 줄 알았는데 다른 등반자를 만난다 (roomType은 battle 유지)
       const rival = type === 'battle' ? rollBuriedIntrusion(char, b.rivalTicks || 0, b.rivalGen || 0) : null;
       const enemy = rival ? buildBuriedRivalEnemy(rival, char, (b.rivalWins || {})[rival.id] || 0) : buildBuriedRoomEnemy(char, type, offer.effect);
-      onUpdateChar({ ...char, room: type, roomEffect: offer.effect || null }, 0);
+      // 1.158.0 — 난입 천장 카운터: 전투방인데 난입이 안 떴으면 +1, 떴으면 0으로 리셋
+      const dry = type !== 'battle' ? (char.intrusionDry || 0) : (rival ? 0 : (char.intrusionDry || 0) + 1);
+      onUpdateChar({ ...char, room: type, roomEffect: offer.effect || null, intrusionDry: dry }, 0);
       onEnterBattle(enemy, type, offer.effect || null);
       return;
     }
