@@ -422,8 +422,8 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     // ---------- 1. 플레이어 행동 ----------
     // kind === 'skip' — [기절]로 행동을 건너뛴다 (적 턴과 상태이상 처리만 진행)
     // kind === 'tame' — 🕯 제령 시도 (1.144.0): 성공 시 즉시 종전, 실패 시 턴 소모 + 적 광포화
-    // 1.147.0 — 직업별 기본기: %형 효과(회복·보호막·자해)는 현재 최대 HP로 환산해 굽는다
-    let skill = (kind === 'skip' || kind === 'tame') ? null : (kind === 'basic' ? buriedClassBasic(char?.classId, P.maxHp) : payload);
+    // 1.147.0 — 직업별 기본기: %형 효과(회복·보호막·자해)는 현재 최대 HP로, 도트 스택은 마물 레벨로 환산해 굽는다
+    let skill = (kind === 'skip' || kind === 'tame') ? null : (kind === 'basic' ? buriedClassBasic(char?.classId, P.maxHp, enemy?.lv || 1) : payload);
 
     if (kind === 'tame' && tameTarget) {
       const rank = BURIED_GHOST_RANKS[tameTarget.rank];
@@ -680,9 +680,19 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
       }
     }
     if (skill && skill.heal) {
+      const room = Math.max(0, P.maxHp - P.hp);
       const h = applyHeal(P, skill.heal);
       if (h > 0) { pushFloat('player', `+${h}`, PALETTE.green); pushLog(`HP ${h} 회복`, PALETTE.green); }
       else pushLog('회복이 봉쇄되어 있다.', PALETTE.textDim);
+      // 1.147.1 — 사제 계열 기본기: 넘친 회복은 🔷보호막으로 (만피 낭비 제거. 회복 봉쇄 중엔 전환도 없음)
+      if (skill.overhealToBarrier && h > 0 && !kf.noBarrier) {
+        const over = Math.max(0, h - room);
+        if (over > 0) {
+          P.barrier = (P.barrier || 0) + over;
+          pushFloat('player', `🔷+${over}`, PALETTE.ice);
+          pushLog(`넘친 여명이 보호막이 된다. 🔷+${over}`, PALETTE.ice);
+        }
+      }
     }
     if (skill && skill.barrierGain && !kf.noBarrier) {
       P.barrier = (P.barrier || 0) + skill.barrierGain;
@@ -1228,7 +1238,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
         <div className="grid grid-cols-2 gap-1.5">
           {(() => {
             // 1.147.0 — 직업별 기본기 표시 (효과 한 줄 = flavor)
-            const cb = buriedClassBasic(char?.classId, player.maxHp);
+            const cb = buriedClassBasic(char?.classId, player.maxHp, enemy?.lv || 1);
             return (
               <button onClick={() => act('basic', cb)} disabled={busy || !!result}
                 className="ui-press px-2.5 py-2 text-left"
