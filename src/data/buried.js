@@ -452,6 +452,12 @@ for (const s of Object.values(BURIED_SKILLS)) {
 }
 export const BURIED_SKILL_LIST = Object.values(BURIED_SKILLS);
 
+// 1.148.0 — 고정 가산·화력 유니크 밸런스 상수 (조정은 여기 한 곳)
+// [u107] 거체의 반지: 물리·기교에 최대 HP의 N%를 **고정 가산** (% 보정 밖)
+// [lg34] 흑색 화약:   물리·기교 % 보정에 +N (곱연산) — 대신 받는 피해 +M%
+export const BURIED_RING_HP_PCT = 8;
+export const BURIED_POWDER = { physPct: 28, takenPct: 4 };
+
 // 기본 공격 — 장비가 없어도 항상 사용 가능 (SP 0, 사용 시 SP 회복)
 export const BURIED_BASIC = {
   id: 'basic', name: '기본 공격', sp: 0, cd: 0, power: 85, spGain: 14,
@@ -794,14 +800,22 @@ export function buriedDerived(char) {
   // 1.133.0 — 전설무구 % 개편: barrierHpPct(최대 HP 비례 보호막)가 maxHp를 참조하므로 먼저 계산
   // 1.113.0 — 레벨당 HP+18 폐지 (성장은 100% 장비)
   const maxHp = Math.max(1, Math.round((140 + st.vit * 11 + (gear.hp || 0) + (tf.hp || 0) + (pf.hp || 0) + (rf.hp || 0) + (uf.hp || 0)) * (tf.hpMult || 1) * (rf.hpMult || 1) * (uf.hpMult || 1) * (1 + (cf.hpPct || 0) / 100) * (1 - Math.min(50, char.curseHpLossPct || 0) / 100)));
+  // 1.148.0 — 🔷보호막·고정 가산 유니크를 파생 스탯에 편입 (PM 지적: 정보창에 안 보여 장비 비교가 불가능했다).
+  // [u107] 물리·기교 += 최대 HP 8% / [u111] 마법 += 보호막 30% — 전에는 전투 화면에서만 더해졌다.
+  // ⚠ 이 두 값은 % 보정(physPct/magPct) **밖**의 고정 가산이다 — 곱해지지 않는다.
+  const barrierVal = Math.round(((gear.barrier || 0) + (tf.barrier || 0) + (pf.barrier || 0) + (rf.barrier || 0) + (uf.barrier || 0) + maxHp * (uf.barrierHpPct || 0) / 100) * (1 + (cf.barrierPct || 0) / 100));
+  const uids = buriedUniqueIds(char);
+  const physFlatAdd = uids.includes('u107') ? Math.round(maxHp * BURIED_RING_HP_PCT / 100) : 0;
+  const magFlatAdd = uids.includes('u111') ? Math.round(barrierVal * 0.3) : 0;
   return {
     stats: st,
     traitFx: tf,
     maxHp,
+    physFlatAdd, magFlatAdd, // 데미지 공식 설명·출처 표시용
     maxSp:   Math.round((38 + st.int * 1.3 + (gear.sp || 0) + (tf.sp || 0) + (rf.sp || 0) + (uf.sp || 0)) * (uf.spMult || 1)),
-    atk:     Math.round((10 + st.str * 1.6 + (gear.atk || 0) + (pf.atk || 0)) * (1 + ((tf.physPct || 0) + (cf.physPct || 0) + (rf.physPct || 0) + (uf.physPct || 0)) / 100)),
-    fin:     Math.round((10 + st.dex * 1.6 + (gear.atk || 0) + (pf.atk || 0)) * (1 + ((tf.physPct || 0) + (cf.physPct || 0) + (rf.physPct || 0) + (uf.physPct || 0)) / 100)),
-    mag:     Math.round((10 + st.int * 1.6 + (gear.mag || 0) + (pf.mag || 0)) * (1 + ((tf.magPct || 0) + (cf.magPct || 0) + (rf.magPct || 0) + (uf.magPct || 0)) / 100)),
+    atk:     Math.round((10 + st.str * 1.6 + (gear.atk || 0) + (pf.atk || 0)) * (1 + ((tf.physPct || 0) + (cf.physPct || 0) + (rf.physPct || 0) + (uf.physPct || 0)) / 100)) + physFlatAdd,
+    fin:     Math.round((10 + st.dex * 1.6 + (gear.atk || 0) + (pf.atk || 0)) * (1 + ((tf.physPct || 0) + (cf.physPct || 0) + (rf.physPct || 0) + (uf.physPct || 0)) / 100)) + physFlatAdd,
+    mag:     Math.round((10 + st.int * 1.6 + (gear.mag || 0) + (pf.mag || 0)) * (1 + ((tf.magPct || 0) + (cf.magPct || 0) + (rf.magPct || 0) + (uf.magPct || 0)) / 100)) + magFlatAdd,
     def:     Math.round(4 + st.vit * 0.9 + (gear.def || 0) + (pf.def || 0) + (uf.def || 0) + (rf.def || 0)),
     crit:    Math.round(5 + st.dex * 0.6 + (gear.crit || 0) + (tf.crit || 0) + (cf.crit || 0) + (pf.crit || 0) + (rf.crit || 0) + (uf.crit || 0)),
     critDmg: 60 + (gear.critDmg || 0),
@@ -809,7 +823,7 @@ export function buriedDerived(char) {
     // 1.118.0 — 패시브 회복 9+int/8 → 3+int/12 (PM: SP가 무의미). 이제 SP의 주 엔진은
     // 기본 공격(+14)·마력 흡수·집중이고, 패시브·장비 spRegen은 보조가 된다
     spRegen: Math.round(3 + st.int / 12 + (gear.spRegen || 0) + (pf.spRegen || 0) + (uf.spRegen || 0)),
-    barrier: Math.round(((gear.barrier || 0) + (tf.barrier || 0) + (pf.barrier || 0) + (rf.barrier || 0) + (uf.barrier || 0) + maxHp * (uf.barrierHpPct || 0) / 100) * (1 + (cf.barrierPct || 0) / 100)),
+    barrier: barrierVal,
     chase:   Math.round((gear.chase || 0) + (tf.chase || 0) + (pf.chase || 0) + (uf.chase || 0)),
     healPct: (tf.healPct || 0) + (cf.healPct || 0) + (pf.healPct || 0) + (rf.healPct || 0) + (uf.healPct || 0),
     drainPct: (tf.drainPct || 0) + (cf.drainPct || 0) + (pf.drainPct || 0) + (rf.drainPct || 0) + (uf.drainPct || 0),
@@ -1978,6 +1992,46 @@ export function buriedSkillDmgPreview(skill, char) {
   return { per, hits, total: per * hits };
 }
 
+// ⚔ 데미지 공식 설명 (1.148.0, PM 지시 "데미지 공식의 설명이 명확했으면") —
+// resolveBuriedAttack의 계산 순서를 **내 실제 수치로** 풀어 쓴다. 공식이 바뀌면 이 함수도 같이 고칠 것.
+// 반환: [{ n, label, value, note }] — UI는 표시만 한다.
+export function buriedDamageFormula(char) {
+  if (!char) return [];
+  const d = buriedDerived(char);
+  const st = d.stats;
+  const tf = aggregateBuriedTraits(char), cf = aggregateBuriedContracts(char);
+  const rf = buriedRaceFx(char), uf = buriedUniqueFx(char);
+  const physPct = (tf.physPct || 0) + (cf.physPct || 0) + (rf.physPct || 0) + (uf.physPct || 0);
+  const magPct = (tf.magPct || 0) + (cf.magPct || 0) + (rf.magPct || 0) + (uf.magPct || 0);
+  // ① 보정 이전 기본치 역산 (표시 전용)
+  const physBase = d.atk - (d.physFlatAdd || 0);
+  const a0 = Math.round(physBase / (1 + physPct / 100));
+  return [
+    { n: '①', label: '기본 공격력', value: `물리 ${a0}`,
+      note: `10 + 근력 ${st.str}×1.6 + 장비·부품 공격력 (기교는 민첩, 마법은 지능 기준)` },
+    { n: '②', label: '% 보정 (곱연산)', value: `물리 +${physPct}% · 마법 +${magPct}%`,
+      note: physPct || magPct ? '특성·종족·출신·계약·유니크의 물리%/마법%는 모두 더한 뒤 ①에 한 번 곱한다 (흑색 화약도 여기)' : '보유한 % 보정이 없다' },
+    { n: '③', label: '고정 가산 (곱연산 밖)', value: `물리 +${d.physFlatAdd || 0} · 마법 +${d.magFlatAdd || 0}`,
+      note: (d.physFlatAdd || d.magFlatAdd) ? '거체의 반지(최대HP 8%)·마력 격막(보호막 30%) — ②의 %와 곱해지지 않는 별도 가산' : '해당 유니크 미보유' },
+    { n: '＝', label: '내 공격력', value: `물리 ${d.atk} · 기교 ${d.fin} · 마법 ${d.mag}`,
+      note: '스킬의 참조 능력치에 따라 셋 중 하나를 쓴다. 기본기는 셋 중 가장 높은 값' },
+    { n: '④', label: '× 스킬 위력%', value: '스킬마다 상이',
+      note: '연격(N회 타격)은 위력%를 매 타마다 따로 굴린다 — 상태이상·자가 버프도 ×N' },
+    { n: '⑤', label: '× 주는 피해 보정', value: '[격노] +10%/스택 · [약화] -6%/스택',
+      note: '방·층 효과, 인장, 수문장의 인장, 동행 괴이도 여기에 곱해진다' },
+    { n: '⑥', label: '× 적의 받는 피해 보정', value: '[속박] +20%/스택 · [저주] +15%/스택',
+      note: '적의 물리·마법 내성, 전쾌시 방어(풀피일 때 감소)도 여기서 곱해진다' },
+    { n: '⑦', label: '× 방어 감쇠', value: '100 ÷ (100 + 적 방어력)',
+      note: `하한 25% — 방어가 아무리 높아도 최소 1/4은 통과한다. 관통 공격은 이 단계를 통째로 무시. [파쇄]는 적 방어를 스택당 10% 깎는다` },
+    { n: '⑧', label: '× 편차', value: '0.92 ~ 1.08',
+      note: '매 타격마다 무작위 — 같은 스킬도 표시 수치의 ±8% 안에서 흔들린다' },
+    { n: '⑨', label: '치명타면 × 치명 피해', value: `${d.crit}% 확률 · ×${(1 + d.critDmg / 100).toFixed(2)}`,
+      note: '연격은 타격마다 따로 판정한다' },
+    { n: '＋', label: '추격 피해 (별도)', value: `${d.chase || 0}`,
+      note: '적중 시 본체와 별개로 1회 더 — 방어를 무시하고 그대로 들어간다' },
+  ];
+}
+
 export function resolveBuriedAttack(att, def, skill, { isPlayer = false, traits = [] } = {}) {
   const dodgeRoll = Math.random() * 100 < buriedEffDodge(def);
   if (dodgeRoll) return { dodged: true, hits: [], total: 0, crits: 0, chase: 0 };
@@ -2881,7 +2935,7 @@ export const BURIED_UNIQUES = [
   UQ({ id: 'u94',  name: '쌍둥이 검흔',     slot: 'acc',   skillId: 'berserkSigil',src: 94,  desc: '공격 스킬이 2회 시전되지만 위력은 절반이 된다.' }),
   UQ({ id: 'u87',  name: '도살자의 눈',     slot: 'acc',   skillId: 'bloodSigil',  src: 87,  desc: '치명타를 입힐 때마다 이 전투 동안 치명 확률 +2%.' }),
   UQ({ id: 'u99',  name: '연륜의 증표',     slot: 'acc',   skillId: 'lifeCharm',   src: 99,  desc: '스킬 위력이 캐릭터 레벨당 +2% 증가한다.' }),
-  UQ({ id: 'u107', name: '거체의 반지',     slot: 'acc',   skillId: 'bloodSigil',  src: 107, desc: '물리·기교 공격력이 최대 HP의 8%만큼 증가한다.' }),
+  UQ({ id: 'u107', name: '거체의 반지',     slot: 'acc',   skillId: 'bloodSigil',  src: 107, desc: `물리·기교 공격력에 최대 HP의 ${BURIED_RING_HP_PCT}%를 고정 가산한다 (% 보정과 곱해지지 않는 별도 가산).` }),
   UQ({ id: 'u111', name: '마력 격막',       slot: 'acc',   skillId: 'venomSigil',  src: 111, desc: '마법 공격력이 보호막 수치의 30%만큼 증가한다.' }),
   // ===== 전투 — 방벽 =====
   UQ({ id: 'u89',  name: '최후의 성벽',     slot: 'armor', skillId: 'ironWall',    src: 89,  desc: 'HP가 0이 될 피해를 받을 때 방벽이 있으면 전부 소모하고 HP 1로 버틴다.' }),
@@ -3095,8 +3149,8 @@ export const BURIED_UNIQUES = [
     desc: '독 바른 화살이 마르지 않는다. 상태이상 확률 +20%, 물리·기교 +8% — 「맹독의 룬」 내장.' }),
   UQ({ id: 'lg33', name: '페스트 의사의 가면', slot: 'helm', skillId: 'observe',    src: 0, fx: { statusResist: 30, statusChance: 12 },
     desc: '역병을 다루는 부리 가면. 상태이상 저항 +30%, 상태이상 확률 +12%.' }),
-  UQ({ id: 'lg34', name: '흑색 화약',       slot: 'acc',   skillId: 'berserkSigil', src: 0, fx: { physPct: 20, takenPct: 6 },
-    desc: '터질 듯한 화력. 물리·기교 +20% — 대신 받는 피해 +6%.' }),
+  UQ({ id: 'lg34', name: '흑색 화약',       slot: 'acc',   skillId: 'berserkSigil', src: 0, fx: { physPct: BURIED_POWDER.physPct, takenPct: BURIED_POWDER.takenPct },
+    desc: `터질 듯한 화력. 물리·기교 +${BURIED_POWDER.physPct}% (기본 공격력에 곱연산) — 대신 받는 피해 +${BURIED_POWDER.takenPct}%.` }),
   UQ({ id: 'lg35', name: '암기 은닉',       slot: 'acc',   skillId: 'sunderSigil',  src: 0, fx: { crit: 10, physPct: 8 }, rune: 'rPierce',
     desc: '소매 속의 마지막 수. 치명 +10%, 물리·기교 +8% — 「관통의 룬」 내장.' }),
   UQ({ id: 'lg36', name: '격투가의 붕대',   slot: 'acc',   skillId: 'bloodSigil',   src: 0, fx: { physPct: 14, dodge: 8 },
@@ -3344,6 +3398,36 @@ export function buriedRunewordCharFx(char) {
     if (rw?.charFx) for (const [k, v] of Object.entries(rw.charFx)) out[k] = out[k] || v;
   }
   return out;
+}
+
+// ⟪룬워드⟫ 열람용 진행도 (1.148.0, PM 지시 "룬워드를 볼 수 있는 방법") —
+// 각 조합의 완성 여부 / 보유 룬으로 만들 수 있는지 / 부족한 룬을 한 번에 계산한다.
+// 순서가 정확히 일치해야 완성되므로, 각인 순서까지 그대로 보여준다.
+export function buriedRunewordProgress(char) {
+  const pouch = [...(char?.runes || [])];
+  // 장착 6칸에서 이미 완성된 룬워드
+  const doneIds = new Set();
+  for (const sl of BURIED_SLOT_IDS) {
+    const rw = buriedRunewordOf(buriedItemRunes(char?.equipped?.[sl]));
+    if (rw) doneIds.add(rw.id);
+  }
+  return BURIED_RUNEWORDS.map(rw => {
+    const runes = rw.runes.map(id => getBuriedRune(id));
+    // 주머니 보유분으로 충당 가능한지 (같은 룬 중복 요구도 정확히 계산)
+    const left = [...pouch];
+    const missing = [];
+    for (const id of rw.runes) {
+      const i = left.indexOf(id);
+      if (i >= 0) left.splice(i, 1);
+      else missing.push(getBuriedRune(id)?.name || id);
+    }
+    return {
+      ...rw, runes,
+      done: doneIds.has(rw.id),
+      craftable: missing.length === 0,
+      missing,
+    };
+  });
 }
 
 export function socketBuriedRune(char, runeIdx, slot) {

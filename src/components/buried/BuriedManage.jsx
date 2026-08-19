@@ -14,12 +14,14 @@ import {
   buriedDerived, buriedDustValue, getBuriedClass,
   buriedTraitIds, getBuriedTrait, buriedSkillLv, buriedSkillRank, BURIED_SKILL_RANKS,
   getBuriedRune, BURIED_RUNE_RARITIES, socketBuriedRune, buriedSkillUsesLeft, buriedBreakIn,
+  buriedDamageFormula, buriedRunewordProgress,
 } from '../../data.js';
 import { BuriedItemCard, BuriedItemSheet, BURIED_DUST_ICON } from './BuriedCommon.jsx';
 
 export default function BuriedManage({ char, dust = 0, onUpdate, onClose }) {
   const [sheet, setSheet] = useState(null); // { item, slot }
   const [runePick, setRunePick] = useState(null); // ᚱ 각인할 룬 index (1.123.0)
+  const [openPanel, setOpenPanel] = useState(null); // 1.148.0 — 'formula' | 'runeword'
 
   if (!char) return null;
   const cls = getBuriedClass(char.classId);
@@ -78,6 +80,69 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose }) {
             </div>
           ))}
         </div>
+
+        {/* 1.148.0 — ⚔ 데미지 공식 / ⟪룬워드⟫ 조합표 (PM 지시: 계산이 명확하고, 룬워드를 볼 수 있게) */}
+        <div className="grid grid-cols-2 gap-1.5">
+          {[
+            { id: 'formula', label: '⚔ 데미지 공식', color: PALETTE.dawn },
+            { id: 'runeword', label: '⟪ ᚱ 룬워드 조합표', color: PALETTE.legendary },
+          ].map(b => (
+            <button key={b.id} onClick={() => setOpenPanel(openPanel === b.id ? null : b.id)}
+              className="ui-press px-2.5 py-2 text-[12px] font-bold"
+              style={{ borderRadius: 'var(--r-btn, 13px)', background: openPanel === b.id ? PALETTE.panelLight : PALETTE.panel,
+                border: `1px solid ${openPanel === b.id ? b.color : PALETTE.panelBorder}`, color: b.color }}>
+              {b.label} {openPanel === b.id ? '▲' : '▼'}
+            </button>
+          ))}
+        </div>
+
+        {openPanel === 'formula' && (
+          <div className="px-3 py-2.5 space-y-1.5" style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panel, border: `1px solid ${PALETTE.dawn}44` }}>
+            <div className="text-[11px] leading-relaxed" style={{ color: PALETTE.textDim }}>
+              위에서 아래로 순서대로 계산한다. ②는 <b style={{ color: PALETTE.dawn }}>곱연산</b>, ③은 <b style={{ color: PALETTE.dawn }}>곱해지지 않는 별도 가산</b> — 장비 비교의 핵심이다.
+            </div>
+            {buriedDamageFormula(char).map((r, i) => (
+              <div key={i} className="flex gap-2 py-1" style={{ borderTop: i > 0 ? `1px solid ${PALETTE.panelBorder}` : 'none' }}>
+                <span className="text-[12px] font-bold shrink-0 w-4 text-center" style={{ color: PALETTE.dawn }}>{r.n}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between gap-2 text-[12px]">
+                    <span style={{ color: PALETTE.text }}>{r.label}</span>
+                    <span className="tabular-nums text-right shrink-0" style={{ color: PALETTE.legendary }}>{r.value}</span>
+                  </div>
+                  <div className="text-[11px] leading-relaxed" style={{ color: PALETTE.textDim }}>{r.note}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {openPanel === 'runeword' && (
+          <div className="px-3 py-2.5 space-y-1.5" style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panel, border: `1px solid ${PALETTE.legendary}44` }}>
+            <div className="text-[11px] leading-relaxed" style={{ color: PALETTE.textDim }}>
+              한 장비의 소켓에 <b style={{ color: PALETTE.legendary }}>정해진 순서 그대로</b> 각인하면 완성된다. 각인은 영구 — 순서를 틀리면 되돌릴 수 없다.
+              <br />★ = 장착 장비에 완성됨 · ✅ = 지금 주머니 룬으로 완성 가능
+            </div>
+            {buriedRunewordProgress(char).map(rw => (
+              <div key={rw.id} className="py-1.5" style={{ borderTop: `1px solid ${PALETTE.panelBorder}` }}>
+                <div className="flex justify-between items-center gap-2">
+                  <span className="text-[12px] font-bold" style={{ color: rw.done ? PALETTE.legendary : rw.craftable ? PALETTE.green : PALETTE.text }}>
+                    {rw.done ? '★ ' : rw.craftable ? '✅ ' : ''}⟪{rw.name}⟫
+                  </span>
+                  <span className="text-[11px] shrink-0" style={{ color: PALETTE.dawn }}>{rw.desc}</span>
+                </div>
+                <div className="text-[11px] mt-0.5" style={{ color: PALETTE.textDim }}>
+                  {rw.runes.map((r, i) => (
+                    <span key={i}>
+                      {i > 0 && <span style={{ color: PALETTE.panelBorder }}> → </span>}
+                      <span style={{ color: BURIED_RUNE_RARITIES[r?.rarity]?.color || PALETTE.text }}>{r?.name || '?'}</span>
+                    </span>
+                  ))}
+                  {rw.missing.length > 0 && <span style={{ color: PALETTE.accent }}> · 부족: {rw.missing.join(', ')}</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* 능력치 4종 — 1.113.0: 배분 폐지, 장비 출처 열람만 */}
         <div className="px-3 py-2.5" style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panel, border: `1px solid ${PALETTE.panelBorder}` }}>
