@@ -5,7 +5,7 @@
 // 저장되는 것: 영혼, 강화 단계, 해금 항목, 클리어 기록
 // ============================================
 
-import { ENGRAVINGS, ENGRAVING_TIERS, ENEMIES, EVENTS, RELICS, PASSIVE_SKILLS, CODEX_DISCOVERY_REWARD, CODEX_COMPLETE_REWARD, backfillRaidSeries, FEATURE_FLAGS, addBuriedItemToChar, buriedDustValue as buriedDustValueOf, checkBuriedEncounterUnlock, buriedContractCap, BURIED_CONTRACT_COST, getBuriedUnionByDungeon, buriedUnionLevel, BURIED_UNION_REWARDS } from './data.js';
+import { ENGRAVINGS, ENGRAVING_TIERS, ENEMIES, EVENTS, RELICS, PASSIVE_SKILLS, CODEX_DISCOVERY_REWARD, CODEX_COMPLETE_REWARD, backfillRaidSeries, FEATURE_FLAGS, addBuriedItemToChar, buriedDustValue as buriedDustValueOf, checkBuriedEncounterUnlock, buriedContractCap, BURIED_CONTRACT_COST, getBuriedUnionByDungeon, buriedUnionLevel, BURIED_UNION_REWARDS, buriedSeasonRewardFor, buriedSeasonMilestones } from './data.js';
 
 const DB_NAME = 'derod_meta';
 const DB_VERSION = 1;
@@ -1482,6 +1482,7 @@ const EMPTY_BURIED = {
   runLog: [],       // 1.154.0~ 내 등반(런) 기록 — 사망 시점 스냅샷 (랭킹·상세 열람용, 던전별 상위 12 유지)
   season: null,     // 1.155.0~ 🏆 랭킹 시즌 { no, startedAt, lengthDays } — null이면 첫 접근 때 시즌 1 개막
   seasonHistory: [],// 1.155.0~ 지난 시즌 결산 [{ no, endedAt, days, champion:{name,floor,dungeonId}, myBest:{floor,rank} }]
+  rankMilestones: [],// 1.156.0~ 🏆 최초 달성 영구 보상 지급 기록 (마일스톤 id — 중복 지급 방지)
 };
 // 1.131.1 — 무덤의 유산 전체 초기화 (PM 요청: 업데이트를 처음부터 온전히 체험).
 // meta.buried만 백지화 — 본편·레이드·HOF 등 다른 메타는 건드리지 않는다.
@@ -1519,7 +1520,43 @@ export function getBuried(meta) {
     runLog: Array.isArray(b.runLog) ? b.runLog : [],
     season: (b.season && typeof b.season === 'object') ? b.season : null,
     seasonHistory: Array.isArray(b.seasonHistory) ? b.seasonHistory : [],
+    rankMilestones: Array.isArray(b.rankMilestones) ? b.rankMilestones : [],
   };
+}
+
+// 1.156.0 — 🏆 시즌 결산 보상 적용 (checkBuriedSeason 내부 전용 순수 계산).
+// summary: { perDungeon: [{dungeonId, myRank}], unifiedFirst, champion, myBest }
+// 반환: { buried(갱신), granted: { dust, shards, milestones: [id...], notes: [문구...] } }
+function applyBuriedSeasonRewards(b, summary) {
+  let dust = 0, shards = 0;
+  const notes = [];
+  // ① 소모성 — 던전별 내 최고 순위 기준
+  for (const p of (summary?.perDungeon || [])) {
+    const rw = buriedSeasonRewardFor(p.myRank);
+    if (rw) { dust += rw.dust; shards += rw.shards; }
+  }
+  // ② 영구 마일스톤 — 최초 1회
+  const newly = buriedSeasonMilestones(summary?.perDungeon || [], summary?.unifiedFirst, b.rankMilestones || []);
+  let out = { ...b, dust: (b.dust || 0) + dust, shards: (b.shards || 0) + shards, rankMilestones: [...(b.rankMilestones || []), ...newly] };
+  for (const id of newly) {
+    if (id === 'ms_top10') { out = { ...out, dust: out.dust + 500, shards: out.shards + 10 }; notes.push('첫 입상 — 🕯500 · ☠10'); }
+    if (id === 'ms_top3') {
+      const bonus = { ...out.rivalStatBonus };
+      for (const k of ['str', 'dex', 'int', 'vit']) bonus[k] = (bonus[k] || 0) + 1;
+      out = { ...out, rivalStatBonus: bonus }; notes.push('시상대 — ⚔격전의 유산 전 능력치 +1 (영구)');
+    }
+    if (id === 'ms_champ' && !(out.unlockedRaces || []).includes('reborn')) {
+      out = { ...out, unlockedRaces: [...(out.unlockedRaces || []), 'reborn'] }; notes.push('던전 제패 — 종족 「🔥환생자」 개방!');
+    }
+    if (id === 'ms_allTop10' && !(out.unlockedClasses || []).includes('summiter')) {
+      out = { ...out, unlockedClasses: [...(out.unlockedClasses || []), 'summiter'] }; notes.push('전 던전 입상 — 직업 「등정자」 개방!');
+    }
+    if (id === 'ms_unified') {
+      if (out.ghosts?.gh_tyrant) { out = { ...out, dust: out.dust + 800 }; notes.push('통합 랭킹 제패 — 폭군은 이미 사역 중, 🕯800으로 대체'); }
+      else { out = { ...out, ghosts: { ...out.ghosts, gh_tyrant: { breaks: 0 } } }; notes.push('통합 랭킹 제패 — 남령급 괴이 「무덤의 폭군」이 사역에 들어왔다!'); }
+    }
+  }
+  return { buried: out, granted: { dust, shards, milestones: newly, notes } };
 }
 
 // 1.155.0 — 🏆 시즌 기간 변경 (일 단위, PM 설정 가능). 현재 시즌의 만료 시점에 즉시 반영된다
@@ -1533,23 +1570,26 @@ export function setBuriedSeasonDays(meta, days) {
 // 1.155.0 — 🏆 시즌 확인·정산. 시즌이 없으면 개막하고, 만료됐으면 결산(챔피언·내 최고 기록)을
 // history에 남긴 뒤 라이벌 세계를 새 세대로 넘긴다 (rivalGen+1 · 시계 0 · 뺏긴 포인트·내 런 기록 리셋).
 // summary는 호출부(App)가 결산 공지·순위 계산에 쓴다 — champion 계산은 데이터 계층이 못 하므로 인자로 받는다.
-export function checkBuriedSeason(meta, now = Date.now(), summaryBuilder = null) {
+export function checkBuriedSeason(meta, now = Date.now(), summaryBuilder = null, { force = false } = {}) {
   const b = getBuried(meta);
   if (!b.season) {
     return { meta: { ...meta, buried: { ...b, season: { no: 1, startedAt: now, lengthDays: 7 } } }, rolled: false, opened: true };
   }
   const endAt = b.season.startedAt + b.season.lengthDays * 86400000;
-  if (now < endAt) return { meta, rolled: false, opened: false };
+  if (!force && now < endAt) return { meta, rolled: false, opened: false };
   const summary = summaryBuilder ? summaryBuilder(b) : null;
+  // 1.156.0 — 🏆 결산 보상 (소모성 + 최초 달성 영구) 지급
+  const { buried: rewarded, granted } = applyBuriedSeasonRewards(b, summary);
   const entry = {
     no: b.season.no, endedAt: now, days: b.season.lengthDays,
     champion: summary?.champion || null, myBest: summary?.myBest || null,
+    granted: { dust: granted.dust, shards: granted.shards, milestones: granted.milestones },
   };
   return {
     meta: {
       ...meta,
       buried: {
-        ...b,
+        ...rewarded,
         season: { no: b.season.no + 1, startedAt: now, lengthDays: b.season.lengthDays },
         seasonHistory: [entry, ...b.seasonHistory].slice(0, 8),
         rivalGen: (b.rivalGen || 0) + 1,
@@ -1558,7 +1598,7 @@ export function checkBuriedSeason(meta, now = Date.now(), summaryBuilder = null)
         runLog: [],
       },
     },
-    rolled: true, opened: false, entry,
+    rolled: true, opened: false, entry, granted,
   };
 }
 

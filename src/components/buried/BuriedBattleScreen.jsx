@@ -149,7 +149,9 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     immuneCrit: uniques.includes('u61'), // [u61] 휘황찬란 — 적 치명타 무효 (resolveBuriedAttack def-side)
     // [u21] 모리건 — 주고받는 피해 절반 / [u52] 결전 — 받는 피해 +15 / 🗝 인장 (1.143.0) — 개당 위력 +8·받피 -4
     // 1.149.0 — rwFx = 완성된 ⟪룬워드⟫의 캐릭터 단위 효과 (dmgPct·takenPct·critAdd·statusUncap)
-    envDmgPct: (env.self.dmgPct || 0) + (uniques.includes('u21') ? -50 : 0) + (char.sigils || 0) * BURIED_SIGILS.dmgPct + (rwFx.dmgPct || 0),
+    // 특성 「정상의 시야」 (1.156.0, 등정자 전용) — 현재 층 50당 주는 피해 +2% (최대 +30%)
+    envDmgPct: (env.self.dmgPct || 0) + (uniques.includes('u21') ? -50 : 0) + (char.sigils || 0) * BURIED_SIGILS.dmgPct + (rwFx.dmgPct || 0)
+      + (buriedTraitIds(char).includes('summitgaze') ? Math.min(30, Math.floor((char.floor || 1) / 50) * 2) : 0),
     envTakenPct: (env.self.takenPct || 0) + (uniques.includes('u21') ? -50 : 0) + (uniques.includes('u52') ? 15 : 0) + (ufx.takenPct || 0) + (kf.takenPct || 0) + (cf.takenPct || 0) - (char.sigils || 0) * BURIED_SIGILS.takenPct + (rwFx.takenPct || 0), // cf.takenPct = 🕯 동행 괴이 패시브 (1.144.0)
     envCritAdd: (env.self.critAdd || 0) + (rwFx.critAdd || 0), envMagPct: env.self.magPct || 0,
     envDodgeAdd: env.self.dodgeAdd || 0,

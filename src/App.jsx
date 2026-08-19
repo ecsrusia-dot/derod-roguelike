@@ -176,7 +176,7 @@ import {
 } from './data.js';
 import { getKstDateKey } from './utils/dailyChallenge.js';
 import { simulateBestEndlessRun } from './utils/endlessSkipSim.js';
-import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, applyEngravingSlot, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear, dismantleRaidItem, dismantleRaidJunk, enhanceRaidItem, claimRaidWeekly, addRaidResources, spendRaidResourcesForItem, resolveRaidSecret, toggleRaidFormation, appendAutoRunLog, getGambleUsed, useGambleEntry, addTwilightCoins, addFateShards, redeemFateShards, buyGambleShopItem, addClassTitle, equipClassTitle, saveHofPatterns, hofLevelUpChar, recordHofClear, recordMastersClearByClass, updateBestRunTime, getBuried, saveBuriedChar, startBuriedChar, recordBuriedDeath, resetBuried, recordBuriedClear, addBuriedDust, craftBuriedForgeItem, trackBuriedKill, buyBuriedContract, addBuriedShards, buyBuriedPart, detachBuriedParts, logBuriedEvent, addBuriedUnionRep, tameBuriedGhost, setBuriedCompanion, resetBuriedRivals, addBuriedRivalStat, addBuriedRivalWin, checkBuriedSeason, setBuriedSeasonDays } from './storage.js';
+import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, applyEngravingSlot, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear, dismantleRaidItem, dismantleRaidJunk, enhanceRaidItem, claimRaidWeekly, addRaidResources, spendRaidResourcesForItem, resolveRaidSecret, toggleRaidFormation, appendAutoRunLog, getGambleUsed, useGambleEntry, addTwilightCoins, addFateShards, redeemFateShards, buyGambleShopItem, addClassTitle, equipClassTitle, saveHofPatterns, hofLevelUpChar, recordHofClear, recordMastersClearByClass, updateBestRunTime, getBuried, saveBuriedChar, startBuriedChar, recordBuriedDeath, resetBuried, recordBuriedClear, addBuriedDust, craftBuriedForgeItem, trackBuriedKill, buyBuriedContract, addBuriedShards, buyBuriedPart, detachBuriedParts, logBuriedEvent, addBuriedUnionRep, tameBuriedGhost, setBuriedCompanion, addBuriedRivalStat, addBuriedRivalWin, checkBuriedSeason, setBuriedSeasonDays } from './storage.js';
 
 
 
@@ -402,30 +402,45 @@ export default function App() {
     });
   };
 
-  // 🏆 시즌 확인 (1.155.0) — 무덤의 유산 화면에 들어올 때마다 만료를 점검한다.
-  // 결산 요약(시즌 챔피언·내 최고 기록)은 만료 시점의 결정론 랭킹으로 계산해 history에 함께 남긴다.
+  // 🏆 시즌 결산 요약 (1.155.0 / 1.156.0 보상 확장) — 만료 시점의 결정론 랭킹으로
+  // 던전별 내 최고 순위 전부 + 통합 1위 여부(4던전 전체 런 풀에서 내가 최고층인가)를 계산한다.
+  const buildBuriedSeasonSummary = (b) => {
+    let champion = null, myBest = null, unifiedTopFloor = -1, unifiedTopIsMe = false;
+    const perDungeon = [];
+    for (const dg of BURIED_DUNGEONS) {
+      const rk = buriedRivalRanking(dg.id, b.rivalTicks || 0, {
+        gen: b.rivalGen || 0,
+        myRuns: (b.runLog || []).filter(e => e.dungeonId === dg.id),
+        topN: 1,
+      });
+      perDungeon.push({ dungeonId: dg.id, myRank: rk.myRank });
+      const top = rk.rows[0];
+      if (top) {
+        if (!champion || top.floor > champion.floor) champion = { name: top.isMe ? '나' : top.name, floor: top.floor, dungeonId: dg.id };
+        if (top.floor > unifiedTopFloor) { unifiedTopFloor = top.floor; unifiedTopIsMe = !!top.isMe; }
+        else if (top.floor === unifiedTopFloor && top.isMe) unifiedTopIsMe = true;
+      }
+      if (rk.myRank && (!myBest || rk.myRank < myBest.rank)) myBest = { rank: rk.myRank, dungeonId: dg.id };
+    }
+    return { perDungeon, unifiedFirst: unifiedTopIsMe, champion, myBest };
+  };
+
+  const buriedSeasonNotice = (r) => {
+    const e = r.entry;
+    const g = r.granted || { dust: 0, shards: 0, notes: [] };
+    const rewardTxt = [
+      g.dust > 0 ? `🕯${g.dust}` : null, g.shards > 0 ? `☠${g.shards}` : null,
+      ...(g.notes || []),
+    ].filter(Boolean).join(' · ');
+    setBuriedForgeNotice(`🏆 시즌 ${e.no} 종료 — 챔피언 「${e.champion?.name || '?'}」 ${e.champion?.floor || '?'}층${e.myBest ? ` · 내 최고 ${e.myBest.rank}위` : ''}. ${rewardTxt ? `결산 보상: ${rewardTxt}. ` : ''}새 시즌 개막!`);
+  };
+
   useEffect(() => {
     if (screen !== 'buried' && screen !== 'buriedDungeon') return;
-    const r = checkBuriedSeason(meta, Date.now(), (b) => {
-      let champion = null, myBest = null;
-      for (const dg of BURIED_DUNGEONS) {
-        const rk = buriedRivalRanking(dg.id, b.rivalTicks || 0, {
-          gen: b.rivalGen || 0,
-          myRuns: (b.runLog || []).filter(e => e.dungeonId === dg.id),
-          topN: 1,
-        });
-        const top = rk.rows[0];
-        if (top && (!champion || top.floor > champion.floor)) champion = { name: top.isMe ? '나' : top.name, floor: top.floor, dungeonId: dg.id };
-        if (rk.myRank && (!myBest || rk.myRank < myBest.rank)) myBest = { rank: rk.myRank, dungeonId: dg.id };
-      }
-      return { champion, myBest };
-    });
+    const r = checkBuriedSeason(meta, Date.now(), buildBuriedSeasonSummary);
     if (r.opened || r.rolled) {
       setMeta(() => { saveMeta(r.meta); return r.meta; });
-      if (r.rolled) {
-        const e = r.entry;
-        setBuriedForgeNotice(`🏆 시즌 ${e.no} 종료 — 챔피언 「${e.champion?.name || '?'}」 ${e.champion?.floor || '?'}층${e.myBest ? ` · 내 최고 ${e.myBest.rank}위` : ''}. 새 시즌이 개막했다! (라이벌 세계 초기화)`);
-      }
+      if (r.rolled) buriedSeasonNotice(r);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [screen]);
@@ -3319,8 +3334,9 @@ export default function App() {
               onForge={handleBuriedForge} onResetAll={handleBuriedReset}
               onSetSeasonDays={(days) => setMeta(prev => { const next = setBuriedSeasonDays(prev, days); saveMeta(next); return next; })}
               onResetRivals={() => {
-                setMeta(prev => { const next = resetBuriedRivals(prev); saveMeta(next); return next; });
-                setBuriedForgeNotice('🏆 시즌 조기 종료 — 새 시즌 개막! 라이벌 100인의 이력과 시즌 랭킹이 초기화됐다. (귀속 스탯은 유지)');
+                // 1.156.0 — 조기 종료도 정식 결산 (보상·마일스톤·히스토리 전부 동일 경로)
+                const r = checkBuriedSeason(meta, Date.now(), buildBuriedSeasonSummary, { force: true });
+                if (r.rolled) { setMeta(() => { saveMeta(r.meta); return r.meta; }); buriedSeasonNotice(r); }
               }}
               onSetCompanion={(gid) => setMeta(prev => { const next = setBuriedCompanion(prev, gid); saveMeta(next); return next; })}
               onBuyContract={handleBuriedBuyContract}

@@ -123,6 +123,9 @@ export const BURIED_RACES = [
     desc: '그늘의 사냥꾼. 치명 +6%, 상태이상 확률 +12%.' },
   { id: 'vampkin',  name: '뱀파이어', icon: '🩸', color: '#7d2b4a', statMods: { dex: 2, int: 2, vit: 1 }, fx: { drainPct: 5, healPct: -15 },
     desc: '피로 산다. 흡혈 +5% — 대신 일반 회복량 -15%.' },
+  // 1.156.0 — 🏆 랭킹 마일스톤 전용 종족 (첫 던전 제패 시 개방). rankGate: 시즌 결산이 unlockedRaces에 넣어준다
+  { id: 'reborn', name: '환생자', icon: '🔥', color: '#e8b04a', rankGate: true, statMods: { str: 1, dex: 1, int: 1, vit: 1 }, fx: { crit: 3, dodge: 3, barrier: 12 },
+    desc: '정상에서 죽고 다시 태어난 자. 전 능력치 +1, 치명 +3%, 회피 +3%, 시작 보호막 +12.' },
   { id: 'revenant', name: '굴레망자', icon: '💀', color: '#8b8378', statMods: { vit: 4, str: 2, dex: -3 }, fx: { statusResist: 20, healPct: -25 },
     desc: '이미 죽은 몸. 적의 상태이상 확률 -20% — 대신 회복량 -25%.' },
   // ===== 1.141.0 — 🏛 조직 전속 종족 4종 (union 필드 = 해당 조직 Lv.5 해금, 위저드가 게이트) =====
@@ -507,6 +510,8 @@ export const BURIED_CLASS_BASICS = {
   necroseer:      { name: '망자의 속삭임',   flavor: '25% 확률 [저주] 1',                 apply: [{ s: 'curse', n: 1, p: 25 }] },
   ronin:          { name: '발도(拔刀)',      flavor: '치명 확률 +15%',                    critBonus: 15 },
   darkknight:     { name: '어둠 물기',       flavor: '피해의 8% 흡혈 · 20% 확률 [약화] 1', drain: 8, apply: [{ s: 'weaken', n: 1, p: 20 }] },
+  // --- 랭킹 전용 직업 (1.156.0) ---
+  summiter:       { name: '등정의 일보',     flavor: '치명 확률 +10% · SP 회수 +2 (총 +16)', critBonus: 10, spGain: 16 },
 };
 
 // 직업 기본기 실효 스킬 — maxHp로 %형 필드를, monLevel로 도트 스택(perLv)을 환산. 미정의 직업은 공용 기본기.
@@ -2491,6 +2496,7 @@ export const BURIED_TRAITS = {
   necromancy: { id: 'necromancy', name: '사령술(死靈術)', exclusive: 'necroseer', trigger: true, desc: '적에게 걸린 디버프 종류당 주는 피해 +8% (최대 +32%).' },
   iaido:      { id: 'iaido',      name: '거합(居合)',     exclusive: 'ronin',     trigger: true, desc: '매 전투 첫 공격의 위력이 2배가 된다.' },
   blackplate: { id: 'blackplate', name: '흑갑(黑甲)',     exclusive: 'darkknight', fx: { takenPct: -15, physPct: 10 }, desc: '어둠을 갑주처럼 두른다. 받는 피해 -15%, 물리·기교 공격력 +10%.' },
+  summitgaze: { id: 'summitgaze', name: '정상의 시야', exclusive: 'summiter', trigger: true, desc: '깊이 오를수록 강해진다 — 현재 층 50당 주는 피해 +2% (최대 +30%).' },
   crusade:    { id: 'crusade',    name: '성전(聖戰)', exclusive: 'paladin',  trigger: true, desc: '🔷보호막이 남아 있는 동안 주는 피해 +25%.' },
   cursedblood:{ id: 'cursedblood',name: '저주받은 혈족', exclusive: 'vampire', trigger: true, fx: { hpMult: 0.6 }, desc: '최대 HP가 40% 줄어드는 대신, 전투 중 매 턴 최대 HP의 10%를 회복한다.' },
   fairywing:  { id: 'fairywing',  name: '요정의 날개', exclusive: 'fairy',   trigger: true, fx: { hpMult: 0.75 }, desc: '최대 HP가 25% 줄어드는 대신, 전투를 🧱방벽 2개로 시작한다.' },
@@ -2568,7 +2574,19 @@ export const BURIED_ADVANCED_CLASSES = [
   },
 ];
 // 전 직업 목록 — 조우 직업(파일 하단 정의)까지 포함해야 하므로 호출 시점에 평가 (TDZ 회피)
-export const buriedAllClasses = () => [...BURIED_CLASSES, ...BURIED_ADVANCED_CLASSES, ...BURIED_ENCOUNTER_CLASSES, ...BURIED_DEPTH_CLASSES, ...BURIED_UNION_CLASSES];
+// 1.156.0 — 🏆 랭킹 마일스톤 전용 직업 (전 던전 TOP10 입상 시 개방)
+export const BURIED_RANK_CLASSES = [
+  {
+    id: 'summiter', name: '등정자', sub: 'Summiter', color: '#ffd27a',
+    image: './classes/wanderer.jpg', rankOnly: true,
+    desc: '모든 무덤의 정상을 밟은 자. 오를수록 검이 예리해진다.',
+    lines: { weapon: 'sword', offhand: 'relic' },
+    stats: { str: 11, dex: 10, int: 7, vit: 9 },
+    traits: ['summitgaze', 'swordmastery', 'wardstone'],
+    unlock: { rank: true, label: '시즌 결산에서 4던전 모두 TOP 10 입상' },
+  },
+];
+export const buriedAllClasses = () => [...BURIED_CLASSES, ...BURIED_ADVANCED_CLASSES, ...BURIED_ENCOUNTER_CLASSES, ...BURIED_DEPTH_CLASSES, ...BURIED_UNION_CLASSES, ...BURIED_RANK_CLASSES];
 
 // =========================================================
 // 14. 스킬 레벨 1~8 (1.104.0)
@@ -4662,4 +4680,40 @@ export function buriedRivalSnapshot(rival, runNo, floor, gen = 0) {
       char: { ...ch, lv: Math.max(1, Math.round(buriedMonsterLevel(ch) * 0.6)), runes: [], skillUsage, skillUsagePct: true },
     };
   });
+}
+
+// =========================================================
+// 🏆 시즌 결산 보상 (1.156.0, PM 지시 "새로 구성해봐")
+// =========================================================
+// 두 축: ① 소모성 — 매 시즌, **던전별 내 최고 순위** 기준 지급 (4던전 각각)
+//        ② 영구 마일스톤 — **최초 1회**, 계정에 영구 귀속 (종족·직업 개방, 남령급 사역마)
+// ⚠ 보상 조정은 이 두 표 한 곳.
+export const BURIED_SEASON_REWARDS = [
+  { maxRank: 1,  label: '1위',     dust: 600, shards: 15 },
+  { maxRank: 3,  label: '2~3위',   dust: 350, shards: 8 },
+  { maxRank: 10, label: '4~10위',  dust: 180, shards: 4 },
+  { maxRank: Infinity, label: '참가 (순위권 밖)', dust: 60, shards: 0 },
+];
+export const buriedSeasonRewardFor = (rank) =>
+  rank == null ? null : BURIED_SEASON_REWARDS.find(r => rank <= r.maxRank) || null;
+
+export const BURIED_RANK_MILESTONES = [
+  { id: 'ms_top10',    name: '첫 입상',        cond: '아무 던전 TOP 10',            reward: '🕯 먼지 500 + ☠ 조각 10' },
+  { id: 'ms_top3',     name: '시상대',         cond: '아무 던전 TOP 3',             reward: '⚔ 격전의 유산 — 전 능력치 +1 (영구)' },
+  { id: 'ms_champ',    name: '던전 제패',      cond: '아무 던전 1위',               reward: '종족 「🔥환생자」 개방' },
+  { id: 'ms_allTop10', name: '전 던전 입상',   cond: '4던전 모두 TOP 10',           reward: '직업 「등정자」 개방' },
+  { id: 'ms_unified',  name: '통합 랭킹 제패', cond: '4던전 통합 랭킹 1위',         reward: '남령급 괴이 「무덤의 폭군」 사역 (이미 소장 시 🕯 800)' },
+];
+
+// 결산 요약(던전별 내 순위 + 통합 1위 여부) → 이번에 새로 달성한 마일스톤 id 목록 (순수 함수)
+export function buriedSeasonMilestones(perDungeon, unifiedFirst, already = []) {
+  const ranks = perDungeon.map(p => p.myRank).filter(r => r != null);
+  const out = [];
+  const hit = (id, ok) => { if (ok && !already.includes(id)) out.push(id); };
+  hit('ms_top10', ranks.some(r => r <= 10));
+  hit('ms_top3', ranks.some(r => r <= 3));
+  hit('ms_champ', ranks.some(r => r === 1));
+  hit('ms_allTop10', perDungeon.length >= 4 && perDungeon.every(p => p.myRank != null && p.myRank <= 10));
+  hit('ms_unified', !!unifiedFirst);
+  return out;
 }
