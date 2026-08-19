@@ -17,7 +17,7 @@ import {
   BURIED_ORIGINS, getBuriedOrigin,
   BURIED_CONTRACTS, BURIED_CONTRACT_COST, BURIED_CONTRACT_CARRY, getBuriedContract,
   buriedContractCost, buriedContractCap,
-  buriedDerived, buriedExpToNext, getBuriedClass, getBuriedDungeon,
+  buriedDerived, buriedExpToNext, getBuriedClass, getBuriedDungeon, getBuriedTier,
   buriedTraitIds, getBuriedTrait, buriedMonsterLevel,
   BURIED_PARTS, BURIED_PART_SLOT_COSTS, getBuriedPart, BURIED_SHARD,
   resolveBuriedLoot, buriedCheckpointFloors,
@@ -27,14 +27,15 @@ import {
   BURIED_SIGILS, BURIED_ZONES,
   BURIED_GHOSTS, BURIED_GHOST_RANKS, buriedGhostKit,
   BURIED_CLASS_BASICS, describeBuriedFx,
-  buriedRivalRanking, BURIED_RIVAL_TUNING,
+  buriedRivalRanking, BURIED_RIVAL_TUNING, BURIED_RIVALS, buriedRivalSnapshot,
+  BURIED_STATS, BURIED_SKILLS,
 } from '../../data.js';
 import { BuriedBar, BURIED_DUST_ICON, BuriedTierLegend, BuriedLootModal } from './BuriedCommon.jsx';
 import BuriedManage from './BuriedManage.jsx';
 
 const R = { chip: 'var(--r-chip, 8px)', btn: 'var(--r-btn, 13px)', panel: 'var(--r-panel, 18px)' };
 
-export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateChar, onRetire, onForge, onBuyContract, onBuyPart, onDetachParts, onResetAll, onSetCompanion, forgeNotice, onBack }) {
+export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateChar, onRetire, onForge, onBuyContract, onBuyPart, onDetachParts, onResetAll, onResetRivals, onSetCompanion, forgeNotice, onBack }) {
   const b = meta?.buried || {};
   const char = b.char || null;
   const clears = (b.clears && typeof b.clears === 'object') ? b.clears : {};
@@ -43,6 +44,8 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
 
   // 화면 상태 — 허브 / 출정 위저드(1~4) / 시설 서브뷰
   const [view, setView] = useState('home'); // home | wizard | forge | contracts | lab | records
+  const [rankDetail, setRankDetail] = useState(null); // 1.154.0 — 랭킹 행 상세 { snapshot } (더미·내 기록 공용 형태)
+  const [rivalResetAsk, setRivalResetAsk] = useState(0); // 더미 초기화 2단 확인
   const [wizStep, setWizStep] = useState(1); // 1 던전 → 2 시작 층 → 3 종족 → 4 직업 → 5 최종
   const [pickClass, setPickClass] = useState(BURIED_CLASSES[0].id);
   const [pickRace, setPickRace] = useState('human'); // 1.122.0 — 종족 축
@@ -932,37 +935,60 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
           </div>
         </div>
 
-        {/* ⚔ 등반 랭킹 (1.153.0) — 라이벌 100인과 던전별 TOP 10. 내 걸음만큼 저들도 오른다 */}
+        {/* ⚔ 등반 랭킹 (1.153.0 / 1.154.0 런 단위 개편) — 행 = 등반 1회. 클릭하면 죽기 직전 상태를 연다 */}
         <div>
-          <SectionTitle>🏆 등반 랭킹 — 라이벌 {BURIED_RIVAL_TUNING.count}인</SectionTitle>
+          <SectionTitle>🏆 등반 랭킹 — 라이벌 {BURIED_RIVAL_TUNING.count}인 (런 단위)</SectionTitle>
           <div className="text-[11px] leading-relaxed mb-1.5" style={{ color: PALETTE.textDim }}>
-            같은 무덤을 오르는 등반자들. <b style={{ color: PALETTE.dawn }}>내가 방을 하나 지날 때마다 저들의 시간도 흐른다</b> —
-            전투 방에서 낮은 확률로 난입해 오며, 쓰러뜨리면 상대의 주 능력치를 영구히 빼앗는다.
+            행 하나 = 등반 1회. 한 명이 순위를 독식할 수도 있다. <b style={{ color: PALETTE.dawn }}>행을 누르면 죽기 직전
+            상태창·장비·주 사용 스킬</b>을 훔쳐볼 수 있다 — 공략에 쓰시라.
           </div>
+          {/* ⚔ 귀속 스탯 — 난입 승패로 쌓인 계정 보너스 (음수 가능, 다음 등반에 합산) */}
+          {Object.entries(b.rivalStatBonus || {}).some(([, v]) => v !== 0) && (
+            <div className="px-3 py-2 mb-1.5 text-[12px]" style={{ borderRadius: R.chip, background: `${PALETTE.legendary}12`, border: `1px solid ${PALETTE.legendary}55` }}>
+              <span style={{ color: PALETTE.legendary }}>⚔ 격전의 유산 (다음 등반 합산): </span>
+              {Object.entries(b.rivalStatBonus).filter(([, v]) => v !== 0).map(([k, v]) => {
+                const st = BURIED_STATS.find(x => x.id === k);
+                return <span key={k} className="mr-1.5 tabular-nums" style={{ color: v > 0 ? PALETTE.green : PALETTE.accent }}>{st?.name} {v > 0 ? '+' : ''}{v}</span>;
+              })}
+            </div>
+          )}
           <div className="space-y-2">
             {BURIED_DUNGEONS.map(dg => {
-              const rk = buriedRivalRanking(dg.id, b.rivalTicks || 0, b.deepestByDungeon?.[dg.id] || 0, 10);
+              const myRuns = (b.runLog || []).filter(e => e.dungeonId === dg.id);
+              const myLive = b.char && b.char.dungeonId === dg.id ? { floor: b.char.floor, classId: b.char.classId } : null;
+              const rk = buriedRivalRanking(dg.id, b.rivalTicks || 0, { gen: b.rivalGen || 0, myRuns, myLive, topN: 10 });
               return (
                 <details key={dg.id} className="px-3 py-2" style={{ borderRadius: R.panel, background: PALETTE.panel, border: `1px solid ${dg.color}44` }}>
                   <summary className="text-[12px] font-bold cursor-pointer flex justify-between" style={{ color: dg.color }}>
                     <span>{dg.gimmick?.icon} {dg.name} TOP 10</span>
                     <span className="tabular-nums" style={{ color: rk.myRank && rk.myRank <= 10 ? PALETTE.legendary : PALETTE.textDim }}>
-                      {rk.myRank ? `내 순위 ${rk.myRank}/${rk.total}` : '기록 없음'}
+                      {rk.myRank ? `내 최고 ${rk.myRank}위/${rk.total}런` : '기록 없음'}
                     </span>
                   </summary>
                   <div className="mt-1.5 space-y-0.5">
                     {rk.rows.map((r, i) => {
                       const rc = r.classId ? getBuriedClass(r.classId) : null;
+                      const openDetail = () => {
+                        if (r.live) return; // 진행 중인 내 런은 상세 없음 (아직 안 죽었다)
+                        if (r.isMe && r.entry) {
+                          setRankDetail({ kind: 'me', snap: r.entry });
+                        } else if (r.rivalId) {
+                          const rv = BURIED_RIVALS.find(x => x.id === r.rivalId);
+                          if (rv) setRankDetail({ kind: 'rival', snap: buriedRivalSnapshot(rv, r.runNo, r.floor, b.rivalGen || 0) });
+                        }
+                      };
                       return (
-                        <div key={i} className="flex items-center gap-2 text-[12px] tabular-nums px-1 py-0.5"
+                        <button key={i} onClick={openDetail} className="ui-press w-full flex items-center gap-2 text-[12px] tabular-nums px-1 py-1 text-left"
                           style={{ borderRadius: 'var(--r-chip, 8px)', background: r.isMe ? `${PALETTE.legendary}18` : 'transparent' }}>
                           <span className="w-6 text-right shrink-0" style={{ color: i < 3 ? PALETTE.legendary : PALETTE.textDim }}>{i + 1}위</span>
                           <span className="flex-1 truncate" style={{ color: r.isMe ? PALETTE.legendary : (rc?.color || PALETTE.text) }}>
                             {r.isMe ? '★ 나' : r.name}
                             {rc && <span className="text-[11px]" style={{ color: PALETTE.textDim }}> · {rc.name}</span>}
+                            {r.ongoing && <span className="text-[11px]" style={{ color: PALETTE.green }}> · 등반 중</span>}
                           </span>
-                          <span style={{ color: PALETTE.text }}>{r.best}층</span>
-                        </div>
+                          <span style={{ color: PALETTE.text }}>{r.floor}층</span>
+                          {!r.live && <span className="text-[11px]" style={{ color: PALETTE.textDim }}>▸</span>}
+                        </button>
                       );
                     })}
                   </div>
@@ -970,7 +996,17 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
               );
             })}
           </div>
+          {/* 더미 초기화 (1.154.0, PM: 포화 대비) — 2단 확인. 내 기록·귀속 스탯은 유지 */}
+          <button onClick={() => {
+            if (rivalResetAsk === 0) { setRivalResetAsk(1); setTimeout(() => setRivalResetAsk(0), 4000); return; }
+            setRivalResetAsk(0); onResetRivals?.();
+          }} className="ui-press w-full mt-2 py-2 text-[11px]"
+            style={{ borderRadius: R.btn, background: rivalResetAsk ? `${PALETTE.accent}22` : PALETTE.panel,
+              border: `1px solid ${rivalResetAsk ? PALETTE.accent : PALETTE.panelBorder}`, color: rivalResetAsk ? PALETTE.accent : PALETTE.textDim }}>
+            {rivalResetAsk ? '⚠ 한 번 더 누르면 라이벌 100인의 이력이 전부 초기화된다 (내 기록·귀속 스탯은 유지)' : '⚔ 라이벌 세계 초기화 — 랭킹이 포화됐을 때 새 세대로'}
+          </button>
         </div>
+
         <div className="px-3 py-2.5 space-y-1.5" style={{ borderRadius: R.panel, background: PALETTE.panel, border: `1px solid ${PALETTE.panelBorder}` }}>
           <div className="text-[11px] tracking-[0.2em]" style={{ color: PALETTE.dawn }}>규칙</div>
           <div className="text-[12px] leading-relaxed" style={{ color: PALETTE.textDim }}>
@@ -1027,6 +1063,79 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
       {view === 'contracts' && renderContracts()}
       {view === 'lab' && renderLab()}
       {view === 'records' && renderRecords()}
+
+      {/* ⚔ 랭킹 상세 (1.154.0) — 죽기 직전 상태창·장비·주 사용 스킬. 더미는 시드 재구성, 나는 실제 기록 */}
+      {rankDetail && (() => {
+        const sn = rankDetail.snap;
+        const cls = getBuriedClass(sn.classId);
+        const isMe = rankDetail.kind === 'me';
+        const topSkills = isMe
+          ? Object.entries(sn.skillUsage || {}).map(([id, n]) => ({ id, name: BURIED_SKILLS[id]?.name || id, n }))
+              .sort((a, b) => b.n - a.n).slice(0, 4)
+          : (sn.topSkills || []);
+        const dv = sn.derived || {};
+        return (
+          <div className="absolute inset-0 z-50 flex items-end" style={{ background: 'rgba(0,0,0,0.75)' }} onClick={() => setRankDetail(null)}>
+            <div className="w-full px-4 pb-4 pt-3 max-h-[82%] overflow-y-auto" onClick={(e) => e.stopPropagation()}
+              style={{ background: PALETTE.bgDeep, borderTop: `1px solid ${cls?.color || PALETTE.panelBorder}88`, borderRadius: '18px 18px 0 0' }}>
+              <div className="text-[14px] font-bold" style={{ color: cls?.color || PALETTE.text }}>
+                {isMe ? '★ 나의 등반 기록' : `등반자 「${sn.name}」`}
+                <span className="text-[12px] font-normal" style={{ color: PALETTE.textDim }}> — {cls?.name} · {sn.floor}층에서 잠들다</span>
+              </div>
+              <div className="text-[11px] mb-2" style={{ color: PALETTE.textDim }}>
+                마물 Lv.{sn.monLv || '?'}{sn.killer || sn.cause ? ` · 사인: ${sn.killer || sn.cause}` : ''}{sn.at ? ` · ${new Date(sn.at).toLocaleDateString()}` : ''}
+              </div>
+              {/* 상태창 */}
+              <div className="grid grid-cols-4 gap-1 mb-2">
+                {[
+                  { l: 'HP', v: dv.maxHp, c: PALETTE.accent },
+                  { l: '물/기/마', v: `${dv.atk}/${dv.fin}/${dv.mag}`, c: PALETTE.dawn },
+                  { l: '방어', v: dv.def, c: PALETTE.ice },
+                  { l: '치명/회피', v: `${dv.crit}%/${dv.dodge}%`, c: PALETTE.legendary },
+                ].map(x => (
+                  <div key={x.l} className="px-1.5 py-1 text-center" style={{ borderRadius: 'var(--r-chip, 8px)', background: PALETTE.panel, border: `1px solid ${PALETTE.panelBorder}` }}>
+                    <div className="text-[11px]" style={{ color: PALETTE.textDim }}>{x.l}</div>
+                    <div className="text-[11px] font-bold tabular-nums" style={{ color: x.c }}>{x.v ?? '?'}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="text-[11px] mb-2 tabular-nums" style={{ color: PALETTE.textDim }}>
+                능력치: {BURIED_STATS.map(st => `${st.name} ${sn.stats?.[st.id] ?? '?'}`).join(' · ')}
+              </div>
+              {/* 주 사용 스킬 */}
+              {topSkills.length > 0 && (
+                <div className="mb-2">
+                  <div className="text-[11px] tracking-[0.15em] mb-1" style={{ color: PALETTE.dawn }}>주 사용 스킬</div>
+                  <div className="flex flex-wrap gap-1">
+                    {topSkills.map(t => (
+                      <span key={t.id} className="px-2 py-0.5 text-[11px]" style={{ borderRadius: 'var(--r-chip, 8px)', background: PALETTE.panel, border: `1px solid ${PALETTE.dawn}55`, color: PALETTE.text }}>
+                        {t.name} <b style={{ color: PALETTE.dawn }}>{t.pct != null ? `${t.pct}%` : `${t.n}회`}</b>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {/* 착용 장비 */}
+              <div className="text-[11px] tracking-[0.15em] mb-1" style={{ color: PALETTE.dawn }}>착용 장비 {sn.equipped?.length || 0}/6</div>
+              <div className="space-y-1">
+                {(sn.equipped || []).map((it, i) => {
+                  const tier = getBuriedTier(it.tier);
+                  const sk = BURIED_SKILLS[it.skillId];
+                  return (
+                    <div key={i} className="px-2.5 py-1.5 text-[12px]" style={{ borderRadius: 'var(--r-chip, 8px)', background: PALETTE.panel, border: `1px solid ${tier?.color || PALETTE.panelBorder}55` }}>
+                      <span style={{ color: tier?.color || PALETTE.text }}>{it.name}</span>
+                      <span className="text-[11px]" style={{ color: PALETTE.textDim }}>
+                        {' '}— {sk?.name || it.skillId}{it.unique ? ' · ⚔유니크' : ''}{(it.runes || []).length > 0 ? ` · ᚱ${it.runes.length}` : ''}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              <button onClick={() => setRankDetail(null)} className="ui-press w-full mt-2.5 py-2 text-[12px]" style={{ color: PALETTE.textDim }}>닫기</button>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* 장비 관리 */}
       {manage && char && (

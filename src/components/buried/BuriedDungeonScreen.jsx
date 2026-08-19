@@ -112,8 +112,8 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onLogEvent, on
     }
     if (type === 'battle' || type === 'elite' || type === 'boss') {
       // ⚔ 난입 (1.153.0) — 일반 전투 방인 줄 알았는데 다른 등반자를 만난다 (roomType은 battle 유지)
-      const rival = type === 'battle' ? rollBuriedIntrusion(char, b.rivalTicks || 0) : null;
-      const enemy = rival ? buildBuriedRivalEnemy(rival, char) : buildBuriedRoomEnemy(char, type, offer.effect);
+      const rival = type === 'battle' ? rollBuriedIntrusion(char, b.rivalTicks || 0, b.rivalGen || 0) : null;
+      const enemy = rival ? buildBuriedRivalEnemy(rival, char, (b.rivalWins || {})[rival.id] || 0) : buildBuriedRoomEnemy(char, type, offer.effect);
       onUpdateChar({ ...char, room: type, roomEffect: offer.effect || null }, 0);
       onEnterBattle(enemy, type, offer.effect || null);
       return;

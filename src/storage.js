@@ -1476,6 +1476,10 @@ const EMPTY_BURIED = {
   ghosts: {},       // 1.144.0~ 🕯 제령한 괴이 (ghostId → { breaks }) — 계정 영구
   companion: null,  // 1.144.0~ 동행 괴이 ghostId (다음 출정부터 적용)
   rivalTicks: 0,    // 1.153.0~ ⚔ 난입 — 라이벌 세계의 시계 (내 누적 걸음. 더미 등반은 이 값으로 결정론 계산)
+  rivalGen: 0,      // 1.154.0~ 더미 세계 세대 — 초기화할 때마다 +1 (시드가 바뀌어 완전히 새 이력)
+  rivalStatBonus: {},// 1.154.0~ 난입 승패로 귀속된 계정 영구 스탯 (statId → n, 음수 가능 — 다음 등반에 합산)
+  rivalWins: {},    // 1.154.0~ 더미가 나를 이기고 빼앗아간 포인트 (rivalId → n) — 그만큼 강해져 돌아온다
+  runLog: [],       // 1.154.0~ 내 등반(런) 기록 — 사망 시점 스냅샷 (랭킹·상세 열람용, 던전별 상위 12 유지)
 };
 // 1.131.1 — 무덤의 유산 전체 초기화 (PM 요청: 업데이트를 처음부터 온전히 체험).
 // meta.buried만 백지화 — 본편·레이드·HOF 등 다른 메타는 건드리지 않는다.
@@ -1507,7 +1511,29 @@ export function getBuried(meta) {
     ghosts: (b.ghosts && typeof b.ghosts === 'object') ? b.ghosts : {},
     companion: b.companion || null,
     rivalTicks: Math.max(0, b.rivalTicks || 0),
+    rivalGen: Math.max(0, b.rivalGen || 0),
+    rivalStatBonus: (b.rivalStatBonus && typeof b.rivalStatBonus === 'object') ? b.rivalStatBonus : {},
+    rivalWins: (b.rivalWins && typeof b.rivalWins === 'object') ? b.rivalWins : {},
+    runLog: Array.isArray(b.runLog) ? b.runLog : [],
   };
+}
+
+// 1.154.0 — ⚔ 더미 세계 초기화 (PM: 만렙·포화 대비). 세대 +1 = 시드 교체 = 완전히 새 등반 이력.
+// 내 자산(runLog·귀속 스탯)은 유지하고 더미 쪽(시계·이력·뺏긴 포인트)만 백지화한다.
+export function resetBuriedRivals(meta) {
+  const b = getBuried(meta);
+  return { ...meta, buried: { ...b, rivalGen: (b.rivalGen || 0) + 1, rivalTicks: 0, rivalWins: {} } };
+}
+
+// 1.154.0 — 난입 승패의 계정 귀속 스탯 (음수 가능 — 다음 등반 시작 스탯에 합산)
+export function addBuriedRivalStat(meta, statId, delta) {
+  const b = getBuried(meta);
+  const bonus = { ...b.rivalStatBonus, [statId]: (b.rivalStatBonus[statId] || 0) + delta };
+  return { ...meta, buried: { ...b, rivalStatBonus: bonus } };
+}
+export function addBuriedRivalWin(meta, rivalId, pts) {
+  const b = getBuried(meta);
+  return { ...meta, buried: { ...b, rivalWins: { ...b.rivalWins, [rivalId]: (b.rivalWins[rivalId] || 0) + pts } } };
 }
 
 // 1.144.0 — 🕯 괴이 제령 성공 기록. 신규 = 소장 / 이미 소장 + 동행 동일 개체 = 한계돌파 (호출부가 조건 판정)
@@ -1570,13 +1596,22 @@ export function startBuriedChar(meta, char) {
 
 // 사망 — 1.117.0 장비는 전부 먼지로 정산 / 1.118.0 골드는 전액 소멸 (계승 없음).
 // 기존 계승 대기 골드(legacyGold)는 다음 캐릭터가 한 번 소비하고 끝난다 (신규 누적 없음)
-export function recordBuriedDeath(meta, settlement) {
+export function recordBuriedDeath(meta, settlement, runEntry = null) {
   const b = getBuried(meta);
+  // 1.154.0 — 등반 기록 보관 (랭킹·상세 열람용). 던전별 도달층 상위 12개만 유지
+  let runLog = b.runLog;
+  if (runEntry) {
+    runLog = [...b.runLog, runEntry];
+    const byDg = {};
+    for (const e of runLog) (byDg[e.dungeonId] = byDg[e.dungeonId] || []).push(e);
+    runLog = Object.values(byDg).flatMap(list => list.sort((x, y) => (y.floor || 0) - (x.floor || 0)).slice(0, 12));
+  }
   return {
     ...meta,
     buried: {
       ...b,
       char: null,
+      runLog,
       dust: (b.dust || 0) + (settlement?.dust || 0),
       deaths: (b.deaths || 0) + 1,
     },
