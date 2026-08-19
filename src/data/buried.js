@@ -1963,9 +1963,14 @@ export const buriedPotionPrice = (monLevel = 1, bought = 0) =>
 // 10. 전투 계산 — 순수 함수 (BuriedBattleScreen이 호출만 한다)
 // =========================================================
 export const BURIED_TUNING = {
-  // 1.152.0 — 수문장(관문 보스) 압력 지수. 0.5(√)는 심층에서 과교정돼 잡몹보다 약해졌다 → 0.72로 상향.
-  // 관통 대기술을 가진 수문장(300·500층)은 방어를 통째로 무시해 같은 압력에서도 2~3배 아프므로 되돌린다.
-  guardianPressureExp: 0.85,   // 압력 지수 (HP·공격 공통). 0.5(√)는 심층에서 잡몹보다 약해졌다
+  // 1.153.0 — 깊이 압력의 **HP/공격 축 분리** (PM 밸런스 패치).
+  // 압력을 두 축에 같은 배율로 곱하면 심층에서 전투가 "길고 아픈" 쪽으로만 자란다
+  // (실측 500층: 일반 34타·일격 66%, 강적 101타·87% — 사실상 진입 불가).
+  // 지수를 낮춰 전 층에서 리듬을 일정하게 유지한다: 일반 5~8타·20%대, 강적 10~18타·30~50%.
+  pressureHpExp: 0.78,         // 일반·강적 HP에 반영되는 압력 지수 (1 = 전량)
+  pressureAtkExp: 0.87,        // 일반·강적 공격력에 반영되는 압력 지수
+  guardianPressureExp: 0.80,   // 수문장 **공격력** 압력 지수 (0.5는 심층에서 잡몹보다 약해졌다)
+  guardianHpExp: 0.62,         // 수문장 **HP** 압력 지수 — 관문전이 40~170타까지 늘어지던 문제 (목표 ~30타)
   guardianHeavyCapPct: 68,     // 대기술 한 방의 상한 = 플레이어 최대 HP의 이 % (관통·방어 자동 반영)
   enemyDmgMult: 1.1,   // 적 화력 체감 조정은 여기 한 곳. 1.113.0 — 레벨 스탯 폐지에도 "너무 쉽다" 응답으로 +10%
   playerDmgMult: 1.0,
@@ -2376,9 +2381,14 @@ export function buildBuriedRoomEnemy(char, roomType, roomEffectId = null) {
     // 비관통(200·400층) 사이 위협이 4~6배 널뛰었다 (실측 16%~98%).
     // → 지수를 GUARDIAN_PRESSURE_EXP로 올리고, 대기술 관통 보유 수문장은 그만큼 되돌려 균형을 맞춘다.
     //   조정은 BURIED_TUNING.guardianPressureExp / guardianPierceOffset 두 상수 한 곳.
-    const gExp = BURIED_TUNING.guardianPressureExp ?? 0.5;
-    const effPressure = enemy.guardian ? Math.pow(pressure, gExp) : pressure;
-    enemy = { ...enemy, hp: Math.round(enemy.hp * effPressure), atk: Math.round(enemy.atk * effPressure) };
+    // 1.153.0 — HP/공격 축 분리: 같은 압력이라도 HP는 덜, 공격은 더 덜 받는다 (상수 표 참조)
+    const hpExp = enemy.guardian ? (BURIED_TUNING.guardianHpExp ?? 0.62) : (BURIED_TUNING.pressureHpExp ?? 1);
+    const atkExp = enemy.guardian ? (BURIED_TUNING.guardianPressureExp ?? 0.5) : (BURIED_TUNING.pressureAtkExp ?? 1);
+    enemy = {
+      ...enemy,
+      hp: Math.round(enemy.hp * Math.pow(pressure, hpExp)),
+      atk: Math.round(enemy.atk * Math.pow(pressure, atkExp)),
+    };
   }
   // 1.152.0 — 수문장 대기술 피해 상한. 지수만 만지면 관통/비관통·수문장별 기본치 차이 때문에
   // 위협이 16%~175%로 널뛴다(실측). 그래서 **「대기술 한 방이 내 최대 HP의 N%를 넘지 않는다」**를
@@ -2395,7 +2405,16 @@ export function buildBuriedRoomEnemy(char, roomType, roomEffectId = null) {
         return Math.max(m, (a.power / 100) * (a.hits || 1) * defMult);
       }, 0);
       const maxAtk = (pd.maxHp * cap / 100) / (worst * (BURIED_TUNING.enemyDmgMult || 1));
-      if (enemy.atk > maxAtk) enemy = { ...enemy, atk: Math.max(1, Math.round(maxAtk)) };
+      // 1.153.0 — atk 자체를 깎으면 일반타까지 5%대로 무력화된다(실측) →
+      // **대기술의 power만** 비율 축소해 일반타는 설계대로, 대기술만 상한에 걸리게 한다.
+      if (enemy.atk > maxAtk) {
+        const scale = maxAtk / enemy.atk;
+        enemy = {
+          ...enemy,
+          actions: (enemy.actions || []).map(a =>
+            a.heavy && a.power ? { ...a, power: Math.max(10, Math.round(a.power * scale)) } : a),
+        };
+      }
     }
   }
   // ☠ 엘리트 변형 (1.124.0) — 강적 방은 항상 랜덤 변형이 붙는다
