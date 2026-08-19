@@ -4076,24 +4076,79 @@ export const BURIED_CURSE_MAX = 3;
 export const getBuriedCurse = (id) => BURIED_CURSES.find(c => c.id === id) || null;
 export const buriedCurseIds = (char) => char?.curses || [];
 export const hasBuriedCurse = (char, id) => buriedCurseIds(char).includes(id);
-// 심각도별 보상 (수락 즉시)
-export const BURIED_CURSE_REWARD = { 1: { dust: 40, gold: 60 }, 2: { dust: 75, gold: 110 }, 3: { dust: 120, gold: 180 } };
+// 1.159.0 전면 리뉴얼 (PM: "보상이 너무 쓸모없음") — 저주는 **런 내내 지속되는 영구 페널티**인데
+// 보상이 일회성 푼돈(먼지 40~120)이라 등가가 무너져 있었다. 저주의 무게에 맞는 3갈래 선택지로:
+// 💰재화(대폭 상향) / 📈영구 성장 / ⚔보물(룬→유물 장비→★3은 **유니크 확정**). 재화·성장은 마물 레벨 스케일.
+export const BURIED_CURSE_REWARD = {
+  1: { dust: 150, gold: 250 },
+  2: { dust: 280, gold: 450 },
+  3: { dust: 500, gold: 800 },
+};
+
+// 심각도별 보상 선택지 — UI 표시용 (실제 지급은 acceptBuriedCurse가 choiceId로)
+export function buriedCurseRewardChoices(char, curseId) {
+  const c = getBuriedCurse(curseId);
+  if (!c) return [];
+  const scale = 1 + Math.max(0, buriedMonsterLevel(char) - 1) * 0.10;
+  const base = BURIED_CURSE_REWARD[c.sev];
+  const statN = (2 + Math.floor(buriedMonsterLevel(char) / 25)) * (c.sev >= 3 ? 2 : 1);
+  const treasure = c.sev >= 3 ? '⚔ 전설의 무구(유니크) 확정 1개'
+    : c.sev === 2 ? '유물급 장비 확정 1개'
+    : 'ᚱ ★★ 룬 1개';
+  return [
+    { id: 'wealth',  label: '재화',      desc: `🕯 ${Math.round(base.dust * scale)} · 🪙 ${Math.round(base.gold * scale)} (즉시)` },
+    { id: 'growth',  label: '영구 성장', desc: `무작위 능력치 +${statN} (영구)` },
+    { id: 'treasure', label: '보물',     desc: treasure },
+  ];
+}
 // 해골 왕관 방 — 아직 안 받은 저주 중 하나를 제안
 export function rollBuriedCurseOffer(char) {
   if (buriedCurseIds(char).length >= BURIED_CURSE_MAX) return null;
   const pool = BURIED_CURSES.filter(c => !hasBuriedCurse(char, c.id));
   return pool.length > 0 ? pick(pool).id : null;
 }
-export function acceptBuriedCurse(char, curseId) {
+// 수락 — choiceId: 'wealth'(재화) | 'growth'(영구 능력치) | 'treasure'(룬/유물/유니크)
+// Math.random 사용 — 반드시 이벤트 핸들러에서 부를 것 (setMeta updater 금지).
+export function acceptBuriedCurse(char, curseId, choiceId = 'wealth') {
   const c = getBuriedCurse(curseId);
   if (!c || hasBuriedCurse(char, curseId)) return { char, reward: null };
-  // 1.117.0 — 보상이 마물 레벨을 따라 자란다 (무한층에서 저주가 계속 거래로 남도록)
-  const scale = 1 + Math.max(0, buriedMonsterLevel(char) - 1) * 0.10;
+  const cursed = { ...char, curses: [...buriedCurseIds(char), curseId] };
+  const monLv = buriedMonsterLevel(char);
+  const scale = 1 + Math.max(0, monLv - 1) * 0.10;
+
+  if (choiceId === 'growth') {
+    const n = (2 + Math.floor(monLv / 25)) * (c.sev >= 3 ? 2 : 1);
+    const k = pick(['str', 'dex', 'int', 'vit']);
+    const nm = BURIED_STATS.find(x => x.id === k)?.name;
+    return {
+      char: { ...cursed, stats: { ...cursed.stats, [k]: (cursed.stats[k] || 0) + n } },
+      reward: { dust: 0, gold: 0 },
+      text: `왕관이 피에 새겨진다 — ${nm} +${n} (영구).`,
+    };
+  }
+  if (choiceId === 'treasure') {
+    if (c.sev >= 3) {
+      const item = rollBuriedUniqueItem({ classId: char.classId, floor: monLv, powerMult: buriedLootPower(char) });
+      return { char: cursed, reward: { dust: 0, gold: 0 }, item, text: '왕관 아래에서 전설의 무구가 모습을 드러낸다!' };
+    }
+    if (c.sev === 2) {
+      const item = rollBuriedItem({ slot: null, classId: char.classId, floor: monLv, tier: 'relic', powerMult: buriedLootPower(char) });
+      return { char: cursed, reward: { dust: 0, gold: 0 }, item, text: '유물급 장비가 손에 들어온다.' };
+    }
+    const runeId = rollBuriedRuneIn(2, 2);
+    return {
+      char: runeId ? { ...cursed, runes: [...(cursed.runes || []), runeId] } : cursed,
+      reward: { dust: 0, gold: 0 },
+      text: runeId ? `ᚱ 「${getBuriedRune(runeId)?.name}」이(가) 주머니에 들어왔다.` : '아무것도 없었다.',
+    };
+  }
+  // wealth (기본)
   const base = BURIED_CURSE_REWARD[c.sev];
   const reward = { dust: Math.round(base.dust * scale), gold: Math.round(base.gold * scale) };
   return {
-    char: { ...char, curses: [...buriedCurseIds(char), curseId], gold: char.gold + reward.gold },
+    char: { ...cursed, gold: cursed.gold + reward.gold },
     reward,
+    text: `왕관이 재보를 게워낸다 — 🕯 ${reward.dust} · 🪙 ${reward.gold}.`,
   };
 }
 export const BURIED_SKULL_ROOM = {

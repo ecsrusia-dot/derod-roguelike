@@ -29,7 +29,7 @@ import {
   BURIED_EVENT_ROOMS, BURIED_EVENT_ROOM_IDS, resolveBuriedEvent, buriedEventChoices,
   buriedWandererOffers, wandererAddOption, wandererApplyMod, wandererReroll,
   BURIED_SKULL_ROOM, BURIED_CURSE_MAX, getBuriedCurse, buriedCurseIds,
-  rollBuriedCurseOffer, acceptBuriedCurse, hasBuriedCurse, BURIED_CURSE_REWARD,
+  rollBuriedCurseOffer, acceptBuriedCurse, hasBuriedCurse, BURIED_CURSE_REWARD, buriedCurseRewardChoices,
   aggregateBuriedContracts,
   BURIED_CALAMITY_GAUGE_MAX, buildBuriedCalamity,
   resolveBuriedLoot, buriedBossKeyAt,
@@ -288,12 +288,22 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onLogEvent, on
   const bumpGauge = (c) => ({ ...c, calamityGauge: Math.min(BURIED_CALAMITY_GAUGE_MAX, (c.calamityGauge || 0) + 1) });
 
   // ===== 해골 왕관 (1.108.0) — 저주 수락 = 즉시 보상 + 런 전체 페널티 =====
-  const acceptCurse = () => {
+  // 1.159.0 리뉴얼 — 보상 3갈래 (재화/영구 성장/보물). 장비 보상은 획득 판단 파이프라인을 그대로 탄다
+  const acceptCurse = (choiceId) => {
     const offer = char.roomData?.offer;
     if (!offer || char.roomData?.done) return;
-    const { char: cursed, reward } = acceptBuriedCurse(char, offer);
+    const r = acceptBuriedCurse(char, offer, choiceId);
     const c = getBuriedCurse(offer);
-    onUpdateChar(bumpGauge({ ...cursed, roomData: { ...char.roomData, done: true, text: `「${c.name}」의 저주를 받아들였다 — 🕯 ${reward.dust} · 🪙 ${reward.gold}. 이번 런이 끝날 때까지 저주가 따라붙는다.` } }), reward.dust);
+    let next = r.char;
+    let itemNote = '';
+    if (r.item) {
+      const added = addBuriedItemToChar(next, r.item);
+      next = added.char;
+      itemNote = added.raised ? ` «${r.item.name}» — 같은 스킬이라 레벨이 올랐다.`
+        : added.equippedDirect ? ` «${r.item.name}» 즉시 장착.`
+        : ` «${r.item.name}» — [교체/버리기]를 판단하라.`;
+    }
+    onUpdateChar(bumpGauge({ ...next, roomData: { ...char.roomData, done: true, text: `「${c.name}」의 저주를 받아들였다. ${r.text || ''}${itemNote} 이번 런이 끝날 때까지 저주가 따라붙는다.` } }), r.reward?.dust || 0);
   };
 
   // ===== 이벤트 방 (1.107.0) — 도박: 영구 보너스와 함정이 한 테이블에 =====
@@ -726,7 +736,7 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onLogEvent, on
                   </div>
                   <div className="text-[12px] leading-relaxed" style={{ color: PALETTE.text }}>{c.desc}</div>
                   <div className="text-[11px]" style={{ color: PALETTE.legendary }}>
-                    보상: 🕯 {BURIED_CURSE_REWARD[c.sev].dust} · 🪙 {BURIED_CURSE_REWARD[c.sev].gold} (즉시) · 저주는 이번 런 내내 지속 ({buriedCurseIds(char).length}/{BURIED_CURSE_MAX})
+                    아래 보상 중 하나를 골라 맞바꾼다 · 저주는 이번 런 내내 지속 ({buriedCurseIds(char).length}/{BURIED_CURSE_MAX})
                   </div>
                 </div>
               )}
@@ -734,10 +744,19 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onLogEvent, on
                 <div className="text-[12px]" style={{ color: PALETTE.textDim }}>왕관은 더 이상 너에게 관심이 없다. (저주 {BURIED_CURSE_MAX}개 보유)</div>
               )}
               {!rd.done && c && (
-                <button onClick={acceptCurse} className="ui-press w-full py-2.5 text-[12px] font-bold"
-                  style={{ borderRadius: 'var(--r-btn, 13px)', background: BURIED_SKULL_ROOM.color, color: '#0a0608' }}>
-                  저주를 받아들인다
-                </button>
+                <div className="space-y-1.5">
+                  <div className="text-[11px] tracking-[0.15em]" style={{ color: BURIED_SKULL_ROOM.color }}>◆ 무엇과 맞바꿀 것인가</div>
+                  {buriedCurseRewardChoices(char, rd.offer).map(ch => (
+                    <button key={ch.id} onClick={() => acceptCurse(ch.id)} className="ui-press w-full px-3 py-2.5 text-left"
+                      style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panel,
+                        border: `1px solid ${ch.id === 'treasure' ? PALETTE.legendary : BURIED_SKULL_ROOM.color}66` }}>
+                      <div className="text-[12px] font-bold" style={{ color: ch.id === 'treasure' ? PALETTE.legendary : PALETTE.text }}>
+                        {ch.id === 'wealth' ? '💰' : ch.id === 'growth' ? '📈' : '⚔'} {ch.label}
+                      </div>
+                      <div className="text-[11px] leading-relaxed" style={{ color: PALETTE.textDim }}>{ch.desc}</div>
+                    </button>
+                  ))}
+                </div>
               )}
               <button onClick={advance} className="ui-press w-full py-2.5 text-[12px]"
                 style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panelLight, color: PALETTE.text, border: `1px solid ${PALETTE.panelBorder}` }}>
