@@ -37,6 +37,7 @@ import {
   tickBuriedGearBreak, BURIED_BREAK_GRACE,
   buriedZoneAt, buriedRoomThreat,
   BURIED_GHOST_RANKS,
+  rollBuriedIntrusion, buildBuriedRivalEnemy,
 } from '../../data.js';
 import { BuriedItemCard, BuriedBar, BURIED_DUST_ICON, slotMeta, BuriedLootModal } from './BuriedCommon.jsx';
 import BuriedManage from './BuriedManage.jsx';
@@ -110,7 +111,9 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onLogEvent, on
       return;
     }
     if (type === 'battle' || type === 'elite' || type === 'boss') {
-      const enemy = buildBuriedRoomEnemy(char, type, offer.effect);
+      // ⚔ 난입 (1.153.0) — 일반 전투 방인 줄 알았는데 다른 등반자를 만난다 (roomType은 battle 유지)
+      const rival = type === 'battle' ? rollBuriedIntrusion(char, b.rivalTicks || 0) : null;
+      const enemy = rival ? buildBuriedRivalEnemy(rival, char) : buildBuriedRoomEnemy(char, type, offer.effect);
       onUpdateChar({ ...char, room: type, roomEffect: offer.effect || null }, 0);
       onEnterBattle(enemy, type, offer.effect || null);
       return;

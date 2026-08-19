@@ -172,6 +172,7 @@ import {
   BURIED_UNION_REP_GAIN, getBuriedUnion,
   BURIED_SIGILS, rollBuriedUniqueItem, buriedMonsterLevel, buriedLootPower,
   BURIED_GHOST_RANKS, getBuriedGhost, rollBuriedTalisman,
+  buriedRivalNews, buriedRivalStatGain,
 } from './data.js';
 import { getKstDateKey } from './utils/dailyChallenge.js';
 import { simulateBestEndlessRun } from './utils/endlessSkipSim.js';
@@ -362,8 +363,19 @@ export default function App() {
   // ============================================
   // 캐릭터 스냅샷은 매 변경마다 meta.buried.char에 저장된다 (앱을 꺼도 그대로 이어진다).
   const updateBuriedChar = (char, dustGain = 0) => {
+    // ⚔ 난입 (1.153.0) — 내 걸음이 늘어난 만큼 라이벌 세계도 전진했다. 결정론이라 전후 비교만으로
+    // "누가 방금 100층 경계를 넘었나"를 알 수 있다. 다른 알림이 떠 있으면 양보한다 (소식은 사소하다).
+    const b0 = getBuried(meta);
+    const sameRun = b0.char && char && b0.char.startedAt === char.startedAt;
+    const tickGain = sameRun ? Math.max(0, (char.steps || 0) - (b0.char.steps || 0)) : 0;
+    if (tickGain > 0 && !buriedForgeNotice) {
+      const news = buriedRivalNews(b0.rivalTicks || 0, (b0.rivalTicks || 0) + tickGain, 1);
+      if (news.length > 0) {
+        setBuriedForgeNotice(`🏔 등반 소식 — 「${news[0].name}」이(가) ${getBuriedDungeon(news[0].dungeonId)?.name} ${news[0].floor}층을 돌파했다!`);
+      }
+    }
     setMeta(prev => {
-      let next = saveBuriedChar(prev, char);
+      let next = saveBuriedChar(prev, char); // rivalTicks 적립은 saveBuriedChar가 처리
       if (dustGain) next = addBuriedDust(next, dustGain);
       saveMeta(next);
       return next;
@@ -543,6 +555,17 @@ export default function App() {
       pendingStatuses: null, // 1.107.0 — 이벤트 함정의 지연 상태이상은 1회 적용 후 소거
       carryBarrier: res.carryBarrier || 0, // [u6] 달인 — 남은 보호막을 다음 전투로
     };
+    // ⚔ 난입 승리 (1.153.0) — 상대 등반자의 주 스탯을 영구히 빼앗는다 (같은 상대는 런당 1회)
+    if (buriedEnemy?.rival) {
+      const rv = buriedEnemy.rival;
+      const gain = buriedRivalStatGain(char);
+      c = {
+        ...c,
+        stats: { ...c.stats, [rv.mainStat]: (c.stats[rv.mainStat] || 0) + gain },
+        beatenRivals: [...(c.beatenRivals || []), rv.id],
+      };
+      setBuriedForgeNotice(`⚔ 등반자 「${rv.name}」 격퇴 — ${rv.mainStatName} +${gain} (영구). 쓰러진 자의 힘이 스며든다.`);
+    }
     // 🧿 제령부 소모 정산 (1.144.0) — 실패 포함 이번 전투에서 태운 부적
     if (res.talismansSpent && Object.keys(res.talismansSpent).length > 0) {
       const t = { ...(c.talismans || {}) };

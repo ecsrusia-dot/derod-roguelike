@@ -4417,3 +4417,176 @@ export const BURIED_CALAMITY_REWARD = {
   shards: { labyrinth: 15, ruins: 20, chasm: 25, abyss: 30 },
   dust: 80,
 };
+
+// =========================================================
+// 26. ⚔ 난입 — 라이벌 등반자 100인 (1.153.0, PM 지시)
+// =========================================================
+// 「일반 적인 줄 알고 들어갔는데 다른 유저를 만난다」 — 솔로 게임에 유사 멀티 감각을 넣는 축.
+// 설계 원칙 3가지:
+//   ① **결정론 시뮬** — 더미 100명의 등반은 전부 시드 함수로 계산한다. 저장하는 것은
+//      `meta.buried.rivalTicks`(내 누적 걸음) 하나뿐. 언제 계산해도 같은 결과 = 치트·꼬임 없음.
+//   ② **시계 = 내 걸음** — "내가 진행한 만큼 세계도 움직인다"(PM). 방을 하나 지날 때마다
+//      전 더미의 시간이 1틱 흐른다. 자리를 비워도 더미가 앞서가지 않는다.
+//   ③ 더미도 죽고, 체크포인트에서 재출발한다 — 실제 유저의 등반 곡선을 흉내 낸다.
+// ⚠ 밸런스 조정은 BURIED_RIVAL_TUNING 한 곳.
+
+export const BURIED_RIVAL_TUNING = {
+  count: 100,          // 더미 수
+  intrusionPct: 8,     // 일반 전투 방에서 난입으로 바뀔 확률 (%)
+  hpMult: 1.7,         // 난입 적 HP = 파리티 유저 최대 HP × 이 값 (유저전 특유의 "질긴" 감각)
+  hitPct: 27,          // 난입 적 일반타 = 내 최대 HP의 이 % (내 방어를 반영해 역산 — 전 층 일정한 위협)
+  defMult: 0.55,       // 방어·회피는 절반 수준 — 유저전이 수문장보다 아프면 안 된다
+  statSteal: 2,        // 승리 시 주 스탯 영구 획득 기본치 (+ 마물 25레벨당 +1)
+};
+
+// 시드 난수 — mulberry32. Math.random 금지 구역 (결정론이 시스템의 뼈대다)
+function rivalRng(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a |= 0; a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// 더미 100인 — 고정 시드로 코드에서 생성 (항상 동일한 로스터)
+export const BURIED_RIVALS = (() => {
+  const A = ['잿빛', '새벽', '침묵의', '어스름', '핏빛', '무저갱', '떠도는', '녹슨', '창백한', '검은',
+             '여명의', '황혼', '무너진', '얼어붙은', '이름없는', '가면의', '탑골', '심연의', '폐허의', '달빛'];
+  const B = ['까마귀', '삽자루', '순례자', '등불', '해골꾼', '올빼미', '이리', '문지기', '곡괭이', '나방',
+             '방울뱀', '지렁이', '수집가', '약장수', '재봉사', '거미', '박쥐', '독버섯', '두더지', '유령'];
+  const solo = ['무덤도둑A', '9층주민', '포기를모름', '한줌의재', '지하철도', '뼈와먼지', '백골단장', '관짝수집가',
+                'RIP중독', '심장이두개', '오늘도유령', '가지마세요', '먼지풀풀', '지하실장', '평생등반러'];
+  const rng = rivalRng(20260819);
+  const dungeons = ['labyrinth', 'ruins', 'chasm', 'abyss'];
+  const classes = buriedAllClasses().map(c => c.id);
+  const names = new Set();
+  const out = [];
+  while (out.length < BURIED_RIVAL_TUNING.count) {
+    const i = out.length;
+    let name;
+    if (i < solo.length && rng() < 0.7) name = solo[i];
+    else name = A[Math.floor(rng() * A.length)] + ' ' + B[Math.floor(rng() * B.length)];
+    if (names.has(name)) continue;
+    names.add(name);
+    const classId = classes[Math.floor(rng() * classes.length)];
+    out.push({
+      id: `rv${i}`,
+      name,
+      classId,
+      dungeonId: dungeons[i % 4],           // 4던전 균등 배치 (25명씩)
+      pace: 0.5 + rng() * 1.3,              // 등반 실력 계수 — 상위권은 나보다 빠르다
+      grit: 60 + Math.floor(rng() * 160),   // 평균 런 길이(틱) — 길수록 한 런에 깊이 간다
+      seed: Math.floor(rng() * 1e9),
+    });
+  }
+  return out;
+})();
+
+// 더미의 시각 t(틱)에서의 상태 — { floor: 현재 층, best: 최고 기록, runs: 런 수 }
+// 런 구조: 체크포인트(최고기록의 100층 단위)에서 출발 → pace × 런길이^0.9만큼 오르고 사망 → 재출발.
+export function buriedRivalState(rival, ticks) {
+  const rng = rivalRng(rival.seed);
+  let best = 0, t = 0, runs = 0, floor = 1;
+  while (t < ticks && runs < 400) {
+    runs++;
+    const len = Math.max(20, Math.round(rival.grit * (0.5 + rng() * 1.0)));
+    const used = Math.min(len, ticks - t);
+    const start = 1 + Math.floor(best / 100) * 100;             // 돌파한 관문 너머에서 재출발
+    // 심층 감속(깊이 압력 재현: 시작층이 높을수록 덜 오른다) × 숙련 성장(런을 거듭하면 장비·실력이 쌓인다)
+    // — 숙련이 없으면 한 런에 다음 관문(+100층)을 영원히 못 넘어 세계가 정체한다
+    const climb = rival.pace * Math.pow(used, 0.78) * (1 / (1 + start / 350)) * (1 + runs * 0.012);
+    // 100층 관문 통과 판정 — 관문마다 실력 굴림. 못 넘으면 그 앞에서 막힌다 (수문장 벽 재현).
+    // 런을 거듭할수록 숙련돼 통과율이 조금씩 오른다 — 하위권도 아주 느리게나마 전진한다
+    let reach = start + climb;
+    const gate = (Math.floor(start / 100) + 1) * 100;
+    if (reach >= gate && rng() > 0.30 + rival.pace * 0.22 + runs * 0.006) reach = gate - 1 - Math.floor(rng() * 4);
+    floor = Math.max(1, Math.round(reach));
+    best = Math.max(best, floor);
+    t += used;
+    if (used < len) break; // 진행 중인 런 (아직 안 죽음)
+  }
+  return { floor, best, runs };
+}
+
+// 던전별 등반 랭킹 TOP N — 그 던전 배정 더미 25명 + 나
+export function buriedRivalRanking(dungeonId, ticks, myBest = 0, topN = 10) {
+  const rows = BURIED_RIVALS.filter(r => r.dungeonId === dungeonId)
+    .map(r => ({ name: r.name, classId: r.classId, best: buriedRivalState(r, ticks).best, isMe: false }));
+  if (myBest > 0) rows.push({ name: '나', classId: null, best: myBest, isMe: true });
+  rows.sort((a, b) => b.best - a.best);
+  return { rows: rows.slice(0, topN), myRank: rows.findIndex(r => r.isMe) + 1 || null, total: rows.length };
+}
+
+// 틱 구간 사이에 100층 경계를 새로 넘은 더미 — 공지용. 결정론이라 전후 비교만 하면 된다
+export function buriedRivalNews(prevTicks, ticks, limit = 2) {
+  if (ticks <= prevTicks) return [];
+  const news = [];
+  for (const r of BURIED_RIVALS) {
+    const a = Math.floor(buriedRivalState(r, prevTicks).best / 100);
+    const b = buriedRivalState(r, ticks).best;
+    if (Math.floor(b / 100) > a) news.push({ name: r.name, classId: r.classId, floor: Math.floor(b / 100) * 100, dungeonId: r.dungeonId });
+  }
+  news.sort((x, y) => y.floor - x.floor);
+  return news.slice(0, limit);
+}
+
+// 전투 방 난입 판정 — 내 층 근처(±40%)를 오르는 중인 더미를 상대로 고른다.
+// Math.random 사용 — 반드시 이벤트 핸들러(enterRoom)에서만 부를 것 (setMeta updater 금지).
+export function rollBuriedIntrusion(char, ticks) {
+  if (Math.random() * 100 >= BURIED_RIVAL_TUNING.intrusionPct) return null;
+  const myFloor = char.floor || 1;
+  const beaten = char.beatenRivals || [];
+  const near = BURIED_RIVALS.filter(r => {
+    if (beaten.includes(r.id)) return null;
+    const f = buriedRivalState(r, ticks).floor;
+    return f >= myFloor * 0.6 && f <= myFloor * 1.6;
+  }).filter(Boolean);
+  const pool = near.length > 0 ? near : BURIED_RIVALS.filter(r => !beaten.includes(r.id));
+  if (pool.length === 0) return null;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+// 난입 적 생성 — 상대는 "그 층 파리티 장비를 갖춘 유저". 실제 캐릭터 생성 공식으로 스탯을 만든다.
+export function buildBuriedRivalEnemy(rival, char) {
+  const T = BURIED_RIVAL_TUNING;
+  const floor = char.floor || 1;
+  const dummy = createBuriedChar(rival.classId, { items: [], gold: 0 }, char.dungeonId || 'labyrinth', [], {}, floor);
+  const d = buriedDerived(dummy);
+  const cls = getBuriedClass(rival.classId);
+  // 공격력은 "내가 얼마나 아프게 맞느냐"로 역산 — 수문장 상한(1.152.0)과 같은 자기교정 방식.
+  // 파리티 스탯을 그대로 쓰면 심층에서 내 방어 감쇠에 묻혀 10%대로 물렁해진다(실측).
+  const pd = buriedDerived(char);
+  const myDefMult = Math.max(0.25, 100 / (100 + (pd.def || 0)));
+  const atk = Math.max(1, Math.round((pd.maxHp * T.hitPct / 100) / (myDefMult * (BURIED_TUNING.enemyDmgMult || 1))));
+  const mainStatKey = Object.entries(cls.stats).sort((a, b) => b[1] - a[1])[0][0];
+  const mainStat = BURIED_STATS.find(s => s.id === mainStatKey);
+  return {
+    key: `rival_${rival.id}`,
+    name: `등반자 「${rival.name}」`,
+    color: cls.color,
+    tier: 'elite',
+    lv: buriedMonsterLevel(char),
+    hp: Math.round(d.maxHp * T.hpMult),
+    atk,
+    def: Math.round(d.def * T.defMult),
+    crit: d.crit,
+    dodge: Math.round(d.dodge * T.defMult),
+    exp: Math.round(30 * (1 + (buriedMonsterLevel(char) - 1) * 0.1) * 1.3),
+    gold: [Math.round(40 * (1 + floor * 0.02)), Math.round(90 * (1 + floor * 0.02))],
+    actions: [
+      { name: '가늠하기', power: 90, kind: 'attack', weight: 3 },
+      { name: `${cls.name}의 일격`, power: 125, kind: 'attack', weight: 3 },
+      { name: '필살의 한 수', power: 175, kind: 'attack', heavy: true, weight: 2 },
+    ],
+    // 전투·정산이 읽는 난입 메타
+    rival: { id: rival.id, name: rival.name, classId: rival.classId, mainStat: mainStatKey, mainStatName: mainStat?.name, image: cls.image },
+    roomType: 'battle', isBoss: false,
+  };
+}
+
+// 승리 보상 — 상대 주 스탯 영구 획득량 (샘·석상과 같은 심층 스케일)
+export function buriedRivalStatGain(char) {
+  return BURIED_RIVAL_TUNING.statSteal + Math.floor(buriedMonsterLevel(char) / 25);
+}
