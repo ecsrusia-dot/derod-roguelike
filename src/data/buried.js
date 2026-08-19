@@ -468,24 +468,26 @@ export const BURIED_BASIC = {
 // flavor는 UI 표시용 한 줄 (전투 버튼·출정 위저드 공용).
 export const BURIED_CLASS_BASICS = {
   // --- 기본 5직업 ---
-  wanderer:       { name: '응수의 검',       flavor: '25% 확률 [출혈] 1',                 apply: [{ s: 'bleed', n: 1, p: 25 }] },
-  sage:           { name: '잿불 손짓',       flavor: '25% 확률 [화상] 1',                 apply: [{ s: 'burn', n: 1, p: 25 }] },
+  // 1.147.1 — 도트형(출혈·화상·중독)은 tickDmg가 고정치라 심층에서 무의미해지는 문제:
+  //           perLv(마물 레벨 N당 스택 +1)로 스케일 보정. %형(약화·파쇄·저주·치명·흡혈)은 자연 스케일.
+  wanderer:       { name: '응수의 검',       flavor: '40% 확률 [출혈] 1+ (마물 Lv 30당 +1)', apply: [{ s: 'bleed', n: 1, p: 40, perLv: 30 }] },
+  sage:           { name: '잿불 손짓',       flavor: '40% 확률 [화상] 1+ (마물 Lv 30당 +1)', apply: [{ s: 'burn', n: 1, p: 40, perLv: 30 }] },
   demonblood:     { name: '피의 미각',       flavor: '피해의 12% 흡혈',                   drain: 12 },
   elf:            { name: '정조준',          flavor: '치명 확률 +12%',                    critBonus: 12 },
-  priest:         { name: '여명의 손길',     flavor: '사용 시 최대 HP 2.5% 회복',         healPctOfMax: 2.5 },
+  priest:         { name: '여명의 손길',     flavor: '최대 HP 4% 회복 · 넘치면 🔷보호막', healPctOfMax: 4, overhealToBarrier: true },
   // --- 전직 5직업 (기본형의 강화판 — 계열 정체성 유지) ---
-  wanderer_adv:   { name: '되돌아오는 칼날', flavor: '50% 확률 [출혈] 1',                 apply: [{ s: 'bleed', n: 1, p: 50 }] },
-  sage_adv:       { name: '겁화의 불씨',     flavor: '45% 확률 [화상] 1',                 apply: [{ s: 'burn', n: 1, p: 45 }] },
+  wanderer_adv:   { name: '되돌아오는 칼날', flavor: '60% 확률 [출혈] 1+ (마물 Lv 30당 +1)', apply: [{ s: 'bleed', n: 1, p: 60, perLv: 30 }] },
+  sage_adv:       { name: '겁화의 불씨',     flavor: '60% 확률 [화상] 1+ (마물 Lv 30당 +1)', apply: [{ s: 'burn', n: 1, p: 60, perLv: 30 }] },
   demonblood_adv: { name: '군주의 미각',     flavor: '피해의 20% 흡혈',                   drain: 20 },
   elf_adv:        { name: '이중 조준',       flavor: '치명 확률 +18%',                    critBonus: 18 },
-  priest_adv:     { name: '여명의 축도',     flavor: '사용 시 최대 HP 4% 회복',           healPctOfMax: 4 },
+  priest_adv:     { name: '여명의 축도',     flavor: '최대 HP 6% 회복 · 넘치면 🔷보호막', healPctOfMax: 6, overhealToBarrier: true },
   // --- 조우 3직업 ---
   magiblade:      { name: '혈인검(血刃劍)',  flavor: '위력 100% · 최대 HP 2% 자해 (혈류 발동)', power: 100, selfDmgPctOfMax: 2 },
   vampire:        { name: '흡혈',            flavor: '피해의 25% 흡혈',                   drain: 25 },
   fairy:          { name: '요정의 가루',     flavor: '20% 확률 [약화] 1',                 apply: [{ s: 'weaken', n: 1, p: 20 }] },
   // --- 심층 4직업 ---
   mazewarden:     { name: '지리 감각',       flavor: 'SP 회수 +4 (총 +18)',               spGain: 18 },
-  plaguedoc:      { name: '곪은 손길',       flavor: '25% 확률 [중독] 1',                 apply: [{ s: 'poison', n: 1, p: 25 }] },
+  plaguedoc:      { name: '곪은 손길',       flavor: '40% 확률 [중독] 1+ (마물 Lv 30당 +1)', apply: [{ s: 'poison', n: 1, p: 40, perLv: 30 }] },
   chasmrager:     { name: '나락의 완력',     flavor: '잃은 HP에 비례해 위력 증가',        berserk: true },
   voidwalker:     { name: '공허 찌르기',     flavor: '20% 확률 [파쇄] 1',                 apply: [{ s: 'shatter', n: 1, p: 20 }] },
   // --- 조직 전속 4직업 ---
@@ -495,8 +497,8 @@ export const BURIED_CLASS_BASICS = {
   darkknight:     { name: '어둠 물기',       flavor: '피해의 8% 흡혈 · 20% 확률 [약화] 1', drain: 8, apply: [{ s: 'weaken', n: 1, p: 20 }] },
 };
 
-// 직업 기본기 실효 스킬 — maxHp를 받아 %형 필드를 실수치로 환산. 미정의 직업은 공용 기본기.
-export function buriedClassBasic(classId, maxHp = 0) {
+// 직업 기본기 실효 스킬 — maxHp로 %형 필드를, monLevel로 도트 스택(perLv)을 환산. 미정의 직업은 공용 기본기.
+export function buriedClassBasic(classId, maxHp = 0, monLevel = 0) {
   const mod = BURIED_CLASS_BASICS[classId];
   if (!mod) return BURIED_BASIC;
   const { healPctOfMax, barrierPctOfMax, selfDmgPctOfMax, ...rest } = mod;
@@ -504,6 +506,14 @@ export function buriedClassBasic(classId, maxHp = 0) {
   if (healPctOfMax) out.heal = Math.max(1, Math.round(maxHp * healPctOfMax / 100));
   if (barrierPctOfMax) out.barrierGain = Math.max(1, Math.round(maxHp * barrierPctOfMax / 100));
   if (selfDmgPctOfMax) out.selfDmg = Math.max(1, Math.round(maxHp * selfDmgPctOfMax / 100));
+  // 1.147.1 — 도트 스케일: perLv 필드가 있으면 마물 레벨 비례로 스택 가산 (심층 보정)
+  if (out.apply?.some(a => a.perLv)) {
+    out.apply = out.apply.map(({ perLv, ...a }) =>
+      perLv ? { ...a, n: a.n + Math.floor(Math.max(0, monLevel) / perLv) } : a);
+    if (monLevel > 0) {
+      out.flavor = out.apply.map(a => `${a.p}% 확률 [${BURIED_STATUS[a.s]?.name}] ${a.n}`).join(' · ');
+    }
+  }
   return out;
 }
 
