@@ -305,7 +305,7 @@ export const BURIED_SKILLS = {
   // ===== 숲의 정령사 — 활(bow) =====
   preciseShot: SK({ id: 'preciseShot', name: '정밀 사격',  slot: 'weapon', line: 'bow', gear: '단궁',       sp: 10, cd: 0, stat: 'dex', power: 118, critBonus: 10, desc: '치명 확률 +10%' }),
   pierceShot:  SK({ id: 'pierceShot',  name: '관통 사격',  slot: 'weapon', line: 'bow', gear: '관통궁',     sp: 20, cd: 1, stat: 'dex', power: 108, pierce: true, desc: '방어 무시.' }),
-  stormVolley: SK({ id: 'stormVolley', name: '폭풍 화살',  slot: 'weapon', line: 'bow', gear: '폭풍궁',     sp: 26, cd: 2, stat: 'dex', power: 58, hits: 4, desc: '4연타 (타격당 58%).' }),
+  stormVolley: SK({ id: 'stormVolley', name: '폭풍 화살',  slot: 'weapon', line: 'bow', gear: '폭풍궁',     sp: 26, cd: 2, stat: 'dex', power: 50, hits: 4, desc: '4연타 (타격당 58%).' }),
   moonSnipe:   SK({ id: 'moonSnipe',   name: '월광 저격',  slot: 'weapon', line: 'bow', gear: '월광궁',     sp: 30, cd: 2, stat: 'dex', power: 170, critBonus: 40, desc: '치명 확률 +40%' }),
   // ===== 숲의 정령사 — 화살통(quiver) =====
   venomArrow:  SK({ id: 'venomArrow',  name: '독화살',     slot: 'offhand', line: 'quiver', gear: '독 화살통',   sp: 12, cd: 0, stat: 'dex', power: 66, apply: [{ s: 'poison', n: 3, p: 100 }], desc: '[중독] 3' }),
@@ -419,6 +419,12 @@ export const BURIED_SKILLS = {
   shockwave:   SK({ id: 'shockwave',   name: '충격파',     slot: 'weapon', line: 'mace', gear: '충파 망치',     sp: 18, cd: 1, stat: 'int', power: 70, barrierGain: 10, desc: '보호막 +10' }),
   // --- 성물(relic) ---
   firstAid:    SK({ id: 'firstAid',    name: '응급 처치',  slot: 'offhand', line: 'relic', gear: '응급 성물',   sp: 16, cd: 1, heal: 58, desc: 'HP 58 회복.' }),
+  // 1.152.0 — relic 공격기 3종 (PM 지시 구조 교정). 진단: relic은 7종 중 공격기 1개뿐이라
+  // 사제 계열 4직업(사제·대사제·성기사·역병사제)이 보조 슬롯에서 딜을 전혀 못 냈다.
+  // 정체성은 「치면서 지킨다」 — 공격에 회복·보호막·디버프가 붙는다.
+  smiteSeal:   SK({ id: 'smiteSeal',   name: '응보의 인장', slot: 'offhand', line: 'relic', gear: '응보의 인장', sp: 16, cd: 1, stat: 'int', power: 104, barrierGain: 18, desc: '빛으로 치고 보호막 +18.' }),
+  radiantChain:SK({ id: 'radiantChain',name: '광휘 연쇄',   slot: 'offhand', line: 'relic', gear: '광휘의 성물', sp: 20, cd: 2, stat: 'int', power: 62, hits: 2, apply: [{ s: 'weaken', n: 2, p: 100 }], desc: '빛이 두 번 꿰뚫는다. [약화] 2' }),
+  retribution: SK({ id: 'retribution', name: '신벌(神罰)',  slot: 'offhand', line: 'relic', gear: '신벌의 성물', sp: 24, cd: 2, stat: 'int', power: 122, apply: [{ s: 'curse', n: 1, p: 100 }], desc: '신의 벌이 내린다. [저주] 1' }),
   sunlight:    SK({ id: 'sunlight',    name: '선라이트',   slot: 'offhand', line: 'relic', gear: '햇살 성물',   sp: 16, cd: 2, self: [{ s: 'regen', n: 3 }], barrierGain: 15, desc: '[재생] 3 + 보호막 +15' }),
   // --- 방어구 공용 ---
   holyAura:    SK({ id: 'holyAura',    name: '홀리 오라',  slot: 'armor', line: null, gear: '성광 갑주',   sp: 22, cd: 3, barrierGain: 45, desc: '보호막 +45' }),
@@ -1957,6 +1963,10 @@ export const buriedPotionPrice = (monLevel = 1, bought = 0) =>
 // 10. 전투 계산 — 순수 함수 (BuriedBattleScreen이 호출만 한다)
 // =========================================================
 export const BURIED_TUNING = {
+  // 1.152.0 — 수문장(관문 보스) 압력 지수. 0.5(√)는 심층에서 과교정돼 잡몹보다 약해졌다 → 0.72로 상향.
+  // 관통 대기술을 가진 수문장(300·500층)은 방어를 통째로 무시해 같은 압력에서도 2~3배 아프므로 되돌린다.
+  guardianPressureExp: 0.85,   // 압력 지수 (HP·공격 공통). 0.5(√)는 심층에서 잡몹보다 약해졌다
+  guardianHeavyCapPct: 68,     // 대기술 한 방의 상한 = 플레이어 최대 HP의 이 % (관통·방어 자동 반영)
   enemyDmgMult: 1.1,   // 적 화력 체감 조정은 여기 한 곳. 1.113.0 — 레벨 스탯 폐지에도 "너무 쉽다" 응답으로 +10%
   playerDmgMult: 1.0,
   goldEarnMult: 0.7,   // 1.125.0 — 재화 인플레 픽스 (PM: 골드 9만 사례). 적 골드 -30%
@@ -2116,8 +2126,18 @@ export function resolveBuriedAttack(att, def, skill, { isPlayer = false, traits 
   if (skill.berserk && att.maxHp > 0) power *= 1 + (1 - att.hp / att.maxHp);
   // 특성 — 혈투 / 혈군 (HP가 낮을수록 강해진다)
   const lowHp = att.maxHp > 0 && att.hp / att.maxHp <= 0.5;
-  if (lowHp && traits.includes('bloodlord')) power *= 1.45;
-  else if (lowHp && traits.includes('bloodrush')) power *= 1.25;
+  // 1.152.0 — 「혈군」(마혈군주 전직 전용)은 HP 50% 문턱을 넘어야만 발동해 전직 체감이 0이었다.
+  //           잃은 HP에 비례하는 **상시 스케일**로 전환 (최대 +45%, 만피에서도 0에서 시작해 자연히 오른다)
+  if (traits.includes('bloodlord') && att.maxHp > 0) {
+    power *= 1 + Math.min(45, (1 - att.hp / att.maxHp) * 90) / 100;
+  } else if (lowHp && traits.includes('bloodrush')) power *= 1.25;
+  // 특성 — 성전 (1.152.0, 성기사 전용): 보호막을 유지하는 동안 화력이 오른다
+  if (traits.includes('crusade') && (att.barrier || 0) > 0) power *= 1.25;
+  // 특성 — 사령술 (1.152.0, 강령술사 전용): 적이 앓는 디버프 종류만큼 강해진다
+  if (traits.includes('necromancy')) {
+    const n = Object.keys(def.statuses || {}).filter(k => (def.statuses[k] || 0) > 0 && BURIED_STATUS[k]?.kind === 'debuff').length;
+    if (n > 0) power *= 1 + Math.min(32, n * 8) / 100;
+  }
   // ☠ 「격노한」 변형 (1.124.0) — HP 50% 이하에서 공격 +40%
   if (att.enrage && lowHp) power *= 1.4;
 
@@ -2349,11 +2369,34 @@ export function buildBuriedRoomEnemy(char, roomType, roomEffectId = null) {
   // 깊이의 압력 — 정복 층 이후 층당 선형 증가 (장비는 마물 레벨만 따라가므로 여기서 격차가 벌어진다)
   const pressure = buriedDepthPressure(dg, floor);
   if (pressure > 1) {
-    // 1.146.1 — A안 (PM 채택): 수문장은 base가 이미 절대치 설계(일반 보스의 2~3배)인데
-    // 레벨 스케일 ×압력이 중첩돼 100층에서 관통 원킬(플레이어 HP 150%)이 나오던 문제.
-    // 수문장 한정 압력을 √로 완화 — 100층 ×5.7 → ×2.39. 여전히 최강이지만 "대응 가능한 강함"으로.
-    const effPressure = enemy.guardian ? Math.sqrt(pressure) : pressure;
+    // 1.146.1 — A안: 수문장은 base가 이미 절대치 설계(일반 보스의 2~3배)인데 레벨 스케일 ×압력이
+    // 중첩돼 100층에서 관통 원킬이 나오던 문제 → 압력을 √로 완화했다.
+    // 1.152.0 — 그런데 √는 깊어질수록 과교정돼(300층 압력 ×105 → ×10.3, 즉 10%만 반영)
+    // **수문장이 같은 층 강적보다 약해지는 역전**이 났다. 게다가 관통 대기술 보유 수문장(300·500층)과
+    // 비관통(200·400층) 사이 위협이 4~6배 널뛰었다 (실측 16%~98%).
+    // → 지수를 GUARDIAN_PRESSURE_EXP로 올리고, 대기술 관통 보유 수문장은 그만큼 되돌려 균형을 맞춘다.
+    //   조정은 BURIED_TUNING.guardianPressureExp / guardianPierceOffset 두 상수 한 곳.
+    const gExp = BURIED_TUNING.guardianPressureExp ?? 0.5;
+    const effPressure = enemy.guardian ? Math.pow(pressure, gExp) : pressure;
     enemy = { ...enemy, hp: Math.round(enemy.hp * effPressure), atk: Math.round(enemy.atk * effPressure) };
+  }
+  // 1.152.0 — 수문장 대기술 피해 상한. 지수만 만지면 관통/비관통·수문장별 기본치 차이 때문에
+  // 위협이 16%~175%로 널뛴다(실측). 그래서 **「대기술 한 방이 내 최대 HP의 N%를 넘지 않는다」**를
+  // 직접 보장한다 — 관통 여부·방어력·층을 전부 흡수하는 자기교정 상한.
+  // ⚠ 내리기만 한다(상한). 장비가 좋은 플레이어는 설계된 수문장을 그대로 만난다 — 물몸 보호용이지 하향이 아니다.
+  // HP는 건드리지 않으므로 "길고 무거운 싸움"이라는 관문의 성격은 유지된다.
+  if (enemy.guardian) {
+    const cap = BURIED_TUNING.guardianHeavyCapPct ?? 62;
+    const pd = buriedDerived(char);
+    const heavy = (enemy.actions || []).filter(a => a.heavy && a.power);
+    if (pd.maxHp > 0 && heavy.length > 0) {
+      const worst = heavy.reduce((m, a) => {
+        const defMult = a.pierce ? 1 : Math.max(0.25, 100 / (100 + (pd.def || 0)));
+        return Math.max(m, (a.power / 100) * (a.hits || 1) * defMult);
+      }, 0);
+      const maxAtk = (pd.maxHp * cap / 100) / (worst * (BURIED_TUNING.enemyDmgMult || 1));
+      if (enemy.atk > maxAtk) enemy = { ...enemy, atk: Math.max(1, Math.round(maxAtk)) };
+    }
   }
   // ☠ 엘리트 변형 (1.124.0) — 강적 방은 항상 랜덤 변형이 붙는다
   if (roomType === 'elite') enemy = applyBuriedEliteMod(enemy, rollBuriedEliteMod());
@@ -2425,6 +2468,11 @@ export const BURIED_TRAITS = {
   ironFall: { id: 'ironFall', name: '낙하 단련',     fx: { hp: 60, physPct: 5 },   desc: '[나락 150층] 최대 HP +60, 물리·기교 공격력 +5%.' },
   nightEye: { id: 'nightEye', name: '밤눈',          fx: { crit: 5, dodge: 4 },    desc: '[심연 150층] 치명 확률 +5%, 회피율 +4%.' },
   bloodflow:  { id: 'bloodflow',  name: '혈류',       exclusive: 'magiblade', trigger: true, desc: '자해가 있는 스킬을 쓸 때마다 이 전투 동안 주는 데미지 +15% (최대 +150%).' },
+  // 1.152.0 — 조직 3직업도 전용 특성이 없어 정체성이 비어 있었다 (성기사 포함 4직업 보완)
+  necromancy: { id: 'necromancy', name: '사령술(死靈術)', exclusive: 'necroseer', trigger: true, desc: '적에게 걸린 디버프 종류당 주는 피해 +8% (최대 +32%).' },
+  iaido:      { id: 'iaido',      name: '거합(居合)',     exclusive: 'ronin',     trigger: true, desc: '매 전투 첫 공격의 위력이 2배가 된다.' },
+  blackplate: { id: 'blackplate', name: '흑갑(黑甲)',     exclusive: 'darkknight', fx: { takenPct: -15, physPct: 10 }, desc: '어둠을 갑주처럼 두른다. 받는 피해 -15%, 물리·기교 공격력 +10%.' },
+  crusade:    { id: 'crusade',    name: '성전(聖戰)', exclusive: 'paladin',  trigger: true, desc: '🔷보호막이 남아 있는 동안 주는 피해 +25%.' },
   cursedblood:{ id: 'cursedblood',name: '저주받은 혈족', exclusive: 'vampire', trigger: true, fx: { hpMult: 0.6 }, desc: '최대 HP가 40% 줄어드는 대신, 전투 중 매 턴 최대 HP의 10%를 회복한다.' },
   fairywing:  { id: 'fairywing',  name: '요정의 날개', exclusive: 'fairy',   trigger: true, fx: { hpMult: 0.75 }, desc: '최대 HP가 25% 줄어드는 대신, 전투를 🧱방벽 2개로 시작한다.' },
   hunter:       { id: 'hunter',       name: '추격자',   fx: { chase: 9 },    desc: '추격 피해 +9.' },
@@ -2488,7 +2536,7 @@ export const BURIED_ADVANCED_CLASSES = [
     image: './classes/elf.jpg', advanced: true,
     desc: '바람을 다스리는 궁수. 화살은 두 번 꽂힌다.',
     lines: { weapon: 'bow', offhand: 'quiver' },
-    stats: { str: 7, dex: 19, int: 10, vit: 10 },
+    stats: { str: 7, dex: 17, int: 10, vit: 11 },
     traits: ['tempest', 'precision', 'hunter'],
   },
   {
@@ -3973,7 +4021,7 @@ export const BURIED_ENCOUNTER_CLASSES = [
     image: './classes/demonblood.jpg', encounter: true,
     desc: '저주받은 혈족. 생명의 그릇은 작지만, 피는 마르지 않는다.',
     lines: { weapon: 'sword', offhand: 'claw' },
-    stats: { str: 12, dex: 8, int: 6, vit: 10 },
+    stats: { str: 13, dex: 9, int: 6, vit: 10 },
     traits: ['cursedblood', 'sanguine', 'toughness'],
     unlock: { enemyKey: 'graveWraith', kills: 8, label: '묘지 망령 8회 처치' },
   },
@@ -3982,7 +4030,7 @@ export const BURIED_ENCOUNTER_CLASSES = [
     image: './classes/elf.jpg', encounter: true,
     desc: '황혼의 요정. 몸은 유리처럼 여리지만, 날개가 칼날을 흘려낸다.',
     lines: { weapon: 'staff', offhand: 'relic' },
-    stats: { str: 4, dex: 10, int: 13, vit: 5 },
+    stats: { str: 4, dex: 11, int: 15, vit: 5 },
     traits: ['fairywing', 'wardstone', 'lightstep'],
     unlock: { enemyKey: 'twilightHusk', kills: 4, label: '황혼의 잔재 4회 처치' },
   },
@@ -4098,7 +4146,7 @@ export const BURIED_UNION_CLASSES = [
     desc: '봉인 감시단의 수호 기사. 빛과 강철로 벽이 된다.',
     lines: { weapon: 'mace', offhand: 'relic' },
     stats: { str: 10, dex: 5, int: 9, vit: 12 },
-    traits: ['faith', 'toughness', 'wardstone'],
+    traits: ['crusade', 'faith', 'wardstone'],
     unlock: { union: 'sealwatch', label: '봉인 감시단 평판 Lv.7' },
   },
   {
@@ -4107,7 +4155,7 @@ export const BURIED_UNION_CLASSES = [
     desc: '상조회가 거둔 망자의 목소리를 듣는 자. 병과 저주가 도구다.',
     lines: { weapon: 'staff', offhand: 'tome' },
     stats: { str: 4, dex: 6, int: 14, vit: 8 },
-    traits: ['pestilence', 'arcana', 'willpower'],
+    traits: ['necromancy', 'arcana', 'willpower'],
     unlock: { union: 'mourners', label: '침묵의 상조회 평판 Lv.7' },
   },
   {
@@ -4116,7 +4164,7 @@ export const BURIED_UNION_CLASSES = [
     desc: '암월상회의 해결사. 칼값은 선불이다.',
     lines: { weapon: 'sword', offhand: 'blade' },
     stats: { str: 12, dex: 11, int: 4, vit: 7 },
-    traits: ['swordmastery', 'precision', 'gale'],
+    traits: ['iaido', 'precision', 'swordmastery'],
     unlock: { union: 'darkmoon', label: '암월상회 평판 Lv.7' },
   },
   {
@@ -4124,8 +4172,8 @@ export const BURIED_UNION_CLASSES = [
     image: './classes/demonblood.jpg', unionOnly: true,
     desc: '무저갱 교단의 성전 기사. 어둠을 갑주처럼 두른다.',
     lines: { weapon: 'axe', offhand: 'tome' },
-    stats: { str: 12, dex: 4, int: 9, vit: 10 },
-    traits: ['cursedblood', 'sanguine', 'toughness'],
+    stats: { str: 13, dex: 5, int: 10, vit: 10 },
+    traits: ['blackplate', 'cursedblood', 'sanguine'],
     unlock: { union: 'abyssorder', label: '무저갱 교단 평판 Lv.7' },
   },
 ];
