@@ -26,7 +26,7 @@ import {
   BURIED_UNIONS, BURIED_UNION_CLASSES, getBuriedUnion, buriedUnionLevel, BURIED_UNION_LEVELS, BURIED_UNION_REWARDS,
   BURIED_SIGILS, BURIED_ZONES,
   BURIED_GHOSTS, BURIED_GHOST_RANKS, buriedGhostKit,
-  BURIED_CLASS_BASICS,
+  BURIED_CLASS_BASICS, describeBuriedFx,
 } from '../../data.js';
 import { BuriedBar, BURIED_DUST_ICON, BuriedTierLegend, BuriedLootModal } from './BuriedCommon.jsx';
 import BuriedManage from './BuriedManage.jsx';
@@ -322,7 +322,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
                         </div>
                         {owned ? (
                           <div className="text-[11px]" style={{ color: PALETTE.textDim }}>
-                            패시브: {Object.entries(kit.passive).map(([k, v]) => `${k} ${v > 0 ? '+' : ''}${v}`).join(' · ')}
+                            패시브: {describeBuriedFx(kit.passive)}
                             <br />액티브(쿨 {kit.active.cd}턴): {g.aDesc}
                           </div>
                         ) : (
