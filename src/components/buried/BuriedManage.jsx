@@ -15,6 +15,7 @@ import {
   buriedTraitIds, getBuriedTrait, buriedSkillLv, buriedSkillRank, BURIED_SKILL_RANKS,
   getBuriedRune, BURIED_RUNE_RARITIES, socketBuriedRune, buriedSkillUsesLeft, buriedBreakIn,
   buriedDamageFormula, buriedRunewordProgress,
+  BURIED_RUNE_FUSION, buriedFusionInfo, fuseBuriedRunes,
 } from '../../data.js';
 import { BuriedItemCard, BuriedItemSheet, BURIED_DUST_ICON } from './BuriedCommon.jsx';
 
@@ -22,6 +23,8 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose }) {
   const [sheet, setSheet] = useState(null); // { item, slot }
   const [runePick, setRunePick] = useState(null); // ᚱ 각인할 룬 index (1.123.0)
   const [openPanel, setOpenPanel] = useState(null); // 1.148.0 — 'formula' | 'runeword'
+  const [fuseSel, setFuseSel] = useState([]);       // 1.149.0 — 융합 재료로 고른 룬 index
+  const [fuseMsg, setFuseMsg] = useState(null);     // 융합 결과 메시지
 
   if (!char) return null;
   const cls = getBuriedClass(char.classId);
@@ -34,6 +37,26 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose }) {
     if (next !== char) onUpdate(next, 0);
     setRunePick(null);
     void text;
+  };
+
+  // ᚱ 룬 융합 (1.149.0) — 같은 등급 3개 → 상위 1개. 랜덤이므로 updater 밖에서 굴린다
+  const doFuse = () => {
+    const r = fuseBuriedRunes(char, fuseSel, dust);
+    if (r.char !== char) onUpdate(r.char, -r.dustCost);
+    setFuseSel([]);
+    setFuseMsg({ ok: r.ok, text: r.text });
+  };
+  const toggleFuse = (i) => {
+    setFuseMsg(null);
+    setFuseSel(prev => {
+      if (prev.includes(i)) return prev.filter(x => x !== i);
+      const rar = getBuriedRune(runes[i])?.rarity;
+      // 다른 등급을 고르면 선택을 새로 시작한다 (같은 등급끼리만 융합)
+      const same = prev.filter(x => getBuriedRune(runes[x])?.rarity === rar);
+      const need = BURIED_RUNE_FUSION[rar]?.need || 3;
+      if (!BURIED_RUNE_FUSION[rar]) return prev; // ★5는 더 위가 없다
+      return same.length >= need ? [...same.slice(1), i] : [...same, i];
+    });
   };
 
   // 장착 장비 분해 — 슬롯이 비면 그 스킬도 못 쓴다 (신중히)
@@ -122,14 +145,21 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose }) {
               한 장비의 소켓에 <b style={{ color: PALETTE.legendary }}>정해진 순서 그대로</b> 각인하면 완성된다. 각인은 영구 — 순서를 틀리면 되돌릴 수 없다.
               <br />★ = 장착 장비에 완성됨 · ✅ = 지금 주머니 룬으로 완성 가능
             </div>
-            {buriedRunewordProgress(char).map(rw => (
+            {(() => { const L = buriedRunewordProgress(char);
+              return <div className="text-[11px] tabular-nums" style={{ color: PALETTE.dawn }}>
+                총 {L.length}종 · ★ 완성 {L.filter(x => x.done).length} · ✅ 지금 가능 {L.filter(x => x.craftable && !x.done).length}
+              </div>; })()}
+            {[...buriedRunewordProgress(char)]
+              .sort((a, b) => (b.done - a.done) || (b.craftable - a.craftable) || (a.runes.length - b.runes.length))
+              .map(rw => (
               <div key={rw.id} className="py-1.5" style={{ borderTop: `1px solid ${PALETTE.panelBorder}` }}>
                 <div className="flex justify-between items-center gap-2">
                   <span className="text-[12px] font-bold" style={{ color: rw.done ? PALETTE.legendary : rw.craftable ? PALETTE.green : PALETTE.text }}>
                     {rw.done ? '★ ' : rw.craftable ? '✅ ' : ''}⟪{rw.name}⟫
                   </span>
-                  <span className="text-[11px] shrink-0" style={{ color: PALETTE.dawn }}>{rw.desc}</span>
+                  <span className="text-[11px] shrink-0" style={{ color: PALETTE.textDim }}>룬 {rw.runes.length}칸</span>
                 </div>
+                <div className="text-[11px] leading-relaxed" style={{ color: PALETTE.dawn }}>{rw.desc}</div>
                 <div className="text-[11px] mt-0.5" style={{ color: PALETTE.textDim }}>
                   {rw.runes.map((r, i) => (
                     <span key={i}>
@@ -221,10 +251,69 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose }) {
                       style={{ borderRadius: 'var(--r-chip, 8px)', background: `${rar.color}22`, border: `1px solid ${rar.color}66`, color: rar.color }}>
                       각인
                     </button>
+                    {/* 1.149.0 — 융합 재료 선택 (★5는 더 위가 없어 제외) */}
+                    {BURIED_RUNE_FUSION[r.rarity] && (
+                      <button onClick={() => toggleFuse(i)} className="ui-press shrink-0 px-2 py-1.5 text-[11px] font-bold"
+                        style={{ borderRadius: 'var(--r-chip, 8px)',
+                          background: fuseSel.includes(i) ? PALETTE.legendary : 'transparent',
+                          border: `1px solid ${PALETTE.legendary}66`,
+                          color: fuseSel.includes(i) ? '#1a0f14' : PALETTE.legendary }}>
+                        {fuseSel.includes(i) ? '✓ 재료' : '융합'}
+                      </button>
+                    )}
                   </div>
                 );
               })}
             </div>
+
+            {/* ᚱ 융합 패널 (1.149.0) — 같은 등급 3개 → 상위 1개. 실패해도 1개만 잃는다 */}
+            {(() => {
+              const selRar = fuseSel.length > 0 ? getBuriedRune(runes[fuseSel[0]])?.rarity : null;
+              const info = selRar ? buriedFusionInfo(char, selRar, dust) : null;
+              return (
+                <div className="mt-2 pt-2" style={{ borderTop: `1px solid ${PALETTE.panelBorder}` }}>
+                  <div className="text-[11px] leading-relaxed" style={{ color: PALETTE.textDim }}>
+                    ᚱ <b style={{ color: PALETTE.legendary }}>융합</b> — 같은 등급 3개로 한 등급 위의 룬 1개를 노린다.
+                    성공 시 재료 3개 소모 · <b style={{ color: PALETTE.accent }}>실패해도 1개만 소실</b> (2개는 남는다).
+                    ★★★★★ 전승급은 <b style={{ color: '#ff6b35' }}>드랍되지 않는다 — 융합이 유일한 길</b>.
+                  </div>
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {[1, 2, 3, 4].map(r => {
+                      const f = BURIED_RUNE_FUSION[r];
+                      const st = BURIED_RUNE_RARITIES[r];
+                      return (
+                        <span key={r} className="px-1.5 py-0.5 text-[11px] tabular-nums"
+                          style={{ borderRadius: 'var(--r-chip, 8px)', border: `1px solid ${st.color}44`, color: PALETTE.textDim }}>
+                          <span style={{ color: st.color }}>{st.stars}</span>×{f.need} → {f.rate}%{f.dust ? ` · ${BURIED_DUST_ICON}${f.dust}` : ''}
+                        </span>
+                      );
+                    })}
+                  </div>
+                  {info && (
+                    <button onClick={doFuse} disabled={fuseSel.length !== info.need || !info.enoughDust}
+                      className="ui-press w-full mt-1.5 py-2 text-[12px] font-bold"
+                      style={{ borderRadius: 'var(--r-btn, 13px)',
+                        background: fuseSel.length === info.need && info.enoughDust ? `${PALETTE.legendary}22` : PALETTE.panel,
+                        border: `1px solid ${PALETTE.legendary}66`, color: PALETTE.legendary,
+                        opacity: fuseSel.length === info.need && info.enoughDust ? 1 : 0.45 }}>
+                      {fuseSel.length !== info.need
+                        ? `${BURIED_RUNE_RARITIES[selRar].stars} 재료 ${fuseSel.length}/${info.need} 선택`
+                        : !info.enoughDust ? `${BURIED_DUST_ICON} 먼지 부족 (${info.dust} 필요)`
+                        : `융합 실행 — 성공률 ${info.rate}%${info.dust ? ` · ${BURIED_DUST_ICON}${info.dust}` : ''} → ${BURIED_RUNE_RARITIES[info.to].stars}`}
+                    </button>
+                  )}
+                  {fuseMsg && (
+                    <div className="mt-1.5 px-2.5 py-1.5 text-[11px] leading-relaxed"
+                      style={{ borderRadius: 'var(--r-chip, 8px)',
+                        background: fuseMsg.ok ? `${PALETTE.legendary}18` : `${PALETTE.accent}18`,
+                        border: `1px solid ${fuseMsg.ok ? PALETTE.legendary : PALETTE.accent}66`,
+                        color: fuseMsg.ok ? PALETTE.legendary : PALETTE.accent }}>
+                      {fuseMsg.text}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         )}
 

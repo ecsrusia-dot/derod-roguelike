@@ -57,6 +57,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
   const rf = buriedRaceFx(char); // 1.122.0 — 종족 fx
   const ufx = buriedUniqueFx(char); // 1.127.0 — 전설무구 선언형 fx
   const kf = buriedKeystoneFx(char); // 1.128.0 — ⚓ 쐐기석 (자가 디버프)
+  const rwFx = buriedRunewordCharFx(char); // 1.149.0 — ⟪룬워드⟫ 캐릭터 단위 효과
   // ===== 던전 고유 기믹 (1.114.0) — flood(침수): 도트 ×1.5·회복 -25% 양쪽 / dark(어둠): 적 수치 은폐
   const gimmickId = dungeon.gimmick?.id || null;
   // [da1] 심연의 눈 / 특성 「공허시」 — 어둠을 꿰뚫는다 (수치 은폐 무효)
@@ -147,9 +148,10 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     cds: {}, reflect: 0, reflectTurns: 0,
     immuneCrit: uniques.includes('u61'), // [u61] 휘황찬란 — 적 치명타 무효 (resolveBuriedAttack def-side)
     // [u21] 모리건 — 주고받는 피해 절반 / [u52] 결전 — 받는 피해 +15 / 🗝 인장 (1.143.0) — 개당 위력 +8·받피 -4
-    envDmgPct: (env.self.dmgPct || 0) + (uniques.includes('u21') ? -50 : 0) + (char.sigils || 0) * BURIED_SIGILS.dmgPct,
-    envTakenPct: (env.self.takenPct || 0) + (uniques.includes('u21') ? -50 : 0) + (uniques.includes('u52') ? 15 : 0) + (ufx.takenPct || 0) + (kf.takenPct || 0) + (cf.takenPct || 0) - (char.sigils || 0) * BURIED_SIGILS.takenPct, // cf.takenPct = 🕯 동행 괴이 패시브 (1.144.0)
-    envCritAdd: env.self.critAdd || 0, envMagPct: env.self.magPct || 0,
+    // 1.149.0 — rwFx = 완성된 ⟪룬워드⟫의 캐릭터 단위 효과 (dmgPct·takenPct·critAdd·statusUncap)
+    envDmgPct: (env.self.dmgPct || 0) + (uniques.includes('u21') ? -50 : 0) + (char.sigils || 0) * BURIED_SIGILS.dmgPct + (rwFx.dmgPct || 0),
+    envTakenPct: (env.self.takenPct || 0) + (uniques.includes('u21') ? -50 : 0) + (uniques.includes('u52') ? 15 : 0) + (ufx.takenPct || 0) + (kf.takenPct || 0) + (cf.takenPct || 0) - (char.sigils || 0) * BURIED_SIGILS.takenPct + (rwFx.takenPct || 0), // cf.takenPct = 🕯 동행 괴이 패시브 (1.144.0)
+    envCritAdd: (env.self.critAdd || 0) + (rwFx.critAdd || 0), envMagPct: env.self.magPct || 0,
     envDodgeAdd: env.self.dodgeAdd || 0,
   }));
   // [u25] 성스러운 유산 — 전 공격 스탯이 최고값을 따른다 (첫 렌더에서 1회 정규화)
@@ -340,7 +342,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
   // 특성 「역병」 — 내가 거는 상태이상 스택 +1
   const statusOpts = { chancePct: (env.self.statusChancePct || 0) + (uq('u57') ? 100 : 0) + (cf.statusChance || 0) + (pf.statusChance || 0) + (rf.statusChance || 0) + (ufx.statusChance || 0), extra: (env.self.statusExtra || 0) + (traits.includes('pestilence') ? 1 : 0),
     // 1.146.0 — 상한 해제: ⟪만개⟫ 룬워드 또는 「백화의 낙인」 (절대 상한 99)
-    uncap: !!((ufx.statusUncap || 0) || buriedRunewordCharFx(char).statusUncap) };
+    uncap: !!((ufx.statusUncap || 0) || rwFx.statusUncap) };
   const foeStatusOpts = { chancePct: (env.foe.statusChancePct || 0) - (cf.statusResist || 0) - (rf.statusResist || 0) - (ufx.statusResist || 0), extra: (uq('u113') ? 1 : 0) + (cs('sabnock') ? 1 : 0) };
 
   // ===== 전투 종료 =====
