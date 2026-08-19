@@ -29,6 +29,7 @@ import {
   BURIED_CLASS_BASICS, describeBuriedFx,
   buriedRivalRanking, BURIED_RIVAL_TUNING, BURIED_RIVALS, buriedRivalSnapshot,
   BURIED_STATS, BURIED_SKILLS,
+  BURIED_RANK_CLASSES, BURIED_SEASON_REWARDS, BURIED_RANK_MILESTONES,
 } from '../../data.js';
 import { BuriedBar, BURIED_DUST_ICON, BuriedTierLegend, BuriedLootModal } from './BuriedCommon.jsx';
 import BuriedManage from './BuriedManage.jsx';
@@ -73,6 +74,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
     ...BURIED_ENCOUNTER_CLASSES.filter(c => unlockedClasses.includes(c.id)),
     ...BURIED_DEPTH_CLASSES.filter(c => unlockedClasses.includes(c.id)),
     ...BURIED_UNION_CLASSES.filter(c => unlockedClasses.includes(c.id)), // 1.141.0 — 조직 전속 직업
+    ...BURIED_RANK_CLASSES.filter(c => unlockedClasses.includes(c.id)),  // 1.156.0 — 🏆 랭킹 마일스톤 직업
   ];
   const earnedDepthTraits = buriedEarnedDepthTraits(b.deepestByDungeon);
   const killsByEnemy = b.killsByEnemy || {};
@@ -445,7 +447,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
             <div className="text-[11px]" style={{ color: PALETTE.textDim }}>
               시체의 뼈대를 고른다 — 종족은 기본 스탯과 체질을 바꾼다.
             </div>
-            {BURIED_RACES.filter(r => !r.union || (b.unlockedRaces || []).includes(r.id)).map(r => {
+            {BURIED_RACES.filter(r => (!r.union && !r.rankGate) || (b.unlockedRaces || []).includes(r.id)).map(r => {
               const on = pickRace === r.id;
               return (
                 <button key={r.id} onClick={() => setPickRace(r.id)} className="ui-press w-full flex items-start gap-2.5 px-3 py-2 text-left"
@@ -464,12 +466,12 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
               );
             })}
             {/* 🏛 조직 전속 종족 — 미해금은 잠금 힌트 (1.141.0) */}
-            {BURIED_RACES.filter(r => r.union && !(b.unlockedRaces || []).includes(r.id)).length > 0 && (
+            {BURIED_RACES.filter(r => (r.union || r.rankGate) && !(b.unlockedRaces || []).includes(r.id)).length > 0 && (
               <div className="flex flex-wrap gap-1.5">
-                {BURIED_RACES.filter(r => r.union && !(b.unlockedRaces || []).includes(r.id)).map(r => (
+                {BURIED_RACES.filter(r => (r.union || r.rankGate) && !(b.unlockedRaces || []).includes(r.id)).map(r => (
                   <span key={r.id} className="px-2 py-1 text-[11px] flex items-center gap-1"
                     style={{ borderRadius: R.chip, border: `1px solid ${PALETTE.panelBorder}`, color: PALETTE.textDim, opacity: 0.75 }}>
-                    <Lock size={10} /> {r.icon} {r.name} — {getBuriedUnion(r.union)?.name} 평판 Lv.5
+                    <Lock size={10} /> {r.icon} {r.name} — {r.rankGate ? '🏆 시즌 결산 아무 던전 1위' : `${getBuriedUnion(r.union)?.name} 평판 Lv.5`}
                   </span>
                 ))}
               </div>
@@ -968,6 +970,28 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
                     style={{ borderRadius: 'var(--r-chip, 8px)', background: PALETTE.panel, border: `1px solid ${PALETTE.panelBorder}`, color: PALETTE.text }} />
                   <span className="text-[11px]" style={{ color: PALETTE.textDim }}>일 (1~90)</span>
                 </div>
+                {/* 🏆 결산 보상표 + 최초 달성 영구 보상 현황 (1.156.0) */}
+                <details className="mt-1.5">
+                  <summary className="text-[11px] cursor-pointer" style={{ color: PALETTE.dawn }}>🎁 결산 보상 보기 — 던전별 순위 보상 + 최초 달성 영구 보상</summary>
+                  <div className="mt-1 space-y-0.5">
+                    {BURIED_SEASON_REWARDS.map(rw => (
+                      <div key={rw.label} className="flex justify-between text-[11px] tabular-nums px-1" style={{ color: PALETTE.textDim }}>
+                        <span>{rw.label} <span style={{ color: PALETTE.panelBorder }}>(던전별)</span></span>
+                        <span style={{ color: PALETTE.text }}>🕯{rw.dust}{rw.shards > 0 ? ` · ☠${rw.shards}` : ''}</span>
+                      </div>
+                    ))}
+                    <div className="pt-1 mt-1 space-y-0.5" style={{ borderTop: `1px solid ${PALETTE.panelBorder}` }}>
+                      {BURIED_RANK_MILESTONES.map(m => {
+                        const got = (b.rankMilestones || []).includes(m.id);
+                        return (
+                          <div key={m.id} className="text-[11px] px-1 leading-relaxed" style={{ color: got ? PALETTE.legendary : PALETTE.textDim }}>
+                            {got ? '✅' : '◻'} <b>{m.name}</b> ({m.cond}) → {m.reward}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </details>
                 {(b.seasonHistory || []).length > 0 && (
                   <div className="mt-1.5 pt-1.5 space-y-0.5" style={{ borderTop: `1px solid ${PALETTE.panelBorder}` }}>
                     {(b.seasonHistory || []).slice(0, 3).map(h => (
