@@ -112,11 +112,12 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     barrier: hasBuriedCurse(char, 'alloces') || kf.noBarrier ? 0
       : Math.round(((d.barrier || 0) + (env.self.barrierAdd || 0) + (char.carryBarrier || 0) + (uniques.includes('u80') ? 30 : 0)) * (hasBuriedCurse(char, 'amon') ? 0.5 : 1)),
     noDodge: !!kf.noDodge, noCrit: !!kf.noCrit,
-    // [u107] 물리·기교 += 최대 HP 8% / [u111] 마법 += 보호막 30%
+    // 1.148.0 — [u107] 최대HP 8% / [u111] 보호막 30% 고정 가산은 buriedDerived로 이관 (정보창에도 보이도록).
+    //           여기서 다시 더하면 이중 계산이 되므로 절대 되살리지 말 것.
     // [u36] 비전 — 1.133.0 %화: researchPct(처치당 +0.5%) 배율. 구세이브 researchPower(고정치)는 그대로 가산 유지
-    atk: Math.round((d.atk + (uniques.includes('u107') ? Math.round(d.maxHp * 0.08) : 0) + (char.researchPower || 0)) * (1 + (char.researchPct || 0) / 100)),
-    fin: Math.round((d.fin + (uniques.includes('u107') ? Math.round(d.maxHp * 0.08) : 0) + (char.researchPower || 0)) * (1 + (char.researchPct || 0) / 100)),
-    mag: Math.round((d.mag + (uniques.includes('u111') ? Math.round((d.barrier || 0) * 0.3) : 0) + (char.researchPower || 0)) * (1 + (char.researchPct || 0) / 100)),
+    atk: Math.round((d.atk + (char.researchPower || 0)) * (1 + (char.researchPct || 0) / 100)),
+    fin: Math.round((d.fin + (char.researchPower || 0)) * (1 + (char.researchPct || 0) / 100)),
+    mag: Math.round((d.mag + (char.researchPower || 0)) * (1 + (char.researchPct || 0) / 100)),
     def: d.def, chase: d.chase || 0,
     crit: hasBuriedCurse(char, 'gaap') ? 0 : (uniques.includes('u52') ? 100 : d.crit + (uniques.includes('da1') ? 8 : 0)),
     critDmg: d.critDmg,
