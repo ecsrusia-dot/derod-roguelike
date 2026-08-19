@@ -1895,9 +1895,63 @@ export function rollBuriedShop(floor, classId, powerMult = 1) {
 }
 
 export const BURIED_POTION_HEAL_PCT = 45;
-export const BURIED_POTION_PRICE = 55; // 기준가 — 실판매가는 buriedPotionPrice(마물 레벨)
-export const buriedPotionPrice = (monLevel = 1) =>
-  Math.round(BURIED_POTION_PRICE * (1 + Math.max(0, (monLevel || 1) - 1) * 0.08));
+// 🈯 fx 키 → 한글 설명 (1.150.0, PM 지적: 사역각에 physPct+4 같은 영어 키가 그대로 노출됐다)
+// 괴이 패시브·액티브, 계약·특성 fx 등 **같은 어휘를 쓰는 모든 표시부가 공유**한다.
+// 새 fx 키를 추가하면 여기에도 한 줄 넣을 것 — 없으면 키 이름이 그대로 노출된다.
+export const BURIED_FX_LABELS = {
+  // 공격·치명
+  physPct:      { name: '물리·기교 공격력', unit: '%' },
+  magPct:       { name: '마법 공격력',      unit: '%' },
+  crit:         { name: '치명 확률',        unit: '%' },
+  critDmg:      { name: '치명 피해',        unit: '%' },
+  drainPct:     { name: '흡혈',             unit: '%', note: '준 피해의 이 비율만큼 회복' },
+  power:        { name: '위력',             unit: '%' },
+  // 방어·생존
+  hpPct:        { name: '최대 HP',          unit: '%' },
+  hp:           { name: '최대 HP',          unit: '' },
+  def:          { name: '방어력',           unit: '' },
+  takenPct:     { name: '받는 피해',        unit: '%', good: 'down' },
+  dodge:        { name: '회피율',           unit: '%' },
+  barrier:      { name: '보호막',           unit: '' },
+  barrierPct:   { name: '보호막',           unit: '%' },
+  healPct:      { name: '회복량',           unit: '%' },
+  // 자원·수급
+  sp:           { name: '최대 SP',          unit: '' },
+  startSpPct:   { name: '전투 시작 SP',     unit: '%p', note: '시작 SP 비율에 가산' },
+  spRegen:      { name: '턴당 SP 회복',     unit: '' },
+  goldPct:      { name: '골드 획득',        unit: '%' },
+  expPct:       { name: '경험치 획득',      unit: '%' },
+  dropLuck:     { name: '드랍 운',          unit: '', note: '좋은 등급이 나올 확률이 오른다' },
+  dustPct:      { name: '먼지 획득',        unit: '%' },
+  // 상태이상
+  statusChance: { name: '상태이상 적중',    unit: '%', note: '내가 거는 상태이상 확률' },
+  statusResist: { name: '상태이상 저항',    unit: '%' },
+  apply:        { name: '적에게 부여',      unit: '' },
+  self:         { name: '나에게 부여',      unit: '' },
+  // 기타
+  stepBonus:    { name: '성장 필요 걸음',   unit: '', note: '마물이 늦게 강해진다' },
+  dmgPct:       { name: '주는 피해',        unit: '%' },
+};
+
+// fx 뭉치 → 사람이 읽는 한 줄 (예: "물리·기교 공격력 +4% · 받는 피해 -6%")
+export function describeBuriedFx(fx, sep = ' · ') {
+  if (!fx) return '';
+  return Object.entries(fx).map(([k, v]) => {
+    const L = BURIED_FX_LABELS[k];
+    if (!L) return `${k} ${v}`;
+    if (typeof v !== 'number') return L.name;
+    return `${L.name} ${v > 0 ? '+' : ''}${v}${L.unit}`;
+  }).join(sep);
+}
+
+// 1.150.0 — 물약은 **살수록 비싸진다** (PM 지시). 깊이(마물 레벨) × 이번 런 누적 구매 수.
+// 누진은 1.12배 복리 — 3개째 ×1.25, 5개째 ×1.57, 8개째 ×2.21. 물약 무한 구매로 층을 버티는 걸 막는다.
+export const BURIED_POTION_PRICE = 55;        // 기준가
+export const BURIED_POTION_PRICE_STEP = 1.12; // 구매 1회당 가격 배율
+export const buriedPotionPrice = (monLevel = 1, bought = 0) =>
+  Math.round(BURIED_POTION_PRICE
+    * (1 + Math.max(0, (monLevel || 1) - 1) * 0.08)
+    * Math.pow(BURIED_POTION_PRICE_STEP, Math.max(0, bought || 0)));
 
 // =========================================================
 // 10. 전투 계산 — 순수 함수 (BuriedBattleScreen이 호출만 한다)

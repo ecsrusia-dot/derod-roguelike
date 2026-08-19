@@ -163,10 +163,10 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onLogEvent, on
     setNotice(raised ? `${entry.item.name} 구매 — 스킬이 Lv.${lv}이 되었다.` : `${entry.item.name}을(를) 샀다.`);
   };
 
-  const potionPrice = buriedPotionPrice(monLevel); // 1.117.0 — 깊이에 따라 가격 상승
+  const potionPrice = buriedPotionPrice(monLevel, char.potionsBought || 0); // 1.117.0 깊이 + 1.150.0 구매할수록 누진
   const buyPotion = () => {
     if (char.gold < potionPrice) return;
-    onUpdateChar({ ...char, gold: char.gold - potionPrice, potions: (char.potions || 0) + 1 }, 0);
+    onUpdateChar({ ...char, gold: char.gold - potionPrice, potions: (char.potions || 0) + 1, potionsBought: (char.potionsBought || 0) + 1 }, 0);
     setNotice('물약을 하나 챙겼다.');
   };
 
@@ -532,6 +532,9 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onLogEvent, on
                 opacity: char.gold >= potionPrice ? 1 : 0.5,
               }}>
               🧪 물약 구매 — 🪙{potionPrice} (전투 중 HP {BURIED_POTION_HEAL_PCT}% 회복)
+              {(char.potionsBought || 0) > 0 && (
+                <span style={{ color: PALETTE.textDim }}> · 이번 런 {char.potionsBought}개 구매 — 다음 🪙{buriedPotionPrice(monLevel, (char.potionsBought || 0) + 1)}</span>
+              )}
             </button>
             <button onClick={advance} className="ui-press w-full py-2.5 text-[12px]"
               style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panelLight, color: PALETTE.text, border: `1px solid ${PALETTE.panelBorder}` }}>
