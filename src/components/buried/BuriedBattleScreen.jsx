@@ -1293,6 +1293,14 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
             );
           })()}
 
+          {/* 🧿 보유 제령부 안내 (1.147.2) — 괴이가 아닌 적일 때도 부적이 유지 중임을 보여준다 */}
+          {!tameTarget && Object.entries(char.talismans || {}).some(([, n]) => n > 0) && (
+            <div className="col-span-2 px-1 text-[11px]" style={{ color: PALETTE.textDim }}>
+              🧿 보유 부적: {Object.entries(char.talismans).filter(([, n]) => n > 0)
+                .map(([r, n]) => `${BURIED_GHOST_RANKS[r]?.name}부 ×${n}`).join(' · ')} — 이 적은 괴이가 아니라 제령할 수 없다
+            </div>
+          )}
+
           {/* 장착 장비 6칸 = 스킬 6개 (스킬 레벨 반영) */}
           {equipped.map(({ slot, item, skill }) => {
             const lv = Math.min(8, buriedSkillLv(char, skill.id) + (uq('u71') ? 1 : 0)); // [u71] 후손
