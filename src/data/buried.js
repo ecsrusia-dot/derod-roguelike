@@ -4627,7 +4627,11 @@ export function withSeededRandom(seed, fn) {
 // 같은 (더미, 런, 세대)는 언제 열어도 같은 스냅샷 — 저장 0바이트.
 export function buriedRivalSnapshot(rival, runNo, floor, gen = 0) {
   return withSeededRandom((rival.seed ^ Math.imul(runNo, 2654435761) ^ (gen * 97)) >>> 0, () => {
-    const ch = createBuriedChar(rival.classId, { items: [], gold: 0 }, rival.dungeonId, [], {}, Math.max(1, floor));
+    // 1.155.0 — 더미도 종족·출신을 가진다 (조직 전속 종족은 제외 — 해금 자산이므로)
+    const races = BURIED_RACES.filter(r => !r.union);
+    const raceId = races[Math.floor(Math.random() * races.length)]?.id || null;
+    const originId = BURIED_ORIGINS[Math.floor(Math.random() * BURIED_ORIGINS.length)]?.id || null;
+    const ch = createBuriedChar(rival.classId, { items: [], gold: 0 }, rival.dungeonId, [], {}, Math.max(1, floor), [], raceId, [], originId);
     // 그 층 파리티 등급으로 장비 6슬롯을 다시 굴린다 (낡은 시작 장비 → 실제 등반 장비)
     for (const slot of BURIED_SLOT_IDS) {
       const it = rollBuriedItem({ slot, classId: rival.classId, floor: buriedMonsterLevel(ch), luck: 2, powerMult: buriedLootPower(ch) });
@@ -4643,6 +4647,9 @@ export function buriedRivalSnapshot(rival, runNo, floor, gen = 0) {
     // 사망 원인 — 그 층에서 실제로 나올 법한 적 (100층 배수면 수문장이 잡는다)
     let killer = '무덤의 어둠';
     try { killer = buildBuriedRoomEnemy(ch, Math.random() < 0.3 ? 'elite' : 'battle')?.name || killer; } catch { /* noop */ }
+    // 스킬 사용 기록을 char에 구워 정보창(주 사용 스킬)에서 그대로 읽게 한다
+    const skillUsage = {};
+    for (const t of topSkills) skillUsage[t.id] = t.pct;
     return {
       name: rival.name, classId: rival.classId, dungeonId: rival.dungeonId,
       floor, runNo, monLv: buriedMonsterLevel(ch),
@@ -4651,6 +4658,8 @@ export function buriedRivalSnapshot(rival, runNo, floor, gen = 0) {
       equipped: BURIED_SLOT_IDS.map(sl => ch.equipped[sl]).filter(Boolean),
       topSkills: topSkills.slice(0, 4),
       killer,
+      // 1.155.0 — 실제 정보창(BuriedManage) 열람용 완전한 캐릭터 (룬 주머니는 비운다 — 열람 전용)
+      char: { ...ch, lv: Math.max(1, Math.round(buriedMonsterLevel(ch) * 0.6)), runes: [], skillUsage, skillUsagePct: true },
     };
   });
 }
