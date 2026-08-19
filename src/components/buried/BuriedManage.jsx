@@ -14,12 +14,13 @@ import {
   buriedDerived, buriedDustValue, getBuriedClass,
   buriedTraitIds, getBuriedTrait, buriedSkillLv, buriedSkillRank, BURIED_SKILL_RANKS,
   getBuriedRune, BURIED_RUNE_RARITIES, socketBuriedRune, buriedSkillUsesLeft, buriedBreakIn,
-  buriedDamageFormula, buriedRunewordProgress,
+  buriedDamageFormula, buriedRunewordProgress, getBuriedRace, getBuriedOrigin,
   BURIED_RUNE_FUSION, buriedFusionInfo, fuseBuriedRunes,
 } from '../../data.js';
 import { BuriedItemCard, BuriedItemSheet, BURIED_DUST_ICON } from './BuriedCommon.jsx';
 
-export default function BuriedManage({ char, dust = 0, onUpdate, onClose }) {
+// 1.155.0 — readOnly: 랭킹 상세 열람 모드 (분해·각인·융합 숨김) / subtitle: 헤더 보조 문구 교체
+export default function BuriedManage({ char, dust = 0, onUpdate, onClose, readOnly = false, subtitle = null }) {
   const [sheet, setSheet] = useState(null); // { item, slot }
   const [runePick, setRunePick] = useState(null); // ᚱ 각인할 룬 index (1.123.0)
   const [openPanel, setOpenPanel] = useState(null); // 1.148.0 — 'formula' | 'runeword'
@@ -61,6 +62,7 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose }) {
 
   // 장착 장비 분해 — 슬롯이 비면 그 스킬도 못 쓴다 (신중히)
   const dismantle = (item) => {
+    if (readOnly) return;
     const gain = buriedDustValue(item);
     const slot = BURIED_SLOT_IDS.find(s => char.equipped?.[s]?.id === item.id);
     const next = { ...char, equipped: { ...char.equipped, [slot]: null } };
@@ -76,9 +78,18 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose }) {
         <div>
           <div className="text-[13px] font-bold" style={{ color: cls?.color || PALETTE.text }}>
             {cls?.name} <span style={{ color: PALETTE.textDim }}>Lv.{char.lv}</span>
+            {/* 1.155.0 — 종족·출신 표기 (PM 지시) */}
+            {(() => {
+              const race = getBuriedRace(char.raceId), origin = getBuriedOrigin(char.originId);
+              return (race || origin) ? (
+                <span className="text-[11px] font-normal ml-1.5" style={{ color: PALETTE.dawn }}>
+                  {race ? `${race.icon} ${race.name}` : ''}{race && origin ? ' · ' : ''}{origin ? `${origin.icon || '🌾'} ${origin.name}` : ''}
+                </span>
+              ) : null;
+            })()}
           </div>
           <div className="text-[11px] tabular-nums" style={{ color: PALETTE.textDim }}>
-            🪙 {char.gold} · {BURIED_DUST_ICON} {dust}
+            {subtitle != null ? subtitle : <>🪙 {char.gold} · {BURIED_DUST_ICON} {dust}</>}
           </div>
         </div>
         <button onClick={onClose} className="ui-press p-1.5" style={{ color: PALETTE.textDim }}><X size={18} /></button>
@@ -194,6 +205,20 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose }) {
           </div>
         </div>
 
+        {/* 주 사용 스킬 (1.155.0) — 전투에서 실제로 쓴 스킬 집계. 랭킹 열람 시 공략 정보가 된다 */}
+        {char.skillUsage && Object.keys(char.skillUsage).length > 0 && (
+          <div className="px-3 py-2.5" style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panel, border: `1px solid ${PALETTE.panelBorder}` }}>
+            <div className="text-[11px] tracking-[0.2em] mb-1.5" style={{ color: PALETTE.dawn }}>주 사용 스킬</div>
+            <div className="flex flex-wrap gap-1">
+              {Object.entries(char.skillUsage).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([id, n]) => (
+                <span key={id} className="px-2 py-0.5 text-[11px]" style={{ borderRadius: 'var(--r-chip, 8px)', background: PALETTE.panelLight, border: `1px solid ${PALETTE.dawn}44`, color: PALETTE.text }}>
+                  {BURIED_SKILLS[id]?.name || id} <b className="tabular-nums" style={{ color: PALETTE.dawn }}>{char.skillUsagePct ? `${n}%` : `${n}회`}</b>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* 6슬롯 */}
         <div>
           <div className="text-[11px] tracking-[0.2em] mb-1.5" style={{ color: PALETTE.dawn }}>
@@ -230,7 +255,7 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose }) {
         </div>
 
         {/* ᚱ 룬 주머니 (1.123.0) — 각인은 영구, 장비를 버리면 소멸 */}
-        {runes.length > 0 && (
+        {!readOnly && runes.length > 0 && (
           <div className="px-3 py-2.5" style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panel, border: `1px solid ${PALETTE.legendary}44` }}>
             <div className="text-[11px] tracking-[0.2em] mb-1.5" style={{ color: PALETTE.legendary }}>
               ᚱ 룬 주머니 {runes.length}개 — 장비 스킬에 영구 각인 (장비당 1칸 · 제거 불가)
@@ -339,7 +364,7 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose }) {
         <BuriedItemSheet
           char={char}
           item={sheet.item}
-          onDismantle={() => dismantle(sheet.item)}
+          onDismantle={readOnly ? null : () => dismantle(sheet.item)}
           onClose={() => setSheet(null)}
         />
       )}

@@ -35,7 +35,7 @@ import BuriedManage from './BuriedManage.jsx';
 
 const R = { chip: 'var(--r-chip, 8px)', btn: 'var(--r-btn, 13px)', panel: 'var(--r-panel, 18px)' };
 
-export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateChar, onRetire, onForge, onBuyContract, onBuyPart, onDetachParts, onResetAll, onResetRivals, onSetCompanion, forgeNotice, onBack }) {
+export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateChar, onRetire, onForge, onBuyContract, onBuyPart, onDetachParts, onResetAll, onResetRivals, onSetSeasonDays, onSetCompanion, forgeNotice, onBack }) {
   const b = meta?.buried || {};
   const char = b.char || null;
   const clears = (b.clears && typeof b.clears === 'object') ? b.clears : {};
@@ -938,6 +938,49 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
         {/* ⚔ 등반 랭킹 (1.153.0 / 1.154.0 런 단위 개편) — 행 = 등반 1회. 클릭하면 죽기 직전 상태를 연다 */}
         <div>
           <SectionTitle>🏆 등반 랭킹 — 라이벌 {BURIED_RIVAL_TUNING.count}인 (런 단위)</SectionTitle>
+          {/* 🏆 시즌 (1.155.0) — 기간은 PM(사용자)이 일 단위로 설정. 만료 시 자동 결산·새 시즌 개막 */}
+          {(() => {
+            const sz = b.season || { no: 1, startedAt: Date.now(), lengthDays: 7 };
+            const endAt = sz.startedAt + sz.lengthDays * 86400000;
+            const leftMs = Math.max(0, endAt - Date.now());
+            const leftD = Math.floor(leftMs / 86400000), leftH = Math.floor((leftMs % 86400000) / 3600000);
+            return (
+              <div className="px-3 py-2 mb-1.5" style={{ borderRadius: R.panel, background: `${PALETTE.legendary}0e`, border: `1px solid ${PALETTE.legendary}44` }}>
+                <div className="flex justify-between items-center text-[12px]">
+                  <span className="font-bold" style={{ color: PALETTE.legendary }}>시즌 {sz.no}</span>
+                  <span className="tabular-nums" style={{ color: leftD < 1 ? PALETTE.accent : PALETTE.text }}>
+                    종료까지 {leftD > 0 ? `${leftD}일 ${leftH}시간` : `${leftH}시간`}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1 mt-1.5">
+                  <span className="text-[11px] mr-1" style={{ color: PALETTE.textDim }}>시즌 기간</span>
+                  {[3, 7, 14, 30].map(d => (
+                    <button key={d} onClick={() => onSetSeasonDays?.(d)} className="ui-press px-2 py-0.5 text-[11px] tabular-nums"
+                      style={{ borderRadius: 'var(--r-chip, 8px)', background: sz.lengthDays === d ? PALETTE.legendary : PALETTE.panel,
+                        border: `1px solid ${sz.lengthDays === d ? PALETTE.legendary : PALETTE.panelBorder}`,
+                        color: sz.lengthDays === d ? '#1a0f14' : PALETTE.textDim }}>
+                      {d}일
+                    </button>
+                  ))}
+                  <input type="number" min="1" max="90" defaultValue={sz.lengthDays} key={sz.lengthDays}
+                    onBlur={(e) => { const v = parseInt(e.target.value, 10); if (v >= 1 && v <= 90 && v !== sz.lengthDays) onSetSeasonDays?.(v); }}
+                    className="w-12 px-1 py-0.5 text-[11px] text-center tabular-nums"
+                    style={{ borderRadius: 'var(--r-chip, 8px)', background: PALETTE.panel, border: `1px solid ${PALETTE.panelBorder}`, color: PALETTE.text }} />
+                  <span className="text-[11px]" style={{ color: PALETTE.textDim }}>일 (1~90)</span>
+                </div>
+                {(b.seasonHistory || []).length > 0 && (
+                  <div className="mt-1.5 pt-1.5 space-y-0.5" style={{ borderTop: `1px solid ${PALETTE.panelBorder}` }}>
+                    {(b.seasonHistory || []).slice(0, 3).map(h => (
+                      <div key={h.no} className="text-[11px] tabular-nums" style={{ color: PALETTE.textDim }}>
+                        시즌 {h.no} — 챔피언 <span style={{ color: PALETTE.legendary }}>{h.champion?.name || '?'}</span> {h.champion?.floor || '?'}층
+                        {h.myBest ? ` · 내 최고 ${h.myBest.rank}위` : ''}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
           <div className="text-[11px] leading-relaxed mb-1.5" style={{ color: PALETTE.textDim }}>
             행 하나 = 등반 1회. 한 명이 순위를 독식할 수도 있다. <b style={{ color: PALETTE.dawn }}>행을 누르면 죽기 직전
             상태창·장비·주 사용 스킬</b>을 훔쳐볼 수 있다 — 공략에 쓰시라.
@@ -971,10 +1014,13 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
                       const openDetail = () => {
                         if (r.live) return; // 진행 중인 내 런은 상세 없음 (아직 안 죽었다)
                         if (r.isMe && r.entry) {
-                          setRankDetail({ kind: 'me', snap: r.entry });
+                          setRankDetail({ kind: 'me', snap: r.entry, char: r.entry.charSnap || null });
                         } else if (r.rivalId) {
                           const rv = BURIED_RIVALS.find(x => x.id === r.rivalId);
-                          if (rv) setRankDetail({ kind: 'rival', snap: buriedRivalSnapshot(rv, r.runNo, r.floor, b.rivalGen || 0) });
+                          if (rv) {
+                            const snap = buriedRivalSnapshot(rv, r.runNo, r.floor, b.rivalGen || 0);
+                            setRankDetail({ kind: 'rival', snap, char: snap.char || null });
+                          }
                         }
                       };
                       return (
@@ -1003,7 +1049,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
           }} className="ui-press w-full mt-2 py-2 text-[11px]"
             style={{ borderRadius: R.btn, background: rivalResetAsk ? `${PALETTE.accent}22` : PALETTE.panel,
               border: `1px solid ${rivalResetAsk ? PALETTE.accent : PALETTE.panelBorder}`, color: rivalResetAsk ? PALETTE.accent : PALETTE.textDim }}>
-            {rivalResetAsk ? '⚠ 한 번 더 누르면 라이벌 100인의 이력이 전부 초기화된다 (내 기록·귀속 스탯은 유지)' : '⚔ 라이벌 세계 초기화 — 랭킹이 포화됐을 때 새 세대로'}
+            {rivalResetAsk ? '⚠ 한 번 더 누르면 시즌이 조기 종료된다 — 라이벌 이력·시즌 랭킹 초기화 (귀속 스탯 유지)' : '🏆 시즌 조기 종료 — 랭킹이 포화됐을 때 새 시즌으로'}
           </button>
         </div>
 
@@ -1064,8 +1110,18 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
       {view === 'lab' && renderLab()}
       {view === 'records' && renderRecords()}
 
-      {/* ⚔ 랭킹 상세 (1.154.0) — 죽기 직전 상태창·장비·주 사용 스킬. 더미는 시드 재구성, 나는 실제 기록 */}
-      {rankDetail && (() => {
+      {/* ⚔ 랭킹 상세 (1.155.0) — **등반 중 보는 실제 정보창(BuriedManage)** 그대로 열람한다 (PM 지시).
+          더미는 시드 재구성 char, 내 기록은 사망 순간 charSnap. 구 기록(charSnap 없음)만 간이 표로 폴백 */}
+      {rankDetail && rankDetail.char && (() => {
+        const sn = rankDetail.snap;
+        const isMe = rankDetail.kind === 'me';
+        const sub = `${isMe ? '★ 나' : `등반자 「${sn.name}」`} — ${sn.floor}층에서 잠들다 · 사인: ${sn.killer || sn.cause || '무덤의 어둠'}${sn.at ? ` · ${new Date(sn.at).toLocaleDateString()}` : ''}`;
+        return (
+          <BuriedManage char={rankDetail.char} dust={0} readOnly subtitle={sub}
+            onUpdate={() => {}} onClose={() => setRankDetail(null)} />
+        );
+      })()}
+      {rankDetail && !rankDetail.char && (() => {
         const sn = rankDetail.snap;
         const cls = getBuriedClass(sn.classId);
         const isMe = rankDetail.kind === 'me';

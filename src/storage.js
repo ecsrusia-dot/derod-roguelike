@@ -1480,6 +1480,8 @@ const EMPTY_BURIED = {
   rivalStatBonus: {},// 1.154.0~ 난입 승패로 귀속된 계정 영구 스탯 (statId → n, 음수 가능 — 다음 등반에 합산)
   rivalWins: {},    // 1.154.0~ 더미가 나를 이기고 빼앗아간 포인트 (rivalId → n) — 그만큼 강해져 돌아온다
   runLog: [],       // 1.154.0~ 내 등반(런) 기록 — 사망 시점 스냅샷 (랭킹·상세 열람용, 던전별 상위 12 유지)
+  season: null,     // 1.155.0~ 🏆 랭킹 시즌 { no, startedAt, lengthDays } — null이면 첫 접근 때 시즌 1 개막
+  seasonHistory: [],// 1.155.0~ 지난 시즌 결산 [{ no, endedAt, days, champion:{name,floor,dungeonId}, myBest:{floor,rank} }]
 };
 // 1.131.1 — 무덤의 유산 전체 초기화 (PM 요청: 업데이트를 처음부터 온전히 체험).
 // meta.buried만 백지화 — 본편·레이드·HOF 등 다른 메타는 건드리지 않는다.
@@ -1515,6 +1517,48 @@ export function getBuried(meta) {
     rivalStatBonus: (b.rivalStatBonus && typeof b.rivalStatBonus === 'object') ? b.rivalStatBonus : {},
     rivalWins: (b.rivalWins && typeof b.rivalWins === 'object') ? b.rivalWins : {},
     runLog: Array.isArray(b.runLog) ? b.runLog : [],
+    season: (b.season && typeof b.season === 'object') ? b.season : null,
+    seasonHistory: Array.isArray(b.seasonHistory) ? b.seasonHistory : [],
+  };
+}
+
+// 1.155.0 — 🏆 시즌 기간 변경 (일 단위, PM 설정 가능). 현재 시즌의 만료 시점에 즉시 반영된다
+export function setBuriedSeasonDays(meta, days) {
+  const b = getBuried(meta);
+  const d = Math.max(1, Math.min(90, Math.round(days || 7)));
+  const season = b.season ? { ...b.season, lengthDays: d } : { no: 1, startedAt: Date.now(), lengthDays: d };
+  return { ...meta, buried: { ...b, season } };
+}
+
+// 1.155.0 — 🏆 시즌 확인·정산. 시즌이 없으면 개막하고, 만료됐으면 결산(챔피언·내 최고 기록)을
+// history에 남긴 뒤 라이벌 세계를 새 세대로 넘긴다 (rivalGen+1 · 시계 0 · 뺏긴 포인트·내 런 기록 리셋).
+// summary는 호출부(App)가 결산 공지·순위 계산에 쓴다 — champion 계산은 데이터 계층이 못 하므로 인자로 받는다.
+export function checkBuriedSeason(meta, now = Date.now(), summaryBuilder = null) {
+  const b = getBuried(meta);
+  if (!b.season) {
+    return { meta: { ...meta, buried: { ...b, season: { no: 1, startedAt: now, lengthDays: 7 } } }, rolled: false, opened: true };
+  }
+  const endAt = b.season.startedAt + b.season.lengthDays * 86400000;
+  if (now < endAt) return { meta, rolled: false, opened: false };
+  const summary = summaryBuilder ? summaryBuilder(b) : null;
+  const entry = {
+    no: b.season.no, endedAt: now, days: b.season.lengthDays,
+    champion: summary?.champion || null, myBest: summary?.myBest || null,
+  };
+  return {
+    meta: {
+      ...meta,
+      buried: {
+        ...b,
+        season: { no: b.season.no + 1, startedAt: now, lengthDays: b.season.lengthDays },
+        seasonHistory: [entry, ...b.seasonHistory].slice(0, 8),
+        rivalGen: (b.rivalGen || 0) + 1,
+        rivalTicks: 0,
+        rivalWins: {},
+        runLog: [],
+      },
+    },
+    rolled: true, opened: false, entry,
   };
 }
 
@@ -1522,7 +1566,11 @@ export function getBuried(meta) {
 // 내 자산(runLog·귀속 스탯)은 유지하고 더미 쪽(시계·이력·뺏긴 포인트)만 백지화한다.
 export function resetBuriedRivals(meta) {
   const b = getBuried(meta);
-  return { ...meta, buried: { ...b, rivalGen: (b.rivalGen || 0) + 1, rivalTicks: 0, rivalWins: {} } };
+  // 1.155.0 — 시즌 조기 종료로 통합: 다음 시즌 개막 + 내 시즌 런 기록도 함께 리셋 (귀속 스탯은 유지)
+  const season = b.season
+    ? { no: b.season.no + 1, startedAt: Date.now(), lengthDays: b.season.lengthDays }
+    : { no: 1, startedAt: Date.now(), lengthDays: 7 };
+  return { ...meta, buried: { ...b, rivalGen: (b.rivalGen || 0) + 1, rivalTicks: 0, rivalWins: {}, runLog: [], season } };
 }
 
 // 1.154.0 — 난입 승패의 계정 귀속 스탯 (음수 가능 — 다음 등반 시작 스탯에 합산)
