@@ -519,8 +519,9 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
           res.total = Math.round(res.total * mult); res.chase = Math.round(res.chase * mult);
         }
         // [da2] 어둠에 벼린 칼 ×2 / 특성 「공허시」 ×1.5 — 매 전투 첫 공격
-        if ((uq('da2') || traits.includes('voidsight')) && firstStrikeRef.current) {
-          const fsMult = (uq('da2') ? 2 : 1) * (traits.includes('voidsight') ? 1.5 : 1);
+        // 1.152.0 — 「거합」(떠돌이 사무라이 전용) 첫 공격 ×2 합류
+        if ((uq('da2') || traits.includes('voidsight') || traits.includes('iaido')) && firstStrikeRef.current) {
+          const fsMult = (uq('da2') ? 2 : 1) * (traits.includes('voidsight') ? 1.5 : 1) * (traits.includes('iaido') ? 2 : 1);
           res.total = Math.round(res.total * fsMult); res.chase = Math.round(res.chase * fsMult);
           firstStrikeRef.current = false;
           pushLog(`어둠 속의 일격 — 첫 공격 피해 ×${fsMult}!`, PALETTE.legendary);
