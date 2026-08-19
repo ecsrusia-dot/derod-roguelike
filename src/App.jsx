@@ -170,13 +170,13 @@ import {
   buriedEarnedDepthTraits,
   checkBuriedDepthClassUnlock,
   BURIED_UNION_REP_GAIN, getBuriedUnion,
-  BURIED_SIGILS, rollBuriedUniqueItem, buriedMonsterLevel, buriedLootPower,
+  BURIED_SIGILS, rollBuriedUniqueItem, buriedMonsterLevel, buriedLootPower, buriedDerived,
   BURIED_GHOST_RANKS, getBuriedGhost, rollBuriedTalisman,
-  buriedRivalNews, buriedRivalStatGain,
+  buriedRivalNews, buriedRivalStatGain, BURIED_STATS,
 } from './data.js';
 import { getKstDateKey } from './utils/dailyChallenge.js';
 import { simulateBestEndlessRun } from './utils/endlessSkipSim.js';
-import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, applyEngravingSlot, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear, dismantleRaidItem, dismantleRaidJunk, enhanceRaidItem, claimRaidWeekly, addRaidResources, spendRaidResourcesForItem, resolveRaidSecret, toggleRaidFormation, appendAutoRunLog, getGambleUsed, useGambleEntry, addTwilightCoins, addFateShards, redeemFateShards, buyGambleShopItem, addClassTitle, equipClassTitle, saveHofPatterns, hofLevelUpChar, recordHofClear, recordMastersClearByClass, updateBestRunTime, getBuried, saveBuriedChar, startBuriedChar, recordBuriedDeath, resetBuried, recordBuriedClear, addBuriedDust, craftBuriedForgeItem, trackBuriedKill, buyBuriedContract, addBuriedShards, buyBuriedPart, detachBuriedParts, logBuriedEvent, addBuriedUnionRep, tameBuriedGhost, setBuriedCompanion } from './storage.js';
+import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, applyEngravingSlot, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear, dismantleRaidItem, dismantleRaidJunk, enhanceRaidItem, claimRaidWeekly, addRaidResources, spendRaidResourcesForItem, resolveRaidSecret, toggleRaidFormation, appendAutoRunLog, getGambleUsed, useGambleEntry, addTwilightCoins, addFateShards, redeemFateShards, buyGambleShopItem, addClassTitle, equipClassTitle, saveHofPatterns, hofLevelUpChar, recordHofClear, recordMastersClearByClass, updateBestRunTime, getBuried, saveBuriedChar, startBuriedChar, recordBuriedDeath, resetBuried, recordBuriedClear, addBuriedDust, craftBuriedForgeItem, trackBuriedKill, buyBuriedContract, addBuriedShards, buyBuriedPart, detachBuriedParts, logBuriedEvent, addBuriedUnionRep, tameBuriedGhost, setBuriedCompanion, resetBuriedRivals, addBuriedRivalStat, addBuriedRivalWin } from './storage.js';
 
 
 
@@ -369,7 +369,7 @@ export default function App() {
     const sameRun = b0.char && char && b0.char.startedAt === char.startedAt;
     const tickGain = sameRun ? Math.max(0, (char.steps || 0) - (b0.char.steps || 0)) : 0;
     if (tickGain > 0 && !buriedForgeNotice) {
-      const news = buriedRivalNews(b0.rivalTicks || 0, (b0.rivalTicks || 0) + tickGain, 1);
+      const news = buriedRivalNews(b0.rivalTicks || 0, (b0.rivalTicks || 0) + tickGain, 1, b0.rivalGen || 0);
       if (news.length > 0) {
         setBuriedForgeNotice(`🏔 등반 소식 — 「${news[0].name}」이(가) ${getBuriedDungeon(news[0].dungeonId)?.name} ${news[0].floor}층을 돌파했다!`);
       }
@@ -409,6 +409,10 @@ export default function App() {
       const char = createBuriedChar(classId, { items: [], gold: b.legacyGold }, dungeonId, contracts, aggregateBuriedParts(b.parts), startFloor, buriedEarnedDepthTraits(b.deepestByDungeon), raceId, keystones, originId);
       if (!char) return prev;
       char.sigils = (b.gateSigils || []).length; // 🗝 수문장의 인장 (1.143.0) — 생성 시 계정 인장 수를 굽는다
+      // ⚔ 난입 귀속 스탯 (1.154.0) — 승패로 쌓인 계정 보너스를 다음 등반에 합산 (음수 가능, 최소 1)
+      for (const [k, v] of Object.entries(b.rivalStatBonus || {})) {
+        if (v) char.stats[k] = Math.max(1, (char.stats[k] || 0) + v);
+      }
       // 🕯 괴이 사역 (1.144.0) — 제령부는 런 한정(빈손 시작), 소장 목록·동행은 생성 시 굽는다
       char.talismans = {};
       char.ownedGhosts = Object.keys(b.ghosts || {});
@@ -502,11 +506,29 @@ export default function App() {
     setBuriedForgeNotice(`👑 ${dg?.name} 정복!${nextDungeonId ? ` 다음 던전이 열렸다.` : ''}${advanceClassId ? ` 전직 「${getBuriedClass(advanceClassId)?.name}」 해금.` : ''} 무덤은 더 깊이 이어진다…`);
   };
 
+  // 1.154.0 — 등반(런) 기록 스냅샷: 죽기 직전 상태창·장비·스킬 사용 기록을 랭킹 상세용으로 남긴다
+  const buildBuriedRunEntry = (char, cause) => {
+    if (!char) return null;
+    const d = buriedDerived(char);
+    return {
+      at: Date.now(), dungeonId: char.dungeonId || 'labyrinth', floor: char.floor || 1,
+      classId: char.classId, lv: char.lv || 1, monLv: buriedMonsterLevel(char),
+      stats: { ...char.stats },
+      derived: { maxHp: d.maxHp, atk: d.atk, fin: d.fin, mag: d.mag, def: d.def, crit: d.crit, dodge: d.dodge, barrier: d.barrier || 0 },
+      equipped: ['weapon', 'offhand', 'helm', 'armor', 'acc1', 'acc2']
+        .map(sl => char.equipped?.[sl]).filter(Boolean)
+        .map(it => ({ slot: it.slot, name: it.name, tier: it.tier, skillId: it.skillId, unique: it.unique || null, mod: it.mod || null, runes: it.runes || (it.rune ? [it.rune] : []) })),
+      skillUsage: { ...(char.skillUsage || {}) },
+      cause: cause || '무덤의 어둠',
+    };
+  };
+
   // 사망 — 1.117.0: 장비 계승 폐지. 장착 장비 전부 자동 분해 → 먼지 정산 + 골드 30% 계승
-  const handleBuriedDeath = (char) => {
+  const handleBuriedDeath = (char, cause = null) => {
     const settle = buriedDeathSettlement(char);
+    const entry = buildBuriedRunEntry(char, cause);
     setMeta(prev => {
-      const next = recordBuriedDeath(prev, settle);
+      const next = recordBuriedDeath(prev, settle, entry);
       saveMeta(next);
       return next;
     });
@@ -541,7 +563,21 @@ export default function App() {
     }
     if (!res?.win) {
       if (res?.dustGain) setMeta(prev => { const next = addBuriedDust(prev, res.dustGain); saveMeta(next); return next; });
-      handleBuriedDeath(char);
+      // ⚔ 난입 패배 (1.154.0) — 상대가 내 능력치를 빼앗아간다. 계정 귀속이라 다음 등반부터 차감 (음수 가능),
+      // 그 더미는 뺏은 포인트만큼 실제로 강해져 돌아온다 (rivalWins → buildBuriedRivalEnemy 보정)
+      if (buriedEnemy?.rival) {
+        const rv = buriedEnemy.rival;
+        const loss = buriedRivalStatGain(char);
+        const stolen = BURIED_STATS[Math.floor(Math.random() * BURIED_STATS.length)];
+        setMeta(prev => {
+          let next = addBuriedRivalStat(prev, stolen.id, -loss);
+          next = addBuriedRivalWin(next, rv.id, loss);
+          saveMeta(next);
+          return next;
+        });
+        setBuriedForgeNotice(`⚔ 등반자 「${rv.name}」에게 패배 — ${stolen.name} ${loss}을 빼앗겼다. 다음 등반부터 적용되며, 그자는 더 강해져 돌아온다.`);
+      }
+      handleBuriedDeath(char, buriedEnemy?.rival ? `등반자 「${buriedEnemy.rival.name}」` : buriedEnemy?.name);
       return;
     }
 
@@ -555,7 +591,8 @@ export default function App() {
       pendingStatuses: null, // 1.107.0 — 이벤트 함정의 지연 상태이상은 1회 적용 후 소거
       carryBarrier: res.carryBarrier || 0, // [u6] 달인 — 남은 보호막을 다음 전투로
     };
-    // ⚔ 난입 승리 (1.153.0) — 상대 등반자의 주 스탯을 영구히 빼앗는다 (같은 상대는 런당 1회)
+    // ⚔ 난입 승리 (1.153.0 / 1.154.0 개편) — 상대의 주 스탯을 **계정에 영구 귀속**한다.
+    // 이번 런에도 즉시 오르고, 죽은 뒤 다음 등반에도 시너지로 남는다 (PM 지시). 같은 상대는 런당 1회.
     if (buriedEnemy?.rival) {
       const rv = buriedEnemy.rival;
       const gain = buriedRivalStatGain(char);
@@ -564,7 +601,8 @@ export default function App() {
         stats: { ...c.stats, [rv.mainStat]: (c.stats[rv.mainStat] || 0) + gain },
         beatenRivals: [...(c.beatenRivals || []), rv.id],
       };
-      setBuriedForgeNotice(`⚔ 등반자 「${rv.name}」 격퇴 — ${rv.mainStatName} +${gain} (영구). 쓰러진 자의 힘이 스며든다.`);
+      setMeta(prev => { const next = addBuriedRivalStat(prev, rv.mainStat, gain); saveMeta(next); return next; });
+      setBuriedForgeNotice(`⚔ 등반자 「${rv.name}」 격퇴 — ${rv.mainStatName} +${gain} 영구 귀속. 다음 등반에도 이 힘이 남는다.`);
     }
     // 🧿 제령부 소모 정산 (1.144.0) — 실패 포함 이번 전투에서 태운 부적
     if (res.talismansSpent && Object.keys(res.talismansSpent).length > 0) {
@@ -575,10 +613,14 @@ export default function App() {
     // 1.132.0 — 전투에서 쓴 스킬 사용 횟수 정산 (소진 시 봉인 — 새 장비를 주워야 해제)
     if (res.usesSpent && Object.keys(res.usesSpent).length > 0) {
       const eq = { ...c.equipped };
+      const usage = { ...(c.skillUsage || {}) }; // 1.154.0 — 주 사용 스킬 집계 (런 기록·랭킹 상세용)
       for (const [slot, n] of Object.entries(res.usesSpent)) {
-        if (eq[slot]) eq[slot] = { ...eq[slot], usesSpent: (eq[slot].usesSpent || 0) + n };
+        if (eq[slot]) {
+          eq[slot] = { ...eq[slot], usesSpent: (eq[slot].usesSpent || 0) + n };
+          if (eq[slot].skillId) usage[eq[slot].skillId] = (usage[eq[slot].skillId] || 0) + n;
+        }
       }
-      c = { ...c, equipped: eq };
+      c = { ...c, equipped: eq, skillUsage: usage };
     }
     // [u36] 비전 — 처치마다 모든 공격력 누적 (런 영구). 1.133.0 %화: researchPct(+0.5%/처치), 구세이브 researchPower(고정치)도 계속 정산
     if (res.research) c = { ...c, researchPower: (c.researchPower || 0) + res.research };
@@ -3241,10 +3283,14 @@ export default function App() {
               onUpdateChar={updateBuriedChar}
               onRetire={(char) => {
                 const settle = buriedDeathSettlement(char);
-                setMeta(prev => { const next = recordBuriedDeath(prev, settle); saveMeta(next); return next; });
+                setMeta(prev => { const next = recordBuriedDeath(prev, settle, buildBuriedRunEntry(char, '스스로 등반을 접었다')); saveMeta(next); return next; });
                 setBuriedForgeNotice(`⚰ 정산 — 장비 ${settle.itemCount}개 분해 🕯 +${settle.dust} · 골드는 무덤에 흩어졌다`);
               }}
               onForge={handleBuriedForge} onResetAll={handleBuriedReset}
+              onResetRivals={() => {
+                setMeta(prev => { const next = resetBuriedRivals(prev); saveMeta(next); return next; });
+                setBuriedForgeNotice('⚔ 라이벌 세계 초기화 — 100인의 등반자가 새 얼굴로 1층부터 다시 오른다. (내 기록·귀속 스탯은 유지)');
+              }}
               onSetCompanion={(gid) => setMeta(prev => { const next = setBuriedCompanion(prev, gid); saveMeta(next); return next; })}
               onBuyContract={handleBuriedBuyContract}
               onBuyPart={handleBuriedBuyPart}

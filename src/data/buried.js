@@ -4432,7 +4432,7 @@ export const BURIED_CALAMITY_REWARD = {
 
 export const BURIED_RIVAL_TUNING = {
   count: 100,          // 더미 수
-  intrusionPct: 8,     // 일반 전투 방에서 난입으로 바뀔 확률 (%)
+  intrusionPct: 1,     // 일반 전투 방에서 난입으로 바뀔 확률 (%) — 1.154.0 PM 지시 「100층에 1번 수준」
   hpMult: 1.7,         // 난입 적 HP = 파리티 유저 최대 HP × 이 값 (유저전 특유의 "질긴" 감각)
   hitPct: 27,          // 난입 적 일반타 = 내 최대 HP의 이 % (내 방어를 반영해 역산 — 전 층 일정한 위협)
   defMult: 0.55,       // 방어·회피는 절반 수준 — 유저전이 수문장보다 아프면 안 된다
@@ -4484,48 +4484,68 @@ export const BURIED_RIVALS = (() => {
   return out;
 })();
 
-// 더미의 시각 t(틱)에서의 상태 — { floor: 현재 층, best: 최고 기록, runs: 런 수 }
-// 런 구조: 체크포인트(최고기록의 100층 단위)에서 출발 → pace × 런길이^0.9만큼 오르고 사망 → 재출발.
-export function buriedRivalState(rival, ticks) {
-  const rng = rivalRng(rival.seed);
-  let best = 0, t = 0, runs = 0, floor = 1;
+// 더미의 런 목록 — [{ runNo, floor(도달층), len(틱), ongoing }] (1.154.0 — 랭킹이 런 단위가 되면서 분리)
+// 런 구조: 체크포인트(최고기록의 100층 단위)에서 출발 → 심층 감속·숙련 성장 반영해 오르고 사망 → 재출발.
+// gen = 더미 세계 세대. 초기화하면 gen이 올라 시드가 바뀌고 완전히 새 등반 이력이 시작된다.
+export function buriedRivalRuns(rival, ticks, gen = 0) {
+  const rng = rivalRng(rival.seed + gen * 7777777);
+  const out = [];
+  let best = 0, t = 0, runs = 0;
   while (t < ticks && runs < 400) {
     runs++;
     const len = Math.max(20, Math.round(rival.grit * (0.5 + rng() * 1.0)));
     const used = Math.min(len, ticks - t);
     const start = 1 + Math.floor(best / 100) * 100;             // 돌파한 관문 너머에서 재출발
-    // 심층 감속(깊이 압력 재현: 시작층이 높을수록 덜 오른다) × 숙련 성장(런을 거듭하면 장비·실력이 쌓인다)
-    // — 숙련이 없으면 한 런에 다음 관문(+100층)을 영원히 못 넘어 세계가 정체한다
+    // 심층 감속(깊이 압력 재현) × 숙련 성장 — 숙련이 없으면 한 런에 +100층을 영원히 못 넘어 세계가 정체한다
     const climb = rival.pace * Math.pow(used, 0.78) * (1 / (1 + start / 350)) * (1 + runs * 0.012);
-    // 100층 관문 통과 판정 — 관문마다 실력 굴림. 못 넘으면 그 앞에서 막힌다 (수문장 벽 재현).
-    // 런을 거듭할수록 숙련돼 통과율이 조금씩 오른다 — 하위권도 아주 느리게나마 전진한다
+    // 100층 관문 통과 판정 — 관문마다 실력 굴림. 런을 거듭할수록 통과율이 조금씩 오른다
     let reach = start + climb;
     const gate = (Math.floor(start / 100) + 1) * 100;
     if (reach >= gate && rng() > 0.30 + rival.pace * 0.22 + runs * 0.006) reach = gate - 1 - Math.floor(rng() * 4);
-    floor = Math.max(1, Math.round(reach));
+    const floor = Math.max(1, Math.round(reach));
     best = Math.max(best, floor);
     t += used;
+    out.push({ runNo: runs, floor, len: used, ongoing: used < len && t >= ticks });
     if (used < len) break; // 진행 중인 런 (아직 안 죽음)
   }
-  return { floor, best, runs };
+  return out;
 }
 
-// 던전별 등반 랭킹 TOP N — 그 던전 배정 더미 25명 + 나
-export function buriedRivalRanking(dungeonId, ticks, myBest = 0, topN = 10) {
-  const rows = BURIED_RIVALS.filter(r => r.dungeonId === dungeonId)
-    .map(r => ({ name: r.name, classId: r.classId, best: buriedRivalState(r, ticks).best, isMe: false }));
-  if (myBest > 0) rows.push({ name: '나', classId: null, best: myBest, isMe: true });
-  rows.sort((a, b) => b.best - a.best);
-  return { rows: rows.slice(0, topN), myRank: rows.findIndex(r => r.isMe) + 1 || null, total: rows.length };
+// 더미의 시각 t(틱)에서의 요약 상태 — { floor: 현재 층, best: 최고 기록, runs: 런 수 }
+export function buriedRivalState(rival, ticks, gen = 0) {
+  const runs = buriedRivalRuns(rival, ticks, gen);
+  const last = runs[runs.length - 1];
+  return {
+    floor: last ? last.floor : 1,
+    best: runs.reduce((m, r) => Math.max(m, r.floor), 0),
+    runs: runs.length,
+  };
+}
+
+// 던전별 등반 랭킹 TOP N — 1.154.0 개편: **런(등반 1회) 단위**. 같은 등반자의 여러 런이
+// 순위를 독식할 수 있다 (PM: "한 번 등반한 기록 결과가 랭킹이야").
+// myRuns = 내 사망 기록(runLog 중 이 던전) / myLive = 진행 중인 내 런 (있으면 실시간 반영)
+export function buriedRivalRanking(dungeonId, ticks, { gen = 0, myRuns = [], myLive = null, topN = 10 } = {}) {
+  const rows = [];
+  for (const r of BURIED_RIVALS.filter(x => x.dungeonId === dungeonId)) {
+    for (const run of buriedRivalRuns(r, ticks, gen)) {
+      rows.push({ name: r.name, classId: r.classId, floor: run.floor, runNo: run.runNo, rivalId: r.id, ongoing: run.ongoing, isMe: false });
+    }
+  }
+  myRuns.forEach((m, i) => rows.push({ name: '나', classId: m.classId, floor: m.floor, isMe: true, entry: m, runNo: i + 1 }));
+  if (myLive?.floor > 0) rows.push({ name: '나', classId: myLive.classId, floor: myLive.floor, isMe: true, ongoing: true, live: true });
+  rows.sort((a, b) => b.floor - a.floor);
+  const myBestRank = rows.findIndex(r => r.isMe) + 1 || null;
+  return { rows: rows.slice(0, topN), myRank: myBestRank, total: rows.length };
 }
 
 // 틱 구간 사이에 100층 경계를 새로 넘은 더미 — 공지용. 결정론이라 전후 비교만 하면 된다
-export function buriedRivalNews(prevTicks, ticks, limit = 2) {
+export function buriedRivalNews(prevTicks, ticks, limit = 2, gen = 0) {
   if (ticks <= prevTicks) return [];
   const news = [];
   for (const r of BURIED_RIVALS) {
-    const a = Math.floor(buriedRivalState(r, prevTicks).best / 100);
-    const b = buriedRivalState(r, ticks).best;
+    const a = Math.floor(buriedRivalState(r, prevTicks, gen).best / 100);
+    const b = buriedRivalState(r, ticks, gen).best;
     if (Math.floor(b / 100) > a) news.push({ name: r.name, classId: r.classId, floor: Math.floor(b / 100) * 100, dungeonId: r.dungeonId });
   }
   news.sort((x, y) => y.floor - x.floor);
@@ -4534,13 +4554,13 @@ export function buriedRivalNews(prevTicks, ticks, limit = 2) {
 
 // 전투 방 난입 판정 — 내 층 근처(±40%)를 오르는 중인 더미를 상대로 고른다.
 // Math.random 사용 — 반드시 이벤트 핸들러(enterRoom)에서만 부를 것 (setMeta updater 금지).
-export function rollBuriedIntrusion(char, ticks) {
+export function rollBuriedIntrusion(char, ticks, gen = 0) {
   if (Math.random() * 100 >= BURIED_RIVAL_TUNING.intrusionPct) return null;
   const myFloor = char.floor || 1;
   const beaten = char.beatenRivals || [];
   const near = BURIED_RIVALS.filter(r => {
     if (beaten.includes(r.id)) return null;
-    const f = buriedRivalState(r, ticks).floor;
+    const f = buriedRivalState(r, ticks, gen).floor;
     return f >= myFloor * 0.6 && f <= myFloor * 1.6;
   }).filter(Boolean);
   const pool = near.length > 0 ? near : BURIED_RIVALS.filter(r => !beaten.includes(r.id));
@@ -4549,7 +4569,8 @@ export function rollBuriedIntrusion(char, ticks) {
 }
 
 // 난입 적 생성 — 상대는 "그 층 파리티 장비를 갖춘 유저". 실제 캐릭터 생성 공식으로 스탯을 만든다.
-export function buildBuriedRivalEnemy(rival, char) {
+export function buildBuriedRivalEnemy(rival, char, stolenPts = 0) {
+  // stolenPts = 이 더미가 과거 난입에서 나를 이기고 빼앗아간 스탯 포인트 — 그만큼 실제로 강해져 돌아온다
   const T = BURIED_RIVAL_TUNING;
   const floor = char.floor || 1;
   const dummy = createBuriedChar(rival.classId, { items: [], gold: 0 }, char.dungeonId || 'labyrinth', [], {}, floor);
@@ -4559,7 +4580,8 @@ export function buildBuriedRivalEnemy(rival, char) {
   // 파리티 스탯을 그대로 쓰면 심층에서 내 방어 감쇠에 묻혀 10%대로 물렁해진다(실측).
   const pd = buriedDerived(char);
   const myDefMult = Math.max(0.25, 100 / (100 + (pd.def || 0)));
-  const atk = Math.max(1, Math.round((pd.maxHp * T.hitPct / 100) / (myDefMult * (BURIED_TUNING.enemyDmgMult || 1))));
+  const stealBoost = 1 + Math.min(40, stolenPts * 2) / 100; // 뺏은 포인트당 +2% (최대 +40%)
+  const atk = Math.max(1, Math.round((pd.maxHp * T.hitPct / 100) / (myDefMult * (BURIED_TUNING.enemyDmgMult || 1)) * stealBoost));
   const mainStatKey = Object.entries(cls.stats).sort((a, b) => b[1] - a[1])[0][0];
   const mainStat = BURIED_STATS.find(s => s.id === mainStatKey);
   return {
@@ -4568,7 +4590,7 @@ export function buildBuriedRivalEnemy(rival, char) {
     color: cls.color,
     tier: 'elite',
     lv: buriedMonsterLevel(char),
-    hp: Math.round(d.maxHp * T.hpMult),
+    hp: Math.round(d.maxHp * T.hpMult * (1 + Math.min(40, stolenPts * 2) / 100)),
     atk,
     def: Math.round(d.def * T.defMult),
     crit: d.crit,
@@ -4589,4 +4611,46 @@ export function buildBuriedRivalEnemy(rival, char) {
 // 승리 보상 — 상대 주 스탯 영구 획득량 (샘·석상과 같은 심층 스케일)
 export function buriedRivalStatGain(char) {
   return BURIED_RIVAL_TUNING.statSteal + Math.floor(buriedMonsterLevel(char) / 25);
+}
+
+// 시드 고정 실행 (1.154.0) — 블록 안에서 Math.random이 시드 난수로 바뀐다.
+// 기존 롤러(rollBuriedItem 등)를 결정론으로 재사용하기 위한 유틸. 반드시 동기 블록에서만 쓸 것.
+export function withSeededRandom(seed, fn) {
+  const orig = Math.random;
+  const rng = rivalRng(seed >>> 0);
+  Math.random = rng;
+  try { return fn(); } finally { Math.random = orig; }
+}
+
+// 라이벌 런의 「죽기 직전」 상세 스냅샷 (1.154.0, PM: 공략에 쓸 수 있게 가능한 정보 전부) —
+// 상태창(스탯·파생), 장비 6슬롯, 주 사용 스킬 분포, 사망 원인까지 시드로 결정론 재구성한다.
+// 같은 (더미, 런, 세대)는 언제 열어도 같은 스냅샷 — 저장 0바이트.
+export function buriedRivalSnapshot(rival, runNo, floor, gen = 0) {
+  return withSeededRandom((rival.seed ^ Math.imul(runNo, 2654435761) ^ (gen * 97)) >>> 0, () => {
+    const ch = createBuriedChar(rival.classId, { items: [], gold: 0 }, rival.dungeonId, [], {}, Math.max(1, floor));
+    // 그 층 파리티 등급으로 장비 6슬롯을 다시 굴린다 (낡은 시작 장비 → 실제 등반 장비)
+    for (const slot of BURIED_SLOT_IDS) {
+      const it = rollBuriedItem({ slot, classId: rival.classId, floor: buriedMonsterLevel(ch), luck: 2, powerMult: buriedLootPower(ch) });
+      if (it) ch.equipped[slot] = it;
+    }
+    const d = buriedDerived(ch);
+    // 주 사용 스킬 — 장착 스킬에 시드 가중치로 사용률 분배 (공격기는 가중 ↑)
+    const skills = buriedEquippedSkills(ch).map(x => x.skill);
+    const w = skills.map(sk => (sk.power ? 3 : 1) * (0.5 + Math.random()));
+    const tot = w.reduce((a, b) => a + b, 0) || 1;
+    const topSkills = skills.map((sk, i) => ({ id: sk.id, name: sk.name, pct: Math.round((w[i] / tot) * 100) }))
+      .sort((a, b) => b.pct - a.pct);
+    // 사망 원인 — 그 층에서 실제로 나올 법한 적 (100층 배수면 수문장이 잡는다)
+    let killer = '무덤의 어둠';
+    try { killer = buildBuriedRoomEnemy(ch, Math.random() < 0.3 ? 'elite' : 'battle')?.name || killer; } catch { /* noop */ }
+    return {
+      name: rival.name, classId: rival.classId, dungeonId: rival.dungeonId,
+      floor, runNo, monLv: buriedMonsterLevel(ch),
+      stats: ch.stats,
+      derived: { maxHp: d.maxHp, atk: d.atk, fin: d.fin, mag: d.mag, def: d.def, crit: d.crit, dodge: d.dodge, barrier: d.barrier || 0 },
+      equipped: BURIED_SLOT_IDS.map(sl => ch.equipped[sl]).filter(Boolean),
+      topSkills: topSkills.slice(0, 4),
+      killer,
+    };
+  });
 }
