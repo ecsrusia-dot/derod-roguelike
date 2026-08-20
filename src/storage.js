@@ -1460,6 +1460,7 @@ export function recordHofClear(meta, stageId, firstMedals) {
 // 본편 메타(영혼·각인·유물)와 완전 분리. 이 모드의 모든 영속 상태는 meta.buried 하나에만 쌓인다.
 
 const EMPTY_BURIED = {
+  balance: {}, // 1.168.0 — ⚖ PM 밸런스 오버라이드 { fieldId: number }
   char: null, legacy: [], legacyGold: 0, dust: 0, deepest: 0,
   clears: {}, deaths: 0, runs: 0, unlockedDungeons: ['labyrinth'], unlockedClasses: [],
   legacySlots: 6,
@@ -1557,6 +1558,20 @@ function applyBuriedSeasonRewards(b, summary) {
     }
   }
   return { buried: out, granted: { dust, shards, milestones: newly, notes } };
+}
+
+// ⚖ 밸런스 오버라이드 저장 (1.168.0) — 실제 상수 반영은 호출부(applyBuriedBalance)가 한다.
+// 기본값과 같은 값은 저장하지 않는다 (나중에 코드 기본값이 바뀌면 자동으로 따라가도록)
+export function setBuriedBalance(meta, id, value, defaults = {}) {
+  const b = getBuried(meta);
+  const next = { ...(b.balance || {}) };
+  if (value == null || value === defaults[id]) delete next[id];
+  else next[id] = value;
+  return { ...meta, buried: { ...b, balance: next } };
+}
+export function clearBuriedBalance(meta) {
+  const b = getBuried(meta);
+  return { ...meta, buried: { ...b, balance: {} } };
 }
 
 // 1.155.0 — 🏆 시즌 기간 변경 (일 단위, PM 설정 가능). 현재 시즌의 만료 시점에 즉시 반영된다

@@ -173,10 +173,11 @@ import {
   BURIED_SIGILS, rollBuriedUniqueItem, buriedMonsterLevel, buriedLootPower, buriedDerived,
   BURIED_GHOST_RANKS, getBuriedGhost, rollBuriedTalisman,
   buriedRivalNews, buriedRivalStatGain, BURIED_STATS, buriedRivalRanking,
+  applyBuriedBalance, resetBuriedBalance, BURIED_BALANCE_DEFAULTS,
 } from './data.js';
 import { getKstDateKey } from './utils/dailyChallenge.js';
 import { simulateBestEndlessRun } from './utils/endlessSkipSim.js';
-import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, applyEngravingSlot, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear, dismantleRaidItem, dismantleRaidJunk, enhanceRaidItem, claimRaidWeekly, addRaidResources, spendRaidResourcesForItem, resolveRaidSecret, toggleRaidFormation, appendAutoRunLog, getGambleUsed, useGambleEntry, addTwilightCoins, addFateShards, redeemFateShards, buyGambleShopItem, addClassTitle, equipClassTitle, saveHofPatterns, hofLevelUpChar, recordHofClear, recordMastersClearByClass, updateBestRunTime, getBuried, saveBuriedChar, startBuriedChar, recordBuriedDeath, resetBuried, recordBuriedClear, addBuriedDust, craftBuriedForgeItem, trackBuriedKill, buyBuriedContract, addBuriedShards, buyBuriedPart, detachBuriedParts, logBuriedEvent, addBuriedUnionRep, tameBuriedGhost, setBuriedCompanion, addBuriedRivalStat, addBuriedRivalWin, checkBuriedSeason, setBuriedSeasonDays } from './storage.js';
+import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, applyEngravingSlot, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear, dismantleRaidItem, dismantleRaidJunk, enhanceRaidItem, claimRaidWeekly, addRaidResources, spendRaidResourcesForItem, resolveRaidSecret, toggleRaidFormation, appendAutoRunLog, getGambleUsed, useGambleEntry, addTwilightCoins, addFateShards, redeemFateShards, buyGambleShopItem, addClassTitle, equipClassTitle, saveHofPatterns, hofLevelUpChar, recordHofClear, recordMastersClearByClass, updateBestRunTime, getBuried, saveBuriedChar, startBuriedChar, recordBuriedDeath, resetBuried, recordBuriedClear, addBuriedDust, craftBuriedForgeItem, trackBuriedKill, buyBuriedContract, addBuriedShards, buyBuriedPart, detachBuriedParts, logBuriedEvent, addBuriedUnionRep, tameBuriedGhost, setBuriedCompanion, addBuriedRivalStat, addBuriedRivalWin, checkBuriedSeason, setBuriedSeasonDays, setBuriedBalance, clearBuriedBalance } from './storage.js';
 
 
 
@@ -362,6 +363,27 @@ export default function App() {
   // 무덤의 유산 (1.103.0) — BuriedBornes 모티브 별도 모드
   // ============================================
   // 캐릭터 스냅샷은 매 변경마다 meta.buried.char에 저장된다 (앱을 꺼도 그대로 이어진다).
+  // ⚖ 밸런스 오버라이드 (1.168.0, PM 지시) — 저장값을 실제 전투 상수에 반영.
+  // meta가 바뀔 때마다(부팅·클라우드 동기화·편집) 기본값으로 되돌린 뒤 오버라이드를 다시 얹는다.
+  useEffect(() => {
+    resetBuriedBalance();
+    applyBuriedBalance(getBuried(meta).balance);
+  }, [meta?.buried?.balance]);
+  const handleBuriedBalanceSet = (id, value) => {
+    setMeta(prev => {
+      const next = setBuriedBalance(prev, id, value, BURIED_BALANCE_DEFAULTS);
+      saveMeta(next);
+      return next;
+    });
+  };
+  const handleBuriedBalanceReset = () => {
+    setMeta(prev => {
+      const next = clearBuriedBalance(prev);
+      saveMeta(next);
+      return next;
+    });
+  };
+
   const updateBuriedChar = (char, dustGain = 0) => {
     // ⚔ 난입 (1.153.0) — 내 걸음이 늘어난 만큼 라이벌 세계도 전진했다. 결정론이라 전후 비교만으로
     // "누가 방금 100층 경계를 넘었나"를 알 수 있다. 다른 알림이 떠 있으면 양보한다 (소식은 사소하다).
@@ -3326,6 +3348,8 @@ export default function App() {
               onStartChar={handleBuriedStart}
               onContinue={() => setScreen('buriedDungeon')}
               onUpdateChar={updateBuriedChar}
+              onBalanceSet={handleBuriedBalanceSet}
+              onBalanceReset={handleBuriedBalanceReset}
               onRetire={(char) => {
                 const settle = buriedDeathSettlement(char);
                 setMeta(prev => { const next = recordBuriedDeath(prev, settle, buildBuriedRunEntry(char, '스스로 등반을 접었다')); saveMeta(next); return next; });
