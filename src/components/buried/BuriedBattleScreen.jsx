@@ -123,6 +123,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     mag: Math.round((d.mag + (char.researchPower || 0)) * (1 + (char.researchPct || 0) / 100)),
     def: d.def, chase: d.chase || 0,
     crit: hasBuriedCurse(char, 'gaap') ? 0 : (uniques.includes('u52') ? 100 : d.crit + (uniques.includes('da1') ? 8 : 0)),
+    critSure: uniques.includes('u52'), // 1.166.0 — [u52] 결전은 확정 치명이 정체성 (치명 상한 예외)
     critDmg: d.critDmg,
     dodge: hasBuriedCurse(char, 'belial') ? -999 : d.dodge + (uniques.includes('da3') ? 8 : 0),
     spRegen: d.spRegen,

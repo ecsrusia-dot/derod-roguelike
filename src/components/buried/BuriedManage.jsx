@@ -117,7 +117,9 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose, readOn
             { l: '최대 SP', v: d.maxSp, c: PALETTE.ice },
             { l: '방어력', v: d.def, c: PALETTE.ice },
             { l: '물리/기교/마법', v: `${d.atk}/${d.fin}/${d.mag}`, c: PALETTE.dawn },
-            { l: '치명', v: `${d.crit}% ×${(1 + d.critDmg / 100).toFixed(1)}`, c: PALETTE.legendary },
+            // 1.166.0 — PM 지적: "67% ×2.6"이 곱셈으로 읽혔다 → 확률·피해를 완전히 분리 표시
+            { l: '치명 확률', v: `${d.crit}%${d.critOverflowDmg ? ` (상한)` : ''}`, c: PALETTE.legendary },
+            { l: '치명 피해', v: `×${(1 + d.critDmg / 100).toFixed(1)}`, c: PALETTE.legendary },
             { l: '회피 / SP회복', v: `${d.dodge}% / +${d.spRegen}`, c: PALETTE.green },
             { l: '🔷 보호막', v: d.barrier || 0, c: PALETTE.ice },
             { l: '추격 피해', v: d.chase || 0, c: PALETTE.dawn },
@@ -128,6 +130,15 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose, readOn
             </div>
           ))}
         </div>
+
+        {/* 1.166.0 — 치명 확률 상한 초과분이 치명 피해로 전환됐음을 그 자리에서 알린다 */}
+        {d.critOverflowDmg > 0 && (
+          <div className="px-2.5 py-1.5 text-[11px] leading-relaxed"
+            style={{ borderRadius: 'var(--r-chip, 8px)', background: `${PALETTE.legendary}12`, border: `1px solid ${PALETTE.legendary}44`, color: PALETTE.textDim }}>
+            🎯 치명 확률 원본 <b style={{ color: PALETTE.text }}>{d.critRaw}%</b> → 상한 {d.crit}%.
+            초과 {d.critRaw - d.crit}%p는 <b style={{ color: PALETTE.legendary }}>치명 피해 +{d.critOverflowDmg}%</b>로 전환됐다.
+          </div>
+        )}
 
         {/* 1.148.0 — ⚔ 데미지 공식 / ⟪룬워드⟫ 조합표 (PM 지시: 계산이 명확하고, 룬워드를 볼 수 있게) */}
         <div className="grid grid-cols-2 gap-1.5">
