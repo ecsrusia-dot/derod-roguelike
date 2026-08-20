@@ -4080,7 +4080,12 @@ export function buriedRunePouchGroups(char) {
 // 조건: ① 장비 소켓 수 ≥ 룬워드 길이 ② 이미 박힌 룬이 룬워드의 **앞부분과 정확히 일치**(빈 장비 포함)
 //       ③ 주머니에 남은 재료가 전부 있다 ④ 연격 룬 CD0 제한(1.163.0)에 걸리지 않는다
 // 반환: { ok, reason } — 사유는 UI가 그대로 보여준다
+// 1.167.2 — rw.runes는 원본(id 문자열)과 buriedRunewordProgress 반환값(룬 객체) 두 형태가 돈다.
+// 판정 함수는 어느 쪽이 와도 같은 답을 내야 한다 (PM 보고: 객체가 넘어와 재료 판정이 항상 실패했다)
+const rwRuneIds = (rw) => (rw?.runes || []).map(r => (typeof r === 'string' ? r : r?.id)).filter(Boolean);
+
 export function buriedRunewordFitCheck(char, rw, slot) {
+  const rwIds = rwRuneIds(rw);
   const item = char?.equipped?.[slot];
   if (!item) return { ok: false, reason: '빈 슬롯', free: -1, empty: true };
   const cur = buriedItemRunes(item);
@@ -4089,10 +4094,10 @@ export function buriedRunewordFitCheck(char, rw, slot) {
   // 1.167.0 — 이미 박힌 룬의 **끝부분**이 룬워드의 앞부분과 이어지면 그만큼 아껴 각인한다.
   // (부분 일치 매칭이라 이어 붙이기만 하면 완성된다 — 앞에 무관한 룬이 있어도 무방)
   let head = 0;
-  for (let k = Math.min(cur.length, rw.runes.length - 1); k > 0; k--) {
-    if (rw.runes.slice(0, k).every((r, i) => cur[cur.length - k + i] === r)) { head = k; break; }
+  for (let k = Math.min(cur.length, rwIds.length - 1); k > 0; k--) {
+    if (rwIds.slice(0, k).every((r, i) => cur[cur.length - k + i] === r)) { head = k; break; }
   }
-  const need = rw.runes.slice(head);
+  const need = rwIds.slice(head);
   const free = sockets - cur.length;
   const base = { free, need: need.length, item, sockets };
   if (free < need.length) {
@@ -4139,11 +4144,12 @@ export function applyBuriedRuneword(char, runewordId, slot) {
   if (!fit.ok) return { char, ok: false, text: fit.reason };
   const item = char.equipped[slot];
   const cur = buriedItemRunes(item);
+  const rwIds = rwRuneIds(rw); // 1.167.2 — 원본에서 찾은 rw라 항상 id 배열이지만 방어적으로 정규화
   let head = 0;
-  for (let k = Math.min(cur.length, rw.runes.length - 1); k > 0; k--) {
-    if (rw.runes.slice(0, k).every((r, i) => cur[cur.length - k + i] === r)) { head = k; break; }
+  for (let k = Math.min(cur.length, rwIds.length - 1); k > 0; k--) {
+    if (rwIds.slice(0, k).every((r, i) => cur[cur.length - k + i] === r)) { head = k; break; }
   }
-  const need = rw.runes.slice(head);
+  const need = rwIds.slice(head);
   // 주머니에서 재료를 순서대로 1개씩 꺼낸다 (같은 룬 중복 요구도 정확히 소모)
   const pouch = [...(char.runes || [])];
   for (const id of need) pouch.splice(pouch.indexOf(id), 1);
