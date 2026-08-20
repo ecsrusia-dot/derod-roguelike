@@ -17,6 +17,7 @@ import {
   buriedDamageFormula, buriedRunewordProgress, getBuriedRace, getBuriedOrigin,
   BURIED_RUNE_FUSION, buriedFusionInfo, fuseBuriedRunes,
   buriedRunePouchGroups, buriedRunewordFitCheck, applyBuriedRuneword, BURIED_RUNEWORDS,
+  rollBuriedRuneRecovery, BURIED_RUNE_RECOVERY,
 } from '../../data.js';
 import { BuriedItemCard, BuriedItemSheet, BURIED_DUST_ICON } from './BuriedCommon.jsx';
 
@@ -73,16 +74,19 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose, readOn
   };
 
   // 장착 장비 분해 — 슬롯이 비면 그 스킬도 못 쓴다 (신중히)
-  // 1.160.0 「순환 패키지」 — 각인된 룬은 전량 주머니로 회수
+  // 1.160.0 「순환 패키지」 — 각인된 룬 회수 / 1.167.0 — 등급별 확률(★1 90% ~ ★5 40%)
   const dismantle = (item) => {
     if (readOnly) return;
     const gain = buriedDustValue(item);
     const slot = BURIED_SLOT_IDS.find(s => char.equipped?.[s]?.id === item.id);
-    const back = buriedItemRunes(item);
-    const next = { ...char, equipped: { ...char.equipped, [slot]: null }, runes: [...(char.runes || []), ...back] };
+    const rec = rollBuriedRuneRecovery(buriedItemRunes(item)); // 1.167.0 — 등급별 확률 회수
+    const next = { ...char, equipped: { ...char.equipped, [slot]: null }, runes: [...(char.runes || []), ...rec.kept] };
     next.hp = Math.min(next.hp, buriedDerived(next).maxHp);
     onUpdate(next, gain);
     setSheet(null);
+    if (rec.kept.length + rec.lost.length > 0) {
+      setRwMsg({ ok: rec.lost.length === 0, text: `ᚱ 룬 회수 ${rec.kept.length}개${rec.lost.length > 0 ? ` · ${rec.lost.length}개는 부서졌다` : ''}` });
+    }
   };
 
   return (
@@ -315,11 +319,11 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose, readOn
           </div>
         </div>
 
-        {/* ᚱ 룬 주머니 (1.123.0) — 각인은 영구, 1.160.0~ 장비 분해 시 주머니로 회수 */}
+        {/* ᚱ 룬 주머니 (1.123.0) — 각인은 영구, 1.167.0~ 분해 시 등급별 확률 회수 */}
         {!readOnly && runes.length > 0 && (
           <div className="px-3 py-2.5" style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panel, border: `1px solid ${PALETTE.legendary}44` }}>
             <div className="text-[11px] tracking-[0.2em] mb-1.5" style={{ color: PALETTE.legendary }}>
-              ᚱ 룬 주머니 {runes.length}개 — 등급순 정리 · 각인은 영구 · 장비 분해 시 회수
+              ᚱ 룬 주머니 {runes.length}개 — 등급순 정리 · 각인은 영구 · 분해 시 등급별 확률 회수
             </div>
             {/* 1.165.0 PM 지시 — 등급 내림차순 + 같은 룬은 한 줄에 ×개수로 묶는다 */}
             <div className="space-y-1.5">
@@ -492,7 +496,7 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose, readOn
               style={{ background: PALETTE.bgDeep, borderTop: `1px solid ${rar.color}66`, borderRadius: '18px 18px 0 0', maxHeight: '80%', overflowY: 'auto' }}>
               <div className="text-[13px] font-bold mb-0.5" style={{ color: rar.color }}>ᚱ {r.name} {rar.stars} — 어디에 각인할까</div>
               <div className="text-[11px] mb-2 leading-relaxed" style={{ color: PALETTE.textDim }}>
-                {r.desc}. <b style={{ color: PALETTE.accent }}>각인은 영구</b> — 장착 중엔 떼어낼 수 없다. 그 장비를 분해하면 룬은 <b style={{ color: PALETTE.text }}>주머니로 회수</b>된다.
+                {r.desc}. <b style={{ color: PALETTE.accent }}>각인은 영구</b> — 장착 중엔 떼어낼 수 없다. 그 장비를 분해하면 <b style={{ color: PALETTE.text }}>{BURIED_RUNE_RECOVERY[r.rarity]}% 확률</b>로만 회수된다 (실패 시 소멸).
               </div>
               {targets.length === 0 ? (
                 <div className="px-3 py-3 text-[12px]" style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panel, color: PALETTE.textDim }}>
