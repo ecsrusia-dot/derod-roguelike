@@ -694,7 +694,13 @@ export function buriedDustValue(item) {
 // =========================================================
 // 7. 캐릭터 — 생성 / 파생 스탯 / 레벨
 // =========================================================
-export const buriedExpToNext = (lv) => 32 + lv * 20;
+// 1.161.0 PM 지시 「경험치 체계 재점검」 — 기존 선형(32+20L)은 수입(마물 레벨 비례)과
+// 요구량이 같은 속도로 자라 심층에서 **매 층 레벨업**이 됐다. 2차항을 더해 자기 교정:
+// 수입이 큰 플레이어일수록 레벨이 높아져 요구량이 빠르게 추격 → 어느 깊이든 4~7층/레벨로 수렴
+// (시뮬: 평균 수입 F600 기준 현행 1~3.6층/레벨 → 5~7층/레벨). ⚠ 페이스 조정은 이 계수 한 곳
+export const BURIED_EXP_CURVE = { base: 32, perLv: 20, quad: 0.35 };
+export const buriedExpToNext = (lv) =>
+  BURIED_EXP_CURVE.base + lv * BURIED_EXP_CURVE.perLv + Math.round(lv * lv * BURIED_EXP_CURVE.quad);
 
 export function createBuriedChar(classId, legacy = { items: [], gold: 0 }, dungeonId = 'labyrinth', contracts = [], partsFx = {}, startFloor = 1, depthTraits = [], raceId = null, keystones = [], originId = null) {
   const cls = getBuriedClass(classId);
@@ -808,6 +814,8 @@ export function buriedDerived(char) {
   const rf = buriedRaceFx(char);
   // 전설무구 (1.127.0) — 선언형 유니크 fx (fx 없는 구 유니크는 빈 객체)
   const uf = buriedUniqueFx(char);
+  // [dc4] 바닥 없는 주머니 (1.161.0 리뉴얼) — 소지 골드 1,500당 물리·기교·마법 +1% (최대 +25%)
+  const dc4Pow = buriedUniqueIds(char).includes('dc4') ? Math.min(25, Math.floor((char.gold || 0) / 1500)) : 0;
   // 1.133.0 — 전설무구 % 개편: barrierHpPct(최대 HP 비례 보호막)가 maxHp를 참조하므로 먼저 계산
   // 1.113.0 — 레벨당 HP+18 폐지 (성장은 100% 장비)
   const maxHp = Math.max(1, Math.round((140 + st.vit * 11 + (gear.hp || 0) + (tf.hp || 0) + (pf.hp || 0) + (rf.hp || 0) + (uf.hp || 0)) * (tf.hpMult || 1) * (rf.hpMult || 1) * (uf.hpMult || 1) * (1 + (cf.hpPct || 0) / 100) * (1 - Math.min(50, char.curseHpLossPct || 0) / 100)));
@@ -824,9 +832,9 @@ export function buriedDerived(char) {
     maxHp,
     physFlatAdd, magFlatAdd, // 데미지 공식 설명·출처 표시용
     maxSp:   Math.round((38 + st.int * 1.3 + (gear.sp || 0) + (tf.sp || 0) + (rf.sp || 0) + (uf.sp || 0)) * (uf.spMult || 1)),
-    atk:     Math.round((10 + st.str * 1.6 + (gear.atk || 0) + (pf.atk || 0)) * (1 + ((tf.physPct || 0) + (cf.physPct || 0) + (rf.physPct || 0) + (uf.physPct || 0)) / 100)) + physFlatAdd,
-    fin:     Math.round((10 + st.dex * 1.6 + (gear.atk || 0) + (pf.atk || 0)) * (1 + ((tf.physPct || 0) + (cf.physPct || 0) + (rf.physPct || 0) + (uf.physPct || 0)) / 100)) + physFlatAdd,
-    mag:     Math.round((10 + st.int * 1.6 + (gear.mag || 0) + (pf.mag || 0)) * (1 + ((tf.magPct || 0) + (cf.magPct || 0) + (rf.magPct || 0) + (uf.magPct || 0)) / 100)) + magFlatAdd,
+    atk:     Math.round((10 + st.str * 1.6 + (gear.atk || 0) + (pf.atk || 0)) * (1 + ((tf.physPct || 0) + (cf.physPct || 0) + (rf.physPct || 0) + (uf.physPct || 0) + dc4Pow) / 100)) + physFlatAdd,
+    fin:     Math.round((10 + st.dex * 1.6 + (gear.atk || 0) + (pf.atk || 0)) * (1 + ((tf.physPct || 0) + (cf.physPct || 0) + (rf.physPct || 0) + (uf.physPct || 0) + dc4Pow) / 100)) + physFlatAdd,
+    mag:     Math.round((10 + st.int * 1.6 + (gear.mag || 0) + (pf.mag || 0)) * (1 + ((tf.magPct || 0) + (cf.magPct || 0) + (rf.magPct || 0) + (uf.magPct || 0) + dc4Pow) / 100)) + magFlatAdd,
     def:     Math.round(4 + st.vit * 0.9 + (gear.def || 0) + (pf.def || 0) + (uf.def || 0) + (rf.def || 0)),
     crit:    Math.round(5 + st.dex * 0.6 + (gear.crit || 0) + (tf.crit || 0) + (cf.crit || 0) + (pf.crit || 0) + (rf.crit || 0) + (uf.crit || 0)),
     critDmg: 60 + (gear.critDmg || 0),
@@ -852,8 +860,10 @@ export function buriedEquippedSkills(char) {
     .map(x => ({ slot: x.slot, item: x.item, skill: BURIED_SKILLS[x.item.skillId] }));
 }
 
-// 경험치 적용 — 1.113.0 PM 결정: 레벨업 보상은 **HP 전액 회복뿐** (스탯 3p 폐지).
-// 성장은 100% 장비 — 레벨은 기록·회복 리듬용 지표로만 남는다.
+// 경험치 적용 — 1.113.0 PM 결정: 레벨업 보상은 HP 회복뿐 (스탯 3p 폐지).
+// 1.161.0 PM 승인 — 전액 회복 → **최대 HP 35%만** (풀피 경제 해체: 매 전투 만피 진입이
+// 회복 전설·야영·물약을 전부 죽이던 문제. 조정은 BURIED_LEVEL_HEAL_PCT 한 곳)
+export const BURIED_LEVEL_HEAL_PCT = 35;
 export function grantBuriedExp(char, amount) {
   let c = { ...char, exp: (char.exp || 0) + amount };
   const gained = [];
@@ -862,7 +872,10 @@ export function grantBuriedExp(char, amount) {
     c.lv += 1;
     gained.push(c.lv);
   }
-  if (gained.length > 0) c.hp = buriedDerived(c).maxHp;
+  if (gained.length > 0) {
+    const maxHp = buriedDerived(c).maxHp;
+    c.hp = Math.min(maxHp, c.hp + Math.round(maxHp * BURIED_LEVEL_HEAL_PCT / 100 * gained.length));
+  }
   return { char: c, levels: gained };
 }
 
@@ -2139,8 +2152,9 @@ export function buriedDamageFormula(char) {
   const st = d.stats;
   const tf = aggregateBuriedTraits(char), cf = aggregateBuriedContracts(char);
   const rf = buriedRaceFx(char), uf = buriedUniqueFx(char);
-  const physPct = (tf.physPct || 0) + (cf.physPct || 0) + (rf.physPct || 0) + (uf.physPct || 0);
-  const magPct = (tf.magPct || 0) + (cf.magPct || 0) + (rf.magPct || 0) + (uf.magPct || 0);
+  const fDc4 = buriedUniqueIds(char).includes('dc4') ? Math.min(25, Math.floor((char.gold || 0) / 1500)) : 0;
+  const physPct = (tf.physPct || 0) + (cf.physPct || 0) + (rf.physPct || 0) + (uf.physPct || 0) + fDc4;
+  const magPct = (tf.magPct || 0) + (cf.magPct || 0) + (rf.magPct || 0) + (uf.magPct || 0) + fDc4;
   // ① 보정 이전 기본치 역산 (표시 전용)
   const physBase = d.atk - (d.physFlatAdd || 0);
   const a0 = Math.round(physBase / (1 + physPct / 100));
@@ -2332,10 +2346,9 @@ export function advanceBuriedFloor(char) {
       ? [...(char.pendingStatuses || []), { s: pick(['rage', 'guard', 'regen', 'evade']), n: 2 }]
       : char.pendingStatuses,
   };
-  // [dl2] 미로 걸음 — 층 이동 시 30% 확률 최대 HP 12% 회복
-  if (hasBuriedUnique(char, 'dl2') && Math.random() < 0.30) {
-    const maxHp = buriedDerived(out).maxHp;
-    out = { ...out, hp: Math.min(maxHp, (out.hp || 1) + Math.round(maxHp * 0.12)) };
+  // [dl2] 미로 걸음 (1.161.0 리뉴얼) — 층 이동 회복은 풀피 경제에서 무의미했다 → 다음 전투 [재생] 3
+  if (hasBuriedUnique(char, 'dl2')) {
+    out = { ...out, pendingStatuses: [...(out.pendingStatuses || []), { s: 'regen', n: 3 }] };
   }
   // 층 효과 「망자의 가호」 — 층에 들어설 때 회복 (1.117.0 배선 — 정의만 있고 미적용이던 효과)
   const enterFx = getBuriedFloorEffect(out.floorEffect)?.fx;
@@ -3010,6 +3023,10 @@ export function buriedEnemyAtLevel(key, monLevel) {
 export function addBuriedItemToChar(char, item) {
   if (!char || !item) return { char, raised: false, lv: 1 };
   let c = char;
+  // 1.161.0 — 이번 런에서 얻은 유니크 기록 (같은 런 중복 드랍 차단용 — 드랍 롤러의 excludeIds로 쓴다)
+  if (item.unique && !(c.uniquesFound || []).includes(item.unique)) {
+    c = { ...c, uniquesFound: [...(c.uniquesFound || []), item.unique] };
+  }
   const cur = c.skillLevels?.[item.skillId];
   let raised = false, lv = 1;
   if (cur) {
@@ -3177,7 +3194,7 @@ export const BURIED_UNIQUES = [
   UQ({ id: 'u113', name: '폭주 기관',       slot: 'acc',   skillId: 'berserkSigil',src: 113, desc: '모든 스킬의 쿨다운이 0이 되지만, 적이 거는 상태이상 스택 +1.' }),
   UQ({ id: 'u101', name: '시간 왜곡구',     slot: 'acc',   skillId: 'lifeCharm',   src: 101, desc: '스킬 쿨다운이 1턴을 초과하지 않는다.' }),
   // ===== 전투 — 특수 트리거 =====
-  UQ({ id: 'u91',  name: '망자 사냥꾼',     slot: 'acc',   skillId: 'bloodSigil',  src: 91,  desc: '망령·정령·잔재 계열을 처치하면 최대 HP의 15%를 회복한다.' }),
+  UQ({ id: 'u91',  name: '망자 사냥꾼',     slot: 'acc',   skillId: 'bloodSigil',  src: 91,  desc: '망령·정령·잔재 계열에게 주는 피해 +30%, 처치하면 최대 HP의 15%를 회복한다.' }),
   UQ({ id: 'u108', name: '역행의 모래시계', slot: 'acc',   skillId: 'lifeCharm',   src: 108, desc: '[노화]에 걸리면 즉시 제거하고 모든 쿨다운을 초기화한다.' }),
   UQ({ id: 'u109', name: '저주 포식자',     slot: 'acc',   skillId: 'silenceSigil',src: 109, desc: '[저주]에 걸릴 때마다 무덤 먼지 10을 얻는다.' }),
   UQ({ id: 'u106', name: '각성의 관',       slot: 'helm',  skillId: 'focusMind',   src: 106, desc: '전투를 SP 100%로 시작한다. (기본 55%)' }),
@@ -3194,7 +3211,7 @@ export const BURIED_UNIQUES = [
   UQ({ id: 'u3',   name: '오베론',         slot: 'acc',   skillId: 'venomSigil',  src: 3,   desc: '마법(지혜) 스킬이 적중하면 마법 공격력의 30%만큼 추가 타격.' }),
   UQ({ id: 'u8',   name: '미카엘',         slot: 'armor', skillId: 'regenScale',  src: 8,   desc: 'HP를 회복할 때마다 회복량만큼 적에게 피해를 준다.' }),
   UQ({ id: 'u6',   name: '달인',           slot: 'armor', skillId: 'ironWall',    src: 6,   desc: '전투가 끝나도 남은 보호막이 다음 전투로 이어진다.' }),
-  UQ({ id: 'u7',   name: '드라큘라',       slot: 'armor', skillId: 'shadowCloak', src: 7,   desc: '적을 처치하면 HP를 전부 회복한다.' }),
+  UQ({ id: 'u7',   name: '드라큘라',       slot: 'armor', skillId: 'shadowCloak', src: 7,   desc: '적을 처치하면 HP를 전부 회복한다. 이미 가득했다면 최대 HP의 25%를 보호막으로 얻고 다음 전투로 이월한다.' }),
   UQ({ id: 'u9',   name: '오니',           slot: 'acc',   skillId: 'bloodSigil',  src: 9,   desc: '물리(완력) 스킬의 쿨다운 -1.' }),
   UQ({ id: 'u10',  name: '고에몬',         slot: 'acc',   skillId: 'sunderSigil', src: 10,  desc: '기교 스킬의 쿨다운 -1.' }),
   UQ({ id: 'u11',  name: '미미르',         slot: 'acc',   skillId: 'venomSigil',  src: 11,  desc: '마법(지혜) 스킬의 쿨다운 -1.' }),
@@ -3209,7 +3226,7 @@ export const BURIED_UNIQUES = [
   UQ({ id: 'u40',  name: '학식',           slot: 'acc',   skillId: 'lifeCharm',   src: 40,  desc: '경험치 2배.' }),
   UQ({ id: 'u41',  name: '왕관',           slot: 'helm',  skillId: 'focusMind',   src: 41,  desc: '방 효과·층 효과를 전부 무시한다.' }),
   UQ({ id: 'u42',  name: '공물',           slot: 'acc',   skillId: 'sunderSigil', src: 42,  desc: '적이 매 턴 최대 HP의 2%를 잃는다.' }),
-  UQ({ id: 'u48',  name: '게헨나',         slot: 'acc',   skillId: 'berserkSigil',src: 48,  desc: '적이 회복할 때마다 회복량의 3배 피해를 준다.' }),
+  UQ({ id: 'u48',  name: '게헨나',         slot: 'acc',   skillId: 'berserkSigil',src: 48,  desc: '전투를 시작할 때 적에게 [저주] 3을 건다 (회복 무효·받는 피해 증가). 적이 회복을 시도하면 회복량의 3배 피해.' }),
   UQ({ id: 'u52',  name: '다인슬라이프',   slot: 'acc',   skillId: 'berserkSigil',src: 52,  desc: '모든 공격이 치명타가 되지만, 받는 피해 +15%.' }),
   UQ({ id: 'u53',  name: '바쥬라',         slot: 'acc',   skillId: 'silenceSigil',src: 53,  desc: '모든 스킬의 쿨다운 -1.' }),
   UQ({ id: 'u56',  name: '심장',           slot: 'armor', skillId: 'regenScale',  src: 56,  desc: '매 턴 최대 HP의 12%를 회복한다.' }),
@@ -3241,14 +3258,14 @@ export const BURIED_UNIQUES = [
   UQ({ id: 'u38',  name: '투명화',          slot: 'armor', skillId: 'shadowCloak', src: 38,  desc: '일반 전투에서 적이 첫 턴에 나를 찾지 못한다 (강적·보스·재앙 제외).' }),
   UQ({ id: 'u49',  name: '변신',            slot: 'armor', skillId: 'bulwark',     src: 49,  desc: '보스·재앙 전투를 [격노] 2 + [수호] 2로 시작한다.' }),
   UQ({ id: 'u51',  name: '탐식자',          slot: 'helm',  skillId: 'warHorn',     src: 51,  desc: '전투를 시작할 때 적에게 [약화] 2.' }),
-  UQ({ id: 'u54',  name: '건강한 잠',       slot: 'armor', skillId: 'regenScale',  src: 54,  desc: '야영의 휴식 회복량이 2배가 된다.' }),
+  UQ({ id: 'u54',  name: '건강한 잠',       slot: 'armor', skillId: 'regenScale',  src: 54,  desc: '야영의 효과가 2배 — 회복 45%→90%, 스킬 정비(만충)도 장비 1개→2개.' }),
   UQ({ id: 'u55',  name: '군림',            slot: 'helm',  skillId: 'chargeUp',    src: 55,  desc: '전투를 시작할 때 적에게 [파쇄] 2.' }),
   UQ({ id: 'u58',  name: '무념무상',        slot: 'helm',  skillId: 'focusMind',   src: 58,  desc: '피격당할 때마다 이 전투 동안 받는 피해 -3% (최대 -30%).' }),
   UQ({ id: 'u59',  name: '간계',            slot: 'acc',   skillId: 'venomSigil',  src: 59,  desc: '내가 부여하는 상태이상 스택이 2배가 된다. (「균일한 저주」 보유 시 그쪽 우선)' }),
   UQ({ id: 'u60',  name: '강령술',          slot: 'acc',   skillId: 'grudge',      src: 60,  desc: '모든 공격에 준 피해의 15%만큼 추격 피해가 붙는다.' }),
   UQ({ id: 'u61',  name: '휘황찬란',        slot: 'helm',  skillId: 'insight',     src: 61,  fx: { dodge: 8 }, desc: '적의 치명타를 무효화하고 회피율 +8%.' }),
   UQ({ id: 'u62',  name: '근심',            slot: 'armor', skillId: 'ironWall',    src: 62,  desc: '🧱방벽이 소모될 때 40% 확률로 소모되지 않는다.' }),
-  UQ({ id: 'u63',  name: '스탬피드',        slot: 'acc',   skillId: 'sunderSigil', src: 63,  desc: '공격 스킬이 적중할 때마다 적 최대 HP -2%.' }),
+  UQ({ id: 'u63',  name: '스탬피드',        slot: 'acc',   skillId: 'sunderSigil', src: 63,  desc: '공격 스킬이 적중할 때마다 적 최대 HP의 2.5%만큼 방어 무시 고정 피해 (수문장·묘주는 1%).' }),
   UQ({ id: 'u64',  name: '일그러진 사랑',   slot: 'acc',   skillId: 'fairyDust',   src: 64,  desc: '적에게 걸린 디버프 종류 1개당 주는 피해 +6%.' }),
   UQ({ id: 'u65',  name: '폭풍우',          slot: 'acc',   skillId: 'dragonFang',  src: 65,  desc: '스킬을 사용해도 30% 확률로 쿨다운이 시작되지 않는다.' }),
   UQ({ id: 'u68',  name: '끝없이 깊은 물',  slot: 'acc',   skillId: 'boneGraft',   src: 68,  desc: '쿨다운 2 이상의 스킬을 사용하면 최대 HP의 12%를 회복한다.' }),
@@ -3280,11 +3297,34 @@ export const BURIED_UNIQUES = [
   UQ({ id: 'u81',  name: '고고학',          slot: 'helm',  skillId: 'observe',     src: 81,  fx: { expPct: -100, dropLuck: 6, goldPct: 50 }, desc: '성장을 멈추고 유물을 좇는다. 경험치 0 — 대신 드랍 운 +6, 골드 +50%.' }),
   UQ({ id: 'u82',  name: '육체의 변질',     slot: 'armor', skillId: 'shieldBash',  src: 82,  fx: { hpMult: 1.25, dodge: -8 }, desc: '몸이 부풀어 오른다. 최대 HP +25% — 대신 회피 -8%.' }),
 
+  // ===== ⚔ 무기·보조 유니크 18종 (1.161.0, PM 승인) =====
+  // 문제: 일반 풀 154종에 무기 0·보조 0 — 무기 전설은 던전 심층 4종(3종 물리)이 전부라
+  // "무기 전설은 물리만 나온다"는 체감이 사실이었다. 물리 4·기교 4·마법 4 + 보조 6으로 증설.
+  // 전부 선언형 fx (전투 분기 코드 0줄) — 일부는 룬·접두어 내장 (1.127.0 패턴)
+  UQ({ id: 'uw1',  name: '묘굴꾼의 대낫',   slot: 'weapon', skillId: 'executioner', src: 0, fx: { physPct: 15, crit: 6 },  desc: '무덤을 여는 날. 물리·기교 +15%, 치명 +6%.' }),
+  UQ({ id: 'uw2',  name: '왕릉 파쇄추',     slot: 'weapon', skillId: 'sunderCut',   src: 0, fx: { physPct: 10 }, mod: 'sharp', desc: '봉인석을 부수던 추. 물리·기교 +10% — 「날카로운」 접두어 내장.' }),
+  UQ({ id: 'uw3',  name: '갈증의 도끼',     slot: 'weapon', skillId: 'savageAxe',   src: 0, fx: { physPct: 8, drainPct: 8 }, desc: '피를 마셔야 조용해진다. 물리·기교 +8%, 흡혈 +8%.' }),
+  UQ({ id: 'uw4',  name: '침묵의 처형검',   slot: 'weapon', skillId: 'decapitate',  src: 0, fx: { physPct: 12, takenPct: -6 }, desc: '소리 없이 무겁다. 물리·기교 +12%, 받는 피해 -6%.' }),
+  UQ({ id: 'uw5',  name: '그림자 활',       slot: 'weapon', skillId: 'shadowShot',  src: 0, fx: { crit: 10, physPct: 8 },  desc: '어둠이 시위를 당긴다. 치명 +10%, 물리·기교 +8%.' }),
+  UQ({ id: 'uw6',  name: '폭풍 전조',       slot: 'weapon', skillId: 'stormVolley', src: 0, fx: { dodge: 8, physPct: 10 }, desc: '바람이 먼저 도착한다. 회피 +8%, 물리·기교 +10%.' }),
+  UQ({ id: 'uw7',  name: '월영(月影)의 시위', slot: 'weapon', skillId: 'moonSnipe', src: 0, fx: { crit: 14 }, rune: 'rKeen', desc: '달그림자를 겨눈다. 치명 +14% — 「예리의 룬」 내장.' }),
+  UQ({ id: 'uw8',  name: '여우 송곳니',     slot: 'weapon', skillId: 'rapidShot',   src: 0, fx: { physPct: 12, statusChance: 10 }, desc: '교활하게 문다. 물리·기교 +12%, 상태이상 확률 +10%.' }),
+  UQ({ id: 'uw9',  name: '잿불 지팡이',     slot: 'weapon', skillId: 'infernoSeal', src: 0, fx: { magPct: 15, statusChance: 10 }, desc: '꺼지지 않는 불씨. 마법 +15%, 상태이상 확률 +10%.' }),
+  UQ({ id: 'uw10', name: '서리 문장의 창',  slot: 'weapon', skillId: 'frostLance',  src: 0, fx: { magPct: 12, takenPct: -5 }, desc: '한기가 몸을 감싼다. 마법 +12%, 받는 피해 -5%.' }),
+  UQ({ id: 'uw11', name: '심판자의 홀',     slot: 'weapon', skillId: 'judgment',    src: 0, fx: { magPct: 10, crit: 8 },  desc: '죄를 읽는 눈. 마법 +10%, 치명 +8%.' }),
+  UQ({ id: 'uw12', name: '뇌옥(雷獄)의 막대', slot: 'weapon', skillId: 'chainBolt', src: 0, fx: { magPct: 14, spRegen: 1 }, desc: '갇힌 번개가 운다. 마법 +14%, SP 회복 +1.' }),
+  UQ({ id: 'uo1',  name: '백골 단도',       slot: 'offhand', skillId: 'vitalStab',  src: 0, fx: { crit: 8, physPct: 8 },  desc: '뼈로 벼린 이빨. 치명 +8%, 물리·기교 +8%.' }),
+  UQ({ id: 'uo2',  name: '독니 화살통',     slot: 'offhand', skillId: 'venomArrow', src: 0, fx: { statusChance: 15, physPct: 6 }, desc: '살아 있는 독. 상태이상 확률 +15%, 물리·기교 +6%.' }),
+  UQ({ id: 'uo3',  name: '칠흑의 마도서',   slot: 'offhand', skillId: 'darkBolt',   src: 0, fx: { magPct: 12, drainPct: 5 }, desc: '읽는 자를 갉아먹고 힘을 준다. 마법 +12%, 흡혈 +5%.' }),
+  UQ({ id: 'uo4',  name: '성해(聖骸)의 성표', slot: 'offhand', skillId: 'smiteSeal', src: 0, fx: { magPct: 10, healPct: 15 }, desc: '옛 성인의 유골 조각. 마법 +10%, 회복 +15%.' }),
+  UQ({ id: 'uo5',  name: '수호 문장',       slot: 'offhand', skillId: 'arcaneWard', src: 0, fx: { takenPct: -10, barrierHpPct: 12 }, desc: '지키는 자의 인장. 받는 피해 -10%, 전투 시작 보호막 = 최대 HP의 12%.' }),
+  UQ({ id: 'uo6',  name: '새벽 기도서',     slot: 'offhand', skillId: 'healPrayer', src: 0, fx: { healPct: 25, hpMult: 1.08 }, desc: '첫 빛의 구절. 회복 +25%, 최대 HP +8%.' }),
+
   // ===== 던전 전용 유니크 16종 (1.115.0) — 그 던전의 **심층 보스**(정복 층 이후)만 떨어뜨린다 =====
   // 각 던전의 기믹 정체성을 강화하는 방향으로 설계 (PM 결정: 공략 요소)
   // 🌀 미궁 — 선택·탐험
   UQ({ id: 'dl1', dungeon: 'labyrinth', name: '미궁의 실타래',   slot: 'acc',    skillId: 'lifeCharm',   src: 0, desc: '[미궁 심층] 층을 오를 때 방 선택지가 1개 더 늘어난다.' }),
-  UQ({ id: 'dl2', dungeon: 'labyrinth', name: '미로 걸음',       slot: 'helm',   skillId: 'focusMind',   src: 0, desc: '[미궁 심층] 층을 이동할 때마다 30% 확률로 최대 HP의 12%를 회복한다.' }),
+  UQ({ id: 'dl2', dungeon: 'labyrinth', name: '미로 걸음',       slot: 'helm',   skillId: 'focusMind',   src: 0, desc: '[미궁 심층] 층을 오를 때마다 다음 전투를 [재생] 3으로 시작한다.' }),
   UQ({ id: 'dl3', dungeon: 'labyrinth', name: '선택자의 낫',     slot: 'weapon', skillId: 'decapitate',  src: 0, desc: '[미궁 심층] 방 선택지가 3개 이상이던 층에서는 전투를 [격노] 2로 시작한다.' }),
   UQ({ id: 'dl4', dungeon: 'labyrinth', name: '유산 도굴사',     slot: 'offhand',skillId: 'vitalStab',    src: 0, desc: '[미궁 심층] 전투 승리 시 장비 드랍 확률 +20%p.' }),
   // 🌊 폐허 — 도트·부패
@@ -3296,7 +3336,7 @@ export const BURIED_UNIQUES = [
   UQ({ id: 'dc1', dungeon: 'chasm', name: '나락의 갈고리',       slot: 'acc',    skillId: 'bloodSigil',  src: 0, desc: '[나락 심층] 낙하 구멍의 HP 비용이 절반이 된다.' }),
   UQ({ id: 'dc2', dungeon: 'chasm', name: '추락자의 갑주',       slot: 'armor',  skillId: 'thornMail',   src: 0, desc: '[나락 심층] 낙하할 때마다 다음 전투를 🧱방벽 1로 시작한다.' }),
   UQ({ id: 'dc3', dungeon: 'chasm', name: '심락의 대검',         slot: 'weapon', skillId: 'decapitate',  src: 0, desc: '[나락 심층] 잃은 HP 1%당 주는 피해 +0.5% (최대 +40%).' }),
-  UQ({ id: 'dc4', dungeon: 'chasm', name: '바닥 없는 주머니',    slot: 'offhand',skillId: 'manaDrain',    src: 0, desc: '[나락 심층] 골드 +50%, 전투 승리 시 최대 HP의 8%를 회복한다.' }),
+  UQ({ id: 'dc4', dungeon: 'chasm', name: '바닥 없는 주머니',    slot: 'offhand',skillId: 'manaDrain',    src: 0, desc: '[나락 심층] 골드 +50%, 소지 골드 1,500당 물리·기교·마법 +1% (최대 +25%).' }),
   // 🌑 심연 — 어둠·일격
   UQ({ id: 'da1', dungeon: 'abyss', name: '심연의 눈',           slot: 'helm',   skillId: 'insight',     src: 0, desc: '[심연 심층] 어둠을 꿰뚫는다 — 적 수치가 다시 보이고, 치명 확률 +8%.' }),
   UQ({ id: 'da2', dungeon: 'abyss', name: '어둠에 벼린 칼',      slot: 'weapon', skillId: 'executioner', src: 0, desc: '[심연 심층] 매 전투 첫 공격의 피해가 2배가 된다.' }),
@@ -3429,12 +3469,39 @@ export function buriedUniqueFx(char) {
   return out;
 }
 
+// ⚔ 유니크 속성 (1.161.0, PM 결정 70/30) — 드랍의 70%는 캐릭터 **메인 속성**(물리계/마법계)과
+// 같은 속성 풀에서, 30%는 나머지에서 굴린다. 속성은 내장 스킬의 참조 스탯 → fx 순으로 판정.
+// 'any'(방어·유틸)는 어느 캐릭터에게나 메인 풀 취급.
+export function buriedUniqueAffinity(u) {
+  const sk = BURIED_SKILLS[u.skillId];
+  if (sk?.stat === 'int') return 'mag';
+  if (sk?.stat === 'str' || sk?.stat === 'dex') return 'phys';
+  const fx = u.fx || {};
+  if (fx.magPct && !fx.physPct) return 'mag';
+  if (fx.physPct && !fx.magPct) return 'phys';
+  return 'any';
+}
+// 캐릭터 메인 속성 — 최종 공격력 3종 중 마법이 최고면 mag, 아니면 phys
+export function buriedMainAttr(char) {
+  if (!char) return null;
+  const d = buriedDerived(char);
+  return (d.mag || 0) >= Math.max(d.atk || 0, d.fin || 0) ? 'mag' : 'phys';
+}
+export const BURIED_UNIQUE_AFFINITY_PCT = 70; // 메인 속성 풀 비중 (PM 결정)
+
 // 유니크 장비 생성 — 스탯은 전설 등급 배율, 이름·스킬·효과 고정.
 // 1.115.0 — dungeonId·deep: 던전 전용 유니크는 그 던전 심층에서만 풀에 들어오고,
 // 미보유 전용이 남아 있으면 50% 확률로 전용 쪽을 우선 뽑는다 (공략 목적지 역할)
-export function rollBuriedUniqueItem({ classId, floor = 1, excludeIds = [], dungeonId = null, deep = false, powerMult = 1, forceId = null } = {}) {
+// 1.161.0 — mainAttr('phys'|'mag'): 지정 시 일반 풀을 70/30 속성 분배로 굴린다
+export function rollBuriedUniqueItem({ classId, floor = 1, excludeIds = [], dungeonId = null, deep = false, powerMult = 1, forceId = null, mainAttr = null } = {}) {
   // 1.143.0 — forceId: 특정 유니크 확정 생성 (묘주의 관 등 정점 보상)
-  const generic = BURIED_UNIQUES.filter(u => !u.dungeon && !excludeIds.includes(u.id));
+  let generic = BURIED_UNIQUES.filter(u => !u.dungeon && !excludeIds.includes(u.id));
+  if (mainAttr && generic.length > 0) {
+    const match = generic.filter(u => { const a = buriedUniqueAffinity(u); return a === mainAttr || a === 'any'; });
+    const rest = generic.filter(u => !match.includes(u));
+    if (Math.random() * 100 < BURIED_UNIQUE_AFFINITY_PCT) { if (match.length > 0) generic = match; }
+    else if (rest.length > 0) generic = rest;
+  }
   const exclusive = (deep && dungeonId)
     ? BURIED_UNIQUES.filter(u => u.dungeon === dungeonId && !excludeIds.includes(u.id))
     : [];
@@ -3459,13 +3526,13 @@ export function rollBuriedUniqueItem({ classId, floor = 1, excludeIds = [], dung
 
 // 보스 유니크 드랍 확률 (%) — 던전이 깊을수록 후하다. 최종 보스는 2배
 export const BURIED_UNIQUE_DROP = { labyrinth: 8, ruins: 12, chasm: 16, abyss: 22 };
-export function rollBuriedUniqueDrop({ dungeonId, isFinalBoss, classId, floor, ownedIds = [], guaranteed = false, deep = null, powerMult = 1 }) {
+export function rollBuriedUniqueDrop({ dungeonId, isFinalBoss, classId, floor, ownedIds = [], guaranteed = false, deep = null, powerMult = 1, mainAttr = null }) {
   const base = BURIED_UNIQUE_DROP[dungeonId] || 8;
   const chance = guaranteed ? 100 : base * (isFinalBoss ? 2 : 1);
   if (Math.random() * 100 >= chance) return null;
   // deep — 정복 층 **이후**만 전용 풀 개방 (1.117.0: 정복 층 당일 포함 off-by-one 픽스).
   // 미지정 시 기존 isFinalBoss 기준 유지 (재앙 등)
-  return rollBuriedUniqueItem({ classId, floor, excludeIds: ownedIds, dungeonId, deep: deep === null ? !!isFinalBoss : !!deep, powerMult });
+  return rollBuriedUniqueItem({ classId, floor, excludeIds: ownedIds, dungeonId, deep: deep === null ? !!isFinalBoss : !!deep, powerMult, mainAttr });
 }
 
 // 층 이동 시 유니크 [u102] 판정 — 25% 확률 무작위 스킬 레벨 +1
@@ -4182,7 +4249,7 @@ export function acceptBuriedCurse(char, curseId, choiceId = 'wealth') {
   }
   if (choiceId === 'treasure') {
     if (c.sev >= 3) {
-      const item = rollBuriedUniqueItem({ classId: char.classId, floor: monLv, powerMult: buriedLootPower(char) });
+      const item = rollBuriedUniqueItem({ classId: char.classId, floor: monLv, powerMult: buriedLootPower(char), mainAttr: buriedMainAttr(char), excludeIds: char.uniquesFound || [] });
       return { char: cursed, reward: { dust: 0, gold: 0 }, item, text: '왕관 아래에서 전설의 무구가 모습을 드러낸다!' };
     }
     if (c.sev === 2) {

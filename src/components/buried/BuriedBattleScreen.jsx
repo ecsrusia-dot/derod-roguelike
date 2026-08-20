@@ -31,7 +31,7 @@ import {
   BURIED_SIGILS, buriedZoneAt,
   BURIED_GHOST_RANKS, getBuriedGhost, buriedGhostForEnemy, buriedGhostKit, buriedTameChance,
   buriedItemRunes, buriedRunewordCharFx,
-  buriedMonsterLevel, applyBuriedGearDecay,
+  buriedMonsterLevel, applyBuriedGearDecay, buriedMainAttr,
 } from '../../data.js';
 import { BuriedBar, BuriedStatusRow, BuriedItemCard, slotMeta, SkillKindBadge, BuriedInfoModal } from './BuriedCommon.jsx';
 
@@ -153,7 +153,8 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     // 1.149.0 — rwFx = 완성된 ⟪룬워드⟫의 캐릭터 단위 효과 (dmgPct·takenPct·critAdd·statusUncap)
     // 특성 「정상의 시야」 (1.156.0, 등정자 전용) — 현재 층 50당 주는 피해 +2% (최대 +30%)
     envDmgPct: (env.self.dmgPct || 0) + (uniques.includes('u21') ? -50 : 0) + (char.sigils || 0) * BURIED_SIGILS.dmgPct + (rwFx.dmgPct || 0)
-      + (buriedTraitIds(char).includes('summitgaze') ? Math.min(30, Math.floor((char.floor || 1) / 50) * 2) : 0),
+      + (buriedTraitIds(char).includes('summitgaze') ? Math.min(30, Math.floor((char.floor || 1) / 50) * 2) : 0)
+      + (uniques.includes('u91') && BURIED_UNDEAD_KEYS.includes(enemy.key) ? 30 : 0), // [u91] 망자 사냥꾼 (1.161.0) — 망자 특효 +30%
     envTakenPct: (env.self.takenPct || 0) + (uniques.includes('u21') ? -50 : 0) + (uniques.includes('u52') ? 15 : 0) + (ufx.takenPct || 0) + (kf.takenPct || 0) + (cf.takenPct || 0) - (char.sigils || 0) * BURIED_SIGILS.takenPct + (rwFx.takenPct || 0), // cf.takenPct = 🕯 동행 괴이 패시브 (1.144.0)
     envCritAdd: (env.self.critAdd || 0) + (rwFx.critAdd || 0), envMagPct: env.self.magPct || 0,
     envDodgeAdd: env.self.dodgeAdd || 0,
@@ -182,6 +183,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     immuneCrit: !!eliteFx.immuneCrit, enrage: !!eliteFx.enrage,
     statuses: (() => {
       const s = hasBuriedCurse(char, 'berith') ? { wall: 2 } : {};
+      if (uniques.includes('u48')) s.curse = (s.curse || 0) + 3; // [u48] 게헨나 (1.161.0) — 회복 무효·받피 증가
       if (uniques.includes('u22')) s.stun = (s.stun || 0) + 1; // [u22] 심판자
       if (uniques.includes('u51')) s.weaken = (s.weaken || 0) + 2; // [u51] 탐식자
       if (uniques.includes('u55')) s.shatter = (s.shatter || 0) + 2; // [u55] 군림
@@ -380,6 +382,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
         const owned = [
           ...Object.values(char.equipped || {}).map(i => i?.unique),
           ...(char.pendingLoot || []).map(i => i.unique),
+          ...(char.uniquesFound || []), // 1.161.0 — 이번 런에서 이미 나온 유니크는 다시 안 나온다
         ].filter(Boolean);
         const uniqueDrop = rollBuriedUniqueDrop({
           dungeonId: char.dungeonId,
@@ -388,6 +391,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
           classId: char.classId,
           floor: enemy.lv || char.floor,
           ownedIds: owned,
+          mainAttr: buriedMainAttr(char), // 1.161.0 — PM 결정: 메인 속성 70% / 그외 30%
           guaranteed: roomType === 'calamity' || guardianFight,
           powerMult: lootPower,
         });
@@ -402,17 +406,17 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
         hp = Math.min(d.maxHp, hp + Math.round(d.maxHp * 0.15));
         pushLog('망자 사냥꾼 — 망자의 기운을 흡수해 HP 15% 회복', PALETTE.green);
       }
-      // [u7] 드라큘라 — 처치 시 HP 전액 회복
-      if (uq('u7')) { hp = d.maxHp; pushLog('드라큘라 — 적의 피가 상처를 전부 메운다.', '#7d2b4a'); }
-      // [dc4] 바닥 없는 주머니 — 승리 시 최대 HP 8% 회복
-      if (uq('dc4')) hp = Math.min(d.maxHp, hp + Math.round(d.maxHp * 0.08));
+      // [u7] 드라큘라 (1.161.0) — 처치 시 HP 전액 회복, 이미 만피였다면 최대 HP 25% 보호막 이월
+      const u7Full = uq('u7') && hp >= d.maxHp;
+      if (uq('u7')) { hp = d.maxHp; pushLog(u7Full ? '드라큘라 — 넘친 피가 장막이 된다. 보호막 25% 이월!' : '드라큘라 — 적의 피가 상처를 전부 메운다.', '#7d2b4a'); }
+      // [dc4] 승리 회복은 1.161.0 리뉴얼로 삭제 — 골드 비례 화력으로 대체 (buriedDerived)
       setResult({
         win: true, gold, exp, drops, rune: runeDrop, usesSpent: spentMapRef.current,
         hp: cs('balam') ? 1 : hp, // 저주 「발람」 — 승리해도 HP 1
         potions,
         dustGain: dustGainRef.current,
         skillLvUp: uq('u100') && Math.random() < 0.75, // [u100] 수확자의 서
-        carryBarrier: uq('u6') ? Math.max(0, playerRef.current?.barrier || 0) : 0, // [u6] 달인
+        carryBarrier: (uq('u6') ? Math.max(0, playerRef.current?.barrier || 0) : 0) + (u7Full ? Math.round(d.maxHp * 0.25) : 0), // [u6] 달인 + [u7] 드라큘라 만피 이월
         researchPct: uq('u36') ? 0.5 : 0, // [u36] 비전 — 1.133.0 %화: 처치마다 공격력 +0.5% (런 영구)
         tamed: tameRef.current, // 🕯 제령 성공 (1.144.0) — { ghostId, breakUp }
         talismansSpent: talismanSpentRef.current, // 이번 전투 소모 제령부
@@ -584,10 +588,13 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
         if (uq('u15')) {
           E.statuses = applyBuriedStatuses(E.statuses, [{ s: 'shatter', n: 1 }], statusOpts);
         }
-        // [u63] 스탬피드 — 적중마다 적 최대 HP -2%
-        if (uq('u63')) {
-          E.maxHp = Math.max(1, Math.round(E.maxHp * 0.98));
-          if (E.hp > E.maxHp) E.hp = E.maxHp;
+        // [u63] 스탬피드 (1.161.0 리뉴얼) — 적중마다 적 최대 HP 비례 방어 무시 고정 피해.
+        // 구버전(최대 HP 깎기)은 이미 깎인 HP엔 무의미했다 (PM 지적) → 탱커 특효 고정 피해로
+        if (uq('u63') && res.hits.length > 0) {
+          const pct = enemy.guardian || enemy.apex ? 1 : 2.5;
+          const stomp = Math.max(1, Math.round(E.maxHp * pct / 100)) * res.hits.length;
+          E.hp = Math.max(0, E.hp - stomp);
+          pushFloat('enemy', `-${stomp}`, PALETTE.legendary);
         }
         // [u31] 오의 — 치명타 시 10% 즉사 (보스 면역)
         if (uq('u31') && res.crits > 0 && E.hp > 0 && enemy.tier !== 'boss' && Math.random() < 0.1) {
