@@ -813,6 +813,9 @@ export function buriedCheckpointFloors(deepestFloor) {
 
 // 파생 스탯 — 장비·레벨·스탯·특성 전부 합산
 // 1.104.0~ barrier(보호막)·chase(추격 피해) 추가 — 원작의 핵심 2축
+// 🌀 회피율 상한 (1.167.0, PM 결정) — 45% → 70%. 회피 특화 직업(정령사·다크엘프 등)이
+// 실제로 회피 빌드를 굴릴 수 있도록. buriedEffDodge의 전투 상한(70)과 같은 값으로 맞췄다.
+export const BURIED_DODGE_CAP = 70;
 // 🎯 치명 확률 상한 (1.166.0) — 초과분은 치명 피해로 전환
 export const BURIED_CRIT_CAP = 75;      // 확률 상한 (%)
 export const BURIED_CRIT_OVERFLOW = 2;  // 초과 1%p당 치명 피해 +N%
@@ -874,7 +877,7 @@ export function buriedDerived(char) {
     critRaw, // 표시용 — 상한 전 원본 (초과분이 얼마나 전환됐는지 보여준다)
     critDmg: 60 + (gear.critDmg || 0) + critOverflowDmg,
     critOverflowDmg, // 표시용 — 초과분 전환으로 얻은 치명 피해
-    dodge:   Math.min(45, Math.round(3 + st.dex * 0.4 + (gear.dodge || 0) + (tf.dodge || 0) + (cf.dodge || 0) + (pf.dodge || 0) + (rf.dodge || 0) + (uf.dodge || 0))),
+    dodge:   Math.min(BURIED_DODGE_CAP, Math.round(3 + st.dex * 0.4 + (gear.dodge || 0) + (tf.dodge || 0) + (cf.dodge || 0) + (pf.dodge || 0) + (rf.dodge || 0) + (uf.dodge || 0))),
     // 1.118.0 — 패시브 회복 9+int/8 → 3+int/12 (PM: SP가 무의미). 이제 SP의 주 엔진은
     // 기본 공격(+14)·마력 흡수·집중이고, 패시브·장비 spRegen은 보조가 된다
     spRegen: Math.round(3 + st.int / 12 + (gear.spRegen || 0) + (pf.spRegen || 0) + (uf.spRegen || 0)),
@@ -2131,7 +2134,7 @@ export function buriedEffDef(u) {
 export function buriedEffDodge(u) {
   if (u?.noDodge) return 0; // ⚓ 둔족의 쐐기 (1.128.0)
   if (stacksOf(u, 'bind') > 0) return 0;
-  return Math.min(70, (u?.dodge || 0) + stacksOf(u, 'evade') * 15 + (u?.envDodgeAdd || 0));
+  return Math.min(BURIED_DODGE_CAP, (u?.dodge || 0) + stacksOf(u, 'evade') * 15 + (u?.envDodgeAdd || 0));
 }
 // 회복 가능 여부 (저주 = 회복 무효)
 export const buriedCanHeal = (u) => stacksOf(u, 'curse') === 0;
@@ -2917,11 +2920,11 @@ export function tickBuriedGearBreak(char) {
     if (floor - it.depletedAt >= BURIED_BREAK_GRACE) { broken.push(it); equipped[s] = null; changed = true; }
   }
   if (!changed) return { char, broken, marked };
-  // 1.160.0 — 부서진 장비의 룬도 주머니로 회수 (파손 벌칙은 장비·스킬·스탯 상실로 충분하다)
-  const runesBack = broken.flatMap(it => buriedItemRunes(it));
+  // 1.160.0 — 부서진 장비의 룬도 회수 시도 / 1.167.0 — 등급별 확률 (100% 회수 폐지)
+  const rec = rollBuriedRuneRecovery(broken.flatMap(it => buriedItemRunes(it)));
   const next = { ...char, equipped };
-  if (runesBack.length > 0) next.runes = [...(char.runes || []), ...runesBack];
-  return { char: next, broken, marked };
+  if (rec.kept.length > 0) next.runes = [...(char.runes || []), ...rec.kept];
+  return { char: next, broken, marked, runesBack: rec.kept.length, runesLost: rec.lost.length };
 }
 // 파손까지 남은 층 (표시용) — 소진 상태가 아니면 null
 export function buriedBreakIn(char, slot) {
@@ -3148,10 +3151,11 @@ export function resolveBuriedLoot(char, replace, opts = {}) {
   const rest = queue.slice(1);
   const ksMult = 1 + buriedKeystoneBonus(char).rewardPct / 100; // ⚓ 쐐기 보상 (1.128.0)
   if (!replace) {
-    const back = buriedItemRunes(item);
+    const rec = rollBuriedRuneRecovery(buriedItemRunes(item)); // 1.167.0 — 등급별 확률 회수
     return {
-      char: { ...char, pendingLoot: rest, runes: [...(char.runes || []), ...back] },
-      dustGain: Math.round(buriedDustValue(item) * ksMult), dismantled: item, runesBack: back.length, modMoved: null,
+      char: { ...char, pendingLoot: rest, runes: [...(char.runes || []), ...rec.kept] },
+      dustGain: Math.round(buriedDustValue(item) * ksMult), dismantled: item,
+      runesBack: rec.kept.length, runesLost: rec.lost.length, modMoved: null,
     };
   }
   const prev = char.equipped?.[item.slot] || null;
@@ -3161,14 +3165,15 @@ export function resolveBuriedLoot(char, replace, opts = {}) {
     const mod = getBuriedMod(prev.mod);
     if (mod) { equipItem = { ...item, mod: prev.mod, name: `${mod.name} ${item.name}` }; modMoved = mod.name; }
   }
-  const back = prev ? buriedItemRunes(prev) : [];
+  const rec = rollBuriedRuneRecovery(prev ? buriedItemRunes(prev) : []); // 1.167.0 — 등급별 확률 회수
   let next = {
     ...char, pendingLoot: rest,
     equipped: { ...char.equipped, [item.slot]: equipItem },
-    runes: [...(char.runes || []), ...back],
+    runes: [...(char.runes || []), ...rec.kept],
   };
   next.hp = Math.min(next.hp, buriedDerived(next).maxHp);
-  return { char: next, dustGain: prev ? Math.round(buriedDustValue(prev) * ksMult) : 0, dismantled: prev, runesBack: back.length, modMoved };
+  return { char: next, dustGain: prev ? Math.round(buriedDustValue(prev) * ksMult) : 0, dismantled: prev,
+    runesBack: rec.kept.length, runesLost: rec.lost.length, modMoved };
 }
 
 // 협상 방 — 지불액과 보상. 마물 레벨이 높을수록 비싸고 크다.
@@ -4001,9 +4006,17 @@ export function buriedRunewordAudit() {
   return bad;
 }
 
+// 1.167.0 PM 지시 — 소켓 수와 정확히 같아야 완성되던 규칙을 **연속 부분 일치**로 완화.
+// 3칸 장비에 2룬 룬워드를 넣어도(빈 칸이 남아도, 앞뒤에 다른 룬이 있어도) 순서만 맞으면 발동한다.
+// 여러 개가 겹치면 **긴 룬워드 우선** — 짧은 조합이 먼저 잡혀 상위 룬워드를 가리는 걸 막는다.
+const BURIED_RUNEWORDS_BY_LEN = null; // (정렬은 아래에서 지연 생성)
+let _rwSorted = null;
 export function buriedRunewordOf(runes) {
   const list = runes || [];
-  return BURIED_RUNEWORDS.find(rw => rw.runes.length === list.length && rw.runes.every((r, i) => list[i] === r)) || null;
+  if (list.length === 0) return null;
+  if (!_rwSorted) _rwSorted = [...BURIED_RUNEWORDS].sort((a, b) => b.runes.length - a.runes.length);
+  return _rwSorted.find(rw => rw.runes.length <= list.length
+    && list.some((_, i) => i + rw.runes.length <= list.length && rw.runes.every((r, j) => list[i + j] === r))) || null;
 }
 // 장착 6칸의 완성 룬워드 charFx 합산 — 전투가 소비 (statusUncap 등)
 export function buriedRunewordCharFx(char) {
@@ -4068,11 +4081,18 @@ export function buriedRunewordFitCheck(char, rw, slot) {
   if (!item) return { ok: false, reason: '빈 슬롯' };
   const cur = buriedItemRunes(item);
   const sockets = buriedItemSockets(item);
-  if (sockets < rw.runes.length) return { ok: false, reason: `소켓 ${sockets}칸 (${rw.runes.length}칸 필요)` };
-  if (!rw.runes.slice(0, cur.length).every((r, i) => cur[i] === r)) {
-    return { ok: false, reason: cur.length > 0 ? '이미 다른 룬이 박혀 있다' : '각인 불가' };
+  if (buriedRunewordOf(cur)?.id === rw.id) return { ok: false, reason: '이미 완성됨' };
+  // 1.167.0 — 이미 박힌 룬의 **끝부분**이 룬워드의 앞부분과 이어지면 그만큼 아껴 각인한다.
+  // (부분 일치 매칭이라 이어 붙이기만 하면 완성된다 — 앞에 무관한 룬이 있어도 무방)
+  let head = 0;
+  for (let k = Math.min(cur.length, rw.runes.length - 1); k > 0; k--) {
+    if (rw.runes.slice(0, k).every((r, i) => cur[cur.length - k + i] === r)) { head = k; break; }
   }
-  const need = rw.runes.slice(cur.length);
+  const need = rw.runes.slice(head);
+  const free = sockets - cur.length;
+  if (free < need.length) {
+    return { ok: false, reason: `빈 소켓 ${free}칸 (${need.length}칸 필요)` };
+  }
   const left = [...(char.runes || [])];
   for (const id of need) {
     const i = left.indexOf(id);
@@ -4086,7 +4106,7 @@ export function buriedRunewordFitCheck(char, rw, slot) {
       return { ok: false, reason: `「${r.name}」은 쿨다운 1 이상 스킬 전용` };
     }
   }
-  return { ok: true, reason: cur.length > 0 ? `이어서 ${need.length}개 각인` : `${need.length}개 각인` };
+  return { ok: true, reason: head > 0 ? `이어서 ${need.length}개 각인` : `${need.length}개 각인` };
 }
 export function applyBuriedRuneword(char, runewordId, slot) {
   const rw = BURIED_RUNEWORDS.find(x => x.id === runewordId);
@@ -4095,7 +4115,11 @@ export function applyBuriedRuneword(char, runewordId, slot) {
   if (!fit.ok) return { char, ok: false, text: fit.reason };
   const item = char.equipped[slot];
   const cur = buriedItemRunes(item);
-  const need = rw.runes.slice(cur.length);
+  let head = 0;
+  for (let k = Math.min(cur.length, rw.runes.length - 1); k > 0; k--) {
+    if (rw.runes.slice(0, k).every((r, i) => cur[cur.length - k + i] === r)) { head = k; break; }
+  }
+  const need = rw.runes.slice(head);
   // 주머니에서 재료를 순서대로 1개씩 꺼낸다 (같은 룬 중복 요구도 정확히 소모)
   const pouch = [...(char.runes || [])];
   for (const id of need) pouch.splice(pouch.indexOf(id), 1);
@@ -4106,6 +4130,20 @@ export function applyBuriedRuneword(char, runewordId, slot) {
     ok: true,
     text: `«${item.name}»에 ⟪${rw.name}⟫ 완성! ${rw.desc}`,
   };
+}
+
+// ᚱ 룬 회수율 (1.167.0, PM 지시) — 100% 회수는 사기. 장비를 분해·교체·파손할 때
+// **등급별 확률**로만 돌아온다. 높은 등급일수록 잃기 쉽다 = 각인은 여전히 도박.
+// ⚠ 랜덤이므로 반드시 이벤트 핸들러에서 호출할 것 (setMeta updater 안 금지 — StrictMode 이중 실행)
+export const BURIED_RUNE_RECOVERY = { 1: 90, 2: 70, 3: 60, 4: 50, 5: 40 };
+export function rollBuriedRuneRecovery(runeIds) {
+  const kept = [], lost = [];
+  for (const id of runeIds || []) {
+    const r = getBuriedRune(id);
+    const pct = BURIED_RUNE_RECOVERY[r?.rarity] ?? 60;
+    (Math.random() * 100 < pct ? kept : lost).push(id);
+  }
+  return { kept, lost };
 }
 
 export function socketBuriedRune(char, runeIdx, slot) {

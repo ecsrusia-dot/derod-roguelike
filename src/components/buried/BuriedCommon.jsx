@@ -303,7 +303,7 @@ export function BuriedItemSheet({ item, compare, onEquip, onUnequip, onDismantle
                 </div>
               )}
               <div className="text-[11px] mt-1" style={{ color: PALETTE.textDim }}>
-                각인은 영구 — 장착 중엔 떼어낼 수 없다. 장비를 분해하면 룬은 <b style={{ color: PALETTE.text }}>주머니로 회수</b>된다. 룬 **순서**가 조합과 일치하면 ⟪룬워드⟫가 발동한다.
+                각인은 영구 — 장착 중엔 떼어낼 수 없다. 장비를 분해하면 룬은 <b style={{ color: PALETTE.text }}>등급별 확률(★1 90% ~ ★5 40%)</b>로만 회수된다. 룬이 <b style={{ color: PALETTE.legendary }}>순서대로 이어져</b> 있으면 빈 소켓이 남아도 ⟪룬워드⟫가 발동한다.
               </div>
             </div>
           );
@@ -466,7 +466,7 @@ export function BuriedLootModal({ char, onResolve, dust = 0 }) {
         {/* 1.160.0 — 분해되는 장비의 룬은 주머니로 회수된다 (교체·버리기 공통 안내) */}
         {curRunesBack > 0 && (
           <div className="mb-1.5 text-[11px]" style={{ color: PALETTE.twilight }}>
-            ᚱ 교체하면 기존 장비의 룬 {curRunesBack}개는 주머니로 회수된다 — 새 장비에 다시 각인 가능.
+            ᚱ 교체하면 기존 장비의 룬 {curRunesBack}개는 <b style={{ color: PALETTE.text }}>등급별 확률</b>로 회수된다 (★1 90% · ★2 70% · ★3 60% · ★4 50% · ★5 40%) — 실패한 룬은 부서진다.
           </div>
         )}
         <div className="flex gap-2">

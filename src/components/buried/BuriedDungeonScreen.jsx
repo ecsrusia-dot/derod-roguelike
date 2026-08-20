@@ -86,6 +86,7 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onLogEvent, on
     const msgs = [];
     if (raised) msgs.push(`순례자의 성표 — 오르는 길에 [${raised.id}] 스킬이 Lv.${raised.lv}이 되었다.`);
     for (const it of tick.broken) msgs.push(`⛓ «${it.name}»이(가) 부서져 사라졌다 — 소진된 채 ${BURIED_BREAK_GRACE}층이 지났다.`);
+    if (tick.runesBack > 0 || tick.runesLost > 0) msgs.push(`ᚱ 룬 ${tick.runesBack}개 회수${tick.runesLost > 0 ? ` · ${tick.runesLost}개 소실` : ''}.`);
     for (const it of tick.marked) msgs.push(`⚠ «${it.name}» 스킬 소진 — ${BURIED_BREAK_GRACE}층 안에 충전하지 못하면 부서진다!`);
     setEventLogOpen(false);
     onUpdateChar(tick.char, 0);
@@ -904,7 +905,7 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onLogEvent, on
           onUpdateChar(r.char, r.dustGain - cost);
           const bits = [];
           if (r.dismantled) bits.push(`${r.dismantled.name} 자동 분해 — ${BURIED_DUST_ICON} +${r.dustGain}`);
-          if (r.runesBack > 0) bits.push(`ᚱ 룬 ${r.runesBack}개 주머니로 회수`);
+          if (r.runesBack > 0 || r.runesLost > 0) bits.push(`ᚱ 룬 ${r.runesBack}개 회수${r.runesLost > 0 ? ` · ${r.runesLost}개 소실` : ''}`);
           if (r.modMoved) bits.push(`◈ 「${r.modMoved}」 전승 완료 (${BURIED_DUST_ICON} -${cost})`);
           if (bits.length > 0) setNotice(bits.join(' · '));
         }} />
