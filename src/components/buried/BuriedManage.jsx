@@ -183,7 +183,8 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose, readOn
           <div className="px-3 py-2.5 space-y-1.5" style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panel, border: `1px solid ${PALETTE.legendary}44` }}>
             <div className="text-[11px] leading-relaxed" style={{ color: PALETTE.textDim }}>
               한 장비의 소켓에 <b style={{ color: PALETTE.legendary }}>정해진 순서 그대로</b> 각인하면 완성된다. 각인은 영구 — 순서를 틀리면 되돌릴 수 없다.
-              <br />★ = 장착 장비에 완성됨 · ✅ = 지금 주머니 룬으로 완성 가능
+              <br />★ = 장착 장비에 완성됨 · ✅ = 지금 바로 각인 가능 (재료·소켓 모두 충족)
+              <br />각인이 막히면 그 아래에 <b style={{ color: PALETTE.accent }}>막힌 이유</b>가 뜬다 — 재료가 없으면 필요한 룬 이름을, 소켓이 모자라면 어느 장비가 몇 칸 비었는지 알려준다.
             </div>
             {(() => { const L = buriedRunewordProgress(char);
               const ready = L.filter(x => x.craftable && !x.done).length;
@@ -242,9 +243,12 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose, readOn
                       <span style={{ color: BURIED_RUNE_RARITIES[r?.rarity]?.color || PALETTE.text }}>{r?.name || '?'}</span>
                     </span>
                   ))}
-                  {/* 1.167.1 — 왜 못 넣는지 **실제 사유**를 그대로 보여준다 (가장 가까운 장비 기준) */}
+                  {/* 1.167.3 — 사유 표시: 재료 부족은 **전역 사실**이라 슬롯 이름을 붙이지 않고,
+                      장비별 문제(소켓·쿨다운)일 때만 어느 장비 기준인지 밝힌다 */}
                   {!rw.done && !canApply && rw.fit && (
-                    <span style={{ color: PALETTE.accent }}> · {rw.fit.item ? `${slotMeta(rw.fit.slot).name}: ` : ''}{rw.fit.reason}</span>
+                    <span style={{ color: PALETTE.accent }}> · {rw.fit.kind === 'material' || rw.fit.kind === 'noitem'
+                      ? rw.fit.reason
+                      : `${slotMeta(rw.fit.slot).name}(${rw.fit.item?.name || '장비'}) — ${rw.fit.reason}`}</span>
                   )}
                 </div>
               </div>
