@@ -27,7 +27,7 @@ import {
   buriedModdedSkill, hasBuriedCurse, aggregateBuriedContracts, buriedLootPower, buriedRaceFx,
   rollBuriedRune, getBuriedRune, BURIED_RUNE_RARITIES,
   buriedUniqueFx, buriedKeystoneFx, buriedKeystoneBonus, getBuriedKeystone,
-  buriedSkillMaxUses,
+  buriedSkillMaxUses, buriedItemMaxUses, BURIED_GUARDIAN_DOT_RESIST,
   BURIED_SIGILS, buriedZoneAt,
   BURIED_GHOST_RANKS, getBuriedGhost, buriedGhostForEnemy, buriedGhostKit, buriedTameChance,
   buriedItemRunes, buriedRunewordCharFx,
@@ -994,6 +994,8 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
 
     const canE = buriedCanHeal(E) && !env.foe.noHeal;
     const et = tickBuriedStatuses(E, { canHeal: canE });
+    // ☠ 수문장·묘주 도트 저항 (1.162.0) — %화된 도트가 긴 관문전 자동승리가 되지 않게 50% 감쇄
+    if ((enemy.guardian || enemy.apex) && et.dmg > 0) et.dmg = Math.round(et.dmg * (1 - BURIED_GUARDIAN_DOT_RESIST / 100));
     if (gimmickId === 'flood') { // 기믹 「침수」 — 도트 +50% · 회복 -25% (적도 동일)
       if (et.dmg > 0) et.dmg = Math.round(et.dmg * 1.5);
       if (et.heal > 0) et.heal = Math.round(et.heal * 0.75);
@@ -1332,7 +1334,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
             const spCost = Math.round(eff.sp * (1 + (env.self.spCostPct || 0) / 100));
             const noSp = spCost > player.sp;
             // 1.132.0 — 사용 횟수: 잔여 0이면 봉인 (새 장비를 주워야 다시 쓴다)
-            const usesLeft = buriedSkillMaxUses(skill, lv) - (item.usesSpent || 0) - (spentMap[slot] || 0);
+            const usesLeft = buriedItemMaxUses(item, skill, lv) - (item.usesSpent || 0) - (spentMap[slot] || 0); // 1.162.0 — 🛠 마모 반영
             const sealed = usesLeft <= 0;
             // 1.144.1 — 현재(버프 포함) 공격력 기준 예상 데미지 (적 방어 적용 전)
             const pvBase = eff.power ? ({ str: player.atk, dex: player.fin, int: player.mag }[eff.stat] ?? Math.max(player.atk, player.fin, player.mag)) : 0;

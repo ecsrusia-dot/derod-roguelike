@@ -9,7 +9,7 @@ import {
   BURIED_SKILLS, BURIED_STATUS, BURIED_SLOTS, BURIED_TIERS,
   getBuriedTier, buriedItemStats, buriedDustValue,
   buriedSkillEffectLines, getBuriedUnique, getBuriedMod, getBuriedRune, BURIED_RUNE_RARITIES,
-  buriedSkillMaxUses, buriedSkillLv,
+  buriedSkillMaxUses, buriedItemMaxUses, buriedSkillLv,
   buriedSkillAt, buriedModdedSkill, buriedSkillDmgPreview,
   buriedItemRunes, buriedItemSockets, buriedRunewordOf,
   buriedMonsterLevel, applyBuriedGearDecay, buriedModTransferCost,
@@ -21,8 +21,8 @@ export function buriedItemUses(item, char = null) {
   const skill = item ? BURIED_SKILLS[item.skillId] : null;
   if (!skill) return null;
   const lv = char ? buriedSkillLv(char, item.skillId) : 1;
-  const max = buriedSkillMaxUses(skill, lv);
-  return { max, left: Math.max(0, max - (item.usesSpent || 0)) };
+  const max = buriedItemMaxUses(item, skill, lv); // 1.162.0 — 🛠 마모 반영
+  return { max, left: Math.max(0, max - (item.usesSpent || 0)), wear: Math.min(100, item.wearPct || 0) };
 }
 export function usesColor(u) {
   if (!u) return PALETTE.textDim;
@@ -326,7 +326,7 @@ export function BuriedItemSheet({ item, compare, onEquip, onUnequip, onDismantle
               const u = buriedItemUses(item, char);
               return u ? (
                 <div className="text-[11px] mt-0.5 tabular-nums" style={{ color: usesColor(u) }}>
-                  ⛓ 사용 가능 횟수 <b>{u.left}/{u.max}</b>{u.left <= 0 ? ' — 소진: 스킬 봉인 상태 (야영·봉헌·상점 정비로 충전)' : ' — 소진 시 스킬 봉인, 야영·봉헌·상점 정비로 충전'}
+                  ⛓ 사용 가능 횟수 <b>{u.left}/{u.max}</b>{u.wear > 0 ? ` · 🛠 마모 ${u.wear}%` : ''}{u.left <= 0 ? ' — 소진: 스킬 봉인 상태 (야영·봉헌·상점 정비로 충전)' : ' — 소진 시 스킬 봉인, 충전할 때마다 최대치가 15%p씩 마모된다'}
                 </div>
               ) : null;
             })()}
