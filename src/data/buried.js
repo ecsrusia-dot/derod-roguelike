@@ -276,7 +276,7 @@ export const BURIED_STATUS = {
 const SK = (o) => o;
 export const BURIED_SKILLS = {
   // ===== 방랑검사 — 검(sword) =====
-  bladeStrike: SK({ id: 'bladeStrike', name: '검격',       slot: 'weapon', line: 'sword', gear: '장검',       sp: 12, cd: 0, stat: 'str', power: 130, desc: '기본에 충실한 베기.' }),
+  bladeStrike: SK({ id: 'bladeStrike', name: '검격',       slot: 'weapon', line: 'sword', gear: '장검',       sp: 12, cd: 0, stat: 'str', power: 92, desc: '기본에 충실한 베기.' }),
   crossSlash:  SK({ id: 'crossSlash',  name: '십자참',     slot: 'weapon', line: 'sword', gear: '쌍인검',     sp: 22, cd: 1, stat: 'str', power: 82, hits: 2, desc: '2연타 (타격당 82%).' }),
   sunderCut:   SK({ id: 'sunderCut',   name: '파쇄격',     slot: 'weapon', line: 'sword', gear: '중검',       sp: 20, cd: 1, stat: 'str', power: 108, apply: [{ s: 'shatter', n: 2, p: 100 }], desc: '적 방어를 깎는다. [파쇄] 2' }),
   executioner: SK({ id: 'executioner', name: '처형검',     slot: 'weapon', line: 'sword', gear: '처형검',     sp: 30, cd: 2, stat: 'str', power: 155, executeBelow: 35, desc: '적 HP 35% 이하면 데미지 2배.' }),
@@ -286,7 +286,7 @@ export const BURIED_SKILLS = {
   afterimage:  SK({ id: 'afterimage',  name: '잔영',       slot: 'offhand', line: 'blade', gear: '환영 단검', sp: 16, cd: 2, self: [{ s: 'evade', n: 3 }], spGain: 8, desc: '그림자를 남긴다. [잔영] 3, SP +8' }),
 
   // ===== 술법사 — 지팡이(staff) =====
-  fireball:    SK({ id: 'fireball',    name: '화염구',     slot: 'weapon', line: 'staff', gear: '화염 지팡이', sp: 14, cd: 0, stat: 'int', power: 128, apply: [{ s: 'burn', n: 2, p: 100 }], desc: '[화상] 2' }),
+  fireball:    SK({ id: 'fireball',    name: '화염구',     slot: 'weapon', line: 'staff', gear: '화염 지팡이', sp: 14, cd: 0, stat: 'int', power: 95, apply: [{ s: 'burn', n: 2, p: 100 }], desc: '[화상] 2' }),
   frostLance:  SK({ id: 'frostLance',  name: '서리창',     slot: 'weapon', line: 'staff', gear: '서리 지팡이', sp: 18, cd: 1, stat: 'int', power: 118, apply: [{ s: 'bind', n: 1, p: 100 }], desc: '[속박] 1' }),
   chainBolt:   SK({ id: 'chainBolt',   name: '연쇄 번개',  slot: 'weapon', line: 'staff', gear: '뇌전 지팡이', sp: 24, cd: 1, stat: 'int', power: 68, hits: 3, desc: '3연타 (타격당 68%).' }),
   infernoSeal: SK({ id: 'infernoSeal', name: '겁화',       slot: 'weapon', line: 'staff', gear: '겁화의 홀',   sp: 32, cd: 2, stat: 'int', power: 145, apply: [{ s: 'burn', n: 4, p: 100 }], desc: '[화상] 4' }),
@@ -296,17 +296,17 @@ export const BURIED_SKILLS = {
   arcaneWard:  SK({ id: 'arcaneWard',  name: '비전 수호',  slot: 'offhand', line: 'tome', gear: '수호 마도서', sp: 16, cd: 2, self: [{ s: 'guard', n: 3 }], desc: '[수호] 3' }),
 
   // ===== 혼혈 마족 — 도끼(axe) =====
-  savageAxe:   SK({ id: 'savageAxe',   name: '광폭 도끼',  slot: 'weapon', line: 'axe', gear: '전투 도끼',   sp: 12, cd: 0, stat: 'str', power: 126, desc: '거칠게 내리찍는다.' }),
+  savageAxe:   SK({ id: 'savageAxe',   name: '광폭 도끼',  slot: 'weapon', line: 'axe', gear: '전투 도끼',   sp: 12, cd: 0, stat: 'str', power: 90, desc: '거칠게 내리찍는다.' }),
   bloodthirst: SK({ id: 'bloodthirst', name: '피의 갈증',  slot: 'weapon', line: 'axe', gear: '흡혈 도끼',   sp: 20, cd: 1, stat: 'str', power: 112, drain: 45, selfDmg: 8, desc: '준 피해의 45% 흡혈. 자해 8' }),
   decapitate:  SK({ id: 'decapitate',  name: '참수',       slot: 'weapon', line: 'axe', gear: '참수 도끼',   sp: 26, cd: 2, stat: 'str', power: 148, apply: [{ s: 'bleed', n: 3, p: 100 }], desc: '[출혈] 3' }),
   doomStrike:  SK({ id: 'doomStrike',  name: '파멸의 일격', slot: 'weapon', line: 'axe', gear: '파멸의 대부', sp: 34, cd: 3, stat: 'str', power: 95, pierce: true, berserk: true, desc: '방어 무시. 잃은 HP 비율만큼 위력 최대 2배.' }),
   // ===== 혼혈 마족 — 마수의 손톱(claw) =====
-  laceration:  SK({ id: 'laceration',  name: '열상',       slot: 'offhand', line: 'claw', gear: '마수의 손톱', sp: 12, cd: 0, stat: 'str', power: 62, hits: 2, apply: [{ s: 'bleed', n: 2, p: 100 }], desc: '2연타. [출혈] 2' }),
+  laceration:  SK({ id: 'laceration',  name: '열상',       slot: 'offhand', line: 'claw', gear: '마수의 손톱', sp: 12, cd: 0, stat: 'str', power: 47, hits: 2, apply: [{ s: 'bleed', n: 2, p: 100 }], desc: '2연타. [출혈] 2' }),
   frenzy:      SK({ id: 'frenzy',      name: '광기',       slot: 'offhand', line: 'claw', gear: '광기의 발톱', sp: 18, cd: 2, self: [{ s: 'rage', n: 3 }], selfDmg: 10, desc: '[격노] 3. 자해 10' }),
   demonBlood:  SK({ id: 'demonBlood',  name: '마혈',       slot: 'offhand', line: 'claw', gear: '마혈의 손톱', sp: 16, cd: 2, self: [{ s: 'regen', n: 3 }, { s: 'rage', n: 1 }], desc: '[재생] 3 + [격노] 1' }),
 
   // ===== 숲의 정령사 — 활(bow) =====
-  preciseShot: SK({ id: 'preciseShot', name: '정밀 사격',  slot: 'weapon', line: 'bow', gear: '단궁',       sp: 10, cd: 0, stat: 'dex', power: 118, critBonus: 10, desc: '치명 확률 +10%' }),
+  preciseShot: SK({ id: 'preciseShot', name: '정밀 사격',  slot: 'weapon', line: 'bow', gear: '단궁',       sp: 10, cd: 0, stat: 'dex', power: 92, critBonus: 10, desc: '치명 확률 +10%' }),
   pierceShot:  SK({ id: 'pierceShot',  name: '관통 사격',  slot: 'weapon', line: 'bow', gear: '관통궁',     sp: 20, cd: 1, stat: 'dex', power: 108, pierce: true, desc: '방어 무시.' }),
   stormVolley: SK({ id: 'stormVolley', name: '폭풍 화살',  slot: 'weapon', line: 'bow', gear: '폭풍궁',     sp: 26, cd: 2, stat: 'dex', power: 50, hits: 4, desc: '4연타 (타격당 58%).' }),
   moonSnipe:   SK({ id: 'moonSnipe',   name: '월광 저격',  slot: 'weapon', line: 'bow', gear: '월광궁',     sp: 30, cd: 2, stat: 'dex', power: 170, critBonus: 40, desc: '치명 확률 +40%' }),
@@ -316,7 +316,7 @@ export const BURIED_SKILLS = {
   windStep:    SK({ id: 'windStep',    name: '바람 걸음',  slot: 'offhand', line: 'quiver', gear: '질풍 화살통', sp: 14, cd: 2, self: [{ s: 'evade', n: 3 }], spGain: 6, desc: '[잔영] 3, SP +6' }),
 
   // ===== 여명의 사제 — 철퇴(mace) =====
-  holySmite:   SK({ id: 'holySmite',   name: '신성 타격',  slot: 'weapon', line: 'mace', gear: '성전 철퇴',   sp: 12, cd: 0, stat: 'int', power: 130, desc: '빛으로 내리친다.' }),
+  holySmite:   SK({ id: 'holySmite',   name: '신성 타격',  slot: 'weapon', line: 'mace', gear: '성전 철퇴',   sp: 12, cd: 0, stat: 'int', power: 92, desc: '빛으로 내리친다.' }),
   judgment:    SK({ id: 'judgment',    name: '심판',       slot: 'weapon', line: 'mace', gear: '심판의 철퇴', sp: 24, cd: 2, stat: 'int', power: 152, apply: [{ s: 'silence', n: 1, p: 100 }], desc: '[침묵] 1' }),
   purifyLight: SK({ id: 'purifyLight', name: '정화의 빛',  slot: 'weapon', line: 'mace', gear: '정화의 철퇴', sp: 18, cd: 1, stat: 'int', power: 88, heal: 25, desc: '자신 HP 25 회복.' }),
   dawnCrush:   SK({ id: 'dawnCrush',   name: '여명의 강타', slot: 'weapon', line: 'mace', gear: '여명의 대추', sp: 30, cd: 2, stat: 'int', power: 170, apply: [{ s: 'stun', n: 1, p: 40 }], desc: '40% 확률 [기절] 1' }),
@@ -347,7 +347,7 @@ export const BURIED_SKILLS = {
 
   // ===== 1.126.0 — BB2 공식 데이터시트(スキルSkill 421행) 선별 이식 30종 =====
   // 검(sword)
-  twinFang:    SK({ id: 'twinFang',    name: '이연격',     slot: 'weapon', line: 'sword', gear: '쌍아검',     sp: 16, cd: 0, stat: 'str', power: 72, hits: 2, desc: '가볍게 두 번 벤다 (타격당 72%).' }),
+  twinFang:    SK({ id: 'twinFang',    name: '이연격',     slot: 'weapon', line: 'sword', gear: '쌍아검',     sp: 16, cd: 0, stat: 'str', power: 48, hits: 2, desc: '가볍게 두 번 벤다 (타격당 72%).' }),
   whirlSlash:  SK({ id: 'whirlSlash',  name: '선풍검',     slot: 'weapon', line: 'sword', gear: '선풍검',     sp: 28, cd: 2, stat: 'str', power: 64, hits: 3, desc: '휘몰아치는 3연타 (타격당 64%).' }),
   // 지팡이(staff)
   flameWall:   SK({ id: 'flameWall',   name: '업화 방벽',  slot: 'weapon', line: 'staff', gear: '업화 지팡이', sp: 18, cd: 2, stat: 'int', power: 52, apply: [{ s: 'burn', n: 2, p: 100 }], self: [{ s: 'guard', n: 2 }], desc: '[화상] 2 + 자신 [수호] 2' }),
@@ -356,7 +356,7 @@ export const BURIED_SKILLS = {
   earthSplit:  SK({ id: 'earthSplit',  name: '대지 가르기', slot: 'weapon', line: 'axe', gear: '단층 도끼',   sp: 18, cd: 1, stat: 'str', power: 96, apply: [{ s: 'shatter', n: 3, p: 100 }], desc: '[파쇄] 3' }),
   rampage:     SK({ id: 'rampage',     name: '광란',       slot: 'weapon', line: 'axe', gear: '광란 도끼',   sp: 24, cd: 2, stat: 'str', power: 88, hits: 2, selfDmg: 6, desc: '2연타 (타격당 88%). 자해 6' }),
   // 활(bow)
-  rapidShot:   SK({ id: 'rapidShot',   name: '속사',       slot: 'weapon', line: 'bow', gear: '속사궁',     sp: 14, cd: 0, stat: 'dex', power: 62, hits: 2, desc: '연달아 쏜다 (타격당 62%).' }),
+  rapidShot:   SK({ id: 'rapidShot',   name: '속사',       slot: 'weapon', line: 'bow', gear: '속사궁',     sp: 14, cd: 0, stat: 'dex', power: 46, hits: 2, desc: '연달아 쏜다 (타격당 62%).' }),
   shadowShot:  SK({ id: 'shadowShot',  name: '그림자 사격', slot: 'weapon', line: 'bow', gear: '그림자 궁',   sp: 24, cd: 2, stat: 'dex', power: 165, self: [{ s: 'evade', n: 1 }], desc: '어둠에서 쏜다. 자신 [잔영] 1' }),
   // 철퇴(mace)
   holyBolt:    SK({ id: 'holyBolt',    name: '성뢰',       slot: 'weapon', line: 'mace', gear: '성뢰의 철퇴', sp: 16, cd: 1, stat: 'int', power: 112, critBonus: 15, desc: '빛의 화살. 치명 확률 +15%' }),
@@ -623,6 +623,30 @@ function tierWeightAt(tier, floor) {
   return Math.max(0.5, tier.weight * (1 + rankIdx * depth * 0.09) - (rankIdx === 0 ? depth * 2.6 : 0));
 }
 
+// =========================================================
+// 🎖 장비 품질 A~D (1.164.0, PM 설계) — **스킬과 무관한 순수 장비 품질**.
+// 드랍마다 롤 — 같은 스킬 장비도 품질이 다르다. 품질은 그 장비의 **스킬 데미지에만** 배율.
+// 사용 횟수·CD·기능은 스킬 고정값 (PM 원칙: 강한 스킬 = 고CD+적은 횟수).
+// 구 세이브 장비(quality 없음) = B(×1.0) 취급 — 체감 무변화.
+export const BURIED_QUALITY_MULT = { D: 0.7, C: 0.8, B: 1.0, A: 1.2 };
+export const BURIED_QUALITY_COLORS = { D: '#8b8378', C: '#7ba3c4', B: '#5c4a8c', A: '#e8b04a' };
+// 장비 등급이 높을수록 상위 품질 확률↑ — 전설은 B 이상 보장
+export const BURIED_QUALITY_WEIGHTS = {
+  worn:   { D: 50, C: 35, B: 13, A: 2 },
+  fine:   { D: 50, C: 35, B: 13, A: 2 },
+  rare:   { D: 30, C: 40, B: 22, A: 8 },
+  epic:   { D: 15, C: 30, B: 37, A: 18 },
+  relic:  { D: 5,  C: 20, B: 45, A: 30 },
+  legend: { D: 0,  C: 0,  B: 55, A: 45 },
+};
+export function rollBuriedQuality(tierId) {
+  const w = BURIED_QUALITY_WEIGHTS[tierId] || BURIED_QUALITY_WEIGHTS.rare;
+  const total = w.D + w.C + w.B + w.A;
+  let r = Math.random() * total;
+  for (const q of ['D', 'C', 'B', 'A']) { r -= w[q]; if (r <= 0) return q; }
+  return 'A';
+}
+
 // 장비 1개 생성.
 // opts: { slot, classId, floor, tier(강제), luck(등급 가중 보정), powerMult(1.121.0 — 깊이 위력 배율) }
 export function rollBuriedItem({ slot, classId, floor = 1, tier = null, luck = 0, powerMult = 1 } = {}) {
@@ -672,6 +696,7 @@ export function rollBuriedItem({ slot, classId, floor = 1, tier = null, luck = 0
     slot: slotId, pool, tier: t.id, skillId: skill.id,
     name: `${t.name} ${affix ? affix + ' ' : ''}${skill.gear}`,
     stats, options, plus: 0, floor: floor || 1, sockets, runes: [],
+    quality: rollBuriedQuality(t.id), // 🎖 품질 (1.164.0)
   };
 }
 
@@ -2177,7 +2202,7 @@ export function buriedDamageFormula(char) {
     { n: '＝', label: '내 공격력', value: `물리 ${d.atk} · 기교 ${d.fin} · 마법 ${d.mag}`,
       note: '스킬의 참조 능력치에 따라 셋 중 하나를 쓴다. 기본기는 셋 중 가장 높은 값' },
     { n: '④', label: '× 스킬 위력%', value: '스킬마다 상이',
-      note: `연격(N회 타격)은 위력%를 매 타마다 따로 굴린다 — 상태이상·자가 버프도 ×N. ⏳ 기본 쿨다운 1당 위력 +18% + 🎖 스킬 등급 배율(D 0.7 / C 0.8 / B 1.0 / A 1.2) 보정. ⚙ 발동 장비가 마물 레벨보다 ${BURIED_GEAR_DECAY.graceLv}Lv 넘게 낡으면 위력이 깎인다 (하한 ${BURIED_GEAR_DECAY.floorPct}% — 장비 카드에 감쇠율 표시)` },
+      note: `연격(N회 타격)은 위력%를 매 타마다 따로 굴린다 — 상태이상·자가 버프도 ×N. ⏳ 기본 쿨다운 1당 위력 +18% + 🎖 장비 품질 배율(D ×0.7 / C ×0.8 / B ×1.0 / A ×1.2) 보정 — 품질은 장비 카드에 표시. ⚙ 발동 장비가 마물 레벨보다 ${BURIED_GEAR_DECAY.graceLv}Lv 넘게 낡으면 위력이 깎인다 (하한 ${BURIED_GEAR_DECAY.floorPct}% — 장비 카드에 감쇠율 표시)` },
     { n: '⑤', label: '× 주는 피해 보정', value: '[격노] +10%/스택 · [약화] -6%/스택',
       note: '방·층 효과, 인장, 수문장의 인장, 동행 괴이도 여기에 곱해진다' },
     { n: '⑥', label: '× 적의 받는 피해 보정', value: '[속박] +20%/스택 · [저주] +15%/스택',
@@ -2740,17 +2765,12 @@ export function buriedSkillRank(skill) {
 // 기본 쿨다운 1당 위력 +18%. CD0 스팸이 항상 최적이던 구조에 대기 비용의 보상을 준다.
 // 기준은 **원본 스킬의 cd** — 더블 접두어(쿨 2배) 등 개조로 보정이 부풀지 않는다
 export const BURIED_CD_POWER_PCT = 18;
-// 1.163.1 — 🎖 스킬 등급 위력 배율 (PM 지시): 등급은 비용(sp+cd×4) 자동 산정이라
-// D급 cd0 스킬인데 위력이 130%(B급 수준)인 이상치가 8종 있었다 — "싸고 빠른데 세다".
-// 등급이 곧 기본 화력의 저울이 되도록 배율을 곱한다. 65종 재분석 결과:
-//   발당 평균 D 72% / C 78% / B 130% / A 238% — 등급 사다리 복원
-export const BURIED_RANK_POWER_MULT = { D: 0.7, C: 0.8, B: 1.0, A: 1.2 };
+// 1.164.0 — 스킬 등급 배율(1.163.1) 폐지 (PM 정정: A~D는 장비 품질이지 스킬 등급이 아니다).
+// 화력 사다리는 ① cd0 이상치 기본 위력 데이터 하향 + ② CD 보정 + ③ 장비 품질 배율이 담당한다.
 export function buriedSkillAt(skill, lv = 1) {
   if (!skill) return skill;
   const L = Math.min(BURIED_SKILL_MAX_LV, Math.max(1, lv));
-  const rankMult = BURIED_RANK_POWER_MULT[buriedSkillRank(skill)] ?? 1;
-  const cdBoost = skill.power && (skill.cd || 0) > 0 ? 1 + (skill.cd || 0) * BURIED_CD_POWER_PCT / 100 : 1;
-  const qMult = skill.power ? cdBoost * rankMult : 1; // 등급 배율 × CD 보정 — 위력에만 적용
+  const qMult = skill.power && (skill.cd || 0) > 0 ? 1 + (skill.cd || 0) * BURIED_CD_POWER_PCT / 100 : 1;
   if (L === 1) return qMult !== 1 ? { ...skill, power: Math.max(1, Math.round(skill.power * qMult)) } : skill;
   const out = { ...skill, lv: L };
   const steps = L - 1;
@@ -2771,7 +2791,7 @@ export function buriedSkillAt(skill, lv = 1) {
   if (L >= 3) out.sp = Math.max(0, out.sp - 2);
   if (skill.lv3 && L >= 3) Object.assign(out, skill.lv3);
   if (skill.lv8 && L >= 8) Object.assign(out, skill.lv8);
-  if (out.power && qMult !== 1) out.power = Math.max(1, Math.round(out.power * qMult)); // 🎖 등급 배율 × ⏳ CD 보정 (1.163.1)
+  if (out.power && qMult !== 1) out.power = Math.max(1, Math.round(out.power * qMult)); // ⏳ CD 보정 (등급 배율은 1.164.0 폐지 — 품질 배율이 대체)
   return out;
 }
 // Lv.3 / Lv.8에서 무엇이 열리는지 안내 문구 (UI 표시용) — 1.132.0 스킬 종류별
@@ -3681,13 +3701,17 @@ export function buriedGearDecayMult(itemFloor, monLevel) {
   const r = fm((itemFloor || 1) + BURIED_GEAR_DECAY.graceLv) / fm(monLevel || 1);
   return Math.min(1, Math.max(BURIED_GEAR_DECAY.floorPct / 100, r));
 }
-// 실효 스킬에 감쇠 적용 — buriedModdedSkill 결과에 마지막으로 씌운다.
-// 감쇠가 없으면 원본 그대로 반환 (회귀 0). decayPct는 UI 표시용.
+// 실효 스킬에 장비 보정 적용 — buriedModdedSkill 결과에 마지막으로 씌운다.
+// 1.164.0 — 🎖 품질 배율(quality ×0.7~1.2)도 여기서 함께 — 호출부 3곳(전투·카드·상세)이 자동 일치.
+// 보정이 없으면 원본 그대로 반환 (회귀 0). decayPct는 UI 표시용.
 export function applyBuriedGearDecay(skill, item, monLevel) {
   if (!skill?.power || !item) return skill;
+  let out = skill;
+  const qm = BURIED_QUALITY_MULT[item.quality] ?? 1; // 구 세이브(quality 없음) = B ×1.0
+  if (qm !== 1) out = { ...out, power: Math.max(1, Math.round(out.power * qm)) };
   const m = buriedGearDecayMult(item.floor || 1, monLevel);
-  if (m >= 0.999) return skill;
-  return { ...skill, power: Math.max(1, Math.round(skill.power * m)), decayPct: Math.round((1 - m) * 100) };
+  if (m >= 0.999) return out;
+  return { ...out, power: Math.max(1, Math.round(out.power * m)), decayPct: Math.round((1 - m) * 100) };
 }
 
 // ◈ 접두어 전승 (1.160.0) — 「순환 패키지」 ③: 교체 시 먼지를 내고 기존 장비의 접두어를

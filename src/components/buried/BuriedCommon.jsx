@@ -12,7 +12,7 @@ import {
   buriedSkillMaxUses, buriedItemMaxUses, buriedSkillLv,
   buriedSkillAt, buriedModdedSkill, buriedSkillDmgPreview,
   buriedItemRunes, buriedItemSockets, buriedRunewordOf,
-  buriedMonsterLevel, applyBuriedGearDecay, buriedModTransferCost,
+  buriedMonsterLevel, applyBuriedGearDecay, buriedModTransferCost, BURIED_QUALITY_COLORS,
 } from '../../data.js';
 
 // 1.143.0 — ⛓ 스킬 사용 가능 횟수 (장비 카드·상세·획득 판단 공용).
@@ -170,6 +170,7 @@ export function BuriedItemCard({ item, slotId, onClick, right, dim = false, show
       <div className="flex-1 min-w-0">
         <div className={`text-[12px] font-bold ${wrap}`} style={{ color: tier.color }}>
           <span className="tabular-nums font-normal" style={{ color: PALETTE.textDim }}>Lv.{item.floor || 1} </span>
+          <span style={{ color: BURIED_QUALITY_COLORS[item.quality || 'B'] }}>[{item.quality || 'B'}] </span>
           {item.name}
         </div>
         <div className={`text-[11px] ${full ? '' : 'truncate'} flex items-center gap-1 flex-wrap`} style={{ color: PALETTE.dawn }}>
@@ -251,7 +252,7 @@ export function BuriedItemSheet({ item, compare, onEquip, onUnequip, onDismantle
               {item.name}
             </div>
             <div className="text-[11px] mt-0.5" style={{ color: PALETTE.textDim }}>
-              {slotMeta(item.slot).name} · {tier.name} 등급 · <b style={{ color: PALETTE.text }}>장비 Lv.{item.floor || 1}</b>
+              {slotMeta(item.slot).name} · {tier.name} 등급 · <b style={{ color: BURIED_QUALITY_COLORS[item.quality || 'B'] }}>품질 {item.quality || 'B'} (스킬 위력 ×{(({ D: 0.7, C: 0.8, B: 1.0, A: 1.2 })[item.quality || 'B'])})</b> · <b style={{ color: PALETTE.text }}>장비 Lv.{item.floor || 1}</b>
             </div>
           </div>
           <button onClick={onClose} className="ui-press text-[12px] px-2 py-1" style={{ color: PALETTE.textDim }}>닫기</button>
