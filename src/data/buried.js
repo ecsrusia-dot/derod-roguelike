@@ -4030,6 +4030,69 @@ export function buriedRunewordProgress(char) {
   });
 }
 
+// 🎒 룬 주머니 정리 (1.165.0, PM 지시) — 등급 내림차순 → 이름순으로 묶는다.
+// 같은 룬은 한 줄 + 개수. idxs는 char.runes의 실제 인덱스 (각인·융합이 그대로 쓴다)
+export function buriedRunePouchGroups(char) {
+  const map = new Map();
+  (char?.runes || []).forEach((id, i) => {
+    if (!map.has(id)) map.set(id, { id, rune: getBuriedRune(id), idxs: [] });
+    map.get(id).idxs.push(i);
+  });
+  return [...map.values()]
+    .filter(g => g.rune)
+    .map(g => ({ ...g, count: g.idxs.length }))
+    .sort((a, b) => (b.rune.rarity - a.rune.rarity) || a.rune.name.localeCompare(b.rune.name, 'ko'));
+}
+
+// ⟪룬워드⟫ 원클릭 각인 (1.165.0, PM 지시 "룬워드 자체를 눌러 장비에 한 번에 적용").
+// 조건: ① 장비 소켓 수 ≥ 룬워드 길이 ② 이미 박힌 룬이 룬워드의 **앞부분과 정확히 일치**(빈 장비 포함)
+//       ③ 주머니에 남은 재료가 전부 있다 ④ 연격 룬 CD0 제한(1.163.0)에 걸리지 않는다
+// 반환: { ok, reason } — 사유는 UI가 그대로 보여준다
+export function buriedRunewordFitCheck(char, rw, slot) {
+  const item = char?.equipped?.[slot];
+  if (!item) return { ok: false, reason: '빈 슬롯' };
+  const cur = buriedItemRunes(item);
+  const sockets = buriedItemSockets(item);
+  if (sockets < rw.runes.length) return { ok: false, reason: `소켓 ${sockets}칸 (${rw.runes.length}칸 필요)` };
+  if (!rw.runes.slice(0, cur.length).every((r, i) => cur[i] === r)) {
+    return { ok: false, reason: cur.length > 0 ? '이미 다른 룬이 박혀 있다' : '각인 불가' };
+  }
+  const need = rw.runes.slice(cur.length);
+  const left = [...(char.runes || [])];
+  for (const id of need) {
+    const i = left.indexOf(id);
+    if (i < 0) return { ok: false, reason: `주머니에 ${getBuriedRune(id)?.name || id} 부족` };
+    left.splice(i, 1);
+  }
+  const skill = BURIED_SKILLS[item.skillId];
+  for (const id of need) {
+    const r = getBuriedRune(id);
+    if (r?.fx?.hitsAdd && r.rarity < 5 && (skill?.cd || 0) === 0) {
+      return { ok: false, reason: `「${r.name}」은 쿨다운 1 이상 스킬 전용` };
+    }
+  }
+  return { ok: true, reason: cur.length > 0 ? `이어서 ${need.length}개 각인` : `${need.length}개 각인` };
+}
+export function applyBuriedRuneword(char, runewordId, slot) {
+  const rw = BURIED_RUNEWORDS.find(x => x.id === runewordId);
+  if (!rw) return { char, ok: false, text: '알 수 없는 룬워드.' };
+  const fit = buriedRunewordFitCheck(char, rw, slot);
+  if (!fit.ok) return { char, ok: false, text: fit.reason };
+  const item = char.equipped[slot];
+  const cur = buriedItemRunes(item);
+  const need = rw.runes.slice(cur.length);
+  // 주머니에서 재료를 순서대로 1개씩 꺼낸다 (같은 룬 중복 요구도 정확히 소모)
+  const pouch = [...(char.runes || [])];
+  for (const id of need) pouch.splice(pouch.indexOf(id), 1);
+  const nextItem = { ...item, runes: [...cur, ...need] };
+  delete nextItem.rune; // 구 필드 → 배열 승격
+  return {
+    char: { ...char, runes: pouch, equipped: { ...char.equipped, [slot]: nextItem } },
+    ok: true,
+    text: `«${item.name}»에 ⟪${rw.name}⟫ 완성! ${rw.desc}`,
+  };
+}
+
 export function socketBuriedRune(char, runeIdx, slot) {
   const runeId = (char.runes || [])[runeIdx];
   const rune = getBuriedRune(runeId);
