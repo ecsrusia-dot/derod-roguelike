@@ -2177,7 +2177,7 @@ export function buriedDamageFormula(char) {
     { n: '＝', label: '내 공격력', value: `물리 ${d.atk} · 기교 ${d.fin} · 마법 ${d.mag}`,
       note: '스킬의 참조 능력치에 따라 셋 중 하나를 쓴다. 기본기는 셋 중 가장 높은 값' },
     { n: '④', label: '× 스킬 위력%', value: '스킬마다 상이',
-      note: `연격(N회 타격)은 위력%를 매 타마다 따로 굴린다 — 상태이상·자가 버프도 ×N. ⏳ 기본 쿨다운 1당 위력 +18% 보정. ⚙ 발동 장비가 마물 레벨보다 ${BURIED_GEAR_DECAY.graceLv}Lv 넘게 낡으면 위력이 깎인다 (하한 ${BURIED_GEAR_DECAY.floorPct}% — 장비 카드에 감쇠율 표시)` },
+      note: `연격(N회 타격)은 위력%를 매 타마다 따로 굴린다 — 상태이상·자가 버프도 ×N. ⏳ 기본 쿨다운 1당 위력 +18% + 🎖 스킬 등급 배율(D 0.7 / C 0.8 / B 1.0 / A 1.2) 보정. ⚙ 발동 장비가 마물 레벨보다 ${BURIED_GEAR_DECAY.graceLv}Lv 넘게 낡으면 위력이 깎인다 (하한 ${BURIED_GEAR_DECAY.floorPct}% — 장비 카드에 감쇠율 표시)` },
     { n: '⑤', label: '× 주는 피해 보정', value: '[격노] +10%/스택 · [약화] -6%/스택',
       note: '방·층 효과, 인장, 수문장의 인장, 동행 괴이도 여기에 곱해진다' },
     { n: '⑥', label: '× 적의 받는 피해 보정', value: '[속박] +20%/스택 · [저주] +15%/스택',
@@ -2740,11 +2740,18 @@ export function buriedSkillRank(skill) {
 // 기본 쿨다운 1당 위력 +18%. CD0 스팸이 항상 최적이던 구조에 대기 비용의 보상을 준다.
 // 기준은 **원본 스킬의 cd** — 더블 접두어(쿨 2배) 등 개조로 보정이 부풀지 않는다
 export const BURIED_CD_POWER_PCT = 18;
+// 1.163.1 — 🎖 스킬 등급 위력 배율 (PM 지시): 등급은 비용(sp+cd×4) 자동 산정이라
+// D급 cd0 스킬인데 위력이 130%(B급 수준)인 이상치가 8종 있었다 — "싸고 빠른데 세다".
+// 등급이 곧 기본 화력의 저울이 되도록 배율을 곱한다. 65종 재분석 결과:
+//   발당 평균 D 72% / C 78% / B 130% / A 238% — 등급 사다리 복원
+export const BURIED_RANK_POWER_MULT = { D: 0.7, C: 0.8, B: 1.0, A: 1.2 };
 export function buriedSkillAt(skill, lv = 1) {
   if (!skill) return skill;
   const L = Math.min(BURIED_SKILL_MAX_LV, Math.max(1, lv));
+  const rankMult = BURIED_RANK_POWER_MULT[buriedSkillRank(skill)] ?? 1;
   const cdBoost = skill.power && (skill.cd || 0) > 0 ? 1 + (skill.cd || 0) * BURIED_CD_POWER_PCT / 100 : 1;
-  if (L === 1) return cdBoost > 1 ? { ...skill, power: Math.round(skill.power * cdBoost) } : skill;
+  const qMult = skill.power ? cdBoost * rankMult : 1; // 등급 배율 × CD 보정 — 위력에만 적용
+  if (L === 1) return qMult !== 1 ? { ...skill, power: Math.max(1, Math.round(skill.power * qMult)) } : skill;
   const out = { ...skill, lv: L };
   const steps = L - 1;
   const hasStatus = !!skill.apply;
@@ -2764,7 +2771,7 @@ export function buriedSkillAt(skill, lv = 1) {
   if (L >= 3) out.sp = Math.max(0, out.sp - 2);
   if (skill.lv3 && L >= 3) Object.assign(out, skill.lv3);
   if (skill.lv8 && L >= 8) Object.assign(out, skill.lv8);
-  if (out.power && cdBoost > 1) out.power = Math.round(out.power * cdBoost); // ⏳ CD 보정 (1.163.0)
+  if (out.power && qMult !== 1) out.power = Math.max(1, Math.round(out.power * qMult)); // 🎖 등급 배율 × ⏳ CD 보정 (1.163.1)
   return out;
 }
 // Lv.3 / Lv.8에서 무엇이 열리는지 안내 문구 (UI 표시용) — 1.132.0 스킬 종류별
@@ -2788,7 +2795,7 @@ export function buriedSkillLvNote(skill, lv) {
 // PM 결정: 빡빡하게(D30/C22/B15/A10) + 소진 시 스킬만 봉인(장비 스탯 유지).
 // 잔여 = 최대(등급·레벨) - item.usesSpent — 레벨이 오르면 최대가 늘어 잔여도 함께 늘어난다.
 // 구 세이브 장비는 usesSpent 없음 = 만충 (자연 호환). 기본 공격은 무제한.
-export const BURIED_SKILL_USES = { D: 30, C: 24, B: 18, A: 14 }; // 1.163.0 — 상위 등급 기본 횟수 상향 (PM: 마모는 일괄 15 유지, 횟수로 차등)
+export const BURIED_SKILL_USES = { D: 30, C: 22, B: 15, A: 10 }; // 1.163.1 — 원상복구 (PM 원칙: 강한 스킬 = 고CD + 적은 횟수 / 약한 스킬 = 저CD + 많은 횟수)
 export function buriedSkillMaxUses(skill, lv = 1) {
   const base = BURIED_SKILL_USES[buriedSkillRank(skill)] || 30;
   return Math.round(base * (1 + (Math.max(1, lv) - 1) * 0.08));
