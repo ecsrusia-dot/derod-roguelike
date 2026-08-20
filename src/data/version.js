@@ -3,6 +3,6 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.167.1';
+export const GAME_VERSION = '1.167.2';
 export const VERSION_DATE = '2026-08-20';
-export const VERSION_LABEL = '⟪룬워드⟫ 각인 판정 단일화 — 막힌 사유 그대로 표시';
+export const VERSION_LABEL = '⟪룬워드⟫ 장비 선택 판정 버그 픽스';
