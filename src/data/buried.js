@@ -2019,6 +2019,9 @@ export const BURIED_FX_LABELS = {
   // 기타
   stepBonus:    { name: '성장 필요 걸음',   unit: '', note: '마물이 늦게 강해진다' },
   dmgPct:       { name: '주는 피해',        unit: '%' },
+  pierce:       { name: '방어·보호막 완전 관통', unit: '' },
+  barrierPierce:{ name: '보호막 관통',      unit: '' },
+  defPierce:    { name: '방어 관통',        unit: '' },
 };
 
 // fx 뭉치 → 사람이 읽는 한 줄 (예: "물리·기교 공격력 +4% · 받는 피해 -6%")
@@ -2049,6 +2052,8 @@ export const BURIED_TUNING = {
   // 압력을 두 축에 같은 배율로 곱하면 심층에서 전투가 "길고 아픈" 쪽으로만 자란다
   // (실측 500층: 일반 34타·일격 66%, 강적 101타·87% — 사실상 진입 불가).
   // 지수를 낮춰 전 층에서 리듬을 일정하게 유지한다: 일반 5~8타·20%대, 강적 10~18타·30~50%.
+  defScaleAtkPct: 0.22,        // 1.163.0 — 방어 상대화: S = 100 + 적 공격×0.22 (파리티 방어 = 받피 ~25%, 기존 체감 유지)
+  defFloorPct: 12,             // 1.163.0 — 내 방어 감쇠 하한 12% (파리티 초과 투자에 보상이 생기도록 25→12)
   maturityPerFloor: 0.004,     // 1.162.0 — 성숙 램프: 층당 적 HP +0.4%p (스킬Lv·접두어 성숙 반영)
   maturityCap: 0.6,            // 성숙 램프 상한 +60% (PM 결정: 완만 ×1.6 — F151에서 도달)
   pressureHpExp: 0.78,         // 일반·강적 HP에 반영되는 압력 지수 (1 = 전량)
@@ -2118,12 +2123,14 @@ export function buriedRoomThreat(char, roomType) {
   }
   if (keys.length === 0) return null;
   const pressure = Math.max(1, buriedDepthPressure(dg, floor));
-  const defMult = Math.max(0.25, 100 / (100 + (d.def || 0)));
   let lo = Infinity, hi = 0;
   for (const k of keys) {
     const e = buriedEnemyAtLevel(k, monLevel);
     if (!e) continue;
-    const hit = Math.max(1, Math.round(e.atk * pressure * defMult));
+    const atkP = e.atk * pressure;
+    const scale = 100 + atkP * (BURIED_TUNING.defScaleAtkPct ?? 0.22); // 1.163.0 — 방어 상대화와 동일 공식
+    const defMult = Math.max((BURIED_TUNING.defFloorPct ?? 12) / 100, scale / (scale + (d.def || 0)));
+    const hit = Math.max(1, Math.round(atkP * defMult));
     if (hit < lo) lo = hit;
     if (hit > hi) hi = hit;
   }
@@ -2170,13 +2177,13 @@ export function buriedDamageFormula(char) {
     { n: '＝', label: '내 공격력', value: `물리 ${d.atk} · 기교 ${d.fin} · 마법 ${d.mag}`,
       note: '스킬의 참조 능력치에 따라 셋 중 하나를 쓴다. 기본기는 셋 중 가장 높은 값' },
     { n: '④', label: '× 스킬 위력%', value: '스킬마다 상이',
-      note: `연격(N회 타격)은 위력%를 매 타마다 따로 굴린다 — 상태이상·자가 버프도 ×N. ⚙ 발동 장비가 마물 레벨보다 ${BURIED_GEAR_DECAY.graceLv}Lv 넘게 낡으면 위력이 깎인다 (하한 ${BURIED_GEAR_DECAY.floorPct}% — 장비 카드에 감쇠율 표시)` },
+      note: `연격(N회 타격)은 위력%를 매 타마다 따로 굴린다 — 상태이상·자가 버프도 ×N. ⏳ 기본 쿨다운 1당 위력 +18% 보정. ⚙ 발동 장비가 마물 레벨보다 ${BURIED_GEAR_DECAY.graceLv}Lv 넘게 낡으면 위력이 깎인다 (하한 ${BURIED_GEAR_DECAY.floorPct}% — 장비 카드에 감쇠율 표시)` },
     { n: '⑤', label: '× 주는 피해 보정', value: '[격노] +10%/스택 · [약화] -6%/스택',
       note: '방·층 효과, 인장, 수문장의 인장, 동행 괴이도 여기에 곱해진다' },
     { n: '⑥', label: '× 적의 받는 피해 보정', value: '[속박] +20%/스택 · [저주] +15%/스택',
       note: '적의 물리·마법 내성, 전쾌시 방어(풀피일 때 감소)도 여기서 곱해진다' },
     { n: '⑦', label: '× 방어 감쇠', value: '100 ÷ (100 + 적 방어력)',
-      note: `하한 25% — 방어가 아무리 높아도 최소 1/4은 통과한다. 관통 공격은 이 단계를 통째로 무시. [파쇄]는 적 방어를 스택당 10% 깎는다` },
+      note: `하한 25% — 방어가 아무리 높아도 최소 1/4은 통과한다. 완전 관통·방어 관통은 이 단계를 통째로 무시 (보호막 관통은 못 뚫는다). 내가 받을 때는 상대화 — 적 공격력 대비 내 방어로 감쇄 (파리티 ≈ 받피 25%, 투자하면 하한 12%까지). [파쇄]는 적 방어를 스택당 10% 깎는다` },
     { n: '⑧', label: '× 편차', value: '0.92 ~ 1.08',
       note: '매 타격마다 무작위 — 같은 스킬도 표시 수치의 ±8% 안에서 흔들린다' },
     { n: '⑨', label: '치명타면 × 치명 피해', value: `${d.crit}% 확률 · ×${(1 + d.critDmg / 100).toFixed(2)}`,
@@ -2207,9 +2214,16 @@ export function resolveBuriedAttack(att, def, skill, { isPlayer = false, traits 
   if (def.physTakenPct && !isMagAtk) taken *= 1 + def.physTakenPct / 100;
   if (def.magTakenPct && isMagAtk) taken *= 1 + def.magTakenPct / 100;
   if (def.fullGuardPct && def.maxHp > 0 && def.hp >= def.maxHp) taken *= Math.max(0, 1 - def.fullGuardPct / 100);
-  const effDef = skill.pierce ? 0 : buriedEffDef(def);
+  const effDef = skill.pierce || skill.defPierce ? 0 : buriedEffDef(def);
   // 1.121.0 — 감쇠 하한 25%: 방어가 아무리 높아도 피해의 1/4은 통과 (심층 "안 아픔" 붕괴 픽스)
-  const defMult = Math.max(0.25, 100 / (100 + effDef));
+  // 1.163.0 — 방어 상대화 (수비자가 플레이어일 때, PM 승인): 절대 곡선 100/(100+방어)는 방어 300에서
+  // 하한 포화 → F100+ 내 방어가 완전 죽은 스탯이었다 (실측: 방어 459도 45,649도 똑같이 25%).
+  // S/(S+방어), S = 100 + 공격자 공격력×0.22 — **파리티 방어 = 받피 ~25% (기존 체감 그대로)**,
+  // 방어를 더 쌓으면 하한 12%까지 내려가고, 부족하면 그만큼 아프다. 초반(F30 이하)도 거의 동일.
+  // 내가 적을 때릴 때(isPlayer)는 기존 절대 곡선 유지 — 적 방어(15~241)는 절대치 설계라 상대화하면 전멸한다
+  const defMult = isPlayer
+    ? Math.max(0.25, 100 / (100 + effDef))
+    : (() => { const S = 100 + baseAtk * (BURIED_TUNING.defScaleAtkPct ?? 0.22); return Math.max((BURIED_TUNING.defFloorPct ?? 12) / 100, S / (S + effDef)); })();
 
   let power = skill.power || 0;
   if (skill.executeBelow && def.maxHp > 0 && (def.hp / def.maxHp) * 100 <= skill.executeBelow) power *= 2;
@@ -2502,7 +2516,9 @@ export function buildBuriedRoomEnemy(char, roomType, roomEffectId = null) {
     const heavy = (enemy.actions || []).filter(a => a.heavy && a.power);
     if (pd.maxHp > 0 && heavy.length > 0) {
       const worst = heavy.reduce((m, a) => {
-        const defMult = a.pierce ? 1 : Math.max(0.25, 100 / (100 + (pd.def || 0)));
+        // 1.163.0 — 방어 상대화와 동일 공식 (수비자 = 플레이어)
+        const gScale = 100 + enemy.atk * (BURIED_TUNING.defScaleAtkPct ?? 0.22);
+        const defMult = a.pierce ? 1 : Math.max((BURIED_TUNING.defFloorPct ?? 12) / 100, gScale / (gScale + (pd.def || 0)));
         return Math.max(m, (a.power / 100) * (a.hits || 1) * defMult);
       }, 0);
       const maxAtk = (pd.maxHp * cap / 100) / (worst * (BURIED_TUNING.enemyDmgMult || 1));
@@ -2720,10 +2736,15 @@ export function buriedSkillRank(skill) {
 //   상태이상·버프기: Lv.3·Lv.8 스택 +1씩
 //   회복·보호막기: +10%/Lv / SP기: 획득 +8%/Lv
 //   전 스킬 공통: Lv.3 SP -2, 최대 사용 횟수 +8%/Lv (buriedSkillMaxUses)
+// 1.163.0 — ⏳ 쿨다운 위력 보정 (PM 지시 "고CD 저횟수 스킬 메리트를 확실히"):
+// 기본 쿨다운 1당 위력 +18%. CD0 스팸이 항상 최적이던 구조에 대기 비용의 보상을 준다.
+// 기준은 **원본 스킬의 cd** — 더블 접두어(쿨 2배) 등 개조로 보정이 부풀지 않는다
+export const BURIED_CD_POWER_PCT = 18;
 export function buriedSkillAt(skill, lv = 1) {
   if (!skill) return skill;
   const L = Math.min(BURIED_SKILL_MAX_LV, Math.max(1, lv));
-  if (L === 1) return skill;
+  const cdBoost = skill.power && (skill.cd || 0) > 0 ? 1 + (skill.cd || 0) * BURIED_CD_POWER_PCT / 100 : 1;
+  if (L === 1) return cdBoost > 1 ? { ...skill, power: Math.round(skill.power * cdBoost) } : skill;
   const out = { ...skill, lv: L };
   const steps = L - 1;
   const hasStatus = !!skill.apply;
@@ -2743,6 +2764,7 @@ export function buriedSkillAt(skill, lv = 1) {
   if (L >= 3) out.sp = Math.max(0, out.sp - 2);
   if (skill.lv3 && L >= 3) Object.assign(out, skill.lv3);
   if (skill.lv8 && L >= 8) Object.assign(out, skill.lv8);
+  if (out.power && cdBoost > 1) out.power = Math.round(out.power * cdBoost); // ⏳ CD 보정 (1.163.0)
   return out;
 }
 // Lv.3 / Lv.8에서 무엇이 열리는지 안내 문구 (UI 표시용) — 1.132.0 스킬 종류별
@@ -2766,7 +2788,7 @@ export function buriedSkillLvNote(skill, lv) {
 // PM 결정: 빡빡하게(D30/C22/B15/A10) + 소진 시 스킬만 봉인(장비 스탯 유지).
 // 잔여 = 최대(등급·레벨) - item.usesSpent — 레벨이 오르면 최대가 늘어 잔여도 함께 늘어난다.
 // 구 세이브 장비는 usesSpent 없음 = 만충 (자연 호환). 기본 공격은 무제한.
-export const BURIED_SKILL_USES = { D: 30, C: 22, B: 15, A: 10 };
+export const BURIED_SKILL_USES = { D: 30, C: 24, B: 18, A: 14 }; // 1.163.0 — 상위 등급 기본 횟수 상향 (PM: 마모는 일괄 15 유지, 횟수로 차등)
 export function buriedSkillMaxUses(skill, lv = 1) {
   const base = BURIED_SKILL_USES[buriedSkillRank(skill)] || 30;
   return Math.round(base * (1 + (Math.max(1, lv) - 1) * 0.08));
@@ -3160,7 +3182,9 @@ export function buriedSkillEffectLines(skill) {
   if (skill.swift) push('⚡ 신속 — 사용해도 턴을 소모하지 않는다 (턴당 1회)', '#e8c8a0');
   if (skill.power) {
     if (skill.hits > 1) push(`${skill.hits}회 연속 타격 — 타격마다 위력 ${skill.power}% 적용`);
-    if (skill.pierce) push('방어 무시 — 적 방어력을 계산하지 않는다');
+    if (skill.pierce) push('완전 관통 — 적 방어력과 보호막을 모두 무시한다');
+    if (skill.defPierce) push('방어 관통 — 적 방어력을 무시한다 (보호막은 못 뚫는다)');
+    if (skill.barrierPierce) push('보호막 관통 — 적 보호막을 무시하고 HP를 직접 때린다 (방어는 못 뚫는다)');
     if (skill.critBonus) push(`이 스킬 한정 치명 확률 +${skill.critBonus}%`);
     if (skill.executeBelow) push(`적 HP ${skill.executeBelow}% 이하면 데미지 2배`);
     if (skill.berserk) push('잃은 HP 비율만큼 위력 증가 (최대 2배)');
@@ -3592,7 +3616,7 @@ export const BURIED_MODS = {
   bloody:   { id: 'bloody',   name: '블러디',   desc: '위력 +35%, 사용 시 자해 8',        fx: { powerPct: 35, selfDmg: 8 } },
   reactive: { id: 'reactive', name: '반응형',   desc: '적중 시 다른 스킬 쿨다운 -1',       fx: { cdrOnHit: 1 } },
   vampiric: { id: 'vampiric', name: '흡혈',     desc: '준 피해의 25% 흡혈',               fx: { drain: 25 } },
-  piercing: { id: 'piercing', name: '관통',     desc: '방어·보호막 무시',                 fx: { pierce: true } },
+  piercing: { id: 'piercing', name: '관통',     desc: '보호막 무시 (방어는 못 뚫는다)',    fx: { barrierPierce: true } }, // 1.163.0 하향
   light:    { id: 'light',    name: '경쾌한',   desc: 'SP 소모 -30%, 위력 -15%',          fx: { spPct: -30, powerPct: -15 } },
   double:   { id: 'double',   name: '더블',     desc: '위력 +100%, 쿨다운 2배(최소 2)',    fx: { powerPct: 100, cdMult: 2 } },
   legendary:{ id: 'legendary',name: '전설의',   desc: '위력 +20%, 쿨다운 -1',             fx: { powerPct: 20, cdAdd: -1 } },
@@ -3614,6 +3638,8 @@ function applyBuriedSkillFx(out, fx) {
   if (fx.cdMult) out.cd = Math.max(2, (out.cd || 0) * fx.cdMult);
   if (fx.cdAdd) out.cd = Math.max(0, (out.cd || 0) + fx.cdAdd);
   if (fx.pierce) out.pierce = true;
+  if (fx.barrierPierce) out.barrierPierce = true; // 1.163.0 — 보호막만 관통
+  if (fx.defPierce) out.defPierce = true;         // 1.163.0 — 방어만 관통
   if (fx.critBonus) out.critBonus = (out.critBonus || 0) + fx.critBonus;
   if (fx.drain) out.drain = (out.drain || 0) + fx.drain;
   if (fx.heal) out.heal = (out.heal || 0) + fx.heal;
@@ -3716,7 +3742,8 @@ export const BURIED_RUNES = {
   // ★3 — 강력 (시트: パワー中·レイジ弱·エンチャント 계열)
   rRage:   { id: 'rRage',   name: '격노의 룬', rarity: 3, desc: '위력 +30%, 사용 시 자해 6',  fx: { powerPct: 30, selfDmg: 6 } },
   rDrain:  { id: 'rDrain',  name: '흡혈의 룬', rarity: 3, desc: '준 피해의 20% 흡혈',        fx: { drain: 20 } },
-  rPierce: { id: 'rPierce', name: '관통의 룬', rarity: 3, desc: '방어·보호막 무시',          fx: { pierce: true } },
+  rPierce: { id: 'rPierce', name: '관통의 룬', rarity: 3, desc: '보호막 무시 (방어는 못 뚫는다)', fx: { barrierPierce: true } }, // 1.163.0 하향 — 완전 관통은 ★5·룬워드 「관철」만
+  rSunder: { id: 'rSunder', name: '파갑(破甲)의 룬', rarity: 4, desc: '적 방어력 무시 (보호막은 못 뚫는다)', fx: { defPierce: true } }, // 1.163.0 신설 — 관통 분리의 ★4 축
   rChain:  { id: 'rChain',  name: '연쇄의 룬', rarity: 3, desc: '적중 시 다른 스킬 쿨다운 -1', fx: { cdrOnHit: 1 } },
   rTwin:   { id: 'rTwin',   name: '쌍격의 룬', rarity: 3, desc: '타격 +1회 — 대신 위력 -25%', fx: { hitsAdd: 1, powerPct: -25 } },
   rThunder:{ id: 'rThunder',name: '뇌명의 룬', rarity: 3, desc: '적중 시 35% [기절] 1',       fx: { addApply: { s: 'stun', n: 1, p: 35 } } },
@@ -3838,6 +3865,8 @@ export const BURIED_RUNEWORDS = [
   // ===== 2룬 — 접근성 (초·중반에 노려볼 만하다) =====
   { id: 'rwSlaughter', name: '살육(殺戮)',   runes: ['rKeen', 'rRage'],        fx: { powerPct: 12, critBonus: 6 },
     desc: '위력 +12%, 치명 +6%' },
+  { id: 'rwPierceAll', name: '관철(貫徹)',   runes: ['rPierce', 'rSunder', 'rKeen'], fx: { pierce: true, powerPct: 10 },
+    desc: '방어·보호막 완전 관통 + 위력 +10% — 완전 관통에 닿는 유일한 조합 (1.163.0)' },
   { id: 'rwGale',      name: '질풍(疾風)',   runes: ['rSpeed', 'rPierce'],     fx: { cdAdd: -1, hitsAdd: 1 },
     desc: '쿨다운 -1 추가, 타격 +1회' },
   { id: 'rwFlash',     name: '섬광검(閃光劍)', runes: ['rSpeed', 'rKeen'],     fx: { swift: true },
@@ -3978,6 +4007,11 @@ export function socketBuriedRune(char, runeIdx, slot) {
   const cur = buriedItemRunes(item);
   const sockets = buriedItemSockets(item);
   if (cur.length >= sockets) return { char, text: `소켓이 가득 찼다 (${cur.length}/${sockets}) — 소켓 수만큼만 각인할 수 있다.` };
+  // 1.163.0 — 연격 룬(타격+N, ★5 정점 제외)은 CD 0 스킬에 새로 각인 불가 (PM 결정: CD0 스팸+연격 종결 차단)
+  const baseSk = BURIED_SKILLS[item.skillId];
+  if (rune.fx?.hitsAdd && rune.rarity < 5 && (baseSk?.cd || 0) === 0) {
+    return { char, text: `「${rune.name}」은 쿨다운 1 이상의 스킬에만 각인할 수 있다 — «${baseSk?.name || item.name}»은 쿨다운이 없다.` };
+  }
   const runes = (char.runes || []).filter((_, i) => i !== runeIdx);
   const nextRunes = [...cur, runeId];
   const nextItem = { ...item, runes: nextRunes };

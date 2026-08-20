@@ -550,7 +550,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
             pushLog('반응형 — 다른 스킬 쿨다운 -1', PALETTE.ice);
           }
         }
-        const r = hurt(E, res.total, !!skill.pierce);
+        const r = hurt(E, res.total, !!(skill.pierce || skill.barrierPierce)); // 1.163.0 — 보호막 관통 분리
         // 1.119.0 — 스킬 계열별 피격 이펙트 (물리·기교 슬래시 / 마법 버스트 / 치명 링+펀치)
         setFxHit({ kind: skill.stat || 'any', crit: res.crits > 0, id: ++floatSeq.current });
         if (res.crits > 0) retriggerClass(rootRef.current, 'fx-b-punch');
