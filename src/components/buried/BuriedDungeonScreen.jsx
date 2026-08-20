@@ -265,7 +265,7 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onLogEvent, on
     const rcFinal = sleepy ? rechargeBuriedRandomSlot(rc.char) : rc;
     const rcMsg2 = sleepy && rcFinal.item ? ` + «${rcFinal.item.name}» 만충` : '';
     onUpdateChar({ ...rcFinal.char, hp: Math.min(d.maxHp, char.hp + amount), potions: (char.potions || 0) + 1, ...mark }, 0);
-    setNotice(`야영 — HP ${amount} 회복, 물약 +1, 무작위 ${rcMsg}${rcMsg2}.`);
+    setNotice(`야영 — HP ${amount} 회복, 물약 +1, 무작위 ${rcMsg}${rcMsg2}. (충전된 장비 🛠 마모 +15%)`);
   };
 
   // 협상 — 지불하면 전투 없이 통과 + 장비. 거절하면 강적과 싸운다.

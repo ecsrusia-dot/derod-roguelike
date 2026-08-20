@@ -238,9 +238,9 @@ export function buriedKeystoneBonus(char) {
 // tickDmg / tickHeal : 턴 종료 시 스택당 피해·회복
 // decay: 'one'(매 턴 1 감소) | 'half'(절반) | 'none'(유지)
 export const BURIED_STATUS = {
-  bleed:   { id: 'bleed',   name: '출혈', icon: '🩸', color: '#8b1f1f', kind: 'debuff', max: 20, tickDmg: 4, decay: 'one',  desc: '턴 종료 시 스택×4 피해. 매 턴 1 감소' },
-  poison:  { id: 'poison',  name: '중독', icon: '☠',  color: '#7a9a5e', kind: 'debuff', max: 15, tickDmg: 3, decay: 'none', desc: '턴 종료 시 스택×3 피해. 스스로 사라지지 않는다' },
-  burn:    { id: 'burn',    name: '화상', icon: '🔥', color: '#ff6b35', kind: 'debuff', max: 20, tickDmg: 6, decay: 'half', desc: '턴 종료 시 스택×6 피해. 매 턴 절반으로 감소' },
+  bleed:   { id: 'bleed',   name: '출혈', icon: '🩸', color: '#8b1f1f', kind: 'debuff', max: 20, tickDmg: 4, tickPct: 0.9, decay: 'one',  desc: '턴 종료 시 스택당 최대 HP 0.9% 피해. 매 턴 1 감소' },
+  poison:  { id: 'poison',  name: '중독', icon: '☠',  color: '#7a9a5e', kind: 'debuff', max: 15, tickDmg: 3, tickPct: 0.6, decay: 'none', desc: '턴 종료 시 스택당 최대 HP 0.6% 피해. 스스로 사라지지 않는다' },
+  burn:    { id: 'burn',    name: '화상', icon: '🔥', color: '#ff6b35', kind: 'debuff', max: 20, tickDmg: 6, tickPct: 1.2, decay: 'half', desc: '턴 종료 시 스택당 최대 HP 1.2% 피해. 매 턴 절반으로 감소' },
   stun:    { id: 'stun',    name: '기절', icon: '💫', color: '#e8b04a', kind: 'debuff', max: 3,  decay: 'one',  desc: '스택이 있으면 행동 불가. 매 턴 1 감소' },
   silence: { id: 'silence', name: '침묵', icon: '🤐', color: '#5c4a8c', kind: 'debuff', max: 5,  decay: 'one',  desc: '스킬 사용 불가 (기본 공격만 가능). 매 턴 1 감소' },
   bind:    { id: 'bind',    name: '속박', icon: '🕸',  color: '#8b6f4d', kind: 'debuff', max: 5,  decay: 'one',  desc: '회피 불가 + 받는 피해 스택당 +20%' },
@@ -249,7 +249,7 @@ export const BURIED_STATUS = {
   shatter: { id: 'shatter', name: '파쇄', icon: '⚒',  color: '#c4453d', kind: 'debuff', max: 8,  decay: 'one',  desc: '방어력 스택당 -10% (최대 -80%)' },
   rage:    { id: 'rage',    name: '격노', icon: '🔺', color: '#c4453d', kind: 'buff',   max: 10, decay: 'one',  desc: '주는 데미지 스택당 +10%' },
   guard:   { id: 'guard',   name: '수호', icon: '🛡', color: '#7ba3c4', kind: 'buff',   max: 8,  decay: 'one',  desc: '받는 피해 스택당 -12% (최대 -80%)' },
-  regen:   { id: 'regen',   name: '재생', icon: '💚', color: '#7a9a5e', kind: 'buff',   max: 10, tickHeal: 5, decay: 'one', desc: '턴 종료 시 스택×5 회복. 매 턴 1 감소' },
+  regen:   { id: 'regen',   name: '재생', icon: '💚', color: '#7a9a5e', kind: 'buff',   max: 10, tickHeal: 5, tickHealPct: 1.0, decay: 'one', desc: '턴 종료 시 스택당 최대 HP 1% 회복. 매 턴 1 감소' },
   evade:   { id: 'evade',   name: '잔영', icon: '💨', color: '#d4a574', kind: 'buff',   max: 6,  decay: 'one',  desc: '회피율 스택당 +15%' },
   // 1.106.0 — 원작의 방벽(개수형)·혼란·노화
   wall:    { id: 'wall',    name: '방벽', icon: '🧱', color: '#b8a678', kind: 'buff',   max: 5,  decay: 'none', desc: '적의 공격 행동 1회를 완전히 무효화하고 1개 소모. 스스로 사라지지 않는다' },
@@ -2049,6 +2049,8 @@ export const BURIED_TUNING = {
   // 압력을 두 축에 같은 배율로 곱하면 심층에서 전투가 "길고 아픈" 쪽으로만 자란다
   // (실측 500층: 일반 34타·일격 66%, 강적 101타·87% — 사실상 진입 불가).
   // 지수를 낮춰 전 층에서 리듬을 일정하게 유지한다: 일반 5~8타·20%대, 강적 10~18타·30~50%.
+  maturityPerFloor: 0.004,     // 1.162.0 — 성숙 램프: 층당 적 HP +0.4%p (스킬Lv·접두어 성숙 반영)
+  maturityCap: 0.6,            // 성숙 램프 상한 +60% (PM 결정: 완만 ×1.6 — F151에서 도달)
   pressureHpExp: 0.78,         // 일반·강적 HP에 반영되는 압력 지수 (1 = 전량)
   pressureAtkExp: 0.87,        // 일반·강적 공격력에 반영되는 압력 지수
   guardianPressureExp: 0.80,   // 수문장 **공격력** 압력 지수 (0.5는 심층에서 잡몹보다 약해졌다)
@@ -2278,12 +2280,21 @@ export function tickBuriedStatuses(unit, { canHeal = true } = {}) {
   const next = {};
   let dmg = 0, heal = 0;
   const log = [];
+  const maxHp = unit?.maxHp || 0;
   for (const [key, stack] of Object.entries(src)) {
     if (!stack || stack <= 0) continue;
     const def = BURIED_STATUS[key];
     if (!def) continue;
-    if (def.tickDmg) { const d = def.tickDmg * stack; dmg += d; log.push({ key, name: def.name, dmg: d }); }
-    if (def.tickHeal && canHeal) { const h = def.tickHeal * stack; heal += h; log.push({ key, name: def.name, heal: h }); }
+    // 1.162.0 PM 결정 — 도트·재생은 **대상 최대 HP 비례** (고정치와 큰 쪽 적용, 초반 하위호환).
+    // 고정 3~6/스택은 적 HP가 400→30만으로 자라는 게임에서 10층 이후 무의미했다 (PM 지적)
+    if (def.tickDmg || def.tickPct) {
+      const d = Math.max((def.tickDmg || 0) * stack, def.tickPct ? Math.round(maxHp * def.tickPct * stack / 100) : 0);
+      if (d > 0) { dmg += d; log.push({ key, name: def.name, dmg: d }); }
+    }
+    if ((def.tickHeal || def.tickHealPct) && canHeal) {
+      const h = Math.max((def.tickHeal || 0) * stack, def.tickHealPct ? Math.round(maxHp * def.tickHealPct * stack / 100) : 0);
+      if (h > 0) { heal += h; log.push({ key, name: def.name, heal: h }); }
+    }
     let rest = stack;
     if (def.decay === 'one') rest = stack - 1;
     else if (def.decay === 'half') rest = Math.floor(stack / 2);
@@ -2471,6 +2482,14 @@ export function buildBuriedRoomEnemy(char, roomType, roomEffectId = null) {
       hp: Math.round(enemy.hp * Math.pow(pressure, hpExp)),
       atk: Math.round(enemy.atk * Math.pow(pressure, atkExp)),
     };
+  }
+  // 1.162.0 — 🧬 성숙 램프 (PM 원킬 픽스, 완만 ×1.6): 적 HP 예산은 스킬 Lv.1·무접두어 기준이었는데
+  // 실제 플레이어는 스킬 Lv.8(×1.86)·접두어·룬을 갖춰 CD0 스킬로 일반·강적 원킬이 났다 (TTK 실측).
+  // 층당 +0.4%p, 최대 +60% — HP만 올린다 (공격은 그대로: 길어질 뿐 더 아프지 않게).
+  // 수문장은 자체 지수 체계라 제외. ⚠ 조정은 BURIED_TUNING.maturityPerFloor / maturityCap 한 곳
+  if (!enemy.guardian) {
+    const mat = 1 + Math.min(BURIED_TUNING.maturityCap ?? 0.6, Math.max(0, (floor || 1) - 1) * (BURIED_TUNING.maturityPerFloor ?? 0.004));
+    enemy = { ...enemy, hp: Math.round(enemy.hp * mat) };
   }
   // 1.152.0 — 수문장 대기술 피해 상한. 지수만 만지면 관통/비관통·수문장별 기본치 차이 때문에
   // 위협이 16%~175%로 널뛴다(실측). 그래서 **「대기술 한 방이 내 최대 HP의 N%를 넘지 않는다」**를
@@ -2752,12 +2771,21 @@ export function buriedSkillMaxUses(skill, lv = 1) {
   const base = BURIED_SKILL_USES[buriedSkillRank(skill)] || 30;
   return Math.round(base * (1 + (Math.max(1, lv) - 1) * 0.08));
 }
+// 🛠 정비 마모 (1.162.0, PM 결정) — 충전(야영·봉헌·상점 정비)할 때마다 그 장비의
+// **최대 사용 횟수가 원래 최대치의 15%p씩 영구 감소**한다 (item.wearPct 누적).
+// 충전 5~6회면 수명 종료 → 같은 무기 무한 고집이 불가능해진다 (순환 패키지와 연계).
+// 마모로 최대치가 0이 되면 스킬 봉인 — 소진 상태로 5층이 지나면 파손 규칙대로 부서진다.
+export const BURIED_WEAR_PCT = 15;
+export function buriedItemMaxUses(item, skill, lv = 1) {
+  const base = buriedSkillMaxUses(skill, lv);
+  return Math.max(0, Math.round(base * (1 - Math.min(100, item?.wearPct || 0) / 100)));
+}
 export function buriedSkillUsesLeft(char, slot) {
   const item = char?.equipped?.[slot];
   if (!item) return 0;
   const skill = BURIED_SKILLS[item.skillId];
   if (!skill) return 0;
-  const max = buriedSkillMaxUses(skill, buriedSkillLv(char, item.skillId));
+  const max = buriedItemMaxUses(item, skill, buriedSkillLv(char, item.skillId));
   return Math.max(0, max - (item.usesSpent || 0));
 }
 // 충전 (순수 함수) — pct 100 = 만충, 그 외엔 최대치의 pct%만큼 usesSpent 감소
@@ -2767,10 +2795,11 @@ export function rechargeBuriedUses(char, pct = 100) {
   for (const s of BURIED_SLOT_IDS) {
     const it = equipped[s];
     if (!it || !(it.usesSpent > 0)) continue;
-    if (pct >= 100) { equipped[s] = { ...it, usesSpent: 0 }; continue; }
+    const wear = Math.min(100, (it.wearPct || 0) + BURIED_WEAR_PCT); // 🛠 마모 (1.162.0)
+    if (pct >= 100) { equipped[s] = { ...it, usesSpent: 0, wearPct: wear }; continue; }
     const skill = BURIED_SKILLS[it.skillId];
-    const max = buriedSkillMaxUses(skill, buriedSkillLv(char, it.skillId));
-    equipped[s] = { ...it, usesSpent: Math.max(0, (it.usesSpent || 0) - Math.ceil(max * pct / 100)) };
+    const max = buriedItemMaxUses(it, skill, buriedSkillLv(char, it.skillId));
+    equipped[s] = { ...it, usesSpent: Math.max(0, (it.usesSpent || 0) - Math.ceil(max * pct / 100)), wearPct: wear };
   }
   return { ...char, equipped };
 }
@@ -2779,7 +2808,8 @@ export function rechargeBuriedUses(char, pct = 100) {
 export function rechargeBuriedSlot(char, slotId) {
   const it = char?.equipped?.[slotId];
   if (!it || !(it.usesSpent > 0)) return char;
-  return { ...char, equipped: { ...char.equipped, [slotId]: { ...it, usesSpent: 0 } } };
+  // 🛠 마모 (1.162.0) — 충전할 때마다 최대치 15%p 영구 감소
+  return { ...char, equipped: { ...char.equipped, [slotId]: { ...it, usesSpent: 0, wearPct: Math.min(100, (it.wearPct || 0) + BURIED_WEAR_PCT) } } };
 }
 // 랜덤 1장비 만충 (야영용) — 소진분이 있는 슬롯 중 하나를 무작위로. 랜덤 롤이므로 setMeta updater 밖에서 호출할 것
 export function rechargeBuriedRandomSlot(char) {
@@ -2795,6 +2825,9 @@ export function rechargeBuriedRandomSlot(char) {
 // 스킬 사용 횟수가 0이 된 장비는 소진된 층(depletedAt)이 찍히고,
 // BURIED_BREAK_GRACE(5)층 안에 충전하지 못하면 층 이동 시 부서져 사라진다.
 // 층 이동(일반 advance·낙하 구멍 공용) 직후 호출 — 낙하로 건너뛴 층도 그대로 계산된다.
+// ☠ 수문장·묘주 도트 저항 (1.162.0, PM 결정) — %화된 도트가 긴 수문장전(26~35턴)에서
+// 자동승리 버튼이 되는 걸 막는다. 일반 보스(폭군 등)는 저항 없음
+export const BURIED_GUARDIAN_DOT_RESIST = 50;
 export const BURIED_BREAK_GRACE = 5;
 function isBuriedSlotDepleted(char, slot) {
   const it = char?.equipped?.[slot];
