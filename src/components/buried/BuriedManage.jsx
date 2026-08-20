@@ -16,6 +16,7 @@ import {
   getBuriedRune, BURIED_RUNE_RARITIES, socketBuriedRune, buriedSkillUsesLeft, buriedBreakIn,
   buriedDamageFormula, buriedRunewordProgress, getBuriedRace, getBuriedOrigin,
   BURIED_RUNE_FUSION, buriedFusionInfo, fuseBuriedRunes,
+  buriedRunePouchGroups, buriedRunewordFitCheck, applyBuriedRuneword, BURIED_RUNEWORDS,
 } from '../../data.js';
 import { BuriedItemCard, BuriedItemSheet, BURIED_DUST_ICON } from './BuriedCommon.jsx';
 
@@ -26,6 +27,9 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose, readOn
   const [openPanel, setOpenPanel] = useState(null); // 1.148.0 — 'formula' | 'runeword'
   const [fuseSel, setFuseSel] = useState([]);       // 1.149.0 — 융합 재료로 고른 룬 index
   const [fuseMsg, setFuseMsg] = useState(null);     // 융합 결과 메시지
+  const [rwOnly, setRwOnly] = useState(false);      // 1.165.0 — ✅ 완성 가능만 보기
+  const [rwPick, setRwPick] = useState(null);       // 1.165.0 — 원클릭 각인할 룬워드
+  const [rwMsg, setRwMsg] = useState(null);         // 원클릭 각인 결과
 
   if (!char) return null;
   const cls = getBuriedClass(char.classId);
@@ -47,6 +51,14 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose, readOn
     setFuseSel([]);
     setFuseMsg({ ok: r.ok, text: r.text });
   };
+  // ⟪룬워드⟫ 원클릭 각인 (1.165.0) — 재료가 다 모인 룬워드를 눌러 장비 하나에 한 번에 박는다
+  const doRuneword = (rw, slot) => {
+    const r = applyBuriedRuneword(char, rw.id, slot);
+    if (r.ok) onUpdate(r.char, 0);
+    setRwPick(null);
+    setRwMsg({ ok: r.ok, text: r.text });
+  };
+
   const toggleFuse = (i) => {
     setFuseMsg(null);
     setFuseSel(prev => {
@@ -159,18 +171,53 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose, readOn
               <br />★ = 장착 장비에 완성됨 · ✅ = 지금 주머니 룬으로 완성 가능
             </div>
             {(() => { const L = buriedRunewordProgress(char);
-              return <div className="text-[11px] tabular-nums" style={{ color: PALETTE.dawn }}>
-                총 {L.length}종 · ★ 완성 {L.filter(x => x.done).length} · ✅ 지금 가능 {L.filter(x => x.craftable && !x.done).length}
-              </div>; })()}
+              const ready = L.filter(x => x.craftable && !x.done).length;
+              return (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] tabular-nums" style={{ color: PALETTE.dawn }}>
+                    총 {L.length}종 · ★ 완성 {L.filter(x => x.done).length} · ✅ 지금 가능 {ready}
+                  </span>
+                  {/* 1.165.0 — PM 지시: 재료가 다 모인 룬워드만 추려 보기 */}
+                  <button onClick={() => setRwOnly(v => !v)} className="ui-press shrink-0 px-2 py-1 text-[11px] font-bold"
+                    style={{ borderRadius: 'var(--r-chip, 8px)',
+                      background: rwOnly ? `${PALETTE.green}22` : PALETTE.panelLight,
+                      border: `1px solid ${rwOnly ? PALETTE.green : PALETTE.panelBorder}`,
+                      color: rwOnly ? PALETTE.green : PALETTE.textDim }}>
+                    {rwOnly ? `✅ 완성 가능만 (${ready})` : '↕ 전체 보기'}
+                  </button>
+                </div>
+              ); })()}
+            {rwMsg && (
+              <div className="px-2.5 py-1.5 text-[11px] leading-relaxed"
+                style={{ borderRadius: 'var(--r-chip, 8px)',
+                  background: rwMsg.ok ? `${PALETTE.legendary}18` : `${PALETTE.accent}18`,
+                  border: `1px solid ${rwMsg.ok ? PALETTE.legendary : PALETTE.accent}66`,
+                  color: rwMsg.ok ? PALETTE.legendary : PALETTE.accent }}>
+                {rwMsg.text}
+              </div>
+            )}
             {[...buriedRunewordProgress(char)]
+              .filter(rw => !rwOnly || (rw.craftable && !rw.done))
               .sort((a, b) => (b.done - a.done) || (b.craftable - a.craftable) || (a.runes.length - b.runes.length))
-              .map(rw => (
+              .map(rw => {
+              // 1.165.0 — 원클릭 각인: 지금 이 룬워드를 받을 수 있는 장비가 하나라도 있는가
+              const canApply = !readOnly && rw.craftable && !rw.done
+                && BURIED_SLOT_IDS.some(sl => buriedRunewordFitCheck(char, rw, sl).ok);
+              return (
               <div key={rw.id} className="py-1.5" style={{ borderTop: `1px solid ${PALETTE.panelBorder}` }}>
                 <div className="flex justify-between items-center gap-2">
                   <span className="text-[12px] font-bold" style={{ color: rw.done ? PALETTE.legendary : rw.craftable ? PALETTE.green : PALETTE.text }}>
                     {rw.done ? '★ ' : rw.craftable ? '✅ ' : ''}⟪{rw.name}⟫
                   </span>
-                  <span className="text-[11px] shrink-0" style={{ color: PALETTE.textDim }}>룬 {rw.runes.length}칸</span>
+                  {canApply ? (
+                    <button onClick={() => { setRwMsg(null); setRwPick(rw); }}
+                      className="ui-press shrink-0 px-2.5 py-1 text-[11px] font-bold"
+                      style={{ borderRadius: 'var(--r-chip, 8px)', background: `${PALETTE.green}22`, border: `1px solid ${PALETTE.green}88`, color: PALETTE.green }}>
+                      ⚡ 한 번에 각인
+                    </button>
+                  ) : (
+                    <span className="text-[11px] shrink-0" style={{ color: PALETTE.textDim }}>룬 {rw.runes.length}칸</span>
+                  )}
                 </div>
                 <div className="text-[11px] leading-relaxed" style={{ color: PALETTE.dawn }}>{rw.desc}</div>
                 <div className="text-[11px] mt-0.5" style={{ color: PALETTE.textDim }}>
@@ -181,9 +228,10 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose, readOn
                     </span>
                   ))}
                   {rw.missing.length > 0 && <span style={{ color: PALETTE.accent }}> · 부족: {rw.missing.join(', ')}</span>}
+                  {rw.craftable && !rw.done && !canApply && <span style={{ color: PALETTE.accent }}> · 받을 장비 없음 (소켓 {rw.runes.length}칸 빈 장비 필요)</span>}
                 </div>
               </div>
-            ))}
+            );})}
           </div>
         )}
 
@@ -260,32 +308,40 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose, readOn
         {!readOnly && runes.length > 0 && (
           <div className="px-3 py-2.5" style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panel, border: `1px solid ${PALETTE.legendary}44` }}>
             <div className="text-[11px] tracking-[0.2em] mb-1.5" style={{ color: PALETTE.legendary }}>
-              ᚱ 룬 주머니 {runes.length}개 — 각인은 영구 · 장비 분해 시 회수
+              ᚱ 룬 주머니 {runes.length}개 — 등급순 정리 · 각인은 영구 · 장비 분해 시 회수
             </div>
+            {/* 1.165.0 PM 지시 — 등급 내림차순 + 같은 룬은 한 줄에 ×개수로 묶는다 */}
             <div className="space-y-1.5">
-              {runes.map((id, i) => {
-                const r = getBuriedRune(id);
-                if (!r) return null;
+              {buriedRunePouchGroups(char).map(g => {
+                const r = g.rune;
                 const rar = BURIED_RUNE_RARITIES[r.rarity];
+                const selN = g.idxs.filter(i => fuseSel.includes(i)).length;
+                // 융합 버튼: 이 묶음에서 아직 안 고른 것 하나를 넣거나, 마지막으로 고른 것을 뺀다
+                const nextIdx = g.idxs.find(i => !fuseSel.includes(i));
+                const lastSel = [...g.idxs].reverse().find(i => fuseSel.includes(i));
                 return (
-                  <div key={`${id}-${i}`} className="flex items-center gap-2 px-2.5 py-2"
+                  <div key={g.id} className="flex items-center gap-2 px-2.5 py-2"
                     style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panelLight, border: `1px solid ${rar.color}55` }}>
                     <div className="flex-1 min-w-0">
-                      <div className="text-[12px] font-bold" style={{ color: rar.color }}>ᚱ {r.name} <span className="font-normal">{rar.stars}</span></div>
+                      <div className="text-[12px] font-bold" style={{ color: rar.color }}>
+                        ᚱ {r.name} <span className="font-normal">{rar.stars}</span>
+                        {g.count > 1 && <span className="tabular-nums ml-1" style={{ color: PALETTE.text }}>×{g.count}</span>}
+                      </div>
                       <div className="text-[11px] break-keep" style={{ color: PALETTE.textDim }}>{r.desc}</div>
                     </div>
-                    <button onClick={() => setRunePick(i)} className="ui-press shrink-0 px-2.5 py-1.5 text-[11px] font-bold"
+                    <button onClick={() => setRunePick(g.idxs[0])} className="ui-press shrink-0 px-2.5 py-1.5 text-[11px] font-bold"
                       style={{ borderRadius: 'var(--r-chip, 8px)', background: `${rar.color}22`, border: `1px solid ${rar.color}66`, color: rar.color }}>
                       각인
                     </button>
                     {/* 1.149.0 — 융합 재료 선택 (★5는 더 위가 없어 제외) */}
                     {BURIED_RUNE_FUSION[r.rarity] && (
-                      <button onClick={() => toggleFuse(i)} className="ui-press shrink-0 px-2 py-1.5 text-[11px] font-bold"
+                      <button onClick={() => toggleFuse(selN > 0 && nextIdx == null ? lastSel : (nextIdx ?? lastSel))}
+                        className="ui-press shrink-0 px-2 py-1.5 text-[11px] font-bold tabular-nums"
                         style={{ borderRadius: 'var(--r-chip, 8px)',
-                          background: fuseSel.includes(i) ? PALETTE.legendary : 'transparent',
+                          background: selN > 0 ? PALETTE.legendary : 'transparent',
                           border: `1px solid ${PALETTE.legendary}66`,
-                          color: fuseSel.includes(i) ? '#1a0f14' : PALETTE.legendary }}>
-                        {fuseSel.includes(i) ? '✓ 재료' : '융합'}
+                          color: selN > 0 ? '#1a0f14' : PALETTE.legendary }}>
+                        {selN > 0 ? `✓ 재료 ${selN}` : '융합'}
                       </button>
                     )}
                   </div>
@@ -372,6 +428,49 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose, readOn
       )}
 
       {/* ᚱ 각인 대상 선택 (1.123.0) — 소켓이 빈 장착 장비만 */}
+      {/* ⟪룬워드⟫ 원클릭 각인 — 받을 장비 고르기 (1.165.0) */}
+      {rwPick && (
+        <div className="absolute inset-0 z-50 flex items-end" style={{ background: 'rgba(0,0,0,0.72)' }} onClick={() => setRwPick(null)}>
+          <div className="w-full px-3 pb-4 pt-3" onClick={(e) => e.stopPropagation()}
+            style={{ background: PALETTE.bgDeep, borderTop: `1px solid ${PALETTE.legendary}66`, borderRadius: '18px 18px 0 0', maxHeight: '80%', overflowY: 'auto' }}>
+            <div className="text-[13px] font-bold mb-0.5" style={{ color: PALETTE.legendary }}>
+              ⟪{rwPick.name}⟫ — 어느 장비에 한 번에 각인할까
+            </div>
+            <div className="text-[11px] mb-2 leading-relaxed" style={{ color: PALETTE.textDim }}>
+              {rwPick.runes.map((r, i) => (
+                <span key={i}>
+                  {i > 0 && <span style={{ color: PALETTE.panelBorder }}> → </span>}
+                  <span style={{ color: BURIED_RUNE_RARITIES[r?.rarity]?.color }}>{r?.name}</span>
+                </span>
+              ))}
+              <br />순서대로 자동 각인된다. <b style={{ color: PALETTE.accent }}>각인은 영구</b> — 되돌릴 수 없다.
+            </div>
+            <div className="space-y-1.5">
+              {BURIED_SLOTS.map(sl => {
+                const item = char.equipped?.[sl.id];
+                if (!item) return null;
+                const fit = buriedRunewordFitCheck(char, rwPick, sl.id);
+                return (
+                  <div key={sl.id} style={{ opacity: fit.ok ? 1 : 0.5 }}>
+                    <BuriedItemCard item={item} slotId={sl.id} char={char}
+                      onClick={fit.ok ? () => doRuneword(rwPick, sl.id) : undefined}
+                      right={
+                        <span className="text-[11px] shrink-0 text-right" style={{ color: fit.ok ? PALETTE.green : PALETTE.accent }}>
+                          {fit.ok ? `⚡ ${fit.reason}` : fit.reason}
+                        </span>
+                      } />
+                  </div>
+                );
+              })}
+            </div>
+            <button onClick={() => setRwPick(null)} className="ui-press w-full py-2.5 mt-2 text-[12px]"
+              style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panel, border: `1px solid ${PALETTE.panelBorder}`, color: PALETTE.textDim }}>
+              취소
+            </button>
+          </div>
+        </div>
+      )}
+
       {runePick !== null && getBuriedRune(runes[runePick]) && (() => {
         const r = getBuriedRune(runes[runePick]);
         const rar = BURIED_RUNE_RARITIES[r.rarity];
