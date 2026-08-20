@@ -187,7 +187,7 @@ export function BuriedItemCard({ item, slotId, onClick, right, dim = false, show
           const pv = char ? buriedSkillDmgPreview(eff, char) : null;
           return (
             <div className="text-[11px] leading-relaxed break-keep" style={{ color: PALETTE.ice }}>
-              ▸ {eff.power ? `위력 ${eff.power}%${(eff.hits || 1) > 1 ? ` ×${eff.hits}` : ''}${pv ? ` (예상 ${pv.hits > 1 ? `${pv.per}×${pv.hits} = ` : ''}` + `${pv.total} 피해)` : ''}${eff.decayPct ? ` · ⚙감쇠 -${eff.decayPct}% (Lv.${item.floor || 1} 장비 vs 마물 Lv.${buriedMonsterLevel(char)})` : ''}${eff.pierce ? ' · 방어 무시' : ''}${eff.drain ? ` · 흡혈 ${eff.drain}%` : ''}${eff.critBonus ? ` · 치명 +${eff.critBonus}%` : ''} — ` : ''}{skill.desc}
+              ▸ {eff.power ? `위력 ${eff.power}%${(eff.hits || 1) > 1 ? ` ×${eff.hits}` : ''}${pv ? ` (예상 ${pv.hits > 1 ? `${pv.per}×${pv.hits} = ` : ''}` + `${pv.total} 피해)` : ''}${eff.decayPct ? ` · ⚙감쇠 -${eff.decayPct}% (Lv.${item.floor || 1} 장비 vs 마물 Lv.${buriedMonsterLevel(char)})` : ''}${eff.pierce ? ' · 완전 관통' : ''}${eff.defPierce ? ' · 방어 관통' : ''}${eff.barrierPierce ? ' · 보호막 관통' : ''}${eff.drain ? ` · 흡혈 ${eff.drain}%` : ''}${eff.critBonus ? ` · 치명 +${eff.critBonus}%` : ''} — ` : ''}{skill.desc}
             </div>
           );
         })()}
@@ -318,7 +318,7 @@ export function BuriedItemSheet({ item, compare, onEquip, onUnequip, onDismantle
             <div className="text-[11px] mt-0.5 tabular-nums" style={{ color: PALETTE.ice }}>
               SP {skill.sp}{skill.cd > 0 ? ` · 쿨다운 ${skill.cd}턴` : ' · 쿨다운 없음'}
               {skill.power ? ` · 위력 ${skill.power}%${skill.hits ? ` ×${skill.hits}` : ''}${dmgPv ? ` ≈ ${dmgPv.hits > 1 ? `${dmgPv.per}×${dmgPv.hits} = ` : ''}${dmgPv.total} 피해` : ''} (${skill.stat ? `${skillKindMeta(skill).refs} 기반 ${skillKindMeta(skill).label} 공격력 참조` : '물리·기교·마법 중 최고 공격력 참조'})` : ' · 스탯 무관 (보조 스킬)'}
-              {skill.pierce ? ' · 방어 무시' : ''}
+              {skill.pierce ? ' · 완전 관통' : ''}{effSkill?.defPierce ? ' · 방어 관통' : ''}{effSkill?.barrierPierce ? ' · 보호막 관통' : ''}
               {effSkill?.decayPct ? <span style={{ color: PALETTE.accent }}> · ⚙ 위력 감쇠 -{effSkill.decayPct}% — 장비 Lv.{item.floor || 1}이(가) 마물 레벨보다 낡았다</span> : null}
             </div>
             {/* 1.143.0 — ⛓ 사용 가능 횟수 */}
