@@ -4087,10 +4087,10 @@ const rwRuneIds = (rw) => (rw?.runes || []).map(r => (typeof r === 'string' ? r 
 export function buriedRunewordFitCheck(char, rw, slot) {
   const rwIds = rwRuneIds(rw);
   const item = char?.equipped?.[slot];
-  if (!item) return { ok: false, reason: '빈 슬롯', free: -1, empty: true };
+  if (!item) return { ok: false, reason: '이 슬롯은 비어 있다 (장비 없음)', free: -1, empty: true, kind: 'noitem' };
   const cur = buriedItemRunes(item);
   const sockets = buriedItemSockets(item);
-  if (buriedRunewordOf(cur)?.id === rw.id) return { ok: false, reason: '이미 완성됨', free: sockets - cur.length, item };
+  if (buriedRunewordOf(cur)?.id === rw.id) return { ok: false, reason: '이 장비에 이미 완성돼 있다', free: sockets - cur.length, item, kind: 'done' };
   // 1.167.0 — 이미 박힌 룬의 **끝부분**이 룬워드의 앞부분과 이어지면 그만큼 아껴 각인한다.
   // (부분 일치 매칭이라 이어 붙이기만 하면 완성된다 — 앞에 무관한 룬이 있어도 무방)
   let head = 0;
@@ -4100,11 +4100,9 @@ export function buriedRunewordFitCheck(char, rw, slot) {
   const need = rwIds.slice(head);
   const free = sockets - cur.length;
   const base = { free, need: need.length, item, sockets };
-  if (free < need.length) {
-    return { ...base, ok: false,
-      reason: sockets === 0 ? '소켓이 없는 장비' : `빈 소켓 ${free}/${sockets}칸 — ${need.length}칸 필요` };
-  }
-  // 주머니 재료 (같은 룬 중복 요구도 정확히 소모)
+  // 1.167.3 — 검사 **순서**가 중요하다 (PM 지적: 엉뚱한 사유가 먼저 떴다).
+  // ① 재료 부족은 **어느 장비를 골라도 같은 전역 사실** → 가장 먼저 알려야 한다.
+  //    (예전엔 소켓을 먼저 봐서, 재료가 없는데도 "빈 소켓 2칸 — 3칸 필요"가 떠 장비 탓처럼 보였다)
   const left = [...(char.runes || [])];
   const missing = [];
   for (const id of need) {
@@ -4112,30 +4110,43 @@ export function buriedRunewordFitCheck(char, rw, slot) {
     if (i < 0) missing.push(getBuriedRune(id)?.name || id);
     else left.splice(i, 1);
   }
-  if (missing.length > 0) return { ...base, ok: false, reason: `주머니에 ${missing.join('·')} 부족`, missing };
-  // 1.163.0 연격 룬 CD0 제한
+  if (missing.length > 0) {
+    return { ...base, ok: false, kind: 'material', missing,
+      reason: `가진 룬이 모자란다 — ᚱ ${missing.join('·')} 필요` };
+  }
+  // ② 소켓 — 이제 이 장비만의 문제다
+  if (free < need.length) {
+    return { ...base, ok: false, kind: 'socket',
+      reason: sockets === 0 ? '이 장비엔 룬 소켓이 없다'
+        : `이 장비는 빈 소켓 ${free}칸뿐 (소켓 ${sockets}칸 중) — ${need.length}칸 필요` };
+  }
+  // ③ 1.163.0 연격 룬 CD0 제한
   const skill = BURIED_SKILLS[item.skillId];
   for (const id of need) {
     const r = getBuriedRune(id);
     if (r?.fx?.hitsAdd && r.rarity < 5 && (skill?.cd || 0) === 0) {
-      return { ...base, ok: false, reason: `「${r.name}」은 쿨다운 1 이상 스킬 전용 (이 장비는 CD 0)` };
+      return { ...base, ok: false, kind: 'cd',
+        reason: `ᚱ${r.name}은 쿨다운 1 이상 스킬에만 각인된다 (이 장비 스킬은 쿨다운 0)` };
     }
   }
-  return { ...base, ok: true, reason: head > 0 ? `이어서 ${need.length}개 각인` : `${need.length}개 각인` };
+  return { ...base, ok: true, kind: 'ok', reason: head > 0 ? `이어서 ${need.length}개 각인` : `${need.length}개 각인` };
 }
 // 이 룬워드를 지금 각인할 수 있는 **가장 나은 슬롯** 하나를 고른다 (없으면 사유가 가장 유용한 슬롯).
 // 조합표 게이트·버튼·사유 표시가 전부 이 결과 하나만 본다 — 판정이 갈라지지 않게 (1.167.1)
+// 1.167.3 — 사유 종류별 **우선순위**로 고른다 (PM 지적: 3칸짜리 투구가 있는데 2칸 보조를 지목했다).
+// 재료 부족은 전역 사실이라 최우선, 그 다음이 "장비만 바꾸면 되는" CD·소켓 문제.
+// 같은 종류끼리는 빈 소켓이 많은 쪽 = 가장 가까운 장비.
+const RW_FIT_RANK = { material: 4, cd: 3, socket: 2, done: 1, noitem: 0 };
 export function buriedRunewordBestFit(char, rw) {
   let best = null;
   for (const sl of BURIED_SLOT_IDS) {
     const f = { ...buriedRunewordFitCheck(char, rw, sl), slot: sl };
     if (f.ok) return f;
     if (!best) { best = f; continue; }
-    // 빈 슬롯(장비 없음)은 정보가 없으니 후순위. 그 외엔 빈 소켓이 많은 쪽 = 가장 가까운 장비
-    const score = (x) => (x.empty ? -100 : 0) + (x.free ?? 0) + (x.missing ? -1 : 0);
-    if (score(f) > score(best)) best = f;
+    const rank = (x) => RW_FIT_RANK[x.kind] ?? 0;
+    if (rank(f) > rank(best) || (rank(f) === rank(best) && (f.free ?? -1) > (best.free ?? -1))) best = f;
   }
-  return best || { ok: false, reason: '장착한 장비가 없다', free: -1 };
+  return best || { ok: false, reason: '장착한 장비가 없다', free: -1, kind: 'noitem' };
 }
 export function applyBuriedRuneword(char, runewordId, slot) {
   const rw = BURIED_RUNEWORDS.find(x => x.id === runewordId);
