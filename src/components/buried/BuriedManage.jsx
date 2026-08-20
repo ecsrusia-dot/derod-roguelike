@@ -12,7 +12,7 @@ import {
   BURIED_SLOTS, BURIED_SLOT_IDS, BURIED_STATS, BURIED_SKILLS, BURIED_SKILL_MAX_LV,
   buriedItemRunes, buriedItemSockets,
   buriedDerived, buriedDustValue, getBuriedClass,
-  buriedTraitIds, getBuriedTrait, buriedSkillLv, buriedSkillRank, BURIED_SKILL_RANKS,
+  buriedTraitIds, getBuriedTrait, buriedSkillLv, BURIED_QUALITY_COLORS,
   getBuriedRune, BURIED_RUNE_RARITIES, socketBuriedRune, buriedSkillUsesLeft, buriedBreakIn,
   buriedDamageFormula, buriedRunewordProgress, getBuriedRace, getBuriedOrigin,
   BURIED_RUNE_FUSION, buriedFusionInfo, fuseBuriedRunes,
@@ -230,7 +230,7 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose, readOn
             {BURIED_SLOTS.map(s => {
               const item = char.equipped?.[s.id] || null;
               const lv = item ? buriedSkillLv(char, item.skillId) : 1;
-              const rank = item ? buriedSkillRank(BURIED_SKILLS[item.skillId]) : null;
+              const q = item ? (item.quality || 'B') : null; // 1.164.0 — 🎖 장비 품질 (구 세이브 = B)
               return (
                 <BuriedItemCard key={s.id} item={item} slotId={s.id} char={char}
                   right={item ? (
@@ -238,7 +238,7 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose, readOn
                       <div className="text-[11px] font-bold tabular-nums" style={{ color: lv >= BURIED_SKILL_MAX_LV ? PALETTE.legendary : PALETTE.text }}>
                         Lv.{lv}
                       </div>
-                      <div className="text-[11px]" style={{ color: BURIED_SKILL_RANKS[rank]?.color }}>{rank}급</div>
+                      <div className="text-[11px]" style={{ color: BURIED_QUALITY_COLORS[q] }}>품질 {q}</div>
                       {(() => { // 1.132.0 — 스킬 사용 횟수 / 1.134.0 — 파손 카운트다운
                         const left = buriedSkillUsesLeft(char, s.id);
                         const brk = left <= 0 ? buriedBreakIn(char, s.id) : null;
