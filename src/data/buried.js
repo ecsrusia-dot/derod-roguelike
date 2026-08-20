@@ -815,10 +815,10 @@ export function buriedCheckpointFloors(deepestFloor) {
 // 1.104.0~ barrier(보호막)·chase(추격 피해) 추가 — 원작의 핵심 2축
 // 🌀 회피율 상한 (1.167.0, PM 결정) — 45% → 70%. 회피 특화 직업(정령사·다크엘프 등)이
 // 실제로 회피 빌드를 굴릴 수 있도록. buriedEffDodge의 전투 상한(70)과 같은 값으로 맞췄다.
-export const BURIED_DODGE_CAP = 70;
+export let BURIED_DODGE_CAP = 70;
 // 🎯 치명 확률 상한 (1.166.0) — 초과분은 치명 피해로 전환
-export const BURIED_CRIT_CAP = 75;      // 확률 상한 (%)
-export const BURIED_CRIT_OVERFLOW = 2;  // 초과 1%p당 치명 피해 +N%
+export let BURIED_CRIT_CAP = 75;      // 확률 상한 (%)
+export let BURIED_CRIT_OVERFLOW = 2;  // 초과 1%p당 치명 피해 +N%
 export function buriedDerived(char) {
   if (!char) return { maxHp: 1, maxSp: 1, atk: 1, mag: 1, fin: 1, def: 0, crit: 0, critDmg: 60, dodge: 0, spRegen: 12, barrier: 0, chase: 0, healPct: 0, drainPct: 0, stats: { str: 0, dex: 0, int: 0, vit: 0 } };
   const noAcc = buriedKeystoneFx(char).noAcc; // ⚓ 공허의 쐐기 (1.128.0) — 장신구 2슬롯 무효
@@ -902,7 +902,7 @@ export function buriedEquippedSkills(char) {
 // 경험치 적용 — 1.113.0 PM 결정: 레벨업 보상은 HP 회복뿐 (스탯 3p 폐지).
 // 1.161.0 PM 승인 — 전액 회복 → **최대 HP 35%만** (풀피 경제 해체: 매 전투 만피 진입이
 // 회복 전설·야영·물약을 전부 죽이던 문제. 조정은 BURIED_LEVEL_HEAL_PCT 한 곳)
-export const BURIED_LEVEL_HEAL_PCT = 35;
+export let BURIED_LEVEL_HEAL_PCT = 35;
 export function grantBuriedExp(char, amount) {
   let c = { ...char, exp: (char.exp || 0) + amount };
   const gained = [];
@@ -2782,7 +2782,7 @@ export function buriedSkillRank(skill) {
 // 1.163.0 — ⏳ 쿨다운 위력 보정 (PM 지시 "고CD 저횟수 스킬 메리트를 확실히"):
 // 기본 쿨다운 1당 위력 +18%. CD0 스팸이 항상 최적이던 구조에 대기 비용의 보상을 준다.
 // 기준은 **원본 스킬의 cd** — 더블 접두어(쿨 2배) 등 개조로 보정이 부풀지 않는다
-export const BURIED_CD_POWER_PCT = 18;
+export let BURIED_CD_POWER_PCT = 18;
 // 1.164.0 — 스킬 등급 배율(1.163.1) 폐지 (PM 정정: A~D는 장비 품질이지 스킬 등급이 아니다).
 // 화력 사다리는 ① cd0 이상치 기본 위력 데이터 하향 + ② CD 보정 + ③ 장비 품질 배율이 담당한다.
 export function buriedSkillAt(skill, lv = 1) {
@@ -2842,7 +2842,7 @@ export function buriedSkillMaxUses(skill, lv = 1) {
 // **최대 사용 횟수가 원래 최대치의 15%p씩 영구 감소**한다 (item.wearPct 누적).
 // 충전 5~6회면 수명 종료 → 같은 무기 무한 고집이 불가능해진다 (순환 패키지와 연계).
 // 마모로 최대치가 0이 되면 스킬 봉인 — 소진 상태로 5층이 지나면 파손 규칙대로 부서진다.
-export const BURIED_WEAR_PCT = 15;
+export let BURIED_WEAR_PCT = 15;
 export function buriedItemMaxUses(item, skill, lv = 1) {
   const base = buriedSkillMaxUses(skill, lv);
   return Math.max(0, Math.round(base * (1 - Math.min(100, item?.wearPct || 0) / 100)));
@@ -2894,7 +2894,7 @@ export function rechargeBuriedRandomSlot(char) {
 // 층 이동(일반 advance·낙하 구멍 공용) 직후 호출 — 낙하로 건너뛴 층도 그대로 계산된다.
 // ☠ 수문장·묘주 도트 저항 (1.162.0, PM 결정) — %화된 도트가 긴 수문장전(26~35턴)에서
 // 자동승리 버튼이 되는 걸 막는다. 일반 보스(폭군 등)는 저항 없음
-export const BURIED_GUARDIAN_DOT_RESIST = 50;
+export let BURIED_GUARDIAN_DOT_RESIST = 50;
 export const BURIED_BREAK_GRACE = 5;
 function isBuriedSlotDepleted(char, slot) {
   const it = char?.equipped?.[slot];
@@ -5218,3 +5218,113 @@ export function buriedSeasonMilestones(perDungeon, unifiedFirst, already = []) {
   hit('ms_unified', !!unifiedFirst);
   return out;
 }
+
+
+// =========================================================
+// ⚖ 밸런스 편집 (1.168.0, PM 지시) — 인게임에서 전투 상수를 직접 조정
+// =========================================================
+// PM이 매번 개발 요청 없이 체감을 잡을 수 있도록 주요 전투 상수를 한 화면에 모았다.
+// 구현 원칙:
+//   · 스칼라는 `export let` — ES 모듈 **라이브 바인딩**이라 재할당하면 소비 지점이 즉시 반영된다
+//   · 객체(BURIED_TUNING·BURIED_STATUS·BURIED_GEAR_DECAY·BURIED_RUNE_RECOVERY)는 필드를 직접 갱신
+//   · 소비 지점은 전부 **호출 시점에** 값을 읽으므로 전투 중 변경도 다음 계산부터 적용된다
+// ⚠ 새 상수를 편집 대상에 넣을 때는 여기 한 줄만 추가하면 UI가 자동으로 생긴다
+const BF = (id, group, label, unit, min, max, step, get, set, note) => ({ id, group, label, unit, min, max, step, get, set, note });
+export const BURIED_BALANCE_FIELDS = [
+  // ☠ 도트 — 스택당 대상 최대 HP 비례 (%)
+  BF('dotPoison', '☠ 도트', '중독 스택당 피해', '%/스택', 0, 5, 0.05,
+    () => BURIED_STATUS.poison.tickPct, v => { BURIED_STATUS.poison.tickPct = v; }, '감소 없음 — 한 번 쌓이면 계속 들어간다'),
+  BF('dotBleed', '☠ 도트', '출혈 스택당 피해', '%/스택', 0, 5, 0.05,
+    () => BURIED_STATUS.bleed.tickPct, v => { BURIED_STATUS.bleed.tickPct = v; }, '매 턴 1스택씩 감소'),
+  BF('dotBurn', '☠ 도트', '화상 스택당 피해', '%/스택', 0, 5, 0.05,
+    () => BURIED_STATUS.burn.tickPct, v => { BURIED_STATUS.burn.tickPct = v; }, '매 턴 절반으로 감소'),
+  BF('dotRegen', '☠ 도트', '재생 스택당 회복', '%/스택', 0, 5, 0.05,
+    () => BURIED_STATUS.regen.tickHealPct, v => { BURIED_STATUS.regen.tickHealPct = v; }, '내가 받는 회복 버프'),
+  BF('dotGuardResist', '☠ 도트', '수문장·묘주 도트 저항', '%', 0, 95, 5,
+    () => BURIED_GUARDIAN_DOT_RESIST, v => { BURIED_GUARDIAN_DOT_RESIST = v; }, '관문 보스가 받는 도트를 이 비율만큼 깎는다'),
+
+  // 🎯 치명·회피
+  BF('critCap', '🎯 치명·회피', '치명 확률 상한', '%', 10, 100, 1,
+    () => BURIED_CRIT_CAP, v => { BURIED_CRIT_CAP = v; }, '100이면 확정 치명이 가능해진다'),
+  BF('critOverflow', '🎯 치명·회피', '상한 초과 → 치명 피해 전환', '%/1%p', 0, 10, 0.5,
+    () => BURIED_CRIT_OVERFLOW, v => { BURIED_CRIT_OVERFLOW = v; }, '넘친 확률 1%p가 치명 피해 몇 %가 되는가'),
+  BF('dodgeCap', '🎯 치명·회피', '회피율 상한', '%', 0, 95, 1,
+    () => BURIED_DODGE_CAP, v => { BURIED_DODGE_CAP = v; }, '[회피] 버프 포함 최종 상한'),
+
+  // ⚔ 전역 화력
+  BF('playerDmgMult', '⚔ 전역 화력', '내 피해 배율', '×', 0.2, 3, 0.05,
+    () => BURIED_TUNING.playerDmgMult, v => { BURIED_TUNING.playerDmgMult = v; }, '모든 내 공격에 곱해진다'),
+  BF('enemyDmgMult', '⚔ 전역 화력', '적 피해 배율', '×', 0.2, 3, 0.05,
+    () => BURIED_TUNING.enemyDmgMult, v => { BURIED_TUNING.enemyDmgMult = v; }, '모든 적 공격에 곱해진다'),
+  BF('cdPowerPct', '⚔ 전역 화력', '쿨다운 1당 위력 보정', '%', 0, 60, 1,
+    () => BURIED_CD_POWER_PCT, v => { BURIED_CD_POWER_PCT = v; }, '고CD 스킬의 한 방 보상'),
+
+  // 🌊 깊이 압력 (층이 깊어질수록 적이 강해지는 곡선)
+  BF('depthPerFloor', '🌊 깊이 압력', '층당 압력 증가', '/층', 0, 0.05, 0.001,
+    () => BURIED_TUNING.depthPressurePerFloor, v => { BURIED_TUNING.depthPressurePerFloor = v; }, '정복 층 이후 1층마다 더해지는 압력'),
+  BF('depthStep50', '🌊 깊이 압력', '50층 계단 배율', '×', 1, 4, 0.1,
+    () => BURIED_TUNING.depthStep50, v => { BURIED_TUNING.depthStep50 = v; }, '50층 단위로 곱해지는 계단'),
+  BF('depthStep100', '🌊 깊이 압력', '100층 계단 배율', '×', 1, 6, 0.1,
+    () => BURIED_TUNING.depthStep100, v => { BURIED_TUNING.depthStep100 = v; }, '100층 단위로 곱해지는 계단'),
+  BF('pressureHpExp', '🌊 깊이 압력', '압력 → 적 HP 지수', '지수', 0, 1.2, 0.01,
+    () => BURIED_TUNING.pressureHpExp, v => { BURIED_TUNING.pressureHpExp = v; }, '1이면 압력 전량이 HP에 반영'),
+  BF('pressureAtkExp', '🌊 깊이 압력', '압력 → 적 공격 지수', '지수', 0, 1.2, 0.01,
+    () => BURIED_TUNING.pressureAtkExp, v => { BURIED_TUNING.pressureAtkExp = v; }, '낮출수록 심층이 덜 아프다'),
+  BF('maturityPerFloor', '🌊 깊이 압력', '성숙 램프 (층당 적 HP)', '/층', 0, 0.02, 0.001,
+    () => BURIED_TUNING.maturityPerFloor, v => { BURIED_TUNING.maturityPerFloor = v; }, '스킬 레벨·접두어 성숙 보정'),
+  BF('maturityCap', '🌊 깊이 압력', '성숙 램프 상한', '+배', 0, 3, 0.1,
+    () => BURIED_TUNING.maturityCap, v => { BURIED_TUNING.maturityCap = v; }, '0.6 = 최대 +60%'),
+
+  // 🛡 수문장 (관문 보스)
+  BF('guardianHpExp', '🛡 수문장', '압력 → 수문장 HP 지수', '지수', 0, 1.2, 0.01,
+    () => BURIED_TUNING.guardianHpExp, v => { BURIED_TUNING.guardianHpExp = v; }, '높이면 관문전이 길어진다'),
+  BF('guardianAtkExp', '🛡 수문장', '압력 → 수문장 공격 지수', '지수', 0, 1.2, 0.01,
+    () => BURIED_TUNING.guardianPressureExp, v => { BURIED_TUNING.guardianPressureExp = v; }, '높이면 관문전이 아파진다'),
+  BF('guardianHeavyCap', '🛡 수문장', '대기술 한 방 상한', '% 내 최대 HP', 20, 120, 1,
+    () => BURIED_TUNING.guardianHeavyCapPct, v => { BURIED_TUNING.guardianHeavyCapPct = v; }, '관통·방어를 자동 반영하는 안전 상한'),
+
+  // 🛡 방어
+  BF('defScaleAtkPct', '🛡 방어', '방어 상대화 계수', '×적 공격', 0, 1, 0.01,
+    () => BURIED_TUNING.defScaleAtkPct, v => { BURIED_TUNING.defScaleAtkPct = v; }, '낮출수록 내 방어가 강해진다'),
+  BF('defFloorPct', '🛡 방어', '받는 피해 하한', '%', 1, 50, 1,
+    () => BURIED_TUNING.defFloorPct, v => { BURIED_TUNING.defFloorPct = v; }, '방어가 아무리 높아도 이만큼은 들어온다'),
+
+  // ⚙ 장비·성장
+  BF('gearDecayGrace', '⚙ 장비·성장', '장비 감쇠 유예', 'Lv', 0, 120, 5,
+    () => BURIED_GEAR_DECAY.graceLv, v => { BURIED_GEAR_DECAY.graceLv = v; }, '마물 레벨보다 이만큼 낡아도 무감쇠'),
+  BF('gearDecayFloor', '⚙ 장비·성장', '장비 감쇠 하한', '%', 10, 100, 5,
+    () => BURIED_GEAR_DECAY.floorPct, v => { BURIED_GEAR_DECAY.floorPct = v; }, '낡은 장비 위력의 최저치'),
+  BF('wearPct', '⚙ 장비·성장', '정비 마모', '%p/충전', 0, 50, 1,
+    () => BURIED_WEAR_PCT, v => { BURIED_WEAR_PCT = v; }, '충전할 때마다 최대 횟수가 이만큼 준다'),
+  BF('levelHealPct', '⚙ 장비·성장', '레벨업 회복', '% 최대 HP', 0, 100, 5,
+    () => BURIED_LEVEL_HEAL_PCT, v => { BURIED_LEVEL_HEAL_PCT = v; }, '100이면 매 레벨업마다 완전 회복'),
+
+  // ᚱ 룬 회수율
+  BF('rune1', 'ᚱ 룬 회수율', '★1 회수 확률', '%', 0, 100, 5, () => BURIED_RUNE_RECOVERY[1], v => { BURIED_RUNE_RECOVERY[1] = v; }),
+  BF('rune2', 'ᚱ 룬 회수율', '★2 회수 확률', '%', 0, 100, 5, () => BURIED_RUNE_RECOVERY[2], v => { BURIED_RUNE_RECOVERY[2] = v; }),
+  BF('rune3', 'ᚱ 룬 회수율', '★3 회수 확률', '%', 0, 100, 5, () => BURIED_RUNE_RECOVERY[3], v => { BURIED_RUNE_RECOVERY[3] = v; }),
+  BF('rune4', 'ᚱ 룬 회수율', '★4 회수 확률', '%', 0, 100, 5, () => BURIED_RUNE_RECOVERY[4], v => { BURIED_RUNE_RECOVERY[4] = v; }),
+  BF('rune5', 'ᚱ 룬 회수율', '★5 회수 확률', '%', 0, 100, 5, () => BURIED_RUNE_RECOVERY[5], v => { BURIED_RUNE_RECOVERY[5] = v; }),
+
+  // 💰 경제
+  BF('goldEarnMult', '💰 경제', '골드 획득 배율', '×', 0.1, 3, 0.05,
+    () => BURIED_TUNING.goldEarnMult, v => { BURIED_TUNING.goldEarnMult = v; }),
+  BF('dustEarnMult', '💰 경제', '먼지 획득 배율', '×', 0.1, 3, 0.05,
+    () => BURIED_TUNING.dustEarnMult, v => { BURIED_TUNING.dustEarnMult = v; }),
+];
+export const getBuriedBalanceField = (id) => BURIED_BALANCE_FIELDS.find(f => f.id === id) || null;
+// 기본값 스냅샷 — 모듈 로드 시점(= 코드에 박힌 값)을 기억해 언제든 되돌린다
+export const BURIED_BALANCE_DEFAULTS = Object.fromEntries(BURIED_BALANCE_FIELDS.map(f => [f.id, f.get()]));
+// 현재 값 전부 읽기 (편집 화면 표시용)
+export const readBuriedBalance = () => Object.fromEntries(BURIED_BALANCE_FIELDS.map(f => [f.id, f.get()]));
+// 오버라이드 적용 — 저장된 값을 실제 상수에 반영한다. 범위를 벗어난 값은 잘라낸다.
+export function applyBuriedBalance(overrides) {
+  if (!overrides) return;
+  for (const f of BURIED_BALANCE_FIELDS) {
+    const v = overrides[f.id];
+    if (typeof v !== 'number' || !isFinite(v)) continue;
+    f.set(Math.min(f.max, Math.max(f.min, v)));
+  }
+}
+// 전체 초기화 — 코드 기본값으로 되돌린다
+export function resetBuriedBalance() { applyBuriedBalance(BURIED_BALANCE_DEFAULTS); }

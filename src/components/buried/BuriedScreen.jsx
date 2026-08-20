@@ -21,6 +21,7 @@ import {
   buriedTraitIds, getBuriedTrait, buriedMonsterLevel,
   BURIED_PARTS, BURIED_PART_SLOT_COSTS, getBuriedPart, BURIED_SHARD,
   resolveBuriedLoot, buriedCheckpointFloors, buriedModTransferCost,
+  BURIED_BALANCE_FIELDS, BURIED_BALANCE_DEFAULTS, readBuriedBalance,
   BURIED_DEPTH_CLASSES, buriedEarnedDepthTraits,
   BURIED_RACES, getBuriedRace,
   BURIED_UNIONS, BURIED_UNION_CLASSES, getBuriedUnion, buriedUnionLevel, BURIED_UNION_LEVELS, BURIED_UNION_REWARDS,
@@ -36,7 +37,7 @@ import BuriedManage from './BuriedManage.jsx';
 
 const R = { chip: 'var(--r-chip, 8px)', btn: 'var(--r-btn, 13px)', panel: 'var(--r-panel, 18px)' };
 
-export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateChar, onRetire, onForge, onBuyContract, onBuyPart, onDetachParts, onResetAll, onResetRivals, onSetSeasonDays, onSetCompanion, forgeNotice, onBack }) {
+export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateChar, onRetire, onForge, onBuyContract, onBuyPart, onDetachParts, onBalanceSet, onBalanceReset, onResetAll, onResetRivals, onSetSeasonDays, onSetCompanion, forgeNotice, onBack }) {
   const b = meta?.buried || {};
   const char = b.char || null;
   const clears = (b.clears && typeof b.clears === 'object') ? b.clears : {};
@@ -200,6 +201,8 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
               { id: 'unions', icon: <span className="text-[13px]">🏛</span>, name: '조직', sub: `평판 Lv 합 ${BURIED_UNIONS.reduce((s, u) => s + buriedUnionLevel(b.unionRep?.[u.id] || 0), 0)}/${BURIED_UNIONS.length * 8}`, c: PALETTE.dawn },
               { id: 'ghosts', icon: <span className="text-[13px]">🕯</span>, name: '사역각', sub: `괴이 ${Object.keys(b.ghosts || {}).length}/${BURIED_GHOSTS.length} · 동행 ${b.companion ? BURIED_GHOSTS.find(g => g.id === b.companion)?.name || '-' : '없음'}`, c: '#c48bd4' },
               { id: 'records', icon: <BarChart3 size={15} />, name: '기록 · 규칙', sub: `최고 ${b.deepest || 0}층 · 사망 ${b.deaths || 0}`, c: PALETTE.ice },
+              // 1.168.0 — ⚖ PM 전용 밸런스 편집기 (전투 상수를 인게임에서 바로 조정)
+              { id: 'balance', icon: <span className="text-[13px]">⚖</span>, name: '밸런스 편집', sub: `조정 중 ${Object.keys(b.balance || {}).length}개 / 전체 ${BURIED_BALANCE_FIELDS.length}`, c: PALETTE.legendary },
             ].map(m => (
               <button key={m.id} onClick={() => setView(m.id)} className="ui-press px-3 py-3 text-left"
                 style={{ borderRadius: R.btn, background: PALETTE.panel, border: `1px solid ${m.c}44` }}>
@@ -883,6 +886,79 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
   // ============================================
   // 시설 서브뷰 — 기록·규칙
   // ============================================
+  // ⚖ 밸런스 편집 (1.168.0, PM 지시) — 전투에 반영되는 주요 상수를 인라인으로 조정.
+  // 값은 meta.buried.balance에 저장되고, App의 useEffect가 실제 상수에 반영한다 (즉시 적용).
+  const renderBalance = () => {
+    const cur = readBuriedBalance();
+    const groups = [...new Set(BURIED_BALANCE_FIELDS.map(f => f.group))];
+    const changed = Object.keys(b.balance || {}).length;
+    return (
+      <div className="flex-1 flex flex-col min-h-0">
+        <SubHeader title="⚖ 밸런스 편집" color={PALETTE.legendary} onPrev={() => setView('home')} />
+        <div className="flex-1 overflow-y-auto px-3 py-3 pb-6 space-y-3">
+          <div className="px-3 py-2.5 text-[11px] leading-relaxed"
+            style={{ borderRadius: R.panel, background: PALETTE.panel, border: `1px solid ${PALETTE.legendary}44`, color: PALETTE.textDim }}>
+            전투에 실제로 반영되는 상수를 직접 조정한다. <b style={{ color: PALETTE.legendary }}>저장 즉시 적용</b>되고 다음 계산부터 반영된다 (전투 중에도 가능).
+            <br />값을 지우거나 <b style={{ color: PALETTE.text }}>기본</b>을 누르면 코드 기본값으로 돌아간다. 조정한 값은 이 기기에 저장된다.
+            {changed > 0 && <><br /><b style={{ color: PALETTE.accent }}>지금 {changed}개 항목이 기본값과 다르다.</b></>}
+          </div>
+
+          {changed > 0 && (
+            <button onClick={() => onBalanceReset?.()} className="ui-press w-full py-2.5 text-[12px] font-bold"
+              style={{ borderRadius: R.btn, background: PALETTE.panelLight, border: `1px solid ${PALETTE.accent}66`, color: PALETTE.accent }}>
+              ↺ 전체 기본값으로 되돌리기 ({changed}개)
+            </button>
+          )}
+
+          {groups.map(g => (
+            <div key={g}>
+              <SectionTitle>{g}</SectionTitle>
+              <div className="space-y-1.5">
+                {BURIED_BALANCE_FIELDS.filter(f => f.group === g).map(f => {
+                  const val = cur[f.id];
+                  const def = BURIED_BALANCE_DEFAULTS[f.id];
+                  const isOn = (b.balance || {})[f.id] != null;
+                  return (
+                    <div key={f.id} className="px-3 py-2.5"
+                      style={{ borderRadius: R.btn, background: PALETTE.panel, border: `1px solid ${isOn ? PALETTE.legendary : PALETTE.panelBorder}${isOn ? '88' : ''}` }}>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[12px] font-bold" style={{ color: isOn ? PALETTE.legendary : PALETTE.text }}>{f.label}</span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <input type="number" inputMode="decimal" value={val} step={f.step} min={f.min} max={f.max}
+                            onChange={(e) => {
+                              const v = parseFloat(e.target.value);
+                              if (!isFinite(v)) return;
+                              onBalanceSet?.(f.id, Math.min(f.max, Math.max(f.min, v)));
+                            }}
+                            className="text-[13px] font-bold tabular-nums text-right px-2 py-1"
+                            style={{ width: 78, borderRadius: R.chip, background: PALETTE.bgDeep,
+                              border: `1px solid ${isOn ? PALETTE.legendary : PALETTE.panelBorder}`, color: isOn ? PALETTE.legendary : PALETTE.text }} />
+                          <span className="text-[11px] w-16" style={{ color: PALETTE.textDim }}>{f.unit}</span>
+                          <button onClick={() => onBalanceSet?.(f.id, null)} disabled={!isOn}
+                            className="ui-press px-2 py-1 text-[11px]"
+                            style={{ borderRadius: R.chip, border: `1px solid ${PALETTE.panelBorder}`, color: PALETTE.textDim, opacity: isOn ? 1 : 0.35 }}>
+                            기본
+                          </button>
+                        </div>
+                      </div>
+                      {/* 슬라이더 — 손가락으로 훑으며 체감 잡기 */}
+                      <input type="range" min={f.min} max={f.max} step={f.step} value={val}
+                        onChange={(e) => onBalanceSet?.(f.id, parseFloat(e.target.value))}
+                        className="w-full mt-1.5" style={{ accentColor: PALETTE.legendary }} />
+                      <div className="text-[11px] leading-relaxed" style={{ color: PALETTE.textDim }}>
+                        기본 {def}{f.unit ? ` ${f.unit}` : ''}{f.note ? ` · ${f.note}` : ''}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   const renderRecords = () => (
     <>
       <SubHeader title="📊 기록 · 규칙" color={PALETTE.ice} onPrev={() => setView('home')} />
@@ -1133,6 +1209,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
       {view === 'contracts' && renderContracts()}
       {view === 'lab' && renderLab()}
       {view === 'records' && renderRecords()}
+      {view === 'balance' && renderBalance()}
 
       {/* ⚔ 랭킹 상세 (1.155.0) — **등반 중 보는 실제 정보창(BuriedManage)** 그대로 열람한다 (PM 지시).
           더미는 시드 재구성 char, 내 기록은 사망 순간 charSnap. 구 기록(charSnap 없음)만 간이 표로 폴백 */}
