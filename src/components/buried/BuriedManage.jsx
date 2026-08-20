@@ -19,7 +19,7 @@ import {
   buriedRunePouchGroups, buriedRunewordFitCheck, applyBuriedRuneword, BURIED_RUNEWORDS,
   rollBuriedRuneRecovery, BURIED_RUNE_RECOVERY,
 } from '../../data.js';
-import { BuriedItemCard, BuriedItemSheet, BURIED_DUST_ICON } from './BuriedCommon.jsx';
+import { BuriedItemCard, BuriedItemSheet, BURIED_DUST_ICON, slotMeta } from './BuriedCommon.jsx';
 
 // 1.155.0 — readOnly: 랭킹 상세 열람 모드 (분해·각인·융합 숨김) / subtitle: 헤더 보조 문구 교체
 export default function BuriedManage({ char, dust = 0, onUpdate, onClose, readOnly = false, subtitle = null }) {
@@ -198,7 +198,7 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose, readOn
                       background: rwOnly ? `${PALETTE.green}22` : PALETTE.panelLight,
                       border: `1px solid ${rwOnly ? PALETTE.green : PALETTE.panelBorder}`,
                       color: rwOnly ? PALETTE.green : PALETTE.textDim }}>
-                    {rwOnly ? `✅ 완성 가능만 (${ready})` : '↕ 전체 보기'}
+                    {rwOnly ? `✅ 지금 각인 가능만 (${ready})` : '↕ 전체 보기'}
                   </button>
                 </div>
               ); })()}
@@ -216,8 +216,8 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose, readOn
               .sort((a, b) => (b.done - a.done) || (b.craftable - a.craftable) || (a.runes.length - b.runes.length))
               .map(rw => {
               // 1.165.0 — 원클릭 각인: 지금 이 룬워드를 받을 수 있는 장비가 하나라도 있는가
-              const canApply = !readOnly && rw.craftable && !rw.done
-                && BURIED_SLOT_IDS.some(sl => buriedRunewordFitCheck(char, rw, sl).ok);
+              // 1.167.1 — 판정 단일화: 조합표·버튼·사유가 전부 rw.fit 하나만 본다
+              const canApply = !readOnly && !rw.done && !!rw.fit?.ok;
               return (
               <div key={rw.id} className="py-1.5" style={{ borderTop: `1px solid ${PALETTE.panelBorder}` }}>
                 <div className="flex justify-between items-center gap-2">
@@ -242,8 +242,10 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose, readOn
                       <span style={{ color: BURIED_RUNE_RARITIES[r?.rarity]?.color || PALETTE.text }}>{r?.name || '?'}</span>
                     </span>
                   ))}
-                  {rw.missing.length > 0 && <span style={{ color: PALETTE.accent }}> · 부족: {rw.missing.join(', ')}</span>}
-                  {rw.craftable && !rw.done && !canApply && <span style={{ color: PALETTE.accent }}> · 받을 장비 없음 (소켓 {rw.runes.length}칸 빈 장비 필요)</span>}
+                  {/* 1.167.1 — 왜 못 넣는지 **실제 사유**를 그대로 보여준다 (가장 가까운 장비 기준) */}
+                  {!rw.done && !canApply && rw.fit && (
+                    <span style={{ color: PALETTE.accent }}> · {rw.fit.item ? `${slotMeta(rw.fit.slot).name}: ` : ''}{rw.fit.reason}</span>
+                  )}
                 </div>
               </div>
             );})}

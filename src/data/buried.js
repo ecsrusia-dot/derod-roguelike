@@ -4049,11 +4049,15 @@ export function buriedRunewordProgress(char) {
       if (i >= 0) left.splice(i, 1);
       else missing.push(getBuriedRune(id)?.name || id);
     }
+    const done = doneIds.has(rw.id);
+    // 1.167.1 — craftable을 **실제 각인 가능 여부**로 재정의 (PM 지적: 주머니만 보느라
+    // 장비에 이미 박힌 룬을 무시해 "가능한데 불가"로 뜨고, 사유도 알 수 없었다)
+    const fit = done ? null : buriedRunewordBestFit(char, rw);
     return {
-      ...rw, runes,
-      done: doneIds.has(rw.id),
-      craftable: missing.length === 0,
-      missing,
+      ...rw, runes, done,
+      craftable: !!fit?.ok,
+      pouchReady: missing.length === 0, // 주머니 재료만 본 값 (참고용)
+      missing, fit,
     };
   });
 }
@@ -4078,10 +4082,10 @@ export function buriedRunePouchGroups(char) {
 // 반환: { ok, reason } — 사유는 UI가 그대로 보여준다
 export function buriedRunewordFitCheck(char, rw, slot) {
   const item = char?.equipped?.[slot];
-  if (!item) return { ok: false, reason: '빈 슬롯' };
+  if (!item) return { ok: false, reason: '빈 슬롯', free: -1, empty: true };
   const cur = buriedItemRunes(item);
   const sockets = buriedItemSockets(item);
-  if (buriedRunewordOf(cur)?.id === rw.id) return { ok: false, reason: '이미 완성됨' };
+  if (buriedRunewordOf(cur)?.id === rw.id) return { ok: false, reason: '이미 완성됨', free: sockets - cur.length, item };
   // 1.167.0 — 이미 박힌 룬의 **끝부분**이 룬워드의 앞부분과 이어지면 그만큼 아껴 각인한다.
   // (부분 일치 매칭이라 이어 붙이기만 하면 완성된다 — 앞에 무관한 룬이 있어도 무방)
   let head = 0;
@@ -4090,23 +4094,43 @@ export function buriedRunewordFitCheck(char, rw, slot) {
   }
   const need = rw.runes.slice(head);
   const free = sockets - cur.length;
+  const base = { free, need: need.length, item, sockets };
   if (free < need.length) {
-    return { ok: false, reason: `빈 소켓 ${free}칸 (${need.length}칸 필요)` };
+    return { ...base, ok: false,
+      reason: sockets === 0 ? '소켓이 없는 장비' : `빈 소켓 ${free}/${sockets}칸 — ${need.length}칸 필요` };
   }
+  // 주머니 재료 (같은 룬 중복 요구도 정확히 소모)
   const left = [...(char.runes || [])];
+  const missing = [];
   for (const id of need) {
     const i = left.indexOf(id);
-    if (i < 0) return { ok: false, reason: `주머니에 ${getBuriedRune(id)?.name || id} 부족` };
-    left.splice(i, 1);
+    if (i < 0) missing.push(getBuriedRune(id)?.name || id);
+    else left.splice(i, 1);
   }
+  if (missing.length > 0) return { ...base, ok: false, reason: `주머니에 ${missing.join('·')} 부족`, missing };
+  // 1.163.0 연격 룬 CD0 제한
   const skill = BURIED_SKILLS[item.skillId];
   for (const id of need) {
     const r = getBuriedRune(id);
     if (r?.fx?.hitsAdd && r.rarity < 5 && (skill?.cd || 0) === 0) {
-      return { ok: false, reason: `「${r.name}」은 쿨다운 1 이상 스킬 전용` };
+      return { ...base, ok: false, reason: `「${r.name}」은 쿨다운 1 이상 스킬 전용 (이 장비는 CD 0)` };
     }
   }
-  return { ok: true, reason: head > 0 ? `이어서 ${need.length}개 각인` : `${need.length}개 각인` };
+  return { ...base, ok: true, reason: head > 0 ? `이어서 ${need.length}개 각인` : `${need.length}개 각인` };
+}
+// 이 룬워드를 지금 각인할 수 있는 **가장 나은 슬롯** 하나를 고른다 (없으면 사유가 가장 유용한 슬롯).
+// 조합표 게이트·버튼·사유 표시가 전부 이 결과 하나만 본다 — 판정이 갈라지지 않게 (1.167.1)
+export function buriedRunewordBestFit(char, rw) {
+  let best = null;
+  for (const sl of BURIED_SLOT_IDS) {
+    const f = { ...buriedRunewordFitCheck(char, rw, sl), slot: sl };
+    if (f.ok) return f;
+    if (!best) { best = f; continue; }
+    // 빈 슬롯(장비 없음)은 정보가 없으니 후순위. 그 외엔 빈 소켓이 많은 쪽 = 가장 가까운 장비
+    const score = (x) => (x.empty ? -100 : 0) + (x.free ?? 0) + (x.missing ? -1 : 0);
+    if (score(f) > score(best)) best = f;
+  }
+  return best || { ok: false, reason: '장착한 장비가 없다', free: -1 };
 }
 export function applyBuriedRuneword(char, runewordId, slot) {
   const rw = BURIED_RUNEWORDS.find(x => x.id === runewordId);
