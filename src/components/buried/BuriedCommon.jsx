@@ -396,6 +396,8 @@ export const BURIED_DUST_ICON = '🕯';
 // 어느 쪽이든 밀려난/버려진 장비는 자동 분해 → 먼지. onResolve(replace: boolean, transferMod?: boolean)
 // 1.160.0 「순환 패키지」 — 분해되는 장비의 룬은 주머니로 회수 + ◈접두어 전승 버튼 (dust prop 필요)
 export function BuriedLootModal({ char, onResolve, dust = 0 }) {
+  // 1.165.1 — ◈ 전승은 되돌릴 수 없는 먼지 지출이라 **확인 모달**을 거친다 (PM 지시: 오탭 방지)
+  const [confirmTransfer, setConfirmTransfer] = React.useState(false);
   const item = char?.pendingLoot?.[0];
   if (!item) return null;
   const tier = getBuriedTier(item.tier);
@@ -427,6 +429,23 @@ export function BuriedLootModal({ char, onResolve, dust = 0 }) {
           )}
           <BuriedItemCard item={item} full char={char} />
         </div>
+        {/* ◈ 접두어 전승 (1.160.0 / 1.165.1 위치 이동) — 하단 [교체]·[버리기]와 멀리 떨어뜨려
+            오탭을 막는다. 실제 실행은 확인 모달을 한 번 더 거친다 (PM 지시) */}
+        {transferCost !== null && (
+          <div className="px-3 py-2 mb-2" style={{ borderRadius: 'var(--r-panel, 18px)', background: `${PALETTE.twilight}12`, border: `1px solid ${PALETTE.twilight}55` }}>
+            <div className="text-[11px] leading-relaxed mb-1.5" style={{ color: PALETTE.textDim }}>
+              ◈ 기존 장비의 <b style={{ color: PALETTE.twilight }}>「{curMod.name}」</b> 접두어({curMod.desc}) — 그냥 교체하면 함께 분해되어 사라진다.
+            </div>
+            <button onClick={() => dust >= transferCost && setConfirmTransfer(true)} disabled={dust < transferCost}
+              className="ui-press w-full py-2 text-[12px] font-bold"
+              style={{
+                borderRadius: 'var(--r-btn, 13px)', background: 'transparent', color: PALETTE.twilight,
+                border: `1px solid ${PALETTE.twilight}88`, opacity: dust >= transferCost ? 1 : 0.45,
+              }}>
+              ◈ 「{curMod.name}」 전승하고 교체 — {BURIED_DUST_ICON} {transferCost}{dust < transferCost ? ` (보유 ${dust})` : ''}
+            </button>
+          </div>
+        )}
         {/* 스탯 증감 비교 */}
         {cur && keys.length > 0 && (
           <div className="px-3 py-2 mb-2" style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panel, border: `1px solid ${PALETTE.panelBorder}` }}>
@@ -450,17 +469,6 @@ export function BuriedLootModal({ char, onResolve, dust = 0 }) {
             ᚱ 교체하면 기존 장비의 룬 {curRunesBack}개는 주머니로 회수된다 — 새 장비에 다시 각인 가능.
           </div>
         )}
-        {/* ◈ 접두어 전승 (1.160.0) — 기존 장비의 접두어를 새 장비로 옮기고 교체 */}
-        {transferCost !== null && (
-          <button onClick={() => dust >= transferCost && onResolve(true, true)} disabled={dust < transferCost}
-            className="ui-press w-full mb-1.5 py-2.5 text-[12px] font-bold"
-            style={{
-              borderRadius: 'var(--r-btn, 13px)', background: `${PALETTE.twilight}22`, color: PALETTE.twilight,
-              border: `1px solid ${PALETTE.twilight}88`, opacity: dust >= transferCost ? 1 : 0.45,
-            }}>
-            ◈ 「{curMod.name}」 전승 + 교체 — {BURIED_DUST_ICON} {transferCost}{dust < transferCost ? ` (보유 ${dust})` : ''}
-          </button>
-        )}
         <div className="flex gap-2">
           <button onClick={() => onResolve(true)} className="ui-press flex-1 py-2.5 text-[12px] font-bold"
             style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.accent, color: '#fff' }}>
@@ -471,12 +479,37 @@ export function BuriedLootModal({ char, onResolve, dust = 0 }) {
             버리기 ({BURIED_DUST_ICON}{buriedDustValue(item)})
           </button>
         </div>
-        {transferCost !== null && curMod && (
-          <div className="mt-1.5 text-[11px]" style={{ color: PALETTE.textDim }}>
-            ◈ 전승 없이 그냥 교체하면 「{curMod.name}」 접두어는 기존 장비와 함께 분해되어 사라진다.
-          </div>
-        )}
       </div>
+
+      {/* ◈ 전승 확인 (1.165.1) — 실수 방지 2단 확인 */}
+      {confirmTransfer && transferCost !== null && curMod && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center px-6"
+          style={{ background: 'rgba(0,0,0,0.82)' }} onClick={() => setConfirmTransfer(false)}>
+          <div className="w-full px-4 py-4" onClick={(e) => e.stopPropagation()}
+            style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.bgDeep, border: `1px solid ${PALETTE.twilight}88` }}>
+            <div className="text-[13px] font-bold mb-1.5" style={{ color: PALETTE.twilight }}>
+              ◈ 「{curMod.name}」 접두어를 전승할까
+            </div>
+            <div className="text-[12px] leading-relaxed mb-3" style={{ color: PALETTE.textDim }}>
+              «{item.name}»에 「{curMod.name}」({curMod.desc})를 옮기고 <b style={{ color: PALETTE.text }}>바로 교체</b>한다.
+              <br />비용 {BURIED_DUST_ICON} <b style={{ color: PALETTE.text }}>{transferCost}</b> (보유 {dust} → {dust - transferCost})
+              <br />기존 «{cur?.name}»은 분해된다{curRunesBack > 0 ? ` (룬 ${curRunesBack}개 회수)` : ''}.
+              <b style={{ color: PALETTE.accent }}> 되돌릴 수 없다.</b>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => { setConfirmTransfer(false); onResolve(true, true); }}
+                className="ui-press flex-1 py-2.5 text-[12px] font-bold"
+                style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.twilight, color: '#0a0608' }}>
+                전승하고 교체
+              </button>
+              <button onClick={() => setConfirmTransfer(false)} className="ui-press flex-1 py-2.5 text-[12px]"
+                style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panelLight, color: PALETTE.text, border: `1px solid ${PALETTE.panelBorder}` }}>
+                취소
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
