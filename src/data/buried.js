@@ -813,6 +813,9 @@ export function buriedCheckpointFloors(deepestFloor) {
 
 // 파생 스탯 — 장비·레벨·스탯·특성 전부 합산
 // 1.104.0~ barrier(보호막)·chase(추격 피해) 추가 — 원작의 핵심 2축
+// 🎯 치명 확률 상한 (1.166.0) — 초과분은 치명 피해로 전환
+export const BURIED_CRIT_CAP = 75;      // 확률 상한 (%)
+export const BURIED_CRIT_OVERFLOW = 2;  // 초과 1%p당 치명 피해 +N%
 export function buriedDerived(char) {
   if (!char) return { maxHp: 1, maxSp: 1, atk: 1, mag: 1, fin: 1, def: 0, crit: 0, critDmg: 60, dodge: 0, spRegen: 12, barrier: 0, chase: 0, healPct: 0, drainPct: 0, stats: { str: 0, dex: 0, int: 0, vit: 0 } };
   const noAcc = buriedKeystoneFx(char).noAcc; // ⚓ 공허의 쐐기 (1.128.0) — 장신구 2슬롯 무효
@@ -848,6 +851,12 @@ export function buriedDerived(char) {
   // [u107] 물리·기교 += 최대 HP 8% / [u111] 마법 += 보호막 30% — 전에는 전투 화면에서만 더해졌다.
   // ⚠ 이 두 값은 % 보정(physPct/magPct) **밖**의 고정 가산이다 — 곱해지지 않는다.
   const barrierVal = Math.round(((gear.barrier || 0) + (tf.barrier || 0) + (pf.barrier || 0) + (rf.barrier || 0) + (uf.barrier || 0) + maxHp * (uf.barrierHpPct || 0) / 100) * (1 + (cf.barrierPct || 0) / 100));
+  // 🎯 치명 확률 상한 (1.166.0, PM 결정) — 회피(45%)와 달리 상한이 없어 심층에서 100%를 넘어
+  // **무조건 치명타**가 되고, 그 시점부터 치명 투자가 전부 무의미해졌다 (실측 F200 112% / F400 2,350%).
+  // 상한 75% + **초과 1%p당 치명 피해 +2%**로 전환 — 투자는 살리고 확정 치명은 없앤다.
+  // ⚠ 조정은 BURIED_CRIT_CAP / BURIED_CRIT_OVERFLOW 두 상수 한 곳
+  const critRaw = Math.round(5 + st.dex * 0.6 + (gear.crit || 0) + (tf.crit || 0) + (cf.crit || 0) + (pf.crit || 0) + (rf.crit || 0) + (uf.crit || 0));
+  const critOverflowDmg = critRaw > BURIED_CRIT_CAP ? Math.round((critRaw - BURIED_CRIT_CAP) * BURIED_CRIT_OVERFLOW) : 0;
   const uids = buriedUniqueIds(char);
   const physFlatAdd = uids.includes('u107') ? Math.round(maxHp * BURIED_RING_HP_PCT / 100) : 0;
   const magFlatAdd = uids.includes('u111') ? Math.round(barrierVal * 0.3) : 0;
@@ -861,8 +870,10 @@ export function buriedDerived(char) {
     fin:     Math.round((10 + st.dex * 1.6 + (gear.atk || 0) + (pf.atk || 0)) * (1 + ((tf.physPct || 0) + (cf.physPct || 0) + (rf.physPct || 0) + (uf.physPct || 0) + dc4Pow) / 100)) + physFlatAdd,
     mag:     Math.round((10 + st.int * 1.6 + (gear.mag || 0) + (pf.mag || 0)) * (1 + ((tf.magPct || 0) + (cf.magPct || 0) + (rf.magPct || 0) + (uf.magPct || 0) + dc4Pow) / 100)) + magFlatAdd,
     def:     Math.round(4 + st.vit * 0.9 + (gear.def || 0) + (pf.def || 0) + (uf.def || 0) + (rf.def || 0)),
-    crit:    Math.round(5 + st.dex * 0.6 + (gear.crit || 0) + (tf.crit || 0) + (cf.crit || 0) + (pf.crit || 0) + (rf.crit || 0) + (uf.crit || 0)),
-    critDmg: 60 + (gear.critDmg || 0),
+    crit:    critRaw <= BURIED_CRIT_CAP ? critRaw : BURIED_CRIT_CAP,
+    critRaw, // 표시용 — 상한 전 원본 (초과분이 얼마나 전환됐는지 보여준다)
+    critDmg: 60 + (gear.critDmg || 0) + critOverflowDmg,
+    critOverflowDmg, // 표시용 — 초과분 전환으로 얻은 치명 피해
     dodge:   Math.min(45, Math.round(3 + st.dex * 0.4 + (gear.dodge || 0) + (tf.dodge || 0) + (cf.dodge || 0) + (pf.dodge || 0) + (rf.dodge || 0) + (uf.dodge || 0))),
     // 1.118.0 — 패시브 회복 9+int/8 → 3+int/12 (PM: SP가 무의미). 이제 SP의 주 엔진은
     // 기본 공격(+14)·마력 흡수·집중이고, 패시브·장비 spRegen은 보조가 된다
@@ -2212,7 +2223,7 @@ export function buriedDamageFormula(char) {
     { n: '⑧', label: '× 편차', value: '0.92 ~ 1.08',
       note: '매 타격마다 무작위 — 같은 스킬도 표시 수치의 ±8% 안에서 흔들린다' },
     { n: '⑨', label: '치명타면 × 치명 피해', value: `${d.crit}% 확률 · ×${(1 + d.critDmg / 100).toFixed(2)}`,
-      note: '연격은 타격마다 따로 판정한다' },
+      note: `연격은 타격마다 따로 판정한다. 확률은 ${BURIED_CRIT_CAP}%가 상한 — 초과분은 1%p당 치명 피해 +${BURIED_CRIT_OVERFLOW}%로 전환된다${d.critOverflowDmg ? ` (지금 원본 ${d.critRaw}% → 초과 ${d.critRaw - BURIED_CRIT_CAP}%p가 치명 피해 +${d.critOverflowDmg}%로)` : ''}` },
     { n: '＋', label: '추격 피해 (별도)', value: `${d.chase || 0}`,
       note: '적중 시 본체와 별개로 1회 더 — 방어를 무시하고 그대로 들어간다' },
   ];
@@ -2230,7 +2241,11 @@ export function resolveBuriedAttack(att, def, skill, { isPlayer = false, traits 
     : Math.max(att.atk || 0, att.fin || 0, att.mag || 0);
   const hitCount = Math.max(1, skill.hits || 1);
   // ☠ 「강철의」 변형 (1.124.0) — 치명타를 받지 않는다
-  const critRate = def.immuneCrit || att.noCrit ? 0 : (att.crit || 0) + (skill.critBonus || 0) + (att.envCritAdd || 0);
+  // 1.166.0 — 합산 후에도 상한 적용 (스킬 치명 보너스·환경 보정으로 100%를 넘지 않게).
+  // [u52] 결전(치명 100%) 같은 확정 치명 유니크는 상한을 넘어 설계돼 있으므로 att.critSure로 예외
+  const critRate = def.immuneCrit || att.noCrit ? 0
+    : att.critSure ? 100
+    : Math.min(BURIED_CRIT_CAP, (att.crit || 0) + (skill.critBonus || 0) + (att.envCritAdd || 0));
   let offense = buriedOffenseMult(att) * (1 + (att.envDmgPct || 0) / 100);
   if (statKey === 'int') offense *= 1 + (att.envMagPct || 0) / 100;
   let taken = buriedTakenMult(def) * (1 + (def.envTakenPct || 0) / 100);
