@@ -13,7 +13,7 @@ import {
   buriedSkillAt, buriedModdedSkill, buriedSkillDmgPreview,
   buriedItemRunes, buriedItemSockets, buriedRunewordOf,
   buriedMonsterLevel, applyBuriedGearDecay, buriedModTransferCost, BURIED_QUALITY_COLORS,
-  BURIED_AUTO_POOLS, slotPool,
+  BURIED_AUTO_POOLS, slotPool, BURIED_LOOT_RULE_TIERS,
 } from '../../data.js';
 
 // 1.143.0 — ⛓ 스킬 사용 가능 횟수 (장비 카드·상세·획득 판단 공용).
@@ -404,7 +404,7 @@ export const BURIED_DUST_ICON = '🕯';
 // ===== 획득 판단 모달 (1.113.0) — 인벤토리 폐지: 획득 즉시 [교체] or [버리기] =====
 // 어느 쪽이든 밀려난/버려진 장비는 자동 분해 → 먼지. onResolve(replace: boolean, transferMod?: boolean)
 // 1.160.0 「순환 패키지」 — 분해되는 장비의 룬은 주머니로 회수 + ◈접두어 전승 버튼 (dust prop 필요)
-export function BuriedLootModal({ char, onResolve, dust = 0 }) {
+export function BuriedLootModal({ char, onResolve, dust = 0, rule = null, onRuleChange = null }) {
   // 1.165.1 — ◈ 전승은 되돌릴 수 없는 먼지 지출이라 **확인 모달**을 거친다 (PM 지시: 오탭 방지)
   const [confirmTransfer, setConfirmTransfer] = React.useState(false);
   const item = char?.pendingLoot?.[0];
@@ -488,6 +488,24 @@ export function BuriedLootModal({ char, onResolve, dust = 0 }) {
             버리기 ({BURIED_DUST_ICON}{buriedDustValue(item)})
           </button>
         </div>
+        {/* ⚙ 1.175.0 — 획득 자동 규칙: 다음 획득부터 판단 창 없이 바로 분해 */}
+        {rule && onRuleChange && (
+          <div className="mt-3 pt-2.5 space-y-1.5" style={{ borderTop: `1px solid ${PALETTE.panelBorder}` }}>
+            <div className="text-[11px]" style={{ color: PALETTE.textDim }}>⚙ 자동 분해 규칙 — 다음 획득부터 적용 (전설의 무구는 항상 묻는다)</div>
+            <div className="flex flex-wrap gap-1">
+              {BURIED_LOOT_RULE_TIERS.map(t => (
+                <button key={t.id} onClick={() => onRuleChange({ ...rule, tier: t.id })} className="ui-press px-2 py-1 text-[11px]"
+                  style={{ borderRadius: 'var(--r-chip, 8px)', background: rule.tier === t.id ? PALETTE.dawn : PALETTE.panelLight, color: rule.tier === t.id ? '#0a0608' : PALETTE.text, border: `1px solid ${PALETTE.panelBorder}` }}>
+                  {t.id === 'none' ? '등급 분해 끔' : `${t.name} 자동 분해`}
+                </button>
+              ))}
+            </div>
+            <button onClick={() => onRuleChange({ ...rule, notBetter: !rule.notBetter })} className="ui-press w-full px-2 py-1.5 text-[11px] text-left"
+              style={{ borderRadius: 'var(--r-chip, 8px)', background: rule.notBetter ? `${PALETTE.dawn}22` : PALETTE.panelLight, color: PALETTE.text, border: `1px solid ${rule.notBetter ? PALETTE.dawn : PALETTE.panelBorder}` }}>
+              {rule.notBetter ? '☑' : '☐'} 장착 중보다 나을 때만 묻기 (등급·장비 레벨이 둘 다 같거나 낮으면 자동 분해)
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ◈ 전승 확인 (1.165.1) — 실수 방지 2단 확인 */}

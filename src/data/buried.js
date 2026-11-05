@@ -3242,6 +3242,22 @@ export function addBuriedItemToChar(char, item) {
   return { char: c, raised, lv, equippedDirect: !char.equipped?.[item.slot], queued: !!char.equipped?.[item.slot] };
 }
 
+// ⚙ 획득 자동 규칙 (1.175.0, PM 결정 ①②) — 판단 창 없이 바로 분해할 장비인가.
+// rule = { tier: 'none'|'worn'|'fine'|'rare', notBetter: bool }
+//   tier      : 이 등급 이하는 자동 분해 (낡은 < 정련된 < 희귀한)
+//   notBetter : 같은 부위 장착품보다 등급·장비 레벨이 둘 다 같거나 낮으면 자동 분해 (= 나을 때만 묻기)
+// 전설의 무구(유니크)는 어떤 규칙으로도 자동 분해하지 않는다.
+export const BURIED_LOOT_RULE_TIERS = [
+  { id: 'none', name: '끔' }, { id: 'worn', name: '낡은' }, { id: 'fine', name: '정련된 이하' }, { id: 'rare', name: '희귀한 이하' },
+];
+export function buriedLootAutoTrash(item, cur, rule = {}) {
+  if (!item || item.unique || item.tier === 'legend') return false;
+  const rank = (t) => BURIED_TIERS.findIndex(x => x.id === t);
+  if (rule.tier && rule.tier !== 'none' && rank(item.tier) <= rank(rule.tier)) return true;
+  if (rule.notBetter && cur && rank(item.tier) <= rank(cur.tier) && (item.floor || 1) <= (cur.floor || 1)) return true;
+  return false;
+}
+
 // 1.113.0 — pendingLoot 첫 항목 판단. replace=true면 기존 장비를 밀어내고 장착.
 // 밀려나거나 버려진 장비는 자동 분해 → 먼지 반환. 반환: { char, dustGain, dismantled, runesBack, modMoved }
 // 1.160.0 「순환 패키지」 — ② 분해되는 장비의 룬은 전량 주머니로 회수 (도박 룰 폐지)
