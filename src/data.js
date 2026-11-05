@@ -41,3 +41,4 @@ export * from './data/titles.js';
 export * from './data/potions.js';
 export * from './data/hof.js';
 export * from './data/buried.js';
+export * from './data/exorcist.js';

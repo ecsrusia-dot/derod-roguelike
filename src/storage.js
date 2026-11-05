@@ -1459,6 +1459,15 @@ export function recordHofClear(meta, stageId, firstMedals) {
 // ============================================
 // 본편 메타(영혼·각인·유물)와 완전 분리. 이 모드의 모든 영속 상태는 meta.buried 하나에만 쌓인다.
 
+// ============================================
+// ⚱ 제령사 (1.169.0) — 무덤의 유산 포맷 기반 신규 모드. 영속 상태는 meta.exo 하나.
+// ============================================
+const EMPTY_EXO = { char: null, runs: 0, clears: 0, deaths: 0, bestAct: 0, bestAsc: 0, codex: {} };
+export function getExo(meta) {
+  const e = meta?.exo || EMPTY_EXO;
+  return { ...EMPTY_EXO, ...e, codex: (e.codex && typeof e.codex === 'object') ? e.codex : {} };
+}
+
 const EMPTY_BURIED = {
   balance: {}, // 1.168.0 — ⚖ PM 밸런스 오버라이드 { fieldId: number }
   char: null, legacy: [], legacyGold: 0, dust: 0, deepest: 0,

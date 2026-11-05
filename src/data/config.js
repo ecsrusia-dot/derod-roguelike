@@ -58,4 +58,5 @@ export const FEATURE_FLAGS = {
   raid: false,          // 레이드 (타이틀 메뉴 + 백그라운드 전투)
   hof: false,           // 명예의 전당 (타이틀 메뉴)
   buried: true,         // 1.103.0~ 무덤의 유산 (BuriedBornes 모티브 별도 모드)
+  exo: true,            // 1.169.0~ ⚱ 제령사 (무덤의 유산 포맷 기반 신규 게임 — 5막 시나리오·브레이크·빙의)
 };
