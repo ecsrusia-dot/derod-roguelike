@@ -24,7 +24,7 @@ export function buriedItemUses(item, char = null) {
   if (BURIED_AUTO_POOLS[item.pool || slotPool(item.slot)]) return null; // ⟳ 1.171.0 — 자동 슬롯 장비는 횟수 제한 없음
   const lv = char ? buriedSkillLv(char, item.skillId) : 1;
   const max = buriedItemMaxUses(item, skill, lv); // 1.162.0 — 🛠 마모 반영
-  return { max, left: Math.max(0, max - (item.usesSpent || 0)), wear: Math.min(100, item.wearPct || 0) };
+  return { max, left: max, wear: 0 }; // 1.172.0 — 전투당 횟수 (매 전투 리셋, 마모 폐지)
 }
 export function usesColor(u) {
   if (!u) return PALETTE.textDim;
@@ -180,7 +180,7 @@ export function BuriedItemCard({ item, slotId, onClick, right, dim = false, show
           {skill && <SkillKindBadge skill={skill} />}
           <span className={wrap}>◆ {skill ? skill.name : '스킬 없음'}{skill && <span style={{ color: PALETTE.textDim }}>{BURIED_AUTO_POOLS[item.pool || slotPool(item.slot)] ? ' · ⟳ 자동' : ` · SP ${skill.sp}`}{skill.cd > 0 ? ` · CD ${skill.cd}` : ''}</span>}
             {/* 1.143.0 — ⛓ 사용 가능 횟수 (소진 시 스킬 봉인) */}
-            {(() => { const u = buriedItemUses(item, char); return u ? <span className="tabular-nums" style={{ color: usesColor(u) }}> · ⛓ {u.left}/{u.max}</span> : null; })()}
+            {(() => { const u = buriedItemUses(item, char); return u ? <span className="tabular-nums" style={{ color: usesColor(u) }}> · ⛓ 전투당 {u.max}</span> : null; })()}
           </span>
         </div>
         {/* 1.142.2 — full 모드(획득 판단·상점·부장품·상세 비교)에서는 스킬이 무엇을 하는지 처음부터 보여준다 (PM 지시)
@@ -336,7 +336,7 @@ export function BuriedItemSheet({ item, compare, onEquip, onUnequip, onDismantle
               const u = buriedItemUses(item, char);
               return u ? (
                 <div className="text-[11px] mt-0.5 tabular-nums" style={{ color: usesColor(u) }}>
-                  ⛓ 사용 가능 횟수 <b>{u.left}/{u.max}</b>{u.wear > 0 ? ` · 🛠 마모 ${u.wear}%` : ''}{u.left <= 0 ? ' — 소진: 스킬 봉인 상태 (야영·봉헌·상점 정비로 충전)' : ' — 소진 시 스킬 봉인, 충전할 때마다 최대치가 15%p씩 마모된다'}
+                  ⛓ 전투당 사용 횟수 <b>{u.max}회</b> — 전투마다 다시 채워진다 (보급의 봉헌·야영으로 다음 전투 +횟수)
                 </div>
               ) : null;
             })()}

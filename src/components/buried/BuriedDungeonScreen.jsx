@@ -47,7 +47,6 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onLogEvent, on
   const char = b.char || null;
   const [manage, setManage] = useState(false);
   const [notice, setNotice] = useState(null);
-  const [resupplyOpen, setResupplyOpen] = useState(false); // 1.133.0 — 보충의 봉헌 슬롯 지정 피커
   const [eventLogOpen, setEventLogOpen] = useState(false); // 1.134.0 — 이벤트 지난 기록 모달
 
   // 이번 층의 방 선택지가 없으면 생성 (새로고침 후에도 그대로 이어진다).
@@ -203,31 +202,11 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onLogEvent, on
       patch.curses = curses.filter((_, i) => i !== idx);
       setNotice('정화의 봉헌 — 저주 하나가 재로 흩어졌다.');
     } else if (boon.id === 'resupply') {
-      // 1.133.0 — PM 결정: 전 장비 만충 → 지정 1장비 만충. 결제는 슬롯 선택 시점에
-      const has = BURIED_SLOT_IDS.some(s => (char.equipped?.[s]?.usesSpent || 0) > 0);
-      if (!has) { setNotice('충전이 필요한 장비가 없다.'); return; }
-      setResupplyOpen(true);
-      return;
+      // 1.172.0 — 전투당 횟수 전환: 장비 만충 → 다음 전투 무기·보조 사용 횟수 +2
+      patch.bonusUses = (char.bonusUses || 0) + 2;
+      setNotice('보급의 봉헌 — 다음 전투에서 무기·보조 스킬을 2번씩 더 쓸 수 있다.');
     }
     onUpdateChar({ ...char, ...patch }, 0);
-  };
-
-  // 1.133.0 — 보충의 봉헌: 지정한 슬롯 1개만 만충 (여기서 결제 + 봉헌 소모)
-  const applyResupply = (slotId) => {
-    const boon = BURIED_ALTAR_BOONS.find(x => x.id === 'resupply');
-    const cost = buriedBoonCost(boon, monLevel);
-    const it = char.equipped?.[slotId];
-    if (char.gold < cost || (char.roomData?.boons || []).includes('resupply') || !it || !(it.usesSpent > 0)) {
-      setResupplyOpen(false);
-      return;
-    }
-    onUpdateChar({
-      ...rechargeBuriedSlot(char, slotId),
-      gold: char.gold - cost,
-      roomData: { ...char.roomData, boons: [...(char.roomData?.boons || []), 'resupply'] },
-    }, 0);
-    setResupplyOpen(false);
-    setNotice(`보충의 봉헌 — «${it.name}» 스킬 사용 횟수 만충.`);
   };
 
   // 1.125.0 — 상점 리롤 (골드 싱크: 반복할수록 2배)
@@ -246,8 +225,10 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onLogEvent, on
   const rest = () => {
     if (char.roomData?.rested) return;
     const mark = { roomData: { ...char.roomData, rested: true } };
-    const rc = rechargeBuriedRandomSlot(char);
-    const rcMsg = rc.item ? `«${rc.item.name}» 스킬 만충` : '정비할 스킬 없음';
+    // 1.172.0 — 장비 만충 → 다음 전투 사용 횟수 +1 (건강한 잠 +2). 마모 없음
+    const sleepyB = hasBuriedUnique(char, 'u54');
+    const rc = { char: { ...char, bonusUses: (char.bonusUses || 0) + (sleepyB ? 2 : 1) } };
+    const rcMsg = `다음 전투 사용 횟수 +${sleepyB ? 2 : 1}`;
     const kfR = buriedKeystoneFx(char);
     if (kfR.noCampHeal || kfR.noHeal) {
       // 회복만 봉인 — 물약 제작·횟수 충전은 유지 (방이 헛걸음이 되지 않게)
@@ -263,10 +244,8 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onLogEvent, on
     // [u54] 건강한 잠 (1.161.0) — 야영 효과 2배: 회복 ×2 + 스킬 정비도 장비 2개
     const sleepy = hasBuriedUnique(char, 'u54');
     const amount = Math.round(d.maxHp * 0.45 * (1 + (aggregateBuriedContracts(char).campPct || 0) / 100) * (sleepy ? 2 : 1));
-    const rcFinal = sleepy ? rechargeBuriedRandomSlot(rc.char) : rc;
-    const rcMsg2 = sleepy && rcFinal.item ? ` + «${rcFinal.item.name}» 만충` : '';
-    onUpdateChar({ ...rcFinal.char, hp: Math.min(d.maxHp, char.hp + amount), potions: (char.potions || 0) + 1, ...mark }, 0);
-    setNotice(`야영 — HP ${amount} 회복, 물약 +1, 무작위 ${rcMsg}${rcMsg2}. (충전된 장비 🛠 마모 +15%)`);
+    onUpdateChar({ ...rc.char, hp: Math.min(d.maxHp, char.hp + amount), potions: (char.potions || 0) + 1, ...mark }, 0);
+    setNotice(`야영 — HP ${amount} 회복, 물약 +1, ${rcMsg}.`);
   };
 
   // 협상 — 지불하면 전투 없이 통과 + 장비. 거절하면 강적과 싸운다.
@@ -601,30 +580,6 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onLogEvent, on
                 </button>
               );
             })}
-            {resupplyOpen && (
-              <div className="space-y-1 px-3 py-2.5"
-                style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panel, border: `1px solid ${PALETTE.ice}55` }}>
-                <div className="text-[12px] font-bold" style={{ color: PALETTE.ice }}>🔧 만충할 장비 1개를 지정하라</div>
-                {BURIED_SLOT_IDS.filter(s => !isBuriedAutoSlot(s) && (char.equipped?.[s]?.usesSpent || 0) > 0).map(s => {
-                  const it = char.equipped[s];
-                  const left = buriedSkillUsesLeft(char, s);
-                  const max = buriedSkillMaxUses(BURIED_SKILLS[it.skillId], buriedSkillLv(char, it.skillId));
-                  return (
-                    <button key={s} onClick={() => applyResupply(s)}
-                      className="ui-press w-full flex items-center gap-2 px-2.5 py-2 text-left"
-                      style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panelLight, border: `1px solid ${PALETTE.panelBorder}` }}>
-                      <span className="text-[11px] shrink-0" style={{ color: PALETTE.textDim }}>{slotMeta(it.slot).name}</span>
-                      <span className="text-[12px] font-bold flex-1 min-w-0 truncate" style={{ color: PALETTE.text }}>{it.name}</span>
-                      <span className="text-[11px] tabular-nums shrink-0" style={{ color: PALETTE.dawn }}>잔여 {left}/{max}</span>
-                    </button>
-                  );
-                })}
-                <button onClick={() => setResupplyOpen(false)} className="ui-press w-full py-2 text-[12px]"
-                  style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panelLight, color: PALETTE.textDim, border: `1px solid ${PALETTE.panelBorder}` }}>
-                  취소
-                </button>
-              </div>
-            )}
             <button onClick={advance} className="ui-press w-full py-2.5 text-[12px]"
               style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panelLight, color: PALETTE.text, border: `1px solid ${PALETTE.panelBorder}` }}>
               다음 층으로
@@ -640,7 +595,7 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onLogEvent, on
             <button onClick={rest} disabled={!!char.roomData?.rested}
               className="ui-press w-full py-2.5 text-[12px] font-bold"
               style={{ borderRadius: 'var(--r-btn, 13px)', background: char.roomData?.rested ? PALETTE.panel : PALETTE.green, color: char.roomData?.rested ? PALETTE.textDim : '#0a0608', opacity: char.roomData?.rested ? 0.55 : 1 }}>
-              {char.roomData?.rested ? '이미 쉬었다 — 불이 꺼져 간다' : '쉰다 — HP 45% 회복 + 물약 +1 + 무작위 장비 1개 스킬 만충 (1회)'}
+              {char.roomData?.rested ? '이미 쉬었다 — 불이 꺼져 간다' : '쉰다 — HP 45% 회복 + 물약 +1 + 다음 전투 사용 횟수 +1 (1회)'}
             </button>
             <button onClick={advance} className="ui-press w-full py-2.5 text-[12px]"
               style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panelLight, color: PALETTE.text, border: `1px solid ${PALETTE.panelBorder}` }}>

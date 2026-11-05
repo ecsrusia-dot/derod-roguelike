@@ -308,11 +308,10 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose, readOn
                       <div className="text-[11px]" style={{ color: BURIED_QUALITY_COLORS[q] }}>품질 {q}</div>
                       {(() => { // 1.132.0 — 스킬 사용 횟수 / 1.134.0 — 파손 카운트다운
                         if (isBuriedAutoSlot(s.id)) return <div className="text-[11px]" style={{ color: PALETTE.ice }}>⟳ 자동</div>; // 1.171.0
-                        const left = buriedSkillUsesLeft(char, s.id);
-                        const brk = left <= 0 ? buriedBreakIn(char, s.id) : null;
+                        const left = buriedSkillUsesLeft(char, s.id); // 1.172.0 — 전투당 최대치(+다음 전투 보너스)
                         return (
                           <div className="text-[11px] tabular-nums" style={{ color: left <= 0 ? PALETTE.accent : PALETTE.textDim }}>
-                            {left <= 0 ? `⛓ 봉인${brk != null ? ` · ${brk}층 후 파손` : ''}` : `횟수 ${left}`}
+                            {`전투당 ${left}회`}
                           </div>
                         );
                       })()}

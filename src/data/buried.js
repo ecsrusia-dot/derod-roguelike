@@ -634,8 +634,8 @@ export const BURIED_ALTAR_BOONS = [
     desc: '다음 전투 시작 시 [재생] 5 + [수호] 3을 얻는다' },
   { id: 'cleanse', icon: '🕯', name: '정화의 봉헌', costBase: 170,
     desc: '짊어진 저주 1개를 무작위로 해제한다' },
-  { id: 'resupply', icon: '🔧', name: '보충의 봉헌', costBase: 130,
-    desc: '지정한 장비 1개의 스킬 사용 횟수를 만충한다' },
+  { id: 'resupply', icon: '🔧', name: '보급의 봉헌', costBase: 130,
+    desc: '다음 전투에서 무기·보조 스킬 사용 횟수 +2 (1.172.0 — 전투당 횟수 전환)' },
 ];
 export const buriedBoonCost = (boon, monLevel = 1) =>
   Math.round(boon.costBase * (1 + Math.max(0, (monLevel || 1) - 1) * 0.1));
@@ -2904,27 +2904,33 @@ export function buriedSkillLvNote(skill, lv) {
 // PM 결정: 빡빡하게(D30/C22/B15/A10) + 소진 시 스킬만 봉인(장비 스탯 유지).
 // 잔여 = 최대(등급·레벨) - item.usesSpent — 레벨이 오르면 최대가 늘어 잔여도 함께 늘어난다.
 // 구 세이브 장비는 usesSpent 없음 = 만충 (자연 호환). 기본 공격은 무제한.
-export const BURIED_SKILL_USES = { D: 30, C: 22, B: 15, A: 10 }; // 1.163.1 — 원상복구 (PM 원칙: 강한 스킬 = 고CD + 적은 횟수 / 약한 스킬 = 저CD + 많은 횟수)
+// 1.172.0 — ③ PM 결정 「전투당 사용 횟수」: 런 전체 D30/C22/B15/A10 → **전투당 D8/C5/B3/A2** (매 전투 리셋).
+// 마모·파손·충전 폐지 — 아껴 둘 이유가 사라져 한 장비 고집·고횟수 장비 편식이 없어진다.
+// 대상은 무기·보조 수동 2슬롯뿐 (갑옷·투구·장신구는 1.171.0 자동 발동, 쿨다운만).
+// PM 원칙 유지: 강한 스킬 = 고CD + 적은 횟수 / 약한 스킬 = 저CD + 많은 횟수
+export const BURIED_SKILL_USES = { D: 8, C: 5, B: 3, A: 2 };
 export function buriedSkillMaxUses(skill, lv = 1) {
-  const base = BURIED_SKILL_USES[buriedSkillRank(skill)] || 30;
+  const base = BURIED_SKILL_USES[buriedSkillRank(skill)] || 8;
   return Math.round(base * (1 + (Math.max(1, lv) - 1) * 0.08));
 }
 // 🛠 정비 마모 (1.162.0, PM 결정) — 충전(야영·봉헌·상점 정비)할 때마다 그 장비의
 // **최대 사용 횟수가 원래 최대치의 15%p씩 영구 감소**한다 (item.wearPct 누적).
 // 충전 5~6회면 수명 종료 → 같은 무기 무한 고집이 불가능해진다 (순환 패키지와 연계).
 // 마모로 최대치가 0이 되면 스킬 봉인 — 소진 상태로 5층이 지나면 파손 규칙대로 부서진다.
-export let BURIED_WEAR_PCT = 15;
+// 1.172.0 — 마모 폐지: item.wearPct는 무시된다 (구 세이브 장비도 최대치 그대로)
+export let BURIED_WEAR_PCT = 0;
 export function buriedItemMaxUses(item, skill, lv = 1) {
-  const base = buriedSkillMaxUses(skill, lv);
-  return Math.max(0, Math.round(base * (1 - Math.min(100, item?.wearPct || 0) / 100)));
+  return buriedSkillMaxUses(skill, lv);
 }
+// 다음 전투에 더해지는 수동 스킬 사용 횟수 (보급의 봉헌·야영) — 전투가 끝나면 소비된다
+export const buriedBonusUses = (char) => Math.max(0, char?.bonusUses || 0);
 export function buriedSkillUsesLeft(char, slot) {
   const item = char?.equipped?.[slot];
   if (!item) return 0;
   const skill = BURIED_SKILLS[item.skillId];
   if (!skill) return 0;
-  const max = buriedItemMaxUses(item, skill, buriedSkillLv(char, item.skillId));
-  return Math.max(0, max - (item.usesSpent || 0));
+  // 1.172.0 — 전투당 횟수라 전투 밖에서는 항상 최대치 (item.usesSpent는 무시)
+  return buriedItemMaxUses(item, skill, buriedSkillLv(char, item.skillId)) + buriedBonusUses(char);
 }
 // 충전 (순수 함수) — pct 100 = 만충, 그 외엔 최대치의 pct%만큼 usesSpent 감소
 export function rechargeBuriedUses(char, pct = 100) {
@@ -2967,7 +2973,10 @@ export function rechargeBuriedRandomSlot(char) {
 // 자동승리 버튼이 되는 걸 막는다. 일반 보스(폭군 등)는 저항 없음
 export let BURIED_GUARDIAN_DOT_RESIST = 50;
 export const BURIED_BREAK_GRACE = 5;
+// 1.172.0 — 전투당 횟수로 바뀌어 소진 상태가 전투 밖으로 이어지지 않는다 → 파손 폐지 (함수는 호환용으로 유지)
 function isBuriedSlotDepleted(char, slot) {
+  return false;
+  // eslint-disable-next-line no-unreachable
   const it = char?.equipped?.[slot];
   if (!it || !BURIED_SKILLS[it.skillId]) return false;
   if (isBuriedAutoSlot(slot)) return false; // 1.171.0 — 자동 슬롯은 횟수 제한이 없어 소진·파손 대상이 아니다
@@ -3434,7 +3443,7 @@ export const BURIED_UNIQUES = [
   UQ({ id: 'u38',  name: '투명화',          slot: 'armor', skillId: 'shadowCloak', src: 38,  desc: '일반 전투에서 적이 첫 턴에 나를 찾지 못한다 (강적·보스·재앙 제외).' }),
   UQ({ id: 'u49',  name: '변신',            slot: 'armor', skillId: 'bulwark',     src: 49,  desc: '보스·재앙 전투를 [격노] 2 + [수호] 2로 시작한다.' }),
   UQ({ id: 'u51',  name: '탐식자',          slot: 'helm',  skillId: 'warHorn',     src: 51,  desc: '전투를 시작할 때 적에게 [약화] 2.' }),
-  UQ({ id: 'u54',  name: '건강한 잠',       slot: 'armor', skillId: 'regenScale',  src: 54,  desc: '야영의 효과가 2배 — 회복 45%→90%, 스킬 정비(만충)도 장비 1개→2개.' }),
+  UQ({ id: 'u54',  name: '건강한 잠',       slot: 'armor', skillId: 'regenScale',  src: 54,  desc: '야영의 효과가 2배 — 회복 45%→90%, 다음 전투 사용 횟수 보너스 +1→+2.' }),
   UQ({ id: 'u55',  name: '군림',            slot: 'helm',  skillId: 'chargeUp',    src: 55,  desc: '전투를 시작할 때 적에게 [파쇄] 2.' }),
   UQ({ id: 'u58',  name: '무념무상',        slot: 'helm',  skillId: 'focusMind',   src: 58,  desc: '피격당할 때마다 이 전투 동안 받는 피해 -3% (최대 -30%).' }),
   UQ({ id: 'u59',  name: '간계',            slot: 'acc',   skillId: 'venomSigil',  src: 59,  desc: '내가 부여하는 상태이상 스택이 2배가 된다. (「균일한 저주」 보유 시 그쪽 우선)' }),
@@ -5375,8 +5384,6 @@ export const BURIED_BALANCE_FIELDS = [
     () => BURIED_GEAR_DECAY.graceLv, v => { BURIED_GEAR_DECAY.graceLv = v; }, '마물 레벨보다 이만큼 낡아도 무감쇠'),
   BF('gearDecayFloor', '⚙ 장비·성장', '장비 감쇠 하한', '%', 10, 100, 5,
     () => BURIED_GEAR_DECAY.floorPct, v => { BURIED_GEAR_DECAY.floorPct = v; }, '낡은 장비 위력의 최저치'),
-  BF('wearPct', '⚙ 장비·성장', '정비 마모', '%p/충전', 0, 50, 1,
-    () => BURIED_WEAR_PCT, v => { BURIED_WEAR_PCT = v; }, '충전할 때마다 최대 횟수가 이만큼 준다'),
   BF('levelHealPct', '⚙ 장비·성장', '레벨업 회복', '% 최대 HP', 0, 100, 5,
     () => BURIED_LEVEL_HEAL_PCT, v => { BURIED_LEVEL_HEAL_PCT = v; }, '100이면 매 레벨업마다 완전 회복'),
 
