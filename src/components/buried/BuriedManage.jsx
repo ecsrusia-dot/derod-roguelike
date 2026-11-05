@@ -10,6 +10,7 @@ import { X } from 'lucide-react';
 import { PALETTE } from '../../utils/helpers.js';
 import {
   BURIED_SLOTS, BURIED_SLOT_IDS, BURIED_SKILLS, BURIED_SKILL_MAX_LV, buriedStatPtSummary,
+  BURIED_SYNERGY_TAGS, buriedSynergy, buriedSynergyFxText,
   buriedItemRunes, buriedItemSockets,
   buriedDerived, buriedDustValue, getBuriedClass,
   buriedTraitIds, getBuriedTrait, buriedSkillLv, BURIED_QUALITY_COLORS,
@@ -256,6 +257,31 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose, readOn
           </div>
         )}
 
+        {/* 🔗 1.176.0 — 빌드 시너지: 장착 6개 중 같은 태그 2개/4개에서 보너스 */}
+        {(() => {
+          const sy = buriedSynergy(char);
+          return (
+            <div className="px-3 py-2.5" style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panel, border: `1px solid ${PALETTE.panelBorder}` }}>
+              <div className="text-[11px] tracking-[0.2em] mb-1.5" style={{ color: PALETTE.dawn }}>🔗 빌드 시너지 — 같은 태그 2개 / 4개</div>
+              <div className="space-y-1">
+                {BURIED_SYNERGY_TAGS.map(t => {
+                  const n = sy.counts[t.id] || 0;
+                  const lv = n >= 4 ? 4 : n >= 2 ? 2 : 0;
+                  const next = lv === 4 ? null : lv === 2 ? 4 : 2;
+                  return (
+                    <div key={t.id} className="text-[12px] leading-snug" style={{ opacity: lv ? 1 : 0.6 }}>
+                      <span style={{ color: t.color }} className="font-bold">{t.icon} {t.name} {n}/6</span>
+                      <span style={{ color: lv ? PALETTE.green : PALETTE.textDim }}>
+                        {lv ? ` — ✓ ${lv}개: ${buriedSynergyFxText(t.tiers[lv])}` : ` — ${t.hint}`}
+                      </span>
+                      {next && <span className="text-[11px]" style={{ color: PALETTE.textDim }}> · {next}개: {buriedSynergyFxText(t.tiers[next])}</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
         {/* 1.170.0 — 4스탯 표시 폐지 → 종족·출신·이벤트·난입으로 얻은 능력 보정(%)만 보여준다 */}
         {(() => {
           const cb = getBuriedClass(char.classId)?.stats || {};

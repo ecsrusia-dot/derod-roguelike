@@ -13,7 +13,7 @@ import {
   buriedSkillAt, buriedModdedSkill, buriedSkillDmgPreview,
   buriedItemRunes, buriedItemSockets, buriedRunewordOf,
   buriedMonsterLevel, applyBuriedGearDecay, buriedModTransferCost, BURIED_QUALITY_COLORS,
-  BURIED_AUTO_POOLS, slotPool, BURIED_LOOT_RULE_TIERS,
+  BURIED_AUTO_POOLS, slotPool, BURIED_LOOT_RULE_TIERS, buriedSkillTags, getBuriedSynergyTag,
 } from '../../data.js';
 
 // 1.143.0 — ⛓ 스킬 사용 가능 횟수 (장비 카드·상세·획득 판단 공용).
@@ -178,6 +178,8 @@ export function BuriedItemCard({ item, slotId, onClick, right, dim = false, show
         </div>
         <div className={`text-[11px] ${full ? '' : 'truncate'} flex items-center gap-1 flex-wrap`} style={{ color: PALETTE.dawn }}>
           {skill && <SkillKindBadge skill={skill} />}
+          {/* 🔗 1.176.0 — 시너지 태그 아이콘 */}
+          {skill && buriedSkillTags(skill).map(id => { const t = getBuriedSynergyTag(id); return t ? <span key={id} title={t.name} className="text-[11px]">{t.icon}</span> : null; })}
           <span className={wrap}>◆ {skill ? skill.name : '스킬 없음'}{skill && <span style={{ color: PALETTE.textDim }}>{BURIED_AUTO_POOLS[item.pool || slotPool(item.slot)] ? ' · ⟳ 자동' : ` · SP ${skill.sp}`}{skill.cd > 0 ? ` · CD ${skill.cd}` : ''}</span>}
             {/* 1.143.0 — ⛓ 사용 가능 횟수 (소진 시 스킬 봉인) */}
             {(() => { const u = buriedItemUses(item, char); return u ? <span className="tabular-nums" style={{ color: usesColor(u) }}> · ⛓ 전투당 {u.max}</span> : null; })()}
