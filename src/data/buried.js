@@ -616,11 +616,19 @@ let _buriedItemSeq = 0;
 const nextItemId = () => `bi_${Date.now().toString(36)}_${(_buriedItemSeq++).toString(36)}_${Math.floor(Math.random() * 1296).toString(36)}`;
 
 // 층이 깊을수록 상위 등급 가중치 상승
-function tierWeightAt(tier, floor) {
+// 1.170.0 — 드랍 운 재설계 (PM 결정 A): 예전엔 luck을 floor에 더했는데, 레벨 곡선이
+// Lv 20부터 수렴(유물급 ~11.7% 상한)해서 심층에서 드랍 운 효과가 0이었다.
+// 이제 레벨 곡선과 분리된 **배율** — 희귀 이상 등급 가중치 × (1 + luck × LUCK_TIER_PCT × (등급-1)).
+// 낡은 등급 감소분만 기존처럼 레벨 환산 유지 (초반 체감 보존).
+export const BURIED_LUCK_TIER_PCT = 0.05;
+function tierWeightAt(tier, floor, luck = 0) {
   if (tier.weight <= 0) return 0; // legend 등급 — 일반 풀 절대 제외 (1.117.0 유출 픽스)
   const depth = Math.max(0, (floor || 1) - 1);
+  const L = Math.max(0, luck || 0);
   const rankIdx = BURIED_TIERS.indexOf(tier);
-  return Math.max(0.5, tier.weight * (1 + rankIdx * depth * 0.09) - (rankIdx === 0 ? depth * 2.6 : 0));
+  if (rankIdx === 0) return Math.max(0.5, tier.weight - (depth + L) * 2.6);
+  const base = tier.weight * (1 + rankIdx * depth * 0.09);
+  return rankIdx >= 2 ? base * (1 + L * BURIED_LUCK_TIER_PCT * (rankIdx - 1)) : base;
 }
 
 // =========================================================
@@ -656,7 +664,7 @@ export function rollBuriedItem({ slot, classId, floor = 1, tier = null, luck = 0
   if (candidates.length === 0) return null;
   const skill = pick(candidates);
   const t = tier ? getBuriedTier(tier)
-    : weightedPick(BURIED_TIERS, (x) => tierWeightAt(x, (floor || 1) + luck));
+    : weightedPick(BURIED_TIERS, (x) => tierWeightAt(x, floor || 1, luck));
 
   // 1.113.0 — 장비 레벨(floor) 체계.
   //   기본 스탯: 레벨당 +14% × 랜덤 굴림. 일반 장비 굴림 폭 0.75~1.20 (더 좋은 굴림 사냥 동기),
@@ -2048,7 +2056,7 @@ export const BURIED_FX_LABELS = {
   spRegen:      { name: '턴당 SP 회복',     unit: '' },
   goldPct:      { name: '골드 획득',        unit: '%' },
   expPct:       { name: '경험치 획득',      unit: '%' },
-  dropLuck:     { name: '드랍 운',          unit: '', note: '좋은 등급이 나올 확률이 오른다' },
+  dropLuck:     { name: '드랍 운',          unit: '', note: '1당 희귀 이상 등급 가중 +5~15%, 보스 유니크 확률 +1%p(최대 2배), 룬 ★3·★4 확률↑' },
   dustPct:      { name: '먼지 획득',        unit: '%' },
   // 상태이상
   statusChance: { name: '상태이상 적중',    unit: '%', note: '내가 거는 상태이상 확률' },
@@ -3630,9 +3638,15 @@ export function rollBuriedUniqueItem({ classId, floor = 1, excludeIds = [], dung
 
 // 보스 유니크 드랍 확률 (%) — 던전이 깊을수록 후하다. 최종 보스는 2배
 export const BURIED_UNIQUE_DROP = { labyrinth: 8, ruins: 12, chasm: 16, abyss: 22 };
-export function rollBuriedUniqueDrop({ dungeonId, isFinalBoss, classId, floor, ownedIds = [], guaranteed = false, deep = null, powerMult = 1, mainAttr = null }) {
-  const base = BURIED_UNIQUE_DROP[dungeonId] || 8;
-  const chance = guaranteed ? 100 : base * (isFinalBoss ? 2 : 1);
+// 1.170.0 — 캐릭터 드랍 운 1당 유니크 확률 +1%p, 상한 = 기본 확률의 2배 (PM 결정 A).
+// luck은 **캐릭터 출처만**(계약·부품·종족/출신·유니크·쐐기석) — 던전 기본·보스 방 보너스는 제외.
+export const BURIED_UNIQUE_LUCK_PCT = 1;
+export function buriedUniqueDropChance(dungeonId, isFinalBoss, luck = 0) {
+  const base = (BURIED_UNIQUE_DROP[dungeonId] || 8) * (isFinalBoss ? 2 : 1);
+  return base + Math.min(base, Math.max(0, luck || 0) * BURIED_UNIQUE_LUCK_PCT);
+}
+export function rollBuriedUniqueDrop({ dungeonId, isFinalBoss, classId, floor, ownedIds = [], guaranteed = false, deep = null, powerMult = 1, mainAttr = null, luck = 0 }) {
+  const chance = guaranteed ? 100 : buriedUniqueDropChance(dungeonId, isFinalBoss, luck);
   if (Math.random() * 100 >= chance) return null;
   // deep — 정복 층 **이후**만 전용 풀 개방 (1.117.0: 정복 층 당일 포함 off-by-one 픽스).
   // 미지정 시 기존 isFinalBoss 기준 유지 (재앙 등)

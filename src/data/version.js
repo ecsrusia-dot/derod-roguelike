@@ -3,6 +3,6 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.169.0';
-export const VERSION_DATE = '2026-08-20';
-export const VERSION_LABEL = '⚱ 신규 게임 「제령사」 — 5막 시나리오·브레이크·빙의';
+export const GAME_VERSION = '1.169.1';
+export const VERSION_DATE = '2026-11-05';
+export const VERSION_LABEL = '⚰ 무덤의 유산 — 🍀 드랍 운 재설계';

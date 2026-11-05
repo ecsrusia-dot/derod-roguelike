@@ -370,7 +370,9 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
       // [dl4] 유산 도굴사 — 드랍 확률 +20%p
       const dropChance = bossy || roomType === 'elite' ? 100 : Math.min(100, 38 + (uq('dl4') ? 20 : 0));
       const drops = [];
-      const luck = dungeon.dropLuck + (cf.dropLuck || 0) + (pf.dropLuck || 0) + (rf.dropLuck || 0) + (ufx.dropLuck || 0) + buriedKeystoneBonus(char).luck + (guardianFight ? 12 : bossy ? 6 : roomType === 'elite' ? 3 : 0);
+      // 1.170.0 — 캐릭터 출처 드랍 운 (유니크 확률에는 이것만 반영)
+      const charLuck = (cf.dropLuck || 0) + (pf.dropLuck || 0) + (rf.dropLuck || 0) + (ufx.dropLuck || 0) + buriedKeystoneBonus(char).luck;
+      const luck = dungeon.dropLuck + charLuck + (guardianFight ? 12 : bossy ? 6 : roomType === 'elite' ? 3 : 0);
       const lootPower = buriedLootPower(char); // 1.121.0 — 깊이 위력 배율 (시작 장비와 같은 저울)
       if (Math.random() * 100 < dropChance) {
         const it = rollBuriedItem({ slot: null, classId: char.classId, floor: enemy.lv || char.floor, luck, powerMult: lootPower });
@@ -395,6 +397,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
           mainAttr: buriedMainAttr(char), // 1.161.0 — PM 결정: 메인 속성 70% / 그외 30%
           guaranteed: roomType === 'calamity' || guardianFight,
           powerMult: lootPower,
+          luck: charLuck,
         });
         if (uniqueDrop) drops.push(uniqueDrop);
       }
