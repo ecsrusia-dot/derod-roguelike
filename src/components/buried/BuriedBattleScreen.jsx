@@ -35,7 +35,12 @@ import {
 } from '../../data.js';
 import { BuriedBar, BuriedStatusRow, BuriedItemCard, slotMeta, SkillKindBadge, BuriedInfoModal } from './BuriedCommon.jsx';
 
-const wait = (ms) => new Promise(r => setTimeout(r, ms));
+// ⏩ 배속 (1.174.0) — 연출 대기만 압축한다. 전투 판정·확률은 그대로
+let BATTLE_SPEED = 1;
+const wait = (ms) => new Promise(r => setTimeout(r, ms / BATTLE_SPEED));
+// 자동 전투·배속 설정은 기기별 편의 설정 (localStorage — 실패해도 기본값으로 동작)
+const loadPref = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } };
+const savePref = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* 무시 */ } };
 const rnd = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 
 export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId, onFinish }) {
@@ -232,6 +237,10 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
   const [swiftUsedThisTurn, setSwiftUsedThisTurn] = useState(false); // 1.136.0 — ⚡ 신속 (턴당 1회)
   // ⟳ 자동 발동 (1.171.0) — turnNo: 라운드 종료마다 +1 / autoRef: 슬롯별 조건 플래그 + 이번 턴 발동 기록
   const [turnNo, setTurnNo] = useState(1);
+  // 🤖 자동 전투 + ⏩ 배속 (1.174.0, PM 결정 ①②)
+  const [autoBattle, setAutoBattle] = useState(() => !!loadPref('buried_auto_battle', false));
+  const [speed, setSpeed] = useState(() => [1, 2, 4].includes(loadPref('buried_battle_speed', 1)) ? loadPref('buried_battle_speed', 1) : 1);
+  BATTLE_SPEED = speed;
   const autoRef = useRef({ hit: false, attacked: false, fired: {} });
   const [spentMap, setSpentMap] = useState({}); // 1.132.0 — 이번 전투에서 슬롯별 스킬 사용 횟수
   const spentMapRef = useRef({});
@@ -1180,6 +1189,51 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [turnNo, busy, result, stunned]);
 
+  // 🤖 자동 전투 — 자동 슬롯 발동이 다 끝난 뒤, 무기·보조·기본기·물약 중 하나를 고른다.
+  // 우선순위: HP 35% 미만 물약(턴 미소모) → HP 50% 미만 회복 스킬 → ⚡신속 버프(무료) → 예상 피해가 가장 큰 공격 스킬 → 기본기
+  const manualOptions = () => equipped.filter(x => !buriedAutoInfo(x.slot)).map(({ slot, item, skill }) => {
+    const { lv, eff } = effSkillFor(item, skill);
+    const spCost = Math.round(eff.sp * (1 + (env.self.spCostPct || 0) / 100));
+    const usesLeft = buriedItemMaxUses(item, skill, lv) + (char.bonusUses || 0) - (spentMap[slot] || 0);
+    const base = eff.power ? ({ str: player.atk, dex: player.fin, int: player.mag }[eff.stat] ?? Math.max(player.atk, player.fin, player.mag)) : 0;
+    const dmg = eff.power ? base * eff.power / 100 * Math.max(1, eff.hits || 1) : 0;
+    const ok = !silenced && (player.cds[eff.id] || 0) <= 0 && spCost <= player.sp && usesLeft > 0;
+    return { slot, eff, ok, dmg };
+  }).filter(o => o.ok);
+  const autoTimerRef = useRef(null);
+  useEffect(() => {
+    if (!autoBattle || busy || result || stunned || foe.hp <= 0 || player.hp <= 0) return;
+    // 자동 슬롯이 아직 발동 대기 중이면 그쪽이 먼저
+    for (const slot of ['helm', 'armor', 'acc1', 'acc2']) {
+      const row = equipped.find(x => x.slot === slot);
+      if (row && !silenced && autoReady(slot, effSkillFor(row.item, row.skill).eff)) return;
+    }
+    clearTimeout(autoTimerRef.current);
+    autoTimerRef.current = setTimeout(() => {
+      const hpPct = player.hp / player.maxHp * 100;
+      if (hpPct < 35 && potions > 0 && !potionUsedThisTurn && !kf.noPotion) { usePotion(); return; }
+      const opts = manualOptions();
+      const heal = opts.find(o => (o.eff.heal || o.eff.healPct) && !o.eff.power);
+      if (heal && hpPct < 50) { act('skill', heal.eff, heal.slot); return; }
+      const swift = opts.find(o => o.eff.swift && !o.eff.power && !swiftUsedThisTurn);
+      if (swift) { act('skill', swift.eff, swift.slot); return; }
+      const atk = opts.filter(o => o.eff.power).sort((a, b) => b.dmg - a.dmg)[0];
+      const cb = buriedClassBasic(char?.classId, player.maxHp, enemy?.lv || 1);
+      const basicDmg = Math.max(player.atk, player.fin, player.mag) * (cb.power || 100) / 100 * Math.max(1, cb.hits || 1);
+      if (atk && atk.dmg >= basicDmg * 0.9) { act('skill', atk.eff, atk.slot); return; }
+      act('basic', cb);
+    }, 380 / speed);
+    return () => clearTimeout(autoTimerRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoBattle, busy, result, stunned, turnNo, potionUsedThisTurn, swiftUsedThisTurn]);
+  // 자동 전투 중 승리하면 결과 창을 잠시 보여준 뒤 넘어간다 (패배는 직접 확인)
+  useEffect(() => {
+    if (!autoBattle || !result?.win) return;
+    const t = setTimeout(() => onFinish(result), 1400 / speed);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoBattle, result]);
+
   useEffect(() => {
     if (stunned && !busy && !result) {
       pushLog('기절해 움직일 수 없다!', PALETTE.shock);
@@ -1305,6 +1359,19 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
 
       {/* ===== 행동 ===== */}
       <div className="flex-1 overflow-y-auto px-3 pb-3 pt-1">
+        {/* 🤖 자동 전투 / ⏩ 배속 (1.174.0) */}
+        <div className="flex gap-1.5 mb-1.5">
+          <button onClick={() => { const v = !autoBattle; setAutoBattle(v); savePref('buried_auto_battle', v); }}
+            className="ui-press flex-1 py-1.5 text-[12px] font-bold"
+            style={{ borderRadius: 'var(--r-btn, 13px)', background: autoBattle ? PALETTE.ice : PALETTE.panel, color: autoBattle ? '#0a0608' : PALETTE.textDim, border: `1px solid ${PALETTE.ice}66` }}>
+            🤖 자동 전투 {autoBattle ? 'ON' : 'OFF'}
+          </button>
+          <button onClick={() => { const v = speed === 1 ? 2 : speed === 2 ? 4 : 1; setSpeed(v); savePref('buried_battle_speed', v); }}
+            className="ui-press px-4 py-1.5 text-[12px] font-bold tabular-nums"
+            style={{ borderRadius: 'var(--r-btn, 13px)', background: speed > 1 ? PALETTE.dawn : PALETTE.panel, color: speed > 1 ? '#0a0608' : PALETTE.textDim, border: `1px solid ${PALETTE.dawn}66` }}>
+            ⏩ ×{speed}
+          </button>
+        </div>
         <div className="grid grid-cols-2 gap-1.5">
           {(() => {
             // 1.147.0 — 직업별 기본기 표시 (효과 한 줄 = flavor)
