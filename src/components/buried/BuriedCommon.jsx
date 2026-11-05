@@ -13,6 +13,7 @@ import {
   buriedSkillAt, buriedModdedSkill, buriedSkillDmgPreview,
   buriedItemRunes, buriedItemSockets, buriedRunewordOf,
   buriedMonsterLevel, applyBuriedGearDecay, buriedModTransferCost, BURIED_QUALITY_COLORS,
+  BURIED_AUTO_POOLS, slotPool,
 } from '../../data.js';
 
 // 1.143.0 — ⛓ 스킬 사용 가능 횟수 (장비 카드·상세·획득 판단 공용).
@@ -20,6 +21,7 @@ import {
 export function buriedItemUses(item, char = null) {
   const skill = item ? BURIED_SKILLS[item.skillId] : null;
   if (!skill) return null;
+  if (BURIED_AUTO_POOLS[item.pool || slotPool(item.slot)]) return null; // ⟳ 1.171.0 — 자동 슬롯 장비는 횟수 제한 없음
   const lv = char ? buriedSkillLv(char, item.skillId) : 1;
   const max = buriedItemMaxUses(item, skill, lv); // 1.162.0 — 🛠 마모 반영
   return { max, left: Math.max(0, max - (item.usesSpent || 0)), wear: Math.min(100, item.wearPct || 0) };
@@ -176,7 +178,7 @@ export function BuriedItemCard({ item, slotId, onClick, right, dim = false, show
         </div>
         <div className={`text-[11px] ${full ? '' : 'truncate'} flex items-center gap-1 flex-wrap`} style={{ color: PALETTE.dawn }}>
           {skill && <SkillKindBadge skill={skill} />}
-          <span className={wrap}>◆ {skill ? skill.name : '스킬 없음'}{skill && <span style={{ color: PALETTE.textDim }}> · SP {skill.sp}{skill.cd > 0 ? ` · CD ${skill.cd}` : ''}</span>}
+          <span className={wrap}>◆ {skill ? skill.name : '스킬 없음'}{skill && <span style={{ color: PALETTE.textDim }}>{BURIED_AUTO_POOLS[item.pool || slotPool(item.slot)] ? ' · ⟳ 자동' : ` · SP ${skill.sp}`}{skill.cd > 0 ? ` · CD ${skill.cd}` : ''}</span>}
             {/* 1.143.0 — ⛓ 사용 가능 횟수 (소진 시 스킬 봉인) */}
             {(() => { const u = buriedItemUses(item, char); return u ? <span className="tabular-nums" style={{ color: usesColor(u) }}> · ⛓ {u.left}/{u.max}</span> : null; })()}
           </span>
@@ -323,6 +325,12 @@ export function BuriedItemSheet({ item, compare, onEquip, onUnequip, onDismantle
               {skill.pierce ? ' · 완전 관통' : ''}{effSkill?.defPierce ? ' · 방어 관통' : ''}{effSkill?.barrierPierce ? ' · 보호막 관통' : ''}
               {effSkill?.decayPct ? <span style={{ color: PALETTE.accent }}> · ⚙ 위력 감쇠 -{effSkill.decayPct}% — 장비 Lv.{item.floor || 1}이(가) 마물 레벨보다 낡았다</span> : null}
             </div>
+            {/* ⟳ 1.171.0 — 자동 발동 장비 안내 */}
+            {BURIED_AUTO_POOLS[item.pool || slotPool(item.slot)] && (
+              <div className="text-[11px] mt-0.5" style={{ color: PALETTE.ice }}>
+                ⟳ 자동 발동 — {BURIED_AUTO_POOLS[item.pool || slotPool(item.slot)].label}, 쿨다운이 차면 저절로 쓴다. SP 무료 · 횟수 무제한 · 턴 소모 없음
+              </div>
+            )}
             {/* 1.143.0 — ⛓ 사용 가능 횟수 */}
             {(() => {
               const u = buriedItemUses(item, char);

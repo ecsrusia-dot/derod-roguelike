@@ -73,6 +73,22 @@ export const BURIED_SLOT_IDS = BURIED_SLOTS.map(s => s.id);
 export const slotPool = (slotId) => (slotId === 'acc1' || slotId === 'acc2' ? 'acc' : slotId);
 
 // =========================================================
+// 2b. ⟳ 자동 발동 슬롯 (1.171.0, PM 결정 ④ 「수동 2 + 자동 4」)
+// =========================================================
+// 6슬롯이 전부 액티브라 매 턴 센 스킬 1~2개만 쓰고 나머지는 스탯 덩어리였다.
+// 무기·보조만 손으로 쓰고, 갑옷·투구·장신구는 **쿨다운이 차면 자동 발동**한다.
+//   - SP 무료 / 사용 횟수 제한 없음 (쿨다운만) — PM 결정
+//   - 발동 시점은 내 턴 시작. 슬롯별 조건: 투구 = 매 턴 / 갑옷 = 직전 적 턴에 피해를 받았을 때 /
+//     장신구 = 직전 내 행동이 공격이었을 때. 턴을 소모하지 않는다 (신속 경로 재사용)
+export const BURIED_AUTO_POOLS = {
+  helm:  { trigger: 'turnStart',   label: '매 턴 시작',        icon: '⟳' },
+  armor: { trigger: 'struck',      label: '피격 후 턴 시작',   icon: '⟳' },
+  acc:   { trigger: 'afterAttack', label: '공격 후 턴 시작',   icon: '⟳' },
+};
+export const isBuriedAutoSlot = (slotId) => !!BURIED_AUTO_POOLS[slotPool(slotId)];
+export const buriedAutoInfo = (slotId) => BURIED_AUTO_POOLS[slotPool(slotId)] || null;
+
+// =========================================================
 // 3. 직업 5종 — 본편 CLASSES에서 정체성만 계승
 // =========================================================
 // lines  : 착용 가능한 무기/보조 계열 (원작의 직업별 장비 제한)
@@ -2916,7 +2932,7 @@ export function rechargeBuriedUses(char, pct = 100) {
   const equipped = { ...char.equipped };
   for (const s of BURIED_SLOT_IDS) {
     const it = equipped[s];
-    if (!it || !(it.usesSpent > 0)) continue;
+    if (!it || !(it.usesSpent > 0) || isBuriedAutoSlot(s)) continue; // ⟳ 1.171.0 — 자동 슬롯은 충전·마모 대상 아님
     const wear = Math.min(100, (it.wearPct || 0) + BURIED_WEAR_PCT); // 🛠 마모 (1.162.0)
     if (pct >= 100) { equipped[s] = { ...it, usesSpent: 0, wearPct: wear }; continue; }
     const skill = BURIED_SKILLS[it.skillId];
@@ -2929,13 +2945,13 @@ export function rechargeBuriedUses(char, pct = 100) {
 // 지정 1장비 만충 (제단 「보충의 봉헌」용)
 export function rechargeBuriedSlot(char, slotId) {
   const it = char?.equipped?.[slotId];
-  if (!it || !(it.usesSpent > 0)) return char;
+  if (!it || !(it.usesSpent > 0) || isBuriedAutoSlot(slotId)) return char;
   // 🛠 마모 (1.162.0) — 충전할 때마다 최대치 15%p 영구 감소
   return { ...char, equipped: { ...char.equipped, [slotId]: { ...it, usesSpent: 0, wearPct: Math.min(100, (it.wearPct || 0) + BURIED_WEAR_PCT) } } };
 }
 // 랜덤 1장비 만충 (야영용) — 소진분이 있는 슬롯 중 하나를 무작위로. 랜덤 롤이므로 setMeta updater 밖에서 호출할 것
 export function rechargeBuriedRandomSlot(char) {
-  const cands = BURIED_SLOT_IDS.filter(s => (char?.equipped?.[s]?.usesSpent || 0) > 0);
+  const cands = BURIED_SLOT_IDS.filter(s => !isBuriedAutoSlot(s) && (char?.equipped?.[s]?.usesSpent || 0) > 0);
   if (cands.length === 0) return { char, item: null };
   const slot = cands[Math.floor(Math.random() * cands.length)];
   return { char: rechargeBuriedSlot(char, slot), item: char.equipped[slot] };
@@ -2954,6 +2970,7 @@ export const BURIED_BREAK_GRACE = 5;
 function isBuriedSlotDepleted(char, slot) {
   const it = char?.equipped?.[slot];
   if (!it || !BURIED_SKILLS[it.skillId]) return false;
+  if (isBuriedAutoSlot(slot)) return false; // 1.171.0 — 자동 슬롯은 횟수 제한이 없어 소진·파손 대상이 아니다
   return (it.usesSpent || 0) > 0 && buriedSkillUsesLeft(char, slot) <= 0;
 }
 export function tickBuriedGearBreak(char) {

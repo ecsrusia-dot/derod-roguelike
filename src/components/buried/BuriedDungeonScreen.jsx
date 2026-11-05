@@ -17,7 +17,7 @@ import {
   BURIED_ROOMS, BURIED_SLOT_IDS, BURIED_ROOM_COLORS,
   BURIED_ALTAR_BOONS, buriedBoonCost, buriedShopRerollCost,
   buriedKeystoneFx,
-  rechargeBuriedSlot, rechargeBuriedRandomSlot, buriedSkillUsesLeft, buriedSkillMaxUses, BURIED_SKILLS,
+  rechargeBuriedSlot, rechargeBuriedRandomSlot, buriedSkillUsesLeft, buriedSkillMaxUses, BURIED_SKILLS, isBuriedAutoSlot,
   BURIED_POTION_HEAL_PCT, buriedPotionPrice, BURIED_SKILL_MAX_LV,
   buriedDerived, buriedExpToNext,
   getBuriedClass, getBuriedTier, getBuriedDungeon, buriedMonsterLevel,
@@ -605,7 +605,7 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onLogEvent, on
               <div className="space-y-1 px-3 py-2.5"
                 style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panel, border: `1px solid ${PALETTE.ice}55` }}>
                 <div className="text-[12px] font-bold" style={{ color: PALETTE.ice }}>🔧 만충할 장비 1개를 지정하라</div>
-                {BURIED_SLOT_IDS.filter(s => (char.equipped?.[s]?.usesSpent || 0) > 0).map(s => {
+                {BURIED_SLOT_IDS.filter(s => !isBuriedAutoSlot(s) && (char.equipped?.[s]?.usesSpent || 0) > 0).map(s => {
                   const it = char.equipped[s];
                   const left = buriedSkillUsesLeft(char, s);
                   const max = buriedSkillMaxUses(BURIED_SKILLS[it.skillId], buriedSkillLv(char, it.skillId));
