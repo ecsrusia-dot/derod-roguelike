@@ -2015,6 +2015,27 @@ export const BURIED_ROOMS = {
   boss:     { id: 'boss',     name: '봉인의 문',  icon: '👑', color: '#e8b04a', desc: '보스가 기다린다.', weight: 0 },
 };
 
+// 🚪 무작위 방 공개 (1.173.0, PM 지시 「방은 고르지 않고 랜덤으로, 이벤트 결과만 고른다」)
+// 층마다 굴린 후보(offers) 중 하나가 문을 열 때 무작위로 정해진다. 전투 방은 최소 BURIED_DOOR_BATTLE_PCT%
+// (성장이 멈추지 않도록 — 예전 「최소 1칸은 전투」 규칙의 확률판). 나머지는 남은 후보 중 균등.
+// 「다른 문 찾기」(리롤): 미궁 기믹 갈림길 +1 / 길잡이 특성·미궁의 실타래 유니크 +1 — 층마다 다시 채워진다.
+export const BURIED_DOOR_BATTLE_PCT = 45;
+export function buriedDoorRerolls(char) {
+  const dg = getBuriedDungeon(char?.dungeonId);
+  return (dg.gimmick?.id === 'maze' ? 1 : 0)
+    + ((hasBuriedUnique(char, 'dl1') || hasBuriedTrait(char, 'pathfinder')) ? 1 : 0);
+}
+// 후보 인덱스 하나를 고른다 (exclude: 이미 공개됐던 인덱스). 낙하 구멍(chute)은 선택형이라 제외.
+// Math.random — 이벤트 핸들러에서만 호출할 것
+export function pickBuriedDoor(offers = [], exclude = []) {
+  const idx = offers.map((o, i) => i).filter(i => offers[i].type !== 'chute' && !exclude.includes(i));
+  if (idx.length === 0) return -1;
+  const battles = idx.filter(i => offers[i].type === 'battle');
+  const others = idx.filter(i => offers[i].type !== 'battle');
+  if (battles.length > 0 && (others.length === 0 || Math.random() * 100 < BURIED_DOOR_BATTLE_PCT)) return battles[0];
+  return others[Math.floor(Math.random() * others.length)];
+}
+
 // 이번 층에서 고를 방 2~3개. 각 방에는 던전 난이도에 따라 **방 효과**가 붙는다.
 export function rollBuriedOffers(floor, dungeonId = 'labyrinth', extraOffers = 0) {
   const dg = getBuriedDungeon(dungeonId);
@@ -2708,7 +2729,7 @@ export const BURIED_TRAITS = {
   sanguine:     { id: 'sanguine',     name: '흡혈 기질', fx: { drainPct: 6 }, desc: '주는 피해의 6%만큼 HP를 회복한다.' },
   // 1.109.0 — 조우 해금 직업 전용
   // 1.116.0 — 던전 심층 직업 전용
-  pathfinder: { id: 'pathfinder', name: '길잡이',     exclusive: 'mazewarden', trigger: true, desc: '전투를 SP +25%로 시작하고, 층을 오를 때 방 선택지가 1개 더 늘어난다.' },
+  pathfinder: { id: 'pathfinder', name: '길잡이',     exclusive: 'mazewarden', trigger: true, desc: '전투를 SP +25%로 시작하고, 층마다 「다른 문 찾기」 +1회.' },
   pestilence: { id: 'pestilence', name: '역병',       exclusive: 'plaguedoc',  trigger: true, desc: '내가 거는 모든 상태이상의 스택이 +1 된다.' },
   freefall:   { id: 'freefall',   name: '자유낙하',   exclusive: 'chasmrager', trigger: true, desc: '잃은 HP 1%당 주는 피해 +0.4% (최대 +32%).' },
   voidsight:  { id: 'voidsight',  name: '공허시',     exclusive: 'voidwalker', trigger: true, desc: '어둠 속에서도 적의 수치가 보이고, 매 전투 첫 공격의 피해 +50%.' },
@@ -3138,7 +3159,7 @@ export const BURIED_DUNGEONS = [
     unlock: null,
     desc: '열 개의 층. 바닥에는 먼저 내려간 자들의 유산이 쌓여 있다.',
     // 1.114.0 — 던전 고유 기믹 (난이도가 아닌 정체성 축)
-    gimmick: { id: 'maze', name: '갈림길', icon: '🌀', desc: '길이 여럿으로 갈라진다 — 방 선택지가 항상 3~4개. 고르는 자에게 유리한 던전.' },
+    gimmick: { id: 'maze', name: '갈림길', icon: '🌀', desc: '길이 여럿으로 갈라진다 — 층마다 「다른 문 찾기」 1회. 공개된 방이 마음에 들지 않으면 한 번 다시 굴릴 수 있다.' },
   },
   {
     id: 'ruins', name: '침몰한 폐허', sub: 'The Sunken Ruins', color: '#7a9a5e',
@@ -3508,7 +3529,7 @@ export const BURIED_UNIQUES = [
   // ===== 던전 전용 유니크 16종 (1.115.0) — 그 던전의 **심층 보스**(정복 층 이후)만 떨어뜨린다 =====
   // 각 던전의 기믹 정체성을 강화하는 방향으로 설계 (PM 결정: 공략 요소)
   // 🌀 미궁 — 선택·탐험
-  UQ({ id: 'dl1', dungeon: 'labyrinth', name: '미궁의 실타래',   slot: 'acc',    skillId: 'lifeCharm',   src: 0, desc: '[미궁 심층] 층을 오를 때 방 선택지가 1개 더 늘어난다.' }),
+  UQ({ id: 'dl1', dungeon: 'labyrinth', name: '미궁의 실타래',   slot: 'acc',    skillId: 'lifeCharm',   src: 0, desc: '[미궁 심층] 층마다 「다른 문 찾기」 +1회 (공개된 방을 다시 굴린다).' }),
   UQ({ id: 'dl2', dungeon: 'labyrinth', name: '미로 걸음',       slot: 'helm',   skillId: 'focusMind',   src: 0, desc: '[미궁 심층] 층을 오를 때마다 다음 전투를 [재생] 3으로 시작한다.' }),
   UQ({ id: 'dl3', dungeon: 'labyrinth', name: '선택자의 낫',     slot: 'weapon', skillId: 'decapitate',  src: 0, desc: '[미궁 심층] 방 선택지가 3개 이상이던 층에서는 전투를 [격노] 2로 시작한다.' }),
   UQ({ id: 'dl4', dungeon: 'labyrinth', name: '유산 도굴사',     slot: 'offhand',skillId: 'vitalStab',    src: 0, desc: '[미궁 심층] 전투 승리 시 장비 드랍 확률 +20%p.' }),

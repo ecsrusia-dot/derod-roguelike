@@ -1007,6 +1007,7 @@ PM이 AskUserQuestion으로 확정한 설계. **던전앤파이터 모티브, "�
 | ④ | 스킬 구조 | **수동 2 + 자동 4** — 쿨다운 자동 순환(PM 결정: SP 무료·횟수 무제한). `BURIED_AUTO_POOLS`(투구 매 턴 / 갑옷 피격 후 / 장신구 공격 후) + 전투 `act(..., {auto:true})`가 신속 경로처럼 턴 미소모. 발동은 turnNo effect가 내 턴 시작에 슬롯 순서대로 1개씩 | ✅ 1.171.0 |
 | ③ | 내구도 | **전투당 D8/C5/B3/A2회** (`BURIED_SKILL_USES`, 매 전투 리셋 — 전투 `spentMap`만 차감, App은 `item.usesSpent` 누적 중단). 마모(`BURIED_WEAR_PCT`=0)·파손(`isBuriedSlotDepleted`=false) 폐지. 보급의 봉헌 = 다음 전투 +2, 야영 = +1 (`char.bonusUses`, 전투 승리 정산에서 0으로 소비) | ✅ 1.172.0 |
 | ①② | 추가 | 자동 전투+배속 / 획득 자동 규칙 / 빌드 시너지 태그 | ⏳ 다음 |
+| + | 방 무작위화 | PM 지시 「방은 랜덤, 이벤트 결과만 고른다」 — `pickBuriedDoor`(전투 최소 `BURIED_DOOR_BATTLE_PCT` 45%, 나머지 균등, chute 제외) + `char.door`{floor,idx,seen,rerolls}로 결과 고정. 미궁 기믹·길잡이·dl1은 「다른 문 찾기」(`buriedDoorRerolls`)로 전환 | ✅ 1.173.0 |
 
 ⚠️ 1.170.0 주의: `char.stats` 저장 구조는 그대로(해석만 변경). 새 포인트 지급처를 만들면 문구는 `buriedStatGainText(k, n)` 사용. 기본 공격 물리/마법 판정은 동률 시 `att.mainMag`(직업 주 속성).
 
