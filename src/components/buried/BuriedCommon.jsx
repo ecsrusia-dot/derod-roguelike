@@ -36,11 +36,12 @@ export const slotMeta = (slotId) => BURIED_SLOTS.find(s => s.id === slotId) || {
 // 비공격 스킬(방어·회복·버프)은 '보조'로 표기해 스탯 무관임을 명시한다.
 // 색은 BURIED_STATS의 스탯 색과 동일 — 능력치 배분 화면과 1:1로 이어진다.
 const SKILL_KIND = {
-  str: { label: '물리', icon: '💪', color: '#c4453d', refs: '완력' },
-  dex: { label: '기교', icon: '🎯', color: '#7a9a5e', refs: '기교' },
-  int: { label: '마법', icon: '📖', color: '#5c4a8c', refs: '지혜' },
-  // 1.118.1 — stat 미지정 공격(기본 공격): 물리·기교·마법 중 **최고 공격력**을 따른다 (1.117.0 로직 변경분 표시 반영)
-  any:  { label: '자유', icon: '✦', color: '#c9a86a', refs: '최고 공격 스탯' },
+  // 1.170.0 — 공격력 통합: 물리(완력·기교)/마법(지혜)은 % 보정 유형만 다르고 같은 공격력을 쓴다
+  str: { label: '물리', icon: '💪', color: '#c4453d', refs: '물리' },
+  dex: { label: '물리', icon: '🎯', color: '#7a9a5e', refs: '물리' },
+  int: { label: '마법', icon: '📖', color: '#5c4a8c', refs: '마법' },
+  // 1.118.1 — stat 미지정 공격(기본 공격): 물리·마법 중 큰 쪽
+  any:  { label: '자유', icon: '✦', color: '#c9a86a', refs: '물리·마법 중 큰' },
   none: { label: '보조', icon: '◈', color: '#9b8975', refs: null },
   // 1.136.1 — ⚡ 신속 스킬(턴 미소모)은 '보조' 대신 전용 배지로 한눈에 구분
   swift: { label: '신속', icon: '⚡', color: '#e8c8a0', refs: null },
@@ -64,7 +65,7 @@ export function SkillKindBadge({ skill }) {
 }
 
 const STAT_LABEL = {
-  atk: '공격력', mag: '마력', def: '방어력', hp: '최대 HP', sp: '최대 SP',
+  atk: '공격력', mag: '공격력', def: '방어력', hp: '최대 HP', sp: '최대 SP',
   crit: '치명 확률', critDmg: '치명 피해', dodge: '회피율', spRegen: 'SP 회복',
   str: '완력', dex: '기교', int: '지혜', vit: '체력',
   barrier: '🔷 보호막', chase: '추격 피해',
@@ -318,7 +319,7 @@ export function BuriedItemSheet({ item, compare, onEquip, onUnequip, onDismantle
             </div>
             <div className="text-[11px] mt-0.5 tabular-nums" style={{ color: PALETTE.ice }}>
               SP {skill.sp}{skill.cd > 0 ? ` · 쿨다운 ${skill.cd}턴` : ' · 쿨다운 없음'}
-              {skill.power ? ` · 위력 ${skill.power}%${skill.hits ? ` ×${skill.hits}` : ''}${dmgPv ? ` ≈ ${dmgPv.hits > 1 ? `${dmgPv.per}×${dmgPv.hits} = ` : ''}${dmgPv.total} 피해` : ''} (${skill.stat ? `${skillKindMeta(skill).refs} 기반 ${skillKindMeta(skill).label} 공격력 참조` : '물리·기교·마법 중 최고 공격력 참조'})` : ' · 스탯 무관 (보조 스킬)'}
+              {skill.power ? ` · 위력 ${skill.power}%${skill.hits ? ` ×${skill.hits}` : ''}${dmgPv ? ` ≈ ${dmgPv.hits > 1 ? `${dmgPv.per}×${dmgPv.hits} = ` : ''}${dmgPv.total} 피해` : ''} (${skill.stat ? `공격력 참조 · ${skillKindMeta(skill).label} % 보정 적용` : '공격력 참조 · 물리·마법 중 큰 쪽'})` : ' · 스탯 무관 (보조 스킬)'}
               {skill.pierce ? ' · 완전 관통' : ''}{effSkill?.defPierce ? ' · 방어 관통' : ''}{effSkill?.barrierPierce ? ' · 보호막 관통' : ''}
               {effSkill?.decayPct ? <span style={{ color: PALETTE.accent }}> · ⚙ 위력 감쇠 -{effSkill.decayPct}% — 장비 Lv.{item.floor || 1}이(가) 마물 레벨보다 낡았다</span> : null}
             </div>
