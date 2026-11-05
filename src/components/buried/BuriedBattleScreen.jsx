@@ -1380,7 +1380,8 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
             const spCost = Math.round(eff.sp * (1 + (env.self.spCostPct || 0) / 100));
             const noSp = spCost > player.sp;
             // 1.132.0 — 사용 횟수: 잔여 0이면 봉인 (새 장비를 주워야 다시 쓴다)
-            const usesLeft = buriedItemMaxUses(item, skill, lv) - (item.usesSpent || 0) - (spentMap[slot] || 0); // 1.162.0 — 🛠 마모 반영
+            // 1.172.0 — 전투당 횟수: 최대치 + 다음 전투 보너스(봉헌·야영) - 이번 전투 사용량 (item.usesSpent는 무시)
+            const usesLeft = buriedItemMaxUses(item, skill, lv) + (char.bonusUses || 0) - (spentMap[slot] || 0);
             const sealed = usesLeft <= 0;
             // 1.144.1 — 현재(버프 포함) 공격력 기준 예상 데미지 (적 방어 적용 전)
             const pvBase = eff.power ? ({ str: player.atk, dex: player.fin, int: player.mag }[eff.stat] ?? Math.max(player.atk, player.fin, player.mag)) : 0;
@@ -1417,7 +1418,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
                   <span className="truncate">{eff.name}{lv > 1 && <span style={{ color: PALETTE.legendary }}> Lv.{lv}</span>}</span>
                 </div>
                 <div className="text-[11px] tabular-nums truncate" style={{ color: sealed ? PALETTE.accent : noSp ? PALETTE.accent : PALETTE.ice }}>
-                  {sealed ? '⛓ 봉인 — 새 장비 필요' : `SP ${spCost}${cd > 0 ? ` · 쿨 ${cd}` : ''}${eff.power ? ` · ${eff.power}%${eff.hits ? `×${eff.hits}` : ''} ≈${pvDmg}` : ''}${eff.decayPct ? ` · ⚙감쇠 -${eff.decayPct}%` : ''}${eff.swift ? (swiftUsedThisTurn ? ' · ⚡사용됨' : ' · ⚡신속') : ''} · 횟수 ${usesLeft}`}
+                  {sealed ? '⛓ 이번 전투 소진 — 다음 전투에 회복' : `SP ${spCost}${cd > 0 ? ` · 쿨 ${cd}` : ''}${eff.power ? ` · ${eff.power}%${eff.hits ? `×${eff.hits}` : ''} ≈${pvDmg}` : ''}${eff.decayPct ? ` · ⚙감쇠 -${eff.decayPct}%` : ''}${eff.swift ? (swiftUsedThisTurn ? ' · ⚡사용됨' : ' · ⚡신속') : ''} · 횟수 ${usesLeft}`}
                 </div>
                 <div className="text-[11px] truncate" style={{ color: PALETTE.textDim }}>{slotMeta(slot).icon} {eff.desc}</div>
               </button>

@@ -678,18 +678,16 @@ export default function App() {
       for (const [r, n] of Object.entries(res.talismansSpent)) t[r] = Math.max(0, (t[r] || 0) - n);
       c = { ...c, talismans: t };
     }
-    // 1.132.0 — 전투에서 쓴 스킬 사용 횟수 정산 (소진 시 봉인 — 새 장비를 주워야 해제)
+    // 1.172.0 — 전투당 사용 횟수: 장비에 누적하지 않는다 (매 전투 리셋). 주 사용 스킬 집계만 남긴다
     if (res.usesSpent && Object.keys(res.usesSpent).length > 0) {
-      const eq = { ...c.equipped };
       const usage = { ...(c.skillUsage || {}) }; // 1.154.0 — 주 사용 스킬 집계 (런 기록·랭킹 상세용)
       for (const [slot, n] of Object.entries(res.usesSpent)) {
-        if (eq[slot]) {
-          eq[slot] = { ...eq[slot], usesSpent: (eq[slot].usesSpent || 0) + n };
-          if (eq[slot].skillId) usage[eq[slot].skillId] = (usage[eq[slot].skillId] || 0) + n;
-        }
+        const sid = c.equipped?.[slot]?.skillId;
+        if (sid) usage[sid] = (usage[sid] || 0) + n;
       }
-      c = { ...c, equipped: eq, skillUsage: usage };
+      c = { ...c, skillUsage: usage };
     }
+    if (c.bonusUses) c = { ...c, bonusUses: 0 }; // 봉헌·야영의 사용 횟수 보너스는 한 전투로 소비
     // [u36] 비전 — 처치마다 모든 공격력 누적 (런 영구). 1.133.0 %화: researchPct(+0.5%/처치), 구세이브 researchPower(고정치)도 계속 정산
     if (res.research) c = { ...c, researchPower: (c.researchPower || 0) + res.research };
     if (res.researchPct) c = { ...c, researchPct: (c.researchPct || 0) + res.researchPct };
