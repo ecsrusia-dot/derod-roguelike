@@ -13,7 +13,7 @@ import {
   buriedItemRunes, buriedItemSockets,
   buriedDerived, buriedDustValue, getBuriedClass,
   buriedTraitIds, getBuriedTrait, buriedSkillLv, BURIED_QUALITY_COLORS,
-  getBuriedRune, BURIED_RUNE_RARITIES, socketBuriedRune, buriedSkillUsesLeft, buriedBreakIn,
+  getBuriedRune, BURIED_RUNE_RARITIES, socketBuriedRune, buriedSkillUsesLeft, buriedBreakIn, isBuriedAutoSlot,
   buriedDamageFormula, buriedRunewordProgress, getBuriedRace, getBuriedOrigin,
   BURIED_RUNE_FUSION, buriedFusionInfo, fuseBuriedRunes,
   buriedRunePouchGroups, buriedRunewordFitCheck, applyBuriedRuneword, BURIED_RUNEWORDS,
@@ -307,6 +307,7 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose, readOn
                       </div>
                       <div className="text-[11px]" style={{ color: BURIED_QUALITY_COLORS[q] }}>품질 {q}</div>
                       {(() => { // 1.132.0 — 스킬 사용 횟수 / 1.134.0 — 파손 카운트다운
+                        if (isBuriedAutoSlot(s.id)) return <div className="text-[11px]" style={{ color: PALETTE.ice }}>⟳ 자동</div>; // 1.171.0
                         const left = buriedSkillUsesLeft(char, s.id);
                         const brk = left <= 0 ? buriedBreakIn(char, s.id) : null;
                         return (

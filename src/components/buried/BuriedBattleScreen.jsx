@@ -31,7 +31,7 @@ import {
   BURIED_SIGILS, buriedZoneAt,
   BURIED_GHOST_RANKS, getBuriedGhost, buriedGhostForEnemy, buriedGhostKit, buriedTameChance,
   buriedItemRunes, buriedRunewordCharFx,
-  buriedMonsterLevel, applyBuriedGearDecay, buriedMainAttr,
+  buriedMonsterLevel, applyBuriedGearDecay, buriedMainAttr, isBuriedAutoSlot, buriedAutoInfo,
 } from '../../data.js';
 import { BuriedBar, BuriedStatusRow, BuriedItemCard, slotMeta, SkillKindBadge, BuriedInfoModal } from './BuriedCommon.jsx';
 
@@ -230,6 +230,9 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
   const [floats, setFloats] = useState([]);
   const [potionUsedThisTurn, setPotionUsedThisTurn] = useState(false);
   const [swiftUsedThisTurn, setSwiftUsedThisTurn] = useState(false); // 1.136.0 — ⚡ 신속 (턴당 1회)
+  // ⟳ 자동 발동 (1.171.0) — turnNo: 라운드 종료마다 +1 / autoRef: 슬롯별 조건 플래그 + 이번 턴 발동 기록
+  const [turnNo, setTurnNo] = useState(1);
+  const autoRef = useRef({ hit: false, attacked: false, fired: {} });
   const [spentMap, setSpentMap] = useState({}); // 1.132.0 — 이번 전투에서 슬롯별 스킬 사용 횟수
   const spentMapRef = useRef({});
   // 🕯 괴이 사역 (1.144.0)
@@ -432,9 +435,10 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
   };
 
   // ===== 라운드 진행 =====
-  const act = async (kind, payload, slotUsed = null) => {
+  const act = async (kind, payload, slotUsed = null, opts = {}) => {
     if (busy || result) return;
-    if (kind === 'skill' && slotUsed && !uq('u77')) setSpentMap(m => ({ ...m, [slotUsed]: (m[slotUsed] || 0) + 1 })); // 1.132.0 — 횟수 차감 ([u77] 공허는 미소모)
+    const isAuto = !!opts.auto; // ⟳ 자동 발동 (1.171.0) — SP·횟수 무료, 턴 미소모
+    if (kind === 'skill' && slotUsed && !isAuto && !uq('u77')) setSpentMap(m => ({ ...m, [slotUsed]: (m[slotUsed] || 0) + 1 })); // 1.132.0 — 횟수 차감 ([u77] 공허는 미소모)
     setBusy(true);
     let P = { ...player, statuses: { ...player.statuses }, cds: { ...player.cds } };
     let E = { ...foe, statuses: { ...foe.statuses } };
@@ -476,9 +480,11 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
       pushLog('🌀 혼란에 빠져 허우적거렸다 — 행동 실패!', '#c48bd4');
       skill = null;
     }
+    // ⟳ 자동 발동 조건 플래그 — 수동 행동만 기록 (장신구: 직전 내 행동이 공격이었나)
+    if (!isAuto && kind !== 'skip') autoRef.current.attacked = !!(skill && skill.power);
     if (skill) {
-      // 「봉인의 방」은 SP 소모를 올린다
-      const spCost = Math.round(skill.sp * (1 + (env.self.spCostPct || 0) / 100));
+      // 「봉인의 방」은 SP 소모를 올린다 (⟳ 자동 발동은 SP 무료 — PM 결정)
+      const spCost = isAuto ? 0 : Math.round(skill.sp * (1 + (env.self.spCostPct || 0) / 100));
       if (spCost > P.sp) { setBusy(false); return; }
       P.sp -= spCost;
       // [u65] 폭풍우 — 30% 확률 쿨다운 미등록
@@ -486,7 +492,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
         if (uq('u65') && Math.random() < 0.3) pushLog('폭풍우 — 쿨다운이 일지 않는다.', PALETTE.ice);
         else P.cds[skill.id] = skill.cd + 1; // 이번 턴 종료 시 1 감소하므로 +1
       }
-      pushLog(`▶ ${skill.name}${skill.lv > 1 ? ` Lv.${skill.lv}` : ''}`, PALETTE.dawn);
+      pushLog(`${isAuto ? `⟳ 자동 · ${opts.autoLabel || ''} — ` : '▶ '}${skill.name}${skill.lv > 1 ? ` Lv.${skill.lv}` : ''}`, isAuto ? PALETTE.ice : PALETTE.dawn);
       // [u68] 끝없이 깊은 물 — 쿨 2 이상 스킬 사용 시 최대 HP 12% 회복
       if (uq('u68') && (skill.cd || 0) >= 2) {
         const h = applyHeal(P, Math.round(P.maxHp * 0.12));
@@ -753,6 +759,9 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     if (E.hp <= 0 && !eliteRevive(E)) { pushLog(`${E.name} 격파!`, PALETTE.legendary); setFoe({ ...E, hp: 0 }); finish(true, P.hp); setBusy(false); return; }
     if (P.hp <= 0) { finish(false, 0); setBusy(false); return; }
 
+    // ---------- ⟳ 자동 발동 (1.171.0) — 턴을 소모하지 않는다 (혼란 실패여도 마찬가지 — 수동 행동은 그대로 남는다) ----------
+    if (isAuto) { setBusy(false); return; }
+
     // ---------- ⚡ 신속 (1.136.0) — 순수 버프·디버프는 턴을 소모하지 않는다 (턴당 1회) ----------
     // [혼란]으로 행동이 실패하면(skill=null) 신속이라도 턴을 날린다 — 혼란의 정의 그대로.
     if (kind === 'skill' && skill && skill.swift && !swiftUsedThisTurn) {
@@ -804,6 +813,7 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     }
 
     // ---------- 2. 적 행동 ----------
+    const hpBeforeEnemy = P.hp + (P.barrier || 0); // ⟳ 갑옷 자동 발동 조건 — 이번 적 턴에 피해를 받았나
     if ((E.statuses.stun || 0) > 0) {
       pushLog(`${E.name}은(는) 기절해 움직이지 못한다.`, PALETTE.shock);
       await wait(420);
@@ -1095,6 +1105,8 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     setPlayer(P); setFoe(E);
     setPotionUsedThisTurn(false);
     setSwiftUsedThisTurn(false);
+    autoRef.current = { ...autoRef.current, hit: (P.hp + (P.barrier || 0)) < hpBeforeEnemy, fired: {} };
+    setTurnNo(t => t + 1);
     await wait(260);
 
     if (E.hp <= 0 && !eliteRevive(E)) { pushLog(`${E.name} 격파!`, PALETTE.legendary); setFoe({ ...E, hp: 0 }); finish(true, P.hp); setBusy(false); return; }
@@ -1137,6 +1149,36 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
     : getEnemyImageSrc(enemy.img.key, { chapter: enemy.img.chapter }, 'combat');
   const silenced = (player.statuses.silence || 0) > 0;
   const stunned = (player.statuses.stun || 0) > 0;
+
+  // 장착 스킬의 실효치 (레벨·접두어·룬·유니크·감쇠·쐐기석 반영) — 버튼 표시와 자동 발동이 같은 값을 쓴다
+  const effSkillFor = (item, skill) => {
+    const lv = Math.min(8, buriedSkillLv(char, skill.id) + (uq('u71') ? 1 : 0)); // [u71] 후손
+    const eff0 = applyBuriedGearDecay(applyUniqueSkillMods(buriedModdedSkill(buriedSkillAt(skill, lv), item.mod, buriedItemRunes(item))), item, monLevel);
+    const eff = kf.cdAdd && !uq('u74') ? { ...eff0, cd: (eff0.cd || 0) + kf.cdAdd } : eff0; // ⚓ 정체의 쐐기 ([u74] 금줄이 무시)
+    return { lv, eff };
+  };
+  // ⟳ 자동 발동 (1.171.0) — 내 턴이 열릴 때마다 조건을 만족한 자동 슬롯을 하나씩 순서대로 발동 (투구 → 갑옷 → 장신구)
+  const autoReady = (slot, eff) => {
+    const info = buriedAutoInfo(slot);
+    if (!info || (player.cds[eff.id] || 0) > 0 || autoRef.current.fired[slot]) return false;
+    if (info.trigger === 'struck') return autoRef.current.hit;
+    if (info.trigger === 'afterAttack') return autoRef.current.attacked;
+    return true;
+  };
+  useEffect(() => {
+    if (busy || result || stunned || silenced || foe.hp <= 0 || player.hp <= 0) return;
+    const order = ['helm', 'armor', 'acc1', 'acc2'];
+    for (const slot of order) {
+      const row = equipped.find(x => x.slot === slot);
+      if (!row) continue;
+      const { eff } = effSkillFor(row.item, row.skill);
+      if (!autoReady(slot, eff)) continue;
+      autoRef.current = { ...autoRef.current, fired: { ...autoRef.current.fired, [slot]: true } };
+      act('skill', eff, slot, { auto: true, autoLabel: buriedAutoInfo(slot).label }).catch(() => {});
+      return;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [turnNo, busy, result, stunned]);
 
   useEffect(() => {
     if (stunned && !busy && !result) {
@@ -1331,10 +1373,9 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
 
           {/* 장착 장비 6칸 = 스킬 6개 (스킬 레벨 반영) */}
           {equipped.map(({ slot, item, skill }) => {
-            const lv = Math.min(8, buriedSkillLv(char, skill.id) + (uq('u71') ? 1 : 0)); // [u71] 후손
-            // 1.160.0 — ⚙ 장비 레벨 감쇠: 발동 장비가 마물 레벨보다 낡으면 위력이 깎인다 (마지막에 씌운다)
-            const eff0 = applyBuriedGearDecay(applyUniqueSkillMods(buriedModdedSkill(buriedSkillAt(skill, lv), item.mod, buriedItemRunes(item))), item, monLevel);
-            const eff = kf.cdAdd && !uq('u74') ? { ...eff0, cd: (eff0.cd || 0) + kf.cdAdd } : eff0; // ⚓ 정체의 쐐기 ([u74] 금줄이 무시)
+            // 1.160.0 — ⚙ 장비 레벨 감쇠 등 실효치는 effSkillFor 한 곳 (자동 발동과 공유)
+            const { lv, eff } = effSkillFor(item, skill);
+            const auto = buriedAutoInfo(slot); // ⟳ 1.171.0 — 자동 슬롯은 버튼 대신 상태 표시
             const cd = player.cds[eff.id] || 0;
             const spCost = Math.round(eff.sp * (1 + (env.self.spCostPct || 0) / 100));
             const noSp = spCost > player.sp;
@@ -1346,6 +1387,26 @@ export default function BuriedBattleScreen({ char, enemy, roomType, roomEffectId
             const pvDmg = eff.power ? Math.max(1, Math.round(pvBase * eff.power / 100)) * Math.max(1, eff.hits || 1) : 0;
             const off = busy || !!result || cd > 0 || noSp || silenced || sealed;
             const tier = getBuriedTier(item.tier);
+            if (auto) {
+              // ⟳ 자동 슬롯 — 누를 수 없다. 길게 눌러 상세는 그대로
+              const waiting = auto.trigger === 'struck' ? !autoRef.current.hit : auto.trigger === 'afterAttack' ? !autoRef.current.attacked : false;
+              const state = silenced ? '침묵 — 정지' : cd > 0 ? `쿨 ${cd}` : waiting ? '조건 대기' : '준비됨';
+              return (
+                <div key={slot} role="button" tabIndex={0}
+                  onClick={() => setDetail({ item, skill: eff, slot, lv })}
+                  onContextMenu={(e) => { e.preventDefault(); setDetail({ item, skill: eff, slot, lv }); }}
+                  className="px-2.5 py-1.5 text-left"
+                  style={{ borderRadius: 'var(--r-btn, 13px)', background: `${PALETTE.ice}0d`, border: `1px dashed ${tier.color}88`, opacity: cd > 0 || silenced ? 0.6 : 1 }}>
+                  <div className="text-[12px] font-bold truncate flex items-center gap-1" style={{ color: tier.color }}>
+                    <span className="shrink-0" style={{ color: PALETTE.ice }}>⟳</span>
+                    <span className="truncate">{eff.name}{lv > 1 && <span style={{ color: PALETTE.legendary }}> Lv.{lv}</span>}</span>
+                  </div>
+                  <div className="text-[11px] tabular-nums truncate" style={{ color: cd > 0 || silenced ? PALETTE.textDim : PALETTE.ice }}>
+                    자동 · {auto.label} · {state}{eff.power ? ` · ≈${pvDmg}` : ''}
+                  </div>
+                </div>
+              );
+            }
             return (
               <button key={slot} onClick={() => act('skill', eff, slot)} disabled={off}
                 onContextMenu={(e) => { e.preventDefault(); setDetail({ item, skill: eff, slot, lv }); }}
