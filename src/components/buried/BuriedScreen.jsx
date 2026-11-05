@@ -1081,6 +1081,12 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
                       <div key={h.no} className="text-[11px] tabular-nums" style={{ color: PALETTE.textDim }}>
                         시즌 {h.no} — 챔피언 <span style={{ color: PALETTE.legendary }}>{h.champion?.name || '?'}</span> {h.champion?.floor || '?'}층
                         {h.myBest ? ` · 내 최고 ${h.myBest.rank}위` : ''}
+                        {/* 1.177.0 — 받은 결산 보상도 기록에 남긴다 (PM 지적: 보상이 사라진 것처럼 보였다) */}
+                        {h.granted && (h.granted.dust > 0 || h.granted.shards > 0 || (h.granted.notes || []).length > 0) && (
+                          <div className="pl-2" style={{ color: PALETTE.green }}>
+                            🎁 {[h.granted.dust > 0 ? `🕯${h.granted.dust}` : null, h.granted.shards > 0 ? `☠${h.granted.shards}` : null, ...(h.granted.notes || [])].filter(Boolean).join(' · ')}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
