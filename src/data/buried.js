@@ -4952,8 +4952,56 @@ export function rollBuriedContract(ownedIds, unionRep = {}) {
 }
 // 지참 중인 계약의 fx 합산 — 전투·던전·파생 스탯이 이 뭉치를 나눠 읽는다
 // 1.144.0 — 🕯 동행 괴이의 패시브도 같은 어휘로 여기에 합산 (파생·전투·보상 전 소비 지점 공짜)
+// =========================================================
+// 🔗 빌드 시너지 태그 (1.176.0, PM 결정 ①②) — 장비 선택에 수치 외의 이유를 준다
+// =========================================================
+// 태그는 스킬 데이터에서 **자동 판정** (신규 스킬도 규칙만 맞으면 자동 분류). 한 스킬이 여러 태그 가능.
+// 장착 6슬롯 중 같은 태그 2개 / 4개에서 보너스 (4개 단계는 2개 단계를 대체 — 누적 아님).
+// 보너스는 계약 fx 어휘(aggregateBuriedContracts)로 합산 → buriedDerived·전투가 그대로 소비 (전투 코드 0줄).
+const _has = (arr, ids) => (arr || []).some(a => ids.includes(a.s));
+export const BURIED_SYNERGY_TAGS = [
+  { id: 'venom', icon: '🩸', name: '맹독', color: '#7a9a5e', hint: '중독·출혈·화상·저주를 건다',
+    match: (k) => _has(k.apply, ['poison', 'bleed', 'burn', 'curse']),
+    tiers: { 2: { statusChance: 15 }, 4: { statusChance: 30, physPct: 5, magPct: 5 } } },
+  { id: 'ward', icon: '🛡', name: '수호', color: '#7ba3c4', hint: '수호·보호막·재생·방벽',
+    match: (k) => !!k.barrierGain || _has(k.self, ['guard', 'regen', 'wall']),
+    tiers: { 2: { takenPct: -6 }, 4: { takenPct: -12, barrierPct: 20 } } },
+  { id: 'fury', icon: '💢', name: '격노', color: '#c4453d', hint: '격노·치명 보너스·연타',
+    match: (k) => !!k.critBonus || (k.hits || 1) > 1 || _has(k.self, ['rage']),
+    tiers: { 2: { crit: 5 }, 4: { crit: 10, physPct: 8, magPct: 8 } } },
+  { id: 'hex', icon: '🌀', name: '교란', color: '#c48bd4', hint: '기절·속박·혼란·침묵·약화·파쇄·회피',
+    match: (k) => _has(k.apply, ['stun', 'bind', 'confuse', 'silence', 'weaken', 'shatter']) || _has(k.self, ['evade']),
+    tiers: { 2: { dodge: 4 }, 4: { dodge: 8, statusChance: 15 } } },
+  { id: 'life', icon: '💚', name: '생명', color: '#5fbf7f', hint: '회복·흡혈·재생',
+    match: (k) => !!(k.heal || k.healPct || k.drain) || _has(k.self, ['regen']),
+    tiers: { 2: { healPct: 20 }, 4: { healPct: 40, drainPct: 5 } } },
+];
+export const buriedSkillTags = (skill) => skill ? BURIED_SYNERGY_TAGS.filter(t => t.match(skill)).map(t => t.id) : [];
+export const getBuriedSynergyTag = (id) => BURIED_SYNERGY_TAGS.find(t => t.id === id) || null;
+// 장착 스킬 기준 태그 수 + 활성 단계 + 합산 fx
+export function buriedSynergy(char) {
+  const counts = {};
+  for (const { skill } of buriedEquippedSkills(char)) for (const id of buriedSkillTags(skill)) counts[id] = (counts[id] || 0) + 1;
+  const fx = {}; const active = [];
+  for (const t of BURIED_SYNERGY_TAGS) {
+    const n = counts[t.id] || 0;
+    const lv = n >= 4 ? 4 : n >= 2 ? 2 : 0;
+    if (!lv) continue;
+    active.push({ id: t.id, n, lv });
+    for (const [k, v] of Object.entries(t.tiers[lv])) fx[k] = (fx[k] || 0) + v;
+  }
+  return { counts, active, fx };
+}
+export function buriedSynergyFxText(fx) {
+  const L = { statusChance: ['상태이상 확률', '%'], physPct: ['물리 피해', '%'], magPct: ['마법 피해', '%'], takenPct: ['받는 피해', '%'],
+    barrierPct: ['보호막', '%'], crit: ['치명', '%p'], dodge: ['회피', '%p'], healPct: ['회복량', '%'], drainPct: ['흡혈', '%'] };
+  return Object.entries(fx).map(([k, v]) => `${L[k]?.[0] || k} ${v > 0 ? '+' : ''}${v}${L[k]?.[1] || ''}`).join(' · ');
+}
+
 export function aggregateBuriedContracts(char) {
   const out = {};
+  // 🔗 빌드 시너지 (1.176.0) — 장착 스킬 태그 보너스도 같은 bag으로 합산
+  for (const [k, v] of Object.entries(buriedSynergy(char).fx)) out[k] = (out[k] || 0) + v;
   if (char?.ghost?.id) {
     const g = getBuriedGhost(char.ghost.id);
     if (g) {
