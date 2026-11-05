@@ -172,13 +172,13 @@ import {
   checkBuriedDepthClassUnlock,
   BURIED_UNION_REP_GAIN, getBuriedUnion,
   BURIED_SIGILS, rollBuriedUniqueItem, buriedMonsterLevel, buriedLootPower, buriedDerived,
-  BURIED_GHOST_RANKS, getBuriedGhost, rollBuriedTalisman,
+  BURIED_GHOST_RANKS, getBuriedGhost, rollBuriedTalisman, pickRandomBuriedGhost,
   buriedRivalNews, buriedRivalStatGain, BURIED_STATS, buriedRivalRanking, buriedStatGainText,
   applyBuriedBalance, resetBuriedBalance, BURIED_BALANCE_DEFAULTS,
 } from './data.js';
 import { getKstDateKey } from './utils/dailyChallenge.js';
 import { simulateBestEndlessRun } from './utils/endlessSkipSim.js';
-import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, applyEngravingSlot, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear, dismantleRaidItem, dismantleRaidJunk, enhanceRaidItem, claimRaidWeekly, addRaidResources, spendRaidResourcesForItem, resolveRaidSecret, toggleRaidFormation, appendAutoRunLog, getGambleUsed, useGambleEntry, addTwilightCoins, addFateShards, redeemFateShards, buyGambleShopItem, addClassTitle, equipClassTitle, saveHofPatterns, hofLevelUpChar, recordHofClear, recordMastersClearByClass, updateBestRunTime, getExo, getBuried, saveBuriedChar, startBuriedChar, recordBuriedDeath, resetBuried, recordBuriedClear, addBuriedDust, craftBuriedForgeItem, trackBuriedKill, buyBuriedContract, addBuriedShards, buyBuriedPart, detachBuriedParts, logBuriedEvent, addBuriedUnionRep, tameBuriedGhost, setBuriedCompanion, addBuriedRivalStat, addBuriedRivalWin, checkBuriedSeason, setBuriedSeasonDays, setBuriedBalance, clearBuriedBalance } from './storage.js';
+import { loadMeta, saveMeta, addSouls, applyUpgrade, applyUnlock, recordExpeditionClear, needsAltarRefresh, getNextRefreshTime, checkAndResetDaily, claimAchievement, getAchievementState, incrementAchievement, setAchievementProgress, completeAchievement, recordChampionshipClear, hasChampionshipClear, isChampionshipDifficultyUnlocked, unlockChampionshipRelic, setLastSeenVersion, getAuthMode, setAuthMode, getDefaultMeta, clearLocalMeta, recordCodex, recordDailyClear, hasDailyCleared, saveActiveRun, clearActiveRun, clearEngravingMigrationNotice, recordChampionshipClearByClass, recordUltimatePickByClass, clearAwakeningConditionNotice, clearWandererRenameNotice, clearAltarRedesignNotice, applyEngravingSlot, trackDailyMission, getEndlessSkipUsed, useEndlessSkip, addRaidDrops, equipRaidItem, autoEquipRaidBest, recordRaidClear, dismantleRaidItem, dismantleRaidJunk, enhanceRaidItem, claimRaidWeekly, addRaidResources, spendRaidResourcesForItem, resolveRaidSecret, toggleRaidFormation, appendAutoRunLog, getGambleUsed, useGambleEntry, addTwilightCoins, addFateShards, redeemFateShards, buyGambleShopItem, addClassTitle, equipClassTitle, saveHofPatterns, hofLevelUpChar, recordHofClear, recordMastersClearByClass, updateBestRunTime, getExo, getBuried, saveBuriedChar, startBuriedChar, recordBuriedDeath, resetBuried, recordBuriedClear, addBuriedDust, craftBuriedForgeItem, trackBuriedKill, buyBuriedContract, addBuriedShards, buyBuriedPart, detachBuriedParts, logBuriedEvent, addBuriedUnionRep, tameBuriedGhost, setBuriedCompanion, addBuriedRivalStat, addBuriedRivalWin, checkBuriedSeason, setBuriedSeasonDays, setBuriedBalance, clearBuriedBalance, grantBuriedSeasonCompensation, BURIED_SEASON_COMP_FLAG } from './storage.js';
 
 
 
@@ -434,6 +434,8 @@ export default function App() {
       const rk = buriedRivalRanking(dg.id, b.rivalTicks || 0, {
         gen: b.rivalGen || 0,
         myRuns: (b.runLog || []).filter(e => e.dungeonId === dg.id),
+        // 1.177.0 — 진행 중인 런도 포함 (랭킹 화면과 같은 기준 — 살아서 1위여도 보상)
+        myLive: b.char && b.char.dungeonId === dg.id ? { floor: b.char.floor, classId: b.char.classId } : null,
         topN: 1,
       });
       perDungeon.push({ dungeonId: dg.id, myRank: rk.myRank });
@@ -464,6 +466,18 @@ export default function App() {
     if (r.opened || r.rolled) {
       setMeta(() => { saveMeta(r.meta); return r.meta; });
       if (r.rolled) buriedSeasonNotice(r);
+    }
+    // 1.177.0 — 1위 보상 누락 소급 (계정당 1회, 무덤의 유산을 한 번이라도 플레이한 계정)
+    const bc = meta?.buried || {};
+    if (!bc[BURIED_SEASON_COMP_FLAG] && ((bc.runs || 0) > 0 || (bc.seasonHistory || []).length > 0 || bc.char)) {
+      const gid = pickRandomBuriedGhost('indigo', bc.ghosts || {}); // 랜덤은 updater 밖에서
+      setMeta(prev => {
+        if (prev?.buried?.[BURIED_SEASON_COMP_FLAG]) return prev;
+        const next = grantBuriedSeasonCompensation(prev, gid);
+        saveMeta(next);
+        return next;
+      });
+      setBuriedForgeNotice(`🏆 시즌 1위 보상 누락 사과 보상 — 🕯600 · ☠15 + ${gid ? `남령급 괴이 「${getBuriedGhost(gid)?.name}」 사역` : '🕯800 (남령 전부 소장)'}. 이제 진행 중인 런도 시즌 결산 순위에 들어간다.`);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [screen]);

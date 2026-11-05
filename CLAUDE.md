@@ -1008,6 +1008,8 @@ PM이 AskUserQuestion으로 확정한 설계. **던전앤파이터 모티브, "�
 | ③ | 내구도 | **전투당 D8/C5/B3/A2회** (`BURIED_SKILL_USES`, 매 전투 리셋 — 전투 `spentMap`만 차감, App은 `item.usesSpent` 누적 중단). 마모(`BURIED_WEAR_PCT`=0)·파손(`isBuriedSlotDepleted`=false) 폐지. 보급의 봉헌 = 다음 전투 +2, 야영 = +1 (`char.bonusUses`, 전투 승리 정산에서 0으로 소비) | ✅ 1.172.0 |
 | ①② | 추가 | ✅ 자동 전투+배속 1.174.0 (전투 화면 `autoBattle`·`speed` localStorage, 모듈 `BATTLE_SPEED`가 wait 압축, 자동 행동은 자동 슬롯 발동 완료 후 380ms 타이머 — busy 변화 시 cleanup으로 이중 행동 방지) / ✅ 획득 자동 규칙 1.175.0 (`buriedLootAutoTrash` 순수 함수 + 던전 화면 effect, 유니크 제외, 설정 localStorage) / ✅ 빌드 시너지 태그 1.176.0 (`BURIED_SYNERGY_TAGS` 5종 — 스킬 데이터에서 match로 자동 판정, `buriedSynergy(char).fx`를 `aggregateBuriedContracts`에 병합 → 전투 코드 0줄. 보너스 키는 cf 소비 어휘만 사용) | ✅ 시리즈 완료 |
 
+⚠️ 1.176.1 시즌 결산: App `buildBuriedSeasonSummary`는 랭킹 화면과 **같은 입력**(myRuns + myLive)을 써야 한다 — 어긋나면 화면 순위 ≠ 보상 순위. 남령 보상은 `pickRandomBuriedGhost('indigo', owned)`. 사과 보상 플래그 `seasonComp1177`(계정당 1회).
+
 ⚠️ 1.175.0 교훈: `BuriedDungeonScreen`은 `if (!char) return null` 조기 반환이 있다 — **신규 훅은 반드시 그 위에** 두고, effect 안에서 char 확인 후에만 아래 함수를 호출할 것.
 | + | 방 무작위화 | PM 지시 「방은 랜덤, 이벤트 결과만 고른다」 — `pickBuriedDoor`(전투 최소 `BURIED_DOOR_BATTLE_PCT` 45%, 나머지 균등, chute 제외) + `char.door`{floor,idx,seen,rerolls}로 결과 고정. 미궁 기믹·길잡이·dl1은 「다른 문 찾기」(`buriedDoorRerolls`)로 전환 | ✅ 1.173.0 |
 | + | 방 자동 진입 | PM 지시 「2단계 번거롭다」 — 던전 화면 `autoEnter` effect(키 floor:steps, pendingLoot·재앙 게이지 시 정지)가 층 도착 즉시 진입. 리롤은 방 안 `rerollRoom`(door.fresh = 진입 직후 roomData JSON과 같을 때만). 재앙 거절은 `char.calamityDeclined = floor` | ✅ 1.173.1 |

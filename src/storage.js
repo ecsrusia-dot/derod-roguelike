@@ -5,7 +5,7 @@
 // 저장되는 것: 영혼, 강화 단계, 해금 항목, 클리어 기록
 // ============================================
 
-import { ENGRAVINGS, ENGRAVING_TIERS, ENEMIES, EVENTS, RELICS, PASSIVE_SKILLS, CODEX_DISCOVERY_REWARD, CODEX_COMPLETE_REWARD, backfillRaidSeries, FEATURE_FLAGS, addBuriedItemToChar, buriedDustValue as buriedDustValueOf, checkBuriedEncounterUnlock, buriedContractCap, BURIED_CONTRACT_COST, getBuriedUnionByDungeon, buriedUnionLevel, BURIED_UNION_REWARDS, buriedSeasonRewardFor, buriedSeasonMilestones } from './data.js';
+import { ENGRAVINGS, ENGRAVING_TIERS, ENEMIES, EVENTS, RELICS, PASSIVE_SKILLS, CODEX_DISCOVERY_REWARD, CODEX_COMPLETE_REWARD, backfillRaidSeries, FEATURE_FLAGS, addBuriedItemToChar, buriedDustValue as buriedDustValueOf, checkBuriedEncounterUnlock, buriedContractCap, BURIED_CONTRACT_COST, getBuriedUnionByDungeon, buriedUnionLevel, BURIED_UNION_REWARDS, buriedSeasonRewardFor, buriedSeasonMilestones, pickRandomBuriedGhost, getBuriedGhost } from './data.js';
 
 const DB_NAME = 'derod_meta';
 const DB_VERSION = 1;
@@ -1562,8 +1562,10 @@ function applyBuriedSeasonRewards(b, summary) {
       out = { ...out, unlockedClasses: [...(out.unlockedClasses || []), 'summiter'] }; notes.push('전 던전 입상 — 직업 「등정자」 개방!');
     }
     if (id === 'ms_unified') {
-      if (out.ghosts?.gh_tyrant) { out = { ...out, dust: out.dust + 800 }; notes.push('통합 랭킹 제패 — 폭군은 이미 사역 중, 🕯800으로 대체'); }
-      else { out = { ...out, ghosts: { ...out.ghosts, gh_tyrant: { breaks: 0 } } }; notes.push('통합 랭킹 제패 — 남령급 괴이 「무덤의 폭군」이 사역에 들어왔다!'); }
+      // 1.177.0 — PM 지시: 남령은 무작위 (폭군 고정 폐지). 미보유 남령 전부 소장 시 🕯800
+      const gid = pickRandomBuriedGhost('indigo', out.ghosts || {});
+      if (!gid) { out = { ...out, dust: out.dust + 800 }; notes.push('통합 랭킹 제패 — 남령을 모두 사역 중, 🕯800으로 대체'); }
+      else { out = { ...out, ghosts: { ...out.ghosts, [gid]: { breaks: 0 } } }; notes.push(`통합 랭킹 제패 — 남령급 괴이 「${getBuriedGhost(gid)?.name || gid}」이(가) 사역에 들어왔다!`); }
     }
   }
   return { buried: out, granted: { dust, shards, milestones: newly, notes } };
@@ -1607,7 +1609,7 @@ export function checkBuriedSeason(meta, now = Date.now(), summaryBuilder = null,
   const entry = {
     no: b.season.no, endedAt: now, days: b.season.lengthDays,
     champion: summary?.champion || null, myBest: summary?.myBest || null,
-    granted: { dust: granted.dust, shards: granted.shards, milestones: granted.milestones },
+    granted: { dust: granted.dust, shards: granted.shards, milestones: granted.milestones, notes: granted.notes || [] },
   };
   return {
     meta: {
@@ -1624,6 +1626,16 @@ export function checkBuriedSeason(meta, now = Date.now(), summaryBuilder = null,
     },
     rolled: true, opened: false, entry, granted,
   };
+}
+
+// 1.177.0 — 🏆 시즌 1위 보상 누락 소급 (PM 결정): 진행 중인 런이 결산에서 빠지던 버그 보상.
+// 1위 보상 1회분(🕯600·☠15) + 남령급 괴이 1체(호출부가 무작위로 고른 ghostId — 없으면 🕯800). 계정당 1회.
+export const BURIED_SEASON_COMP_FLAG = 'seasonComp1177';
+export function grantBuriedSeasonCompensation(meta, ghostId) {
+  const b = getBuried(meta);
+  if (b[BURIED_SEASON_COMP_FLAG]) return meta;
+  const ghosts = ghostId ? { ...b.ghosts, [ghostId]: b.ghosts[ghostId] || { breaks: 0 } } : b.ghosts;
+  return { ...meta, buried: { ...b, dust: (b.dust || 0) + 600 + (ghostId ? 0 : 800), shards: (b.shards || 0) + 15, ghosts, [BURIED_SEASON_COMP_FLAG]: true } };
 }
 
 // 1.154.0 — ⚔ 더미 세계 초기화 (PM: 만렙·포화 대비). 세대 +1 = 시드 교체 = 완전히 새 등반 이력.

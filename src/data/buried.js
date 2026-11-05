@@ -1853,6 +1853,11 @@ export const BURIED_GHOST_RANKS = {
   indigo: { id: 'indigo', name: '남령', hanja: '藍靈', color: '#5c4a8c', dropShare: 5,  cap: 2,  baseTame: 6,  breakMax: 4, cd: 3, dust: 400 },
   violet: { id: 'violet', name: '자령', hanja: '紫靈', color: '#c48bd4', dropShare: 1,  cap: 1,  baseTame: 2,  breakMax: 5, cd: 3, dust: 1000 },
 };
+// 1.177.0 — 등급 안에서 미보유 괴이 하나를 무작위로 (모두 보유면 null). Math.random — 이벤트 핸들러·effect에서만
+export function pickRandomBuriedGhost(rank, owned = {}) {
+  const pool = BURIED_GHOSTS.filter(g => g.rank === rank && !owned?.[g.id]);
+  return pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)].id : null;
+}
 export const BURIED_TALISMAN_DROP_PCT = 10; // 보스 처치 시 제령부 자체 드랍율 (버프 무관 고정)
 
 // 괴이 26종 — enemyKey = 대응하는 기존 적 (일러 재사용). passive는 계약 fx 어휘(소비 지점 공짜).
@@ -5378,7 +5383,7 @@ export const BURIED_RANK_MILESTONES = [
   { id: 'ms_top3',     name: '시상대',         cond: '아무 던전 TOP 3',             reward: '⚔ 격전의 유산 — 전 능력치 +1 (영구)' },
   { id: 'ms_champ',    name: '던전 제패',      cond: '아무 던전 1위',               reward: '종족 「🔥환생자」 개방' },
   { id: 'ms_allTop10', name: '전 던전 입상',   cond: '4던전 모두 TOP 10',           reward: '직업 「등정자」 개방' },
-  { id: 'ms_unified',  name: '통합 랭킹 제패', cond: '4던전 통합 랭킹 1위',         reward: '남령급 괴이 「무덤의 폭군」 사역 (이미 소장 시 🕯 800)' },
+  { id: 'ms_unified',  name: '통합 랭킹 제패', cond: '4던전 통합 랭킹 1위',         reward: '미보유 남령급 괴이 1체 무작위 사역 (전부 소장 시 🕯 800)' },
 ];
 
 // 결산 요약(던전별 내 순위 + 통합 1위 여부) → 이번에 새로 달성한 마일스톤 id 목록 (순수 함수)
