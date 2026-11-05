@@ -1008,6 +1008,7 @@ PM이 AskUserQuestion으로 확정한 설계. **던전앤파이터 모티브, "�
 | ③ | 내구도 | **전투당 D8/C5/B3/A2회** (`BURIED_SKILL_USES`, 매 전투 리셋 — 전투 `spentMap`만 차감, App은 `item.usesSpent` 누적 중단). 마모(`BURIED_WEAR_PCT`=0)·파손(`isBuriedSlotDepleted`=false) 폐지. 보급의 봉헌 = 다음 전투 +2, 야영 = +1 (`char.bonusUses`, 전투 승리 정산에서 0으로 소비) | ✅ 1.172.0 |
 | ①② | 추가 | 자동 전투+배속 / 획득 자동 규칙 / 빌드 시너지 태그 | ⏳ 다음 |
 | + | 방 무작위화 | PM 지시 「방은 랜덤, 이벤트 결과만 고른다」 — `pickBuriedDoor`(전투 최소 `BURIED_DOOR_BATTLE_PCT` 45%, 나머지 균등, chute 제외) + `char.door`{floor,idx,seen,rerolls}로 결과 고정. 미궁 기믹·길잡이·dl1은 「다른 문 찾기」(`buriedDoorRerolls`)로 전환 | ✅ 1.173.0 |
+| + | 방 자동 진입 | PM 지시 「2단계 번거롭다」 — 던전 화면 `autoEnter` effect(키 floor:steps, pendingLoot·재앙 게이지 시 정지)가 층 도착 즉시 진입. 리롤은 방 안 `rerollRoom`(door.fresh = 진입 직후 roomData JSON과 같을 때만). 재앙 거절은 `char.calamityDeclined = floor` | ✅ 1.173.1 |
 
 ⚠️ 1.170.0 주의: `char.stats` 저장 구조는 그대로(해석만 변경). 새 포인트 지급처를 만들면 문구는 `buriedStatGainText(k, n)` 사용. 기본 공격 물리/마법 판정은 동률 시 `att.mainMag`(직업 주 속성).
 
