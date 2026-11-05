@@ -10,7 +10,7 @@
 //   - 방 효과 / 층 효과 배지 — 붉은 이름 방은 나와 적 모두에게 적용
 //   - 신규 방 2종: 협상(🤝) / 망자의 서고(📜)
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, Package } from 'lucide-react';
 import { PALETTE } from '../../utils/helpers.js';
 import {
@@ -96,7 +96,7 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onLogEvent, on
   };
 
   // ===== 방 진입 =====
-  const enterRoom = (offer) => {
+  const enterRoom = (offer, doorMeta = null) => {
     const type = offer.type;
     // 기믹 「낙하 구멍」(나락, 1.114.0) — HP를 바치고 층을 건너뛴다. [dc1] 나락의 갈고리 — 비용 절반
     if (type === 'chute') {
@@ -119,7 +119,7 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onLogEvent, on
       const enemy = rival ? buildBuriedRivalEnemy(rival, char, (b.rivalWins || {})[rival.id] || 0) : buildBuriedRoomEnemy(char, type, offer.effect);
       // 1.158.0 — 난입 천장 카운터: 전투방인데 난입이 안 떴으면 +1, 떴으면 0으로 리셋
       const dry = type !== 'battle' ? (char.intrusionDry || 0) : (rival ? 0 : (char.intrusionDry || 0) + 1);
-      onUpdateChar({ ...char, room: type, roomEffect: offer.effect || null, intrusionDry: dry }, 0);
+      onUpdateChar({ ...char, room: type, roomEffect: offer.effect || null, intrusionDry: dry, ...(doorMeta ? { door: doorMeta } : {}) }, 0);
       onEnterBattle(enemy, type, offer.effect || null);
       return;
     }
@@ -140,24 +140,37 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onLogEvent, on
     if (type === 'library') roomData = { done: false };
     if (BURIED_EVENT_ROOM_IDS.includes(type)) roomData = { done: false, text: null, tone: null };
     if (type === 'skullcrown') roomData = { offer: rollBuriedCurseOffer(char), done: false };
-    onUpdateChar({ ...char, room: type, roomData, roomEffect: offer.effect || null }, 0);
+    // 1.174.0 — door.fresh: 진입 직후 방 상태. 아무것도 하지 않았을 때만 「다른 길로」 허용 (부장품 챙기고 리롤 방지)
+    onUpdateChar({ ...char, room: type, roomData, roomEffect: offer.effect || null, ...(doorMeta ? { door: { ...doorMeta, fresh: JSON.stringify(roomData) } } : {}) }, 0);
   };
 
-  // 🚪 문 열기 / 다른 문 찾기 (1.173.0) — 결과는 char.door에 저장돼 새로고침으로 다시 굴릴 수 없다
-  const openDoor = () => {
+  // 🚪 자동 진입 (1.174.0, PM 지시 「문 열고 또 들어가는 2단계가 번거롭다」) — 층에 도착하면 바로 무작위 방
+  const autoEnter = () => {
     const idx = pickBuriedDoor(offers);
     if (idx < 0) return;
-    onUpdateChar({ ...char, door: { floor: char.floor, idx, seen: [idx], rerolls: 0 } }, 0);
-    setNotice(null);
+    enterRoom(offers[idx], { floor: char.floor, idx, seen: [idx], rerolls: 0 });
   };
-  const rerollDoor = () => {
+  // 🌀 다른 길로 — 방에 들어와 아무것도 하지 않았을 때만 (미궁 갈림길·길잡이·실타래)
+  const rerollRoom = () => {
     const door = char.door;
     if (!door || door.floor !== char.floor || (door.rerolls || 0) >= buriedDoorRerolls(char)) return;
+    if (JSON.stringify(char.roomData) !== door.fresh) return;
     const idx = pickBuriedDoor(offers, door.seen || []);
-    if (idx < 0) { setNotice('더 찾을 문이 없다.'); return; }
-    onUpdateChar({ ...char, door: { ...door, idx, seen: [...(door.seen || []), idx], rerolls: (door.rerolls || 0) + 1 } }, 0);
-    setNotice('🌀 갈림길을 되짚어 다른 문을 찾았다.');
+    if (idx < 0) { setNotice('더 찾을 길이 없다.'); return; }
+    setNotice('🌀 갈림길을 되짚어 다른 길로 들어섰다.');
+    enterRoom(offers[idx], { ...door, idx, seen: [...(door.seen || []), idx], rerolls: (door.rerolls || 0) + 1 });
   };
+  const autoKeyRef = useRef(null);
+  useEffect(() => {
+    if (!char || char.room || !char.offers || (char.pendingLoot || []).length > 0) return;
+    // 🌑 재앙 게이지가 찼으면 멈추고 맞설지 묻는다 (거절한 층은 그대로 진행)
+    if ((char.calamityGauge || 0) >= BURIED_CALAMITY_GAUGE_MAX && char.calamityDeclined !== char.floor) return;
+    const key = `${char.floor}:${char.steps || 0}`;
+    if (autoKeyRef.current === key) return;
+    autoKeyRef.current = key;
+    autoEnter();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [char]);
 
   // 장비 획득 — 같은 스킬이면 스킬 레벨이 오른다 (원작 규칙)
   const gainItem = (item, extraPatch = {}) => {
@@ -428,7 +441,7 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onLogEvent, on
         )}
 
         {/* ===== 재앙 소환 배너 (1.112.0) — 게이지 5. 무시하고 다른 방으로 가도 된다 ===== */}
-        {!inRoom && (char.calamityGauge || 0) >= BURIED_CALAMITY_GAUGE_MAX && (
+        {!room && (char.calamityGauge || 0) >= BURIED_CALAMITY_GAUGE_MAX && char.calamityDeclined !== char.floor && (
           <div className="px-3 py-3 space-y-2"
             style={{ borderRadius: 'var(--r-panel, 18px)', background: '#1a0d22', border: '1px solid #7b3fa0' }}>
             <div className="text-[13px] font-bold" style={{ color: '#c48bd4' }}>🌑 재앙이 냄새를 맡았다</div>
@@ -440,92 +453,43 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onLogEvent, on
               style={{ borderRadius: 'var(--r-btn, 13px)', background: '#4a1f5c', color: '#e8c8f4', border: '1px solid #7b3fa0' }}>
               맞선다 (초고난도)
             </button>
+            <button onClick={() => onUpdateChar({ ...char, calamityDeclined: char.floor }, 0)} className="ui-press w-full py-2 text-[12px]"
+              style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panelLight, color: PALETTE.textDim, border: `1px solid ${PALETTE.panelBorder}` }}>
+              무시하고 나아간다
+            </button>
           </div>
         )}
 
-        {/* ===== 🚪 문 — 방은 무작위로 정해진다 (1.173.0, PM 지시: 고르는 건 이벤트 결과뿐) ===== */}
-        {!inRoom && (() => {
-          const renderOffer = (o) => {
-                const r = BURIED_ROOMS[o.type] || BURIED_EVENT_ROOMS[o.type]
-                || (o.type === 'skullcrown' ? BURIED_SKULL_ROOM : o.type === 'chute' ? BURIED_CHUTE_ROOM : BURIED_ROOMS.battle);
-              const fx = getBuriedRoomEffect(o.effect);
-              const fxColor = fx ? (BURIED_ROOM_COLORS[fx.color]?.color || PALETTE.dawn) : null;
-              return (
-                <div className="w-full flex items-start gap-3 px-3 py-3 text-left"
-                  style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panel, border: `1px solid ${fxColor || r.color}66` }}>
-                  <span className="text-[22px] mt-0.5">{r.icon}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[13px] font-bold" style={{ color: r.color }}>{r.name}</div>
-                    <div className="text-[12px]" style={{ color: PALETTE.textDim }}>{r.desc}</div>
-                    {/* 1.145.0 — 위협 미리보기: 적 평타 일격 ≈ 내 HP % (PM: 결정 전 필요한 숫자) */}
-                    {(o.type === 'battle' || o.type === 'elite' || o.type === 'boss') && (() => {
-                      const th = buriedRoomThreat(char, o.type);
-                      if (!th) return null;
-                      const danger = th.hiPct >= 40 ? PALETTE.accent : th.hiPct >= 20 ? PALETTE.legendary : PALETTE.textDim;
-                      return (
-                        <div className="mt-0.5 text-[11px] tabular-nums" style={{ color: danger }}>
-                          ⚔ 적 일격 ≈ HP {th.loPct === th.hiPct ? `${th.hiPct}%` : `${th.loPct}~${th.hiPct}%`} <span style={{ color: PALETTE.textDim }}>(평타 기준)</span>
-                        </div>
-                      );
-                    })()}
-                    {fx && (
-                      <div className="mt-1 text-[11px]" style={{ color: fxColor }}>
-                        {fx.both ? '◆' : '◇'} {fx.name} — {fx.desc}
-                        {fx.both && <span style={{ color: PALETTE.textDim }}> (나와 적 모두)</span>}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-          };
-          const door = char.door && char.door.floor === char.floor && offers[char.door.idx] ? char.door : null;
+        {/* ===== 🚪 1.174.0 — 방은 자동 진입. 방 안에서 고를 수 있는 길 선택(다른 길로·낙하 구멍) ===== */}
+        {inRoom && (() => {
+          const door = char.door && char.door.floor === char.floor ? char.door : null;
           const rerollLeft = buriedDoorRerolls(char) - (door?.rerolls || 0);
-          const canReroll = door && rerollLeft > 0 && pickBuriedDoorLeft(offers, door.seen || []) > 0;
+          const canReroll = door && rerollLeft > 0 && JSON.stringify(char.roomData) === door.fresh && pickBuriedDoorLeft(offers, door.seen || []) > 0;
           const chute = offers.find(o => o.type === 'chute');
+          if (!canReroll && !chute) return null;
           return (
-            <>
-              <div className="text-[11px] tracking-[0.25em]" style={{ color: PALETTE.dawn }}>
-                {door ? '문이 열렸다' : '문 너머에 무엇이 있을지는 열어 봐야 안다'}
-              </div>
-              {!door ? (
-                <button onClick={openDoor} className="ui-press ui-sheen w-full py-3.5 text-[14px] font-bold"
-                  style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.accent, color: '#fff' }}>
-                  🚪 문을 연다
+            <div className="flex gap-2">
+              {canReroll && (
+                <button onClick={rerollRoom} className="ui-press flex-1 py-2 text-[12px]"
+                  style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panelLight, color: PALETTE.ice, border: `1px solid ${PALETTE.ice}55` }}>
+                  🌀 다른 길로 (남은 {rerollLeft}회)
                 </button>
-              ) : (
-                <div className="space-y-2">
-                  {renderOffer(offers[door.idx])}
-                  <button onClick={() => enterRoom(offers[door.idx])} className="ui-press w-full py-3 text-[13px] font-bold"
-                    style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.accent, color: '#fff' }}>
-                    들어간다
-                  </button>
-                  {canReroll && (
-                    <button onClick={rerollDoor} className="ui-press w-full py-2.5 text-[12px]"
-                      style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panelLight, color: PALETTE.ice, border: `1px solid ${PALETTE.ice}55` }}>
-                      🌀 다른 문 찾기 (남은 {rerollLeft}회)
-                    </button>
-                  )}
-                </div>
               )}
               {chute && (
-                <button onClick={() => enterRoom(chute)} className="ui-press w-full flex items-start gap-3 px-3 py-2.5 text-left"
-                  style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panel, border: `1px solid ${BURIED_CHUTE_ROOM.color}66` }}>
-                  <span className="text-[20px]">{BURIED_CHUTE_ROOM.icon}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[12px] font-bold" style={{ color: BURIED_CHUTE_ROOM.color }}>{BURIED_CHUTE_ROOM.name} (선택)</div>
-                    <div className="text-[11px]" style={{ color: PALETTE.textDim }}>{BURIED_CHUTE_ROOM.desc}</div>
-                  </div>
+                <button onClick={() => enterRoom(chute)} className="ui-press flex-1 py-2 text-[12px]"
+                  style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panelLight, color: BURIED_CHUTE_ROOM.color, border: `1px solid ${BURIED_CHUTE_ROOM.color}66` }}>
+                  {BURIED_CHUTE_ROOM.icon} {BURIED_CHUTE_ROOM.name}
                 </button>
               )}
-              <div className="px-3 py-2.5 text-[11px] leading-relaxed"
-                style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panel, border: `1px solid ${PALETTE.panelBorder}`, color: PALETTE.textDim }}>
-                방은 고를 수 없다 — 문을 열면 무엇이 나올지 정해진다. 고르는 건 그 안에서 벌어진 일에 어떻게 응할지뿐.
-                {buriedDoorRerolls(char) > 0 && <> 이 층에서는 <b style={{ color: PALETTE.ice }}>다른 문 찾기 {buriedDoorRerolls(char)}회</b>를 쓸 수 있다.</>}
-                {nextBossFloor === char.floor + 1 && <><br /><b style={{ color: PALETTE.legendary }}>다음 층은 봉인의 문이다. 정비할 마지막 기회.</b></>}
-              </div>
-            </>
+            </div>
           );
         })()}
+        {!room && !((char.calamityGauge || 0) >= BURIED_CALAMITY_GAUGE_MAX && char.calamityDeclined !== char.floor) && (
+          <button onClick={autoEnter} className="ui-press w-full py-3 text-[12px]"
+            style={{ borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panel, color: PALETTE.textDim, border: `1px solid ${PALETTE.panelBorder}` }}>
+            길을 나선다…
+          </button>
+        )}
 
         {/* ===== 부장품 ===== */}
         {room === 'treasure' && (
