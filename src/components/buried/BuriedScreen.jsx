@@ -29,7 +29,7 @@ import {
   BURIED_GHOSTS, BURIED_GHOST_RANKS, buriedGhostKit,
   BURIED_CLASS_BASICS, describeBuriedFx,
   buriedRivalRanking, BURIED_RIVAL_TUNING, BURIED_RIVALS, buriedRivalSnapshot,
-  BURIED_STATS, BURIED_SKILLS,
+  BURIED_SKILLS, buriedStatPtSummary,
   BURIED_RANK_CLASSES, BURIED_SEASON_REWARDS, BURIED_RANK_MILESTONES,
 } from '../../data.js';
 import { BuriedBar, BURIED_DUST_ICON, BuriedTierLegend, BuriedLootModal } from './BuriedCommon.jsx';
@@ -637,14 +637,21 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
                 <div className="flex justify-between text-[12px]"><span style={{ color: PALETTE.textDim }}>출신</span><span style={{ color: PALETTE.dawn }}>{getBuriedOrigin(pickOrigin)?.icon} {getBuriedOrigin(pickOrigin)?.name}</span></div>
                 <div className="flex justify-between text-[12px]"><span style={{ color: PALETTE.textDim }}>쐐기석</span><span style={{ color: PALETTE.twilight }}>{pickKeystones.length > 0 ? pickKeystones.map(id => getBuriedKeystone(id)?.icon).join(' ') : '없음'}</span></div>
                 <div className="flex justify-between text-[12px]"><span style={{ color: PALETTE.textDim }}>직업</span><span style={{ color: c?.color }}>{c?.name}</span></div>
-                {/* 1.145.0 — 시작 능력치 합계 (직업+종족+출신) — 결정 전 숫자 확인 */}
+                {/* 1.170.0 — 4스탯 대신 종족·출신이 주는 핵심 능력치 보정(%)을 보여준다 */}
                 {c && (() => {
                   const race = getBuriedRace(pickRace);
                   const origin = getBuriedOrigin(pickOrigin);
-                  const stat = (k) => Math.max(1, (c.stats?.[k] || 0) + (race?.statMods?.[k] || 0) + (origin?.statMods?.[k] || 0));
+                  const pts = {};
+                  for (const k of ['str', 'dex', 'int', 'vit']) {
+                    const v = Math.max(1, (c.stats?.[k] || 0) + (race?.statMods?.[k] || 0) + (origin?.statMods?.[k] || 0));
+                    pts[k] = v - (c.stats?.[k] || 0);
+                  }
+                  const sum = buriedStatPtSummary(pts);
                   return (
-                    <div className="flex justify-between text-[12px]"><span style={{ color: PALETTE.textDim }}>시작 능력치</span>
-                      <span className="tabular-nums" style={{ color: PALETTE.text }}>완력 {stat('str')} · 기교 {stat('dex')} · 지혜 {stat('int')} · 체력 {stat('vit')}</span></div>
+                    <div className="flex justify-between gap-2 text-[12px]"><span className="shrink-0" style={{ color: PALETTE.textDim }}>능력 보정</span>
+                      <span className="tabular-nums text-right" style={{ color: PALETTE.text }}>
+                        {sum.length === 0 ? '없음' : sum.map((x, i) => <span key={i} style={{ color: x.good ? PALETTE.green : PALETTE.accent }}>{i > 0 ? ' · ' : ''}{x.text}</span>)}
+                      </span></div>
                   );
                 })()}
                 {b.companion && b.ghosts?.[b.companion] && (() => {
@@ -1089,10 +1096,9 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
           {Object.entries(b.rivalStatBonus || {}).some(([, v]) => v !== 0) && (
             <div className="px-3 py-2 mb-1.5 text-[12px]" style={{ borderRadius: R.chip, background: `${PALETTE.legendary}12`, border: `1px solid ${PALETTE.legendary}55` }}>
               <span style={{ color: PALETTE.legendary }}>⚔ 격전의 유산 (다음 등반 합산): </span>
-              {Object.entries(b.rivalStatBonus).filter(([, v]) => v !== 0).map(([k, v]) => {
-                const st = BURIED_STATS.find(x => x.id === k);
-                return <span key={k} className="mr-1.5 tabular-nums" style={{ color: v > 0 ? PALETTE.green : PALETTE.accent }}>{st?.name} {v > 0 ? '+' : ''}{v}</span>;
-              })}
+              {buriedStatPtSummary(b.rivalStatBonus).map((x, i) => (
+                <span key={i} className="mr-1.5 tabular-nums" style={{ color: x.good ? PALETTE.green : PALETTE.accent }}>{x.text}</span>
+              ))}
             </div>
           )}
           <div className="space-y-2">
@@ -1246,7 +1252,7 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
               <div className="grid grid-cols-4 gap-1 mb-2">
                 {[
                   { l: 'HP', v: dv.maxHp, c: PALETTE.accent },
-                  { l: '물/기/마', v: `${dv.atk}/${dv.fin}/${dv.mag}`, c: PALETTE.dawn },
+                  { l: '공격력', v: dv.atk === dv.mag || dv.mag == null ? dv.atk : `${dv.atk}/${dv.mag}`, c: PALETTE.dawn },
                   { l: '방어', v: dv.def, c: PALETTE.ice },
                   { l: '치명/회피', v: `${dv.crit}%/${dv.dodge}%`, c: PALETTE.legendary },
                 ].map(x => (
@@ -1255,9 +1261,6 @@ export default function BuriedScreen({ meta, onStartChar, onContinue, onUpdateCh
                     <div className="text-[11px] font-bold tabular-nums" style={{ color: x.c }}>{x.v ?? '?'}</div>
                   </div>
                 ))}
-              </div>
-              <div className="text-[11px] mb-2 tabular-nums" style={{ color: PALETTE.textDim }}>
-                능력치: {BURIED_STATS.map(st => `${st.name} ${sn.stats?.[st.id] ?? '?'}`).join(' · ')}
               </div>
               {/* 주 사용 스킬 */}
               {topSkills.length > 0 && (

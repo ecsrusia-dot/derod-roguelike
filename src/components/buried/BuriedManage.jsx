@@ -9,7 +9,7 @@ import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { PALETTE } from '../../utils/helpers.js';
 import {
-  BURIED_SLOTS, BURIED_SLOT_IDS, BURIED_STATS, BURIED_SKILLS, BURIED_SKILL_MAX_LV,
+  BURIED_SLOTS, BURIED_SLOT_IDS, BURIED_SKILLS, BURIED_SKILL_MAX_LV, buriedStatPtSummary,
   buriedItemRunes, buriedItemSockets,
   buriedDerived, buriedDustValue, getBuriedClass,
   buriedTraitIds, getBuriedTrait, buriedSkillLv, BURIED_QUALITY_COLORS,
@@ -114,25 +114,25 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose, readOn
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 py-3 pb-4 space-y-3">
-        {/* 파생 스탯 요약 */}
+        {/* 1.170.0 — ⑤ 핵심 능력치 6개 (PM 결정). 부가 수치는 아래 한 줄로 작게 */}
         <div className="grid grid-cols-3 gap-1.5">
           {[
-            { l: '최대 HP', v: d.maxHp, c: PALETTE.accent },
-            { l: '최대 SP', v: d.maxSp, c: PALETTE.ice },
-            { l: '방어력', v: d.def, c: PALETTE.ice },
-            { l: '물리/기교/마법', v: `${d.atk}/${d.fin}/${d.mag}`, c: PALETTE.dawn },
-            // 1.166.0 — PM 지적: "67% ×2.6"이 곱셈으로 읽혔다 → 확률·피해를 완전히 분리 표시
-            { l: '치명 확률', v: `${d.crit}%${d.critOverflowDmg ? ` (상한)` : ''}`, c: PALETTE.legendary },
-            { l: '치명 피해', v: `×${(1 + d.critDmg / 100).toFixed(1)}`, c: PALETTE.legendary },
-            { l: '회피 / SP회복', v: `${d.dodge}% / +${d.spRegen}`, c: PALETTE.green },
-            { l: '🔷 보호막', v: d.barrier || 0, c: PALETTE.ice },
-            { l: '추격 피해', v: d.chase || 0, c: PALETTE.dawn },
+            { l: '⚔ 공격력', v: d.atk === d.mag ? d.atk : `${d.atk} / 마 ${d.mag}`, c: PALETTE.dawn },
+            { l: '❤ 최대 HP', v: d.maxHp, c: PALETTE.accent },
+            { l: '🛡 방어력', v: d.def, c: PALETTE.ice },
+            // 1.166.0 — 확률·피해 분리 표시 유지 (치명 피해는 부가 줄로)
+            { l: '🎯 치명', v: `${d.crit}%${d.critOverflowDmg ? ' (상한)' : ''}`, c: PALETTE.legendary },
+            { l: '💨 회피', v: `${d.dodge}%`, c: PALETTE.green },
+            { l: '🔄 SP 회복', v: `+${d.spRegen}/턴`, c: PALETTE.ice },
           ].map(x => (
             <div key={x.l} className="px-2 py-1.5" style={{ borderRadius: 'var(--r-chip, 8px)', background: PALETTE.panel, border: `1px solid ${PALETTE.panelBorder}` }}>
               <div className="text-[11px]" style={{ color: PALETTE.textDim }}>{x.l}</div>
-              <div className="text-[12px] font-bold tabular-nums" style={{ color: x.c }}>{x.v}</div>
+              <div className="text-[13px] font-bold tabular-nums" style={{ color: x.c }}>{x.v}</div>
             </div>
           ))}
+        </div>
+        <div className="px-2 text-[11px] tabular-nums leading-relaxed" style={{ color: PALETTE.textDim }}>
+          부가 — 최대 SP {d.maxSp} · 치명 피해 ×{(1 + d.critDmg / 100).toFixed(1)} · 🔷 보호막 {d.barrier || 0}{d.chase ? ` · 추격 ${d.chase}` : ''}
         </div>
 
         {/* 1.166.0 — 치명 확률 상한 초과분이 치명 피해로 전환됐음을 그 자리에서 알린다 */}
@@ -256,25 +256,23 @@ export default function BuriedManage({ char, dust = 0, onUpdate, onClose, readOn
           </div>
         )}
 
-        {/* 능력치 4종 — 1.113.0: 배분 폐지, 장비 출처 열람만 */}
-        <div className="px-3 py-2.5" style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panel, border: `1px solid ${PALETTE.panelBorder}` }}>
-          <div className="text-[11px] tracking-[0.2em] mb-1.5" style={{ color: PALETTE.dawn }}>
-            능력치 — 성장은 100% 장비 (배분 없음)
-          </div>
-          <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-            {BURIED_STATS.map(s => (
-              <div key={s.id} className="flex justify-between items-center text-[12px]">
-                <span style={{ color: s.color }}>{s.icon} {s.name}</span>
-                <span className="tabular-nums" style={{ color: PALETTE.text }}>
-                  {d.stats[s.id]}
-                  {d.stats[s.id] !== (char.stats[s.id] || 0) && (
-                    <span className="text-[11px] ml-1" style={{ color: PALETTE.green }}>(+{d.stats[s.id] - (char.stats[s.id] || 0)})</span>
-                  )}
-                </span>
+        {/* 1.170.0 — 4스탯 표시 폐지 → 종족·출신·이벤트·난입으로 얻은 능력 보정(%)만 보여준다 */}
+        {(() => {
+          const cb = getBuriedClass(char.classId)?.stats || {};
+          const pts = {};
+          for (const k of ['str', 'dex', 'int', 'vit']) pts[k] = (char.stats?.[k] || 0) - (cb[k] || 0);
+          const sum = buriedStatPtSummary(pts);
+          return (
+            <div className="px-3 py-2.5" style={{ borderRadius: 'var(--r-panel, 18px)', background: PALETTE.panel, border: `1px solid ${PALETTE.panelBorder}` }}>
+              <div className="text-[11px] tracking-[0.2em] mb-1" style={{ color: PALETTE.dawn }}>능력 보정 — 종족·출신·이벤트·난입</div>
+              <div className="text-[12px] tabular-nums" style={{ color: PALETTE.text }}>
+                {sum.length === 0 ? <span style={{ color: PALETTE.textDim }}>없음 — 성장은 장비가 담당한다</span>
+                  : sum.map((x, i) => <span key={i} style={{ color: x.good ? PALETTE.green : PALETTE.accent }}>{i > 0 ? ' · ' : ''}{x.text}</span>)}
               </div>
-            ))}
-          </div>
-        </div>
+              <div className="text-[11px] mt-1" style={{ color: PALETTE.textDim }}>% 보정이라 깊은 층에서도 효과가 줄지 않는다.</div>
+            </div>
+          );
+        })()}
 
         {/* 주 사용 스킬 (1.155.0) — 전투에서 실제로 쓴 스킬 집계. 랭킹 열람 시 공략 정보가 된다 */}
         {char.skillUsage && Object.keys(char.skillUsage).length > 0 && (

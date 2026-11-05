@@ -173,7 +173,7 @@ import {
   BURIED_UNION_REP_GAIN, getBuriedUnion,
   BURIED_SIGILS, rollBuriedUniqueItem, buriedMonsterLevel, buriedLootPower, buriedDerived,
   BURIED_GHOST_RANKS, getBuriedGhost, rollBuriedTalisman,
-  buriedRivalNews, buriedRivalStatGain, BURIED_STATS, buriedRivalRanking,
+  buriedRivalNews, buriedRivalStatGain, BURIED_STATS, buriedRivalRanking, buriedStatGainText,
   applyBuriedBalance, resetBuriedBalance, BURIED_BALANCE_DEFAULTS,
 } from './data.js';
 import { getKstDateKey } from './utils/dailyChallenge.js';
@@ -643,7 +643,7 @@ export default function App() {
           saveMeta(next);
           return next;
         });
-        setBuriedForgeNotice(`⚔ 등반자 「${rv.name}」에게 패배 — ${stolen.name} ${loss}을 빼앗겼다. 다음 등반부터 적용되며, 그자는 더 강해져 돌아온다.`);
+        setBuriedForgeNotice(`⚔ 등반자 「${rv.name}」에게 패배 — ${buriedStatGainText(stolen.id, -loss)}을(를) 빼앗겼다. 다음 등반부터 적용되며, 그자는 더 강해져 돌아온다.`);
       }
       handleBuriedDeath(char, buriedEnemy?.rival ? `등반자 「${buriedEnemy.rival.name}」` : buriedEnemy?.name);
       return;
@@ -670,7 +670,7 @@ export default function App() {
         beatenRivals: [...(c.beatenRivals || []), rv.id],
       };
       setMeta(prev => { const next = addBuriedRivalStat(prev, rv.mainStat, gain); saveMeta(next); return next; });
-      setBuriedForgeNotice(`⚔ 등반자 「${rv.name}」 격퇴 — ${rv.mainStatName} +${gain} 영구 귀속. 다음 등반에도 이 힘이 남는다.`);
+      setBuriedForgeNotice(`⚔ 등반자 「${rv.name}」 격퇴 — ${buriedStatGainText(rv.mainStat, gain)} 영구 귀속. 다음 등반에도 이 힘이 남는다.`);
     }
     // 🧿 제령부 소모 정산 (1.144.0) — 실패 포함 이번 전투에서 태운 부적
     if (res.talismansSpent && Object.keys(res.talismansSpent).length > 0) {

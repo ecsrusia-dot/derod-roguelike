@@ -21,12 +21,41 @@
 // =========================================================
 // 1. 스탯 — BB식 4스탯
 // =========================================================
+// 1.170.0 — ⑤ 능력치 단순화 (PM 결정 「핵심 6개로 축소」): 4스탯은 더 이상 표시 능력치가 아니다.
+// 직업 기본 스탯은 **직업 기본치**(공격력·HP·방어·치명·회피·SP)로 환산되고 (Lv1 수치 불변),
+// 그 외에 얻는 포인트(종족·출신·이벤트·난입·성장의 씨앗)는 깊이와 무관한 **% 보정**으로 환산된다.
+// 저장 구조(char.stats)는 그대로 — 해석만 바뀐다. 변환 계수는 BURIED_STAT_PT 한 곳.
+export const BURIED_STAT_PT = { atkPct: 1, hpPct: 1, crit: 0.6, dodge: 0.4 };
 export const BURIED_STATS = [
-  { id: 'str', name: '완력', icon: '💪', color: '#c4453d', desc: '물리 공격력 +1.6 / 포인트' },
-  { id: 'dex', name: '기교', icon: '🎯', color: '#7a9a5e', desc: '기교 공격력 +1.6, 치명 +0.6%, 회피 +0.4% / 포인트' },
-  { id: 'int', name: '지혜', icon: '📖', color: '#5c4a8c', desc: '마법 공격력 +1.6, 최대 SP +1.3 / 포인트' },
-  { id: 'vit', name: '체력', icon: '🛡', color: '#7ba3c4', desc: '최대 HP +11, 방어 +0.9 / 포인트' },
+  { id: 'str', name: '완력', icon: '💪', color: '#c4453d', desc: '공격력 +1% / 포인트' },
+  { id: 'dex', name: '기교', icon: '🎯', color: '#7a9a5e', desc: '치명 +0.6%p, 회피 +0.4%p / 포인트' },
+  { id: 'int', name: '지혜', icon: '📖', color: '#5c4a8c', desc: '공격력 +1% / 포인트' },
+  { id: 'vit', name: '체력', icon: '🛡', color: '#7ba3c4', desc: '최대 HP +1% / 포인트' },
 ];
+// 포인트 획득 문구 — 「완력 +3」 대신 실제로 오르는 핵심 능력치로 보여준다
+export function buriedStatGainText(k, n) {
+  const P = BURIED_STAT_PT;
+  const r = (x) => Math.round(x * 10) / 10;
+  const sg = n >= 0 ? '+' : '';
+  if (k === 'str' || k === 'int') return `공격력 ${sg}${r(n * P.atkPct)}%`;
+  if (k === 'vit') return `최대 HP ${sg}${r(n * P.hpPct)}%`;
+  if (k === 'dex') return `치명 ${sg}${r(n * P.crit)}%p · 회피 ${sg}${r(n * P.dodge)}%p`;
+  return `${k} ${sg}${n}`;
+}
+// 포인트 묶음 {str,dex,int,vit} → 핵심 능력치 보정 요약 (0은 생략). 완력·지혜는 공격력으로 합쳐 보여준다
+export function buriedStatPtSummary(pts = {}) {
+  const P = BURIED_STAT_PT;
+  const r = (x) => Math.round(x * 10) / 10;
+  const sg = (x) => (x >= 0 ? '+' : '');
+  const out = [];
+  const atk = ((pts.str || 0) + (pts.int || 0)) * P.atkPct;
+  const hp = (pts.vit || 0) * P.hpPct;
+  const dx = pts.dex || 0;
+  if (atk) out.push({ text: `공격력 ${sg(atk)}${r(atk)}%`, good: atk > 0 });
+  if (hp) out.push({ text: `최대 HP ${sg(hp)}${r(hp)}%`, good: hp > 0 });
+  if (dx) out.push({ text: `치명 ${sg(dx)}${r(dx * P.crit)}%p · 회피 ${sg(dx)}${r(dx * P.dodge)}%p`, good: dx > 0 });
+  return out;
+}
 
 // =========================================================
 // 2. 장비 슬롯 6종 — 각 슬롯에 스킬 1개가 내장된다 (원작 핵심)
@@ -559,30 +588,25 @@ export const getBuriedTier = (id) => BURIED_TIERS.find(t => t.id === id) || BURI
 
 // 슬롯별 기본 스탯 (1층 기준). 층·등급 배율이 곱해진다.
 const SLOT_BASE = {
-  weapon:  { atk: 14, mag: 14, chase: 3 },
-  offhand: { atk: 7,  mag: 7, def: 3, barrier: 8 },
+  weapon:  { atk: 14, chase: 3 },          // 1.170.0 — 공격력 통합 (atk/mag → atk)
+  offhand: { atk: 7, def: 3, barrier: 8 },
   armor:   { def: 9,  hp: 26, barrier: 16 },
   helm:    { def: 5,  hp: 12, sp: 8, barrier: 6 },
-  acc:     { atk: 4,  mag: 4, hp: 10, sp: 5, chase: 2 },
+  acc:     { atk: 4, hp: 10, sp: 5, chase: 2 },
 };
 
 // 랜덤 옵션 풀 — 등급 opts 수만큼 붙는다
+// 1.170.0 — ⑤ 핵심 6개만 남긴다 (15 → 6). 구 장비에 이미 붙은 옵션(마력·최대 SP·치명 피해·보호막·
+// 추격·4스탯)은 계속 효과가 있다 — 새로 굴리지 않을 뿐. 마력은 공격력으로 합산된다 (buriedItemStats)
+// 풀이 15 → 6으로 줄어 공격력·HP·방어 옵션이 2.5배 자주 붙는다 → 수치 폭을 줄여 기대값 유지
+// (node 시뮬: 마물 Lv 100·300 평균 전투력 변화 공격 +2% / HP ±3% / 방어 -1%)
 export const BURIED_OPTIONS = [
-  { key: 'atk',    name: '공격력',   min: 3,  max: 9,  affix: '흉포한' },
-  { key: 'mag',    name: '마력',     min: 3,  max: 9,  affix: '비전의' },
-  { key: 'def',    name: '방어력',   min: 2,  max: 7,  affix: '견고한' },
-  { key: 'hp',     name: '최대 HP',  min: 10, max: 30, affix: '강건한' },
-  { key: 'sp',     name: '최대 SP',  min: 4,  max: 12, affix: '심원한' },
+  { key: 'atk',    name: '공격력',   min: 1,  max: 4,  affix: '흉포한' },
+  { key: 'hp',     name: '최대 HP',  min: 9,  max: 26, affix: '강건한' },
+  { key: 'def',    name: '방어력',   min: 1,  max: 4,  affix: '견고한' },
   { key: 'crit',   name: '치명 확률', min: 2,  max: 6,  affix: '예리한', pct: true },
-  { key: 'critDmg',name: '치명 피해', min: 8,  max: 22, affix: '잔혹한', pct: true },
   { key: 'dodge',  name: '회피율',   min: 2,  max: 5,  affix: '민첩한', pct: true },
   { key: 'spRegen',name: 'SP 회복',  min: 2,  max: 5,  affix: '순환의' },
-  { key: 'barrier',name: '보호막',   min: 12, max: 34, affix: '수호의' },
-  { key: 'chase',  name: '추격 피해', min: 4,  max: 12, affix: '추격의' },
-  { key: 'str',    name: '완력',     min: 1,  max: 3,  affix: '역사의' },
-  { key: 'dex',    name: '기교',     min: 1,  max: 3,  affix: '숙련된' },
-  { key: 'int',    name: '지혜',     min: 1,  max: 3,  affix: '현자의' },
-  { key: 'vit',    name: '체력',     min: 1,  max: 3,  affix: '불굴의' },
 ];
 
 // 1.125.0 — 강화 시스템 폐지 (PM 결정: 풀강 +60% = 무적 루트). 구 장비의 plus 필드는 무시된다.
@@ -709,11 +733,18 @@ export function rollBuriedItem({ slot, classId, floor = 1, tier = null, luck = 0
 }
 
 // 장비의 최종 스탯 (기본 + 옵션 + 강화)
+// 1.170.0 — 공격력 통합: 구 장비의 기본 atk/mag는 큰 쪽 하나만(구 장신구는 둘 다 가졌다),
+// 「마력」 옵션은 공격력으로 합산. 새 장비는 atk만 가진다.
 export function buriedItemStats(item) {
   if (!item) return {};
   const out = {};
-  for (const [k, v] of Object.entries(item.stats || {})) out[k] = v;
-  for (const o of item.options || []) out[o.key] = (out[o.key] || 0) + o.value;
+  const base = item.stats || {};
+  for (const [k, v] of Object.entries(base)) if (k !== 'mag') out[k] = v;
+  if (base.atk || base.mag) out.atk = Math.max(base.atk || 0, base.mag || 0);
+  for (const o of item.options || []) {
+    const k = o.key === 'mag' ? 'atk' : o.key;
+    out[k] = (out[k] || 0) + o.value;
+  }
   return out;
 }
 
@@ -855,9 +886,22 @@ export function buriedDerived(char) {
   const uf = buriedUniqueFx(char);
   // [dc4] 바닥 없는 주머니 (1.161.0 리뉴얼) — 소지 골드 1,500당 물리·기교·마법 +1% (최대 +25%)
   const dc4Pow = buriedUniqueIds(char).includes('dc4') ? Math.min(25, Math.floor((char.gold || 0) / 1500)) : 0;
+  // 1.170.0 — ⑤ 4스탯 해석 변경. cb = 직업 기본 스탯(예전 공식 그대로 → Lv1 수치 불변),
+  // bp = 그 외 포인트(종족·출신·이벤트·난입·씨앗) → 깊이 무관 % 보정. 구 장비의 스탯 옵션(gear.*)은 예전 고정 환산 유지.
+  const cb = getBuriedClass(char.classId)?.stats || { str: 10, dex: 10, int: 10, vit: 10 };
+  const bp = (k) => (char.stats?.[k] || 0) - (cb[k] || 0);
+  const P = BURIED_STAT_PT;
+  const atkPtPct = (bp('str') + bp('int')) * P.atkPct;
+  const hpPtPct = bp('vit') * P.hpPct;
+  // 공격력 통합 — 물리·기교·마법 기본치 하나. 직업 주 스탯 기준 (예전 주력 공격력과 동일)
+  const baseAtk = 10 + 1.6 * Math.max(cb.str || 0, cb.dex || 0, cb.int || 0)
+    + 1.6 * ((gear.str || 0) + (gear.dex || 0) + (gear.int || 0))
+    + (gear.atk || 0) + (pf.atk || 0) + (pf.mag || 0);
+  const physPctSum = (tf.physPct || 0) + (cf.physPct || 0) + (rf.physPct || 0) + (uf.physPct || 0) + dc4Pow + atkPtPct;
+  const magPctSum = (tf.magPct || 0) + (cf.magPct || 0) + (rf.magPct || 0) + (uf.magPct || 0) + dc4Pow + atkPtPct;
   // 1.133.0 — 전설무구 % 개편: barrierHpPct(최대 HP 비례 보호막)가 maxHp를 참조하므로 먼저 계산
   // 1.113.0 — 레벨당 HP+18 폐지 (성장은 100% 장비)
-  const maxHp = Math.max(1, Math.round((140 + st.vit * 11 + (gear.hp || 0) + (tf.hp || 0) + (pf.hp || 0) + (rf.hp || 0) + (uf.hp || 0)) * (tf.hpMult || 1) * (rf.hpMult || 1) * (uf.hpMult || 1) * (1 + (cf.hpPct || 0) / 100) * (1 - Math.min(50, char.curseHpLossPct || 0) / 100)));
+  const maxHp = Math.max(1, Math.round((140 + ((cb.vit || 0) + (gear.vit || 0)) * 11 + (gear.hp || 0) + (tf.hp || 0) + (pf.hp || 0) + (rf.hp || 0) + (uf.hp || 0)) * (tf.hpMult || 1) * (rf.hpMult || 1) * (uf.hpMult || 1) * (1 + ((cf.hpPct || 0) + hpPtPct) / 100) * (1 - Math.min(50, char.curseHpLossPct || 0) / 100)));
   // 1.148.0 — 🔷보호막·고정 가산 유니크를 파생 스탯에 편입 (PM 지적: 정보창에 안 보여 장비 비교가 불가능했다).
   // [u107] 물리·기교 += 최대 HP 8% / [u111] 마법 += 보호막 30% — 전에는 전투 화면에서만 더해졌다.
   // ⚠ 이 두 값은 % 보정(physPct/magPct) **밖**의 고정 가산이다 — 곱해지지 않는다.
@@ -876,11 +920,13 @@ export function buriedDerived(char) {
     traitFx: tf,
     maxHp,
     physFlatAdd, magFlatAdd, // 데미지 공식 설명·출처 표시용
-    maxSp:   Math.round((38 + st.int * 1.3 + (gear.sp || 0) + (tf.sp || 0) + (rf.sp || 0) + (uf.sp || 0)) * (uf.spMult || 1)),
-    atk:     Math.round((10 + st.str * 1.6 + (gear.atk || 0) + (pf.atk || 0)) * (1 + ((tf.physPct || 0) + (cf.physPct || 0) + (rf.physPct || 0) + (uf.physPct || 0) + dc4Pow) / 100)) + physFlatAdd,
-    fin:     Math.round((10 + st.dex * 1.6 + (gear.atk || 0) + (pf.atk || 0)) * (1 + ((tf.physPct || 0) + (cf.physPct || 0) + (rf.physPct || 0) + (uf.physPct || 0) + dc4Pow) / 100)) + physFlatAdd,
-    mag:     Math.round((10 + st.int * 1.6 + (gear.mag || 0) + (pf.mag || 0)) * (1 + ((tf.magPct || 0) + (cf.magPct || 0) + (rf.magPct || 0) + (uf.magPct || 0) + dc4Pow) / 100)) + magFlatAdd,
-    def:     Math.round(4 + st.vit * 0.9 + (gear.def || 0) + (pf.def || 0) + (uf.def || 0) + (rf.def || 0)),
+    maxSp:   Math.round((38 + ((cb.int || 0) + (gear.int || 0)) * 1.3 + (gear.sp || 0) + (tf.sp || 0) + (rf.sp || 0) + (uf.sp || 0)) * (uf.spMult || 1)),
+    // 1.170.0 — 공격력 통합: atk(물리)=fin(기교)은 같은 값, mag는 마법% 보정만 다르다
+    baseAtk: Math.round(baseAtk), atkPtPct, hpPtPct,
+    atk:     Math.round(baseAtk * (1 + physPctSum / 100)) + physFlatAdd,
+    fin:     Math.round(baseAtk * (1 + physPctSum / 100)) + physFlatAdd,
+    mag:     Math.round(baseAtk * (1 + magPctSum / 100)) + magFlatAdd,
+    def:     Math.round(4 + ((cb.vit || 0) + (gear.vit || 0)) * 0.9 + (gear.def || 0) + (pf.def || 0) + (uf.def || 0) + (rf.def || 0)),
     crit:    critRaw <= BURIED_CRIT_CAP ? critRaw : BURIED_CRIT_CAP,
     critRaw, // 표시용 — 상한 전 원본 (초과분이 얼마나 전환됐는지 보여준다)
     critDmg: 60 + (gear.critDmg || 0) + critOverflowDmg,
@@ -888,7 +934,7 @@ export function buriedDerived(char) {
     dodge:   Math.min(BURIED_DODGE_CAP, Math.round(3 + st.dex * 0.4 + (gear.dodge || 0) + (tf.dodge || 0) + (cf.dodge || 0) + (pf.dodge || 0) + (rf.dodge || 0) + (uf.dodge || 0))),
     // 1.118.0 — 패시브 회복 9+int/8 → 3+int/12 (PM: SP가 무의미). 이제 SP의 주 엔진은
     // 기본 공격(+14)·마력 흡수·집중이고, 패시브·장비 spRegen은 보조가 된다
-    spRegen: Math.round(3 + st.int / 12 + (gear.spRegen || 0) + (pf.spRegen || 0) + (uf.spRegen || 0)),
+    spRegen: Math.round(3 + ((cb.int || 0) + (gear.int || 0)) / 12 + (gear.spRegen || 0) + (pf.spRegen || 0) + (uf.spRegen || 0)),
     barrier: barrierVal,
     chase:   Math.round((gear.chase || 0) + (tf.chase || 0) + (pf.chase || 0) + (uf.chase || 0)),
     healPct: (tf.healPct || 0) + (cf.healPct || 0) + (pf.healPct || 0) + (rf.healPct || 0) + (uf.healPct || 0),
@@ -2209,20 +2255,19 @@ export function buriedDamageFormula(char) {
   const tf = aggregateBuriedTraits(char), cf = aggregateBuriedContracts(char);
   const rf = buriedRaceFx(char), uf = buriedUniqueFx(char);
   const fDc4 = buriedUniqueIds(char).includes('dc4') ? Math.min(25, Math.floor((char.gold || 0) / 1500)) : 0;
-  const physPct = (tf.physPct || 0) + (cf.physPct || 0) + (rf.physPct || 0) + (uf.physPct || 0) + fDc4;
-  const magPct = (tf.magPct || 0) + (cf.magPct || 0) + (rf.magPct || 0) + (uf.magPct || 0) + fDc4;
-  // ① 보정 이전 기본치 역산 (표시 전용)
-  const physBase = d.atk - (d.physFlatAdd || 0);
-  const a0 = Math.round(physBase / (1 + physPct / 100));
+  // 1.170.0 — 공격력 통합: ① 하나의 기본 공격력 + ② 물리/마법 % 보정 (능력 보정 포인트 포함)
+  const physPct = (tf.physPct || 0) + (cf.physPct || 0) + (rf.physPct || 0) + (uf.physPct || 0) + fDc4 + (d.atkPtPct || 0);
+  const magPct = (tf.magPct || 0) + (cf.magPct || 0) + (rf.magPct || 0) + (uf.magPct || 0) + fDc4 + (d.atkPtPct || 0);
+  void st;
   return [
-    { n: '①', label: '기본 공격력', value: `물리 ${a0}`,
-      note: `10 + 근력 ${st.str}×1.6 + 장비·부품 공격력 (기교는 민첩, 마법은 지능 기준)` },
+    { n: '①', label: '기본 공격력', value: `${d.baseAtk}`,
+      note: '직업 기본치 + 장비·부품 공격력 (물리·기교·마법 공용 — 1.170.0 통합)' },
     { n: '②', label: '% 보정 (곱연산)', value: `물리 +${physPct}% · 마법 +${magPct}%`,
-      note: physPct || magPct ? '특성·종족·출신·계약·유니크의 물리%/마법%는 모두 더한 뒤 ①에 한 번 곱한다 (흑색 화약도 여기)' : '보유한 % 보정이 없다' },
+      note: physPct || magPct ? `특성·종족·출신·계약·유니크의 물리%/마법%와 능력 보정(공격력 ${d.atkPtPct >= 0 ? '+' : ''}${d.atkPtPct || 0}%)을 모두 더한 뒤 ①에 한 번 곱한다` : '보유한 % 보정이 없다' },
     { n: '③', label: '고정 가산 (곱연산 밖)', value: `물리 +${d.physFlatAdd || 0} · 마법 +${d.magFlatAdd || 0}`,
       note: (d.physFlatAdd || d.magFlatAdd) ? '거체의 반지(최대HP 8%)·마력 격막(보호막 30%) — ②의 %와 곱해지지 않는 별도 가산' : '해당 유니크 미보유' },
-    { n: '＝', label: '내 공격력', value: `물리 ${d.atk} · 기교 ${d.fin} · 마법 ${d.mag}`,
-      note: '스킬의 참조 능력치에 따라 셋 중 하나를 쓴다. 기본기는 셋 중 가장 높은 값' },
+    { n: '＝', label: '내 공격력', value: d.atk === d.mag ? `${d.atk}` : `물리 ${d.atk} · 마법 ${d.mag}`,
+      note: '물리 스킬은 물리 값, 마법 스킬은 마법 값을 쓴다 (% 보정이 같으면 둘은 같은 수치). 기본기는 큰 쪽' },
     { n: '④', label: '× 스킬 위력%', value: '스킬마다 상이',
       note: `연격(N회 타격)은 위력%를 매 타마다 따로 굴린다 — 상태이상·자가 버프도 ×N. ⏳ 기본 쿨다운 1당 위력 +18% + 🎖 장비 품질 배율(D ×0.7 / C ×0.8 / B ×1.0 / A ×1.2) 보정 — 품질은 장비 카드에 표시. ⚙ 발동 장비가 마물 레벨보다 ${BURIED_GEAR_DECAY.graceLv}Lv 넘게 낡으면 위력이 깎인다 (하한 ${BURIED_GEAR_DECAY.floorPct}% — 장비 카드에 감쇠율 표시)` },
     { n: '⑤', label: '× 주는 피해 보정', value: '[격노] +10%/스택 · [약화] -6%/스택',
@@ -2261,7 +2306,9 @@ export function resolveBuriedAttack(att, def, skill, { isPlayer = false, traits 
   if (statKey === 'int') offense *= 1 + (att.envMagPct || 0) / 100;
   let taken = buriedTakenMult(def) * (1 + (def.envTakenPct || 0) / 100);
   // 1.130.0 — 몬스터 내성 프로필 (BB2 시트 이식): 물리/마법 내성·전쾌시 방어
-  const isMagAtk = statKey === 'int' || (!statKey && (att.mag || 0) >= Math.max(att.atk || 0, att.fin || 0));
+  // 1.170.0 — 공격력 통합 후 물리=마법이 보통이라, 동률이면 직업 주 속성(att.mainMag)을 따른다
+  const isMagAtk = statKey === 'int' || (!statKey && ((att.mag || 0) > Math.max(att.atk || 0, att.fin || 0)
+    || ((att.mag || 0) === Math.max(att.atk || 0, att.fin || 0) && !!att.mainMag)));
   if (def.physTakenPct && !isMagAtk) taken *= 1 + def.physTakenPct / 100;
   if (def.magTakenPct && isMagAtk) taken *= 1 + def.magTakenPct / 100;
   if (def.fullGuardPct && def.maxHp > 0 && def.hp >= def.maxHp) taken *= Math.max(0, 1 - def.fullGuardPct / 100);
@@ -3311,7 +3358,7 @@ export const BURIED_UNIQUES = [
   UQ({ id: 'u109', name: '저주 포식자',     slot: 'acc',   skillId: 'silenceSigil',src: 109, desc: '[저주]에 걸릴 때마다 무덤 먼지 10을 얻는다.' }),
   UQ({ id: 'u106', name: '각성의 관',       slot: 'helm',  skillId: 'focusMind',   src: 106, desc: '전투를 SP 100%로 시작한다. (기본 55%)' }),
   // ===== 성장·탐험 =====
-  UQ({ id: 'u85',  name: '성장의 씨앗',     slot: 'helm',  skillId: 'insight',     src: 85,  desc: '레벨이 오를 때마다 무작위 능력치 +2를 추가로 얻는다.' }),
+  UQ({ id: 'u85',  name: '성장의 씨앗',     slot: 'helm',  skillId: 'insight',     src: 85,  desc: '레벨이 오를 때마다 무작위 능력 보정을 추가로 얻는다 (공격력 +2% · 최대 HP +2% · 치명 +1.2%p/회피 +0.8%p 중 하나).' }),
   UQ({ id: 'u100', name: '수확자의 서',     slot: 'acc',   skillId: 'venomSigil',  src: 100, desc: '적 처치 시 75% 확률로 장착 스킬 하나의 레벨이 오른다.' }),
   UQ({ id: 'u102', name: '순례자의 성표',   slot: 'acc',   skillId: 'lifeCharm',   src: 102, desc: '층을 오를 때마다 25% 확률로 무작위 스킬 레벨이 오른다.' }),
   UQ({ id: 'u103', name: '상인의 인장',     slot: 'acc',   skillId: 'bloodSigil',  src: 103, desc: '무덤 상인의 판매 가격이 40% 할인된다.' }),
@@ -3597,7 +3644,10 @@ export function buriedUniqueAffinity(u) {
 export function buriedMainAttr(char) {
   if (!char) return null;
   const d = buriedDerived(char);
-  return (d.mag || 0) >= Math.max(d.atk || 0, d.fin || 0) ? 'mag' : 'phys';
+  // 1.170.0 — 공격력 통합 후엔 물리/마법 값이 보통 같다 → 동률이면 직업 주 스탯으로 판정
+  if ((d.mag || 0) !== (d.atk || 0)) return d.mag > d.atk ? 'mag' : 'phys';
+  const cb = getBuriedClass(char.classId)?.stats || {};
+  return (cb.int || 0) > Math.max(cb.str || 0, cb.dex || 0) ? 'mag' : 'phys';
 }
 export const BURIED_UNIQUE_AFFINITY_PCT = 70; // 메인 속성 풀 비중 (PM 결정)
 
@@ -4253,7 +4303,8 @@ const pendStatus = (char, s, n) => ({ ...char, pendingStatuses: [...(char.pendin
 // 1.134.0 — 이벤트 보상 심층 스케일 (저주 보상 1.117.0과 동일 공식: 마물 레벨당 +10%)
 const evScale = (c) => 1 + Math.max(0, buriedMonsterLevel(c) - 1) * 0.10;
 // 1.151.0 — 영구 스탯 보상도 깊이를 탄다 (고정 +2는 심층에서 무의미했다)
-const evStatGain = (c) => 2 + Math.floor(buriedMonsterLevel(c) / 25);
+// 1.170.0 — 포인트가 % 보정이 되면서 레벨 비례 폭을 줄였다 (25레벨당 → 100레벨당 +1)
+const evStatGain = (c) => 2 + Math.floor(buriedMonsterLevel(c) / 100);
 const evGold = (c, base) => Math.round(base * evScale(c));
 const evHeal = (c, pct) => { const d = buriedDerived(c); return { ...c, hp: Math.min(d.maxHp, c.hp + Math.round(d.maxHp * pct / 100)) }; };
 const evHurt = (c, pct) => { const d = buriedDerived(c); return { ...c, hp: Math.max(1, c.hp - Math.round(d.maxHp * pct / 100)) }; };
@@ -4323,10 +4374,10 @@ const EVENT_OUTCOMES = {
   ],
   // ===== ⛲ 샘 — 영구 성장 =====
   'spring:drink': [
-    { w: 42, run: (c) => { const n = evStatGain(c); const k = pick(['str', 'dex', 'int', 'vit']); const nm = BURIED_STATS.find(s => s.id === k)?.name;
-      return { char: { ...c, stats: { ...c.stats, [k]: (c.stats[k] || 0) + n } }, text: `힘이 차오른다 — ${nm} +${n} (영구).`, tone: 'good' }; } },
-    { w: 20, run: (c) => { const n = evStatGain(c) * 2; const k = pick(['str', 'dex', 'int', 'vit']); const nm = BURIED_STATS.find(s => s.id === k)?.name;
-      return { char: { ...c, stats: { ...c.stats, [k]: (c.stats[k] || 0) + n } }, text: `샘이 응답했다! ${nm} +${n} (영구).`, tone: 'good' }; } },
+    { w: 42, run: (c) => { const n = evStatGain(c); const k = pick(['str', 'dex', 'int', 'vit']); 
+      return { char: { ...c, stats: { ...c.stats, [k]: (c.stats[k] || 0) + n } }, text: `힘이 차오른다 — ${buriedStatGainText(k, n)} (영구).`, tone: 'good' }; } },
+    { w: 20, run: (c) => { const n = evStatGain(c) * 2; const k = pick(['str', 'dex', 'int', 'vit']); 
+      return { char: { ...c, stats: { ...c.stats, [k]: (c.stats[k] || 0) + n } }, text: `샘이 응답했다! ${buriedStatGainText(k, n)} (영구).`, tone: 'good' }; } },
     { w: 22, run: (c) => ({ char: pendStatus(c, 'curse', 3), text: '샘 바닥의 눈과 마주쳤다 — 다음 전투를 [저주] 3으로 시작한다.', tone: 'bad' }) },
     { w: 16, run: (c) => ({ char: evHurt(c, 30), text: '물이 시커멓게 변한다 — 최대 HP의 30% 피해.', tone: 'bad' }) },
   ],
@@ -4343,11 +4394,11 @@ const EVENT_OUTCOMES = {
       return { char: evHeal(c, 40), text: `석상이 헌금을 받아들인다 — 🕯 +${ctx.dustGain} · HP 40% 회복.`, tone: 'good' }; } },
   ],
   'statue:blood': [
-    { w: 55, run: (c) => { const n = evStatGain(c); const k = pick(['str', 'dex', 'int', 'vit']); const nm = BURIED_STATS.find(s => s.id === k)?.name;
-      return { char: { ...c, stats: { ...c.stats, [k]: (c.stats[k] || 0) + n } }, text: `피를 받아 마신 석상이 축복을 내린다 — ${nm} +${n} (영구).`, tone: 'good' }; } },
+    { w: 55, run: (c) => { const n = evStatGain(c); const k = pick(['str', 'dex', 'int', 'vit']); 
+      return { char: { ...c, stats: { ...c.stats, [k]: (c.stats[k] || 0) + n } }, text: `피를 받아 마신 석상이 축복을 내린다 — ${buriedStatGainText(k, n)} (영구).`, tone: 'good' }; } },
     { w: 45, run: (c) => { const ids = buriedEquippedSkills(c).map(x => x.skill.id).filter(id => (c.skillLevels?.[id] || 1) < BURIED_SKILL_MAX_LV);
       if (ids.length === 0) { const n = evStatGain(c); const k = pick(['str', 'dex', 'int', 'vit']);
-        return { char: { ...c, stats: { ...c.stats, [k]: (c.stats[k] || 0) + n } }, text: `올릴 스킬이 없어 힘으로 갚는다 — ${BURIED_STATS.find(s => s.id === k)?.name} +${n}.`, tone: 'good' }; }
+        return { char: { ...c, stats: { ...c.stats, [k]: (c.stats[k] || 0) + n } }, text: `올릴 스킬이 없어 힘으로 갚는다 — ${buriedStatGainText(k, n)}.`, tone: 'good' }; }
       const r = raiseBuriedSkill(c, pick(ids));
       return { char: r.char, text: `석상이 기억을 되돌려준다 — 스킬 하나가 Lv.${r.lv}이 되었다.`, tone: 'good' }; } },
   ],
@@ -4507,13 +4558,12 @@ export function acceptBuriedCurse(char, curseId, choiceId = 'wealth') {
   const scale = 1 + Math.max(0, monLv - 1) * 0.10;
 
   if (choiceId === 'growth') {
-    const n = (2 + Math.floor(monLv / 25)) * (c.sev >= 3 ? 2 : 1);
+    const n = (2 + Math.floor(monLv / 100)) * (c.sev >= 3 ? 2 : 1); // 1.170.0 — % 보정화로 25 → 100
     const k = pick(['str', 'dex', 'int', 'vit']);
-    const nm = BURIED_STATS.find(x => x.id === k)?.name;
     return {
       char: { ...cursed, stats: { ...cursed.stats, [k]: (cursed.stats[k] || 0) + n } },
       reward: { dust: 0, gold: 0 },
-      text: `왕관이 피에 새겨진다 — ${nm} +${n} (영구).`,
+      text: `왕관이 피에 새겨진다 — ${buriedStatGainText(k, n)} (영구).`,
     };
   }
   if (choiceId === 'treasure') {
@@ -4865,8 +4915,8 @@ export function aggregateBuriedContracts(char) {
 export const BURIED_SHARD = { name: '죽음의 조각', icon: '☠' };
 export const BURIED_PART_SLOT_COSTS = [0, 20, 100, 240, 500]; // n번째 부품 장착 비용
 export const BURIED_PARTS = [
-  { id: 'p_atk',    name: '완력 코어',    desc: '물리·기교 공격력 +6', fx: { atk: 6 } },
-  { id: 'p_mag',    name: '마도 코어',    desc: '마법 공격력 +6',      fx: { mag: 6 } },
+  { id: 'p_atk',    name: '완력 코어',    desc: '공격력 +6', fx: { atk: 6 } },
+  { id: 'p_mag',    name: '마도 코어',    desc: '공격력 +6 (1.170.0 공격력 통합)', fx: { mag: 6 } },
   { id: 'p_hp',     name: '생체 조직',    desc: '최대 HP +40',        fx: { hp: 40 } },
   { id: 'p_def',    name: '골판 장갑',    desc: '방어력 +6',           fx: { def: 6 } },
   { id: 'p_shield', name: '역장 발생기',  desc: '보호막 +25',          fx: { barrier: 25 } },
@@ -4887,7 +4937,7 @@ export const BURIED_PARTS = [
   { id: 'p_ruin_rot',   dungeon: 'ruins',     needDeep: 100, name: '부패 배양낭',   desc: '상태이상 확률 +30%', fx: { statusChance: 30 } },
   { id: 'p_ruin_seal',  dungeon: 'ruins',     needDeep: 100, name: '방수 격막',     desc: '회복량 +25%', fx: { healPct: 25 } },
   { id: 'p_chasm_bone', dungeon: 'chasm',     needDeep: 100, name: '충격 흡수 골격', desc: '최대 HP +80', fx: { hp: 80 } },
-  { id: 'p_chasm_core', dungeon: 'chasm',     needDeep: 100, name: '낙하자의 심장', desc: '물리·기교 공격력 +10, 마법 +10', fx: { atk: 10, mag: 10 } },
+  { id: 'p_chasm_core', dungeon: 'chasm',     needDeep: 100, name: '낙하자의 심장', desc: '공격력 +10', fx: { atk: 10 } },
   { id: 'p_abyss_eye',  dungeon: 'abyss',     needDeep: 100, name: '심연 동공',     desc: '치명 확률 +8%, 추격 피해 +8', fx: { crit: 8, chase: 8 } },
   { id: 'p_abyss_skin', dungeon: 'abyss',     needDeep: 100, name: '어둠막 피막',   desc: '보호막 +60, 전투 시작 🧱방벽 +1', fx: { barrier: 60, startWall: 1 } },
 ];
@@ -4967,7 +5017,7 @@ export const BURIED_RIVAL_TUNING = {
   hpMult: 1.7,         // 난입 적 HP = 파리티 유저 최대 HP × 이 값 (유저전 특유의 "질긴" 감각)
   hitPct: 27,          // 난입 적 일반타 = 내 최대 HP의 이 % (내 방어를 반영해 역산 — 전 층 일정한 위협)
   defMult: 0.55,       // 방어·회피는 절반 수준 — 유저전이 수문장보다 아프면 안 된다
-  statSteal: 2,        // 승리 시 주 스탯 영구 획득 기본치 (+ 마물 25레벨당 +1)
+  statSteal: 2,        // 승리 시 주 스탯 영구 획득 기본치 (+ 마물 100레벨당 +1, 1.170.0)
 };
 
 // 시드 난수 — mulberry32. Math.random 금지 구역 (결정론이 시스템의 뼈대다)
@@ -5143,7 +5193,7 @@ export function buildBuriedRivalEnemy(rival, char, stolenPts = 0) {
 
 // 승리 보상 — 상대 주 스탯 영구 획득량 (샘·석상과 같은 심층 스케일)
 export function buriedRivalStatGain(char) {
-  return BURIED_RIVAL_TUNING.statSteal + Math.floor(buriedMonsterLevel(char) / 25);
+  return BURIED_RIVAL_TUNING.statSteal + Math.floor(buriedMonsterLevel(char) / 100); // 1.170.0 — % 보정화로 25 → 100
 }
 
 // 시드 고정 실행 (1.154.0) — 블록 안에서 Math.random이 시드 난수로 바뀐다.
