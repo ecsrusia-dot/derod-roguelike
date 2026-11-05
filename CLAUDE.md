@@ -1006,7 +1006,9 @@ PM이 AskUserQuestion으로 확정한 설계. **던전앤파이터 모티브, "�
 | ⑤ | 능력치 단순화 | **핵심 6개**(공격력·HP·방어·치명·회피·SP회복). 4스탯 표시 폐지 — 직업 기본 스탯은 기본치 환산(Lv1 불변), 그 외 포인트는 `BURIED_STAT_PT` % 보정. 공격력 1종 통합(atk=fin, mag는 마법%만 다름). 옵션 풀 15→6 (수치 폭 축소로 전투력 ±5%) | ✅ 1.170.0 |
 | ④ | 스킬 구조 | **수동 2 + 자동 4** — 쿨다운 자동 순환(PM 결정: SP 무료·횟수 무제한). `BURIED_AUTO_POOLS`(투구 매 턴 / 갑옷 피격 후 / 장신구 공격 후) + 전투 `act(..., {auto:true})`가 신속 경로처럼 턴 미소모. 발동은 turnNo effect가 내 턴 시작에 슬롯 순서대로 1개씩 | ✅ 1.171.0 |
 | ③ | 내구도 | **전투당 D8/C5/B3/A2회** (`BURIED_SKILL_USES`, 매 전투 리셋 — 전투 `spentMap`만 차감, App은 `item.usesSpent` 누적 중단). 마모(`BURIED_WEAR_PCT`=0)·파손(`isBuriedSlotDepleted`=false) 폐지. 보급의 봉헌 = 다음 전투 +2, 야영 = +1 (`char.bonusUses`, 전투 승리 정산에서 0으로 소비) | ✅ 1.172.0 |
-| ①② | 추가 | ✅ 자동 전투+배속 1.174.0 (전투 화면 `autoBattle`·`speed` localStorage, 모듈 `BATTLE_SPEED`가 wait 압축, 자동 행동은 자동 슬롯 발동 완료 후 380ms 타이머 — busy 변화 시 cleanup으로 이중 행동 방지) / ⏳ 획득 자동 규칙 / ⏳ 빌드 시너지 태그 | 진행 중 |
+| ①② | 추가 | ✅ 자동 전투+배속 1.174.0 (전투 화면 `autoBattle`·`speed` localStorage, 모듈 `BATTLE_SPEED`가 wait 압축, 자동 행동은 자동 슬롯 발동 완료 후 380ms 타이머 — busy 변화 시 cleanup으로 이중 행동 방지) / ✅ 획득 자동 규칙 1.175.0 (`buriedLootAutoTrash` 순수 함수 + 던전 화면 effect, 유니크 제외, 설정 localStorage) / ⏳ 빌드 시너지 태그 | 진행 중 |
+
+⚠️ 1.175.0 교훈: `BuriedDungeonScreen`은 `if (!char) return null` 조기 반환이 있다 — **신규 훅은 반드시 그 위에** 두고, effect 안에서 char 확인 후에만 아래 함수를 호출할 것.
 | + | 방 무작위화 | PM 지시 「방은 랜덤, 이벤트 결과만 고른다」 — `pickBuriedDoor`(전투 최소 `BURIED_DOOR_BATTLE_PCT` 45%, 나머지 균등, chute 제외) + `char.door`{floor,idx,seen,rerolls}로 결과 고정. 미궁 기믹·길잡이·dl1은 「다른 문 찾기」(`buriedDoorRerolls`)로 전환 | ✅ 1.173.0 |
 | + | 방 자동 진입 | PM 지시 「2단계 번거롭다」 — 던전 화면 `autoEnter` effect(키 floor:steps, pendingLoot·재앙 게이지 시 정지)가 층 도착 즉시 진입. 리롤은 방 안 `rerollRoom`(door.fresh = 진입 직후 roomData JSON과 같을 때만). 재앙 거절은 `char.calamityDeclined = floor` | ✅ 1.173.1 |
 

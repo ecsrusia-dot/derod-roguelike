@@ -35,7 +35,7 @@ import {
   resolveBuriedLoot, buriedBossKeyAt, buriedModTransferCost,
   BURIED_CHUTE_ROOM, BURIED_CHUTE_HP_PCT, buriedChuteJump, buriedLootPower,
   tickBuriedGearBreak, BURIED_BREAK_GRACE,
-  buriedZoneAt, buriedRoomThreat, pickBuriedDoor, buriedDoorRerolls,
+  buriedZoneAt, buriedRoomThreat, pickBuriedDoor, buriedDoorRerolls, buriedLootAutoTrash,
   BURIED_GHOST_RANKS,
   rollBuriedIntrusion, buildBuriedRivalEnemy,
 } from '../../data.js';
@@ -69,6 +69,36 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onLogEvent, on
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ⚠ 1.175.0 — 모든 훅은 아래 조기 반환(!char)보다 위에 둔다 (런 종료로 char가 사라질 때 훅 개수 불일치 방지).
+  //   effect 안에서는 char 확인 뒤에만 아래 함수(autoEnter·resolveLoot)를 부른다.
+  // ⚙ 획득 자동 규칙 (1.175.0) — 기기별 편의 설정
+  const [lootRule, setLootRule] = useState(() => {
+    try { return { tier: 'none', notBetter: false, ...(JSON.parse(localStorage.getItem('buried_loot_rule') || '{}')) }; }
+    catch { return { tier: 'none', notBetter: false }; }
+  });
+  const changeLootRule = (r) => { setLootRule(r); try { localStorage.setItem('buried_loot_rule', JSON.stringify(r)); } catch { /* 무시 */ } };
+  const lootAutoRef = useRef(null);
+  useEffect(() => {
+    if (!char) return;
+    const item = char.pendingLoot?.[0];
+    if (!item || lootAutoRef.current === item.id) return;
+    if (!buriedLootAutoTrash(item, char.equipped?.[item.slot], lootRule)) return;
+    lootAutoRef.current = item.id;
+    resolveLoot(false, false, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [char?.pendingLoot, lootRule]);
+  const autoKeyRef = useRef(null);
+  useEffect(() => {
+    if (!char || char.room || !char.offers || (char.pendingLoot || []).length > 0) return;
+    // 🌑 재앙 게이지가 찼으면 멈추고 맞설지 묻는다 (거절한 층은 그대로 진행)
+    if ((char.calamityGauge || 0) >= BURIED_CALAMITY_GAUGE_MAX && char.calamityDeclined !== char.floor) return;
+    const key = `${char.floor}:${char.steps || 0}`;
+    if (autoKeyRef.current === key) return;
+    autoKeyRef.current = key;
+    autoEnter();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [char]);
 
   if (!char) return null;
   const cls = getBuriedClass(char.classId);
@@ -144,6 +174,19 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onLogEvent, on
     onUpdateChar({ ...char, room: type, roomData, roomEffect: offer.effect || null, ...(doorMeta ? { door: { ...doorMeta, fresh: JSON.stringify(roomData) } } : {}) }, 0);
   };
 
+  // ⚖ 장비 판단 — 교체/버리기 (판단 창과 자동 규칙이 공유)
+  const resolveLoot = (replace, transferMod, auto = false) => {
+    const pending = char.pendingLoot?.[0];
+    const cost = replace && transferMod && pending ? buriedModTransferCost(pending) : 0;
+    const r = resolveBuriedLoot(char, replace, { transferMod });
+    onUpdateChar(r.char, r.dustGain - cost);
+    const bits = [];
+    if (r.dismantled) bits.push(`${auto ? '⚙ 규칙 — ' : ''}${r.dismantled.name} 자동 분해 — ${BURIED_DUST_ICON} +${r.dustGain}`);
+    if (r.runesBack > 0 || r.runesLost > 0) bits.push(`ᚱ 룬 ${r.runesBack}개 회수${r.runesLost > 0 ? ` · ${r.runesLost}개 소실` : ''}`);
+    if (r.modMoved) bits.push(`◈ 「${r.modMoved}」 전승 완료 (${BURIED_DUST_ICON} -${cost})`);
+    if (bits.length > 0) setNotice(bits.join(' · '));
+  };
+
   // 🚪 자동 진입 (1.174.0, PM 지시 「문 열고 또 들어가는 2단계가 번거롭다」) — 층에 도착하면 바로 무작위 방
   const autoEnter = () => {
     const idx = pickBuriedDoor(offers);
@@ -160,17 +203,6 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onLogEvent, on
     setNotice('🌀 갈림길을 되짚어 다른 길로 들어섰다.');
     enterRoom(offers[idx], { ...door, idx, seen: [...(door.seen || []), idx], rerolls: (door.rerolls || 0) + 1 });
   };
-  const autoKeyRef = useRef(null);
-  useEffect(() => {
-    if (!char || char.room || !char.offers || (char.pendingLoot || []).length > 0) return;
-    // 🌑 재앙 게이지가 찼으면 멈추고 맞설지 묻는다 (거절한 층은 그대로 진행)
-    if ((char.calamityGauge || 0) >= BURIED_CALAMITY_GAUGE_MAX && char.calamityDeclined !== char.floor) return;
-    const key = `${char.floor}:${char.steps || 0}`;
-    if (autoKeyRef.current === key) return;
-    autoKeyRef.current = key;
-    autoEnter();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [char]);
 
   // 장비 획득 — 같은 스킬이면 스킬 레벨이 오른다 (원작 규칙)
   const gainItem = (item, extraPatch = {}) => {
@@ -870,17 +902,7 @@ export default function BuriedDungeonScreen({ meta, onUpdateChar, onLogEvent, on
       {/* 획득 판단 (1.113.0) — 인벤토리 폐지: 대기열이 빌 때까지 차례로 [교체/버리기]
           1.160.0 「순환 패키지」 — 룬 회수 + ◈접두어 전승 (먼지 지불) */}
       {(char.pendingLoot || []).length > 0 && (
-        <BuriedLootModal char={char} dust={b.dust || 0} onResolve={(replace, transferMod) => {
-          const pending = char.pendingLoot?.[0];
-          const cost = replace && transferMod && pending ? buriedModTransferCost(pending) : 0;
-          const r = resolveBuriedLoot(char, replace, { transferMod });
-          onUpdateChar(r.char, r.dustGain - cost);
-          const bits = [];
-          if (r.dismantled) bits.push(`${r.dismantled.name} 자동 분해 — ${BURIED_DUST_ICON} +${r.dustGain}`);
-          if (r.runesBack > 0 || r.runesLost > 0) bits.push(`ᚱ 룬 ${r.runesBack}개 회수${r.runesLost > 0 ? ` · ${r.runesLost}개 소실` : ''}`);
-          if (r.modMoved) bits.push(`◈ 「${r.modMoved}」 전승 완료 (${BURIED_DUST_ICON} -${cost})`);
-          if (bits.length > 0) setNotice(bits.join(' · '));
-        }} />
+        <BuriedLootModal char={char} dust={b.dust || 0} rule={lootRule} onRuleChange={changeLootRule} onResolve={resolveLoot} />
       )}
     </div>
   );
