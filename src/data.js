@@ -38,6 +38,7 @@ export * from './data/raid.js';
 export * from './data/gamble.js';
 export * from './data/masters.js';
 export * from './data/titles.js';
+export * from './data/regression.js';
 export * from './data/potions.js';
 export * from './data/hof.js';
 export * from './data/buried.js';
