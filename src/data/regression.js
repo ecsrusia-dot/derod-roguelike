@@ -49,6 +49,10 @@ export const REGRESSION_TUNING = {
   // 직업별 모드 보정 (CombatScreen engravingFx로 전달 — 본편 각인·각성도와 무관한 이 모드 전용 값).
   // 1.178.0 실측: 사제는 회복 -75% / 받는 피해 +35%에도 매 전투 HP ~95%로 끝나 1생부터 정복 → PM 결정 대기, 현재 보정 없음
   classFx: {},
+  // 1.179.0~ 전투 후 HP 규칙 (PM 결정): 전투 중 회복은 그 전투 안에서만 유효 —
+  // 전투 후 HP = 전투 전 HP − 받은 피해 × woundPct (회복으로 되돌린 양은 이월되지 않음, 사제 독주 해소)
+  woundPct: 0.6,
+  spireWoundPct: 0.8,       // 첨탑 층 사이 (층간 회복 없음 규칙의 연장)
   relicSlots: 2,            // 출전 준비에서 장착할 유물 수
   // 랜덤 획득 (승리 시) — 일반: 아래 중 1개 굴림 / 강적: 유물 확정 + passive·potion 중 1개
   lootNormal: { relic: 0.22, passive: 0.18, potion: 0.30 },  // 나머지 = 없음
@@ -543,4 +547,11 @@ export function regressionCombatExpedition(regionKey) {
 
 export function regressionClassFx(classId) {
   return { ...(REGRESSION_TUNING.classFx[classId] || {}) };
+}
+
+// 1.179.0~ 전투 후 HP 비율 — hpBefore(절대값)에서 받은 피해 × 상처 비율만큼만 남는다
+export function regressionPostCombatHpPct(hpBefore, maxHp, damageTaken = 0, spire = false) {
+  const w = spire ? REGRESSION_TUNING.spireWoundPct : REGRESSION_TUNING.woundPct;
+  const hp = hpBefore - Math.max(0, damageTaken) * w;
+  return Math.min(1, Math.max(0.01, hp / Math.max(1, maxHp)));
 }

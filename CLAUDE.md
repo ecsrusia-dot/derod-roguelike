@@ -1025,6 +1025,7 @@ PM이 AskUserQuestion으로 확정한 설계. **던전앤파이터 모티브, "�
 | 시뮬 기준 | 1생 첨탑 자격 ~24% → 2생 ~97% / 첫 정복 중앙값 3생 / 생당 기록 6~8종. 밸런스는 `REGRESSION_TUNING` 한 곳 |
 | MVP 2차 ✅ (1.177.0) | `components/regression/RegressionGame.jsx` (로비·날짜 허브·기록서·회귀 정산) + 본편 `CombatScreen` 재사용 — 신규 prop `enemyOverride`(ENEMIES에 없는 적, `buildInitialEnemy`도 동일) + `observationsRef`(적 행동 [{heavy,countered}] → onVictory 3번째 인자·onDefeat 1번째 인자 `observations`). 저장 `meta.regression`(`getRegression`, 진행 중 생 = `.run`, 전투 중 새로고침 = `run.pending`/`spireRound`로 재전투). 전투 meta는 `upgrades:{}`로 제단 미적용. 타이틀 메뉴 「회귀의 탐험가」 |
 | MVP 3-1 ✅ (1.178.0) | PM 결정: **출전 준비 → 자동 전투(개입 불가)**. CombatScreen 신규 prop `spectate`(수동 버튼 4종 onClick 차단, AI는 같은 핸들러 직접 호출). 출전 준비 = 적 미리보기 + 본편 `PrepScreen`(패시브·유물 2칸) + 포션 벨트(`CLASS_BELT.max`). 랜덤 획득 `rollRegressionLoot`(유물 풀 = 전투 효과 키만 `REGRESSION_RELIC_POOL` / 패시브 풀 강타 제외 / 포션). 밸런스 = `REGRESSION_TUNING.regionEnemyMult`(expedition 배율로 전달) + `classFx`(직업별 engravingFx, 현재 비어 있음). ⚠️ 실측 도구: Playwright 봇으로 생 단위 자동 진행 — 사제는 보정(회복 -75%·피해 +35%)에도 매 전투 HP ~95% 유지로 1생 정복 → PM 결정 대기 |
+| 1.178.1 상처 규칙 ✅ | PM 결정(사제 독주 해소): 전투 후 HP = 전투 전 HP − 받은 피해 × `woundPct` 0.6 (첨탑 `spireWoundPct` 0.8). 전투 중 회복은 이월 안 됨. CombatScreen `damageTakenRef`(player.hp 감소분 누적 effect) → onVictory 3번째 인자 `damageTaken`. 봇 실측: 사제 1생 정복 → 2생 정복 / 검사·술법사·마족 3생 내 미정복 |
 | 다음 | MVP 3-2 — 동료 4명 · 지역 사건(EventScreen 재사용) · 상점 · 엔딩 5종 |
 
 ### 🏆 업적 시스템 (1.90.0 전면 개편 — 신규 콘텐츠 추가 시 필수 체크)

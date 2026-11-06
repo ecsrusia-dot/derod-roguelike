@@ -140,6 +140,14 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
   // 1.177.0~ 회귀의 탐험가 「기록자의 눈」 — 적 행동 관찰 기록 [{ heavy, countered }]
   //   countered = 예고된 대공격을 회피·방어·기절로 받아냄. onVictory 3번째 인자 / onDefeat 1번째 인자로 전달
   const observationsRef = useRef([]);
+  // 1.179.0~ 이번 전투에서 받은 피해 총량 (HP 감소분 누적 — 회복과 무관). onVictory 3번째 인자 damageTaken
+  const damageTakenRef = useRef(0);
+  const prevHpRef = useRef(null);
+  useEffect(() => {
+    const hp = player.hp;
+    if (prevHpRef.current != null && hp < prevHpRef.current) damageTakenRef.current += prevHpRef.current - hp;
+    prevHpRef.current = hp;
+  }, [player.hp]);
   // 1.178.0~ spectate: 관전 전용 (회귀의 탐험가 — 출전 준비 후 자동 전투, 플레이어 개입 불가).
   //   autoPlay와 함께 쓰며, 스킬·턴 종료·포션·소울 버튼의 수동 입력만 막는다 (AI는 같은 핸들러를 직접 호출)
   // 1.91.1~ 방랑검사 자동: "턴 시작부터 소울 100" 커밋 플래그 (참격×2 후 무영의 일격 확정 발동용)
@@ -1172,7 +1180,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       finalHp = Math.min(player.maxHp, player.hp + heal);
     }
     // 1.81.0~ 전투 정산 데이터 전달 (출처별 가한 데미지)
-    onVictory(finalHp, enemy.drop, { total: dmgStatsRef.current.total, bySource: { ...dmgStatsRef.current.bySource }, dodges: dodgeCountRef.current, observations: [...observationsRef.current] });
+    onVictory(finalHp, enemy.drop, { total: dmgStatsRef.current.total, bySource: { ...dmgStatsRef.current.bySource }, dodges: dodgeCountRef.current, observations: [...observationsRef.current], damageTaken: damageTakenRef.current });
   };
 
   useEffect(() => {
