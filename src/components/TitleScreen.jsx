@@ -10,6 +10,7 @@ import React from 'react';
 import { PlayCircle, Sparkles, Gem, Trophy, ChevronRight, Swords, BarChart3, Dices, Crown, Skull, Ghost, Hourglass } from 'lucide-react';
 import { PALETTE } from '../utils/helpers.js';
 import { GAME_VERSION, CLASSES, DAILY_MISSIONS, FEATURE_FLAGS } from '../data.js';
+import { checkLatestVersion, compareVersions, forceAppUpdate } from '../utils/appUpdate.js';
 import { getKstDateKey } from '../utils/dailyChallenge.js';
 import { GlassPanel, Chip, UIButton } from './ui/CommonUI.jsx';
 
@@ -30,6 +31,41 @@ function MenuRow({ icon: Icon, label, onClick }) {
       {label}
       <ChevronRight size={14} className="ml-auto" style={{ color: PALETTE.textDim, opacity: 0.7 }} />
     </button>
+  );
+}
+
+// 1.179.1~ 최신 버전 업데이트 버튼 — 타이틀 진입 시 1회 자동 확인, 탭하면 재확인/업데이트
+function UpdateButton() {
+  // status: checking | latest | available | updating | error
+  const [status, setStatus] = React.useState('checking');
+  const [latest, setLatest] = React.useState(null);
+  const check = React.useCallback(async () => {
+    setStatus('checking');
+    const r = await checkLatestVersion();
+    if (r.error) { setStatus('error'); return; }
+    setLatest(r.latest);
+    setStatus(compareVersions(r.latest, GAME_VERSION) > 0 ? 'available' : 'latest');
+  }, []);
+  React.useEffect(() => { check(); }, [check]);
+  const onClick = () => {
+    if (status === 'available') { setStatus('updating'); forceAppUpdate(); return; }
+    if (status !== 'checking' && status !== 'updating') check();
+  };
+  const label = {
+    checking: '⟳ 확인 중…',
+    latest: '✓ 최신 버전',
+    available: `⬆ v${latest} 업데이트`,
+    updating: '⟳ 업데이트 중…',
+    error: '⟳ 업데이트 확인',
+  }[status];
+  const hot = status === 'available';
+  return (
+    <button onClick={onClick} className={`ui-press${hot ? ' ui-sheen' : ''}`} aria-label="최신 버전 업데이트" style={{
+      minHeight: 32, padding: '0 12px', borderRadius: 999, fontSize: 11, letterSpacing: '0.06em', fontWeight: hot ? 700 : 400,
+      background: hot ? `${PALETTE.legendary}26` : 'transparent',
+      border: `1px solid ${hot ? PALETTE.legendary : PALETTE.panelBorder}`,
+      color: hot ? PALETTE.legendary : PALETTE.textDim,
+    }}>{label}</button>
   );
 }
 
@@ -150,6 +186,7 @@ export default function TitleScreen({ meta, onStart, onResume, onAltar, onEngrav
               fontSize: 10.5, letterSpacing: '0.12em', padding: '8px 4px',
             }}>계정 관리</button>
           ) : <span />}
+          <UpdateButton />
           {/* 버전 정보 — 클릭 시 업데이트 로그 */}
           <button onClick={onChangelog} className="ui-press" style={{
             background: 'transparent', border: 'none', color: PALETTE.textDim,
