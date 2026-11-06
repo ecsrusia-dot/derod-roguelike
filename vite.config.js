@@ -1,6 +1,21 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import { readFileSync } from 'node:fs';
+
+// 1.179.1~ 최신 버전 확인용 version.json — 빌드마다 GAME_VERSION을 담아 내보낸다.
+// 타이틀 「업데이트 확인」 버튼이 캐시 우회(?t=)로 받아 현재 실행 중인 버전과 비교한다.
+// precache 대상 확장자(globPatterns)에 json이 없어 서비스워커 캐시에 묶이지 않는다.
+function versionJsonPlugin() {
+  return {
+    name: 'dnt-version-json',
+    generateBundle() {
+      const src = readFileSync(new URL('./src/data/version.js', import.meta.url), 'utf8');
+      const version = (src.match(/GAME_VERSION\s*=\s*'([^']+)'/) || [])[1] || '0.0.0';
+      this.emitFile({ type: 'asset', fileName: 'version.json', source: JSON.stringify({ version, builtAt: new Date().toISOString() }) });
+    },
+  };
+}
 
 // GitHub Pages에 배포할 때 저장소 이름을 base에 적어야 합니다.
 // 예: 저장소가 https://github.com/jongphil/derod-roguelike 면 base는 '/derod-roguelike/'
@@ -16,6 +31,7 @@ export default defineConfig({
   base: BASE,
   plugins: [
     react(),
+    versionJsonPlugin(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'icon-192.png', 'icon-512.png'],

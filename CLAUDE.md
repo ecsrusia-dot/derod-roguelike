@@ -1029,6 +1029,14 @@ PM이 AskUserQuestion으로 확정한 설계. **던전앤파이터 모티브, "�
 | MVP 3-2 ✅ (1.179.0) | `REGRESSION_COMPANIONS` 4명(지역 1:1, 호감 0~100 · 동행 40 / 맹약 100, `perks` 선언형 → `aggregateRegressionCompanions` 한 곳에서 합산: 수비 패시브·restHealPct·spireRestPct·potionCap·recordBonusPct·spireWeakness·goldPct·famePerWin·spireWoundCut) + `REGRESSION_EVENTS` 24개(본편 EventScreen 스키마, 모드 전용 reward: fame/affinity/record/heal_pct/combat — ⚠️ 본편 EventScreen은 판정 없는 선택지의 `combat`을 전달하지 않으므로 `reward:{type:'combat',name,bonus}`로 표현, `requireMemory`로 기억 조각 선택지) + `REGRESSION_SHOP`(마을, 0일) + 엔딩 5종(`regressionEndingFor` — 맹약 동료 엔딩 우선). 사건 진행 중 = `run.pendingEvent`, 사건 전투 = `pending.fromEvent`(날짜 미소모) |
 | 다음 | PM 실기기 피드백 대기 — 후보: 동료 대화 이벤트 확장 · 첨탑 난이도 조정 · 업적 연동 |
 
+### ⬆ 최신 버전 업데이트 버튼 (1.179.1)
+
+| 항목 | 내용 |
+|---|---|
+| 구조 | `vite.config.js` `versionJsonPlugin` — 빌드마다 `dist/version.json`({version}) 생성 (GAME_VERSION 정규식 추출). precache globPatterns에 json 없음 → SW 캐시 비대상 |
+| 로직 | `src/utils/appUpdate.js` — `checkLatestVersion`(`./version.json?t=` no-store) / `compareVersions` / `forceAppUpdate`(SW update→unregister, 일러·폰트 캐시 제외 전부 삭제, `?v=` 붙여 replace). 저장은 IndexedDB라 무관 |
+| UI | `TitleScreen` 하단 `UpdateButton` — 진입 시 자동 확인, 상태 5종(확인 중/최신/업데이트 가능/업데이트 중/확인 불가). dev 서버는 version.json 없음 → 「업데이트 확인」 표시가 정상 |
+
 ### 🏆 업적 시스템 (1.90.0 전면 개편 — 신규 콘텐츠 추가 시 필수 체크)
 
 | 규칙 | 내용 |
