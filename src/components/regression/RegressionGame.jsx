@@ -8,7 +8,7 @@
 // 순수 로직은 전부 src/data/regression.js — 이 파일은 화면과 저장만.
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Footprints, Tent, Swords, Skull, BookOpen, Sparkles, MapPin, Hourglass } from 'lucide-react';
+import { Footprints, Tent, Swords, Skull, BookOpen, Sparkles, MapPin, Hourglass, ScrollText, HeartHandshake, Store, Coins } from 'lucide-react';
 import { PALETTE } from '../../utils/helpers.js';
 import {
   CLASSES, CHAPTERS, ENEMIES, GAME_CONFIG,
@@ -22,7 +22,11 @@ import {
   describeRegressionRecord, getRegressionMemory,
   POTIONS, AUTO_SPEED_SKIP, rollRegressionLoot, applyRegressionLoot, describeRegressionLoot,
   setRegressionLoadout, consumeRegressionPotions, regressionCombatExpedition, regressionBeltSlots, regressionClassFx, regressionPostCombatHpPct,
+  REGRESSION_COMPANIONS, REGRESSION_ENDINGS, REGRESSION_SHOP, REGRESSION_EVENTS, regressionCompanionAt, regressionCompanionTier,
+  aggregateRegressionCompanions, applyRegressionTalk, rollRegressionEvent, applyRegressionEvent, buyRegressionShop,
+  regressionVictoryGold, regressionEndingFor, getRegressionCompanion, RELICS,
 } from '../../data.js';
+import EventScreen from '../EventScreen.jsx';
 import PrepScreen from '../PrepScreen.jsx';
 import { AP_TUNING } from '../../combat/initCombat.js';
 import { ScreenHeader, GlassPanel, Chip, UIButton, BottomSheet } from '../ui/CommonUI.jsx';
@@ -121,6 +125,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
     try { localStorage.setItem('regressionSpeed', String(nx)); } catch { /* 저장 불가 무시 */ }
     return nx;
   });
+  const [showShop, setShowShop] = useState(false);
   const [prepEdit, setPrepEdit] = useState(false);   // 출전 준비 — 패시브·유물 세팅 (본편 PrepScreen)
   const [beltSel, setBeltSel] = useState(null);      // 출전 준비 — 포션 벨트 선택 (null = 직전 세팅)
   const [combatBelt, setCombatBelt] = useState([]);  // 전투 중 벨트 (사용 시 줄어듦)
@@ -134,6 +139,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
   const combatMeta = useMemo(() => ({ ...(meta || {}), upgrades: {} }), [meta]);
 
   const saveRun = (nextRun, extra = {}) => onSave({ run: nextRun, ...extra });
+  const combatStats = classData ? Object.fromEntries(Object.entries(classData.stats).map(([k, v]) => [k, v + (run?.statBonus?.[k] || 0)])) : {};
 
   // 전투 진입(출전 준비 확정) 시 벨트 장전 — 새로고침으로 다시 마운트돼도 같은 벨트로 복원
   const combatKey = run && !run.over && ((run.pending?.prepared) || (run.spireRound != null && run.spirePrepared))
@@ -143,7 +149,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
     const left = { ...(run.potions || {}) };
     const belt = (run.loadout?.belt || []).filter(id => { if ((left[id] || 0) > 0) { left[id] -= 1; return true; } return false; });
     usedPotionsRef.current = [];
-    setCombatBelt(belt.slice(0, regressionBeltSlots(run.classId)));
+    setCombatBelt(belt.slice(0, regressionBeltSlots(run.classId, run)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [combatKey]);
 
@@ -165,6 +171,16 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
             <div className="text-[40px]">{c.icon}</div>
             <div className="text-[12px] mt-1" style={{ color: PALETTE.textDim }}>{c.desc}</div>
           </GlassPanel>
+          {run.over === 'victory' && (() => {
+            const end = regressionEndingFor(run);
+            return (
+              <GlassPanel strong style={{ padding: 14, border: `1px solid ${PALETTE.legendary}66` }}>
+                <div className="text-[11px]" style={{ color: PALETTE.textDim }}>엔딩</div>
+                <div className="text-[15px] font-bold" style={{ color: PALETTE.legendary }}>👑 {end.name}</div>
+                <div className="text-[12px] mt-1" style={{ color: PALETTE.text }}>{end.text}</div>
+              </GlassPanel>
+            );
+          })()}
           <GlassPanel style={{ padding: 14 }}>
             <div className="grid grid-cols-3 gap-2 text-center">
               {[['명성', run.fame], ['기록', `${run.learned.length}종`], ['처치', run.kills.normal + run.kills.elite]].map(([l, v]) => (
@@ -215,20 +231,37 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
     );
   }
 
+  // ===== 지역 사건 (본편 EventScreen) =====
+  if (run && !run.over && run.pendingEvent && !run.pending && loadout) {
+    const base = REGRESSION_EVENTS.find(e => e.id === run.pendingEvent);
+    if (base) {
+      const ev = { ...base, choices: base.choices.filter(c => !c.requireMemory || reg.memories.includes(c.requireMemory)) };
+      return (
+        <EventScreen key={ev.id} event={ev} classData={classData} stats={combatStats} skills={loadout.skills} gold={run.gold || 0} gem={0}
+          onResolve={(res) => {
+            const { run: next, notes } = applyRegressionEvent({ ...run, pendingEvent: null }, ev.id, res, { maxHp: loadout.maxHp });
+            setBanner(notes.length ? `📜 ${notes.join(' · ')}` : null);
+            saveRun(next);
+          }} />
+      );
+    }
+  }
+
   // ===== 전투 (탐험 / 첨탑) =====
   // 흐름: 적 확정(pending / spireRound) → 출전 준비(prepared=false) → 자동 전투(관전, 개입 불가)
   const inSpire = run && run.spireRound != null && !run.over;
   if (run && loadout && (run.pending || inSpire)) {
     const spireKey = inSpire ? REGRESSION_SPIRE_CHAIN[run.spireRound] : null;
     const enemyKey = inSpire ? spireKey : run.pending.enemyKey;
-    const override = inSpire ? buildRegressionSpireEnemy(run.spireRound, run.memoryCount) : null;
+    const compFx = aggregateRegressionCompanions(run);
+    const override = inSpire ? buildRegressionSpireEnemy(run.spireRound, run.memoryCount, compFx.spireWeakness) : null;
     const enemyBase = override || ENEMIES[enemyKey];
     const region = getRegressionRegion(run.region);
     const gimmick = !inSpire && region ? (CHAPTERS.find(ch => ch.id === region.chapterId)?.gimmick || null) : null;
     const expedition = regressionCombatExpedition(inSpire ? 'spire' : run.region);
     const prepared = inSpire ? !!run.spirePrepared : !!run.pending.prepared;
     const ownedRelics = loadout.relics;
-    const beltSlots = regressionBeltSlots(run.classId);
+    const beltSlots = regressionBeltSlots(run.classId, run);
     const lo = run.loadout || {};
     const validActiveRelics = (lo.activeRelics || []).filter(n => (run.relics || []).includes(n));
 
@@ -334,7 +367,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
     // --- 자동 전투 (관전) ---
     const settleCommon = (r) => consumeRegressionPotions(r, usedPotionsRef.current);
     const finishSpire = (win, taken) => {
-      let next = applyRegressionSpireResult(settleCommon(run), { win, hpPct: regressionPostCombatHpPct(loadout.hp, loadout.maxHp, taken, true) });
+      let next = applyRegressionSpireResult(settleCommon(run), { win, hpPct: regressionPostCombatHpPct(loadout.hp, loadout.maxHp, taken, true, compFx.spireWoundCut) });
       next = { ...next, spirePrepared: false };
       if (win && !next.over) setBanner(`🗼 첨탑 ${run.spireRound + 1}층 돌파`);
       saveRun(next);
@@ -348,6 +381,9 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
       let next = afterCombat;
       const msgs = [];
       if (win) {
+        const gold = regressionVictoryGold(next, enemyKey);
+        next = { ...next, gold: (next.gold || 0) + gold };
+        msgs.push(`◎ +${gold}G`);
         const loot = rollRegressionLoot(next, tier);
         next = applyRegressionLoot(next, loot);
         const txt = describeRegressionLoot(loot);
@@ -361,7 +397,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
       <CombatScreen
         key={`${run.day}-${enemyKey}-${run.spireRound ?? 'x'}`}
         classData={classData}
-        initialPlayer={{ hp: loadout.hp, maxHp: loadout.maxHp, ...classData.stats }}
+        initialPlayer={{ hp: loadout.hp, maxHp: loadout.maxHp, ...combatStats }}
         initialSkills={loadout.skills}
         initialRelics={ownedRelics}
         activeSkills={lo.activeSkills || null}
@@ -438,6 +474,20 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
             </div>
           </GlassPanel>
 
+          <GlassPanel style={{ padding: 14 }}>
+            <div className="text-[12px] font-bold mb-2" style={{ color: PALETTE.legendary }}>👑 엔딩 {reg.endings.length}/{REGRESSION_ENDINGS.length}</div>
+            <div className="space-y-1">
+              {REGRESSION_ENDINGS.map(e => {
+                const has = reg.endings.includes(e.id);
+                const comp = REGRESSION_COMPANIONS.find(c => c.ending.id === e.id);
+                return (
+                  <div key={e.id} className="text-[12px]" style={{ color: has ? PALETTE.legendary : PALETTE.textDim }}>
+                    {has ? `◆ ${e.name}` : `◇ ??? — ${comp ? `${comp.name}와 맹약을 맺고 첨탑 정복` : '맹약 없이 첨탑 정복'}`}
+                  </div>
+                );
+              })}
+            </div>
+          </GlassPanel>
           <ActionButton icon={BookOpen} title={`기록서 (전생 포함 ${learnedEver}/${Object.keys(REGRESSION_RECORDS).length}종)`} sub="적별 기록 보상 보기" onClick={() => setShowBook(true)} />
           <UIButton variant="primary" className="w-full ui-sheen" onClick={startLife}>
             {reg.loops === 0 ? '여명의 마을에서 눈을 뜬다' : `${reg.loops + 1}번째 생을 시작한다`}
@@ -467,6 +517,15 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
     if (a.kind === 'rest') return saveRun(applyRegressionRest(run));
     if (a.kind === 'travel') return saveRun(applyRegressionTravel(run, a.to));
   };
+  const companion = region ? regressionCompanionAt(region.id) : null;
+  const eventsLeft = region ? REGRESSION_EVENTS.filter(e => e.region === region.id && !(run.seenEvents || []).includes(e.id)).length : 0;
+  const startEvent = () => {
+    const ev = rollRegressionEvent(run, reg.memories);
+    if (!ev) return;
+    setBanner(null);
+    saveRun({ ...run, pendingEvent: ev.id });
+  };
+  const talk = () => { setBanner(null); saveRun(applyRegressionTalk(run, companion.id, combatStats.매력 || 10)); };
   const goSpire = () => {
     setBanner(null);
     saveRun(enterRegressionSpire(run));
@@ -524,7 +583,21 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
               {region && !isRegressionEliteOpen(run, run.region) && (
                 <div className="text-[11px] px-1" style={{ color: PALETTE.textDim }}>강적은 명성 {REGRESSION_TUNING.eliteFameGate}부터 나타난다.</div>
               )}
-              <ActionButton icon={Tent} title="야영 (1일)" sub={`HP +${REGRESSION_TUNING.restHealPct}%`} color={PALETTE.green} onClick={() => doAction({ kind: 'rest' })} />
+              {region && eventsLeft > 0 && (
+                <ActionButton icon={ScrollText} title="사건 탐색 (1일)" sub={`이 지역의 남은 사건 ${eventsLeft}개`} color={PALETTE.twilight} onClick={startEvent} />
+              )}
+              {companion && (() => {
+                const aff = run.affinity?.[companion.id] || 0;
+                return (
+                  <ActionButton icon={HeartHandshake} title={`${companion.name}와 교류 (1일)`} color={companion.color}
+                    sub={aff >= 100 ? '맹약 — 더 이상 오를 호감이 없다' : `${companion.title} · 호감 ${aff}/100 (${regressionCompanionTier(aff).name})`}
+                    disabled={aff >= 100} onClick={talk} />
+                );
+              })()}
+              {run.region === REGRESSION_HUB && (
+                <ActionButton icon={Store} title="마을 상점 (0일)" sub={`보유 ${run.gold || 0}G — 포션·유물·교본·치료소`} color={PALETTE.legendary} onClick={() => setShowShop(true)} />
+              )}
+              <ActionButton icon={Tent} title="야영 (1일)" sub={`HP +${REGRESSION_TUNING.restHealPct + aggregateRegressionCompanions(run).restHealPct}%`} color={PALETTE.green} onClick={() => doAction({ kind: 'rest' })} />
             </div>
             <GlassPanel style={{ padding: 12 }}>
               <div className="text-[12px] font-bold mb-2 flex items-center gap-1.5" style={{ color: PALETTE.dawn }}><Footprints size={14} /> 이동</div>
@@ -543,6 +616,25 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
           </>
         )}
 
+        <GlassPanel style={{ padding: 12 }}>
+          <div className="flex items-center justify-between mb-1.5">
+            <div className="text-[12px] font-bold flex items-center gap-1.5" style={{ color: PALETTE.dawn }}><HeartHandshake size={13} /> 동료</div>
+            <Chip icon={<Coins size={12} />} color={PALETTE.legendary}>{run.gold || 0}G</Chip>
+          </div>
+          <div className="space-y-1">
+            {REGRESSION_COMPANIONS.map(c => {
+              const aff = run.affinity?.[c.id] || 0;
+              const tier = regressionCompanionTier(aff);
+              return (
+                <div key={c.id} className="text-[11px]" style={{ color: aff > 0 ? PALETTE.text : PALETTE.textDim }}>
+                  <b style={{ color: aff > 0 ? c.color : PALETTE.textDim }}>{c.name}</b> {c.title} · {getRegressionRegion(c.region).name} · {tier.name} {aff}
+                  <span style={{ color: PALETTE.textDim }}> — 동행: {c.perkText.ally} / 맹약: {c.perkText.oath}</span>
+                </div>
+              );
+            })}
+          </div>
+        </GlassPanel>
+
         <ActionButton icon={BookOpen} title={`기록서 (${run.learned.length}종 완성)`} sub="적별 기록 게이지·보상" onClick={() => setShowBook(true)} />
 
         <GlassPanel style={{ padding: 12 }}>
@@ -555,6 +647,28 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
           </div>
         </GlassPanel>
       </div>
+      {showShop && (
+        <BottomSheet title={`🛒 마을 상점 — ${run.gold || 0}G`} onClose={() => setShowShop(false)}>
+          <div className="space-y-1.5 pb-2">
+            {REGRESSION_SHOP.map(it => {
+              const name = it.kind === 'potion' ? `${POTIONS[it.id].icon} ${POTIONS[it.id].name}` : it.name;
+              const desc = it.kind === 'potion' ? POTIONS[it.id].desc : it.desc;
+              const can = (run.gold || 0) >= it.price;
+              return (
+                <button key={it.id} disabled={!can} className="ui-press w-full flex items-center gap-2 px-3 text-left"
+                  onClick={() => { const r = buyRegressionShop(run, it.id); if (r.bought) { setBanner(`🛒 ${r.bought}`); saveRun(r.run); } }}
+                  style={{ minHeight: 48, borderRadius: 'var(--r-chip, 8px)', background: PALETTE.panelLight, border: `1px solid ${PALETTE.panelBorder}`, opacity: can ? 1 : 0.45 }}>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[12px] font-bold" style={{ color: PALETTE.text }}>{name}</div>
+                    <div className="text-[11px]" style={{ color: PALETTE.textDim }}>{desc}</div>
+                  </div>
+                  <span className="text-[12px] font-bold tabular-nums" style={{ color: PALETTE.legendary }}>{it.price}G</span>
+                </button>
+              );
+            })}
+          </div>
+        </BottomSheet>
+      )}
       {showBook && <RecordBook reg={reg} run={run} onClose={() => setShowBook(false)} />}
     </div>
   );

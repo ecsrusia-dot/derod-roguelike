@@ -191,13 +191,13 @@ export const REGRESSION_SPIRE_LORD = {
 export const REGRESSION_SPIRE_CHAIN = ['iceMage', 'twilightChild', 'oblivionSealer', 'spireLord'];
 
 // 첨탑 라운드의 실효 적 객체 (본편 ENEMIES 포맷 그대로 → CombatScreen에 넘길 수 있음)
-export function buildRegressionSpireEnemy(round, memoryCount = 0) {
+export function buildRegressionSpireEnemy(round, memoryCount = 0, forceWeak = false) {
   const key = REGRESSION_SPIRE_CHAIN[round];
   if (!key) return null;
   const T = REGRESSION_TUNING;
   if (key === 'spireLord') {
     // 약점 = 받는 데미지 +N% → 본편 CombatScreen에는 받는 데미지 배율 필드가 없어 HP ÷ (1+N%)로 동등 환산
-    const weak = memoryCount >= T.spireWeaknessMemories;
+    const weak = forceWeak || memoryCount >= T.spireWeaknessMemories;
     const hp = weak ? Math.round(REGRESSION_SPIRE_LORD.hp / (1 + T.spireWeaknessTakenPct / 100)) : REGRESSION_SPIRE_LORD.hp;
     return { ...REGRESSION_SPIRE_LORD, hp, weaknessRevealed: weak };
   }
@@ -256,6 +256,9 @@ export function createRegressionRun(metaR = EMPTY_REGRESSION, classId) {
     bonusSkills: {},       // 1.178.0~ 랜덤 획득 패시브 Lv
     potions: {},           // 1.178.0~ 포션 보유 { potionId: 개수 }
     loadout: null,         // 1.178.0~ 직전 출전 준비 { activeSkills, activeRelics, belt }
+    affinity: {},          // 1.179.0~ 동료 호감 { companionId: 0~100 }
+    seenEvents: [],        // 1.179.0~ 이번 생에 본 사건 id
+    statBonus: {},         // 1.179.0~ 사건 능력치 보너스 { 근력: n }
     over: null,            // null | 'death' | 'timeout' | 'spireLose' | 'victory'
     log: [],
   };
@@ -310,7 +313,8 @@ export function applyRegressionTravel(run, to) {
 }
 
 export function applyRegressionRest(run) {
-  const hpPct = Math.min(1, run.hpPct + REGRESSION_TUNING.restHealPct / 100);
+  const comp = run.affinity ? aggregateRegressionCompanions(run).restHealPct : 0;
+  const hpPct = Math.min(1, run.hpPct + (REGRESSION_TUNING.restHealPct + comp) / 100);
   return { ...advanceDays(run, 1, '야영'), hpPct };
 }
 
@@ -329,7 +333,8 @@ export function regressionRecordGain(run, observations = [], intStat = 10) {
   const per = T.recordPerPattern + Math.max(0, intStat - 10) * T.recordIntPerPoint;
   let sum = 0;
   for (const o of observations) sum += per * (o.heavy && o.countered ? T.heavyCounterMult : 1);
-  return sum * (1 + (run.recordBonusPct || 0) / 100);
+  const comp = run.affinity ? aggregateRegressionCompanions(run).recordBonusPct : 0;
+  return sum * (1 + ((run.recordBonusPct || 0) + comp) / 100);
 }
 
 // 전투 시작 기록 — 전투 중 새로고침해도 같은 적과 재전투 (도주 불가, 무덤의 유산·제령사와 동일 원칙)
@@ -359,11 +364,12 @@ export function applyRegressionCombat(run, result) {
   const name = ENEMIES[enemyKey]?.name || enemyKey;
   if (win) {
     const regionMult = T.regionFameMult[run.region] || 1;
-    const fame = Math.round((T.fameGain[tier] || 0) * regionMult);
+    const fame = Math.round((T.fameGain[tier] || 0) * regionMult) + (run.affinity ? aggregateRegressionCompanions(run).famePerWin : 0);
     next.fame += fame;
     next.kills[tier] = (next.kills[tier] || 0) + 1;
     next.hpPct = Math.min(1, Math.max(0.01, result.hpPct ?? next.hpPct)); // 1.178.0 상한 — 전투 화면 최대 HP(근력 보너스 포함)가 더 커서 100% 초과 누적되던 버그
-    next = advanceDays(next, 1, `${name} 처치 (명성 +${fame})${learnedNow.length ? ' · 기록 완성' : ''}`);
+    // 사건에서 이어진 전투는 사건이 이미 하루를 썼으므로 날짜 미소모
+    next = advanceDays(next, run.pending?.fromEvent ? 0 : 1, `${name} 처치 (명성 +${fame})${learnedNow.length ? ' · 기록 완성' : ''}`);
   } else {
     next.hpPct = 0;
     next.over = 'death';
@@ -387,7 +393,8 @@ export function applyRegressionSpireResult(run, { win, hpPct }) {
   if (round >= REGRESSION_SPIRE_CHAIN.length) {
     return { ...run, hpPct: Math.min(1, hpPct), spireRound: round, over: 'victory', log: [...run.log, '황혼의 첨탑 정복'] };
   }
-  const healed = Math.min(1, Math.min(1, hpPct) + (run.spireRestPct || 0) / 100);
+  const compRest = run.affinity ? aggregateRegressionCompanions(run).spireRestPct : 0;
+  const healed = Math.min(1, Math.min(1, hpPct) + ((run.spireRestPct || 0) + compRest) / 100);
   return { ...run, hpPct: healed, spireRound: round, log: [...run.log, `첨탑 ${round}층 돌파`] };
 }
 
@@ -416,7 +423,7 @@ export function settleRegression(metaR = EMPTY_REGRESSION, run) {
       bestFame: Math.max(base.bestFame, run.fame),
       bestDay: Math.max(base.bestDay, Math.min(run.day, run.maxDays)),
       spireClears: base.spireClears + (cause === 'victory' ? 1 : 0),
-      endings: cause === 'victory' && !base.endings.includes('ending_spire') ? [...base.endings, 'ending_spire'] : base.endings,
+      endings: cause === 'victory' && !base.endings.includes(regressionEndingFor(run).id) ? [...base.endings, regressionEndingFor(run).id] : base.endings,
     },
     gainedMemories: gained,
     carryOptions: [...run.learned],
@@ -436,7 +443,8 @@ export function setRegressionCarry(metaR, enemyKeys = []) {
 export function buildRegressionLoadout(run, classStartSkills = {}, baseMaxHp = 300) {
   const skills = { ...classStartSkills };
   let maxHp = baseMaxHp + (run.maxHpBonus || 0);
-  for (const [name, lv] of Object.entries(run.bonusSkills || {})) {
+  const compPassive = run.affinity ? aggregateRegressionCompanions(run).passive : {};
+  for (const [name, lv] of [...Object.entries(run.bonusSkills || {}), ...Object.entries(compPassive)]) {
     const maxLv = PASSIVE_SKILLS[name]?.maxLv ?? 7;
     skills[name] = Math.min(maxLv, (skills[name] || 0) + lv);
   }
@@ -476,8 +484,9 @@ export function regressionRelicObjects(run) {
   return (run.relics || []).map(n => RELICS.find(r => r.name === n)).filter(Boolean);
 }
 
-export function regressionBeltSlots(classId) {
-  return Math.max(1, CLASS_BELT[classId]?.max ?? 2);
+export function regressionBeltSlots(classId, run = null) {
+  const extra = run?.affinity ? aggregateRegressionCompanions(run).potionCap : 0;
+  return Math.max(1, CLASS_BELT[classId]?.max ?? 2) + extra;
 }
 
 // 승리 보상 굴림 — rng 주입 (setMeta updater 밖에서 호출)
@@ -550,8 +559,283 @@ export function regressionClassFx(classId) {
 }
 
 // 1.179.0~ 전투 후 HP 비율 — hpBefore(절대값)에서 받은 피해 × 상처 비율만큼만 남는다
-export function regressionPostCombatHpPct(hpBefore, maxHp, damageTaken = 0, spire = false) {
-  const w = spire ? REGRESSION_TUNING.spireWoundPct : REGRESSION_TUNING.woundPct;
+export function regressionPostCombatHpPct(hpBefore, maxHp, damageTaken = 0, spire = false, woundCut = 0) {
+  const w = spire ? REGRESSION_TUNING.spireWoundPct - woundCut : REGRESSION_TUNING.woundPct;
   const hp = hpBefore - Math.max(0, damageTaken) * w;
   return Math.min(1, Math.max(0.01, hp / Math.max(1, maxHp)));
+}
+
+// ============================================
+// 1.179.0~ MVP 3-2 — 동료 · 지역 사건 · 상점 · 엔딩
+// ============================================
+
+// =========== 동료 4명 (오리지널) ===========
+// 교류(1일) = 호감 +affinityPerTalk (매력 15+ 보너스). 단계: 동행 40 / 맹약 100. 호감은 생마다 초기화
+// perks: 단계별 선언형 효과 — 소비처는 아래 aggregateRegressionCompanions 한 곳
+export const REGRESSION_COMPANION_TIERS = [
+  { id: 'stranger', name: '안면', min: 0 },
+  { id: 'ally', name: '동행', min: 40 },
+  { id: 'oath', name: '맹약', min: 100 },
+];
+export const REGRESSION_COMPANIONS = [
+  { id: 'knight', name: '발터', title: '몰락한 기사단장', region: 1, color: '#7ba3c4',
+    desc: '눈보라 속에 사라진 기사단의 마지막 생존자. 지킬 것을 찾고 있다.',
+    perks: { ally: { passive: { 수비: 1 } }, oath: { passive: { 수비: 2 }, spireWoundCut: 0.1 } },
+    perkText: { ally: '패시브 「수비」 +1', oath: '「수비」 +2 추가 · 첨탑 상처 -10%p' },
+    ending: { id: 'ending_knight', name: '눈 속의 기사단', text: '발터와 함께 북부에 새 기사단의 깃발을 세웠다. 황혼은 걷혔고, 지킬 것이 생겼다.' } },
+  { id: 'healer', name: '세레나', title: '떠돌이 치유사', region: 2, color: '#9ad4a3',
+    desc: '망자의 숲에서 살아 있는 자를 돌보는 치유사. 죽음을 미워한다.',
+    perks: { ally: { restHealPct: 20 }, oath: { spireRestPct: 20, potionCap: 1 } },
+    perkText: { ally: '야영 회복 +20%p', oath: '첨탑 층 사이 HP +20% · 포션 벨트 +1' },
+    ending: { id: 'ending_healer', name: '은둔의 숲', text: '세레나와 함께 숲 깊은 곳에 치료소를 열었다. 더는 아무도 그 숲에서 길을 잃지 않는다.' } },
+  { id: 'archivist', name: '오렌', title: '신전 기록관', region: 3, color: '#c9b8ff',
+    desc: '봉인된 신전의 마지막 기록관. 회귀하는 자에 대한 기록을 찾고 있다.',
+    perks: { ally: { recordBonusPct: 20 }, oath: { spireWeakness: true } },
+    perkText: { ally: '기록 게이지 +20%', oath: '첨탑 주인의 약점 즉시 개방' },
+    ending: { id: 'ending_archivist', name: '마지막 기록', text: '오렌은 회귀의 고리를 처음부터 끝까지 기록했다. 그 책의 마지막 장에는 내 이름이 적혀 있다.' } },
+  { id: 'broker', name: '니아', title: '균열의 정보상', region: 4, color: '#e8b04a',
+    desc: '균열 가장자리에서 마족과도 거래하는 정보상. 손해 보는 장사는 하지 않는다.',
+    perks: { ally: { goldPct: 50 }, oath: { famePerWin: 1 } },
+    perkText: { ally: '전투 승리 골드 +50%', oath: '전투 승리마다 명성 +1 추가' },
+    ending: { id: 'ending_broker', name: '그림자 시장의 주인', text: '니아와 함께 균열의 시장을 손에 넣었다. 대륙의 모든 소문이 이제 내 귀로 먼저 들어온다.' } },
+];
+export const REGRESSION_ENDING_SPIRE = { id: 'ending_spire', name: '황혼을 끊은 자', text: '홀로 첨탑에 올라 황혼을 끊었다. 회귀의 고리가 멈추고, 처음으로 41일째 아침이 밝았다.' };
+export const REGRESSION_ENDINGS = [REGRESSION_ENDING_SPIRE, ...REGRESSION_COMPANIONS.map(c => c.ending)];
+
+export const REGRESSION_COMPANION_TUNING = { affinityPerTalk: 20, charismaBonus: 5, charismaGate: 15 };
+
+export function getRegressionCompanion(id) {
+  return REGRESSION_COMPANIONS.find(c => c.id === id) || null;
+}
+export function regressionCompanionTier(affinity = 0) {
+  let t = REGRESSION_COMPANION_TIERS[0];
+  for (const x of REGRESSION_COMPANION_TIERS) if (affinity >= x.min) t = x;
+  return t;
+}
+export function regressionCompanionAt(regionId) {
+  return REGRESSION_COMPANIONS.find(c => c.region === regionId) || null;
+}
+
+// 동료 효과 합산 (fx bag) — 단계가 오르면 하위 단계 효과도 유지
+export function aggregateRegressionCompanions(run) {
+  const fx = { passive: {}, restHealPct: 0, spireRestPct: 0, potionCap: 0, recordBonusPct: 0, spireWeakness: false, goldPct: 0, famePerWin: 0, spireWoundCut: 0 };
+  for (const c of REGRESSION_COMPANIONS) {
+    const aff = run.affinity?.[c.id] || 0;
+    const tiers = [];
+    if (aff >= 40) tiers.push('ally');
+    if (aff >= 100) tiers.push('oath');
+    for (const t of tiers) {
+      for (const [k, v] of Object.entries(c.perks[t] || {})) {
+        if (k === 'passive') for (const [n, lv] of Object.entries(v)) fx.passive[n] = (fx.passive[n] || 0) + lv;
+        else if (typeof v === 'boolean') fx[k] = fx[k] || v;
+        else fx[k] = (fx[k] || 0) + v;
+      }
+    }
+  }
+  return fx;
+}
+
+export function applyRegressionTalk(run, companionId, charisma = 10) {
+  const c = getRegressionCompanion(companionId);
+  if (!c) return run;
+  const T = REGRESSION_COMPANION_TUNING;
+  const gain = T.affinityPerTalk + (charisma >= T.charismaGate ? T.charismaBonus : 0);
+  const before = run.affinity?.[companionId] || 0;
+  const after = Math.min(100, before + gain);
+  const up = regressionCompanionTier(after).id !== regressionCompanionTier(before).id ? ` — 「${regressionCompanionTier(after).name}」` : '';
+  return {
+    ...run, day: run.day + 1, affinity: { ...(run.affinity || {}), [companionId]: after },
+    log: [...run.log, `D${run.day}: ${c.name}와 교류 (호감 ${after})${up}`],
+  };
+}
+
+// 엔딩 — 맹약 동료 중 호감이 가장 높은 동료의 엔딩, 없으면 단독 정복 엔딩
+export function regressionEndingFor(run) {
+  const oaths = REGRESSION_COMPANIONS.filter(c => (run.affinity?.[c.id] || 0) >= 100);
+  return oaths.length ? oaths[0].ending : REGRESSION_ENDING_SPIRE;
+}
+
+// =========== 상점 (여명의 마을) ===========
+export const REGRESSION_SHOP = [
+  { id: 'hp_small', kind: 'potion', price: 50 },
+  { id: 'hp_medium', kind: 'potion', price: 100 },
+  { id: 'hp_large', kind: 'potion', price: 180 },
+  { id: 'soul', kind: 'potion', price: 60 },
+  { id: 'relic', kind: 'relic', name: '유물 상자', desc: '전투 효과 유물 1개 (미보유 중 랜덤)', price: 160 },
+  { id: 'passive', kind: 'passive', name: '수련 교본', desc: '공용 패시브 1개 +1Lv (랜덤)', price: 180 },
+  { id: 'clinic', kind: 'heal', name: '마을 치료소', desc: 'HP 50% 회복', price: 70 },
+];
+export function buyRegressionShop(run, itemId, rng = Math.random) {
+  const item = REGRESSION_SHOP.find(x => x.id === itemId);
+  if (!item || (run.gold || 0) < item.price) return { run, bought: null };
+  let next = { ...run, gold: run.gold - item.price };
+  let bought = '';
+  if (item.kind === 'potion') { next = applyRegressionLoot(next, { potion: item.id }); bought = POTIONS[item.id]?.name; }
+  else if (item.kind === 'relic') {
+    const loot = rollRegressionLoot(next, 'elite', rng);
+    if (!loot.relic) return { run, bought: null };
+    next = applyRegressionLoot(next, { relic: loot.relic }); bought = `유물 「${loot.relic}」`;
+  } else if (item.kind === 'passive') {
+    const name = REGRESSION_PASSIVE_POOL[Math.floor(rng() * REGRESSION_PASSIVE_POOL.length)];
+    next = applyRegressionLoot(next, { passive: name }); bought = `패시브 「${name}」 +1Lv`;
+  } else if (item.kind === 'heal') { next.hpPct = Math.min(1, next.hpPct + 0.5); bought = 'HP 50% 회복'; }
+  return { run: { ...next, log: [...next.log, `D${run.day}: 구매 — ${bought} (-${item.price}G)`] }, bought };
+}
+
+// 전투 승리 골드 (적 drop.gold 범위 × 동료 보너스)
+export function regressionVictoryGold(run, enemyKey, rng = Math.random) {
+  const g = ENEMIES[enemyKey]?.drop?.gold || [10, 20];
+  const base = g[0] + Math.floor(rng() * (g[1] - g[0] + 1));
+  const pct = aggregateRegressionCompanions(run).goldPct;
+  return Math.round(base * (1 + pct / 100));
+}
+
+// =========== 지역 사건 24개 (본편 EventScreen 포맷) ===========
+// 본편과 같은 선택지 스키마(stat/dc/success/fail, result/reward/penalty, cost, combat). 모드 전용 reward.type:
+//   'fame' {value} / 'affinity' {name: companionId, value} / 'record' {name: enemyKey, value} / 'heal_pct' {value: HP%}
+//   'combat' {name: enemyKey, bonus?: reward} — 본편 EventScreen은 판정 없는 선택지의 combat 필드를 전달하지 않아 보상 타입으로 대체
+// choice.requireMemory: 'mem_xxx' — 해당 기억 조각 보유 시에만 보이는 「전생의 기억」 선택지
+export const REGRESSION_EVENTS = [
+  // ── 북부 극지대 ──
+  { id: 'rg_frozen_banner', region: 1, title: '얼어붙은 깃발', text: '눈 더미 속에 기사단의 깃발이 반쯤 묻혀 있다.\n멀리서 누군가 그 깃발을 바라보고 있다.', choices: [
+    { text: '깃발을 파내 그에게 건넨다', result: '사내가 깃발을 받아 들고 오래 말이 없다.\n"…발터다. 이 은혜는 잊지 않겠다."', reward: { type: 'affinity', name: 'knight', value: 30 } },
+    { text: '깃발 아래를 뒤진다', stat: '민첩', dc: 15, success: { text: '얼음 틈에서 은화 주머니를 찾았다.', reward: { type: 'gold', value: 90 } }, fail: { text: '얼음이 갈라지며 손을 베였다.', penalty: { hp: -25 } } },
+  ] },
+  { id: 'rg_wolf_den', region: 1, title: '늑대의 굴', text: '피 냄새가 밴 동굴. 안쪽에서 낮은 으르렁거림이 들린다.', choices: [
+    { text: '숨어서 사냥 습성을 지켜본다', stat: '지능', dc: 14, success: { text: '늑대가 송곳니를 드러내는 순간을 익혔다.', reward: { type: 'record', name: 'iceWolf', value: 40 } }, fail: { text: '들켰다. 늑대가 달려든다!', combat: 'iceWolf' } },
+    { text: '조용히 물러난다', result: '굴 입구에 걸린 늑대 사냥꾼의 부적만 챙겼다.', reward: { type: 'gold', value: 30 } },
+  ] },
+  { id: 'rg_blizzard_camp', region: 1, title: '눈보라 속 야영지', text: '꺼져 가는 모닥불 곁에 원정대의 짐이 버려져 있다.', choices: [
+    { text: '불을 살리고 쉰다', result: '몸이 녹는다.', reward: { type: 'heal_pct', value: 30 } },
+    { text: '짐을 뒤진다', result: '낡은 물약 하나를 찾았다.', reward: { type: 'potion_random' } },
+  ] },
+  { id: 'rg_ice_shrine', region: 1, title: '얼음 사당', text: '얼음으로 깎은 작은 사당. 공물을 바치면 축복을 내린다는 전설이 있다.', choices: [
+    { text: '은화를 바친다 (60G)', cost: { gold: 60 }, result: '사당이 옅게 빛나며 몸이 단단해진다.', reward: { type: 'skill_specific', name: '수비' } },
+    { text: '얼음 조각을 깨 가져간다', stat: '근력', dc: 16, success: { text: '빛나는 얼음 결정을 손에 넣었다. 마을에서 좋은 값을 받을 것이다.', reward: { type: 'gold', value: 120 } }, fail: { text: '사당이 분노하듯 냉기를 뿜는다.', penalty: { hp: -35 } } },
+  ] },
+  { id: 'rg_raider_toll', region: 1, title: '약탈자의 통행세', text: '동토의 약탈자들이 길을 막고 통행세를 요구한다.', choices: [
+    { text: '통행세를 낸다 (40G)', cost: { gold: 40 }, result: '약탈자들이 길을 비킨다. 이름 없는 여행자로 지나간다.' },
+    { text: '정면으로 맞선다', result: '약탈자 하나가 도끼를 뽑는다!', reward: { type: 'combat', name: 'tundraRaider' } },
+    { text: '「전생의 기억」 — 그들의 두목 이름을 부른다', requireMemory: 'mem_frost_grave', result: '약탈자들이 얼어붙는다. "…어떻게 그 이름을?" 소문이 퍼진다.', reward: { type: 'fame', value: 8 } },
+  ] },
+  { id: 'rg_frost_knight_duel', region: 1, title: '기사의 대련', text: '발터가 녹슨 검을 건넨다. "검을 쥐는 법을 보자."', choices: [
+    { text: '대련에 응한다', stat: '근력', dc: 15, success: { text: '"…나쁘지 않군." 발터의 눈빛이 달라졌다.', reward: { type: 'affinity', name: 'knight', value: 25 } }, fail: { text: '검이 튕겨 나간다. 발터가 손을 내민다. "다시."', reward: { type: 'affinity', name: 'knight', value: 10 } } },
+    { text: '정중히 사양한다', result: '발터가 고개를 끄덕이고 다시 눈보라 속으로 돌아간다.' },
+  ] },
+  // ── 죽은 자의 숲 ──
+  { id: 'rg_herb_patch', region: 2, title: '약초 군락', text: '썩은 나무 사이로 은빛 약초가 자라 있다. 누군가 정성껏 돌본 흔적이 있다.', choices: [
+    { text: '약초를 캐 간다', result: '쓸 만한 약초다.', reward: { type: 'heal_pct', value: 25 } },
+    { text: '돌본 사람을 기다린다', result: '해 질 무렵 치유사가 나타난다. "…약초를 남겨 줘서 고마워요. 세레나예요."', reward: { type: 'affinity', name: 'healer', value: 30 } },
+  ] },
+  { id: 'rg_whispering_grave', region: 2, title: '속삭이는 무덤', text: '이름 없는 무덤에서 누군가의 목소리가 새어 나온다. "…돌아왔구나."', choices: [
+    { text: '귀를 기울인다', stat: '지능', dc: 15, success: { text: '망자가 숲의 비밀 하나를 속삭인다.', reward: { type: 'skill_random_lv' } }, fail: { text: '목소리가 비명으로 바뀐다.', penalty: { hp: -30 } } },
+    { text: '무덤을 정돈해 준다', result: '목소리가 잦아든다. 묘비 아래 은화가 놓여 있다.', reward: { type: 'gold', value: 50 } },
+  ] },
+  { id: 'rg_spider_nest', region: 2, title: '거미줄 회랑', text: '나무 사이가 온통 거미줄이다. 그 끝에서 무언가 반짝인다.', choices: [
+    { text: '거미줄을 헤치고 간다', stat: '민첩', dc: 15, success: { text: '반짝이던 것은 유물이었다.', reward: { type: 'random_relic' } }, fail: { text: '줄에 걸렸다. 거미가 내려온다!', combat: 'corruptSpider' } },
+    { text: '거미의 움직임만 관찰한다', result: '거미가 먹이를 감는 방식을 지켜봤다.', reward: { type: 'record', name: 'corruptSpider', value: 35 } },
+  ] },
+  { id: 'rg_lost_child', region: 2, title: '길 잃은 아이', text: '숲속에서 아이가 울고 있다. 망자의 숲에 살아 있는 아이가?', choices: [
+    { text: '아이를 마을까지 데려다준다', result: '아이는 무사히 돌아갔다. 마을에 이름이 알려진다.', reward: { type: 'fame', value: 10 }, penalty: { hp: -10 } },
+    { text: '경계한다', stat: '지능', dc: 13, success: { text: '아이의 그림자가 없다. 망령이었다 — 물러나 화를 피했다.', reward: { type: 'gold', value: 40 } }, fail: { text: '아이가 웃으며 형체를 바꾼다!', combat: 'fallenElf' } },
+  ] },
+  { id: 'rg_healer_request', region: 2, title: '치유사의 부탁', text: '세레나가 다급하게 부른다. "부패한 정령이 약초밭을 망치고 있어요."', choices: [
+    { text: '정령을 쫓아낸다', result: '오염된 정령이 덤벼든다! (세레나 호감 +25)', reward: { type: 'combat', name: 'forestSpirit', bonus: { type: 'affinity', name: 'healer', value: 25 } } },
+    { text: '정화 의식을 돕는다 (50G)', cost: { gold: 50 }, result: '향을 사서 함께 정화했다. 세레나가 활짝 웃는다.', reward: { type: 'affinity', name: 'healer', value: 20 } },
+  ] },
+  { id: 'rg_rotten_tree', region: 2, title: '썩은 고목', text: '거대한 고목이 안쪽부터 썩어 있다. 그 속에 무언가 박혀 있다.', choices: [
+    { text: '팔을 넣어 꺼낸다', stat: '근력', dc: 14, success: { text: '오래된 검집이 나왔다 — 안에는 은화가.', reward: { type: 'gold', value: 100 } }, fail: { text: '부패가 살갗을 파고든다.', penalty: { hp: -30 } } },
+    { text: '「전생의 기억」 — 폭군이 지나간 길을 피한다', requireMemory: 'mem_rotten_path', result: '고목 뒤 숨은 길로 숲의 폭군을 미리 지켜봤다.', reward: { type: 'record', name: 'forestTyrant', value: 50 } },
+  ] },
+  // ── 봉인된 신전 ──
+  { id: 'rg_sealed_library', region: 3, title: '봉인된 서고', text: '먼지 쌓인 서고. 한 노인이 책장 사이를 서성이고 있다.', choices: [
+    { text: '노인에게 말을 건다', result: '"회귀자로군. 나는 오렌, 이 신전의 기록관일세."', reward: { type: 'affinity', name: 'archivist', value: 30 } },
+    { text: '책을 몰래 읽는다', stat: '지능', dc: 15, success: { text: '고대 전투 기록에서 한 수를 배웠다.', reward: { type: 'skill_random_lv' } }, fail: { text: '봉인이 발동해 머리가 깨질 듯하다.', penalty: { hp: -30 } } },
+  ] },
+  { id: 'rg_time_echo', region: 3, title: '시간의 잔향', text: '복도 끝에서 나 자신이 걸어온다. 전생의 나였다.', choices: [
+    { text: '그를 따라간다', result: '잔향이 숨겨진 방으로 안내한다.', reward: { type: 'random_relic' } },
+    { text: '그와 마주 선다', stat: '매력', dc: 15, success: { text: '잔향이 말없이 고개를 끄덕이고 사라진다. 마음이 단단해진다.', reward: { type: 'heal_pct', value: 40 } }, fail: { text: '잔향이 검을 뽑는다!', combat: 'timeKeeper' } },
+  ] },
+  { id: 'rg_golem_repair', region: 3, title: '고장 난 골렘', text: '깨진 골렘이 같은 동작을 반복하고 있다. 핵이 드러나 있다.', choices: [
+    { text: '핵을 고쳐 준다', stat: '지능', dc: 16, success: { text: '골렘이 멈추고 길을 비킨다. 그 뒤에 보물상자가.', reward: { type: 'gold', value: 130 } }, fail: { text: '핵이 폭주한다!', combat: 'brokenGolem' } },
+    { text: '움직임을 관찰한다', result: '골렘의 공격 주기를 기록했다.', reward: { type: 'record', name: 'brokenGolem', value: 40 } },
+  ] },
+  { id: 'rg_offering_altar', region: 3, title: '공물 제단', text: '제단에 "피를 바치는 자에게 힘을"이라 새겨져 있다.', choices: [
+    { text: '피를 바친다 (HP -40)', penalty: { hp: -40 }, result: '제단이 붉게 타오르며 힘이 흘러든다.', reward: { type: 'skill_specific', name: '강타' } },
+    { text: '은화를 바친다 (80G)', cost: { gold: 80 }, result: '제단이 조용히 빛난다.', reward: { type: 'skill_specific', name: '신앙' } },
+    { text: '지나친다', result: '봉인된 신전에서는 공짜가 없다.' },
+  ] },
+  { id: 'rg_seal_puzzle', region: 3, title: '봉인의 문', text: '거대한 문에 문양 네 개가 새겨져 있다. 순서대로 눌러야 열린다.', choices: [
+    { text: '감으로 누른다', stat: '민첩', dc: 17, success: { text: '문이 열리고 고대 유물이 모습을 드러낸다.', reward: { type: 'random_relic' } }, fail: { text: '함정이 작동한다.', penalty: { hp: -35 } } },
+    { text: '「전생의 기억」 — 문양의 순서를 떠올린다', requireMemory: 'mem_seal_glyph', result: '눈을 감아도 보이는 순서대로 눌렀다. 문 너머의 이야기가 퍼진다.', reward: { type: 'fame', value: 12 } },
+  ] },
+  { id: 'rg_archivist_task', region: 3, title: '기록관의 숙제', text: '오렌이 두꺼운 책을 내민다. "자네가 본 것들을 적어 주겠나."', choices: [
+    { text: '지금까지의 싸움을 적는다', result: '오렌이 고개를 끄덕이며 빈 페이지를 채운다.', reward: { type: 'affinity', name: 'archivist', value: 25 } },
+    { text: '대신 그의 기록을 읽는다', stat: '지능', dc: 14, success: { text: '옛 사제의 전투 방식이 적혀 있다.', reward: { type: 'record', name: 'ancientPriest', value: 50 } }, fail: { text: '읽을 수 없는 문자다.', result: '' } },
+  ] },
+  // ── 마계의 균열 ──
+  { id: 'rg_black_market', region: 4, title: '균열의 암시장', text: '균열 가장자리에 천막이 늘어서 있다. 한 여자가 손짓한다. "구경은 공짜야."', choices: [
+    { text: '이야기를 나눈다', result: '"니아라고 불러. 쓸 만한 손님이 될 것 같네."', reward: { type: 'affinity', name: 'broker', value: 30 } },
+    { text: '물건을 산다 (120G)', cost: { gold: 120 }, result: '정체불명의 유물을 손에 넣었다.', reward: { type: 'random_relic' } },
+  ] },
+  { id: 'rg_demon_contract', region: 4, title: '마족의 계약', text: '마족 하나가 계약서를 내민다. "네 피 조금이면 큰 힘을 주지."', choices: [
+    { text: '서명한다 (HP -50)', penalty: { hp: -50 }, result: '피가 끓어오른다.', reward: { type: 'skill_specific', name: '잔혹' } },
+    { text: '계약서를 찢는다', result: '마족이 웃으며 덤벼든다!', reward: { type: 'combat', name: 'wrathDemon' } },
+  ] },
+  { id: 'rg_rift_storm', region: 4, title: '차원 폭풍', text: '하늘이 찢어지며 보라색 번개가 쏟아진다.', choices: [
+    { text: '폭풍을 뚫고 나아간다', stat: '근력', dc: 16, success: { text: '폭풍 너머의 소문이 대륙에 퍼진다.', reward: { type: 'fame', value: 12 } }, fail: { text: '번개에 맞았다.', penalty: { hp: -45 } } },
+    { text: '바위 뒤에 숨어 기다린다', result: '폭풍이 지나가자 균열에서 떨어진 은화가 흩어져 있다.', reward: { type: 'gold', value: 60 } },
+  ] },
+  { id: 'rg_apostle_sermon', region: 4, title: '사도의 설교', text: '마왕의 사도가 마족들 앞에서 설교하고 있다. 아무도 나를 눈치채지 못했다.', choices: [
+    { text: '숨어서 지켜본다', stat: '민첩', dc: 15, success: { text: '사도의 의식을 처음부터 끝까지 봤다.', reward: { type: 'record', name: 'demonApostle', value: 50 } }, fail: { text: '사도의 눈이 이쪽을 향한다!', combat: 'demonApostle' } },
+    { text: '조용히 빠져나간다', result: '균열에서는 살아남는 것이 먼저다.' },
+  ] },
+  { id: 'rg_broker_job', region: 4, title: '정보상의 의뢰', text: '니아가 지도를 펼친다. "정찰병 하나만 처리해 주면 값을 쳐 주지."', choices: [
+    { text: '의뢰를 받는다', result: '마계 정찰병을 찾아냈다! (니아 호감 +25)', reward: { type: 'combat', name: 'demonScout', bonus: { type: 'affinity', name: 'broker', value: 25 } } },
+    { text: '흥정한다', stat: '매력', dc: 15, success: { text: '"…좋아, 선불로 주지." 니아가 웃는다.', reward: { type: 'gold', value: 80 } }, fail: { text: '"손님, 균열에서 흥정은 목숨으로 하는 거야."', penalty: { gold: -30 } } },
+  ] },
+  { id: 'rg_rift_echo', region: 4, title: '균열의 메아리', text: '균열 속에서 수많은 목소리가 내 이름을 부른다.', choices: [
+    { text: '목소리를 따라간다', stat: '매력', dc: 16, success: { text: '목소리들이 물러나며 힘을 남긴다.', reward: { type: 'skill_random_lv' } }, fail: { text: '목소리가 발톱이 되어 할퀸다.', penalty: { hp: -40 } } },
+    { text: '「전생의 기억」 — 상흔이 길을 안다', requireMemory: 'mem_rift_scar', result: '몸이 기억하는 길로 균열을 빠져나오며 은화를 주웠다.', reward: { type: 'gold', value: 120 } },
+  ] },
+];
+
+// 지역 사건 고르기 — 이번 생에 본 사건 제외, 기억 조각 요구 선택지는 미보유 시 숨김
+export function rollRegressionEvent(run, memories = [], rng = Math.random) {
+  const pool = REGRESSION_EVENTS.filter(e => e.region === run.region && !(run.seenEvents || []).includes(e.id));
+  if (!pool.length) return null;
+  const ev = pool[Math.floor(rng() * pool.length)];
+  return { ...ev, choices: ev.choices.filter(c => !c.requireMemory || memories.includes(c.requireMemory)) };
+}
+
+// EventScreen 결과 반영 — 반환 { run, combat: enemyKey|null }. 사건은 1일 소모, 사건으로는 죽지 않음(HP 하한 1%)
+export function applyRegressionEvent(run, eventId, res, { maxHp = 300, rng = Math.random } = {}) {
+  let next = { ...run, day: run.day + 1, seenEvents: [...(run.seenEvents || []), eventId], affinity: { ...(run.affinity || {}) }, statBonus: { ...(run.statBonus || {}) } };
+  const notes = [];
+  let combatFromReward = null;
+  let r = res?.reward;
+  if (r?.type === 'combat') { combatFromReward = r.name; r = r.bonus || null; }
+  if (r) {
+    if (r.type === 'gold') { next.gold = (next.gold || 0) + r.value; notes.push(`+${r.value}G`); }
+    else if (r.type === 'heal_pct') { next.hpPct = Math.min(1, next.hpPct + r.value / 100); notes.push(`HP +${r.value}%`); }
+    else if (r.type === 'fame') { next.fame += r.value; notes.push(`명성 +${r.value}`); }
+    else if (r.type === 'affinity') { next.affinity[r.name] = Math.min(100, (next.affinity[r.name] || 0) + r.value); notes.push(`${getRegressionCompanion(r.name)?.name} 호감 +${r.value}`); }
+    else if (r.type === 'record') {
+      if (!next.learned.includes(r.name)) { next.records = { ...next.records, [r.name]: Math.min(99, (next.records[r.name] || 0) + r.value) }; notes.push(`${ENEMIES[r.name]?.name} 기록 +${r.value}%`); }
+    }
+    else if (r.type === 'random_relic') { const l = rollRegressionLoot(next, 'elite', rng); if (l.relic) { next = applyRegressionLoot(next, { relic: l.relic }); notes.push(`유물 「${l.relic}」`); } else { next.gold = (next.gold || 0) + 80; notes.push('+80G'); } }
+    else if (r.type === 'potion_random') { const id = REGRESSION_POTION_POOL[Math.floor(rng() * REGRESSION_POTION_POOL.length)]; next = applyRegressionLoot(next, { potion: id }); notes.push(POTIONS[id]?.name); }
+    else if (r.type === 'skill_specific') { next = applyRegressionLoot(next, { passive: r.name }); notes.push(`「${r.name}」 +1Lv`); }
+    else if (r.type === 'skill_random_lv') { const n = REGRESSION_PASSIVE_POOL[Math.floor(rng() * REGRESSION_PASSIVE_POOL.length)]; next = applyRegressionLoot(next, { passive: n }); notes.push(`「${n}」 +1Lv`); }
+    else if (r.type === 'stat') { next.statBonus[r.name] = (next.statBonus[r.name] || 0) + r.value; notes.push(`${r.name} +${r.value}`); }
+  }
+  const p = res?.penalty;
+  if (p?.hp) { next.hpPct = Math.max(0.01, next.hpPct + p.hp / maxHp); notes.push(`HP ${p.hp}`); }
+  if (p?.gold) { next.gold = Math.max(0, (next.gold || 0) + p.gold); notes.push(`${p.gold}G`); }
+  const ev = REGRESSION_EVENTS.find(e => e.id === eventId);
+  next.log = [...next.log, `D${run.day}: 사건 「${ev?.title || eventId}」${notes.length ? ` (${notes.filter(Boolean).join(' · ')})` : ''}`];
+  let combat = res?.combat || combatFromReward || null;
+  if (combat && ENEMIES[combat]) next.pending = { enemyKey: combat, tier: ENEMIES[combat].tier === 'elite' ? 'elite' : 'normal', fromEvent: true };
+  else combat = null;
+  return { run: next, combat, notes };
 }
