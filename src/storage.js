@@ -5,7 +5,7 @@
 // 저장되는 것: 영혼, 강화 단계, 해금 항목, 클리어 기록
 // ============================================
 
-import { ENGRAVINGS, ENGRAVING_TIERS, ENEMIES, EVENTS, RELICS, PASSIVE_SKILLS, CODEX_DISCOVERY_REWARD, CODEX_COMPLETE_REWARD, backfillRaidSeries, FEATURE_FLAGS, addBuriedItemToChar, buriedDustValue as buriedDustValueOf, checkBuriedEncounterUnlock, buriedContractCap, BURIED_CONTRACT_COST, getBuriedUnionByDungeon, buriedUnionLevel, BURIED_UNION_REWARDS, buriedSeasonRewardFor, buriedSeasonMilestones, pickRandomBuriedGhost, getBuriedGhost } from './data.js';
+import { ENGRAVINGS, ENGRAVING_TIERS, ENEMIES, EVENTS, RELICS, PASSIVE_SKILLS, CODEX_DISCOVERY_REWARD, CODEX_COMPLETE_REWARD, backfillRaidSeries, FEATURE_FLAGS, addBuriedItemToChar, buriedDustValue as buriedDustValueOf, checkBuriedEncounterUnlock, buriedContractCap, BURIED_CONTRACT_COST, getBuriedUnionByDungeon, buriedUnionLevel, BURIED_UNION_REWARDS, buriedSeasonRewardFor, buriedSeasonMilestones, pickRandomBuriedGhost, getBuriedGhost, EMPTY_REGRESSION } from './data.js';
 
 const DB_NAME = 'derod_meta';
 const DB_VERSION = 1;
@@ -1466,6 +1466,19 @@ const EMPTY_EXO = { char: null, runs: 0, clears: 0, deaths: 0, bestAct: 0, bestA
 export function getExo(meta) {
   const e = meta?.exo || EMPTY_EXO;
   return { ...EMPTY_EXO, ...e, codex: (e.codex && typeof e.codex === 'object') ? e.codex : {} };
+}
+
+// 1.177.0~ 🌀 회귀의 탐험가 — meta.regression (진행 중 생은 run 필드)
+export function getRegression(meta) {
+  const r = meta?.regression || {};
+  return {
+    ...EMPTY_REGRESSION, ...r,
+    memories: Array.isArray(r.memories) ? r.memories : [],
+    carry: Array.isArray(r.carry) ? r.carry : [],
+    endings: Array.isArray(r.endings) ? r.endings : [],
+    recordsEver: (r.recordsEver && typeof r.recordsEver === 'object') ? r.recordsEver : {},
+    run: r.run || null,
+  };
 }
 
 const EMPTY_BURIED = {

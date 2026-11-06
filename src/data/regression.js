@@ -174,8 +174,10 @@ export function buildRegressionSpireEnemy(round, memoryCount = 0) {
   if (!key) return null;
   const T = REGRESSION_TUNING;
   if (key === 'spireLord') {
+    // 약점 = 받는 데미지 +N% → 본편 CombatScreen에는 받는 데미지 배율 필드가 없어 HP ÷ (1+N%)로 동등 환산
     const weak = memoryCount >= T.spireWeaknessMemories;
-    return { ...REGRESSION_SPIRE_LORD, weaknessRevealed: weak, takenPct: weak ? T.spireWeaknessTakenPct : 0 };
+    const hp = weak ? Math.round(REGRESSION_SPIRE_LORD.hp / (1 + T.spireWeaknessTakenPct / 100)) : REGRESSION_SPIRE_LORD.hp;
+    return { ...REGRESSION_SPIRE_LORD, hp, weaknessRevealed: weak };
   }
   const base = ENEMIES[key];
   return {
@@ -227,6 +229,7 @@ export function createRegressionRun(metaR = EMPTY_REGRESSION, classId) {
     spireRestPct: fx.spireRestPct,
     memoryCount: (metaR.memories || []).length,
     spireRound: null,      // 첨탑 진입 후 0~3
+    pending: null,         // 진행 중 전투 { enemyKey, tier } — 새로고침 복원용
     over: null,            // null | 'death' | 'timeout' | 'spireLose' | 'victory'
     log: [],
   };
@@ -303,13 +306,18 @@ export function regressionRecordGain(run, observations = [], intStat = 10) {
   return sum * (1 + (run.recordBonusPct || 0) / 100);
 }
 
+// 전투 시작 기록 — 전투 중 새로고침해도 같은 적과 재전투 (도주 불가, 무덤의 유산·제령사와 동일 원칙)
+export function startRegressionCombat(run, enemyKey, tier) {
+  return { ...run, pending: { enemyKey, tier } };
+}
+
 // 전투 결과 반영 — CombatScreen onVictory/onDefeat에서 호출 (MVP 2차)
 // result: { enemyKey, tier, win, hpPct (전투 후 남은 HP 비율), observations, intStat }
 // 반환: { run, learnedNow: [enemyKey] }
 export function applyRegressionCombat(run, result) {
   const T = REGRESSION_TUNING;
   const { enemyKey, tier = 'normal', win, observations = [], intStat = 10 } = result;
-  let next = { ...run, records: { ...run.records }, learned: [...run.learned], kills: { ...run.kills } };
+  let next = { ...run, pending: null, records: { ...run.records }, learned: [...run.learned], kills: { ...run.kills } };
   const learnedNow = [];
 
   if (REGRESSION_RECORDS[enemyKey] && !next.learned.includes(enemyKey)) {

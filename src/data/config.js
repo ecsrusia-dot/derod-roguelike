@@ -59,5 +59,5 @@ export const FEATURE_FLAGS = {
   hof: false,           // 명예의 전당 (타이틀 메뉴)
   buried: true,         // 1.103.0~ 무덤의 유산 (BuriedBornes 모티브 별도 모드)
   exo: true,            // 1.169.0~ ⚱ 제령사 (무덤의 유산 포맷 기반 신규 게임 — 5막 시나리오·브레이크·빙의)
-  regression: false,    // 🌀 회귀의 탐험가 (MVP 진행 중 — 데이터·로직만, 진입점 없음)
+  regression: true,     // 1.177.0~ 🌀 회귀의 탐험가 (「무림귀환」 운용 모티브 — 40일 회귀 탐험, 본편 전투 재사용)
 };
