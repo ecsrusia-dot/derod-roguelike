@@ -14,6 +14,8 @@
 
 import { ENEMIES } from './enemies.js';
 import { PASSIVE_SKILLS } from './passives.js';
+import { RELICS } from './relics.js';
+import { POTIONS, CLASS_BELT } from './potions.js';
 
 // =========== 튜닝 ===========
 export const REGRESSION_TUNING = {
@@ -35,6 +37,22 @@ export const REGRESSION_TUNING = {
   spireAtkMult: 1.2,
   spireWeaknessMemories: 3, // 기억 조각 N개 이상 → 첨탑 주인 약점 개방
   spireWeaknessTakenPct: 25,
+  // 1.178.0~ 자동 전투 전용 (PM 결정: 플레이어 개입 불가) — 본편 AI는 사람보다 약해 적을 낮춘다.
+  // CombatScreen expedition.enemyHpMult/enemyDmgMult로 전달 (AP_TUNING과 곱연산). 체감 조정은 이 표 한 곳.
+  regionEnemyMult: {
+    1: { hp: 0.85, dmg: 0.85 },
+    2: { hp: 1.00, dmg: 0.95 },
+    3: { hp: 1.10, dmg: 1.05 },
+    4: { hp: 1.20, dmg: 1.15 },
+    spire: { hp: 1.40, dmg: 1.30 },
+  },
+  // 직업별 모드 보정 (CombatScreen engravingFx로 전달 — 본편 각인·각성도와 무관한 이 모드 전용 값).
+  // 1.178.0 실측: 사제는 회복 -75% / 받는 피해 +35%에도 매 전투 HP ~95%로 끝나 1생부터 정복 → PM 결정 대기, 현재 보정 없음
+  classFx: {},
+  relicSlots: 2,            // 출전 준비에서 장착할 유물 수
+  // 랜덤 획득 (승리 시) — 일반: 아래 중 1개 굴림 / 강적: 유물 확정 + passive·potion 중 1개
+  lootNormal: { relic: 0.22, passive: 0.18, potion: 0.30 },  // 나머지 = 없음
+  lootElite: { passive: 0.5, potion: 0.5 },
 };
 
 // =========== 지역 ===========
@@ -76,7 +94,7 @@ export const REGRESSION_RECORDS = {
   shadowWolf:    { reward: { type: 'passive', id: '잔혹', n: 1 } },
   corruptSpider: { reward: { type: 'maxHp', n: 20 } },
   forestSpirit:  { reward: { type: 'passive', id: '재생', n: 2 } },
-  forestTyrant:  { reward: { type: 'passive', id: '강타', n: 2 } },
+  forestTyrant:  { reward: { type: 'maxHp', n: 30 } },  // 1.178.0 강타+2 → HP (자동 전투 실측: 강타 Lv.3+ 다단히트 = 기절 고정)
   // 봉인된 신전
   timeKeeper:    { reward: { type: 'passive', id: '가속', n: 1 } },
   brokenGolem:   { reward: { type: 'passive', id: '수비', n: 1 } },
@@ -230,6 +248,10 @@ export function createRegressionRun(metaR = EMPTY_REGRESSION, classId) {
     memoryCount: (metaR.memories || []).length,
     spireRound: null,      // 첨탑 진입 후 0~3
     pending: null,         // 진행 중 전투 { enemyKey, tier } — 새로고침 복원용
+    relics: [],            // 1.178.0~ 획득 유물 이름 (본편 RELICS)
+    bonusSkills: {},       // 1.178.0~ 랜덤 획득 패시브 Lv
+    potions: {},           // 1.178.0~ 포션 보유 { potionId: 개수 }
+    loadout: null,         // 1.178.0~ 직전 출전 준비 { activeSkills, activeRelics, belt }
     over: null,            // null | 'death' | 'timeout' | 'spireLose' | 'victory'
     log: [],
   };
@@ -336,7 +358,7 @@ export function applyRegressionCombat(run, result) {
     const fame = Math.round((T.fameGain[tier] || 0) * regionMult);
     next.fame += fame;
     next.kills[tier] = (next.kills[tier] || 0) + 1;
-    next.hpPct = Math.max(0.01, result.hpPct ?? next.hpPct);
+    next.hpPct = Math.min(1, Math.max(0.01, result.hpPct ?? next.hpPct)); // 1.178.0 상한 — 전투 화면 최대 HP(근력 보너스 포함)가 더 커서 100% 초과 누적되던 버그
     next = advanceDays(next, 1, `${name} 처치 (명성 +${fame})${learnedNow.length ? ' · 기록 완성' : ''}`);
   } else {
     next.hpPct = 0;
@@ -359,9 +381,9 @@ export function applyRegressionSpireResult(run, { win, hpPct }) {
   if (!win) return { ...run, hpPct: 0, over: 'spireLose', log: [...run.log, `첨탑 ${run.spireRound + 1}층에서 패배`] };
   const round = run.spireRound + 1;
   if (round >= REGRESSION_SPIRE_CHAIN.length) {
-    return { ...run, hpPct, spireRound: round, over: 'victory', log: [...run.log, '황혼의 첨탑 정복'] };
+    return { ...run, hpPct: Math.min(1, hpPct), spireRound: round, over: 'victory', log: [...run.log, '황혼의 첨탑 정복'] };
   }
-  const healed = Math.min(1, hpPct + (run.spireRestPct || 0) / 100);
+  const healed = Math.min(1, Math.min(1, hpPct) + (run.spireRestPct || 0) / 100);
   return { ...run, hpPct: healed, spireRound: round, log: [...run.log, `첨탑 ${round}층 돌파`] };
 }
 
@@ -410,6 +432,10 @@ export function setRegressionCarry(metaR, enemyKeys = []) {
 export function buildRegressionLoadout(run, classStartSkills = {}, baseMaxHp = 300) {
   const skills = { ...classStartSkills };
   let maxHp = baseMaxHp + (run.maxHpBonus || 0);
+  for (const [name, lv] of Object.entries(run.bonusSkills || {})) {
+    const maxLv = PASSIVE_SKILLS[name]?.maxLv ?? 7;
+    skills[name] = Math.min(maxLv, (skills[name] || 0) + lv);
+  }
   for (const k of run.learned) {
     const r = REGRESSION_RECORDS[k]?.reward;
     if (!r) continue;
@@ -420,5 +446,101 @@ export function buildRegressionLoadout(run, classStartSkills = {}, baseMaxHp = 3
       maxHp += r.n;
     }
   }
-  return { skills, maxHp, hp: Math.max(1, Math.round(maxHp * run.hpPct)) };
+  const relics = regressionRelicObjects(run);
+  const activeRelics = run.loadout?.activeRelics?.filter(n => (run.relics || []).includes(n)) || null;
+  for (const r of relics) {
+    if (r.statBonus?.maxHp && (!activeRelics || activeRelics.includes(r.name))) maxHp += r.statBonus.maxHp;
+  }
+  return { skills, maxHp, hp: Math.max(1, Math.round(maxHp * run.hpPct)), relics };
+}
+
+// =========== 1.178.0~ 랜덤 획득 · 출전 준비 ===========
+// 전투에서만 의미 있는 유물만 (시작 골드·지도 공개 등 본편 맵 전용 효과 제외). maxHp는 로드아웃에서 가산
+const REGRESSION_RELIC_KEYS = new Set([
+  'dmgDealt', 'critRate', 'critDmg', 'lifesteal', 'dmgTaken', 'dodge', 'maxHp', 'shieldOnStart', 'reflect',
+  'heal', 'magicDmg', 'cdReduceChance', 'frostbiteResist', 'berserkResist', 'sealResist', 'shockResist', 'antiHeal', 'startSoul',
+]);
+export const REGRESSION_RELIC_POOL = RELICS.filter(r => (r.weight || 0) > 0 && r.statBonus
+  && Object.keys(r.statBonus).every(k => REGRESSION_RELIC_KEYS.has(k)));
+
+// 공용 패시브 (직업 전용·대장간 전용 제외)
+// 강타 제외 — 다단히트 직업(사제·정령사)이 랜덤으로 Lv.3+를 모으면 충격 누적으로 적이 기절 고정됨 (1.178.0 실측)
+export const REGRESSION_PASSIVE_POOL = Object.keys(PASSIVE_SKILLS).filter(n => !PASSIVE_SKILLS[n].classOnly && n !== '강타');
+export const REGRESSION_POTION_POOL = ['hp_small', 'hp_small', 'hp_medium', 'soul', 'hp_large'];
+
+export function regressionRelicObjects(run) {
+  return (run.relics || []).map(n => RELICS.find(r => r.name === n)).filter(Boolean);
+}
+
+export function regressionBeltSlots(classId) {
+  return Math.max(1, CLASS_BELT[classId]?.max ?? 2);
+}
+
+// 승리 보상 굴림 — rng 주입 (setMeta updater 밖에서 호출)
+export function rollRegressionLoot(run, tier = 'normal', rng = Math.random) {
+  const T = REGRESSION_TUNING;
+  const loot = {};
+  const pickRelic = () => {
+    const pool = REGRESSION_RELIC_POOL.filter(r => !(run.relics || []).includes(r.name));
+    if (!pool.length) return null;
+    const total = pool.reduce((a, r) => a + r.weight, 0);
+    let x = rng() * total;
+    for (const r of pool) { x -= r.weight; if (x < 0) return r.name; }
+    return pool[pool.length - 1].name;
+  };
+  const pickPassive = () => REGRESSION_PASSIVE_POOL[Math.floor(rng() * REGRESSION_PASSIVE_POOL.length)];
+  const pickPotion = () => REGRESSION_POTION_POOL[Math.floor(rng() * REGRESSION_POTION_POOL.length)];
+  if (tier === 'elite') {
+    loot.relic = pickRelic();
+    if (rng() < T.lootElite.passive) loot.passive = pickPassive(); else loot.potion = pickPotion();
+  } else {
+    const x = rng();
+    const L = T.lootNormal;
+    if (x < L.relic) loot.relic = pickRelic();
+    else if (x < L.relic + L.passive) loot.passive = pickPassive();
+    else if (x < L.relic + L.passive + L.potion) loot.potion = pickPotion();
+  }
+  if (!loot.relic) delete loot.relic;
+  return loot;
+}
+
+export function applyRegressionLoot(run, loot = {}) {
+  const next = { ...run, relics: [...(run.relics || [])], bonusSkills: { ...(run.bonusSkills || {}) }, potions: { ...(run.potions || {}) } };
+  if (loot.relic && !next.relics.includes(loot.relic)) next.relics.push(loot.relic);
+  if (loot.passive) next.bonusSkills[loot.passive] = (next.bonusSkills[loot.passive] || 0) + 1;
+  if (loot.potion) next.potions[loot.potion] = (next.potions[loot.potion] || 0) + 1;
+  return next;
+}
+
+export function describeRegressionLoot(loot = {}) {
+  const out = [];
+  if (loot.relic) out.push(`유물 「${loot.relic}」`);
+  if (loot.passive) out.push(`패시브 「${loot.passive}」 +1Lv`);
+  if (loot.potion) out.push(`${POTIONS[loot.potion]?.icon || ''} ${POTIONS[loot.potion]?.name || loot.potion}`);
+  return out.join(' · ');
+}
+
+// 출전 준비 확정 → run.loadout 저장 (다음 전투 기본값)
+export function setRegressionLoadout(run, { activeSkills = null, activeRelics = [], belt = [] }) {
+  return { ...run, loadout: { activeSkills, activeRelics, belt } };
+}
+
+// 전투 후 사용한 포션을 보유량에서 차감
+export function consumeRegressionPotions(run, usedIds = []) {
+  const potions = { ...(run.potions || {}) };
+  for (const id of usedIds) {
+    if (potions[id] > 0) potions[id] -= 1;
+    if (potions[id] <= 0) delete potions[id];
+  }
+  return { ...run, potions };
+}
+
+// CombatScreen expedition prop — 자동 전투 보정 배율 + 유물 장착 수
+export function regressionCombatExpedition(regionKey) {
+  const m = REGRESSION_TUNING.regionEnemyMult[regionKey] || { hp: 1, dmg: 1 };
+  return { enemyHpMult: m.hp, enemyDmgMult: m.dmg, maxRelicSelect: REGRESSION_TUNING.relicSlots };
+}
+
+export function regressionClassFx(classId) {
+  return { ...(REGRESSION_TUNING.classFx[classId] || {}) };
 }

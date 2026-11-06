@@ -3,6 +3,6 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.177.0';
+export const GAME_VERSION = '1.178.0';
 export const VERSION_DATE = '2026-11-06';
-export const VERSION_LABEL = '🌀 회귀의 탐험가 — 새 모드 오픈';
+export const VERSION_LABEL = '🌀 회귀의 탐험가 — 출전 준비 + 자동 전투 + 랜덤 획득';
