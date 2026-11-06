@@ -21,7 +21,7 @@ import {
   settleRegression, setRegressionCarry, regressionCarrySlots, buildRegressionLoadout,
   describeRegressionRecord, getRegressionMemory,
   POTIONS, AUTO_SPEED_SKIP, rollRegressionLoot, applyRegressionLoot, describeRegressionLoot,
-  setRegressionLoadout, consumeRegressionPotions, regressionCombatExpedition, regressionBeltSlots, regressionClassFx,
+  setRegressionLoadout, consumeRegressionPotions, regressionCombatExpedition, regressionBeltSlots, regressionClassFx, regressionPostCombatHpPct,
 } from '../../data.js';
 import PrepScreen from '../PrepScreen.jsx';
 import { AP_TUNING } from '../../combat/initCombat.js';
@@ -323,7 +323,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
             </GlassPanel>
 
             <div className="text-[11px] px-1" style={{ color: PALETTE.textDim }}>
-              전투는 세팅대로 <b style={{ color: PALETTE.text }}>자동 진행</b>되며 도중에 개입할 수 없다. HP {loadout.hp}/{loadout.maxHp}로 출전.
+              전투는 세팅대로 <b style={{ color: PALETTE.text }}>자동 진행</b>되며 도중에 개입할 수 없다. HP {loadout.hp}/{loadout.maxHp}로 출전. 전투 중 회복은 그 전투 안에서만 유효하고, 끝나면 <b style={{ color: PALETTE.accent }}>받은 피해의 {Math.round((inSpire ? REGRESSION_TUNING.spireWoundPct : REGRESSION_TUNING.woundPct) * 100)}%</b>가 상처로 남는다.
             </div>
             <UIButton variant="primary" className="w-full ui-sheen" onClick={start}>자동 전투 시작</UIButton>
           </div>
@@ -333,17 +333,17 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
 
     // --- 자동 전투 (관전) ---
     const settleCommon = (r) => consumeRegressionPotions(r, usedPotionsRef.current);
-    const finishSpire = (win, finalHp) => {
-      let next = applyRegressionSpireResult(settleCommon(run), { win, hpPct: Math.max(0, finalHp / loadout.maxHp) });
+    const finishSpire = (win, taken) => {
+      let next = applyRegressionSpireResult(settleCommon(run), { win, hpPct: regressionPostCombatHpPct(loadout.hp, loadout.maxHp, taken, true) });
       next = { ...next, spirePrepared: false };
       if (win && !next.over) setBanner(`🗼 첨탑 ${run.spireRound + 1}층 돌파`);
       saveRun(next);
     };
-    const finishExplore = (win, finalHp, observations) => {
+    const finishExplore = (win, taken, observations) => {
       const tier = run.pending.tier;
       const { run: afterCombat, learnedNow } = applyRegressionCombat(settleCommon(run), {
         enemyKey, tier, win,
-        hpPct: Math.max(0, finalHp / loadout.maxHp), observations, intStat: classData.stats?.지능 || 10,
+        hpPct: regressionPostCombatHpPct(loadout.hp, loadout.maxHp, taken), observations, intStat: classData.stats?.지능 || 10,
       });
       let next = afterCombat;
       const msgs = [];
@@ -379,7 +379,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
         onCycleAutoSpeed={cycleSpeed}
         belt={combatBelt}
         onConsumePotion={(idx) => { usedPotionsRef.current.push(combatBelt[idx]); setCombatBelt(prev => prev.filter((_, i) => i !== idx)); }}
-        onVictory={(finalHp, drop, stats) => (inSpire ? finishSpire(true, finalHp) : finishExplore(true, finalHp, stats?.observations || []))}
+        onVictory={(finalHp, drop, stats) => (inSpire ? finishSpire(true, stats?.damageTaken || 0) : finishExplore(true, stats?.damageTaken || 0, stats?.observations || []))}
         onDefeat={(info) => (inSpire ? finishSpire(false, 0) : finishExplore(false, 0, info?.observations || []))}
       />
     );
