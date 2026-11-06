@@ -1016,6 +1016,15 @@ PM이 AskUserQuestion으로 확정한 설계. **던전앤파이터 모티브, "�
 
 ⚠️ 1.170.0 주의: `char.stats` 저장 구조는 그대로(해석만 변경). 새 포인트 지급처를 만들면 문구는 `buriedStatGainText(k, n)` 사용. 기본 공격 물리/마법 판정은 동률 시 `att.mainMag`(직업 주 속성).
 
+### 🌀 회귀의 탐험가 (「무림귀환」 운용 방식 모티브 — 판타지 탐험으로 각색, PM 확정)
+
+| 항목 | 내용 |
+|---|---|
+| 설계서 | `docs/regression-exploration-mode-design.md` (PR #271) — PM 확정: **40일** · **본편 메타 강화(각인·각성도) 미적용**(engravingFx={}) · 전투·UI는 **본편 CombatScreen 등 오리지널 재사용** |
+| MVP 1차 ✅ | `src/data/regression.js` 데이터+순수 로직 (지역 4 = 클래식 챕터 1~4 재사용 · 기록 18종 · 기억 조각 10종 · 첨탑 4연전) + `scripts/sim-regression.mjs` 시뮬. `FEATURE_FLAGS.regression=false` — 진입점 없음, 사용자 비노출(버전 미변경) |
+| 시뮬 기준 | 1생 첨탑 자격 ~24% → 2생 ~97% / 첫 정복 중앙값 3생 / 생당 기록 6~8종. 밸런스는 `REGRESSION_TUNING` 한 곳 |
+| 다음 | MVP 2차 — 날짜 허브·지역 지도 화면 + 본편 CombatScreen 연결(적 행동 관찰 콜백 → `applyRegressionCombat` observations) + `meta.regression` 저장 + 버전·changelog |
+
 ### 🏆 업적 시스템 (1.90.0 전면 개편 — 신규 콘텐츠 추가 시 필수 체크)
 
 | 규칙 | 내용 |
