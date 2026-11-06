@@ -49,7 +49,7 @@ import {
 } from '../combat/initCombat.js';
 import { FloatingLabel, DamageVignette, WhiteFlash, SlashFx, MagicImpactFx, MagicParticles, BarrierRing, BarrierBreakFx, ThrustFx, BladeGuardFx, ShadowStrikeFx, StatusOverlay, UltimateCutin, EternalFlameCutin, FireballFx, ExplosionFx, IgniteGlowAura, IgniteExplodeFx, FlameBarrierFx, FlameReflectFx, CritScreenFx } from './CombatEffects.jsx';
 
-export default function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimates = [], initialRelics = [], activeSkills = null, activeRelicNames = null, enemyKey, isBoss, expedition, curses = [], meta, engravingFx = {}, chapterGimmick = null, autoPlay = false, autoSpeed = 1, onCycleAutoSpeed = null, onSkipRun = null, autoRunCount = 0, onToggleAuto = null, belt = [], onConsumePotion = null, onLiveStatus = null, enemyOverride = null, onVictory, onDefeat }) {
+export default function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimates = [], initialRelics = [], activeSkills = null, activeRelicNames = null, enemyKey, isBoss, expedition, curses = [], meta, engravingFx = {}, chapterGimmick = null, autoPlay = false, autoSpeed = 1, onCycleAutoSpeed = null, onSkipRun = null, autoRunCount = 0, onToggleAuto = null, belt = [], onConsumePotion = null, onLiveStatus = null, enemyOverride = null, spectate = false, onVictory, onDefeat }) {
   // 1.80.0~ 자동 사냥 배속 — 자동 중에만 내부 진행·연출 딜레이 압축 (수동 플레이는 원속도)
   // 1.102.0~ ⏩스킵: 딜레이 0 — 동일 전투 로직을 즉시 진행 (승리 전투는 순식간에 통과, 패배는 그대로 노출)
   const dly = (ms) => {
@@ -140,6 +140,8 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
   // 1.177.0~ 회귀의 탐험가 「기록자의 눈」 — 적 행동 관찰 기록 [{ heavy, countered }]
   //   countered = 예고된 대공격을 회피·방어·기절로 받아냄. onVictory 3번째 인자 / onDefeat 1번째 인자로 전달
   const observationsRef = useRef([]);
+  // 1.178.0~ spectate: 관전 전용 (회귀의 탐험가 — 출전 준비 후 자동 전투, 플레이어 개입 불가).
+  //   autoPlay와 함께 쓰며, 스킬·턴 종료·포션·소울 버튼의 수동 입력만 막는다 (AI는 같은 핸들러를 직접 호출)
   // 1.91.1~ 방랑검사 자동: "턴 시작부터 소울 100" 커밋 플래그 (참격×2 후 무영의 일격 확정 발동용)
   const autoUltCommitRef = useRef(false);
   const trackDmg = (source, amount) => {
@@ -2975,7 +2977,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                   }}>⏩ 스킵</button>
                 )}
                 {phase === 'playerTurn' && !autoPlay && (
-                  <button onClick={handleEndTurn} className="ui-press flex-none" style={{
+                  <button onClick={spectate ? undefined : handleEndTurn} className="ui-press flex-none" style={{
                     fontSize: 10, letterSpacing: '0.08em', color: PALETTE.textDim,
                     background: 'rgba(255,255,255,0.05)', border: '1px solid var(--ui-line)',
                     borderRadius: 999, padding: '3px 10px',
@@ -2995,7 +2997,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                 if (!potion) return null;
                 const disabled = !!player.usedPotionThisTurn || potionSealed;
                 return (
-                  <button key={`${pid}-${idx}`} disabled={disabled} onClick={() => handleUsePotion(idx)}
+                  <button key={`${pid}-${idx}`} disabled={disabled} onClick={spectate ? undefined : () => handleUsePotion(idx)}
                     className="ui-press flex items-center gap-1 px-2 py-1"
                     style={{
                       borderRadius: 999, background: disabled ? 'rgba(255,255,255,0.04)' : `${potion.color}22`,
@@ -3029,7 +3031,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                 const typeColor = skill.type === 'physical' ? PALETTE.accent : skill.type === 'magic' ? PALETTE.twilight : skill.type === 'defense' ? PALETTE.ice : PALETTE.dawn;
                 const typeGlyph = skill.type === 'physical' ? '⚔' : skill.type === 'magic' ? '✦' : skill.type === 'defense' ? '🛡' : '◈';
                 return (
-                  <button key={skillKey} onClick={() => handlePlayerAction(skillKey)} disabled={disabled}
+                  <button key={skillKey} onClick={spectate ? undefined : () => handlePlayerAction(skillKey)} disabled={disabled}
                     className="ui-press py-1.5 transition-all flex flex-col items-center gap-0.5 relative overflow-hidden"
                     style={{
                       borderRadius: 'var(--r-btn)',
@@ -3066,7 +3068,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
                 const ready = (player.soulGauge || 0) >= 100;
                 return (
                   <button
-                    onClick={() => handleUltimate()}
+                    onClick={spectate ? undefined : () => handleUltimate()}
                     disabled={!ready}
                     title={`${ult.name}\n${ult.desc}`}
                     className={`ui-press py-1.5 transition-all flex flex-col items-center gap-0.5 relative overflow-hidden ${ready ? 'fx-hit-shake' : ''}`}
