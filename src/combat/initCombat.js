@@ -69,8 +69,9 @@ export function buildInitialPlayer({ initialPlayer, initialSkills, initialUltima
 }
 
 // 적 초기 상태 생성 — 원정 배율 적용된 HP와 패턴 데미지 반영.
-export function buildInitialEnemy({ enemyKey, expedition }) {
-  const e = ENEMIES[enemyKey];
+// enemyOverride (1.177.0~): ENEMIES에 없는 모드 전용 적 객체 (회귀의 탐험가 첨탑 등) — 같은 포맷
+export function buildInitialEnemy({ enemyKey, expedition, enemyOverride = null }) {
+  const e = enemyOverride || ENEMIES[enemyKey];
   // 1.69.0~ AP 시스템 보정 배율이 원정 배율에 곱연산으로 얹힘
   const hpMult = (expedition?.enemyHpMult || 1.0) * AP_TUNING.enemyHpMult;
   const dmgMult = (expedition?.enemyDmgMult || 1.0) * AP_TUNING.enemyDmgMult;

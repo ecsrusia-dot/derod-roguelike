@@ -1023,7 +1023,8 @@ PM이 AskUserQuestion으로 확정한 설계. **던전앤파이터 모티브, "�
 | 설계서 | `docs/regression-exploration-mode-design.md` (PR #271) — PM 확정: **40일** · **본편 메타 강화(각인·각성도) 미적용**(engravingFx={}) · 전투·UI는 **본편 CombatScreen 등 오리지널 재사용** |
 | MVP 1차 ✅ | `src/data/regression.js` 데이터+순수 로직 (지역 4 = 클래식 챕터 1~4 재사용 · 기록 18종 · 기억 조각 10종 · 첨탑 4연전) + `scripts/sim-regression.mjs` 시뮬. `FEATURE_FLAGS.regression=false` — 진입점 없음, 사용자 비노출(버전 미변경) |
 | 시뮬 기준 | 1생 첨탑 자격 ~24% → 2생 ~97% / 첫 정복 중앙값 3생 / 생당 기록 6~8종. 밸런스는 `REGRESSION_TUNING` 한 곳 |
-| 다음 | MVP 2차 — 날짜 허브·지역 지도 화면 + 본편 CombatScreen 연결(적 행동 관찰 콜백 → `applyRegressionCombat` observations) + `meta.regression` 저장 + 버전·changelog |
+| MVP 2차 ✅ (1.177.0) | `components/regression/RegressionGame.jsx` (로비·날짜 허브·기록서·회귀 정산) + 본편 `CombatScreen` 재사용 — 신규 prop `enemyOverride`(ENEMIES에 없는 적, `buildInitialEnemy`도 동일) + `observationsRef`(적 행동 [{heavy,countered}] → onVictory 3번째 인자·onDefeat 1번째 인자 `observations`). 저장 `meta.regression`(`getRegression`, 진행 중 생 = `.run`, 전투 중 새로고침 = `run.pending`/`spireRound`로 재전투). 전투 meta는 `upgrades:{}`로 제단 미적용. 타이틀 메뉴 「회귀의 탐험가」 |
+| 다음 | MVP 3차 — 동료 4명 · 지역 사건 24개(EventScreen 재사용) · 상점 · 엔딩 5종 |
 
 ### 🏆 업적 시스템 (1.90.0 전면 개편 — 신규 콘텐츠 추가 시 필수 체크)
 

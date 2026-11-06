@@ -49,7 +49,7 @@ import {
 } from '../combat/initCombat.js';
 import { FloatingLabel, DamageVignette, WhiteFlash, SlashFx, MagicImpactFx, MagicParticles, BarrierRing, BarrierBreakFx, ThrustFx, BladeGuardFx, ShadowStrikeFx, StatusOverlay, UltimateCutin, EternalFlameCutin, FireballFx, ExplosionFx, IgniteGlowAura, IgniteExplodeFx, FlameBarrierFx, FlameReflectFx, CritScreenFx } from './CombatEffects.jsx';
 
-export default function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimates = [], initialRelics = [], activeSkills = null, activeRelicNames = null, enemyKey, isBoss, expedition, curses = [], meta, engravingFx = {}, chapterGimmick = null, autoPlay = false, autoSpeed = 1, onCycleAutoSpeed = null, onSkipRun = null, autoRunCount = 0, onToggleAuto = null, belt = [], onConsumePotion = null, onLiveStatus = null, onVictory, onDefeat }) {
+export default function CombatScreen({ classData, initialPlayer, initialSkills, initialUltimates = [], initialRelics = [], activeSkills = null, activeRelicNames = null, enemyKey, isBoss, expedition, curses = [], meta, engravingFx = {}, chapterGimmick = null, autoPlay = false, autoSpeed = 1, onCycleAutoSpeed = null, onSkipRun = null, autoRunCount = 0, onToggleAuto = null, belt = [], onConsumePotion = null, onLiveStatus = null, enemyOverride = null, onVictory, onDefeat }) {
   // 1.80.0~ 자동 사냥 배속 — 자동 중에만 내부 진행·연출 딜레이 압축 (수동 플레이는 원속도)
   // 1.102.0~ ⏩스킵: 딜레이 0 — 동일 전투 로직을 즉시 진행 (승리 전투는 순식간에 통과, 패배는 그대로 노출)
   const dly = (ms) => {
@@ -63,7 +63,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
   const [player, setPlayer] = useState(() => buildInitialPlayer({
     initialPlayer, initialSkills, initialUltimates, activeSkills, meta, curses,
   }));
-  const [enemy, setEnemy] = useState(() => buildInitialEnemy({ enemyKey, expedition }));
+  const [enemy, setEnemy] = useState(() => buildInitialEnemy({ enemyKey, expedition, enemyOverride }));
   const skills = useMemo(
     () => buildEffectivePassives({ initialSkills, initialRelics, activeRelicNames }),
     [initialSkills, initialRelics, activeRelicNames],
@@ -137,6 +137,9 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
   const dmgStatsRef = useRef({ total: 0, bySource: {} });
   // 1.90.0~ 이 전투의 회피 발동 횟수 (무결한 검사 업적 — 컴포넌트가 전투마다 리마운트라 자동 초기화)
   const dodgeCountRef = useRef(0);
+  // 1.177.0~ 회귀의 탐험가 「기록자의 눈」 — 적 행동 관찰 기록 [{ heavy, countered }]
+  //   countered = 예고된 대공격을 회피·방어·기절로 받아냄. onVictory 3번째 인자 / onDefeat 1번째 인자로 전달
+  const observationsRef = useRef([]);
   // 1.91.1~ 방랑검사 자동: "턴 시작부터 소울 100" 커밋 플래그 (참격×2 후 무영의 일격 확정 발동용)
   const autoUltCommitRef = useRef(false);
   const trackDmg = (source, amount) => {
@@ -1167,7 +1170,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       finalHp = Math.min(player.maxHp, player.hp + heal);
     }
     // 1.81.0~ 전투 정산 데이터 전달 (출처별 가한 데미지)
-    onVictory(finalHp, enemy.drop, { total: dmgStatsRef.current.total, bySource: { ...dmgStatsRef.current.bySource }, dodges: dodgeCountRef.current });
+    onVictory(finalHp, enemy.drop, { total: dmgStatsRef.current.total, bySource: { ...dmgStatsRef.current.bySource }, dodges: dodgeCountRef.current, observations: [...observationsRef.current] });
   };
 
   useEffect(() => {
@@ -1177,7 +1180,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       return () => clearTimeout(t);
     }
     if (phase === 'defeat') {
-      const t = setTimeout(() => onDefeat(), dly(1400));
+      const t = setTimeout(() => onDefeat({ observations: [...observationsRef.current] }), dly(1400));
       return () => clearTimeout(t);
     }
     if (phase !== 'playerTurn') return;
@@ -1398,6 +1401,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
       // 1.68.0 전투 개편 A — 대공격 준비 중 기절시키면 대공격 저지 (충격 빌드의 능동 카운터)
       if (newEnemy.nextIntent?.heavy) {
         newLog.push({ type: 'passive', text: `◆ 준비하던 대공격이 저지되었다!` });
+        observationsRef.current.push({ heavy: true, countered: true });
       }
       // 기절 1턴 소모
       newEnemy.debuffs = { ...newEnemy.debuffs, stunned: 0 };
@@ -1409,12 +1413,15 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
     const intent = curEnemy.nextIntent;
     if (!intent) { setTimeout(() => endTurn(newPlayer, newEnemy, newLog), dly(300)); return; }
     newLog.push({ type: 'enemy', text: `◂ ${enemy.name}: ${intent.name}` });
+    const _obs = { heavy: !!intent.heavy, countered: false };
+    observationsRef.current.push(_obs);
 
     if (intent.type === 'attack') {
       const dodged = rollDodge(skills, newPlayer, activeSkills, relicStat, ultimates, engravingFx, meta);
       if (dodged) {
         newLog.push({ type: 'system', text: `· 회피 성공!` });
         dodgeCountRef.current += 1;
+        if (intent.heavy) _obs.countered = true;
         // FX — 회피: 플레이어 위에 "회피!" 부유 라벨
         pushFxLabel('player', 'miss', null, '회피!');
         // 1.68.0 전투 개편 A — 대공격 간파: ⚠ 예고된 대공격을 회피하면 소울 보너스
@@ -1562,6 +1569,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
           }
           // 1.68.0 대공격 간파 — 방어를 세워 대공격을 받아내면 잔여 피해 -25% + 소울 보너스
           if (heavyGuarded) {
+            _obs.countered = true;
             if (dmg > 0) {
               const cut = Math.floor(dmg * 0.25);
               if (cut > 0) {
@@ -3094,7 +3102,7 @@ export default function CombatScreen({ classData, initialPlayer, initialSkills, 
               }}>▸ 보상 획득</button>
           )}
           {phase === 'defeat' && (
-            <button onClick={() => onDefeat()} className="ui-press w-full py-3 text-xs tracking-[0.3em] font-bold" style={{
+            <button onClick={() => onDefeat({ observations: [...observationsRef.current] })} className="ui-press w-full py-3 text-xs tracking-[0.3em] font-bold" style={{
               borderRadius: 'var(--r-btn)',
               background: `linear-gradient(160deg, ${PALETTE.accent}66, ${PALETTE.accent}28)`,
               border: `1px solid ${PALETTE.accent}`, color: '#ffe9d2',
