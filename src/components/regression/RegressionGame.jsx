@@ -145,7 +145,8 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
     return nx;
   });
   const [showShop, setShowShop] = useState(false);
-  const [skillInfo, setSkillInfo] = useState(null);   // 1.188.0~ 스킬 정보 시트
+  const [skillInfo, setSkillInfo] = useState(null);
+  const [shopLog, setShopLog] = useState([]);       // 1.188.1~ 이번 상인 방문 거래 내역 (상인을 떠날 때까지 창 유지)   // 1.188.0~ 스킬 정보 시트
   const [menu, setMenu] = useState(null);         // 이야기 화면 보조 메뉴: travel | party | log
 
   const classData = run ? classById(run.classId) : null;
@@ -562,6 +563,13 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
   const pendingEv = run.pendingEvent ? regressionEventById(run.pendingEvent) : null;
 
   const nextScene = () => { setMenu(null); saveRun({ ...run, scene: null }); };
+  // 1.188.1~ 상인을 떠날 때 하루를 마치고, 이번 방문의 거래를 결과 장면에 모아 보여 준다
+  const leaveMerchant = () => {
+    const tags = shopLog.map(l => ({ text: l.text, tone: l.tone }));
+    setShowShop(false); setShopLog([]);
+    saveRun({ ...passRegressionDay(run, '떠돌이 상인과 만남'), scene: regressionResultScene('떠돌이 상인', '"다음에 또 봅시다. 살아 있다면 말이오." 짐마차가 멀어진다.', tags) });
+  };
+  const logShop = (text, tone = 'good') => setShopLog(l => [...l, { text, tone }]);
   const explore = (tier) => {
     const key = rollRegressionEnemy(run.region, tier);
     if (!key) return;
@@ -751,7 +759,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
       choices = (
         <>
           <Choice text="물건을 본다" sub={`보유 ${run.gold || 0}G · 진열 ${(run.shop?.offers || []).filter(o => !o.sold).length}개 · 진열 바꾸기 ${REGRESSION_ECON.shopResets - (run.shop?.resets || 0)}회`} onClick={() => setShowShop(true)} />
-          <Choice text="상인과 헤어진다 (하루를 마친다)" onClick={() => saveRun({ ...passRegressionDay(run, '떠돌이 상인과 만남'), scene: sceneOf('떠돌이 상인', '"다음에 또 봅시다. 살아 있다면 말이오." 짐마차가 멀어진다.', []) })} />
+          <Choice text="상인과 헤어진다 (하루를 마친다)" onClick={leaveMerchant} />
         </>
       );
     } else if (t.kind === 'shelter') {
@@ -939,6 +947,12 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
       {showShop && (
         <BottomSheet title={`🛒 떠돌이 상인 — ${run.gold || 0}G`} onClose={() => setShowShop(false)}>
           <div className="space-y-1.5 pb-2">
+            {shopLog.length > 0 && (
+              <div className="px-2.5 py-2" style={{ borderRadius: 'var(--r-chip, 8px)', background: `${PALETTE.green}14`, border: `1px solid ${PALETTE.green}55` }}>
+                <div className="text-[11px] font-bold mb-0.5" style={{ color: PALETTE.green }}>이번 거래 {shopLog.length}건</div>
+                {shopLog.slice(-4).map((l, i) => <div key={i} className="text-[11px]" style={{ color: PALETTE.text }}>· {l.text}</div>)}
+              </div>
+            )}
             <div className="flex items-center justify-between">
               <div className="text-[12px] font-bold" style={{ color: PALETTE.text }}>오늘의 진열</div>
               {(() => {
@@ -956,7 +970,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
               const color = isSkill ? REGRESSION_SKILL_TIERS[sk.tier].color : REGRESSION_GEAR_GRADES[g.grade].color;
               return (
                 <button key={idx} disabled={!can} className="ui-press w-full flex items-center gap-2 px-3 text-left"
-                  onClick={() => { const r = buyRegressionOffer(run, idx); if (r.bought) { setShowShop(false); saveRun({ ...r.run, scene: regressionResultScene('떠돌이 상인', isSkill ? '늙은 교관이 며칠 치 수업을 하루에 몰아 가르쳐 주었다.' : '상인이 물건을 건네며 고개를 끄덕인다. "살아서 돌아오시오."', [{ text: r.bought, tone: 'good' }, { text: `-${r.price}G`, tone: 'bad' }]) }); } }}
+                  onClick={() => { const r = buyRegressionOffer(run, idx); if (r.bought) { saveRun(r.run); logShop(`${r.bought} (-${r.price}G)`); } }}
                   style={{ minHeight: 52, borderRadius: 'var(--r-chip, 8px)', background: PALETTE.panelLight, border: `1px solid ${PALETTE.panelBorder}`, opacity: o.sold ? 0.3 : (can ? 1 : 0.5) }}>
                   <div className="flex-1 min-w-0">
                     <div className="text-[12px] font-bold" style={{ color }}>{isSkill ? `[${REGRESSION_SKILL_TIERS[sk.tier].name} 스킬] ${sk.name}` : regressionGearLabel(o.id)}{o.sold ? ' — 판매됨' : ''}</div>
@@ -975,7 +989,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
               const can = (run.gold || 0) >= it.price;
               return (
                 <button key={it.id} disabled={!can} className="ui-press w-full flex items-center gap-2 px-3 text-left"
-                  onClick={() => { const r = buyRegressionShop(run, it.id); if (r.bought) { setShowShop(false); saveRun({ ...r.run, scene: regressionResultScene('떠돌이 상인', '상인이 물건을 건네며 고개를 끄덕인다. "살아서 돌아오시오."', [{ text: r.bought, tone: 'good' }, { text: `-${it.price}G`, tone: 'bad' }]) }); } }}
+                  onClick={() => { const r = buyRegressionShop(run, it.id); if (r.bought) { saveRun(r.run); logShop(`${r.bought} (-${it.price}G)`); } }}
                   style={{ minHeight: 48, borderRadius: 'var(--r-chip, 8px)', background: PALETTE.panelLight, border: `1px solid ${PALETTE.panelBorder}`, opacity: can ? 1 : 0.45 }}>
                   <div className="flex-1 min-w-0">
                     <div className="text-[12px] font-bold" style={{ color: PALETTE.text }}>{name}</div>
@@ -987,7 +1001,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
             })}
             <div className="text-[12px] font-bold pt-2" style={{ color: PALETTE.text }}>장비 팔기 <span className="font-normal text-[11px]" style={{ color: PALETTE.textDim }}>· 장착하지 않은 장비만</span></div>
             {regressionSellableGear(run).map(({ id, count }) => (
-              <button key={id} className="ui-press w-full flex items-center gap-2 px-3 text-left" onClick={() => saveRun(sellRegressionGear(run, id).run)}
+              <button key={id} className="ui-press w-full flex items-center gap-2 px-3 text-left" onClick={() => { const r = sellRegressionGear(run, id); if (r.sold) { saveRun(r.run); logShop(`${REGRESSION_GEAR[id].name} 판매 (+${r.sold}G)`, 'gold'); } }}
                 style={{ minHeight: 48, borderRadius: 'var(--r-chip, 8px)', background: PALETTE.panelLight, border: `1px solid ${PALETTE.panelBorder}` }}>
                 <div className="flex-1 min-w-0">
                   <div className="text-[12px] font-bold" style={{ color: REGRESSION_GEAR_GRADES[REGRESSION_GEAR[id].grade].color }}>{regressionGearLabel(id)}{count > 1 ? ` ×${count}` : ''}</div>
@@ -998,8 +1012,10 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
             ))}
             {regressionSellableGear(run).length === 0 && <div className="text-[11px]" style={{ color: PALETTE.textDim }}>팔 수 있는 장비가 없다.</div>}
             <div className="text-[11px] pt-1" style={{ color: PALETTE.textDim }}>진열은 상인을 만날 때마다 새로 짜인다. 기연 스킬과 유니크 무구는 팔지 않는다.</div>
-            <button className="ui-press w-full text-[13px] font-bold" onClick={() => setShowShop(false)}
-              style={{ minHeight: 44, borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panelLight, border: `1px solid ${PALETTE.panelBorder}`, color: PALETTE.text }}>닫기</button>
+            <button className="ui-press w-full text-[13px] font-bold" onClick={leaveMerchant}
+              style={{ minHeight: 44, borderRadius: 'var(--r-btn, 13px)', background: `${PALETTE.accent}22`, border: `1px solid ${PALETTE.accent}`, color: PALETTE.text }}>상인과 헤어진다 (하루를 마친다)</button>
+            <button className="ui-press w-full text-[12px]" onClick={() => setShowShop(false)}
+              style={{ minHeight: 40, borderRadius: 'var(--r-btn, 13px)', background: 'transparent', border: `1px solid ${PALETTE.panelBorder}`, color: PALETTE.textDim }}>잠시 닫기 (상인은 기다린다)</button>
           </div>
         </BottomSheet>
       )}
