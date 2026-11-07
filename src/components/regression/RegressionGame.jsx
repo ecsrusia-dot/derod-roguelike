@@ -19,6 +19,7 @@ import {
   isRegressionSpireDay, isRegressionSpireEligible, isRegressionEliteOpen,
   enterRegressionSpire, applyRegressionSpireResult, buildRegressionSpireEnemy,
   REGRESSION_ROUTES, REGRESSION_ROUTE_BOSSES, REGRESSION_ROUTE_REWARDS, REGRESSION_ROUTE_BOSS_DAY_IN_REGION, REGRESSION_ROUTE_FROM_REGION,
+  REGRESSION_OATHS, REGRESSION_OATH_UNLOCK_LOOPS, regressionOathFx, regressionOathEchoMult, regressionOathEnemyMult, regressionFameGate,
   buildRegressionRouteBoss, applyRegressionRouteReward, REGRESSION_RED_MOON, regressionDaysToRedMoon, REGRESSION_GRAVE, resolveRegressionGrave, regressionSpireChain, regressionSpireEnemyFor, regressionRouteFor, REGRESSION_GEAR as __RG_GEAR,
   settleRegression, setRegressionCarry, regressionCarrySlots, buildRegressionLoadout,
   describeRegressionRecord, getRegressionMemory,
@@ -138,6 +139,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
   const [customStats, setCustomStats] = useState(null); // 시작 커스텀 화면 (null = 로비)
   const [customSkills, setCustomSkills] = useState([]);  // 시작 일반 스킬 3개
   const [provisions, setProvisions] = useState([]);      // 1.191.0~ 이번 생 출발 준비물 (잔향 소모)
+  const [oaths, setOaths] = useState([]);                // 1.197.0~ 황혼의 맹세
   const [showBook, setShowBook] = useState(false);
   const [banner, setBanner] = useState(null);
   const [carrySel, setCarrySel] = useState([]);
@@ -220,7 +222,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
           </GlassPanel>
           <GlassPanel style={{ padding: 12 }}>
             <div className="flex items-center justify-between">
-              <span className="text-[12px] font-bold" style={{ color: PALETTE.dawn }}>🔔 잔향 +{settle.echoGain}</span>
+              <span className="text-[12px] font-bold" style={{ color: PALETTE.dawn }}>🔔 잔향 +{settle.echoGain}{run.oaths?.length ? ` (⛓ 맹세 ×${regressionOathEchoMult(run.oaths).toFixed(2)})` : ''}</span>
               <span className="text-[11px]" style={{ color: PALETTE.textDim }}>보유 {settle.meta.echo} · 시작 특성 해금에 쓴다</span>
             </div>
           </GlassPanel>
@@ -379,6 +381,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
         enemyLabel={regressionEnemyLabel(enemyKey, tier, override)}
         regionKey={inSpire ? 'spire' : run.region}
         enemyMult={inSpire ? 1 : regressionDayEnemyMult(run.day) * (run.pending?.redMoon ? REGRESSION_RED_MOON.enemyMult : 1)}
+        enemyExtra={(() => { const om = regressionOathEnemyMult(run, inSpire); const moon = !inSpire && run.pending?.redMoon ? REGRESSION_RED_MOON.enemyMult : 1; return { hp: om.hp * moon, dmg: om.dmg * moon }; })()}
         intro={inSpire ? `첨탑 ${run.spireRound + 1}/${spireLen}층. ${regressionEnemyLabel(enemyKey, 'boss', enemyObj)}이(가) 길을 막아선다.` : `${regressionEnemyLabel(enemyKey, tier, override)}이(가) 앞을 막아선다. 피할 수는 없다.`}
         stats={storyStats}
         level={run.level || 0}
@@ -410,7 +413,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
     if (customStats) {
       const tfx = aggregateRegressionStartTraits(reg.equippedTraits || [], reg);
       const provCost = regressionProvisionsCost(provisions);
-      const skillCount = REGRESSION_START_SKILL_COUNT + (tfx.startSkills || 0);
+      const skillCount = Math.max(1, REGRESSION_START_SKILL_COUNT + (tfx.startSkills || 0) + regressionOathFx(oaths).startSkills);
       const spent = regressionStatsSpent(customStats);
       const left = REGRESSION_START_POINTS + (tfx.startPoints || 0) - spent;
       const adj = (k, d) => {
@@ -499,9 +502,37 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
               </div>
               <div className="text-[11px] mt-1.5" style={{ color: PALETTE.textDim }}>잔향은 출발할 때 빠져나간다. 준비물은 이번 생에서만 쓴다.</div>
             </GlassPanel>
+            {reg.loops >= REGRESSION_OATH_UNLOCK_LOOPS ? (
+              <GlassPanel style={{ padding: 12 }}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="text-[12px] font-bold" style={{ color: PALETTE.accent }}>⛓ 황혼의 맹세 — 스스로 족쇄를 건다</div>
+                  <span className="text-[11px] font-bold tabular-nums" style={{ color: PALETTE.legendary }}>잔향 ×{regressionOathEchoMult(oaths).toFixed(2)}</span>
+                </div>
+                <div className="space-y-1.5">
+                  {Object.entries(REGRESSION_OATHS).map(([id, o]) => {
+                    const on = oaths.includes(id);
+                    return (
+                      <button key={id} onClick={() => setOaths(on ? oaths.filter(x => x !== id) : [...oaths, id])}
+                        className="ui-press w-full flex items-center gap-2 px-2.5 text-left"
+                        style={{ minHeight: 44, borderRadius: 'var(--r-chip, 8px)', background: on ? `${PALETTE.accent}22` : PALETTE.panelLight, border: `1px solid ${on ? PALETTE.accent : PALETTE.panelBorder}` }}>
+                        <span className="text-[16px]">{o.icon}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[12px] font-bold" style={{ color: on ? '#f0a59c' : PALETTE.text }}>{o.name}</div>
+                          <div className="text-[11px]" style={{ color: PALETTE.textDim }}>{o.desc}</div>
+                        </div>
+                        <span className="text-[11px] font-bold flex-none" style={{ color: PALETTE.legendary }}>{on ? '✓ ' : ''}잔향 +{Math.round(o.echo * 100)}%</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="text-[11px] mt-1.5" style={{ color: PALETTE.textDim }}>맹세는 이번 생 내내 풀 수 없다. 이번 생이 끝날 때 받는 잔향이 늘어난다.</div>
+              </GlassPanel>
+            ) : (
+              <div className="text-[11px] px-1" style={{ color: PALETTE.textDim }}>⛓ 황혼의 맹세 — {REGRESSION_OATH_UNLOCK_LOOPS}번 회귀하면 열린다 (현재 {reg.loops}번)</div>
+            )}
             <UIButton variant="primary" className="w-full ui-sheen" disabled={left !== 0 || customSkills.length !== skillCount}
-              onClick={() => { onSave({ run: createRegressionRun(reg, pickClass, customStats, customSkills, reg.equippedTraits || [], provisions), echo: Math.max(0, (reg.echo || 0) - provCost) }); setProvisions([]); setCustomStats(null); }}>
-              {left !== 0 ? `능력치를 ${left} 더 배분하세요` : customSkills.length !== skillCount ? `일반 스킬을 ${skillCount - customSkills.length}개 더 고르세요` : (reg.loops === 0 ? '여명의 마을에서 눈을 뜬다' : `${reg.loops + 1}번째 생을 시작한다`)}
+              onClick={() => { onSave({ run: createRegressionRun(reg, pickClass, customStats, customSkills, reg.equippedTraits || [], provisions, oaths), echo: Math.max(0, (reg.echo || 0) - provCost) }); setProvisions([]); setOaths([]); setCustomStats(null); }}>
+              {left !== 0 ? `능력치를 ${left} 더 배분하세요` : customSkills.length > skillCount ? `일반 스킬을 ${customSkills.length - skillCount}개 빼세요` : customSkills.length !== skillCount ? `일반 스킬을 ${skillCount - customSkills.length}개 더 고르세요` : (reg.loops === 0 ? '여명의 마을에서 눈을 뜬다' : `${reg.loops + 1}번째 생을 시작한다`)}
             </UIButton>
           </div>
         </div>
@@ -629,7 +660,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
   const unrecorded = (tier) => region ? regressionEnemyPool(region.id, tier).filter(k => REGRESSION_RECORDS[k] && !run.learned.includes(k)).length : 0;
   const companion = region ? regressionCompanionAt(region.id) : null;
   const eventsLeft = region ? REGRESSION_EVENTS.filter(e => e.region === region.id && !(run.seenEvents || []).includes(e.id)).length : 0;
-  const stage = regressionFameStage(run.fame);
+  const stage = regressionFameStage(run.fame, regressionFameGate(run));
   const famePath = regressionFamePath(run);
   const daysLeft = Math.max(0, run.maxDays - run.day + 1);
   const compFx = aggregateRegressionCompanions(run);

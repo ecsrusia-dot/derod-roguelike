@@ -165,12 +165,14 @@ export function regressionPlayerCombatant({ stats, level = 0, maxHp, hp, skills 
   };
 }
 // dayMult — 1.185.0~ 날이 갈수록 강해지는 적 (regressionDayEnemyMult, 첨탑은 1)
-export function regressionEnemyCombatant(enemyKey, enemyObj, regionKey, dayMult = 1) {
+export function regressionEnemyCombatant(enemyKey, enemyObj, regionKey, dayMult = 1, extra = null) {
   const C = REGRESSION_COMBAT;
   const e = enemyObj || ENEMIES[enemyKey];
   const tier = e.tier || 'normal';
   const tm = C.tierMult?.[tier] || { hp: 1, dmg: 1 };   // 1.190.0~ 등급 배율 (하급만 따로 조일 수 있게)
-  const hpMult = (C.enemyHp[regionKey] ?? 1) * dayMult * tm.hp, dmgMult = (C.enemyDmg[regionKey] ?? 1) * dayMult * tm.dmg;
+  // 1.197.0~ extra = { hp, dmg } 개별 배율 (황혼의 맹세) — 주어지면 dayMult 대신 쓴다
+  const dH = extra?.hp ?? dayMult, dD = extra?.dmg ?? dayMult;
+  const hpMult = (C.enemyHp[regionKey] ?? 1) * dH * tm.hp, dmgMult = (C.enemyDmg[regionKey] ?? 1) * dD * tm.dmg;
   const hp = Math.round(e.hp * hpMult);
   return {
     key: enemyKey, name: e.name, tier, maxHp: hp, hp,

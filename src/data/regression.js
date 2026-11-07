@@ -233,7 +233,7 @@ export function regressionCarrySlots(metaR) {
 }
 
 // =========== 런 생성 ===========
-export function createRegressionRun(metaR = EMPTY_REGRESSION, classId, stats = null, skills = null, startTraits = [], provisions = []) {
+export function createRegressionRun(metaR = EMPTY_REGRESSION, classId, stats = null, skills = null, startTraits = [], provisions = [], oaths = []) {
   const T = REGRESSION_TUNING;
   const fx = aggregateRegressionMemories(metaR.memories);
   const records = {};
@@ -283,7 +283,9 @@ export function createRegressionRun(metaR = EMPTY_REGRESSION, classId, stats = n
     log: [],
   };
   const withGrave = metaR.grave ? { ...run, grave: { ...metaR.grave } } : run;   // 1.196.0~ 전생의 유품
-  return applyRegressionProvisions(applyRegressionStartTraits({ ...withGrave, shop: buildRegressionShopStock(withGrave) }, startTraits, metaR), provisions);
+  const made = applyRegressionProvisions(applyRegressionStartTraits({ ...withGrave, shop: buildRegressionShopStock(withGrave) }, startTraits, metaR), provisions);
+  const ok = (oaths || []).filter(id => REGRESSION_OATHS[id]);
+  return ok.length ? { ...made, oaths: ok, gold: regressionOathFx(ok).startGoldZero ? 0 : made.gold } : made;   // 1.197.0~ 황혼의 맹세
 }
 
 // =========== 날짜·이동 ===========
@@ -300,7 +302,7 @@ export function isRegressionSpireDay(run) {
 }
 
 export function isRegressionSpireEligible(run) {
-  return run.fame >= REGRESSION_TUNING.fameGate;
+  return run.fame >= regressionFameGate(run);
 }
 
 function advanceDays(run, n, logLine) {
@@ -676,7 +678,7 @@ export function applyRegressionTalk(run, companionId, charisma = 10) {
   const c = getRegressionCompanion(companionId);
   if (!c) return run;
   const T = REGRESSION_COMPANION_TUNING;
-  const gain = T.affinityPerTalk + (charisma >= T.charismaGate ? T.charismaBonus : 0);
+  const gain = Math.round((T.affinityPerTalk + (charisma >= T.charismaGate ? T.charismaBonus : 0)) * regressionOathFx(run.oaths).affinityMult);
   const before = run.affinity?.[companionId] || 0;
   const after = Math.min(100, before + gain);
   const up = regressionCompanionTier(after).id !== regressionCompanionTier(before).id ? ` — 「${regressionCompanionTier(after).name}」` : '';
@@ -734,7 +736,8 @@ export function regressionVictoryGold(run, enemyKey, rng = Math.random) {
   const g = ENEMIES[enemyKey]?.drop?.gold || [10, 20];
   const base = g[0] + Math.floor(rng() * (g[1] - g[0] + 1));
   const pct = aggregateRegressionCompanions(run).goldPct;
-  return Math.max(1, Math.round(base * REGRESSION_ECON.goldMult * (1 + pct / 100)));
+  const oath = regressionOathFx(run.oaths).goldMult;
+  return Math.max(1, Math.round(base * REGRESSION_ECON.goldMult * (1 + pct / 100) * oath));
 }
 
 // =========== 지역 사건 24개 (본편 EventScreen 포맷) ===========
@@ -954,7 +957,7 @@ export function applyRegressionEvent(run, eventId, res, { maxHp = 300, rng = Mat
     if (r.type === 'gold') { next.gold = (next.gold || 0) + r.value; notes.push(`+${r.value}G`); }
     else if (r.type === 'heal_pct') { next.hpPct = Math.min(1, next.hpPct + r.value / 100); notes.push(`HP +${r.value}%`); }
     else if (r.type === 'fame') { next.fame += r.value; notes.push(`명성 +${r.value}`); }
-    else if (r.type === 'affinity') { next.affinity[r.name] = Math.min(100, (next.affinity[r.name] || 0) + r.value); notes.push(`${getRegressionCompanion(r.name)?.name} 호감 +${r.value}`); }
+    else if (r.type === 'affinity') { const v = Math.round(r.value * regressionOathFx(run.oaths).affinityMult); next.affinity[r.name] = Math.min(100, (next.affinity[r.name] || 0) + v); notes.push(`${getRegressionCompanion(r.name)?.name} 호감 +${v}`); }
     else if (r.type === 'record') {
       if (!next.learned.includes(r.name)) { next.records = { ...next.records, [r.name]: Math.min(99, (next.records[r.name] || 0) + r.value) }; notes.push(`${ENEMIES[r.name]?.name} 기록 +${r.value}%`); }
     }
@@ -1019,9 +1022,10 @@ export const REGRESSION_FAME_STAGES = [
   { min: 105, name: '별호가 붙는 중' },
   { min: 140, name: '첨탑의 문이 열렸다' },
 ];
-export function regressionFameStage(fame = 0) {
+export function regressionFameStage(fame = 0, gate = REGRESSION_TUNING.fameGate) {
+  const k = gate / REGRESSION_TUNING.fameGate;   // 1.197.0~ 무명 서약 — 단계 기준도 같이 오른다
   let idx = 0;
-  REGRESSION_FAME_STAGES.forEach((s, i) => { if (fame >= s.min) idx = i; });
+  REGRESSION_FAME_STAGES.forEach((s, i) => { if (fame >= Math.round(s.min * k)) idx = i; });
   return { ...REGRESSION_FAME_STAGES[idx], step: idx, total: REGRESSION_FAME_STAGES.length - 1 };
 }
 
@@ -1935,8 +1939,9 @@ export function regressionEchoGain(metaR, run) {
   const rounds = run.spireRound || 0;
   const end = regressionEndingFor(run);
   const newEnding = end && !(metaR?.endings || []).includes(end.id);
-  return Math.max(E.min, Math.floor((run.fame || 0) / 10) * E.per10Fame + stories * E.perStory + rounds * E.spireRound
+  const raw = Math.max(E.min, Math.floor((run.fame || 0) / 10) * E.per10Fame + stories * E.perStory + rounds * E.spireRound
     + (run.over === 'victory' ? E.victory : 0) + (newEnding ? E.newEnding : 0));
+  return Math.round(raw * regressionOathEchoMult(run.oaths));   // 1.197.0~ 황혼의 맹세 배율
 }
 // 해금(Lv.0→1) 또는 강화(Lv.n→n+1)
 export function unlockRegressionStartTrait(metaR, id) {
@@ -2230,4 +2235,44 @@ export function resolveRegressionGrave(run, take) {
   tags.push({ text: `경험치 +${REGRESSION_GRAVE.exp}`, tone: 'good' });
   if (e.levelUps > 0) tags.push({ text: `레벨 상승 ${e.from}→${next.level}`, tone: 'gold' });
   return { run: passRegressionDay(next, '전생의 유품 회수'), tags };
+}
+
+
+// ============================================
+// 1.197.0~ 황혼의 맹세 (PM 선택 재미 요소 3) — 출발 전 스스로 족쇄를 건다 → 잔향 배율
+// ============================================
+// 여러 개를 함께 걸 수 있다. 잔향 = 기본 잔향 × (1 + 맹세 보너스 합). 해금: 회귀 REGRESSION_OATH_UNLOCK_LOOPS번 이후.
+export const REGRESSION_OATH_UNLOCK_LOOPS = 2;
+export const REGRESSION_OATHS = {
+  blood:    { name: '핏빛 서약', icon: '🩸', echo: 0.25, desc: '적의 피해 +20%', fx: { enemyDmg: 0.2 } },
+  iron:     { name: '강철 서약', icon: '🛡', echo: 0.25, desc: '적의 HP +20%', fx: { enemyHp: 0.2 } },
+  dusk:     { name: '짧아지는 해', icon: '🌒', echo: 0.2, desc: '날이 갈수록 적이 강해지는 속도 ×1.5', fx: { rampMult: 1.5 } },
+  empty:    { name: '빈손 서약', icon: '🪙', echo: 0.15, desc: '시작 은화 0 · 전투 은화 -30%', fx: { startGoldZero: true, goldMult: 0.7 } },
+  lonely:   { name: '고독 서약', icon: '🕯', echo: 0.15, desc: '동료 호감 획득 절반', fx: { affinityMult: 0.5 } },
+  nameless: { name: '무명 서약', icon: '🎭', echo: 0.2, desc: '첨탑 명성 요구 +30', fx: { fameGate: 30 } },
+  sealed:   { name: '봉인 서약', icon: '🔒', echo: 0.15, desc: '시작 스킬 1개 적게', fx: { startSkills: -1 } },
+};
+export function regressionOathFx(ids = []) {
+  const fx = { enemyDmg: 0, enemyHp: 0, rampMult: 1, startGoldZero: false, goldMult: 1, affinityMult: 1, fameGate: 0, startSkills: 0 };
+  for (const id of ids || []) {
+    const o = REGRESSION_OATHS[id]?.fx; if (!o) continue;
+    for (const [k, v] of Object.entries(o)) {
+      if (typeof v === 'boolean') fx[k] = fx[k] || v;
+      else if (['rampMult', 'goldMult', 'affinityMult'].includes(k)) fx[k] *= v;
+      else fx[k] += v;
+    }
+  }
+  return fx;
+}
+export function regressionOathEchoMult(ids = []) {
+  return 1 + (ids || []).reduce((a, id) => a + (REGRESSION_OATHS[id]?.echo || 0), 0);
+}
+export function regressionFameGate(run) {
+  return REGRESSION_TUNING.fameGate + regressionOathFx(run?.oaths).fameGate;
+}
+// 전투 적 배율 { hp, dmg } — 날짜 강화(짧아지는 해 반영) × 맹세 (첨탑은 날짜 강화 없음)
+export function regressionOathEnemyMult(run, inSpire = false) {
+  const fx = regressionOathFx(run?.oaths);
+  const day = inSpire ? 1 : 1 + (regressionDayEnemyMult(run.day) - 1) * fx.rampMult;
+  return { hp: day * (1 + fx.enemyHp), dmg: day * (1 + fx.enemyDmg) };
 }
