@@ -25,12 +25,23 @@ export function regressionTriggerText(id) {
   return sk ? (TRIGGER_TEXT[sk.trigger] || (() => sk.trigger))(sk.at) : '';
 }
 
-function HpBar({ value, max, color }) {
+// 1.191.2~ 방어 식별 색 — 보호막(내 것) 하늘색 / 적 방어 강철색 / 막기 보라
+export const RG_SHIELD = '#7fd4ff';
+export const RG_DEF = '#c3cddc';
+export const RG_GUARD = '#c9a6ff';
+// HP 바 + 보호막 구간 (HP 뒤에 하늘색으로 이어 붙임, 최대 HP를 넘으면 바 끝에서 자름)
+function HpBar({ value, max, color, shield = 0 }) {
+  const hpPct = Math.max(0, Math.min(100, (value / Math.max(1, max)) * 100));
+  const shPct = Math.max(0, Math.min(100 - hpPct, (shield / Math.max(1, max)) * 100));
   return (
-    <div style={{ height: 8, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-      <div style={{ width: `${Math.max(0, Math.min(100, (value / Math.max(1, max)) * 100))}%`, height: '100%', background: color, transition: 'width .3s' }} />
+    <div style={{ display: 'flex', height: 8, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden', boxShadow: shield > 0 ? `0 0 0 1px ${RG_SHIELD}aa` : 'none' }}>
+      <div style={{ width: `${hpPct}%`, height: '100%', background: color, transition: 'width .3s' }} />
+      {shPct > 0 && <div style={{ width: `${shPct}%`, height: '100%', background: `repeating-linear-gradient(45deg, ${RG_SHIELD}, ${RG_SHIELD} 4px, ${RG_SHIELD}bb 4px, ${RG_SHIELD}bb 8px)`, transition: 'width .3s' }} />}
     </div>
   );
+}
+function StateChip({ color, children }) {
+  return <span className="text-[11px] font-bold px-1.5" style={{ borderRadius: 6, color, background: '#000b', border: `1px solid ${color}`, lineHeight: '18px' }}>{children}</span>;
 }
 
 export default function RegressionBattle({
@@ -182,7 +193,10 @@ export default function RegressionBattle({
   const turn = [...evs].reverse().find(e => e.t === 'turn')?.n || 0;
   const logs = evs.filter(e => ['hit', 'crit', 'miss', 'heal', 'shield', 'buff', 'stun', 'stunned', 'potion', 'revive', 'defend', 'skill', 'warn', 'stance'].includes(e.t)).slice(-3).reverse().map(e => {
     if (e.t === 'skill') return `★ ${REGRESSION_SKILLS[e.id]?.name} 발동`;
-    if (e.t === 'hit') return e.who === 'P' ? `${e.label} — ${e.dmg}` : `${enemyBase.name}의 ${e.name} — ${e.dmg}${e.heavy ? ' (대공격)' : ''}`;
+    if (e.t === 'hit') {
+      const extra = [e.absorbed > 0 ? `🛡흡수 ${e.absorbed}` : null, e.guarded > 0 ? `◈막음 ${e.guarded}` : null, e.blocked > 0 ? `적 방어에 ${e.blocked} 막힘` : null].filter(Boolean).join(' · ');
+      return e.who === 'P' ? `${e.label} — ${e.dmg}${extra ? ` (${extra})` : ''}` : `${enemyBase.name}의 ${e.name} — ${e.dmg}${e.heavy ? ' (대공격)' : ''}${extra ? ` (${extra})` : ''}`;
+    }
     if (e.t === 'crit') return `치명타! — ${e.dmg}`;
     if (e.t === 'miss') return e.who === 'P' ? `${enemyBase.name}이(가) 회피했다` : `${e.name}을(를) 회피했다`;
     if (e.t === 'heal') return `${e.label} — HP +${e.amt}`;
@@ -192,28 +206,49 @@ export default function RegressionBattle({
     if (e.t === 'stunned') return `${enemyBase.name}이(가) 움직이지 못한다`;
     if (e.t === 'potion') return `${POTIONS[e.id]?.name} — HP +${e.amt}`;
     if (e.t === 'revive') return '여명의 기적 — 다시 일어섰다';
-    if (e.t === 'defend') return `${enemyBase.name}의 ${e.name}`;
+    if (e.t === 'defend') return `${enemyBase.name}의 ${e.name}${e.def > 0 ? ` — 🛡 방어 +${e.def}` : ''}`;
     if (e.t === 'warn') return `⚠ ${enemyBase.name}이(가) ${e.name}을(를) 준비한다`;
     if (e.t === 'stance') return `전투 태세: ${getRegressionStance(committed?.stanceId || stanceId).name}`;
     return '';
   });
+  // 1.191.2~ 떠오르는 숫자 — 피해 + 방어 내역(보호막 흡수·막기·적 방어 막힘)을 함께 띄운다
   const fx = (who) => {
-    if (!last) return null;
-    if (last.t === 'hit' || last.t === 'crit') { if ((last.who === 'P' && who === 'E') || (last.who === 'E' && who === 'P')) return { text: `-${last.dmg}`, color: last.who === 'P' ? '#fff' : PALETTE.accent }; }
-    if (last.t === 'miss' && ((last.who === 'P' && who === 'E') || (last.who === 'E' && who === 'P'))) return { text: '회피', color: PALETTE.ice };
-    if ((last.t === 'heal' || last.t === 'potion') && who === 'P') return { text: `+${last.amt}`, color: PALETTE.green };
-    return null;
+    if (!last) return [];
+    const out = [];
+    const hitOn = (last.t === 'hit' || last.t === 'crit') && ((last.who === 'P' && who === 'E') || (last.who === 'E' && who === 'P'));
+    if (hitOn) {
+      out.push({ text: `-${last.dmg}`, color: last.who === 'P' ? '#fff' : PALETTE.accent, size: 26 });
+      if (last.absorbed > 0) out.push({ text: `🛡 흡수 ${last.absorbed}`, color: RG_SHIELD, size: 15 });
+      if (last.guarded > 0) out.push({ text: `◈ 막음 ${last.guarded}`, color: RG_GUARD, size: 15 });
+      if (last.blocked > 0) out.push({ text: `🛡 막힘 ${last.blocked}`, color: RG_DEF, size: 15 });
+    }
+    if (last.t === 'miss' && ((last.who === 'P' && who === 'E') || (last.who === 'E' && who === 'P'))) out.push({ text: '회피', color: PALETTE.ice, size: 24 });
+    if ((last.t === 'heal' || last.t === 'potion') && who === 'P') out.push({ text: `+${last.amt}`, color: PALETTE.green, size: 24 });
+    if (last.t === 'shield' && who === 'P') out.push({ text: `🛡 보호막 +${last.amt}`, color: RG_SHIELD, size: 20 });
+    if (last.t === 'stance' && who === 'P' && last.shield > 0) out.push({ text: `🛡 보호막 +${last.shield}`, color: RG_SHIELD, size: 20 });
+    if (last.t === 'defend' && who === 'E' && last.def > 0) out.push({ text: `🛡 방어 +${last.def}`, color: RG_DEF, size: 20 });
+    return out;
   };
+  const ps = last.ps || 0, ed = last.ed || 0, gd = !!last.gd;   // 모든 사건에 방어 상태가 붙어 있다 (방어 행동처럼 HP가 없는 사건 포함)
   const shake = (who) => (last.t === 'hit' || last.t === 'crit') && ((last.who === 'P' && who === 'E') || (last.who === 'E' && who === 'P' && last.heavy));
   const Art = ({ who, src, name, cur, max, color }) => {
-    const f = fx(who);
+    const fs = fx(who);
+    const ring = who === 'P' ? (ps > 0 ? RG_SHIELD : gd ? RG_GUARD : null) : (ed > 0 ? RG_DEF : null);
     return (
       <div className={shake(who) ? 'fx-b-shake' : ''} style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden', background: PALETTE.panel }}>
         {src && <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
-        {f && <span key={`${run.idx}-${who}`} style={{ position: 'absolute', left: '50%', top: '35%', transform: 'translateX(-50%)', fontSize: 26, fontWeight: 800, color: f.color, textShadow: '0 2px 6px #000', animation: 'rgRise .8s ease-out forwards' }}>{f.text}</span>}
+        {ring && <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', boxShadow: `inset 0 0 0 2px ${ring}, inset 0 0 26px ${ring}88`, transition: 'box-shadow .3s' }} />}
+        {fs.map((f, k) => (
+          <span key={`${run.idx}-${who}-${k}`} style={{ position: 'absolute', left: '50%', top: `${30 + k * 11}%`, transform: 'translateX(-50%)', whiteSpace: 'nowrap', fontSize: f.size, fontWeight: 800, color: f.color, textShadow: '0 2px 6px #000', animation: 'rgRise .9s ease-out forwards' }}>{f.text}</span>
+        ))}
         <div style={{ position: 'absolute', left: 10, right: 10, bottom: 8 }}>
-          <div className="flex justify-between text-[12px] font-bold mb-1" style={{ color: '#fff', textShadow: '0 1px 3px #000' }}><span>{name}</span><span className="tabular-nums">{cur}/{max}</span></div>
-          <HpBar value={cur} max={max} color={color} />
+          <div className="flex gap-1 mb-1 flex-wrap">
+            {who === 'P' && ps > 0 && <StateChip color={RG_SHIELD}>🛡 보호막 {ps}</StateChip>}
+            {who === 'P' && gd && <StateChip color={RG_GUARD}>◈ 막기 준비</StateChip>}
+            {who === 'E' && ed > 0 && <StateChip color={RG_DEF}>🛡 방어 {ed}</StateChip>}
+          </div>
+          <div className="flex justify-between text-[12px] font-bold mb-1" style={{ color: '#fff', textShadow: '0 1px 3px #000' }}><span>{name}</span><span className="tabular-nums">{cur}/{max}{who === 'P' && ps > 0 ? <span style={{ color: RG_SHIELD }}> +🛡{ps}</span> : null}</span></div>
+          <HpBar value={cur} max={max} color={color} shield={who === 'P' ? ps : 0} />
         </div>
       </div>
     );
@@ -229,7 +264,7 @@ export default function RegressionBattle({
       <Art who="E" src={enemySrc} name={enemyLabel} cur={lastState.e} max={enemyBase.maxHp} color={PALETTE.accent} />
       <div className="px-3 py-2 text-[11px]" style={{ minHeight: 58, borderTop: `1px solid ${PALETTE.panelBorder}`, borderBottom: `1px solid ${PALETTE.panelBorder}`, background: PALETTE.panel }}>
         {warn && <div style={{ color: '#f0a59c' }}>⚠ 대공격 예고 — {warn}</div>}
-        {logs.map((l, i) => <div key={i} style={{ color: i === 0 ? PALETTE.text : PALETTE.textDim }}>{l}</div>)}
+        {logs.map((l, i) => { const def = /🛡|보호막|◈/.test(l); return <div key={i} style={{ color: def ? (i === 0 ? RG_SHIELD : `${RG_SHIELD}aa`) : (i === 0 ? PALETTE.text : PALETTE.textDim) }}>{l}</div>; })}
       </div>
       <Art who="P" src={heroSrc} name={`${classData.name} Lv.${level}`} cur={lastState.p} max={maxHp} color={lastState.p / maxHp <= 0.4 ? PALETTE.accent : PALETTE.green} />
       <div className="grid gap-1.5 p-2" style={{ gridTemplateColumns: `repeat(${Math.min(3, Math.max(1, skills.length))}, 1fr)`, background: PALETTE.panel }}>

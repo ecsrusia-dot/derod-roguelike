@@ -148,6 +148,9 @@ export function simulateRegressionCombat({ player: P0, enemy: E0, stanceId = 'ca
   const E = { ...E0, stunned: 0, heavyNext: null, defense: 0 };
   const stance = getRegressionStance(stanceId);
   const ev = [];
+  // 1.191.2~ 모든 사건에 방어 상태를 붙인다 (화면이 보호막·막기·적 방어를 그린다) — ps: 내 보호막 / gd: 막기 준비 / ed: 적 방어
+  const pushEv = Array.prototype.push;
+  ev.push = (...items) => pushEv.apply(ev, items.map(e => ({ ...e, ps: P.shield, gd: P.guardNext > 0, ed: E.defense })));
   let damageTaken = 0;
   const observations = [];
   const usedPotions = [];
@@ -163,10 +166,11 @@ export function simulateRegressionCombat({ player: P0, enemy: E0, stanceId = 'ca
 
   const dealToEnemy = (amt, label, kind = 'hit') => {
     let d = amt;
-    if (E.defense > 0) { const a = Math.min(E.defense, d); E.defense -= a; d -= a; }
+    let blocked = 0;
+    if (E.defense > 0) { const a = Math.min(E.defense, d); E.defense -= a; d -= a; blocked = a; }
     E.hp = Math.max(0, E.hp - d);
     if (P.lifesteal && d > 0) P.hp = Math.min(P.maxHp, P.hp + Math.round(d * P.lifesteal / 100));
-    ev.push({ t: kind, who: 'P', dmg: d, label, p: P.hp, e: E.hp });
+    ev.push({ t: kind, who: 'P', dmg: d, label, p: P.hp, e: E.hp, blocked });
     return d;
   };
   const fire = (id, ctx = {}) => {
@@ -247,10 +251,11 @@ export function simulateRegressionCombat({ player: P0, enemy: E0, stanceId = 'ca
           if (!P.hitTaken) { P.hitTaken = true; for (const id of skillsBy('firstHit')) fire(id); }
           let d = vary(pat.dmg[0] + rng() * (pat.dmg[1] - pat.dmg[0]));
           d = Math.max(1, Math.round(d * P.takenMult - P.def));
-          if (P.guardNext) { d = Math.round(d * (1 - P.guardNext)); P.guardNext = 0; if (pat.heavy) obs.countered = true; }
-          if (P.shield > 0) { const a = Math.min(P.shield, d); P.shield -= a; d -= a; }
+          let guarded = 0, absorbed = 0;
+          if (P.guardNext) { const before = d; d = Math.round(d * (1 - P.guardNext)); guarded = before - d; P.guardNext = 0; if (pat.heavy) obs.countered = true; }
+          if (P.shield > 0) { const a = Math.min(P.shield, d); P.shield -= a; d -= a; absorbed = a; }
           P.hp = Math.max(0, P.hp - d); damageTaken += d;
-          ev.push({ t: 'hit', who: 'E', dmg: d, name: pat.name, heavy: !!pat.heavy, p: P.hp, e: E.hp, shield: P.shield });
+          ev.push({ t: 'hit', who: 'E', dmg: d, name: pat.name, heavy: !!pat.heavy, p: P.hp, e: E.hp, shield: P.shield, guarded, absorbed });
           if (P.reflectNext) { const r = P.reflectNext; P.reflectNext = 0; dealToEnemy(r, '반사'); }
           if (P.hp <= 0) {
             const rv = skillsBy('lethal')[0];
