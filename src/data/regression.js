@@ -839,3 +839,127 @@ export function applyRegressionEvent(run, eventId, res, { maxHp = 300, rng = Mat
   else combat = null;
   return { run: next, combat, notes };
 }
+
+// ============================================
+// 1.180.0~ 이야기 화면 (PM 결정: 「무림귀환」 스크린샷 스타일 전면 개편)
+// ============================================
+// 서술 → 선택(성공 가능성 라벨) → 결과(보상 태그) → 「다음」 흐름. 전투는 이야기 안에서 시작·결과 서술.
+
+// 상단 목표 바 — 명성 단계 (n/4)
+export const REGRESSION_FAME_STAGES = [
+  { min: 0, name: '아무도 이름을 모른다' },
+  { min: 25, name: '소문이 도는 중' },
+  { min: 50, name: '이름이 알려지는 중' },
+  { min: 75, name: '별호가 붙는 중' },
+  { min: 100, name: '첨탑의 문이 열렸다' },
+];
+export function regressionFameStage(fame = 0) {
+  let idx = 0;
+  REGRESSION_FAME_STAGES.forEach((s, i) => { if (fame >= s.min) idx = i; });
+  return { ...REGRESSION_FAME_STAGES[idx], step: idx, total: REGRESSION_FAME_STAGES.length - 1 };
+}
+
+// 적 등급 표기 — [하급] 얼음 늑대
+export const REGRESSION_ENEMY_GRADES = { normal: '하급', elite: '상급', boss: '군주' };
+export function regressionEnemyLabel(enemyKey, tierOverride = null) {
+  const e = ENEMIES[enemyKey] || (enemyKey === 'spireLord' ? REGRESSION_SPIRE_LORD : null);
+  const tier = tierOverride || e?.tier || 'normal';
+  return `[${REGRESSION_ENEMY_GRADES[tier] || '하급'}] ${e?.name || enemyKey}`;
+}
+
+// 지역 서술 — 날짜마다 다른 문장
+export const REGRESSION_NARRATION = {
+  village: [
+    '여명의 마을. 굴뚝에서 피어오르는 연기 너머로, 지평선 끝이 붉게 물들어 있다.',
+    '마을 사람들은 황혼 이야기를 애써 입에 올리지 않는다. 그래도 모두 서쪽 하늘을 흘끔거린다.',
+    '광장의 게시판에 새 의뢰서가 붙었다. 대부분은 돌아오지 못한 사람을 찾는 내용이다.',
+  ],
+  1: [
+    '눈보라가 시야를 가린다. 발밑의 얼음이 낮게 우는 소리를 낸다.',
+    '얼어붙은 원정대의 깃발이 바람에 찢겨 나부낀다. 이곳에서 길을 잃은 자가 많다.',
+    '숨을 쉴 때마다 폐가 얼어붙는 것 같다. 멀리서 늑대 울음이 들린다.',
+    '얼음 아래로 무언가 지나가는 그림자가 보였다. 기분 탓이길 바란다.',
+  ],
+  2: [
+    '죽은 자의 숲. 나무들이 숨을 죽인 채 이쪽을 지켜보는 듯하다.',
+    '부패한 안개가 발목까지 차오른다. 달콤하고 역한 냄새가 코를 찌른다.',
+    '이끼 덮인 묘비들 사이로 희미한 불빛이 떠다닌다.',
+    '어딘가에서 누군가 이름을 부른다. 돌아보면 아무도 없다.',
+  ],
+  3: [
+    '봉인된 신전의 회랑. 발소리가 몇 박자 늦게 되돌아온다.',
+    '벽의 문양이 맥박처럼 깜빡인다. 시간이 이곳에서만 느리게 흐르는 것 같다.',
+    '부서진 골렘의 파편이 바닥에 흩어져 있다. 그중 하나가 아직 움직인다.',
+    '천장에서 모래가 흘러내린다. 오래된 봉인이 조금씩 무너지고 있다.',
+  ],
+  4: [
+    '마계의 균열. 하늘이 찢어진 자리에서 핏빛 빛이 새어 나온다.',
+    '공기가 무겁다. 숨을 들이쉴 때마다 쇠 맛이 난다.',
+    '균열 너머에서 거대한 무언가가 이쪽을 내려다보고 있다.',
+    '부러진 검과 갑옷이 산처럼 쌓여 있다. 먼저 온 자들의 흔적이다.',
+  ],
+};
+export function regressionNarration(run) {
+  const lines = REGRESSION_NARRATION[run.region] || REGRESSION_NARRATION.village;
+  return lines[(run.day + (run.region === REGRESSION_HUB ? 0 : run.region)) % lines.length];
+}
+
+// 동료 대화 — 호감 단계별
+export const REGRESSION_COMPANION_LINES = {
+  knight: ['"검을 쥔 손이 떨리는군. 추위 때문인가, 두려움 때문인가."', '"기사단은 사라졌지만, 지킬 것이 생긴다면 다시 검을 들겠다."', '"네 등은 내가 지킨다. 그게 기사의 맹세다."'],
+  healer: ['"상처는 보여 줘요. 숨기면 더 깊어져요."', '"당신이 돌아올 때마다 조금씩 덜 다쳐 오네요. 다행이에요."', '"이번엔 끝까지 함께 갈게요. 아무도 혼자 죽게 두지 않아요."'],
+  archivist: ['"회귀자라… 기록에 남은 건 대부분 실패담일세."', '"자네의 기록이 늘어갈수록, 첨탑의 문장이 읽히기 시작하는군."', '"마지막 장은 자네와 함께 쓰겠네. 그게 기록관의 일이지."'],
+  broker: ['"정보는 공짜가 아니야. 근데 넌 갚을 줄 아는 얼굴이네."', '"요즘 균열 쪽 시세가 네 덕에 올랐어. 고마운 손님이지."', '"좋아, 이번 판은 너한테 다 걸지. 지면 같이 죽는 거야."'],
+};
+export function regressionCompanionLine(companionId, affinity = 0) {
+  const lines = REGRESSION_COMPANION_LINES[companionId] || [''];
+  const idx = affinity >= 100 ? 2 : affinity >= 40 ? 1 : 0;
+  return lines[Math.min(idx, lines.length - 1)];
+}
+
+// 판정 성공 확률 — 능력치 + 주사위(1~6) ≥ DC (본편 EventScreen과 같은 규칙)
+export function regressionCheckChance(statValue = 10, dc = 10, diceMin = 1, diceMax = 6) {
+  let ok = 0; const n = diceMax - diceMin + 1;
+  for (let d = diceMin; d <= diceMax; d++) if (statValue + d >= dc) ok++;
+  return ok / n;
+}
+// 성공 가능성 라벨 — 수치 대신 말로 (스크린샷 스타일)
+export function regressionChanceLabel(p) {
+  if (p >= 1) return { text: '확실', color: '#9ad4a3' };
+  if (p >= 0.8) return { text: '거의 확실', color: '#9ad4a3' };
+  if (p >= 0.6) return { text: '무난', color: '#d4a574' };
+  if (p >= 0.4) return { text: '보통', color: '#d4a574' };
+  if (p > 0) return { text: '도전적', color: '#c4453d' };
+  return { text: '불가능', color: '#9b8975' };
+}
+
+// 사건 선택지 판정 — EventScreen 없이 이야기 화면에서 직접. 반환 형식은 applyRegressionEvent 입력과 같다
+export function resolveRegressionChoice(choice, stats = {}, rng = Math.random) {
+  const res = { text: '', reward: null, penalty: null, combat: null, check: null };
+  if (choice.stat) {
+    const sv = stats[choice.stat] || 10;
+    const dice = 1 + Math.floor(rng() * 6);
+    const ok = sv + dice >= choice.dc;
+    const br = ok ? choice.success : choice.fail;
+    res.text = br?.text || '';
+    res.reward = br?.reward || null;
+    res.penalty = br?.penalty || null;
+    res.combat = br?.combat || null;
+    res.check = ok ? 'ok' : 'fail';
+  } else {
+    res.text = choice.result || '';
+    res.reward = choice.reward || null;
+    res.penalty = choice.penalty ? { ...choice.penalty } : null;
+  }
+  if (choice.cost?.gold) res.penalty = { ...(res.penalty || {}), gold: (res.penalty?.gold || 0) - choice.cost.gold };
+  return res;
+}
+
+// 결과 장면 (run.scene) — { title, text, tags: [{ text, tone }] }. 「다음」을 누르면 비운다
+export function regressionResultScene(title, text, tags = []) {
+  return { kind: 'result', title, text, tags: tags.filter(t => t && t.text) };
+}
+// 노트 문자열 → 보상 태그 (명성·골드·호감 등은 좋은 색, HP 감소는 붉은색)
+export function regressionNotesToTags(notes = []) {
+  return notes.filter(Boolean).map(n => ({ text: n, tone: /^HP -|-\d+G|^-/.test(n) ? 'bad' : 'good' }));
+}
