@@ -1,7 +1,7 @@
 // ============================================
 // data/regression.js — 🌀 회귀의 탐험가 (MVP 1차: 데이터 + 순수 로직)
 // ============================================
-// 설계서: docs/regression-exploration-mode-design.md (PM 확정: 40일 · 본편 메타 강화 미적용)
+// 설계서: docs/regression-exploration-mode-design.md (PM 확정: 60일(1.186.0~, 이전 40일) · 본편 메타 강화 미적용)
 //
 // 구조 원칙 (무덤의 유산·제령사와 동일):
 //   - 이 파일은 데이터 + 순수 함수만. React·storage 의존 0 → node 시뮬로 검증 가능
@@ -19,8 +19,8 @@ import { POTIONS, CLASS_BELT } from './potions.js';
 
 // =========== 튜닝 ===========
 export const REGRESSION_TUNING = {
-  days: 40,                 // 한 생의 길이 (PM 확정). 41일째 = 황혼의 첨탑
-  fameGate: 100,            // 첨탑 입장 자격
+  days: 60,                 // 한 생의 길이 (1.186.0 PM 결정: 40 → 60, 지역당 15일). 61일째 = 황혼의 첨탑
+  fameGate: 140,            // 첨탑 입장 자격
   eliteFameGate: 30,        // 강적 출현 명성
   fameGain: { normal: 3, elite: 8 },    // 1.185.0 랜덤 하루 구조 — 2/5 → 3/8
   regionFameMult: { 1: 1.0, 2: 1.15, 3: 1.3, 4: 1.5 },
@@ -143,8 +143,8 @@ export const REGRESSION_MEMORIES = [
     hint: '한 생에서 적 5종을 완전히 기록한다', effect: { recordBonusPct: 10 },
     trigger: (m, run) => run.learned.length >= 5 },
   { id: 'mem_nameless_hero', name: '이름 없는 영웅', desc: '사람들이 처음 보는 나를 어딘가 안다.',
-    hint: '한 생에서 명성 60에 도달한다', effect: { startFame: 10 },
-    trigger: (m, run) => run.fame >= 60 },
+    hint: '한 생에서 명성 85에 도달한다', effect: { startFame: 15 },
+    trigger: (m, run) => run.fame >= 85 },
   { id: 'mem_spire_shadow', name: '첨탑의 그림자', desc: '첨탑의 계단 사이 숨 돌릴 틈을 안다.',
     hint: '황혼의 첨탑에서 패배한다', effect: { spireRestPct: 20 },
     trigger: (m, run, cause) => cause === 'spireLose' },
@@ -152,7 +152,7 @@ export const REGRESSION_MEMORIES = [
     hint: '다섯 번 회귀한다', effect: { carrySlots: 1 },
     trigger: (m) => (m.loops || 0) + 1 >= 5 },
   { id: 'mem_time_end', name: '시간의 끝', desc: '황혼이 오는 날을 정확히 안다 — 조금 더 일찍 움직인다.',
-    hint: '명성 미달로 40일을 넘긴다', effect: { extraDays: 3 },
+    hint: '명성 미달로 60일을 넘긴다', effect: { extraDays: 3 },
     trigger: (m, run, cause) => cause === 'timeout' },
 ];
 
@@ -249,7 +249,9 @@ export function createRegressionRun(metaR = EMPTY_REGRESSION, classId, stats = n
     travelDiscount: fx.travelDiscount,
     recordBonusPct: fx.recordBonusPct,
     spireRestPct: fx.spireRestPct,
-    fortuneBonus: fx.fortuneBonus || 0,   // 1.185.0~ 기연 가중 +
+    fortuneBonus: fx.fortuneBonus || 0,
+    traits: { truth: 0, power: 0, bond: 0 },   // 1.186.0~ 메인 스토리 성향
+    storyFlags: {},                              // 1.186.0~ 메인 스토리 플래그 (breakLoop 등)   // 1.185.0~ 기연 가중 +
     today: null,           // 1.185.0~ 오늘의 일 (랜덤 카드) — 새로고침해도 같은 카드
     memoryCount: (metaR.memories || []).length,
     spireRound: null,      // 첨탑 진입 후 0~3
@@ -392,7 +394,7 @@ export function applyRegressionCombat(run, result) {
 }
 
 // =========== 첨탑 ===========
-// 41일째 도달 시 호출. 자격 미달이면 timeout으로 종료
+// 61일째(마지막 날 다음) 도달 시 호출. 자격 미달이면 timeout으로 종료
 export function enterRegressionSpire(run) {
   if (!isRegressionSpireDay(run)) return run;
   if (!isRegressionSpireEligible(run)) return { ...run, over: 'timeout', log: [...run.log, `D${run.day}: 명성 부족 — 첨탑의 문이 열리지 않는다`] };
@@ -436,7 +438,7 @@ export function settleRegression(metaR = EMPTY_REGRESSION, run) {
       bestFame: Math.max(base.bestFame, run.fame),
       bestDay: Math.max(base.bestDay, Math.min(run.day, run.maxDays)),
       spireClears: base.spireClears + (cause === 'victory' ? 1 : 0),
-      endings: cause === 'victory' && !base.endings.includes(regressionEndingFor(run).id) ? [...base.endings, regressionEndingFor(run).id] : base.endings,
+      endings: (() => { const e = regressionEndingFor(run); return e && !base.endings.includes(e.id) ? [...base.endings, e.id] : base.endings; })(),
     },
     gainedMemories: gained,
     carryOptions: [...run.learned],
@@ -597,8 +599,16 @@ export const REGRESSION_COMPANIONS = [
     perkText: { ally: '전투 승리 골드 +50%', oath: '전투 승리마다 명성 +1 추가' },
     ending: { id: 'ending_broker', name: '그림자 시장의 주인', text: '니아와 함께 균열의 시장을 손에 넣었다. 대륙의 모든 소문이 이제 내 귀로 먼저 들어온다.' } },
 ];
-export const REGRESSION_ENDING_SPIRE = { id: 'ending_spire', name: '황혼을 끊은 자', text: '홀로 첨탑에 올라 황혼을 끊었다. 회귀의 고리가 멈추고, 처음으로 41일째 아침이 밝았다.' };
-export const REGRESSION_ENDINGS = [REGRESSION_ENDING_SPIRE, ...REGRESSION_COMPANIONS.map(c => c.ending)];
+export const REGRESSION_ENDING_SPIRE = { id: 'ending_spire', name: '황혼을 끊은 자', branch: '정복', hint: '첨탑을 정복한다 (성향이 한쪽으로 기울지 않음)', text: '홀로 첨탑에 올라 황혼을 끊었다. 회귀의 고리가 멈추고, 처음으로 황혼 다음 날 아침이 밝았다.' };
+// 1.186.0~ 메인 스토리 분기 엔딩 (PM 결정: 진실·힘·유대 3성향 누적, 동료 엔딩은 유대 갈래로 흡수)
+export const REGRESSION_STORY_ENDINGS = [
+  { id: 'ending_loop_end', name: '회귀의 끝', branch: '진실', hint: '진실을 끝까지 좇아 결전 전야에 고리를 끊을 방법을 찾고, 첨탑을 정복한다', text: '첨탑 꼭대기에서 황혼을 부른 자의 이름을 불렀다 — 그것은 첫 번째 생의 나였다. 고리를 끊자 기억이 하나씩 흩어진다. 이번에는 정말로, 다시 돌아오지 않는다.' },
+  { id: 'ending_truth', name: '진실의 기록자', branch: '진실', hint: '진실 성향이 가장 높은 채로 첨탑을 정복한다', text: '황혼은 끊었지만, 그것이 왜 왔는지는 아무도 모른다 — 나 말고는. 나는 펜을 들었다. 다음에 올 회귀자가 같은 길을 걷지 않도록.' },
+  { id: 'ending_heir', name: '황혼의 계승자', branch: '힘', hint: '힘 성향이 가장 높은 채로 첨탑을 정복한다', text: '첨탑의 주인이 쓰러지자 황혼이 내 안으로 흘러들었다. 하늘은 다시 맑아졌지만, 내 그림자는 해 질 녘처럼 붉다. 이제 황혼은 나다.' },
+  { id: 'ending_spire_name', name: '첨탑에 남은 이름', branch: '패배', hint: '첨탑에서 쓰러진다', text: '마지막 계단 앞에서 무릎이 꺾였다. 첨탑 벽에 내 이름이 새겨진다 — 먼저 쓰러진 수많은 이름들 사이에.' },
+  { id: 'ending_dusk', name: '황혼에 잠긴 대륙', branch: '패배', hint: '이름을 알리지 못한 채 마지막 날을 넘긴다', text: '이름 없는 자에게 첨탑은 문을 열지 않았다. 황혼이 대륙을 덮고, 나는 마을 언덕에서 그것을 끝까지 지켜보았다.' },
+];
+export const REGRESSION_ENDINGS = [REGRESSION_ENDING_SPIRE, ...REGRESSION_STORY_ENDINGS.slice(0, 3), ...REGRESSION_COMPANIONS.map(c => ({ ...c.ending, branch: '유대', hint: `유대 성향이 가장 높고 ${c.name}와 맹약을 맺은 채 첨탑을 정복한다` })), ...REGRESSION_STORY_ENDINGS.slice(3)];
 
 export const REGRESSION_COMPANION_TUNING = { affinityPerTalk: 20, charismaBonus: 5, charismaGate: 15 };
 
@@ -647,10 +657,27 @@ export function applyRegressionTalk(run, companionId, charisma = 10) {
   };
 }
 
-// 엔딩 — 맹약 동료 중 호감이 가장 높은 동료의 엔딩, 없으면 단독 정복 엔딩
+// 엔딩 — 1.186.0~ 첨탑 결과 × 가장 높은 성향(동점이면 기울지 않음) × 맹약 동료. 사망은 엔딩 없음(회귀)
+export function regressionTopTrait(run) {
+  const t = run?.traits || {};
+  const ent = Object.keys(REGRESSION_TRAITS).map(k => [k, t[k] || 0]).sort((a, b) => b[1] - a[1]);
+  return ent[0][1] > 0 && ent[0][1] > ent[1][1] ? ent[0][0] : null;
+}
 export function regressionEndingFor(run) {
-  const oaths = REGRESSION_COMPANIONS.filter(c => (run.affinity?.[c.id] || 0) >= 100);
-  return oaths.length ? oaths[0].ending : REGRESSION_ENDING_SPIRE;
+  const byId = (id) => REGRESSION_ENDINGS.find(e => e.id === id);
+  if (run.over === 'spireLose') return byId('ending_spire_name');
+  if (run.over === 'timeout') return byId('ending_dusk');
+  if (run.over !== 'victory') return null;
+  const top = regressionTopTrait(run);
+  if (top === 'truth' && run.storyFlags?.breakLoop) return byId('ending_loop_end');
+  if (top === 'truth') return byId('ending_truth');
+  if (top === 'power') return byId('ending_heir');
+  if (top === 'bond') {
+    const oaths = REGRESSION_COMPANIONS.filter(c => (run.affinity?.[c.id] || 0) >= 100)
+      .sort((a, b) => (run.affinity?.[b.id] || 0) - (run.affinity?.[a.id] || 0));
+    if (oaths.length) return { ...oaths[0].ending, branch: '유대' };
+  }
+  return REGRESSION_ENDING_SPIRE;
 }
 
 // =========== 상점 (여명의 마을) ===========
@@ -879,7 +906,12 @@ export function applyRegressionEvent(run, eventId, res, { maxHp = 300, rng = Mat
   const p = res?.penalty;
   if (p?.hp) { next.hpPct = Math.max(0.01, next.hpPct + p.hp / maxHp); notes.push(`HP ${p.hp}`); }
   if (p?.gold) { next.gold = Math.max(0, (next.gold || 0) + p.gold); notes.push(`${p.gold}G`); }
-  const ev = REGRESSION_EVENTS.find(e => e.id === eventId);
+  if (res?.trait) {
+    next.traits = { ...(next.traits || {}) };
+    for (const [k, v] of Object.entries(res.trait)) { next.traits[k] = (next.traits[k] || 0) + v; notes.push(`${REGRESSION_TRAITS[k]?.name} +${v}`); }
+  }
+  if (res?.flag) next.storyFlags = { ...(next.storyFlags || {}), [res.flag]: true };
+  const ev = regressionEventById(eventId);
   next.log = [...next.log, `D${run.day}: 사건 「${ev?.title || eventId}」${notes.length ? ` (${notes.filter(Boolean).join(' · ')})` : ''}`];
   let combat = res?.combat || combatFromReward || null;
   if (combat && ENEMIES[combat]) next.pending = { enemyKey: combat, tier: ENEMIES[combat].tier === 'elite' ? 'elite' : 'normal', fromEvent: true };
@@ -895,10 +927,10 @@ export function applyRegressionEvent(run, eventId, res, { maxHp = 300, rng = Mat
 // 상단 목표 바 — 명성 단계 (n/4)
 export const REGRESSION_FAME_STAGES = [
   { min: 0, name: '아무도 이름을 모른다' },
-  { min: 25, name: '소문이 도는 중' },
-  { min: 50, name: '이름이 알려지는 중' },
-  { min: 75, name: '별호가 붙는 중' },
-  { min: 100, name: '첨탑의 문이 열렸다' },
+  { min: 35, name: '소문이 도는 중' },      // 1.186.0~ 첨탑 자격 140 기준 (35 단위)
+  { min: 70, name: '이름이 알려지는 중' },
+  { min: 105, name: '별호가 붙는 중' },
+  { min: 140, name: '첨탑의 문이 열렸다' },
 ];
 export function regressionFameStage(fame = 0) {
   let idx = 0;
@@ -1003,6 +1035,12 @@ export function resolveRegressionChoice(choice, stats = {}, rng = Math.random) {
     res.penalty = choice.penalty ? { ...choice.penalty } : null;
   }
   if (choice.cost?.gold) res.penalty = { ...(res.penalty || {}), gold: (res.penalty?.gold || 0) - choice.cost.gold };
+  // 1.186.0~ 메인 스토리 — 성향 점수 (선택 기본 + 판정 성공 시 가산) · 플래그
+  if (choice.trait) {
+    const br = res.check === 'ok' ? choice.success : res.check === 'fail' ? choice.fail : null;
+    res.trait = { [choice.trait]: (choice.traitValue || 1) + (br?.traitBonus || 0) };
+  }
+  if (choice.flag) res.flag = choice.flag;
   return res;
 }
 
@@ -1471,10 +1509,10 @@ export function buyRegressionOffer(run, idx) {
 //       「오늘의 일」 카드 1장이 가중 랜덤으로 찾아옴 → 그 카드의 선택지만 고른다 → 하루가 지난다.
 // 날이 갈수록: 적 HP·피해 +enemyRamp/일, 기연 가중 +fortune.perDay/일. 밸런스는 REGRESSION_DAY 한 곳.
 export const REGRESSION_DAY = {
-  regionDays: 10,
+  regionDays: 15,                       // 1.186.0 PM 결정: 10 → 15 (총 60일)
   weights: { battle: 32, elite: 12, event: 26, companion: 9, merchant: 7, shelter: 10 },
-  fortune: { base: 4, perDay: 0.55 },   // 기연 가중 — D1 ≈4% → D40 ≈17% (+ 기억 조각 보너스)
-  enemyRamp: 0.012,                     // 하루당 적 HP·피해 +1.2% (D40 ×1.47) — 지역 단계 상승과 곱
+  fortune: { base: 4, perDay: 0.37 },   // 기연 가중 — D1 ≈4% → D60 ≈17% (+ 기억 조각 보너스)
+  enemyRamp: 0.015,                     // 하루당 적 HP·피해 +1.5% (D60 ×1.89) — 지역 단계 상승과 곱
   hideDc: { battle: 14, elite: 15 },    // 몸을 숨겨 피하기 판정
   trainExp: 25,                         // 쉼터에서 단련
   dailyHealPct: 10,                     // 아침마다 자연 회복 (최대 HP %)
@@ -1520,6 +1558,9 @@ export function rollRegressionDay(run, memories = [], rng = Math.random) {
     const wake = run.region === REGRESSION_HUB && run.day === 1;
     return { ...run, region, today: null, scene: regressionResultScene(getRegressionRegion(region).name, REGION_ENTER_TEXT[region](wake), [{ text: `D${run.day} — 이곳에서 ${REGRESSION_DAY.regionDays}일`, tone: 'gold' }]) };
   }
+  // 1.186.0~ 메인 스토리 — 정해진 날 확정 등장
+  const story = regressionMainStoryFor(run);
+  if (story) return { ...run, today: null, pendingEvent: story.id };
   // 아침 — 하룻밤 자며 조금 회복 (하루 1회)
   if (run.healedDay !== run.day) run = { ...run, healedDay: run.day, hpPct: Math.min(1, (run.hpPct ?? 1) + REGRESSION_DAY.dailyHealPct / 100) };
   const table = regressionDayTable(run);
@@ -1583,3 +1624,62 @@ export const REGRESSION_TODAY_INTRO = {
   shelter: () => '버려진 오두막을 찾았다. 지붕은 새지만 하룻밤 머물 만하다.',
   hermit: () => '누더기를 걸친 은자가 길가에 앉아 있다. "기다렸네. 자네가 배울 것이 하나 있지."',
 };
+
+
+// ============================================
+// 1.186.0~ 메인 스토리 5편 — 정해진 날 확정 등장 (PM 결정)
+// ============================================
+// 지역마다 중반(그 지역 8일째)에 1편 + 마지막 날 「결전 전야」. 선택마다 성향(진실·힘·유대)이 쌓이고 엔딩을 가른다.
+// choice.trait: 'truth'|'power'|'bond' (+traitValue) · success.traitBonus: 판정 성공 가산 · choice.flag · choice.requireTrait {성향: n}
+export const REGRESSION_TRAITS = {
+  truth: { name: '진실', color: '#9cc4e8', desc: '황혼의 정체를 좇는다' },
+  power: { name: '힘', color: '#e0705c', desc: '황혼의 힘을 취한다' },
+  bond: { name: '유대', color: '#9ad4a3', desc: '동료와 함께 걷는다' },
+};
+export const REGRESSION_STORY_DAY_IN_REGION = 8;
+export const REGRESSION_MAIN_STORY = [
+  { id: 'ms_1', main: 1, region: 1, title: '얼음 속의 사자(使者)', text: '빙벽 속에 한 사내가 얼어붙어 있다. 왕국의 문장이 박힌 전령의 망토 — 품 안에 봉인된 편지가 비쳐 보인다.\n얼음 너머로 겨우 읽히는 첫 줄. 「황혼은 저절로 오는 것이 아니다. 누군가 부른 것이다.」', choices: [
+    { text: '얼음을 녹여 편지를 끝까지 읽는다', trait: 'truth', stat: '학식', dc: 14, success: { text: '편지는 첨탑에 오른 첫 번째 사람에 대한 보고였다. 그는 황혼을 「멈추려」 했다고 적혀 있다.', traitBonus: 1, reward: { type: 'fame', value: 5 } }, fail: { text: '글자 절반이 얼음과 함께 녹아내렸다. 「첨탑」, 「첫 번째」라는 단어만 남았다.' } },
+    { text: '전령의 검을 빼낸다', trait: 'power', result: '얼어붙은 손가락을 하나씩 펴고 검을 쥐었다. 차가운 힘이 팔을 타고 올라온다.', reward: { type: 'random_relic' } },
+    { text: '그를 묻어 주고 발터에게 알린다', trait: 'bond', result: '발터는 오래 말이 없었다. "…내 부하였다. 고맙다, 회귀자."', reward: { type: 'affinity', name: 'knight', value: 30 } },
+  ] },
+  { id: 'ms_2', main: 2, region: 2, title: '망자의 행렬', text: '안개 속으로 망자들이 줄지어 걸어간다. 모두 같은 방향 — 서쪽, 첨탑이 있는 곳이다.\n행렬 끝의 아이 망령이 돌아본다. "당신도 가는 거지? 다들 불려 가."', choices: [
+    { text: '행렬을 따라가며 그들의 말을 듣는다', trait: 'truth', stat: '통찰', dc: 15, success: { text: '"첨탑의 주인은 우리를 먹고 자라." 망자들은 황혼의 땔감이었다.', traitBonus: 1, reward: { type: 'fame', value: 5 } }, fail: { text: '망자들의 속삭임이 한데 뒤섞여 아무것도 알아들을 수 없었다.', penalty: { hp: -20 } } },
+    { text: '망자들의 남은 힘을 거둬들인다', trait: 'power', traitValue: 2, result: '망자들이 하나둘 흩어지며 그 온기가 내 몸으로 스며든다. 강해졌다 — 그리고 조금 차가워졌다.', reward: { type: 'stat', name: '강인', value: 1 }, penalty: { hp: -25 } },
+    { text: '세레나와 함께 그들을 잠재운다', trait: 'bond', result: '세레나의 노래에 망자들이 하나씩 눈을 감는다. "고마워요. 혼자서는 못 했을 거예요."', reward: { type: 'affinity', name: 'healer', value: 30 } },
+  ] },
+  { id: 'ms_3', main: 3, region: 3, title: '회귀자의 기록', text: '봉인된 서고 가장 깊은 곳. 먼지 쌓인 책장 하나에 같은 필체의 일지가 빼곡하다.\n표지마다 숫자가 적혀 있다 — 1, 2, 3 … 12. 그리고 빈 표지 하나. 13.', choices: [
+    { text: '일지를 처음부터 읽는다', trait: 'truth', stat: '학식', dc: 15, success: { text: '열두 명의 회귀자. 모두 첨탑에 올랐고, 모두 「주인을 쓰러뜨렸다」고 적었다. 그런데 황혼은 매번 다시 왔다.', traitBonus: 1, reward: { type: 'fame', value: 5 } }, fail: { text: '필체가 갈수록 무너져 뒤쪽은 읽을 수가 없다.' } },
+    { text: '봉인을 부수고 서고의 힘을 취한다', trait: 'power', traitValue: 2, stat: '근력', dc: 15, success: { text: '봉인이 깨지며 쏟아진 힘이 손바닥에 고인다.', reward: { type: 'random_relic' } }, fail: { text: '봉인의 반동이 온몸을 때렸다. 그래도 힘의 일부는 손에 남았다.', penalty: { hp: -30 } } },
+    { text: '오렌에게 13번째 표지를 보여 준다', trait: 'bond', result: '오렌의 손이 떨린다. "…이번에는 내가 끝까지 적겠네. 자네 이름으로."', reward: { type: 'affinity', name: 'archivist', value: 30 } },
+  ] },
+  { id: 'ms_4', main: 4, region: 4, title: '황혼의 사도', text: '균열 한복판, 사도가 기다리고 있었다. "열세 번째로군. 주인께서 너를 눈여겨보신다."\n사도가 손을 내민다. "첨탑의 주인을 쓰러뜨려 봐야 황혼은 다시 온다. 차라리 네가 주인이 되어라."', choices: [
+    { text: '「황혼을 처음 부른 자는 누구냐」고 묻는다', trait: 'truth', stat: '화술', dc: 15, success: { text: '사도가 웃는다. "모르는 척은 그만둬라. 첫 번째 생의 너였다." 등골이 서늘해진다.', traitBonus: 1, reward: { type: 'fame', value: 5 } }, fail: { text: '"알고 싶으면 올라와라." 사도는 그 말만 남기고 사라졌다.' } },
+    { text: '사도의 손을 잡는다', trait: 'power', traitValue: 2, result: '황혼의 힘 일부가 혈관으로 흘러든다. 사도가 속삭인다. "꼭대기에서 보자, 주인님."', reward: { type: 'fame', value: 10 }, penalty: { hp: -30 } },
+    { text: '니아와 짜고 사도의 제단을 무너뜨린다', trait: 'bond', result: '니아가 흘린 거짓 정보에 사도가 자리를 비운 사이, 제단을 무너뜨렸다. "손해 보는 장사는 아니었네."', reward: { type: 'affinity', name: 'broker', value: 30 } },
+  ] },
+  { id: 'ms_5', main: 5, eve: true, title: '결전 전야', text: '내일이면 첨탑의 문이 열린다. 모닥불이 낮게 타오른다.\n지금까지의 생들이 한꺼번에 떠오른다. 이번에는 무엇을 위해 오를 것인가.', choices: [
+    { text: '고리를 끊을 방법을 찾는다', requireTrait: { truth: 4 }, trait: 'truth', flag: 'breakLoop', result: '열두 권의 일지, 망자들의 말, 사도의 웃음. 모든 조각이 맞춰진다 — 황혼을 부른 것이 나라면, 끊을 수 있는 것도 나다.' },
+    { text: '황혼의 힘을 받아들인다', trait: 'power', traitValue: 2, result: '눈을 감자 붉은 힘이 맥박처럼 뛴다. 두렵지 않다.', reward: { type: 'heal_pct', value: 30 } },
+    { text: '동료들과 마지막 밤을 보낸다', trait: 'bond', traitValue: 2, result: '누군가 웃고, 누군가 노래한다. 이 밤을 지키기 위해 오르는 것이다.', reward: { type: 'heal_pct', value: 50 } },
+    { text: '홀로 검을 닦는다', result: '말없이 날을 세운다. 내일은 오직 이 검만 믿는다.', reward: { type: 'heal_pct', value: 40 } },
+  ] },
+];
+export function regressionEventById(id) {
+  return REGRESSION_EVENTS.find(e => e.id === id) || REGRESSION_MAIN_STORY.find(e => e.id === id) || null;
+}
+// 오늘 확정 등장할 메인 스토리 (없으면 null)
+export function regressionMainStoryFor(run) {
+  const seen = run.seenEvents || [];
+  for (const ms of REGRESSION_MAIN_STORY) {
+    if (seen.includes(ms.id)) continue;
+    const day = ms.eve ? run.maxDays : (ms.region - 1) * REGRESSION_DAY.regionDays + REGRESSION_STORY_DAY_IN_REGION;
+    if (run.day === day) return ms;
+  }
+  return null;
+}
+export function regressionChoiceVisible(choice, run, memories = []) {
+  if (choice.requireMemory && !memories.includes(choice.requireMemory)) return false;
+  if (choice.requireTrait) for (const [k, v] of Object.entries(choice.requireTrait)) if ((run?.traits?.[k] || 0) < v) return false;
+  return true;
+}
