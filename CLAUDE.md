@@ -1038,6 +1038,14 @@ PM이 AskUserQuestion으로 확정한 설계. **던전앤파이터 모티브, "�
 | 로직 | `src/utils/appUpdate.js` — `checkLatestVersion`(`./version.json?t=` no-store) / `compareVersions` / `forceAppUpdate`(SW update→unregister, 일러·폰트 캐시 제외 전부 삭제, `?v=` 붙여 replace). 저장은 IndexedDB라 무관 |
 | UI | `TitleScreen` 하단 `UpdateButton` — 진입 시 자동 확인, 상태 5종(확인 중/최신/업데이트 가능/업데이트 중/확인 불가). dev 서버는 version.json 없음 → 「업데이트 확인」 표시가 정상 |
 
+### ⬆ 최신 버전 업데이트 버튼 (1.179.1)
+
+| 항목 | 내용 |
+|---|---|
+| 구조 | `vite.config.js` `versionJsonPlugin` — 빌드마다 `dist/version.json`({version}) 생성 (GAME_VERSION 정규식 추출). precache globPatterns에 json 없음 → SW 캐시 비대상 |
+| 로직 | `src/utils/appUpdate.js` — `checkLatestVersion`(`./version.json?t=` no-store) / `compareVersions` / `forceAppUpdate`(SW update→unregister, 일러·폰트 캐시 제외 전부 삭제, `?v=` 붙여 replace). 저장은 IndexedDB라 무관 |
+| UI | `TitleScreen` 하단 `UpdateButton` — 진입 시 자동 확인, 상태 5종(확인 중/최신/업데이트 가능/업데이트 중/확인 불가). dev 서버는 version.json 없음 → 「업데이트 확인」 표시가 정상 |
+
 ### 🏆 업적 시스템 (1.90.0 전면 개편 — 신규 콘텐츠 추가 시 필수 체크)
 
 | 규칙 | 내용 |
