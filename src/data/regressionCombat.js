@@ -96,20 +96,34 @@ export const REGRESSION_SKILL_PRESETS = {
 };
 export function regressionSkillStats(id) { return Object.keys(REGRESSION_SKILLS[id]?.scale || REGRESSION_SKILLS[id]?.scaleMult || REGRESSION_SKILLS[id]?.reflect?.scale || {}); }
 
+// 1.192.0~ 스킬 레벨 — 같은 스킬을 다시 배우면 Lv+1 (최대 5). 밸런스는 이 표 한 곳.
+export const REGRESSION_SKILL_LV = {
+  max: 5,
+  powerPerLv: 0.15,   // 피해·회복·보호막·반사·필중 추가 피해 +15%/Lv
+  buffPerLv: 0.05,    // 공격 강화 +5%p/Lv
+  revivePerLv: 0.05,  // 부활 HP +5%p/Lv
+  guardPerLv: 0.1,    // 막기 피해 감소 +10%p/Lv (최대 100%)
+};
+export function regressionSkillLevel(skillLv, id) {
+  return Math.max(1, Math.min(REGRESSION_SKILL_LV.max, skillLv?.[id] || 1));
+}
+export function regressionSkillLvMult(lv = 1) { return 1 + (lv - 1) * REGRESSION_SKILL_LV.powerPerLv; }
+
 function scaled(base, scale, stats) {
   return base + Object.entries(scale || {}).reduce((a, [k, c]) => a + (stats[k] || 0) * c, 0);
 }
 // 스킬 수치 미리보기 (화면 설명용)
-export function regressionSkillValue(id, stats) {
+export function regressionSkillValue(id, stats, lv = 1) {
   const sk = REGRESSION_SKILLS[id]; if (!sk) return null;
-  if (sk.effect === 'buff') return Math.round((sk.base + scaled(0, sk.scaleMult, stats)) * 100);
-  if (sk.effect === 'revive') return Math.round((sk.base + scaled(0, sk.scaleMult, stats)) * 100);
-  if (sk.effect === 'guard') return Math.round(sk.base * 100);
-  return Math.round(scaled(sk.base, sk.scale, stats) * (1 + (stats.학식 || 0) * REGRESSION_COMBAT.lorePower));
+  const L = REGRESSION_SKILL_LV, up = lv - 1;
+  if (sk.effect === 'buff') return Math.round((sk.base + up * L.buffPerLv + scaled(0, sk.scaleMult, stats)) * 100);
+  if (sk.effect === 'revive') return Math.round((sk.base + up * L.revivePerLv + scaled(0, sk.scaleMult, stats)) * 100);
+  if (sk.effect === 'guard') return Math.round(Math.min(1, sk.base + up * L.guardPerLv) * 100);
+  return Math.round(scaled(sk.base, sk.scale, stats) * (1 + (stats.학식 || 0) * REGRESSION_COMBAT.lorePower) * regressionSkillLvMult(lv));
 }
 
 // =========== 전투 참가자 ===========
-export function regressionPlayerCombatant({ stats, level = 0, maxHp, hp, skills = [], belt = [], relicBonus = {} }) {
+export function regressionPlayerCombatant({ stats, level = 0, maxHp, hp, skills = [], skillLv = {}, belt = [], relicBonus = {} }) {
   const C = REGRESSION_COMBAT;
   const weapon = Math.max(...Object.entries(C.weaponMult).map(([k, m]) => (stats[k] || 0) * m));
   return {
@@ -121,7 +135,7 @@ export function regressionPlayerCombatant({ stats, level = 0, maxHp, hp, skills 
     takenMult: 1 + (relicBonus.dmgTaken || 0) / 100,
     lifesteal: relicBonus.lifesteal || 0,
     skillPower: 1 + (stats.학식 || 0) * C.lorePower,
-    stats, skills, belt: [...belt],
+    stats, skills, skillLv: { ...skillLv }, belt: [...belt],
   };
 }
 // dayMult — 1.185.0~ 날이 갈수록 강해지는 적 (regressionDayEnemyMult, 첨탑은 1)
@@ -178,14 +192,15 @@ export function simulateRegressionCombat({ player: P0, enemy: E0, stanceId = 'ca
     P.used.add(id);
     ev.push({ t: 'skill', id, p: P.hp, e: E.hp });
     const st = P.stats;
-    const sp = P.skillPower || 1;
+    const L = REGRESSION_SKILL_LV, lv = regressionSkillLevel(P.skillLv, id), up = lv - 1;
+    const sp = (P.skillPower || 1) * regressionSkillLvMult(lv);
     if (sk.effect === 'strike') dealToEnemy(vary(scaled(sk.base, sk.scale, st) * sp * stance.mult), sk.name);
     else if (sk.effect === 'heal') { const h = Math.round(scaled(sk.base, sk.scale, st) * sp); P.hp = Math.min(P.maxHp, P.hp + h); ev.push({ t: 'heal', amt: h, label: sk.name, p: P.hp, e: E.hp }); }
     else if (sk.effect === 'shield') { const s = Math.round(scaled(sk.base, sk.scale, st) * sp); P.shield += s; ev.push({ t: 'shield', amt: s, label: sk.name, p: P.hp, e: E.hp }); }
-    else if (sk.effect === 'buff') { P.buffMult = 1 + sk.base + scaled(0, sk.scaleMult, st); P.buffTurns = sk.turns || 2; ev.push({ t: 'buff', pct: Math.round((P.buffMult - 1) * 100), turns: P.buffTurns, label: sk.name }); }
+    else if (sk.effect === 'buff') { P.buffMult = 1 + sk.base + up * L.buffPerLv + scaled(0, sk.scaleMult, st); P.buffTurns = sk.turns || 2; ev.push({ t: 'buff', pct: Math.round((P.buffMult - 1) * 100), turns: P.buffTurns, label: sk.name }); }
     else if (sk.effect === 'stun') { const d = Math.round(scaled(sk.base, sk.scale, st) * sp); if (d > 0) dealToEnemy(vary(d * stance.mult), sk.name); E.stunned = 1; if (E.heavyNext) E.heavyNext = null; ev.push({ t: 'stun', label: sk.name, p: P.hp, e: E.hp }); }
-    else if (sk.effect === 'sure') P.sureBonus = Math.round(scaled(sk.base, sk.scale, st));
-    else if (sk.effect === 'guard') { P.guardNext = sk.base; if (sk.reflect) P.reflectNext = Math.round(scaled(sk.reflect.base, sk.reflect.scale, st) * sp); }
+    else if (sk.effect === 'sure') P.sureBonus = Math.round(scaled(sk.base, sk.scale, st) * regressionSkillLvMult(lv));
+    else if (sk.effect === 'guard') { P.guardNext = Math.min(1, sk.base + up * L.guardPerLv); if (sk.reflect) P.reflectNext = Math.round(scaled(sk.reflect.base, sk.reflect.scale, st) * sp); }
     return true;
   };
   const checkHpTriggers = () => {
@@ -259,7 +274,7 @@ export function simulateRegressionCombat({ player: P0, enemy: E0, stanceId = 'ca
           if (P.reflectNext) { const r = P.reflectNext; P.reflectNext = 0; dealToEnemy(r, '반사'); }
           if (P.hp <= 0) {
             const rv = skillsBy('lethal')[0];
-            if (rv) { fire(rv); const sk = REGRESSION_SKILLS[rv]; P.hp = Math.round(P.maxHp * (sk.base + scaled(0, sk.scaleMult, P.stats))); ev.push({ t: 'revive', p: P.hp, e: E.hp }); }
+            if (rv) { fire(rv); const sk = REGRESSION_SKILLS[rv]; P.hp = Math.round(P.maxHp * (sk.base + (regressionSkillLevel(P.skillLv, rv) - 1) * REGRESSION_SKILL_LV.revivePerLv + scaled(0, sk.scaleMult, P.stats))); ev.push({ t: 'revive', p: P.hp, e: E.hp }); }
           }
         }
       }
