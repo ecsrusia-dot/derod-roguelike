@@ -1044,7 +1044,8 @@ PM이 AskUserQuestion으로 확정한 설계. **던전앤파이터 모티브, "�
 | 1.191.1 전투 전 속도 ✅ | PM 요청 — RegressionBattle 준비 화면에 「⏱ 전투 속도」 버튼 줄(props `speedOptions`/`onSetSpeed`, RegressionGame `setSpeed`가 localStorage `regressionSpeed` 저장). 재생 중 배속 버튼은 그대로 |
 | 1.191.2 방어 표시 ✅ | PM 요청 「방어·방어막 식별」 — `simulateRegressionCombat`의 `ev.push`가 모든 사건에 `ps`(내 보호막)·`gd`(막기 준비)·`ed`(적 방어)를 붙이고, 피격 사건에 `absorbed`/`guarded`, 내 공격에 `blocked`. RegressionBattle: 색 `RG_SHIELD`(하늘)·`RG_DEF`(강철)·`RG_GUARD`(보라) — 그림 테두리 링·상태 칩·HP 바 보호막 구간·떠오르는 내역 숫자·하늘색 로그. ⚠️ 방어 상태는 `last`(마지막 사건) 기준 — `lastState`는 HP 있는 사건만이라 방어 행동이 늦게 반영됨 |
 | 1.192.0 스킬 레벨 ✅ | PM 결정: **같은 스킬 재습득 = Lv+1 (최대 5)** — `run.skillLv`{id: lv}(없으면 Lv.1), `addRegressionSkill`(신규/승급 공용 — 습득·상점·기연 전부 이것), `canRegressionSkillGrow`(습득 기회·상점·은자 후보 필터 — 만렙만 제외). 밸런스 `REGRESSION_SKILL_LV` 한 곳(위력 +15%/Lv·버프 +5%p·부활 +5%p·막기 +10%p). 재습득 성공률 +`REGRESSION_LEARN.upgradeBonus` .1, 교습비 현재 Lv당 +40%. 비전서 fx `startSkillLvUps`(Lv.2 1개·Lv.4 2개 → 고른 순서 앞부터 Lv.2). 전투 `regressionPlayerCombatant({skillLv})` |
-| 다음 (PM 확정) | ② 기연 20종(능력치당 2, 지역 고정 해제) → ③ 성향 루트제(2지역부터 루트 분기 — 루트별 지역 보스·전용 보상·첨탑 구성·엔딩) |
+| 1.193.0 기연 20종 ✅ | PM 결정 「능력치당 2개」 — `REGRESSION_SKILLS` fortune 20종(첫 scale 능력치 = 대표 능력치, 10종 × 2) + 기연 사건 20개 전부 **`region: 0`(어느 지역에서나)** — `rollRegressionEvent`가 `e.region === run.region` 또는 `e.region === 0`. 빌드 가중은 기존 `regressionEventWeight`(0.3 + 2×적성). 이미 아는 기연 = 숙련(Lv+1). 첨탑 enemyHp spire 1.35 (diag3 정복 33~38%) |
+| 다음 (PM 확정) | ③ 성향 루트제(2지역부터 루트 분기 — 루트별 지역 보스·전용 보상·첨탑 구성·엔딩) |
 
 ### ⬆ 최신 버전 업데이트 버튼 (1.179.1)
 
