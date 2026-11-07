@@ -226,7 +226,7 @@ export function regressionCarrySlots(metaR) {
 }
 
 // =========== 런 생성 ===========
-export function createRegressionRun(metaR = EMPTY_REGRESSION, classId, stats = null) {
+export function createRegressionRun(metaR = EMPTY_REGRESSION, classId, stats = null, skills = null) {
   const T = REGRESSION_TUNING;
   const fx = aggregateRegressionMemories(metaR.memories);
   const records = {};
@@ -259,6 +259,8 @@ export function createRegressionRun(metaR = EMPTY_REGRESSION, classId, stats = n
     affinity: {},          // 1.179.0~ 동료 호감 { companionId: 0~100 }
     stats: stats || regressionPresetStats(classId),   // 1.181.0~ 능력치 10종 (시작 커스텀)
     level: 0, exp: 0, statPoints: 0,                  // 1.181.0~ 레벨업 → 추가 능력치
+    skills: skills || null,                           // 1.182.0~ 보유 스킬 id (null = 직업 프리셋)
+    flames: 3,                                        // 1.182.0~ 생명의 불꽃 (강한 전투 태세 자원, 한 생 3개)
     fameBy: {},                                       // 1.181.0~ 판정 성공 능력치 집계 → 명성 경로
     seenEvents: [],        // 1.179.0~ 이번 생에 본 사건 id
     statBonus: {},         // 1.179.0~ 사건 능력치 보너스 { 근력: n }
@@ -482,7 +484,7 @@ export const REGRESSION_RELIC_POOL = RELICS.filter(r => (r.weight || 0) > 0 && r
 // 공용 패시브 (직업 전용·대장간 전용 제외)
 // 강타 제외 — 다단히트 직업(사제·정령사)이 랜덤으로 Lv.3+를 모으면 충격 누적으로 적이 기절 고정됨 (1.178.0 실측)
 export const REGRESSION_PASSIVE_POOL = Object.keys(PASSIVE_SKILLS).filter(n => !PASSIVE_SKILLS[n].classOnly && n !== '강타');
-export const REGRESSION_POTION_POOL = ['hp_small', 'hp_small', 'hp_medium', 'soul', 'hp_large'];
+export const REGRESSION_POTION_POOL = ['hp_small', 'hp_small', 'hp_medium', 'hp_medium', 'hp_large']; // 1.182.0 소울 물약 제외 (전용 전투에 소울 게이지 없음)
 
 export function regressionRelicObjects(run) {
   return (run.relics || []).map(n => RELICS.find(r => r.name === n)).filter(Boolean);
@@ -664,7 +666,6 @@ export const REGRESSION_SHOP = [
   { id: 'hp_small', kind: 'potion', price: 50 },
   { id: 'hp_medium', kind: 'potion', price: 100 },
   { id: 'hp_large', kind: 'potion', price: 180 },
-  { id: 'soul', kind: 'potion', price: 60 },
   { id: 'relic', kind: 'relic', name: '유물 상자', desc: '전투 효과 유물 1개 (미보유 중 랜덤)', price: 160 },
   { id: 'passive', kind: 'passive', name: '수련 교본', desc: '공용 패시브 1개 +1Lv (랜덤)', price: 180 },
   { id: 'clinic', kind: 'heal', name: '마을 치료소', desc: 'HP 50% 회복', price: 70 },
@@ -1074,3 +1075,10 @@ export function regressionLegacyCombatStats(stats) {
 export function regressionMaxHpBonusFromStats(stats) {
   return (stats?.강인 || 0) * 12;
 }
+
+// 1.182.0~ 보유 스킬 (시작 커스텀 3개 + 습득). 구세이브는 직업 프리셋
+import { REGRESSION_SKILL_PRESETS as __RSP, REGRESSION_FLAMES_PER_LIFE as __RFL } from './regressionCombat.js';
+export function regressionRunSkills(run) {
+  return Array.isArray(run?.skills) && run.skills.length ? run.skills : (__RSP[run?.classId] || []);
+}
+export function regressionRunFlames(run) { return run?.flames ?? __RFL; }

@@ -1030,7 +1030,8 @@ PM이 AskUserQuestion으로 확정한 설계. **던전앤파이터 모티브, "�
 | 1.180.0 이야기 화면 ✅ | PM 결정(무림귀환 스크린샷 「이런 스타일」 — 구글 드라이브 폴더 17c7SGUm… 스크린샷 5장): 허브 → **이야기 화면**(지역 서술 `regressionNarration` → `>` 선택지 → 결과 장면 `run.scene`{title,text,tags} → 「다음」). 상단 목표 바 `regressionFameStage`(명성 4단계 n/4). 사건은 EventScreen 대신 인라인(`resolveRegressionChoice` + `regressionCheckChance`/`regressionChanceLabel` 성공 가능성 라벨). 적 등급 `regressionEnemyLabel`([하급]/[상급]/[군주]). 전투 결과·대화(`regressionCompanionLine`)·야영·구매 모두 결과 장면 |
 | 2.0 시리즈 | 설계서 `docs/regression-v2-design.md` (PR #279). PM 확정: **전투 = 시안 2(본편 전투 화면 스타일)** — 단, 본편 CombatScreen을 개조하지 않고 **회귀 전용 전투 컴포넌트**로 만든다(본편 회귀 위험 0) · 능력치 10종 승인 · 직업 = 초상화+프리셋 · 전투 태세 넣음 · 기존 시스템 연결 |
 | 2.0 PR A ✅ (1.181.0) | 능력치 10종(키 = 한글 이름 `REGRESSION_STATS`, run.stats) · 시작 커스텀 12포인트/상한 5(`REGRESSION_PRESETS` 직업별) · 경험치·레벨(`gainRegressionExp`, `REGRESSION_EXP`, 레벨당 statPoints +1) · 판정 공식 `능력치×2 + d6 ≥ DC − 9`(`REGRESSION_DC_OFFSET`) · 명성 경로 `run.fameBy`/`regressionFamePath`. PR B 전까지 `regressionLegacyCombatStats`로 본편 CombatScreen에 환산 |
-| 다음 | 2.0 PR B — 전용 전투(시안 2 화면) + 스킬 3등급 데이터 + 전투 태세 → PR C 습득 개연성 → PR D 장비·상점·경제 |
+| 2.0 PR B ✅ (1.182.0) | `src/data/regressionCombat.js` — **순수 전투 시뮬** `simulateRegressionCombat`(rng 주입 → 사건 목록) + `REGRESSION_SKILLS`(일반 12/고급 8/기연 6, trigger·effect·scale 선언형) + `REGRESSION_STANCES`(평상/투지/연소/돌파, `run.flames` 3) + 밸런스 `REGRESSION_COMBAT` 한 곳(지역별 enemyHp/enemyDmg). 화면 `components/regression/RegressionBattle.jsx`(시안 2 — 준비: 태세·스킬·벨트 / 재생: 적·로그·주인공·스킬 카드·컷인). 본편 CombatScreen 미사용. 모드 HP 기준 100(+강인×12+레벨×6). 시작 커스텀에 일반 스킬 3개 선택(`run.skills`, 구세이브 = `REGRESSION_SKILL_PRESETS`). ⚠️ node 실측: 사제·혼혈 마족(강인·회복)이 첨탑에 강하고 술법사가 약함 → PR D 봇 실측으로 직업 간 보정 |
+| 다음 | 2.0 PR C — 스킬·유니크 습득 개연성(고급=강적 / 기연=보스·기연 사건, 빌드 적성 계수) · 이야기 판정 보상 확장 → PR D 장비 3칸·상점 랜덤 진열+리셋 1회·경제·드랍 하향·봇 실측 |
 
 ### ⬆ 최신 버전 업데이트 버튼 (1.179.1)
 
