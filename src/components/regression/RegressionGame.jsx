@@ -44,7 +44,7 @@ import {
   REGRESSION_TRAITS, REGRESSION_MAIN_STORY, regressionEventById, regressionChoiceVisible, regressionTopTrait,
   REGRESSION_DAY, rollRegressionDay, passRegressionDay, hideFromRegressionEnemy, fightRegressionToday, restRegressionShelter, trainRegressionShelter,
   askRegressionHermit, regressionDayEnemyMult, regressionDayTable, regressionFortuneWeight, REGRESSION_TODAY_INTRO,
-  REGRESSION_LEARN, offerRegressionLearn, resolveRegressionLearn, regressionLearnChance, regressionLearnIntro, regressionSkillAptitude, regressionRunSkillLv, regressionSkillStats,
+  REGRESSION_LEARN, offerRegressionLearn, resolveRegressionLearn, regressionLearnChance, regressionLearnIntro, regressionSkillAptitude, regressionRunSkillLv, getRegressionClassPerk, regressionSkillStats,
 } from '../../data.js';
 import { AP_TUNING } from '../../combat/initCombat.js';
 import { ScreenHeader, GlassPanel, Chip, UIButton, BottomSheet } from '../ui/CommonUI.jsx';
@@ -974,6 +974,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
               ))}
             </div>
             <div className="text-[11px] mt-1" style={{ color: PALETTE.textDim }}>가장 높은 성향이 길(루트)을 정하고, 첨탑에 오른 길이 엔딩을 가른다. 메인 스토리는 각 지역 {8}일째와 마지막 날 찾아온다.</div>
+            {getRegressionClassPerk(run.classId) && <div className="text-[11px] mt-3" style={{ color: PALETTE.textDim }}><b style={{ color: PALETTE.legendary }}>◆ 직업 특성 「{getRegressionClassPerk(run.classId).name}」</b> — {getRegressionClassPerk(run.classId).desc}</div>}
             <div className="text-[12px] font-bold mt-3 mb-1" style={{ color: PALETTE.text }}>보유 스킬 {regressionRunSkills(run).length}개</div>
             <div className="space-y-1">
               {regressionRunSkills(run).map(id => {
