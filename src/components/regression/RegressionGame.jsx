@@ -20,6 +20,7 @@ import {
   enterRegressionSpire, applyRegressionSpireResult, buildRegressionSpireEnemy,
   REGRESSION_ROUTES, REGRESSION_ROUTE_BOSSES, REGRESSION_ROUTE_REWARDS, REGRESSION_ROUTE_BOSS_DAY_IN_REGION, REGRESSION_ROUTE_FROM_REGION,
   REGRESSION_ENDING_MILESTONES, REGRESSION_EPILOGUES, REGRESSION_QUEST_AFFINITY,
+  REGRESSION_SECRET, REGRESSION_SECRET_PLACES, discoverRegressionSecret, solveRegressionSecretPuzzle, fightRegressionSecretGuardian, claimRegressionSecretTreasure, leaveRegressionSecret,
   REGRESSION_OATHS, REGRESSION_OATH_UNLOCK_LOOPS, regressionOathFx, regressionOathEchoMult, regressionOathEnemyMult, regressionFameGate,
   buildRegressionRouteBoss, applyRegressionRouteReward, REGRESSION_RED_MOON, regressionDaysToRedMoon, REGRESSION_GRAVE, resolveRegressionGrave, regressionSpireChain, regressionSpireEnemyFor, regressionRouteFor, REGRESSION_GEAR as __RG_GEAR,
   settleRegression, setRegressionCarry, regressionCarrySlots, buildRegressionLoadout,
@@ -215,7 +216,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
 
   const saveRun = (nextRun, extra = {}) => onSave({ run: nextRun, ...extra });
   // 1.185.0~ 오늘의 일 — 할 일이 없으면 랜덤 카드 1장을 굴린다 (렌더 밖에서 1회, 결과는 저장돼 새로고침해도 같다)
-  const needRoll = !!run && !run.over && !run.today && !run.scene && !run.pending && !run.pendingEvent && !run.pendingLearn && !run.pendingGear && !run.pendingAwaken
+  const needRoll = !!run && !run.over && !run.today && !run.scene && !run.pending && !run.pendingEvent && !run.pendingLearn && !run.pendingGear && !run.pendingAwaken && !run.secret
     && run.spireRound == null && !isRegressionSpireDay(run);
   useEffect(() => {
     if (!needRoll) return;
@@ -399,6 +400,12 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
       const hpLoss = Math.round((run.hpPct - next.hpPct) * 100);
       if (hpLoss > 0) tags.push({ text: `HP -${hpLoss}%`, tone: 'bad' });
       const lines = [`${enemyName}이(가) 쓰러졌다. 숨을 고르고 주위를 살핀다.`, `${enemyName}의 마지막 일격을 흘려 내고, 승부를 끝냈다.`, `쓰러진 ${enemyName} 곁에서 쓸 만한 것을 챙겨 길을 나선다.`];
+      // 1.201.0~ 숨겨진 장소 수호자 — 3층(보물)로
+      if (run.pending.secret && run.secret) {
+        next.secret = { ...run.secret, floor: 3 };
+        next.scene = regressionResultScene(`[수호자 ${enemyName}] - 승리!`, '수호자가 무너지자 마지막 문이 저절로 열린다.', tags);
+        saveRun(next); return;
+      }
       // 1.194.0~ 길목의 군주 — 길마다 다른 보상 + 기연 기회 확정
       if (run.pending.routeBoss) {
         const rr = applyRegressionRouteReward(next, run.pending.route, run.pending.routeBoss);
@@ -431,7 +438,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
         enemyLabel={regressionEnemyLabel(enemyKey, tier, override)}
         regionKey={inSpire ? 'spire' : run.region}
         enemyMult={inSpire ? 1 : regressionDayEnemyMult(run.day) * (run.pending?.redMoon ? REGRESSION_RED_MOON.enemyMult : 1)}
-        enemyExtra={(() => { const om = regressionOathEnemyMult(run, inSpire); const moon = !inSpire && run.pending?.redMoon ? REGRESSION_RED_MOON.enemyMult : 1; return { hp: om.hp * moon, dmg: om.dmg * moon }; })()}
+        enemyExtra={(() => { const om = regressionOathEnemyMult(run, inSpire); const moon = !inSpire && run.pending?.redMoon ? REGRESSION_RED_MOON.enemyMult : !inSpire && run.pending?.secret ? REGRESSION_SECRET.guardianMult : 1; return { hp: om.hp * moon, dmg: om.dmg * moon }; })()}
         intro={inSpire ? `첨탑 ${run.spireRound + 1}/${spireLen}층. ${regressionEnemyLabel(enemyKey, 'boss', enemyObj)}이(가) 길을 막아선다.` : `${regressionEnemyLabel(enemyKey, tier, override)}이(가) 앞을 막아선다. 피할 수는 없다.`}
         stats={storyStats}
         level={run.level || 0}
@@ -873,6 +880,30 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
         </div>
       </div>
     );
+  } else if (run.secret && REGRESSION_SECRET_PLACES[run.secret.region]) {
+    // 1.201.0~ 숨겨진 장소 — 3층
+    const P = REGRESSION_SECRET_PLACES[run.secret.region];
+    const f = run.secret.floor;
+    const chance = (st, dc) => ({ stat: st, ...regressionChanceLabel(regressionCheckChance(storyStats[st] || 0, dc)) });
+    body = (
+      <div className="space-y-3 ui-screen-enter">
+        <div className="flex items-center justify-between">
+          <div className="text-[14px] font-bold" style={{ color: PALETTE.legendary }}>🗝 {P.name}</div>
+          <div className="text-[12px] font-bold" style={{ color: PALETTE.dawn }}>{f}/3층</div>
+        </div>
+        <div className="text-[14px] leading-relaxed" style={{ color: PALETTE.text }}>{f === 1 ? P.puzzle : f === 2 ? P.guard : P.treasure}</div>
+        <div className="space-y-1.5">
+          {f === 1 && ['통찰', '학식', '민첩'].map(st => (
+            <Choice key={st} text={{ 통찰: '흔적을 읽고 진짜를 고른다', 학식: '문양을 해독해 원리를 푼다', 민첩: '함정이 작동하기 전에 빠져나간다' }[st]} label={chance(st, REGRESSION_SECRET.puzzleDc)}
+              sub={`성공: 은화 +${REGRESSION_SECRET.puzzleGold} · 실패: HP -${REGRESSION_SECRET.puzzleFailHp}% (어느 쪽이든 2층으로)`}
+              onClick={() => { const r = solveRegressionSecretPuzzle(run, st); saveRun({ ...r.run, scene: regressionResultScene(`${P.name} — 1층`, r.ok ? '문이 소리 없이 열렸다.' : '함정이 터졌지만, 길은 열렸다.', r.tags) }); }} />
+          ))}
+          {f === 2 && <Choice text="수호자에게 맞선다" sub={`${run.secret.region === 1 ? '하급' : '상급'} 적 · 이기면 3층 보물`} onClick={() => saveRun(fightRegressionSecretGuardian(run))} />}
+          {f === 3 && <Choice text="보물을 연다" sub="보물 장비 확정 · 유니크 무구 또는 기연의 기회" onClick={() => { const r = claimRegressionSecretTreasure(run); saveRun({ ...r.run, scene: regressionResultScene(`${P.name} — 보물`, '오래 잠들어 있던 것들이 손에 들어왔다.', r.tags) }); }} />}
+          {f < 3 && <Choice text="물러난다 (하루가 지난다)" onClick={() => saveRun({ ...leaveRegressionSecret(run), scene: regressionResultScene(P.name, '욕심을 접고 밖으로 나왔다.', []) })} />}
+        </div>
+      </div>
+    );
   } else if (spireDay) {
     const ok = isRegressionSpireEligible(run);
     body = (
@@ -943,6 +974,18 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
           <Choice text="무덤에 꽃을 놓고 떠난다" sub={`명성 +${REGRESSION_GRAVE.leaveFame} · 유품은 다음 생에도 남는다`} onClick={() => { const r = resolveRegressionGrave(run, false); saveRun({ ...r.run, scene: sceneOf('전생의 무덤', '지난 생의 나에게 작별을 고했다. 이번에는 다른 길을 걷겠다고.', r.tags) }); }} />
         </>
       );
+    } else if (t.kind === 'secret') {
+      const P = REGRESSION_SECRET_PLACES[run.region];
+      const lab = (st) => ({ stat: st, ...regressionChanceLabel(regressionCheckChance(stats[st] || 0, REGRESSION_SECRET.dc)) });
+      choices = (
+        <>
+          {['통찰', '학식'].map(st => (
+            <Choice key={st} text={st === '통찰' ? '주변을 살펴 숨은 입구를 찾는다' : '새겨진 문양을 해독한다'} label={lab(st)} sub={`성공하면 「${P?.name}」에 들어간다 (3층) · 실패하면 이 지역의 기회는 끝`}
+              onClick={() => { const r = discoverRegressionSecret(run, st); saveRun(r.ok ? { ...r.run, scene: sceneOf(P?.name || '숨겨진 장소', '돌이 밀리며 어두운 통로가 드러났다.', [{ text: `${st} - 성공!`, tone: 'gold' }]) } : { ...r.run, scene: sceneOf('수상한 흔적', '끝내 입구를 찾지 못했다. 흔적은 바람에 지워졌다.', [{ text: `${st} - 실패`, tone: 'bad' }]) }); }} />
+          ))}
+          <Choice text="지나친다" onClick={() => saveRun({ ...passRegressionDay(run, '수상한 흔적을 지나침'), scene: sceneOf('수상한 흔적', '괜한 위험은 피하기로 했다.', []) })} />
+        </>
+      );
     } else if (t.kind === 'routeBoss') {
       const rw = REGRESSION_ROUTE_REWARDS[t.route]?.[t.routeBoss] || {};
       const rwTxt = rw.stats ? Object.entries(rw.stats).map(([k, v]) => `${k} +${v}`).join(' · ') : rw.gear ? `여정 장비 「${__RG_GEAR[rw.gear]?.name}」` : rw.affinityAll ? `만난 동료 호감 +${rw.affinityAll}` : rw.text || (rw.gold ? `은화 +${rw.gold} · 회복약` : '');
@@ -961,7 +1004,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
     body = (
       <div className="space-y-3 ui-screen-enter">
         <div className="flex items-center justify-between">
-          <div className="text-[12px] font-bold" style={{ color: t.kind === 'routeBoss' || t.redMoon ? PALETTE.accent : PALETTE.dawn }}>D{run.day} — {t.kind === 'routeBoss' ? `${REGRESSION_ROUTES[t.route]?.icon} 길목의 군주` : t.redMoon ? '🌕 붉은 달의 날' : t.kind === 'grave' ? '⚱ 전생의 무덤' : '오늘의 일'}</div>
+          <div className="text-[12px] font-bold" style={{ color: t.kind === 'routeBoss' || t.redMoon ? PALETTE.accent : PALETTE.dawn }}>D{run.day} — {t.kind === 'routeBoss' ? `${REGRESSION_ROUTES[t.route]?.icon} 길목의 군주` : t.redMoon ? '🌕 붉은 달의 날' : t.kind === 'grave' ? '⚱ 전생의 무덤' : t.kind === 'secret' ? '🗝 수상한 흔적' : '오늘의 일'}</div>
           <div className="text-[11px]" style={{ color: PALETTE.textDim }}>기연의 기운 <b style={{ color: PALETTE.legendary }}>{Math.round((regressionDayTable(run).fortune || 0) * 100)}%</b> · 적 강도 ×{regressionDayEnemyMult(run.day).toFixed(2)}{regressionDaysToRedMoon(run.day) > 0 ? ` · 🌕 붉은 달까지 ${regressionDaysToRedMoon(run.day)}일` : ''}</div>
         </div>
         <div className="text-[14px] leading-relaxed" style={{ color: PALETTE.textDim }}>{regressionNarration(run)}</div>
