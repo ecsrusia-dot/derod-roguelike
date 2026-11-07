@@ -26,7 +26,7 @@ export const REGRESSION_COMBAT = {
   enemyDodge: { normal: 8, elite: 10, boss: 6 },
   // 적 강도 — 지역별 (본편 수치 × 배율). 체감 조정은 여기서
   // 1.190.0 PM 피드백 「전투·첨탑이 너무 쉽다」 — 시뮬 목표: 하급 승률 92~98%·승리 시 HP 27~47% 소모 / 강적 73~92% / 첨탑 진입 대비 정복 ~31%
-  enemyHp: { 1: 1.15, 2: 1.05, 3: 0.9, 4: 0.82, spire: 1.3 },
+  enemyHp: { 1: 1.15, 2: 1.05, 3: 0.9, 4: 0.82, spire: 1.35 },
   enemyDmg: { 1: 1.2, 2: 1.0, 3: 0.8, 4: 0.72, spire: 1.15 },
   tierMult: { normal: { hp: 1.05, dmg: 1.15 }, elite: { hp: 1, dmg: 1 } },
   maxTurns: 30,
@@ -77,13 +77,28 @@ export const REGRESSION_SKILLS = {
   shadow_step:  { tier: 'advanced', name: '그림자 걸음', trigger: 'selfDodge', effect: 'buff', base: 0.35, turns: 2, scaleMult: { 민첩: 0.03 }, desc: '내가 회피하면 — 2턴 공격 +35%' },
   silver_tongue:{ tier: 'advanced', name: '위압', trigger: 'battleStart', effect: 'stun', base: 0, scale: { 화술: 1 }, desc: '전투 시작 — 적의 첫 행동 봉쇄' },
   hunter_mark:  { tier: 'advanced', name: '사냥꾼의 표식', trigger: 'battleStart', effect: 'buff', base: 0.25, turns: 4, scaleMult: { 통찰: 0.03 }, desc: '전투 시작 — 4턴 공격 +25%' },
-  // ── 기연 6 (보스 승리 / 기연 사건 — 빌드 개연성 판정) ──
+  // ── 기연 (보스 승리 / 기연 사건 — 빌드 개연성 판정) ──
   saint_flash:  { tier: 'fortune', name: '검성의 일섬', trigger: 'enemyHp', at: 0.5, effect: 'strike', base: 24, scale: { 검술: 6 }, desc: '적 HP 50% 이하 — 검술 비례 일섬' },
   dragon_breath:{ tier: 'fortune', name: '용의 숨결', trigger: 'battleStart', effect: 'strike', base: 22, scale: { 마법: 6 }, desc: '전투 시작 — 마법 비례 화염 폭풍' },
   sky_volley:   { tier: 'fortune', name: '천궁의 화살비', trigger: 'selfDodge', effect: 'strike', base: 20, scale: { 사격: 5, 민첩: 2 }, desc: '내가 회피하면 — 사격·민첩 비례 화살비' },
   dawn_miracle: { tier: 'fortune', name: '여명의 기적', trigger: 'lethal', effect: 'revive', base: 0.3, scaleMult: { 신성: 0.03 }, desc: '쓰러질 때 1회 — HP 30% (신성 1당 +3%)로 부활' },
   titan_body:   { tier: 'fortune', name: '거인의 육체', trigger: 'battleStart', effect: 'shield', base: 20, scale: { 강인: 8, 근력: 2 }, desc: '전투 시작 — 강인·근력 비례 거대 보호막' },
   sage_eye:     { tier: 'fortune', name: '현자의 눈', trigger: 'enemyHeavy', effect: 'guard', base: 1, reflect: { base: 10, scale: { 통찰: 4, 학식: 3 } }, desc: '적이 대공격을 준비하면 — 그 공격을 완전히 막고 반사' },
+  // ── 1.193.0~ 기연 +14 (능력치당 2종 — 위 6종 포함 20종) ──
+  giant_fist:   { tier: 'fortune', name: '거신의 철권', trigger: 'turn', at: 2, effect: 'strike', base: 22, scale: { 근력: 6 }, desc: '2턴째 — 근력 비례 거대한 주먹' },
+  earthshaker:  { tier: 'fortune', name: '대지 가르기', trigger: 'enemyHeavy', effect: 'stun', base: 16, scale: { 근력: 5 }, desc: '적이 대공격을 준비하면 — 땅을 갈라 저지 + 근력 비례 피해' },
+  wind_blade:   { tier: 'fortune', name: '질풍참', trigger: 'enemyDodge', effect: 'strike', base: 18, scale: { 민첩: 5 }, desc: '상대가 회피하면 — 그 틈을 베는 민첩 비례 일격' },
+  phantom_step: { tier: 'fortune', name: '환영보', trigger: 'selfDodge', effect: 'buff', base: 0.45, turns: 3, scaleMult: { 민첩: 0.04 }, desc: '내가 회피하면 — 3턴 공격 +45% (민첩 1당 +4%)' },
+  undying_will: { tier: 'fortune', name: '불굴의 의지', trigger: 'selfHp', at: 0.3, effect: 'heal', base: 20, scale: { 강인: 7 }, desc: 'HP 30% 이하 — 강인 비례 대회복' },
+  sword_storm:  { tier: 'fortune', name: '만검귀종', trigger: 'turn', at: 3, effect: 'strike', base: 22, scale: { 검술: 5, 근력: 1 }, desc: '3턴째 — 수많은 검격이 한곳으로 모인다' },
+  falling_star: { tier: 'fortune', name: '유성 사격', trigger: 'enemyHp', at: 0.3, effect: 'strike', base: 26, scale: { 사격: 6 }, desc: '적 HP 30% 이하 — 하늘에서 떨어지는 사격 비례 일격' },
+  void_ward:    { tier: 'fortune', name: '허공 결계', trigger: 'firstHit', effect: 'shield', base: 18, scale: { 마법: 6 }, desc: '처음 공격받으면 — 마법 비례 결계' },
+  holy_judgment:{ tier: 'fortune', name: '심판의 빛', trigger: 'enemyHp', at: 0.4, effect: 'strike', base: 18, scale: { 신성: 6 }, desc: '적 HP 40% 이하 — 신성 비례 심판' },
+  fate_read:    { tier: 'fortune', name: '운명 읽기', trigger: 'battleStart', effect: 'sure', base: 20, scale: { 통찰: 5 }, desc: '전투 시작 — 첫 평타 필중 + 통찰 비례 추가 피해' },
+  forbidden_tome:{ tier: 'fortune', name: '금서의 주문', trigger: 'turn', at: 2, effect: 'strike', base: 18, scale: { 학식: 5, 마법: 2 }, desc: '2턴째 — 학식 비례 금지된 주문' },
+  ancient_seal: { tier: 'fortune', name: '고대 봉인', trigger: 'selfHp', at: 0.5, effect: 'stun', base: 10, scale: { 학식: 3 }, desc: 'HP 50% 이하 — 적 행동 1회 봉인 + 학식 비례 피해' },
+  kings_voice:  { tier: 'fortune', name: '왕의 목소리', trigger: 'battleStart', effect: 'stun', base: 8, scale: { 화술: 4 }, desc: '전투 시작 — 적의 첫 행동 봉쇄 + 화술 비례 피해' },
+  banner_oath:  { tier: 'fortune', name: '깃발의 맹세', trigger: 'selfHp', at: 0.5, effect: 'buff', base: 0.5, turns: 3, scaleMult: { 화술: 0.04 }, desc: 'HP 50% 이하 — 3턴 공격 +50% (화술 1당 +4%)' },
 };
 export const REGRESSION_NORMAL_SKILLS = Object.keys(REGRESSION_SKILLS).filter(k => REGRESSION_SKILLS[k].tier === 'normal');
 export const REGRESSION_START_SKILL_COUNT = 3;

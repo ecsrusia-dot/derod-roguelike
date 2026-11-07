@@ -830,36 +830,93 @@ export const REGRESSION_EVENTS = [
     { text: '목소리를 따라간다', stat: '신성', dc: 16, success: { text: '목소리들이 물러나며 힘을 남긴다.', reward: { type: 'skill_random_lv' } }, fail: { text: '목소리가 발톱이 되어 할퀸다.', penalty: { hp: -40 } } },
     { text: '「전생의 기억」 — 상흔이 길을 안다', requireMemory: 'mem_rift_scar', result: '몸이 기억하는 길로 균열을 빠져나오며 은화를 주웠다.', reward: { type: 'gold', value: 120 } },
   ] },
-  // ── 1.183.0~ 기연 사건 6종 (fortune: 배울 수 있는 기연 스킬 — 빌드 가중·적성 판정) ──
-  { id: 'rg_fortune_swordgrave', region: 1, fortune: 'saint_flash', title: '검객의 얼음 무덤', text: '얼음 속에 한 검객이 검을 내리친 자세 그대로 잠들어 있다.\n검끝이 가리키는 바위에 한 줄기 베인 자국이 남아 있다.', choices: [
-    { text: '그 자국을 따라 검을 휘둘러 본다', stat: '검술', dc: 15, success: { text: '바람이 멎는다. 검객의 마지막 일격이 눈앞에 그려진다.', reward: { type: 'learn', name: 'saint_flash' } }, fail: { text: '검이 얼음에 박혀 손목이 꺾였다.', penalty: { hp: -25 } } },
+  // ── 기연 사건 (fortune: 배울 수 있는 기연 스킬 — 빌드 가중·적성 판정) · 1.193.0~ region 0 = 어느 지역에서나 ──
+  { id: 'rg_fortune_swordgrave', region: 0, fortune: 'saint_flash', title: '검객의 얼음 무덤', text: '바위 틈에 한 검객이 검을 내리친 자세 그대로 잠들어 있다.\n검끝이 가리키는 바위에 한 줄기 베인 자국이 남아 있다.', choices: [
+    { text: '그 자국을 따라 검을 휘둘러 본다', stat: '검술', dc: 15, success: { text: '바람이 멎는다. 검객의 마지막 일격이 눈앞에 그려진다.', reward: { type: 'learn', name: 'saint_flash' } }, fail: { text: '검이 바위에 박혀 손목이 꺾였다.', penalty: { hp: -25 } } },
     { text: '검객에게 묵념한다', result: '무덤가에 놓인 은화 몇 닢을 그대로 두고 떠났다. 마음이 가볍다.', reward: { type: 'fame', value: 3 } },
   ] },
-  { id: 'rg_fortune_titan', region: 1, fortune: 'titan_body', title: '거인의 뼈', text: '눈밭에 집채만 한 갈비뼈가 솟아 있다. 뼈 사이로 뜨거운 김이 피어오른다.', choices: [
+  { id: 'rg_fortune_titan', region: 0, fortune: 'titan_body', title: '거인의 뼈', text: '들판에 집채만 한 갈비뼈가 솟아 있다. 뼈 사이로 뜨거운 김이 피어오른다.', choices: [
     { text: '김이 나는 골수 곁에서 버틴다', stat: '강인', dc: 15, success: { text: '살갗이 타는 듯하더니 몸 깊은 곳이 단단해진다.', reward: { type: 'learn', name: 'titan_body' } }, fail: { text: '열기를 견디지 못하고 쓰러졌다.', penalty: { hp: -30 } } },
     { text: '뼈 조각을 떼어 간다', result: '마을 대장장이가 좋은 값을 쳐 줄 것이다.', reward: { type: 'gold', value: 40 } },
   ] },
-  { id: 'rg_fortune_archer_spirit', region: 2, fortune: 'sky_volley', title: '고대 궁수의 혼', text: '썩은 나무 꼭대기에 빛나는 궁수가 앉아 있다. "내 화살을 피해 보아라."', choices: [
+  { id: 'rg_fortune_archer_spirit', region: 0, fortune: 'sky_volley', title: '고대 궁수의 혼', text: '고목 꼭대기에 빛나는 궁수가 앉아 있다. "내 화살을 피해 보아라."', choices: [
     { text: '쏟아지는 화살 사이에서 맞받아 쏜다', stat: '사격', dc: 15, success: { text: '"…좋은 눈이다." 궁수가 하늘을 가리킨다. 화살비의 궤적이 보인다.', reward: { type: 'learn', name: 'sky_volley' } }, fail: { text: '화살 하나가 어깨를 꿰뚫었다.', penalty: { hp: -30 } } },
     { text: '나무 뒤로 몸을 숨긴다', result: '궁수가 웃음소리만 남기고 사라졌다.' },
   ] },
-  { id: 'rg_fortune_dawn_chapel', region: 3, fortune: 'dawn_miracle', title: '여명의 예배당', text: '봉인된 신전 깊은 곳, 햇빛이 들지 않는데도 밝은 예배당이 있다.\n제단에 「한 번 꺼진 불도 다시 타오른다」라고 새겨져 있다.', choices: [
+  { id: 'rg_fortune_dawn_chapel', region: 0, fortune: 'dawn_miracle', title: '여명의 예배당', text: '무너진 성당 깊은 곳, 햇빛이 들지 않는데도 밝은 예배당이 있다.\n제단에 「한 번 꺼진 불도 다시 타오른다」라고 새겨져 있다.', choices: [
     { text: '제단 앞에 무릎 꿇고 기도한다', stat: '신성', dc: 15, success: { text: '빛이 가슴에 스며든다. 죽음의 문턱에서 돌아오는 길이 보인다.', reward: { type: 'learn', name: 'dawn_miracle' } }, fail: { text: '빛이 잦아든다. 아직 응답할 때가 아닌 모양이다.', reward: { type: 'heal_pct', value: 15 } } },
     { text: '촛대를 챙긴다', result: '은촛대 한 쌍. 신의 노여움은 없었다 — 아마도.', reward: { type: 'gold', value: 50 } },
   ] },
-  { id: 'rg_fortune_sage_tome', region: 3, fortune: 'sage_eye', title: '현자의 마지막 책', text: '서고 맨 안쪽 책상 위에 펼쳐진 채 굳은 책이 있다.\n마지막 문장이 중간에서 끊겨 있다.', choices: [
+  { id: 'rg_fortune_sage_tome', region: 0, fortune: 'sage_eye', title: '현자의 마지막 책', text: '서고 맨 안쪽 책상 위에 펼쳐진 채 굳은 책이 있다.\n마지막 문장이 중간에서 끊겨 있다.', choices: [
     { text: '끊긴 문장을 이어 읽는다', stat: '학식', dc: 15, success: { text: '문장이 스스로 완성된다. 적의 일격이 오기 전에 그 끝이 보인다.', reward: { type: 'learn', name: 'sage_eye' } }, fail: { text: '글자가 눈을 찌르는 듯하다.', penalty: { hp: -25 } } },
     { text: '책을 덮어 둔다', result: '어떤 지식은 아직 이르다.' },
   ] },
-  { id: 'rg_fortune_dragon_ash', region: 4, fortune: 'dragon_breath', title: '용의 재', text: '균열 바닥에 아직 식지 않은 검은 재가 쌓여 있다. 재 속에서 불씨가 숨을 쉰다.', choices: [
+  { id: 'rg_fortune_dragon_ash', region: 0, fortune: 'dragon_breath', title: '용의 재', text: '그을린 땅에 아직 식지 않은 검은 재가 쌓여 있다. 재 속에서 불씨가 숨을 쉰다.', choices: [
     { text: '불씨에 마력을 불어넣는다', stat: '마법', dc: 15, success: { text: '불씨가 손바닥 위에서 용의 형상으로 타오른다.', reward: { type: 'learn', name: 'dragon_breath' } }, fail: { text: '불씨가 폭발했다.', penalty: { hp: -40 } } },
     { text: '재를 모아 판다', result: '연금술사들이 탐내는 재다.', reward: { type: 'gold', value: 60 } },
+  ] },
+  // ── 1.193.0~ 기연 사건 +14 (능력치당 2종, 어느 지역에서나) ──
+  { id: 'rg_fortune_giant_anvil', region: 0, fortune: 'giant_fist', title: '거인의 모루', text: '버려진 대장간 한가운데, 사람 키만 한 모루가 박혀 있다.\n모루 위에 커다란 주먹 자국이 움푹 패어 있다.', choices: [
+    { text: '주먹 자국에 내 주먹을 맞춰 내리친다', stat: '근력', dc: 15, success: { text: '모루가 울린다. 팔 끝까지 힘이 한 줄로 꿰인다.', reward: { type: 'learn', name: 'giant_fist' } }, fail: { text: '손등이 터졌다.', penalty: { hp: -25 } } },
+    { text: '쓸 만한 쇳조각을 챙긴다', result: '고철로 팔면 몇 푼은 된다.', reward: { type: 'gold', value: 40 } },
+  ] },
+  { id: 'rg_fortune_rift_stone', region: 0, fortune: 'earthshaker', title: '갈라진 바위', text: '길 한복판의 큰 바위가 위에서 아래로 깨끗하게 갈라져 있다.\n갈라진 틈에서 아직 먼지가 피어오른다.', choices: [
+    { text: '같은 바위를 하나 골라 내리찍는다', stat: '근력', dc: 15, success: { text: '바위가 둘로 쪼개진다. 발밑의 땅이 함께 울렸다.', reward: { type: 'learn', name: 'earthshaker' } }, fail: { text: '반동에 어깨가 빠질 뻔했다.', penalty: { hp: -30 } } },
+    { text: '틈에 앉아 쉬어 간다', result: '바위 그늘이 시원하다.', reward: { type: 'heal_pct', value: 10 } },
+  ] },
+  { id: 'rg_fortune_wind_shrine', region: 0, fortune: 'wind_blade', title: '바람의 사당', text: '언덕 위 작은 사당. 바람개비 수십 개가 바람도 없는데 돌고 있다.', choices: [
+    { text: '도는 바람개비 사이를 빠르게 지나간다', stat: '민첩', dc: 15, success: { text: '바람개비가 한꺼번에 멈춘다. 바람이 내 칼끝을 따라온다.', reward: { type: 'learn', name: 'wind_blade' } }, fail: { text: '날개에 뺨이 베였다.', penalty: { hp: -20 } } },
+    { text: '바람개비 하나를 챙긴다', result: '아이들이 좋아할 물건이다.', reward: { type: 'gold', value: 30 } },
+  ] },
+  { id: 'rg_fortune_mirror_hall', region: 0, fortune: 'phantom_step', title: '거울의 복도', text: '폐허 속 복도 양쪽에 깨진 거울이 늘어서 있다.\n거울마다 내 모습이 한 박자씩 늦게 움직인다.', choices: [
+    { text: '거울 속 나를 앞지른다', stat: '민첩', dc: 15, success: { text: '거울 속 내가 나를 놓쳤다. 발걸음에 잔상이 남는다.', reward: { type: 'learn', name: 'phantom_step' } }, fail: { text: '거울 조각에 발이 찔렸다.', penalty: { hp: -25 } } },
+    { text: '복도를 돌아 나간다', result: '괜히 오래 보고 싶지 않은 거울이다.' },
+  ] },
+  { id: 'rg_fortune_last_stand', region: 0, fortune: 'undying_will', title: '마지막까지 선 자', text: '무너진 성벽 앞에 선 채로 굳은 병사의 해골이 있다.\n방패는 부서졌지만 무릎은 끝내 꿇지 않았다.', choices: [
+    { text: '해골 곁에 서서 같은 자세로 버틴다', stat: '강인', dc: 15, success: { text: '쓰러질 것 같던 다리에 힘이 돌아온다. 아직 끝나지 않았다.', reward: { type: 'learn', name: 'undying_will' } }, fail: { text: '한기에 몸이 굳어 버렸다.', penalty: { hp: -25 } } },
+    { text: '해골을 묻어 준다', result: '이름 모를 병사가 편히 잠든다.', reward: { type: 'fame', value: 3 } },
+  ] },
+  { id: 'rg_fortune_sword_tomb', region: 0, fortune: 'sword_storm', title: '천 자루의 검', text: '골짜기 바닥에 검 천 자루가 꽂혀 있다. 모두 한곳을 향해 기울어 있다.', choices: [
+    { text: '검들이 가리키는 곳으로 검을 뽑아 든다', stat: '검술', dc: 15, success: { text: '천 자루의 검이 한꺼번에 울린다. 검이 모이는 길이 보인다.', reward: { type: 'learn', name: 'sword_storm' } }, fail: { text: '검들이 일제히 쓰러져 다리를 그었다.', penalty: { hp: -30 } } },
+    { text: '쓸 만한 검 하나를 판다', result: '이름 없는 명검이다.', reward: { type: 'gold', value: 60 } },
+  ] },
+  { id: 'rg_fortune_star_tower', region: 0, fortune: 'falling_star', title: '별 관측탑', text: '부서진 관측탑 꼭대기에 낡은 석궁이 하늘을 향해 고정돼 있다.\n화살 끝에 별빛이 맺혀 있다.', choices: [
+    { text: '석궁을 들어 땅을 향해 쏜다', stat: '사격', dc: 15, success: { text: '화살이 유성처럼 떨어져 땅을 꿰뚫었다.', reward: { type: 'learn', name: 'falling_star' } }, fail: { text: '시위가 끊어져 손을 쳤다.', penalty: { hp: -20 } } },
+    { text: '별자리를 기록해 둔다', result: '길을 잃지 않을 것 같다.', reward: { type: 'heal_pct', value: 10 } },
+  ] },
+  { id: 'rg_fortune_void_circle', region: 0, fortune: 'void_ward', title: '빈 마법진', text: '바닥에 그려진 마법진 안쪽만 비가 내리지 않는다.\n진 가장자리의 문자가 반쯤 지워져 있다.', choices: [
+    { text: '지워진 문자를 마력으로 채운다', stat: '마법', dc: 15, success: { text: '마법진이 내 둘레로 옮겨 온다. 보이지 않는 벽이 생겼다.', reward: { type: 'learn', name: 'void_ward' } }, fail: { text: '마법진이 터지며 손이 그을렸다.', penalty: { hp: -30 } } },
+    { text: '진 안에서 하룻밤 묵는다', result: '빗소리만 들리는 고요한 밤이었다.', reward: { type: 'heal_pct', value: 15 } },
+  ] },
+  { id: 'rg_fortune_judge_bell', region: 0, fortune: 'holy_judgment', title: '심판의 종', text: '마을 터 한가운데 종탑만 남아 있다. 종에 「죄 있는 자에게만 울린다」고 새겨져 있다.', choices: [
+    { text: '종을 향해 기도하고 줄을 당긴다', stat: '신성', dc: 15, success: { text: '종소리가 빛이 되어 쏟아진다. 무엇을 심판할지 알게 되었다.', reward: { type: 'learn', name: 'holy_judgment' } }, fail: { text: '종이 울리지 않는다. 아직 자격이 없다.', reward: { type: 'heal_pct', value: 10 } } },
+    { text: '종탑을 그냥 지나친다', result: '뒤에서 종이 한 번 울린 것 같았다.' },
+  ] },
+  { id: 'rg_fortune_fate_cards', region: 0, fortune: 'fate_read', title: '눈먼 점술사', text: '길가에서 눈먼 노파가 카드를 펼치고 있다. "한 장만 뒤집어 보게. 맞히면 가르쳐 주지."', choices: [
+    { text: '노파의 손끝을 보고 카드를 고른다', stat: '통찰', dc: 15, success: { text: '"보이는구먼." 상대의 첫 수가 머릿속에 그려진다.', reward: { type: 'learn', name: 'fate_read' } }, fail: { text: '"틀렸네." 노파가 은화를 한 줌 가져갔다.', penalty: { gold: -30 } } },
+    { text: '점괘만 듣고 간다', result: '"자네는 이미 한 번 죽었구먼." 등골이 서늘하다.', reward: { type: 'fame', value: 2 } },
+  ] },
+  { id: 'rg_fortune_forbidden_shelf', region: 0, fortune: 'forbidden_tome', title: '쇠사슬 서가', text: '무너진 도서관 지하, 쇠사슬로 묶인 책장이 하나 있다.\n사슬 사이로 검은 표지가 보인다.', choices: [
+    { text: '사슬을 풀지 않고 틈으로 읽는다', stat: '학식', dc: 15, success: { text: '금지된 문장이 머릿속에 새겨졌다. 입 밖에 내는 순간 불이 된다.', reward: { type: 'learn', name: 'forbidden_tome' } }, fail: { text: '글자가 머릿속을 긁는다.', penalty: { hp: -25 } } },
+    { text: '사슬만 떼어 판다', result: '고급 쇠사슬이다.', reward: { type: 'gold', value: 40 } },
+  ] },
+  { id: 'rg_fortune_seal_stone', region: 0, fortune: 'ancient_seal', title: '봉인석', text: '이끼 낀 석판에 고대 문양이 둥글게 새겨져 있다.\n문양 가운데만 이끼가 자라지 않는다.', choices: [
+    { text: '문양을 처음부터 끝까지 해독한다', stat: '학식', dc: 15, success: { text: '마지막 획을 읽자 공기가 멈춘다. 무엇이든 한순간 묶어 둘 수 있다.', reward: { type: 'learn', name: 'ancient_seal' } }, fail: { text: '읽다 만 문양이 머리를 조였다.', penalty: { hp: -20 } } },
+    { text: '석판을 탁본해 둔다', result: '학자에게 팔면 값이 나간다.', reward: { type: 'gold', value: 35 } },
+  ] },
+  { id: 'rg_fortune_empty_throne', region: 0, fortune: 'kings_voice', title: '빈 옥좌', text: '폐성의 알현실. 옥좌는 비어 있고, 무릎 꿇은 기사 석상들이 옥좌를 향해 있다.', choices: [
+    { text: '옥좌 앞에 서서 명령한다 — "일어나라"', stat: '화술', dc: 15, success: { text: '석상들이 고개를 든 것 같았다. 목소리에 무게가 실린다.', reward: { type: 'learn', name: 'kings_voice' } }, fail: { text: '메아리만 돌아온다. 민망하다.', penalty: { hp: -10 } } },
+    { text: '옥좌의 보석을 떼어 낸다', result: '석상들이 노려보는 것 같다.', reward: { type: 'gold', value: 70 } },
+  ] },
+  { id: 'rg_fortune_torn_banner', region: 0, fortune: 'banner_oath', title: '찢어진 군기', text: '옛 전장 언덕에 찢어진 군기가 아직 꽂혀 있다.\n주위엔 깃발을 지키다 쓰러진 자들의 무기가 흩어져 있다.', choices: [
+    { text: '깃발을 뽑아 들고 맹세를 외친다', stat: '화술', dc: 15, success: { text: '바람이 깃발을 펼친다. 쓰러진 자들의 함성이 귀에 울린다.', reward: { type: 'learn', name: 'banner_oath' } }, fail: { text: '깃대가 부러졌다. 맹세는 바람에 흩어진다.', penalty: { hp: -15 } } },
+    { text: '깃발을 정리해 다시 꽂는다', result: '언덕이 조금 덜 쓸쓸해졌다.', reward: { type: 'fame', value: 3 } },
   ] },
 ];
 
 // 지역 사건 고르기 — 이번 생에 본 사건 제외, 기억 조각 요구 선택지는 미보유 시 숨김
 export function rollRegressionEvent(run, memories = [], rng = Math.random, { fortune = null } = {}) {
-  const pool = REGRESSION_EVENTS.filter(e => e.region === run.region && !(run.seenEvents || []).includes(e.id)
+  const pool = REGRESSION_EVENTS.filter(e => (e.region === run.region || e.region === 0) && !(run.seenEvents || []).includes(e.id)
     && (fortune == null || !!e.fortune === fortune));
   if (!pool.length) return null;
   // 1.183.0~ 빌드 가중 — 내 능력치로 풀 수 있는 사건·내 빌드에 맞는 기연이 더 자주 (PM 요청 4: 육성 방향대로 랜덤)
