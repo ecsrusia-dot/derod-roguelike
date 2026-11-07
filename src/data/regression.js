@@ -212,6 +212,7 @@ export function buildRegressionSpireEnemy(round, memoryCount = 0, forceWeak = fa
 
 // =========== 메타 (meta.regression) ===========
 export const EMPTY_REGRESSION = {
+  grave: null,         // 1.196.0~ 전생의 유품 { gearId, gold, day, life, cause }
   loops: 0,            // 누적 회귀 횟수
   memories: [],        // 획득 기억 조각 id
   carry: [],           // 다음 생에 들고 갈 기록 (enemyKey) — carrySlots 개까지
@@ -281,7 +282,8 @@ export function createRegressionRun(metaR = EMPTY_REGRESSION, classId, stats = n
     over: null,            // null | 'death' | 'timeout' | 'spireLose' | 'victory'
     log: [],
   };
-  return applyRegressionProvisions(applyRegressionStartTraits({ ...run, shop: buildRegressionShopStock(run) }, startTraits, metaR), provisions);
+  const withGrave = metaR.grave ? { ...run, grave: { ...metaR.grave } } : run;   // 1.196.0~ 전생의 유품
+  return applyRegressionProvisions(applyRegressionStartTraits({ ...withGrave, shop: buildRegressionShopStock(withGrave) }, startTraits, metaR), provisions);
 }
 
 // =========== 날짜·이동 ===========
@@ -456,9 +458,12 @@ export function settleRegression(metaR = EMPTY_REGRESSION, run) {
       bestDay: Math.max(base.bestDay, Math.min(run.day, run.maxDays)),
       spireClears: base.spireClears + (cause === 'victory' ? 1 : 0),
       echo: (base.echo || 0) + regressionEchoGain(base, run),
+      // 1.196.0~ 전생의 유품 — 죽으면 새 무덤이 생긴다(이전 무덤은 덮인다). 정복했으면 회수 여부만 반영
+      grave: cause !== 'victory' ? buildRegressionGrave(run, base.loops + 1) : (run.graveRecovered ? null : base.grave || null),
       endings: (() => { const e = regressionEndingFor(run); return e && !base.endings.includes(e.id) ? [...base.endings, e.id] : base.endings; })(),
     },
     gainedMemories: gained,
+    grave: cause !== 'victory' ? buildRegressionGrave(run, base.loops + 1) : null,
     echoGain: regressionEchoGain(base, run),
     carryOptions: [...run.learned],
   };
@@ -1700,6 +1705,8 @@ export function rollRegressionDay(run, memories = [], rng = Math.random) {
   // 1.194.0~ 길목의 군주 — 루트별 확정 보스 (2~4지역 13일째)
   const rb = regressionRouteBossToday(run);
   if (rb) return { ...run, today: { kind: 'routeBoss', tier: 'boss', enemyKey: rb.key, routeBoss: rb.region, route: rb.route } };
+  // 1.196.0~ 전생의 유품 — 지난 생이 쓰러진 날(또는 그 뒤 첫 빈 날)에 무덤을 만난다
+  if (run.grave && !run.graveDone && run.day >= run.grave.day) return { ...run, today: { kind: 'grave' } };
   // 1.195.0~ 붉은 달의 날 — 지역 11일째, 반드시 전투 (적 강화 · 보상 2배)
   if (isRegressionRedMoonDay(run.day)) {
     const RM = REGRESSION_RED_MOON;
@@ -1773,6 +1780,7 @@ export const REGRESSION_TODAY_INTRO = {
   merchant: () => '짐마차를 끄는 떠돌이 상인이 손을 흔든다. "구경은 공짜요, 회귀자 양반."',
   shelter: () => '버려진 오두막을 찾았다. 지붕은 새지만 하룻밤 머물 만하다.',
   hermit: () => '누더기를 걸친 은자가 길가에 앉아 있다. "기다렸네. 자네가 배울 것이 하나 있지."',
+  grave: (r) => `길가에 낯익은 돌무덤이 있다. 비석에 새겨진 것은 — 내 이름이다.\n${r.grave?.life || '?'}번째 생의 내가 ${r.grave?.cause || '이곳에서'} 쓰러진 자리. 흙 아래에서 무언가 희미하게 빛난다.`,
   routeBoss: (r) => { const b = REGRESSION_ROUTE_BOSSES[r.today.route]?.[r.today.routeBoss]; return b ? `${b.line}\n\n길목의 군주 「${b.name}」. 이 길을 계속 가려면 피할 수 없다.` : ''; },
 };
 
@@ -2188,4 +2196,38 @@ export function regressionDaysToRedMoon(day = 1) {
   const pos = ((day - 1) % REGRESSION_DAY.regionDays) + 1;
   const d = REGRESSION_RED_MOON.dayInRegion - pos;
   return d >= 0 ? d : d + REGRESSION_DAY.regionDays;
+}
+
+
+// ============================================
+// 1.196.0~ 전생의 유품 (PM 선택 재미 요소 2) — 죽음이 다음 생의 보상이 된다
+// ============================================
+// 죽은 생의 가장 좋은 장비 1개 + 은화 일부가 그날에 묻힌다. 다음 생 같은 날(그날 확정 일정이 있으면 그 뒤 첫날) 무덤 카드.
+// 회수 = 장비·은화·경험치 / 두고 간다 = 명성 (무덤은 다음 생에도 남는다). 새로 죽으면 무덤은 새것으로 바뀐다.
+export const REGRESSION_GRAVE = { goldPct: 0.3, exp: 30, leaveFame: 5 };
+const GRADE_RANK = { route: 5, unique: 4, treasure: 3, advanced: 2, normal: 1 };
+export function buildRegressionGrave(run, life = 1) {
+  const pool = regressionEquippedGear(run).length ? regressionEquippedGear(run) : (run.bag || []).filter(id => REGRESSION_GEAR[id]);
+  const gearId = pool.slice().sort((a, b) => (GRADE_RANK[REGRESSION_GEAR[b].grade] || 0) - (GRADE_RANK[REGRESSION_GEAR[a].grade] || 0))[0] || null;
+  const gold = Math.round((run.gold || 0) * REGRESSION_GRAVE.goldPct);
+  const lastLine = [...(run.log || [])].reverse().find(l => /쓰러짐|패배/.test(l)) || '';
+  const killer = (lastLine.match(/: (.+?)에게 쓰러짐/) || [])[1];
+  const day = Math.max(2, Math.min(run.day, (run.maxDays || 60) - 1));
+  return { gearId, gold, day, life, cause: killer ? `${killer}에게` : run.over === 'spireLose' ? '첨탑 앞에서' : run.over === 'timeout' ? '황혼 속에서' : '' };
+}
+export function resolveRegressionGrave(run, take) {
+  const g = run.grave;
+  if (!g) return { run: passRegressionDay({ ...run, graveDone: true }), tags: [] };
+  if (!take) {
+    const next = passRegressionDay({ ...run, graveDone: true, fame: (run.fame || 0) + REGRESSION_GRAVE.leaveFame }, '전생의 무덤에 꽃을 놓음');
+    return { run: next, tags: [{ text: `명성 +${REGRESSION_GRAVE.leaveFame}`, tone: 'gold' }, { text: '유품은 다음 생에도 남는다', tone: 'good' }] };
+  }
+  let next = { ...run, graveDone: true, graveRecovered: true, gold: (run.gold || 0) + (g.gold || 0) };
+  const tags = [];
+  if (g.gearId && REGRESSION_GEAR[g.gearId]) { next = addRegressionGear(next, g.gearId); tags.push({ text: `${regressionGearLabel(g.gearId)} 회수`, tone: 'gold' }); }
+  if (g.gold) tags.push({ text: `은화 +${g.gold}`, tone: 'good' });
+  const e = gainRegressionExp(next, REGRESSION_GRAVE.exp); next = e.run;
+  tags.push({ text: `경험치 +${REGRESSION_GRAVE.exp}`, tone: 'good' });
+  if (e.levelUps > 0) tags.push({ text: `레벨 상승 ${e.from}→${next.level}`, tone: 'gold' });
+  return { run: passRegressionDay(next, '전생의 유품 회수'), tags };
 }

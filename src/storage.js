@@ -1481,6 +1481,7 @@ export function getRegression(meta) {
     echo: Number.isFinite(r.echo) ? r.echo : 0,
     traitLv: (r.traitLv && typeof r.traitLv === 'object') ? r.traitLv : {},
     traitSlotsBought: Number.isFinite(r.traitSlotsBought) ? r.traitSlotsBought : 0,
+    grave: (r.grave && typeof r.grave === 'object') ? r.grave : null,   // 1.196.0~ 전생의 유품
     recordsEver: (r.recordsEver && typeof r.recordsEver === 'object') ? r.recordsEver : {},
     run: r.run || null,
   };

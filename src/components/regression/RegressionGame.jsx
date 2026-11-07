@@ -19,7 +19,7 @@ import {
   isRegressionSpireDay, isRegressionSpireEligible, isRegressionEliteOpen,
   enterRegressionSpire, applyRegressionSpireResult, buildRegressionSpireEnemy,
   REGRESSION_ROUTES, REGRESSION_ROUTE_BOSSES, REGRESSION_ROUTE_REWARDS, REGRESSION_ROUTE_BOSS_DAY_IN_REGION, REGRESSION_ROUTE_FROM_REGION,
-  buildRegressionRouteBoss, applyRegressionRouteReward, REGRESSION_RED_MOON, regressionDaysToRedMoon, regressionSpireChain, regressionSpireEnemyFor, regressionRouteFor, REGRESSION_GEAR as __RG_GEAR,
+  buildRegressionRouteBoss, applyRegressionRouteReward, REGRESSION_RED_MOON, regressionDaysToRedMoon, REGRESSION_GRAVE, resolveRegressionGrave, regressionSpireChain, regressionSpireEnemyFor, regressionRouteFor, REGRESSION_GEAR as __RG_GEAR,
   settleRegression, setRegressionCarry, regressionCarrySlots, buildRegressionLoadout,
   describeRegressionRecord, getRegressionMemory,
   POTIONS, AUTO_SPEED_SKIP, rollRegressionLoot, applyRegressionLoot, describeRegressionLoot,
@@ -224,6 +224,12 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
               <span className="text-[11px]" style={{ color: PALETTE.textDim }}>보유 {settle.meta.echo} · 시작 특성 해금에 쓴다</span>
             </div>
           </GlassPanel>
+          {settle.grave && (
+            <GlassPanel style={{ padding: 12 }}>
+              <div className="text-[12px] font-bold" style={{ color: PALETTE.legendary }}>⚱ 유품이 묻혔다 — 다음 생 D{settle.grave.day}</div>
+              <div className="text-[11px]" style={{ color: PALETTE.textDim }}>{settle.grave.gearId ? `${regressionGearLabel(settle.grave.gearId)}` : '장비 없음'}{settle.grave.gold ? ` · 은화 ${settle.grave.gold}` : ''} — 다음 생 같은 날 무덤을 찾으면 회수할 수 있다.{reg.grave && !run.graveRecovered ? ' (회수하지 않은 이전 무덤은 덮인다)' : ''}</div>
+            </GlassPanel>
+          )}
           {settle.gainedMemories.length > 0 && (
             <GlassPanel style={{ padding: 14 }}>
               <div className="text-[12px] font-bold mb-2" style={{ color: PALETTE.legendary }}>🧩 새 기억 조각 {settle.gainedMemories.length}개</div>
@@ -844,6 +850,14 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
           <Choice text="밤새 단련한다" sub={`경험치 +${REGRESSION_DAY.trainExp}`} onClick={() => { const r = trainRegressionShelter(run); saveRun({ ...r.run, scene: sceneOf('쉼터', '잠을 줄이고 검을 휘둘렀다. 몸이 조금 더 기억한다.', [{ text: `경험치 +${REGRESSION_DAY.trainExp}`, tone: 'good' }, r.levelUps > 0 ? { text: `레벨 상승 ${r.from}→${r.run.level}`, tone: 'gold' } : null, r.levelUps > 0 ? { text: `추가 능력치 +${r.levelUps}`, tone: 'gold' } : null]) }); }} />
         </>
       );
+    } else if (t.kind === 'grave') {
+      const g = run.grave || {};
+      choices = (
+        <>
+          <Choice text="흙을 파고 유품을 거둔다" sub={`${g.gearId && __RG_GEAR[g.gearId] ? `${regressionGearLabel(g.gearId)} · ` : ''}${g.gold ? `은화 +${g.gold} · ` : ''}경험치 +${REGRESSION_GRAVE.exp}`} onClick={() => { const r = resolveRegressionGrave(run, true); saveRun({ ...r.run, scene: sceneOf('전생의 유품', '손에 익은 감촉이다. 지난 생의 내가 이번 생의 나에게 건네는 것 같다.', r.tags) }); }} />
+          <Choice text="무덤에 꽃을 놓고 떠난다" sub={`명성 +${REGRESSION_GRAVE.leaveFame} · 유품은 다음 생에도 남는다`} onClick={() => { const r = resolveRegressionGrave(run, false); saveRun({ ...r.run, scene: sceneOf('전생의 무덤', '지난 생의 나에게 작별을 고했다. 이번에는 다른 길을 걷겠다고.', r.tags) }); }} />
+        </>
+      );
     } else if (t.kind === 'routeBoss') {
       const rw = REGRESSION_ROUTE_REWARDS[t.route]?.[t.routeBoss] || {};
       const rwTxt = rw.stats ? Object.entries(rw.stats).map(([k, v]) => `${k} +${v}`).join(' · ') : rw.gear ? `여정 장비 「${__RG_GEAR[rw.gear]?.name}」` : rw.affinityAll ? `만난 동료 호감 +${rw.affinityAll}` : rw.text || (rw.gold ? `은화 +${rw.gold} · 회복약` : '');
@@ -862,7 +876,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
     body = (
       <div className="space-y-3 ui-screen-enter">
         <div className="flex items-center justify-between">
-          <div className="text-[12px] font-bold" style={{ color: t.kind === 'routeBoss' || t.redMoon ? PALETTE.accent : PALETTE.dawn }}>D{run.day} — {t.kind === 'routeBoss' ? `${REGRESSION_ROUTES[t.route]?.icon} 길목의 군주` : t.redMoon ? '🌕 붉은 달의 날' : '오늘의 일'}</div>
+          <div className="text-[12px] font-bold" style={{ color: t.kind === 'routeBoss' || t.redMoon ? PALETTE.accent : PALETTE.dawn }}>D{run.day} — {t.kind === 'routeBoss' ? `${REGRESSION_ROUTES[t.route]?.icon} 길목의 군주` : t.redMoon ? '🌕 붉은 달의 날' : t.kind === 'grave' ? '⚱ 전생의 무덤' : '오늘의 일'}</div>
           <div className="text-[11px]" style={{ color: PALETTE.textDim }}>기연의 기운 <b style={{ color: PALETTE.legendary }}>{Math.round((regressionDayTable(run).fortune || 0) * 100)}%</b> · 적 강도 ×{regressionDayEnemyMult(run.day).toFixed(2)}{regressionDaysToRedMoon(run.day) > 0 ? ` · 🌕 붉은 달까지 ${regressionDaysToRedMoon(run.day)}일` : ''}</div>
         </div>
         <div className="text-[14px] leading-relaxed" style={{ color: PALETTE.textDim }}>{regressionNarration(run)}</div>
