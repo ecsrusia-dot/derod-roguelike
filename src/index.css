@@ -726,3 +726,15 @@ body {
   .rg-cut, .rg-cut * { animation: none !important; }
   .rg-cut-rays, .rg-cut-ring, .rg-cut-sparks, .rg-cut-streaks, .rg-cut-flash, .rg-cut-vignette { display: none; }
 }
+
+/* ===== 트와일라잇 아르카나 (덱빌딩) — 1.204.0 ===== */
+@keyframes arc-float { 0% { opacity: 0; transform: translate(-50%, 6px) scale(.8); } 15% { opacity: 1; transform: translate(-50%, 0) scale(1.15); } 100% { opacity: 0; transform: translate(-50%, -34px) scale(1); } }
+.arc-float { animation: arc-float 1s ease-out both; }
+@keyframes arc-shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 50% { transform: translateX(4px); } 75% { transform: translateX(-2px); } }
+.arc-shake { animation: arc-shake .28s ease; }
+@keyframes arc-pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(232,176,74,0); } 50% { box-shadow: 0 0 14px 0 rgba(232,176,74,.28); } }
+.arc-pulse { animation: arc-pulse 2.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .arc-float { animation-duration: .01s; }
+  .arc-shake, .arc-pulse { animation: none; }
+}

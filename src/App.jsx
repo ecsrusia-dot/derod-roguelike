@@ -295,7 +295,7 @@ const CLASS_SKILL_PRIO = {
   sage: ['이프리트', '마력', '신앙', '정밀', '재생', '잔혹', '강타', '회피'],
 };
 
-export default function App() {
+export default function App({ onSwitchGame = null } = {}) {
   const [screen, setScreen] = useState('title');
   const [selectedClass, setSelectedClass] = useState(0);
   // 원정 선택 후 출정 화면에서 사용 — start 화면 탭 시 실제 startExpedition 호출
@@ -3354,8 +3354,9 @@ export default function App() {
               onSelectLocal={handleSelectLocal} 
               onSelectGuest={handleSelectGuest} 
               onSelectGoogle={handleSelectGoogle} 
+              onSwitchGame={onSwitchGame}
             />}
-            {screen === 'title' && authMode && <TitleScreen meta={meta} onStart={() => setScreen('expeditionSelect')} onResume={resumeActiveRun} onAltar={enterAltar} onEngravings={() => setScreen('engraving')} onRaid={FEATURE_FLAGS.raid && raidUnlocked ? () => setScreen('raid') : null} onAchievements={() => { setPrevAchievementsBack('title'); setScreen('achievements'); }} onAutoStats={() => setScreen('autoStats')} onGamble={raidUnlocked ? () => { setGambleResult(null); setScreen('gamble'); } : null} onHof={FEATURE_FLAGS.hof && raidUnlocked ? () => setScreen('hof') : null} onBuried={FEATURE_FLAGS.buried ? () => setScreen('buried') : null} onExo={FEATURE_FLAGS.exo ? () => setScreen('exo') : null} onRegression={FEATURE_FLAGS.regression ? () => setScreen('regression') : null} onChangelog={() => setShowChangelog({ firstSeen: false })} onAccount={() => setScreen('account')} />}
+            {screen === 'title' && authMode && <TitleScreen meta={meta} onStart={() => setScreen('expeditionSelect')} onResume={resumeActiveRun} onAltar={enterAltar} onEngravings={() => setScreen('engraving')} onRaid={FEATURE_FLAGS.raid && raidUnlocked ? () => setScreen('raid') : null} onAchievements={() => { setPrevAchievementsBack('title'); setScreen('achievements'); }} onAutoStats={() => setScreen('autoStats')} onGamble={raidUnlocked ? () => { setGambleResult(null); setScreen('gamble'); } : null} onHof={FEATURE_FLAGS.hof && raidUnlocked ? () => setScreen('hof') : null} onBuried={FEATURE_FLAGS.buried ? () => setScreen('buried') : null} onExo={FEATURE_FLAGS.exo ? () => setScreen('exo') : null} onRegression={FEATURE_FLAGS.regression ? () => setScreen('regression') : null} onChangelog={() => setShowChangelog({ firstSeen: false })} onAccount={() => setScreen('account')} onSwitchGame={onSwitchGame} />}
             {FEATURE_FLAGS.hof && screen === 'hof' && <HofScreen meta={meta} onEnterStage={(stage) => { setHofStage(stage); setScreen('hofBattle'); }} onLevelUp={handleHofLevelUp} onSavePatterns={handleHofSavePatterns} onBack={() => setScreen('title')} />}
             {FEATURE_FLAGS.hof && screen === 'hofBattle' && hofStage && <HofBattleScreen meta={meta} stage={hofStage} onFinish={handleHofFinish} onRetreat={() => { setHofStage(null); setScreen('hof'); }} />}
             {FEATURE_FLAGS.regression && screen === 'regression' && <RegressionGame reg={getRegression(meta)} meta={meta}

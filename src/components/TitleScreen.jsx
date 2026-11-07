@@ -69,7 +69,7 @@ function UpdateButton() {
   );
 }
 
-export default function TitleScreen({ meta, onStart, onResume, onAltar, onEngravings, onRaid, onAchievements, onAutoStats = null, onGamble = null, onHof = null, onBuried = null, onExo = null, onRegression = null, onChangelog, onAccount }) {
+export default function TitleScreen({ meta, onStart, onResume, onAltar, onEngravings, onRaid, onAchievements, onAutoStats = null, onGamble = null, onHof = null, onBuried = null, onExo = null, onRegression = null, onChangelog, onAccount, onSwitchGame = null }) {
   // 진행 중인 런이 있는지 — 이어하기 버튼 노출 여부 결정
   const activeRun = meta?.activeRun;
   const canResume = !!(activeRun && activeRun.v === 1 && activeRun.expedition);
@@ -180,6 +180,12 @@ export default function TitleScreen({ meta, onStart, onResume, onAltar, onEngrav
         })()}
 
         <div className="flex items-center justify-between px-1 mt-1">
+          {onSwitchGame && (
+            <button onClick={onSwitchGame} className="ui-press" style={{
+              background: 'transparent', border: 'none', color: PALETTE.dawn,
+              fontSize: 10.5, letterSpacing: '0.12em', padding: '8px 4px',
+            }}>⇄ 게임 선택</button>
+          )}
           {onAccount ? (
             <button onClick={onAccount} className="ui-press" style={{
               background: 'transparent', border: 'none', color: PALETTE.textDim,
