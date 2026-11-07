@@ -19,7 +19,7 @@ import {
   isRegressionSpireDay, isRegressionSpireEligible, isRegressionEliteOpen,
   enterRegressionSpire, applyRegressionSpireResult, buildRegressionSpireEnemy,
   REGRESSION_ROUTES, REGRESSION_ROUTE_BOSSES, REGRESSION_ROUTE_REWARDS, REGRESSION_ROUTE_BOSS_DAY_IN_REGION, REGRESSION_ROUTE_FROM_REGION,
-  buildRegressionRouteBoss, applyRegressionRouteReward, regressionSpireChain, regressionSpireEnemyFor, regressionRouteFor, REGRESSION_GEAR as __RG_GEAR,
+  buildRegressionRouteBoss, applyRegressionRouteReward, REGRESSION_RED_MOON, regressionDaysToRedMoon, regressionSpireChain, regressionSpireEnemyFor, regressionRouteFor, REGRESSION_GEAR as __RG_GEAR,
   settleRegression, setRegressionCarry, regressionCarrySlots, buildRegressionLoadout,
   describeRegressionRecord, getRegressionMemory,
   POTIONS, AUTO_SPEED_SKIP, rollRegressionLoot, applyRegressionLoot, describeRegressionLoot,
@@ -320,14 +320,18 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
       }
       const tags = [];
       tags.push({ text: `명성 +${next.fame - run.fame}`, tone: 'gold' });
-      const gold = regressionVictoryGold(next, enemyKey);
+      const moonMult = run.pending?.redMoon ? REGRESSION_RED_MOON.rewardMult : 1;
+      const gold = regressionVictoryGold(next, enemyKey) * moonMult;
       next = { ...next, gold: (next.gold || 0) + gold };
       tags.push({ text: `은화 +${gold}`, tone: 'good' });
-      const loot = rollRegressionLoot(next, tier);
-      next = applyRegressionLoot(next, loot);
-      const lootTxt = describeRegressionLoot(loot);
-      if (lootTxt) tags.push({ text: lootTxt, tone: 'good' });
-      tags.push({ text: `경험치 +${REGRESSION_EXP[tier] || 0}`, tone: 'good' });
+      for (let li = 0; li < moonMult; li++) {
+        const loot = rollRegressionLoot(next, tier);
+        next = applyRegressionLoot(next, loot);
+        const lootTxt = describeRegressionLoot(loot);
+        if (lootTxt) tags.push({ text: lootTxt, tone: 'good' });
+      }
+      if (moonMult > 1) tags.unshift({ text: `🌕 붉은 달 — 보상 ×${moonMult}`, tone: 'gold' });
+      tags.push({ text: `경험치 +${(REGRESSION_EXP[tier] || 0) * moonMult}`, tone: 'good' });
       if ((next.level || 0) > (run.level || 0)) tags.push({ text: `레벨 상승 ${run.level || 0}→${next.level}`, tone: 'gold' }, { text: `추가 능력치 +${next.level - (run.level || 0)}`, tone: 'gold' });
       if (learnedNow.length) tags.push({ text: `기록 완성 — ${describeRegressionRecord(learnedNow[0])}`, tone: 'gold' });
       else if (REGRESSION_RECORDS[enemyKey] && !run.learned.includes(enemyKey)) {
@@ -368,7 +372,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
         enemyObj={enemyObj}
         enemyLabel={regressionEnemyLabel(enemyKey, tier, override)}
         regionKey={inSpire ? 'spire' : run.region}
-        enemyMult={inSpire ? 1 : regressionDayEnemyMult(run.day)}
+        enemyMult={inSpire ? 1 : regressionDayEnemyMult(run.day) * (run.pending?.redMoon ? REGRESSION_RED_MOON.enemyMult : 1)}
         intro={inSpire ? `첨탑 ${run.spireRound + 1}/${spireLen}층. ${regressionEnemyLabel(enemyKey, 'boss', enemyObj)}이(가) 길을 막아선다.` : `${regressionEnemyLabel(enemyKey, tier, override)}이(가) 앞을 막아선다. 피할 수는 없다.`}
         stats={storyStats}
         level={run.level || 0}
@@ -806,7 +810,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
       const hide = regressionChanceLabel(regressionCheckChance(stats[st] || 0, REGRESSION_DAY.hideDc[t.kind] || 14));
       choices = (
         <>
-          <Choice text="맞서 싸운다" sub={`승리 시 명성 +${Math.round(REGRESSION_TUNING.fameGain[t.tier] * (REGRESSION_TUNING.regionFameMult[run.region] || 1))} · 경험치 +${REGRESSION_EXP[t.tier]}${t.kind === 'elite' ? ' · 장비 35% · 비급·유니크 기회' : ''}`} onClick={() => saveRun(fightRegressionToday(run))} />
+          <Choice text="맞서 싸운다" sub={`승리 시 명성 +${Math.round(REGRESSION_TUNING.fameGain[t.tier] * (REGRESSION_TUNING.regionFameMult[run.region] || 1) * (t.redMoon ? REGRESSION_RED_MOON.rewardMult : 1))} · 경험치 +${REGRESSION_EXP[t.tier] * (t.redMoon ? REGRESSION_RED_MOON.rewardMult : 1)}${t.kind === 'elite' ? ' · 장비 35% · 비급·유니크 기회' : ''}`} onClick={() => saveRun(fightRegressionToday(run))} />
           <Choice text="몸을 숨기고 지나간다" label={{ stat: st, ...hide }} sub="실패하면 들킨 채로 싸운다 · 성공하면 아무것도 얻지 못한다"
             onClick={() => { const r = hideFromRegressionEnemy(run); saveRun(r.ok ? { ...r.run, scene: sceneOf('숨어서 지나감', '숨을 죽이고 그림자 속에 몸을 묻었다. 적은 끝내 이쪽을 보지 못했다.', [{ text: `${st} - 성공!`, tone: 'gold' }]) } : r.run); }} />
         </>
@@ -858,10 +862,11 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
     body = (
       <div className="space-y-3 ui-screen-enter">
         <div className="flex items-center justify-between">
-          <div className="text-[12px] font-bold" style={{ color: t.kind === 'routeBoss' ? PALETTE.accent : PALETTE.dawn }}>D{run.day} — {t.kind === 'routeBoss' ? `${REGRESSION_ROUTES[t.route]?.icon} 길목의 군주` : '오늘의 일'}</div>
-          <div className="text-[11px]" style={{ color: PALETTE.textDim }}>기연의 기운 <b style={{ color: PALETTE.legendary }}>{Math.round((regressionDayTable(run).fortune || 0) * 100)}%</b> · 적 강도 ×{regressionDayEnemyMult(run.day).toFixed(2)}</div>
+          <div className="text-[12px] font-bold" style={{ color: t.kind === 'routeBoss' || t.redMoon ? PALETTE.accent : PALETTE.dawn }}>D{run.day} — {t.kind === 'routeBoss' ? `${REGRESSION_ROUTES[t.route]?.icon} 길목의 군주` : t.redMoon ? '🌕 붉은 달의 날' : '오늘의 일'}</div>
+          <div className="text-[11px]" style={{ color: PALETTE.textDim }}>기연의 기운 <b style={{ color: PALETTE.legendary }}>{Math.round((regressionDayTable(run).fortune || 0) * 100)}%</b> · 적 강도 ×{regressionDayEnemyMult(run.day).toFixed(2)}{regressionDaysToRedMoon(run.day) > 0 ? ` · 🌕 붉은 달까지 ${regressionDaysToRedMoon(run.day)}일` : ''}</div>
         </div>
         <div className="text-[14px] leading-relaxed" style={{ color: PALETTE.textDim }}>{regressionNarration(run)}</div>
+        {t.redMoon && <div className="text-[13px] leading-relaxed" style={{ color: '#f0a59c' }}>하늘에 핏빛 달이 떴다. 오늘 밤 마물들은 미쳐 날뛴다 — 그만큼 거둘 것도 많다. (적 ×{REGRESSION_RED_MOON.enemyMult} · 보상 ×{REGRESSION_RED_MOON.rewardMult})</div>}
         <div className="text-[14px] leading-relaxed whitespace-pre-line" style={{ color: PALETTE.text }}>{intro}</div>
         {gimmick && (t.kind === 'battle' || t.kind === 'elite') && <div className="text-[11px]" style={{ color: PALETTE.dawn }}>◈ {gimmick.name} — {gimmick.desc}</div>}
         <div className="space-y-1.5">{choices}</div>
