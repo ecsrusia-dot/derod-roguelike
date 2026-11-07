@@ -19,6 +19,7 @@ import {
   isRegressionSpireDay, isRegressionSpireEligible, isRegressionEliteOpen,
   enterRegressionSpire, applyRegressionSpireResult, buildRegressionSpireEnemy,
   REGRESSION_ROUTES, REGRESSION_ROUTE_BOSSES, REGRESSION_ROUTE_REWARDS, REGRESSION_ROUTE_BOSS_DAY_IN_REGION, REGRESSION_ROUTE_FROM_REGION,
+  REGRESSION_ENDING_MILESTONES, REGRESSION_EPILOGUES,
   REGRESSION_OATHS, REGRESSION_OATH_UNLOCK_LOOPS, regressionOathFx, regressionOathEchoMult, regressionOathEnemyMult, regressionFameGate,
   buildRegressionRouteBoss, applyRegressionRouteReward, REGRESSION_RED_MOON, regressionDaysToRedMoon, REGRESSION_GRAVE, resolveRegressionGrave, regressionSpireChain, regressionSpireEnemyFor, regressionRouteFor, REGRESSION_GEAR as __RG_GEAR,
   settleRegression, setRegressionCarry, regressionCarrySlots, buildRegressionLoadout,
@@ -54,6 +55,51 @@ import RegressionSkillInfo from './RegressionSkillInfo.jsx';
 
 const CLASS_IDS = ['wanderer', 'sage', 'demonblood', 'elf', 'priest'];
 const classById = (id) => CLASSES.find(c => c.id === id) || null;
+
+// 1.198.0~ 엔딩 도감 — 갈래별 묶음 · 본 엔딩은 본문 + 후일담 + 처음 본 생
+function EndingCodex({ reg, onClose }) {
+  const n = reg.endings.length;
+  const branches = [...new Set(REGRESSION_ENDINGS.map(e => e.branch))];
+  return (
+    <BottomSheet title="👑 엔딩 도감" onClose={onClose}>
+      <div className="space-y-3 pb-3 px-1">
+        <div>
+          <div className="flex justify-between text-[12px]"><b style={{ color: PALETTE.legendary }}>{n} / {REGRESSION_ENDINGS.length}종</b><span style={{ color: PALETTE.textDim }}>수집 보상</span></div>
+          <div className="flex gap-1.5 mt-1.5">
+            {REGRESSION_ENDING_MILESTONES.map(m => (
+              <div key={m.n} className="flex-1 text-center px-1 py-1" style={{ borderRadius: 8, background: n >= m.n ? `${PALETTE.legendary}22` : PALETTE.panelLight, border: `1px solid ${n >= m.n ? PALETTE.legendary : PALETTE.panelBorder}` }}>
+                <div className="text-[11px]" style={{ color: PALETTE.textDim }}>{m.n}종</div>
+                <div className="text-[11px] font-bold" style={{ color: n >= m.n ? PALETTE.legendary : PALETTE.text }}>{n >= m.n ? '✓ ' : ''}잔향 {m.echo}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+        {branches.map(br => (
+          <div key={br}>
+            <div className="text-[12px] font-bold mb-1" style={{ color: PALETTE.dawn }}>{br} 갈래</div>
+            <div className="space-y-1.5">
+              {REGRESSION_ENDINGS.filter(e => e.branch === br).map(e => {
+                const has = reg.endings.includes(e.id);
+                const log = reg.endingLog?.[e.id];
+                return (
+                  <div key={e.id} className="px-2.5 py-2" style={{ borderRadius: 'var(--r-chip, 8px)', background: PALETTE.panelLight, border: `1px solid ${has ? `${PALETTE.legendary}66` : PALETTE.panelBorder}` }}>
+                    <div className="text-[13px] font-bold" style={{ color: has ? PALETTE.legendary : PALETTE.textDim }}>{has ? `◆ ${e.name}` : '◇ ???'}</div>
+                    <div className="text-[11px]" style={{ color: PALETTE.textDim }}>조건: {e.hint}</div>
+                    {has && <div className="text-[12px] mt-1" style={{ color: PALETTE.text }}>{e.text}</div>}
+                    {has && REGRESSION_EPILOGUES[e.id] && <div className="text-[11px] mt-1 italic" style={{ color: PALETTE.textDim }}>{REGRESSION_EPILOGUES[e.id]}</div>}
+                    {has && log && <div className="text-[11px] mt-1" style={{ color: PALETTE.dawn }}>처음 본 생: {log.life}번째 생 · {classById(log.classId)?.name || '?'} · D{log.day}</div>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+        <button className="ui-press w-full text-[13px] font-bold" onClick={onClose}
+          style={{ minHeight: 44, borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panelLight, border: `1px solid ${PALETTE.panelBorder}`, color: PALETTE.text }}>닫기</button>
+      </div>
+    </BottomSheet>
+  );
+}
 const AUTO_SPEEDS = [2, 5, 10, AUTO_SPEED_SKIP];
 const CAUSE_TEXT = {
   death: { icon: '💀', title: '쓰러졌다', desc: '눈앞이 어두워지고 — 다시 여명의 마을에서 눈을 뜬다.' },
@@ -141,6 +187,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
   const [provisions, setProvisions] = useState([]);      // 1.191.0~ 이번 생 출발 준비물 (잔향 소모)
   const [oaths, setOaths] = useState([]);                // 1.197.0~ 황혼의 맹세
   const [showBook, setShowBook] = useState(false);
+  const [showEndings, setShowEndings] = useState(false);   // 1.198.0~ 엔딩 도감
   const [banner, setBanner] = useState(null);
   const [carrySel, setCarrySel] = useState([]);
   const [autoSpeed, setAutoSpeed] = useState(() => {
@@ -210,6 +257,8 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
                 <div className="text-[11px]" style={{ color: PALETTE.textDim }}>엔딩 · {end.branch} 갈래</div>
                 <div className="text-[15px] font-bold" style={{ color: PALETTE.legendary }}>👑 {end.name}</div>
                 <div className="text-[12px] mt-1" style={{ color: PALETTE.text }}>{end.text}</div>
+                {REGRESSION_EPILOGUES[end.id] && <div className="text-[12px] mt-2 pt-2 italic" style={{ color: PALETTE.textDim, borderTop: `1px solid ${PALETTE.panelBorder}` }}>{REGRESSION_EPILOGUES[end.id]}</div>}
+                {!reg.endings.includes(end.id) && <div className="text-[11px] mt-1.5 font-bold" style={{ color: PALETTE.green }}>✦ 새 엔딩 — 도감 {reg.endings.length + 1}/{REGRESSION_ENDINGS.length}{settle.endingReward ? ` · 수집 보상 잔향 +${settle.endingReward}` : ''}</div>}
               </GlassPanel>
             );
           })()}
@@ -629,25 +678,14 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
             <div className="text-[11px] mt-2" style={{ color: PALETTE.textDim }}>잔향은 생을 마칠 때마다 쌓인다 — 명성 10당 1 · 메인 스토리 1편당 2 · 첨탑 1층당 3 · 정복 10 · 새 엔딩 10.</div>
           </GlassPanel>
 
-          <GlassPanel style={{ padding: 14 }}>
-            <div className="text-[12px] font-bold mb-2" style={{ color: PALETTE.legendary }}>👑 엔딩 {reg.endings.length}/{REGRESSION_ENDINGS.length}</div>
-            <div className="space-y-1">
-              {REGRESSION_ENDINGS.map(e => {
-                const has = reg.endings.includes(e.id);
-                return (
-                  <div key={e.id} className="text-[12px]" style={{ color: has ? PALETTE.legendary : PALETTE.textDim }}>
-                    <span className="text-[11px]" style={{ color: PALETTE.textDim }}>[{e.branch}] </span>{has ? `◆ ${e.name}` : `◇ ??? — ${e.hint}`}
-                  </div>
-                );
-              })}
-            </div>
-          </GlassPanel>
+          <ActionButton icon={BookOpen} title={`👑 엔딩 도감 ${reg.endings.length}/${REGRESSION_ENDINGS.length}`} sub={(() => { const m = REGRESSION_ENDING_MILESTONES.find(x => reg.endings.length < x.n); return m ? `${m.n}종 모으면 잔향 +${m.echo}` : '모든 엔딩을 모았다'; })()} onClick={() => setShowEndings(true)} />
           <ActionButton icon={BookOpen} title={`기록서 (전생 포함 ${learnedEver}/${Object.keys(REGRESSION_RECORDS).length}종)`} sub="적별 기록 보상 보기" onClick={() => setShowBook(true)} />
           <UIButton variant="primary" className="w-full ui-sheen" onClick={startLife}>
             능력치를 정하고 출발한다
           </UIButton>
         </div>
         {showBook && <RecordBook reg={reg} run={null} onClose={() => setShowBook(false)} />}
+        {showEndings && <EndingCodex reg={reg} onClose={() => setShowEndings(false)} />}
       </div>
     );
   }
