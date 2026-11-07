@@ -42,7 +42,7 @@ import {
   REGRESSION_TRAITS, REGRESSION_MAIN_STORY, regressionEventById, regressionChoiceVisible, regressionTopTrait,
   REGRESSION_DAY, rollRegressionDay, passRegressionDay, hideFromRegressionEnemy, fightRegressionToday, restRegressionShelter, trainRegressionShelter,
   askRegressionHermit, regressionDayEnemyMult, regressionDayTable, regressionFortuneWeight, REGRESSION_TODAY_INTRO,
-  REGRESSION_LEARN, offerRegressionLearn, resolveRegressionLearn, regressionLearnChance, regressionLearnIntro, regressionSkillAptitude, regressionSkillStats,
+  REGRESSION_LEARN, offerRegressionLearn, resolveRegressionLearn, regressionLearnChance, regressionLearnIntro, regressionSkillAptitude, regressionRunSkillLv, regressionSkillStats,
 } from '../../data.js';
 import { AP_TUNING } from '../../combat/initCombat.js';
 import { ScreenHeader, GlassPanel, Chip, UIButton, BottomSheet } from '../ui/CommonUI.jsx';
@@ -361,6 +361,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
         maxHp={loadout.maxHp}
         hp={loadout.hp}
         skills={regressionRunSkills(run)}
+        skillLv={run.skillLv || {}}
         relicBonus={relicBonus}
         potions={run.potions || {}}
         beltSlots={regressionBeltSlots(run.classId, run)}
@@ -687,7 +688,8 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
     const sk = REGRESSION_SKILLS[pl.skillId];
     const tierInfo = REGRESSION_SKILL_TIERS[sk.tier];
     const intro = regressionLearnIntro(pl);
-    const p = regressionLearnChance(pl.skillId, storyStats);
+    const knownLv = regressionRunSkills(run).includes(pl.skillId) ? regressionRunSkillLv(run, pl.skillId) : 0;
+    const p = regressionLearnChance(pl.skillId, storyStats, knownLv > 0);
     const apt = regressionSkillAptitude(pl.skillId, storyStats);
     const lab = regressionChanceLabel(p);
     body = (
@@ -698,6 +700,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
           <div className="flex items-center gap-2">
             <span className="text-[11px] px-1.5 rounded" style={{ color: tierInfo.color, border: `1px solid ${tierInfo.color}` }}>{tierInfo.name}</span>
             <b className="text-[13px]" style={{ color: PALETTE.text }}>{sk.name}</b>
+            {knownLv > 0 && <span className="text-[11px] font-bold" style={{ color: PALETTE.legendary }}>숙련 Lv.{knownLv} → Lv.{knownLv + 1}</span>}
           </div>
           <div className="text-[12px] mt-1" style={{ color: PALETTE.dawn }}>발동: {regressionTriggerText(pl.skillId)}</div>
           <div className="text-[11px] mt-0.5" style={{ color: PALETTE.textDim }}>{sk.desc}</div>
@@ -823,7 +826,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
       const sk = REGRESSION_SKILLS[t.skillId];
       choices = (
         <>
-          <Choice text={`가르침을 청한다 — 「${sk?.name}」`} sub={`${REGRESSION_SKILL_TIERS[sk?.tier]?.name} 스킬 · 습득 ${Math.round(regressionLearnChance(t.skillId, stats) * 100)}% (적성 판정)`} onClick={() => saveRun(askRegressionHermit(run))} />
+          <Choice text={`가르침을 청한다 — 「${sk?.name}」`} sub={`${REGRESSION_SKILL_TIERS[sk?.tier]?.name} 스킬 · ${regressionRunSkills(run).includes(t.skillId) ? `숙련 Lv.${regressionRunSkillLv(run, t.skillId)}→${regressionRunSkillLv(run, t.skillId) + 1} · ` : ''}습득 ${Math.round(regressionLearnChance(t.skillId, stats, regressionRunSkills(run).includes(t.skillId)) * 100)}% (적성 판정)`} onClick={() => saveRun(askRegressionHermit(run))} />
           <Choice text="정중히 사양한다" onClick={() => saveRun({ ...passRegressionDay(run, '떠도는 은자를 지나침'), scene: sceneOf('떠도는 은자', '"인연이 아니었군." 은자가 연기처럼 사라졌다.', []) })} />
         </>
       );
@@ -941,13 +944,13 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
                 return (
                   <button key={id} className="ui-press w-full text-left text-[11px] px-2.5 flex items-center gap-2" onClick={() => setSkillInfo(id)}
                     style={{ minHeight: 40, borderRadius: 'var(--r-chip, 8px)', background: PALETTE.panelLight, border: `1px solid ${PALETTE.panelBorder}`, color: PALETTE.textDim }}>
-                    <span className="flex-1"><b style={{ color: t.color }}>[{t.name}] {sk.name}</b> — {regressionTriggerText(id)}</span>
+                    <span className="flex-1"><b style={{ color: t.color }}>[{t.name}] {sk.name}</b> <b style={{ color: PALETTE.legendary }}>Lv.{regressionRunSkillLv(run, id)}</b> — {regressionTriggerText(id)}</span>
                     <span style={{ color: PALETTE.dawn }}>ⓘ</span>
                   </button>
                 );
               })}
             </div>
-            <div className="text-[11px] mt-1" style={{ color: PALETTE.textDim }}>강적의 비급·군주 격파·기연 사건으로 새 스킬을 배울 기회가 온다. 성공률은 스킬의 관련 능력치가 내 빌드와 얼마나 맞는지(적성)로 정해진다.</div>
+            <div className="text-[11px] mt-1" style={{ color: PALETTE.textDim }}>강적의 비급·군주 격파·기연 사건으로 새 스킬을 배울 기회가 온다. 이미 아는 스킬을 다시 익히면 레벨이 오른다 (최대 Lv.5). 성공률은 스킬의 관련 능력치가 내 빌드와 얼마나 맞는지(적성)로 정해진다.</div>
           </GlassPanel>
         )}
         {menu === 'gear' && (
@@ -1023,7 +1026,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
                   onClick={() => { const r = buyRegressionOffer(run, idx); if (r.bought) { saveRun(r.run); logShop(`${r.bought} (-${r.price}G)`); } }}
                   style={{ minHeight: 52, borderRadius: 'var(--r-chip, 8px)', background: PALETTE.panelLight, border: `1px solid ${PALETTE.panelBorder}`, opacity: o.sold ? 0.3 : (can ? 1 : 0.5) }}>
                   <div className="flex-1 min-w-0">
-                    <div className="text-[12px] font-bold" style={{ color }}>{isSkill ? `[${REGRESSION_SKILL_TIERS[sk.tier].name} 스킬] ${sk.name}` : regressionGearLabel(o.id)}{o.sold ? ' — 판매됨' : ''}</div>
+                    <div className="text-[12px] font-bold" style={{ color }}>{isSkill ? `[${REGRESSION_SKILL_TIERS[sk.tier].name} 스킬] ${sk.name}${regressionRunSkills(run).includes(o.id) ? ` — 숙련 Lv.${regressionRunSkillLv(run, o.id)}→${regressionRunSkillLv(run, o.id) + 1}` : ''}` : regressionGearLabel(o.id)}{o.sold ? ' — 판매됨' : ''}</div>
                     <div className="text-[11px]" style={{ color: PALETTE.textDim }}>
                       {isSkill ? `${regressionTriggerText(o.id)} · 교습비는 적성 ${Math.round(regressionSkillAptitude(o.id, storyStats) * 100)}% 기준` : `${REGRESSION_GEAR_SLOTS.find(x => x.id === g.slot)?.name} · ${regressionGearStatText(o.id)}`}
                     </div>
@@ -1070,7 +1073,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
         </BottomSheet>
       )}
       {showBook && <RecordBook reg={reg} run={run} onClose={() => setShowBook(false)} />}
-      {skillInfo && <RegressionSkillInfo skillId={skillInfo} stats={storyStats} onClose={() => setSkillInfo(null)} />}
+      {skillInfo && <RegressionSkillInfo skillId={skillInfo} stats={storyStats} lv={regressionRunSkillLv(run, skillInfo)} onClose={() => setSkillInfo(null)} />}
     </div>
   );
 }

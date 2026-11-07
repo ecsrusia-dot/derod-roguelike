@@ -270,6 +270,7 @@ export function createRegressionRun(metaR = EMPTY_REGRESSION, classId, stats = n
     stats: stats || regressionPresetStats(classId),   // 1.181.0~ 능력치 10종 (시작 커스텀)
     level: 0, exp: 0, statPoints: 0,                  // 1.181.0~ 레벨업 → 추가 능력치
     skills: skills || null,                           // 1.182.0~ 보유 스킬 id (null = 직업 프리셋)
+    skillLv: {},                                      // 1.192.0~ 스킬 레벨 { id: 2~5 } (없으면 Lv.1)
     flames: 3,                                        // 1.182.0~ 생명의 불꽃 (강한 전투 태세 자원, 한 생 3개)
     fameBy: {},                                       // 1.181.0~ 판정 성공 능력치 집계 → 명성 경로
     seenEvents: [],        // 1.179.0~ 이번 생에 본 사건 id
@@ -892,9 +893,8 @@ export function applyRegressionEvent(run, eventId, res, { maxHp = 300, rng = Mat
     else if (r.type === 'stat') { next.statBonus[r.name] = (next.statBonus[r.name] || 0) + r.value; notes.push(`${r.name} +${r.value}`); }
     else if (r.type === 'learn') {
       // 1.183.0~ 기연 — 배울 기회만 연다. 실제 습득은 적성 판정 (resolveRegressionLearn)
-      const owned = regressionRunSkills(next);
-      if (owned.includes(r.name)) { const g = gainRegressionExp(next, REGRESSION_LEARN.knownExp); next = g.run; notes.push(`이미 아는 깨달음 — 경험치 +${REGRESSION_LEARN.knownExp}`); }
-      else { next.pendingLearn = { skillId: r.name, source: 'fortune', from: eventId }; notes.push(`기연 — 「${__RSK[r.name]?.name}」`); }
+      if (!canRegressionSkillGrow(next, r.name)) { const g = gainRegressionExp(next, REGRESSION_LEARN.knownExp); next = g.run; notes.push(`이미 아는 깨달음 — 경험치 +${REGRESSION_LEARN.knownExp}`); }
+      else { next.pendingLearn = { skillId: r.name, source: 'fortune', from: eventId }; notes.push(`기연 — 「${__RSK[r.name]?.name}」${regressionRunSkills(next).includes(r.name) ? ' 숙련' : ''}`); }
     }
   }
   // 1.181.0~ 판정 성공 = 경험치 + 명성 + 명성 경로 (원작: 주사위 성공으로 이름이 알려진다)
@@ -1159,11 +1159,23 @@ export function regressionMaxHpBonusFromStats(stats) {
 }
 
 // 1.182.0~ 보유 스킬 (시작 커스텀 3개 + 습득). 구세이브는 직업 프리셋
-import { REGRESSION_SKILL_PRESETS as __RSP, REGRESSION_FLAMES_PER_LIFE as __RFL, REGRESSION_SKILLS as __RSK, regressionSkillStats as __rss, REGRESSION_COMBAT as __RCB } from './regressionCombat.js';
+import { REGRESSION_SKILL_PRESETS as __RSP, REGRESSION_FLAMES_PER_LIFE as __RFL, REGRESSION_SKILLS as __RSK, regressionSkillStats as __rss, REGRESSION_COMBAT as __RCB, REGRESSION_SKILL_LV as __RSLV, regressionSkillLevel as __rsl } from './regressionCombat.js';
 export function regressionRunSkills(run) {
   return Array.isArray(run?.skills) && run.skills.length ? run.skills : (__RSP[run?.classId] || []);
 }
 export function regressionRunFlames(run) { return run?.flames ?? __RFL; }
+// 1.192.0~ 스킬 레벨 — 같은 스킬을 다시 배우면 Lv+1 (최대 REGRESSION_SKILL_LV.max)
+export function regressionRunSkillLv(run, id) { return __rsl(run?.skillLv, id); }
+export function canRegressionSkillGrow(run, id) {
+  return !regressionRunSkills(run).includes(id) || regressionRunSkillLv(run, id) < __RSLV.max;
+}
+// 새로 배우거나 레벨 +1. 반환 { run, lv, upgraded }
+export function addRegressionSkill(run, id) {
+  const owned = regressionRunSkills(run);
+  if (!owned.includes(id)) return { run: { ...run, skills: [...owned, id] }, lv: 1, upgraded: false };
+  const lv = Math.min(__RSLV.max, regressionRunSkillLv(run, id) + 1);
+  return { run: { ...run, skills: owned, skillLv: { ...(run.skillLv || {}), [id]: lv } }, lv, upgraded: true };
+}
 
 
 // ============================================
@@ -1180,7 +1192,8 @@ export const REGRESSION_LEARN = {
   offer: { normal: 0.12, elite: 0.6, boss: 1 },  // 승리 후 배울 기회가 열릴 확률
   offFocusWeight: 0.15,     // 기회가 열릴 때 빌드와 무관한 스킬이 뽑힐 기본 가중 (개연성 드라마)
   learnExp: 10,             // 습득 성공 경험치
-  knownExp: 20,             // 이미 아는 기연을 다시 만나면
+  knownExp: 20,             // 이미 만렙인 기연을 다시 만나면
+  upgradeBonus: 0.1,        // 1.192.0~ 이미 아는 스킬을 다시 익힐 때 성공률 +10%p (몸이 기억한다)
   checkPotionChance: 0.1,   // 판정 성공 덤 (회복약)
 };
 const LEARN_SOURCE_TIER = { normal: 'normal', elite: 'advanced', boss: 'fortune', fortune: 'fortune' };
@@ -1198,11 +1211,11 @@ export function regressionAptitude(rel = [], stats = {}) {
   const avg = rel.reduce((a, k) => a + (stats[k] || 0), 0) / rel.length;
   return Math.max(0, Math.min(1, avg / top));
 }
-export function regressionLearnChance(skillId, stats = {}) {
+export function regressionLearnChance(skillId, stats = {}, known = false) {
   const L = REGRESSION_LEARN;
   const sk = __RSK[skillId]; if (!sk) return 0;
   const apt = regressionSkillAptitude(skillId, stats);
-  const p = (L.base[sk.tier] || 0.5) * (L.floor + (1 - L.floor) * apt * apt) + (stats.학식 || 0) * L.lorePerPoint;
+  const p = (L.base[sk.tier] || 0.5) * (L.floor + (1 - L.floor) * apt * apt) + (stats.학식 || 0) * L.lorePerPoint + (known ? L.upgradeBonus : 0);
   return Math.max(L.min, Math.min(L.max, p));
 }
 // 사건 가중 — 판정 능력치가 높을수록, 기연은 적성이 맞을수록 자주
@@ -1218,7 +1231,7 @@ export function offerRegressionLearn(run, source = 'normal', enemyKey = null, rn
   if (rng() >= (L.offer[source] ?? 0)) return null;
   const tier = LEARN_SOURCE_TIER[source];
   const stats = regressionEffectiveStats(run);
-  const cands = Object.keys(__RSK).filter(k => __RSK[k].tier === tier && !owned.includes(k));
+  const cands = Object.keys(__RSK).filter(k => __RSK[k].tier === tier && canRegressionSkillGrow(run, k));
   if (!cands.length) return null;
   const w = cands.map(k => L.offFocusWeight + regressionSkillAptitude(k, stats));
   let roll = rng() * w.reduce((a, b) => a + b, 0);
@@ -1257,16 +1270,19 @@ export function resolveRegressionLearn(run, accept, rng = Math.random) {
   if (!sk) return { run: base, scene: null };
   if (!accept) return { run: base, scene: regressionResultScene(sk.name, '욕심을 접었다. 지금의 길을 끝까지 걷기로 한다.', []) };
   const stats = regressionEffectiveStats(run);
-  const p = regressionLearnChance(pl.skillId, stats);
-  const owned = regressionRunSkills(run);
+  const known = regressionRunSkills(run).includes(pl.skillId);
+  const p = regressionLearnChance(pl.skillId, stats, known);
   if (rng() < p) {
-    let next = { ...base, skills: [...owned, pl.skillId] };
+    const add = addRegressionSkill(base, pl.skillId);
+    let next = add.run;
     const g = gainRegressionExp(next, REGRESSION_LEARN.learnExp);
     next = g.run;
-    next.log = [...(next.log || []), `D${run.day}: 「${sk.name}」 습득`];
-    const tags = [{ text: `「${sk.name}」 습득!`, tone: 'gold' }, { text: `경험치 +${REGRESSION_LEARN.learnExp}`, tone: 'good' }];
+    const what = add.upgraded ? `「${sk.name}」 Lv.${add.lv}` : `「${sk.name}」 습득`;
+    next.log = [...(next.log || []), `D${run.day}: ${what}`];
+    const tags = [{ text: add.upgraded ? `${what}!` : `「${sk.name}」 습득!`, tone: 'gold' }, { text: `경험치 +${REGRESSION_LEARN.learnExp}`, tone: 'good' }];
     if (g.levelUps > 0) tags.push({ text: `레벨 상승 ${g.from}→${next.level}`, tone: 'gold' }, { text: `추가 능력치 +${g.levelUps}`, tone: 'gold' });
-    return { run: next, scene: regressionResultScene(`${sk.name} - 성공!`, '몸 깊은 곳에 새 기술이 새겨졌다. 이제 싸움 속에서 저절로 나올 것이다.', tags) };
+    const text = add.upgraded ? `이미 아는 기술이 한층 깊어졌다. 위력이 오른다 (Lv.${add.lv - 1} → Lv.${add.lv}).` : '몸 깊은 곳에 새 기술이 새겨졌다. 이제 싸움 속에서 저절로 나올 것이다.';
+    return { run: next, scene: regressionResultScene(`${sk.name} - 성공!`, text, tags) };
   }
   const apt = regressionSkillAptitude(pl.skillId, stats);
   const rel = __rss(pl.skillId);
@@ -1491,7 +1507,7 @@ export function regressionSkillShopPrice(skillId, stats = {}) {
 export function buildRegressionShopStock(run, rng = Math.random, resets = 0) {
   const E = REGRESSION_ECON;
   const owned = regressionRunSkills(run);
-  const skillPool = Object.keys(__RSK).filter(k => ['normal', 'advanced'].includes(__RSK[k].tier) && !owned.includes(k));
+  const skillPool = Object.keys(__RSK).filter(k => ['normal', 'advanced'].includes(__RSK[k].tier) && canRegressionSkillGrow(run, k));
   const offers = [];
   for (let i = 0; i < E.shopOffers * 4 && offers.length < E.shopOffers; i++) {
     if (skillPool.length && rng() < E.shopSkillShare) {
@@ -1510,7 +1526,11 @@ export function rerollRegressionShop(run, rng = Math.random) {
   return { ...run, shop: buildRegressionShopStock(run, rng, used + 1) };
 }
 export function regressionShopOfferPrice(run, offer) {
-  return offer.kind === 'skill' ? regressionSkillShopPrice(offer.id, regressionEffectiveStats(run)) : offer.price;
+  if (offer.kind !== 'skill') return offer.price;
+  // 1.192.0~ 아는 스킬은 숙련 교습 — 현재 Lv당 +40%
+  const known = regressionRunSkills(run).includes(offer.id);
+  const lvMult = known ? 1 + regressionRunSkillLv(run, offer.id) * 0.4 : 1;
+  return Math.round(regressionSkillShopPrice(offer.id, regressionEffectiveStats(run)) * lvMult / 10) * 10;
 }
 // 진열 상품 구매 — 스킬은 교습(적성에 따라 값이 다를 뿐 확정 습득), 장비는 가방으로
 export function buyRegressionOffer(run, idx) {
@@ -1520,7 +1540,11 @@ export function buyRegressionOffer(run, idx) {
   if ((run.gold || 0) < price) return { run, bought: null };
   let next = { ...run, gold: run.gold - price, shop: { ...run.shop, offers: run.shop.offers.map((o, i) => (i === idx ? { ...o, sold: true } : o)) } };
   let bought;
-  if (offer.kind === 'skill') { next.skills = [...regressionRunSkills(run), offer.id]; bought = `「${__RSK[offer.id].name}」 습득`; }
+  if (offer.kind === 'skill') {
+    if (!canRegressionSkillGrow(next, offer.id)) return { run, bought: null };
+    const add = addRegressionSkill(next, offer.id); next = add.run;
+    bought = add.upgraded ? `「${__RSK[offer.id].name}」 Lv.${add.lv}` : `「${__RSK[offer.id].name}」 습득`;
+  }
   else { next = addRegressionGear(next, offer.id); bought = `${regressionGearLabel(offer.id)} 획득`; }
   return { run: { ...next, log: [...next.log, `D${run.day}: 구매 — ${bought} (-${price}G)`] }, bought, price };
 }
@@ -1739,8 +1763,11 @@ export const REGRESSION_START_TRAITS = [
     fxAt: (lv) => ({ startPoints: 2 + Math.floor((lv - 1) / 2) }),
     desc: (lv) => `시작 능력치 배분 +${2 + Math.floor((lv - 1) / 2)}` },
   { id: 'st_tome', name: '비전서', icon: '📕', cost: 30,
-    fxAt: (lv) => ({ startSkills: lv >= 5 ? 2 : 1, startExp: (lv - 1) * 10 }),
-    desc: (lv) => `시작 일반 스킬 +${lv >= 5 ? 2 : 1}${lv > 1 ? ` · 시작 경험치 +${(lv - 1) * 10}` : ''}` },
+    fxAt: (lv) => ({ startSkills: lv >= 5 ? 2 : 1, startExp: (lv - 1) * 10, startSkillLvUps: lv >= 4 ? 2 : lv >= 2 ? 1 : 0 }),
+    desc: (lv) => {
+      const n = lv >= 5 ? 2 : 1, ups = lv >= 4 ? 2 : lv >= 2 ? 1 : 0;
+      return `시작 스킬을 ${n}개 더 고른다${ups ? ` · 고른 스킬 앞 ${ups}개가 Lv.2로 시작` : ''}${lv > 1 ? ` · 시작 경험치 +${(lv - 1) * 10}` : ''}`;
+    } },
   { id: 'st_luck', name: '기연의 별', icon: '✨', cost: 20,
     fxAt: (lv) => ({ fortuneBonus: 4 + 2 * (lv - 1) }),
     desc: (lv) => `기연이 더 자주 찾아온다 (기연 가중 +${4 + 2 * (lv - 1)})` },
@@ -1768,7 +1795,7 @@ export function regressionNextSlotCost(metaR) {
   return REGRESSION_TRAIT_TUNING.slotCosts[metaR?.traitSlotsBought || 0] ?? null;
 }
 export function aggregateRegressionStartTraits(ids = [], metaR = null) {
-  const fx = { revives: 0, reviveHpPct: 0, gold: 0, startPoints: 0, startSkills: 0, startExp: 0, fortuneBonus: 0, affinityAll: 0 };
+  const fx = { revives: 0, reviveHpPct: 0, gold: 0, startPoints: 0, startSkills: 0, startExp: 0, startSkillLvUps: 0, fortuneBonus: 0, affinityAll: 0 };
   for (const id of ids) {
     const t = getRegressionStartTrait(id); if (!t) continue;
     const lv = Math.max(1, metaR ? regressionTraitLevel(metaR, id) : 1);
@@ -1788,6 +1815,11 @@ function applyRegressionStartTraits(run, ids = [], metaR = null) {
     affinity,
   };
   if (fx.startExp) next = gainRegressionExp(next, fx.startExp).run;
+  if (fx.startSkillLvUps) {
+    const lvMap = { ...(next.skillLv || {}) };
+    for (const id of regressionRunSkills(next).slice(0, fx.startSkillLvUps)) lvMap[id] = Math.max(2, lvMap[id] || 1);
+    next.skillLv = lvMap;
+  }
   return next;
 }
 // 잔향 — 생을 마칠 때. 명성·메인 스토리·첨탑 진행·정복·새 엔딩

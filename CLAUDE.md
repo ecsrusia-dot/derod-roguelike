@@ -1043,7 +1043,8 @@ PM이 AskUserQuestion으로 확정한 설계. **던전앤파이터 모티브, "�
 | 1.191.0 잔향 소비처 ✅ | PM 지적 「잔향이 남는다」(한 생 평균 17 · 특성 전부 152 → 약 9생 뒤 쓸모 0) → PM 결정 A+B: **특성 Lv.1~5**(`REGRESSION_START_TRAITS[].fxAt(lv)`/`desc(lv)`, `meta.regression.traitLv`, 구세이브 unlockedTraits → Lv.1 `regressionTraitLevel`, 강화 비용 = cost × `upgradeMult`[1,1.5,2,2.5]) + **슬롯 확장**(`traitSlotsBought`, `slotCosts` 120/300, `regressionTraitSlots`) + **출발 준비물** `REGRESSION_PROVISIONS` 5종(createRegressionRun 6번째 인자 → `applyRegressionProvisions`, 잔향 차감은 UI onSave 패치 `echo`). 소비처 합계 1,636 + 매 생 준비물 |
 | 1.191.1 전투 전 속도 ✅ | PM 요청 — RegressionBattle 준비 화면에 「⏱ 전투 속도」 버튼 줄(props `speedOptions`/`onSetSpeed`, RegressionGame `setSpeed`가 localStorage `regressionSpeed` 저장). 재생 중 배속 버튼은 그대로 |
 | 1.191.2 방어 표시 ✅ | PM 요청 「방어·방어막 식별」 — `simulateRegressionCombat`의 `ev.push`가 모든 사건에 `ps`(내 보호막)·`gd`(막기 준비)·`ed`(적 방어)를 붙이고, 피격 사건에 `absorbed`/`guarded`, 내 공격에 `blocked`. RegressionBattle: 색 `RG_SHIELD`(하늘)·`RG_DEF`(강철)·`RG_GUARD`(보라) — 그림 테두리 링·상태 칩·HP 바 보호막 구간·떠오르는 내역 숫자·하늘색 로그. ⚠️ 방어 상태는 `last`(마지막 사건) 기준 — `lastState`는 HP 있는 사건만이라 방어 행동이 늦게 반영됨 |
-| 다음 | 2.0 후속 후보 — 갈래별 추가 장면(메인 스토리 확장) · 실기 피드백 반영 |
+| 1.192.0 스킬 레벨 ✅ | PM 결정: **같은 스킬 재습득 = Lv+1 (최대 5)** — `run.skillLv`{id: lv}(없으면 Lv.1), `addRegressionSkill`(신규/승급 공용 — 습득·상점·기연 전부 이것), `canRegressionSkillGrow`(습득 기회·상점·은자 후보 필터 — 만렙만 제외). 밸런스 `REGRESSION_SKILL_LV` 한 곳(위력 +15%/Lv·버프 +5%p·부활 +5%p·막기 +10%p). 재습득 성공률 +`REGRESSION_LEARN.upgradeBonus` .1, 교습비 현재 Lv당 +40%. 비전서 fx `startSkillLvUps`(Lv.2 1개·Lv.4 2개 → 고른 순서 앞부터 Lv.2). 전투 `regressionPlayerCombatant({skillLv})` |
+| 다음 (PM 확정) | ② 기연 20종(능력치당 2, 지역 고정 해제) → ③ 성향 루트제(2지역부터 루트 분기 — 루트별 지역 보스·전용 보상·첨탑 구성·엔딩) |
 
 ### ⬆ 최신 버전 업데이트 버튼 (1.179.1)
 

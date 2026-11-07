@@ -4,7 +4,7 @@
 // 이야기 화면(능력치 창)·전투 준비·전투 재생의 스킬 카드가 공용으로 연다.
 import React from 'react';
 import { PALETTE } from '../../utils/helpers.js';
-import { REGRESSION_SKILLS, REGRESSION_SKILL_TIERS, REGRESSION_COMBAT, regressionSkillValue } from '../../data.js';
+import { REGRESSION_SKILLS, REGRESSION_SKILL_TIERS, REGRESSION_COMBAT, REGRESSION_SKILL_LV, regressionSkillValue, regressionSkillLvMult } from '../../data.js';
 import { BottomSheet } from '../ui/CommonUI.jsx';
 
 const TRIGGER_TEXT = {
@@ -17,7 +17,7 @@ const EFFECT_TEXT = {
   stun: '적 행동 1회 봉쇄 (+피해)', sure: '다음 평타 필중 + 추가 피해', revive: '부활',
 };
 
-export function regressionSkillPowerLines(id, stats = {}) {
+export function regressionSkillPowerLines(id, stats = {}, lv = 1) {
   const sk = REGRESSION_SKILLS[id]; if (!sk) return [];
   const lore = 1 + (stats.학식 || 0) * REGRESSION_COMBAT.lorePower;
   const lines = [];
@@ -34,10 +34,17 @@ export function regressionSkillPowerLines(id, stats = {}) {
     lines.push(`반사 기본 ${sk.reflect.base}`);
     for (const [k, c] of Object.entries(sk.reflect.scale || {})) lines.push(`반사 ${k} ${stats[k] || 0} × ${c}`);
   }
+  if (lv > 1) {
+    const L = REGRESSION_SKILL_LV, up = lv - 1;
+    if (sk.effect === 'buff') lines.push(`스킬 Lv.${lv} → 공격 강화 +${Math.round(up * L.buffPerLv * 100)}%p`);
+    else if (sk.effect === 'revive') lines.push(`스킬 Lv.${lv} → 부활 HP +${Math.round(up * L.revivePerLv * 100)}%p`);
+    else if (sk.effect === 'guard') lines.push(`스킬 Lv.${lv} → 막기 +${Math.round(up * L.guardPerLv * 100)}%p (최대 100%)`);
+    else lines.push(`스킬 Lv.${lv} → 위력 ×${regressionSkillLvMult(lv).toFixed(2)}`);
+  }
   return lines;
 }
 
-export default function RegressionSkillInfo({ skillId, stats = {}, onClose }) {
+export default function RegressionSkillInfo({ skillId, stats = {}, lv = 1, onClose }) {
   const sk = REGRESSION_SKILLS[skillId];
   if (!sk) return null;
   const tier = REGRESSION_SKILL_TIERS[sk.tier];
@@ -48,11 +55,12 @@ export default function RegressionSkillInfo({ skillId, stats = {}, onClose }) {
         <div className="flex items-center gap-2">
           <span className="text-[11px] px-1.5 rounded" style={{ color: tier.color, border: `1px solid ${tier.color}` }}>{tier.name}</span>
           <b className="text-[15px]" style={{ color: PALETTE.text }}>{sk.name}</b>
+          <span className="text-[12px] font-bold" style={{ color: PALETTE.legendary }}>Lv.{lv}/{REGRESSION_SKILL_LV.max}</span>
         </div>
         <div className="text-[12px]" style={{ color: PALETTE.textDim }}>{sk.desc}</div>
         <div className="grid grid-cols-2 gap-1.5">
           {[['발동 조건', (TRIGGER_TEXT[sk.trigger] || (() => sk.trigger))(sk.at)], ['효과', EFFECT_TEXT[sk.effect] || sk.effect],
-            ['현재 위력', `${regressionSkillValue(skillId, stats)}${pct ? '%' : ''}`], ['사용 횟수', '전투당 1번 (자동)']].map(([l, v]) => (
+            ['현재 위력', `${regressionSkillValue(skillId, stats, lv)}${pct ? '%' : ''}`], ['사용 횟수', '전투당 1번 (자동)']].map(([l, v]) => (
             <div key={l} className="px-2.5 py-2" style={{ borderRadius: 'var(--r-chip, 8px)', background: PALETTE.panelLight }}>
               <div className="text-[11px]" style={{ color: PALETTE.textDim }}>{l}</div>
               <div className="text-[12px] font-bold" style={{ color: PALETTE.text }}>{v}</div>
@@ -61,8 +69,8 @@ export default function RegressionSkillInfo({ skillId, stats = {}, onClose }) {
         </div>
         <div>
           <div className="text-[12px] font-bold mb-1" style={{ color: PALETTE.dawn }}>위력 계산</div>
-          {regressionSkillPowerLines(skillId, stats).map((l, i) => <div key={i} className="text-[11px]" style={{ color: PALETTE.textDim }}>· {l}</div>)}
-          <div className="text-[11px] mt-1" style={{ color: PALETTE.textDim }}>관련 능력치가 높을수록 위력이 오른다. 전투 태세 배율은 별도로 곱해진다.</div>
+          {regressionSkillPowerLines(skillId, stats, lv).map((l, i) => <div key={i} className="text-[11px]" style={{ color: PALETTE.textDim }}>· {l}</div>)}
+          <div className="text-[11px] mt-1" style={{ color: PALETTE.textDim }}>관련 능력치가 높을수록 위력이 오른다. 같은 스킬을 다시 배우면 레벨이 오른다 (Lv당 위력 +15%). 전투 태세 배율은 별도로 곱해진다.</div>
         </div>
         <button className="ui-press w-full text-[13px] font-bold" onClick={onClose}
           style={{ minHeight: 44, borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panelLight, border: `1px solid ${PALETTE.panelBorder}`, color: PALETTE.text }}>닫기</button>
