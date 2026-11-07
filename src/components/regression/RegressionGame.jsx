@@ -1,7 +1,7 @@
 // ============================================
 // components/regression/RegressionGame.jsx — 🌀 회귀의 탐험가 컨테이너 (1.177.0, MVP 2차)
 // ============================================
-// 로비(직업 선택·능력치·스킬 커스텀) → 이야기 화면(하루 1행동) → 전용 전투(RegressionBattle) → 41일째 황혼의 첨탑 → 회귀 정산.
+// 로비(직업 선택·능력치·스킬 커스텀) → 이야기 화면(하루 1행동) → 전용 전투(RegressionBattle) → 61일째 황혼의 첨탑 → 회귀 정산.
 // 모든 상태는 meta.regression 하나로 영속 (onSave 패치). 진행 중인 생은 regression.run.
 // 전투 중 새로고침 = 같은 적과 재전투 (run.pending / run.spireRound — 도주 불가).
 // PM 결정: 본편 메타 강화(각인·각성도·제단) 미적용 → engravingFx={}, meta.upgrades 비움.
@@ -35,6 +35,7 @@ import {
   REGRESSION_ECON, REGRESSION_GEAR, REGRESSION_GEAR_SLOTS, REGRESSION_GEAR_GRADES, regressionGearLabel, regressionGearStatText, regressionGearFx, regressionGearStats,
   regressionEffectiveStats, equipRegressionGear, unequipRegressionGear, offerRegressionUnique, resolveRegressionUnique, regressionUniqueChance, regressionUniqueIntro,
   regressionAptitude, buildRegressionShopStock, rerollRegressionShop, regressionShopOfferPrice, buyRegressionOffer,
+  REGRESSION_TRAITS, REGRESSION_MAIN_STORY, regressionEventById, regressionChoiceVisible, regressionTopTrait,
   REGRESSION_DAY, rollRegressionDay, passRegressionDay, hideFromRegressionEnemy, fightRegressionToday, restRegressionShelter, trainRegressionShelter,
   askRegressionHermit, regressionDayEnemyMult, regressionDayTable, regressionFortuneWeight, REGRESSION_TODAY_INTRO,
   REGRESSION_LEARN, offerRegressionLearn, resolveRegressionLearn, regressionLearnChance, regressionLearnIntro, regressionSkillAptitude, regressionSkillStats,
@@ -186,11 +187,11 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
             <div className="text-[40px]">{c.icon}</div>
             <div className="text-[12px] mt-1" style={{ color: PALETTE.textDim }}>{c.desc}</div>
           </GlassPanel>
-          {run.over === 'victory' && (() => {
+          {regressionEndingFor(run) && (() => {
             const end = regressionEndingFor(run);
             return (
               <GlassPanel strong style={{ padding: 14, border: `1px solid ${PALETTE.legendary}66` }}>
-                <div className="text-[11px]" style={{ color: PALETTE.textDim }}>엔딩</div>
+                <div className="text-[11px]" style={{ color: PALETTE.textDim }}>엔딩 · {end.branch} 갈래</div>
                 <div className="text-[15px] font-bold" style={{ color: PALETTE.legendary }}>👑 {end.name}</div>
                 <div className="text-[12px] mt-1" style={{ color: PALETTE.text }}>{end.text}</div>
               </GlassPanel>
@@ -480,10 +481,9 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
             <div className="space-y-1">
               {REGRESSION_ENDINGS.map(e => {
                 const has = reg.endings.includes(e.id);
-                const comp = REGRESSION_COMPANIONS.find(c => c.ending.id === e.id);
                 return (
                   <div key={e.id} className="text-[12px]" style={{ color: has ? PALETTE.legendary : PALETTE.textDim }}>
-                    {has ? `◆ ${e.name}` : `◇ ??? — ${comp ? `${comp.name}와 맹약을 맺고 첨탑 정복` : '맹약 없이 첨탑 정복'}`}
+                    <span className="text-[11px]" style={{ color: PALETTE.textDim }}>[{e.branch}] </span>{has ? `◆ ${e.name}` : `◇ ??? — ${e.hint}`}
                   </div>
                 );
               })}
@@ -512,7 +512,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
   const daysLeft = Math.max(0, run.maxDays - run.day + 1);
   const compFx = aggregateRegressionCompanions(run);
   const scene = run.scene || null;
-  const pendingEv = run.pendingEvent ? REGRESSION_EVENTS.find(e => e.id === run.pendingEvent) : null;
+  const pendingEv = run.pendingEvent ? regressionEventById(run.pendingEvent) : null;
 
   const nextScene = () => { setMenu(null); saveRun({ ...run, scene: null }); };
   const explore = (tier) => {
@@ -637,16 +637,22 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
       </div>
     );
   } else if (pendingEv) {
-    const choices = pendingEv.choices.filter(c => !c.requireMemory || reg.memories.includes(c.requireMemory));
+    const choices = pendingEv.choices.filter(c => regressionChoiceVisible(c, run, reg.memories));
     body = (
       <div className="space-y-3 ui-screen-enter">
-        <div className="text-[14px] font-bold" style={{ color: PALETTE.twilight }}>◆ {pendingEv.title}</div>
+        {pendingEv.main
+          ? <div className="text-[12px] font-bold" style={{ color: PALETTE.legendary }}>📜 메인 스토리 {pendingEv.main}/{REGRESSION_MAIN_STORY.length}</div>
+          : null}
+        <div className="text-[14px] font-bold" style={{ color: pendingEv.main ? PALETTE.legendary : PALETTE.twilight }}>◆ {pendingEv.title}</div>
         <div className="text-[14px] leading-relaxed whitespace-pre-line" style={{ color: PALETTE.text }}>{pendingEv.text}</div>
         <div className="space-y-1.5">
           {choices.map((c, i) => {
             const label = c.stat ? { stat: c.stat, ...regressionChanceLabel(regressionCheckChance(storyStats[c.stat] || 0, c.dc)) } : null;
             const cantPay = c.cost?.gold && (run.gold || 0) < c.cost.gold;
-            return <Choice key={i} text={c.text} label={label} disabled={cantPay} sub={c.requireMemory ? '★ 전생의 기억' : (cantPay ? `은화가 부족하다 (보유 ${run.gold || 0}G)` : null)} onClick={() => chooseEvent(c)} />;
+            const traitTxt = c.trait ? `${REGRESSION_TRAITS[c.trait].name} +${c.traitValue || 1}${c.success?.traitBonus ? ` (성공 시 +${(c.traitValue || 1) + c.success.traitBonus})` : ''}` : null;
+            const req = c.requireTrait ? `★ ${Object.entries(c.requireTrait).map(([k, v]) => `${REGRESSION_TRAITS[k].name} ${v} 이상`).join(' · ')}` : null;
+            const sub = [c.requireMemory ? '★ 전생의 기억' : null, req, traitTxt, cantPay ? `은화가 부족하다 (보유 ${run.gold || 0}G)` : null].filter(Boolean).join(' · ') || null;
+            return <Choice key={i} text={c.text} label={label} disabled={cantPay} sub={sub} onClick={() => chooseEvent(c)} />;
           })}
         </div>
       </div>
@@ -803,6 +809,16 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
               ))}
             </div>
             <div className="text-[11px] mt-2" style={{ color: PALETTE.textDim }}>판정에 성공하거나 전투에서 이기면 경험치를 얻는다. 레벨이 오를 때마다 추가 능력치 +1.</div>
+            <div className="text-[12px] font-bold mt-3 mb-1" style={{ color: PALETTE.text }}>성향 (메인 스토리 선택)</div>
+            <div className="flex gap-1.5">
+              {Object.entries(REGRESSION_TRAITS).map(([k, tr]) => (
+                <div key={k} className="flex-1 text-center px-1 py-1.5" style={{ borderRadius: 8, background: PALETTE.panelLight, border: `1px solid ${regressionTopTrait(run) === k ? tr.color : 'transparent'}` }}>
+                  <div className="text-[11px]" style={{ color: tr.color }}>{tr.name}</div>
+                  <b className="text-[14px] tabular-nums" style={{ color: PALETTE.text }}>{run.traits?.[k] || 0}</b>
+                </div>
+              ))}
+            </div>
+            <div className="text-[11px] mt-1" style={{ color: PALETTE.textDim }}>가장 높은 성향이 첨탑 정복 후의 엔딩을 가른다. 메인 스토리는 각 지역 {8}일째와 마지막 날 찾아온다.</div>
             <div className="text-[12px] font-bold mt-3 mb-1" style={{ color: PALETTE.text }}>보유 스킬 {regressionRunSkills(run).length}개</div>
             <div className="space-y-1">
               {regressionRunSkills(run).map(id => {
