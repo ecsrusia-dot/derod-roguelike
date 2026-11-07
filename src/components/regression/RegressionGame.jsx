@@ -27,6 +27,9 @@ import {
   regressionVictoryGold, regressionEndingFor, getRegressionCompanion, RELICS,
   regressionFameStage, regressionEnemyLabel, regressionNarration, regressionCompanionLine, regressionCheckChance,
   regressionChanceLabel, resolveRegressionChoice, regressionResultScene, regressionNotesToTags, regressionTravelCost,
+  REGRESSION_STATS, REGRESSION_STAT_IDS, REGRESSION_START_POINTS, REGRESSION_START_CAP, REGRESSION_STAT_MAX, REGRESSION_EXP,
+  emptyRegressionStats, regressionPresetStats, regressionRandomStats, regressionStatsSpent, regressionRunStats,
+  regressionExpToNext, spendRegressionStatPoint, regressionFamePath, regressionLegacyCombatStats,
 } from '../../data.js';
 import PrepScreen from '../PrepScreen.jsx';
 import { AP_TUNING } from '../../combat/initCombat.js';
@@ -115,6 +118,7 @@ function RecordBook({ reg, run, onClose }) {
 export default function RegressionGame({ reg, meta, onSave, onBack }) {
   const run = reg.run;
   const [pickClass, setPickClass] = useState('wanderer');
+  const [customStats, setCustomStats] = useState(null); // 시작 커스텀 화면 (null = 로비)
   const [showBook, setShowBook] = useState(false);
   const [banner, setBanner] = useState(null);
   const [carrySel, setCarrySel] = useState([]);
@@ -141,7 +145,9 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
   const combatMeta = useMemo(() => ({ ...(meta || {}), upgrades: {} }), [meta]);
 
   const saveRun = (nextRun, extra = {}) => onSave({ run: nextRun, ...extra });
-  const combatStats = classData ? Object.fromEntries(Object.entries(classData.stats).map(([k, v]) => [k, v + (run?.statBonus?.[k] || 0)])) : {};
+  // 1.181.0~ 능력치 10종(이야기 판정) + 본편 전투용 환산 능력치 (PR B 전용 전투 전까지)
+  const storyStats = run ? regressionRunStats(run) : {};
+  const combatStats = run ? regressionLegacyCombatStats(storyStats) : {};
 
   // 전투 진입(출전 준비 확정) 시 벨트 장전 — 새로고침으로 다시 마운트돼도 같은 벨트로 복원
   const combatKey = run && !run.over && ((run.pending?.prepared) || (run.spireRound != null && run.spirePrepared))
@@ -255,7 +261,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
     if (!prepared) {
       if (prepEdit) {
         return (
-          <PrepScreen classData={classData} skills={loadout.skills} stats={classData.stats} relics={ownedRelics} ultimates={[]}
+          <PrepScreen classData={classData} skills={loadout.skills} stats={combatStats} relics={ownedRelics} ultimates={[]}
             expedition={expedition} engravingFx={regressionClassFx(run.classId)} meta={combatMeta} mode="full"
             onConfirm={(selSkills, selRelics) => { setPrepEdit(false); saveRun(setRegressionLoadout(run, { ...lo, activeSkills: selSkills, activeRelics: selRelics })); }} />
         );
@@ -371,7 +377,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
       const label = regressionEnemyLabel(enemyKey, tier);
       const { run: afterCombat, learnedNow } = applyRegressionCombat(settleCommon(run), {
         enemyKey, tier, win,
-        hpPct: regressionPostCombatHpPct(loadout.hp, loadout.maxHp, taken), observations, intStat: classData.stats?.지능 || 10,
+        hpPct: regressionPostCombatHpPct(loadout.hp, loadout.maxHp, taken), observations, intStat: combatStats.지능 || 10,
       });
       let next = afterCombat;
       if (!win) { saveRun(next); return; }
@@ -384,6 +390,8 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
       next = applyRegressionLoot(next, loot);
       const lootTxt = describeRegressionLoot(loot);
       if (lootTxt) tags.push({ text: lootTxt, tone: 'good' });
+      tags.push({ text: `경험치 +${REGRESSION_EXP[tier] || 0}`, tone: 'good' });
+      if ((next.level || 0) > (run.level || 0)) tags.push({ text: `레벨 상승 ${run.level || 0}→${next.level}`, tone: 'gold' }, { text: `추가 능력치 +${next.level - (run.level || 0)}`, tone: 'gold' });
       if (learnedNow.length) tags.push({ text: `기록 완성 — ${describeRegressionRecord(learnedNow[0])}`, tone: 'gold' });
       else if (REGRESSION_RECORDS[enemyKey] && !run.learned.includes(enemyKey)) {
         const g = Math.round((next.records[enemyKey] || 0) - (run.records[enemyKey] || 0));
@@ -425,10 +433,58 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
 
   // ===== 로비 =====
   if (!run) {
-    const startLife = () => {
-      setBanner(null);
-      onSave({ run: createRegressionRun(reg, pickClass) });
-    };
+    const startLife = () => { setBanner(null); setCustomStats(regressionPresetStats(pickClass)); };
+    // ===== 시작 커스텀 — 능력치 배분 (원작 「남은 능력치」 화면) =====
+    if (customStats) {
+      const spent = regressionStatsSpent(customStats);
+      const left = REGRESSION_START_POINTS - spent;
+      const adj = (k, d) => {
+        const v = customStats[k] + d;
+        if (v < 0 || v > REGRESSION_START_CAP || (d > 0 && left <= 0)) return;
+        setCustomStats({ ...customStats, [k]: v });
+      };
+      const groups = ['신체', '전투술', '비전투'];
+      const cls = classById(pickClass);
+      return (
+        <div className="h-full flex flex-col ui-screen-enter" style={{ background: PALETTE.bgDeep }}>
+          <ScreenHeader title="능력치 배분" subtitle={`${cls?.name} · 남은 능력치 ${left}`} onBack={() => setCustomStats(null)} />
+          <div className="flex-1 overflow-y-auto px-4 pb-6 space-y-3">
+            <div className="text-[12px] leading-relaxed" style={{ color: PALETTE.textDim }}>
+              능력치는 전투 위력과 이야기 판정 성공률을 정한다. 시작 후에는 레벨업 때 얻는 추가 능력치로만 바꿀 수 있다. 시작 상한 {REGRESSION_START_CAP}.
+            </div>
+            {groups.map(g => (
+              <GlassPanel key={g} style={{ padding: 12 }}>
+                <div className="text-[12px] font-bold mb-2" style={{ color: PALETTE.dawn }}>{g}</div>
+                <div className="space-y-1.5">
+                  {REGRESSION_STATS.filter(st => st.group === g).map(st => (
+                    <div key={st.id} className="flex items-center gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[13px] font-bold" style={{ color: PALETTE.text }}>{st.id}</div>
+                        <div className="text-[11px] truncate" style={{ color: PALETTE.textDim }}>{st.desc}</div>
+                      </div>
+                      <button aria-label={`${st.id} 내리기`} className="ui-press" onClick={() => adj(st.id, -1)} disabled={customStats[st.id] <= 0}
+                        style={{ width: 40, height: 40, borderRadius: 10, background: PALETTE.panelLight, border: `1px solid ${PALETTE.panelBorder}`, color: PALETTE.text, opacity: customStats[st.id] <= 0 ? 0.35 : 1 }}>−</button>
+                      <b className="text-[16px] tabular-nums text-center" style={{ width: 24, color: customStats[st.id] > 0 ? PALETTE.legendary : PALETTE.textDim }}>{customStats[st.id]}</b>
+                      <button aria-label={`${st.id} 올리기`} className="ui-press" onClick={() => adj(st.id, 1)} disabled={left <= 0 || customStats[st.id] >= REGRESSION_START_CAP}
+                        style={{ width: 40, height: 40, borderRadius: 10, background: PALETTE.panelLight, border: `1px solid ${PALETTE.panelBorder}`, color: PALETTE.text, opacity: left <= 0 || customStats[st.id] >= REGRESSION_START_CAP ? 0.35 : 1 }}>+</button>
+                    </div>
+                  ))}
+                </div>
+              </GlassPanel>
+            ))}
+            <div className="grid grid-cols-3 gap-1.5">
+              <UIButton variant="ghost" onClick={() => setCustomStats(regressionPresetStats(pickClass))}>프리셋</UIButton>
+              <UIButton variant="ghost" onClick={() => setCustomStats(regressionRandomStats())}>랜덤</UIButton>
+              <UIButton variant="ghost" onClick={() => setCustomStats(emptyRegressionStats())}>초기화</UIButton>
+            </div>
+            <UIButton variant="primary" className="w-full ui-sheen" disabled={left !== 0}
+              onClick={() => { onSave({ run: createRegressionRun(reg, pickClass, customStats) }); setCustomStats(null); }}>
+              {left === 0 ? (reg.loops === 0 ? '여명의 마을에서 눈을 뜬다' : `${reg.loops + 1}번째 생을 시작한다`) : `능력치를 ${left} 더 배분하세요`}
+            </UIButton>
+          </div>
+        </div>
+      );
+    }
     const learnedEver = Object.keys(reg.recordsEver || {}).length;
     return (
       <div className="h-full flex flex-col ui-screen-enter" style={{ background: PALETTE.bgDeep }}>
@@ -492,7 +548,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
           </GlassPanel>
           <ActionButton icon={BookOpen} title={`기록서 (전생 포함 ${learnedEver}/${Object.keys(REGRESSION_RECORDS).length}종)`} sub="적별 기록 보상 보기" onClick={() => setShowBook(true)} />
           <UIButton variant="primary" className="w-full ui-sheen" onClick={startLife}>
-            {reg.loops === 0 ? '여명의 마을에서 눈을 뜬다' : `${reg.loops + 1}번째 생을 시작한다`}
+            능력치를 정하고 출발한다
           </UIButton>
         </div>
         {showBook && <RecordBook reg={reg} run={null} onClose={() => setShowBook(false)} />}
@@ -509,6 +565,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
   const companion = region ? regressionCompanionAt(region.id) : null;
   const eventsLeft = region ? REGRESSION_EVENTS.filter(e => e.region === region.id && !(run.seenEvents || []).includes(e.id)).length : 0;
   const stage = regressionFameStage(run.fame);
+  const famePath = regressionFamePath(run);
   const daysLeft = Math.max(0, run.maxDays - run.day + 1);
   const compFx = aggregateRegressionCompanions(run);
   const scene = run.scene || null;
@@ -540,9 +597,9 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
       [{ text: `호감 +${after - before} (${after}/100)`, tone: 'good' }, upTier ? { text: `「${regressionCompanionTier(after).name}」 달성`, tone: 'gold' } : null]) });
   };
   const chooseEvent = (choice) => {
-    const res = resolveRegressionChoice(choice, combatStats);
+    const res = resolveRegressionChoice(choice, storyStats);
     const { run: next, notes } = applyRegressionEvent({ ...run, pendingEvent: null }, pendingEv.id, res, { maxHp: loadout.maxHp });
-    const checkTag = res.check ? [{ text: res.check === 'ok' ? `[${choice.stat}] 판정 성공` : `[${choice.stat}] 판정 실패`, tone: res.check === 'ok' ? 'gold' : 'bad' }] : [];
+    const checkTag = res.check ? [{ text: res.check === 'ok' ? `${choice.stat} - 성공!` : `${choice.stat} - 실패!`, tone: res.check === 'ok' ? 'gold' : 'bad' }] : [];
     saveRun({ ...next, scene: regressionResultScene(pendingEv.title, res.text, [...checkTag, ...regressionNotesToTags(notes)]) });
   };
 
@@ -585,7 +642,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
         <div className="text-[14px] leading-relaxed whitespace-pre-line" style={{ color: PALETTE.text }}>{pendingEv.text}</div>
         <div className="space-y-1.5">
           {choices.map((c, i) => {
-            const label = c.stat ? { stat: c.stat, ...regressionChanceLabel(regressionCheckChance(combatStats[c.stat] || 10, c.dc)) } : null;
+            const label = c.stat ? { stat: c.stat, ...regressionChanceLabel(regressionCheckChance(storyStats[c.stat] || 0, c.dc)) } : null;
             const cantPay = c.cost?.gold && (run.gold || 0) < c.cost.gold;
             return <Choice key={i} text={c.text} label={label} disabled={cantPay} sub={c.requireMemory ? '★ 전생의 기억' : (cantPay ? `은화가 부족하다 (보유 ${run.gold || 0}G)` : null)} onClick={() => chooseEvent(c)} />;
           })}
@@ -653,13 +710,13 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
           <div className="flex-1 min-w-0">
             <div className="text-[11px]" style={{ color: PALETTE.textDim }}>이름을 알려 첨탑에 오르기</div>
             <div className="text-[13px] font-bold truncate" style={{ color: stage.step >= stage.total ? PALETTE.legendary : PALETTE.dawn }}>
-              {stage.name} ({stage.step}/{stage.total}) <span className="font-normal tabular-nums" style={{ color: PALETTE.textDim }}>· 명성 {run.fame}</span>
+              {famePath ? `${famePath}${/[가-힣]/.test(famePath) && (famePath.charCodeAt(famePath.length - 1) - 0xac00) % 28 && (famePath.charCodeAt(famePath.length - 1) - 0xac00) % 28 !== 8 ? '으로' : '로'} 알려지는 중` : stage.name} ({stage.step}/{stage.total}) <span className="font-normal tabular-nums" style={{ color: PALETTE.textDim }}>· 명성 {run.fame}</span>
             </div>
           </div>
           <Chip icon={<Hourglass size={12} />} color={daysLeft <= 5 ? PALETTE.accent : PALETTE.dawn}>{spireDay ? '첨탑의 날' : `D${run.day}/${run.maxDays}`}</Chip>
         </div>
         <div className="flex items-center gap-2 mt-2">
-          <div className="text-[12px] font-bold flex-none" style={{ color: PALETTE.text }}>{classData.name}</div>
+          <div className="text-[12px] font-bold flex-none" style={{ color: PALETTE.text }}>{classData.name} <span style={{ color: PALETTE.dawn }}>Lv.{run.level || 0}</span></div>
           <div className="flex-1"><Bar label="" value={loadout.hp} max={loadout.maxHp} color={PALETTE.accent} right="" /></div>
           <div className="text-[11px] tabular-nums flex-none" style={{ color: PALETTE.text }}>{loadout.hp}/{loadout.maxHp}</div>
           <div className="text-[11px] tabular-nums flex-none" style={{ color: PALETTE.legendary }}>{run.gold || 0}G</div>
@@ -675,6 +732,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
         <div className="flex gap-1.5 pt-2">
           <button className="ui-press flex-1 text-[12px]" onClick={() => setShowBook(true)} style={{ minHeight: 40, borderRadius: 'var(--r-chip, 8px)', background: 'transparent', border: `1px solid ${PALETTE.panelBorder}`, color: PALETTE.textDim }}>📖 기록서 {run.learned.length}</button>
           <button className="ui-press flex-1 text-[12px]" onClick={() => setMenu(menu === 'party' ? null : 'party')} style={{ minHeight: 40, borderRadius: 'var(--r-chip, 8px)', background: 'transparent', border: `1px solid ${PALETTE.panelBorder}`, color: PALETTE.textDim }}>🤝 동료</button>
+          <button className="ui-press flex-1 text-[12px]" onClick={() => setMenu(menu === 'stats' ? null : 'stats')} style={{ minHeight: 40, borderRadius: 'var(--r-chip, 8px)', background: run.statPoints > 0 ? `${PALETTE.legendary}22` : 'transparent', border: `1px solid ${run.statPoints > 0 ? PALETTE.legendary : PALETTE.panelBorder}`, color: run.statPoints > 0 ? PALETTE.legendary : PALETTE.textDim }}>📊 능력치{run.statPoints > 0 ? ` +${run.statPoints}` : ''}</button>
           <button className="ui-press flex-1 text-[12px]" onClick={() => setMenu(menu === 'log' ? null : 'log')} style={{ minHeight: 40, borderRadius: 'var(--r-chip, 8px)', background: 'transparent', border: `1px solid ${PALETTE.panelBorder}`, color: PALETTE.textDim }}>📜 지난 일</button>
         </div>
         {menu === 'party' && (
@@ -690,6 +748,27 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
                 );
               })}
             </div>
+          </GlassPanel>
+        )}
+        {menu === 'stats' && (
+          <GlassPanel style={{ padding: 12 }}>
+            <div className="flex justify-between text-[12px] mb-2">
+              <span style={{ color: PALETTE.text }}>Lv.{run.level || 0} · 경험치 {run.exp || 0}/{regressionExpToNext(run.level || 0)}</span>
+              <span style={{ color: run.statPoints > 0 ? PALETTE.legendary : PALETTE.textDim }}>남은 추가 능력치 {run.statPoints || 0}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              {REGRESSION_STATS.map(st => (
+                <div key={st.id} className="flex items-center gap-2 px-2" style={{ minHeight: 40, borderRadius: 'var(--r-chip, 8px)', background: PALETTE.panelLight }}>
+                  <span className="text-[12px] flex-1" style={{ color: PALETTE.text }}>{st.id}</span>
+                  <b className="text-[13px] tabular-nums" style={{ color: PALETTE.dawn }}>{storyStats[st.id]}</b>
+                  {run.statPoints > 0 && storyStats[st.id] < REGRESSION_STAT_MAX && (
+                    <button aria-label={`${st.id} 올리기`} className="ui-press text-[13px] font-bold" onClick={() => saveRun(spendRegressionStatPoint(run, st.id))}
+                      style={{ width: 32, height: 32, borderRadius: 8, background: `${PALETTE.legendary}22`, border: `1px solid ${PALETTE.legendary}`, color: PALETTE.legendary }}>+</button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="text-[11px] mt-2" style={{ color: PALETTE.textDim }}>판정에 성공하거나 전투에서 이기면 경험치를 얻는다. 레벨이 오를 때마다 추가 능력치 +1.</div>
           </GlassPanel>
         )}
         {menu === 'log' && (

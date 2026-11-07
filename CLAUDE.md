@@ -1028,7 +1028,9 @@ PM이 AskUserQuestion으로 확정한 설계. **던전앤파이터 모티브, "�
 | 1.178.1 상처 규칙 ✅ | PM 결정(사제 독주 해소): 전투 후 HP = 전투 전 HP − 받은 피해 × `woundPct` 0.6 (첨탑 `spireWoundPct` 0.8). 전투 중 회복은 이월 안 됨. CombatScreen `damageTakenRef`(player.hp 감소분 누적 effect) → onVictory 3번째 인자 `damageTaken`. 봇 실측: 사제 1생 정복 → 2생 정복 / 검사·술법사·마족 3생 내 미정복 |
 | MVP 3-2 ✅ (1.179.0) | `REGRESSION_COMPANIONS` 4명(지역 1:1, 호감 0~100 · 동행 40 / 맹약 100, `perks` 선언형 → `aggregateRegressionCompanions` 한 곳에서 합산: 수비 패시브·restHealPct·spireRestPct·potionCap·recordBonusPct·spireWeakness·goldPct·famePerWin·spireWoundCut) + `REGRESSION_EVENTS` 24개(본편 EventScreen 스키마, 모드 전용 reward: fame/affinity/record/heal_pct/combat — ⚠️ 본편 EventScreen은 판정 없는 선택지의 `combat`을 전달하지 않으므로 `reward:{type:'combat',name,bonus}`로 표현, `requireMemory`로 기억 조각 선택지) + `REGRESSION_SHOP`(마을, 0일) + 엔딩 5종(`regressionEndingFor` — 맹약 동료 엔딩 우선). 사건 진행 중 = `run.pendingEvent`, 사건 전투 = `pending.fromEvent`(날짜 미소모) |
 | 1.180.0 이야기 화면 ✅ | PM 결정(무림귀환 스크린샷 「이런 스타일」 — 구글 드라이브 폴더 17c7SGUm… 스크린샷 5장): 허브 → **이야기 화면**(지역 서술 `regressionNarration` → `>` 선택지 → 결과 장면 `run.scene`{title,text,tags} → 「다음」). 상단 목표 바 `regressionFameStage`(명성 4단계 n/4). 사건은 EventScreen 대신 인라인(`resolveRegressionChoice` + `regressionCheckChance`/`regressionChanceLabel` 성공 가능성 라벨). 적 등급 `regressionEnemyLabel`([하급]/[상급]/[군주]). 전투 결과·대화(`regressionCompanionLine`)·야영·구매 모두 결과 장면 |
-| 다음 | 이야기 화면 2차 — 전투를 전체 화면 대신 이야기 속 작은 자동 전투 패널로(스크린샷 「▶전투시작」 패널) · PM 실기기 피드백 |
+| 2.0 시리즈 | 설계서 `docs/regression-v2-design.md` (PR #279). PM 확정: **전투 = 시안 2(본편 전투 화면 스타일)** — 단, 본편 CombatScreen을 개조하지 않고 **회귀 전용 전투 컴포넌트**로 만든다(본편 회귀 위험 0) · 능력치 10종 승인 · 직업 = 초상화+프리셋 · 전투 태세 넣음 · 기존 시스템 연결 |
+| 2.0 PR A ✅ (1.181.0) | 능력치 10종(키 = 한글 이름 `REGRESSION_STATS`, run.stats) · 시작 커스텀 12포인트/상한 5(`REGRESSION_PRESETS` 직업별) · 경험치·레벨(`gainRegressionExp`, `REGRESSION_EXP`, 레벨당 statPoints +1) · 판정 공식 `능력치×2 + d6 ≥ DC − 9`(`REGRESSION_DC_OFFSET`) · 명성 경로 `run.fameBy`/`regressionFamePath`. PR B 전까지 `regressionLegacyCombatStats`로 본편 CombatScreen에 환산 |
+| 다음 | 2.0 PR B — 전용 전투(시안 2 화면) + 스킬 3등급 데이터 + 전투 태세 → PR C 습득 개연성 → PR D 장비·상점·경제 |
 
 ### ⬆ 최신 버전 업데이트 버튼 (1.179.1)
 

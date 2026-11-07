@@ -226,7 +226,7 @@ export function regressionCarrySlots(metaR) {
 }
 
 // =========== 런 생성 ===========
-export function createRegressionRun(metaR = EMPTY_REGRESSION, classId) {
+export function createRegressionRun(metaR = EMPTY_REGRESSION, classId, stats = null) {
   const T = REGRESSION_TUNING;
   const fx = aggregateRegressionMemories(metaR.memories);
   const records = {};
@@ -257,6 +257,9 @@ export function createRegressionRun(metaR = EMPTY_REGRESSION, classId) {
     potions: {},           // 1.178.0~ 포션 보유 { potionId: 개수 }
     loadout: null,         // 1.178.0~ 직전 출전 준비 { activeSkills, activeRelics, belt }
     affinity: {},          // 1.179.0~ 동료 호감 { companionId: 0~100 }
+    stats: stats || regressionPresetStats(classId),   // 1.181.0~ 능력치 10종 (시작 커스텀)
+    level: 0, exp: 0, statPoints: 0,                  // 1.181.0~ 레벨업 → 추가 능력치
+    fameBy: {},                                       // 1.181.0~ 판정 성공 능력치 집계 → 명성 경로
     seenEvents: [],        // 1.179.0~ 이번 생에 본 사건 id
     statBonus: {},         // 1.179.0~ 사건 능력치 보너스 { 근력: n }
     over: null,            // null | 'death' | 'timeout' | 'spireLose' | 'victory'
@@ -367,6 +370,7 @@ export function applyRegressionCombat(run, result) {
     const fame = Math.round((T.fameGain[tier] || 0) * regionMult) + (run.affinity ? aggregateRegressionCompanions(run).famePerWin : 0);
     next.fame += fame;
     next.kills[tier] = (next.kills[tier] || 0) + 1;
+    next = gainRegressionExp(next, REGRESSION_EXP[tier] || 0).run;
     next.hpPct = Math.min(1, Math.max(0.01, result.hpPct ?? next.hpPct)); // 1.178.0 상한 — 전투 화면 최대 HP(근력 보너스 포함)가 더 커서 100% 초과 누적되던 버그
     // 사건에서 이어진 전투는 사건이 이미 하루를 썼으므로 날짜 미소모
     next = advanceDays(next, run.pending?.fromEvent ? 0 : 1, `${name} 처치 (명성 +${fame})${learnedNow.length ? ' · 기록 완성' : ''}`);
@@ -442,7 +446,7 @@ export function setRegressionCarry(metaR, enemyKeys = []) {
 // classStartSkills: CLASSES[].startSkills, baseMaxHp: GAME_CONFIG.startHp
 export function buildRegressionLoadout(run, classStartSkills = {}, baseMaxHp = 300) {
   const skills = { ...classStartSkills };
-  let maxHp = baseMaxHp + (run.maxHpBonus || 0);
+  let maxHp = baseMaxHp + (run.maxHpBonus || 0) + regressionMaxHpBonusFromStats(regressionRunStats(run));
   const compPassive = run.affinity ? aggregateRegressionCompanions(run).passive : {};
   for (const [name, lv] of [...Object.entries(run.bonusSkills || {}), ...Object.entries(compPassive)]) {
     const maxLv = PASSIVE_SKILLS[name]?.maxLv ?? 7;
@@ -702,7 +706,7 @@ export const REGRESSION_EVENTS = [
     { text: '깃발 아래를 뒤진다', stat: '민첩', dc: 15, success: { text: '얼음 틈에서 은화 주머니를 찾았다.', reward: { type: 'gold', value: 90 } }, fail: { text: '얼음이 갈라지며 손을 베였다.', penalty: { hp: -25 } } },
   ] },
   { id: 'rg_wolf_den', region: 1, title: '늑대의 굴', text: '피 냄새가 밴 동굴. 안쪽에서 낮은 으르렁거림이 들린다.', choices: [
-    { text: '숨어서 사냥 습성을 지켜본다', stat: '지능', dc: 14, success: { text: '늑대가 송곳니를 드러내는 순간을 익혔다.', reward: { type: 'record', name: 'iceWolf', value: 40 } }, fail: { text: '들켰다. 늑대가 달려든다!', combat: 'iceWolf' } },
+    { text: '숨어서 사냥 습성을 지켜본다', stat: '통찰', dc: 14, success: { text: '늑대가 송곳니를 드러내는 순간을 익혔다.', reward: { type: 'record', name: 'iceWolf', value: 40 } }, fail: { text: '들켰다. 늑대가 달려든다!', combat: 'iceWolf' } },
     { text: '조용히 물러난다', result: '굴 입구에 걸린 늑대 사냥꾼의 부적만 챙겼다.', reward: { type: 'gold', value: 30 } },
   ] },
   { id: 'rg_blizzard_camp', region: 1, title: '눈보라 속 야영지', text: '꺼져 가는 모닥불 곁에 원정대의 짐이 버려져 있다.', choices: [
@@ -728,7 +732,7 @@ export const REGRESSION_EVENTS = [
     { text: '돌본 사람을 기다린다', result: '해 질 무렵 치유사가 나타난다. "…약초를 남겨 줘서 고마워요. 세레나예요."', reward: { type: 'affinity', name: 'healer', value: 30 } },
   ] },
   { id: 'rg_whispering_grave', region: 2, title: '속삭이는 무덤', text: '이름 없는 무덤에서 누군가의 목소리가 새어 나온다. "…돌아왔구나."', choices: [
-    { text: '귀를 기울인다', stat: '지능', dc: 15, success: { text: '망자가 숲의 비밀 하나를 속삭인다.', reward: { type: 'skill_random_lv' } }, fail: { text: '목소리가 비명으로 바뀐다.', penalty: { hp: -30 } } },
+    { text: '귀를 기울인다', stat: '통찰', dc: 15, success: { text: '망자가 숲의 비밀 하나를 속삭인다.', reward: { type: 'skill_random_lv' } }, fail: { text: '목소리가 비명으로 바뀐다.', penalty: { hp: -30 } } },
     { text: '무덤을 정돈해 준다', result: '목소리가 잦아든다. 묘비 아래 은화가 놓여 있다.', reward: { type: 'gold', value: 50 } },
   ] },
   { id: 'rg_spider_nest', region: 2, title: '거미줄 회랑', text: '나무 사이가 온통 거미줄이다. 그 끝에서 무언가 반짝인다.', choices: [
@@ -737,7 +741,7 @@ export const REGRESSION_EVENTS = [
   ] },
   { id: 'rg_lost_child', region: 2, title: '길 잃은 아이', text: '숲속에서 아이가 울고 있다. 망자의 숲에 살아 있는 아이가?', choices: [
     { text: '아이를 마을까지 데려다준다', result: '아이는 무사히 돌아갔다. 마을에 이름이 알려진다.', reward: { type: 'fame', value: 10 }, penalty: { hp: -10 } },
-    { text: '경계한다', stat: '지능', dc: 13, success: { text: '아이의 그림자가 없다. 망령이었다 — 물러나 화를 피했다.', reward: { type: 'gold', value: 40 } }, fail: { text: '아이가 웃으며 형체를 바꾼다!', combat: 'fallenElf' } },
+    { text: '경계한다', stat: '통찰', dc: 13, success: { text: '아이의 그림자가 없다. 망령이었다 — 물러나 화를 피했다.', reward: { type: 'gold', value: 40 } }, fail: { text: '아이가 웃으며 형체를 바꾼다!', combat: 'fallenElf' } },
   ] },
   { id: 'rg_healer_request', region: 2, title: '치유사의 부탁', text: '세레나가 다급하게 부른다. "부패한 정령이 약초밭을 망치고 있어요."', choices: [
     { text: '정령을 쫓아낸다', result: '오염된 정령이 덤벼든다! (세레나 호감 +25)', reward: { type: 'combat', name: 'forestSpirit', bonus: { type: 'affinity', name: 'healer', value: 25 } } },
@@ -750,14 +754,14 @@ export const REGRESSION_EVENTS = [
   // ── 봉인된 신전 ──
   { id: 'rg_sealed_library', region: 3, title: '봉인된 서고', text: '먼지 쌓인 서고. 한 노인이 책장 사이를 서성이고 있다.', choices: [
     { text: '노인에게 말을 건다', result: '"회귀자로군. 나는 오렌, 이 신전의 기록관일세."', reward: { type: 'affinity', name: 'archivist', value: 30 } },
-    { text: '책을 몰래 읽는다', stat: '지능', dc: 15, success: { text: '고대 전투 기록에서 한 수를 배웠다.', reward: { type: 'skill_random_lv' } }, fail: { text: '봉인이 발동해 머리가 깨질 듯하다.', penalty: { hp: -30 } } },
+    { text: '책을 몰래 읽는다', stat: '학식', dc: 15, success: { text: '고대 전투 기록에서 한 수를 배웠다.', reward: { type: 'skill_random_lv' } }, fail: { text: '봉인이 발동해 머리가 깨질 듯하다.', penalty: { hp: -30 } } },
   ] },
   { id: 'rg_time_echo', region: 3, title: '시간의 잔향', text: '복도 끝에서 나 자신이 걸어온다. 전생의 나였다.', choices: [
     { text: '그를 따라간다', result: '잔향이 숨겨진 방으로 안내한다.', reward: { type: 'random_relic' } },
-    { text: '그와 마주 선다', stat: '매력', dc: 15, success: { text: '잔향이 말없이 고개를 끄덕이고 사라진다. 마음이 단단해진다.', reward: { type: 'heal_pct', value: 40 } }, fail: { text: '잔향이 검을 뽑는다!', combat: 'timeKeeper' } },
+    { text: '그와 마주 선다', stat: '신성', dc: 15, success: { text: '잔향이 말없이 고개를 끄덕이고 사라진다. 마음이 단단해진다.', reward: { type: 'heal_pct', value: 40 } }, fail: { text: '잔향이 검을 뽑는다!', combat: 'timeKeeper' } },
   ] },
   { id: 'rg_golem_repair', region: 3, title: '고장 난 골렘', text: '깨진 골렘이 같은 동작을 반복하고 있다. 핵이 드러나 있다.', choices: [
-    { text: '핵을 고쳐 준다', stat: '지능', dc: 16, success: { text: '골렘이 멈추고 길을 비킨다. 그 뒤에 보물상자가.', reward: { type: 'gold', value: 130 } }, fail: { text: '핵이 폭주한다!', combat: 'brokenGolem' } },
+    { text: '핵을 고쳐 준다', stat: '학식', dc: 16, success: { text: '골렘이 멈추고 길을 비킨다. 그 뒤에 보물상자가.', reward: { type: 'gold', value: 130 } }, fail: { text: '핵이 폭주한다!', combat: 'brokenGolem' } },
     { text: '움직임을 관찰한다', result: '골렘의 공격 주기를 기록했다.', reward: { type: 'record', name: 'brokenGolem', value: 40 } },
   ] },
   { id: 'rg_offering_altar', region: 3, title: '공물 제단', text: '제단에 "피를 바치는 자에게 힘을"이라 새겨져 있다.', choices: [
@@ -771,7 +775,7 @@ export const REGRESSION_EVENTS = [
   ] },
   { id: 'rg_archivist_task', region: 3, title: '기록관의 숙제', text: '오렌이 두꺼운 책을 내민다. "자네가 본 것들을 적어 주겠나."', choices: [
     { text: '지금까지의 싸움을 적는다', result: '오렌이 고개를 끄덕이며 빈 페이지를 채운다.', reward: { type: 'affinity', name: 'archivist', value: 25 } },
-    { text: '대신 그의 기록을 읽는다', stat: '지능', dc: 14, success: { text: '옛 사제의 전투 방식이 적혀 있다.', reward: { type: 'record', name: 'ancientPriest', value: 50 } }, fail: { text: '읽을 수 없는 문자다.', result: '' } },
+    { text: '대신 그의 기록을 읽는다', stat: '학식', dc: 14, success: { text: '옛 사제의 전투 방식이 적혀 있다.', reward: { type: 'record', name: 'ancientPriest', value: 50 } }, fail: { text: '읽을 수 없는 문자다.', result: '' } },
   ] },
   // ── 마계의 균열 ──
   { id: 'rg_black_market', region: 4, title: '균열의 암시장', text: '균열 가장자리에 천막이 늘어서 있다. 한 여자가 손짓한다. "구경은 공짜야."', choices: [
@@ -792,10 +796,10 @@ export const REGRESSION_EVENTS = [
   ] },
   { id: 'rg_broker_job', region: 4, title: '정보상의 의뢰', text: '니아가 지도를 펼친다. "정찰병 하나만 처리해 주면 값을 쳐 주지."', choices: [
     { text: '의뢰를 받는다', result: '마계 정찰병을 찾아냈다! (니아 호감 +25)', reward: { type: 'combat', name: 'demonScout', bonus: { type: 'affinity', name: 'broker', value: 25 } } },
-    { text: '흥정한다', stat: '매력', dc: 15, success: { text: '"…좋아, 선불로 주지." 니아가 웃는다.', reward: { type: 'gold', value: 80 } }, fail: { text: '"손님, 균열에서 흥정은 목숨으로 하는 거야."', penalty: { gold: -30 } } },
+    { text: '흥정한다', stat: '화술', dc: 15, success: { text: '"…좋아, 선불로 주지." 니아가 웃는다.', reward: { type: 'gold', value: 80 } }, fail: { text: '"손님, 균열에서 흥정은 목숨으로 하는 거야."', penalty: { gold: -30 } } },
   ] },
   { id: 'rg_rift_echo', region: 4, title: '균열의 메아리', text: '균열 속에서 수많은 목소리가 내 이름을 부른다.', choices: [
-    { text: '목소리를 따라간다', stat: '매력', dc: 16, success: { text: '목소리들이 물러나며 힘을 남긴다.', reward: { type: 'skill_random_lv' } }, fail: { text: '목소리가 발톱이 되어 할퀸다.', penalty: { hp: -40 } } },
+    { text: '목소리를 따라간다', stat: '신성', dc: 16, success: { text: '목소리들이 물러나며 힘을 남긴다.', reward: { type: 'skill_random_lv' } }, fail: { text: '목소리가 발톱이 되어 할퀸다.', penalty: { hp: -40 } } },
     { text: '「전생의 기억」 — 상흔이 길을 안다', requireMemory: 'mem_rift_scar', result: '몸이 기억하는 길로 균열을 빠져나오며 은화를 주웠다.', reward: { type: 'gold', value: 120 } },
   ] },
 ];
@@ -828,6 +832,20 @@ export function applyRegressionEvent(run, eventId, res, { maxHp = 300, rng = Mat
     else if (r.type === 'skill_specific') { next = applyRegressionLoot(next, { passive: r.name }); notes.push(`「${r.name}」 +1Lv`); }
     else if (r.type === 'skill_random_lv') { const n = REGRESSION_PASSIVE_POOL[Math.floor(rng() * REGRESSION_PASSIVE_POOL.length)]; next = applyRegressionLoot(next, { passive: n }); notes.push(`「${n}」 +1Lv`); }
     else if (r.type === 'stat') { next.statBonus[r.name] = (next.statBonus[r.name] || 0) + r.value; notes.push(`${r.name} +${r.value}`); }
+  }
+  // 1.181.0~ 판정 성공 = 경험치 + 명성 + 명성 경로 (원작: 주사위 성공으로 이름이 알려진다)
+  if (res?.check === 'ok' && res.stat) {
+    const g = gainRegressionExp(next, REGRESSION_EXP.check);
+    next = g.run;
+    next.fame += 2;
+    next.fameBy = { ...(next.fameBy || {}), [res.stat]: ((next.fameBy || {})[res.stat] || 0) + 1 };
+    notes.push(`경험치 +${REGRESSION_EXP.check}`, '명성 +2');
+    if (g.levelUps > 0) notes.push(`레벨 상승 ${g.from}→${next.level}`, `추가 능력치 +${g.levelUps}`);
+  } else if (!res?.check) {
+    const g = gainRegressionExp(next, REGRESSION_EXP.event);
+    next = g.run;
+    notes.push(`경험치 +${REGRESSION_EXP.event}`);
+    if (g.levelUps > 0) notes.push(`레벨 상승 ${g.from}→${next.level}`, `추가 능력치 +${g.levelUps}`);
   }
   const p = res?.penalty;
   if (p?.hp) { next.hpPct = Math.max(0.01, next.hpPct + p.hp / maxHp); notes.push(`HP ${p.hp}`); }
@@ -917,18 +935,20 @@ export function regressionCompanionLine(companionId, affinity = 0) {
   return lines[Math.min(idx, lines.length - 1)];
 }
 
-// 판정 성공 확률 — 능력치 + 주사위(1~6) ≥ DC (본편 EventScreen과 같은 규칙)
-export function regressionCheckChance(statValue = 10, dc = 10, diceMin = 1, diceMax = 6) {
+// 판정 성공 확률 — 1.181.0~ 능력치 10종(0~10) 체계: 능력치 × 2 + 주사위(1~6) ≥ (DC − 9)
+// 사건 데이터의 DC(13~17)는 그대로 두고 여기서 환산 → 능력치 0이면 대부분 운, 3이면 유리, 5면 거의 확실
+export const REGRESSION_DC_OFFSET = 9;
+export function regressionCheckChance(statValue = 0, dc = 10, diceMin = 1, diceMax = 6) {
   let ok = 0; const n = diceMax - diceMin + 1;
-  for (let d = diceMin; d <= diceMax; d++) if (statValue + d >= dc) ok++;
+  for (let d = diceMin; d <= diceMax; d++) if (statValue * 2 + d >= dc - REGRESSION_DC_OFFSET) ok++;
   return ok / n;
 }
-// 성공 가능성 라벨 — 수치 대신 말로 (스크린샷 스타일)
+// 성공 가능성 라벨 — 원작 표기(유리함/보통/불리함)에 맞춤
 export function regressionChanceLabel(p) {
   if (p >= 1) return { text: '확실', color: '#9ad4a3' };
-  if (p >= 0.8) return { text: '거의 확실', color: '#9ad4a3' };
-  if (p >= 0.6) return { text: '무난', color: '#d4a574' };
-  if (p >= 0.4) return { text: '보통', color: '#d4a574' };
+  if (p >= 0.8) return { text: '유리함', color: '#9ad4a3' };
+  if (p >= 0.5) return { text: '보통', color: '#d4a574' };
+  if (p >= 0.2) return { text: '불리함', color: '#e08a5c' };
   if (p > 0) return { text: '도전적', color: '#c4453d' };
   return { text: '불가능', color: '#9b8975' };
 }
@@ -937,15 +957,16 @@ export function regressionChanceLabel(p) {
 export function resolveRegressionChoice(choice, stats = {}, rng = Math.random) {
   const res = { text: '', reward: null, penalty: null, combat: null, check: null };
   if (choice.stat) {
-    const sv = stats[choice.stat] || 10;
+    const sv = stats[choice.stat] || 0;
     const dice = 1 + Math.floor(rng() * 6);
-    const ok = sv + dice >= choice.dc;
+    const ok = sv * 2 + dice >= choice.dc - REGRESSION_DC_OFFSET;
     const br = ok ? choice.success : choice.fail;
     res.text = br?.text || '';
     res.reward = br?.reward || null;
     res.penalty = br?.penalty || null;
     res.combat = br?.combat || null;
     res.check = ok ? 'ok' : 'fail';
+    res.stat = choice.stat;
   } else {
     res.text = choice.result || '';
     res.reward = choice.reward || null;
@@ -962,4 +983,94 @@ export function regressionResultScene(title, text, tags = []) {
 // 노트 문자열 → 보상 태그 (명성·골드·호감 등은 좋은 색, HP 감소는 붉은색)
 export function regressionNotesToTags(notes = []) {
   return notes.filter(Boolean).map(n => ({ text: n, tone: /^HP -|-\d+G|^-/.test(n) ? 'bad' : 'good' }));
+}
+
+// ============================================
+// 1.181.0~ 2.0 PR A — 능력치 10종 · 시작 커스텀 · 레벨업 (docs/regression-v2-design.md 2.1·2.2)
+// ============================================
+export const REGRESSION_STATS = [
+  { id: '근력', group: '신체', desc: '물리 피해 · 힘쓰기·파괴 판정' },
+  { id: '민첩', group: '신체', desc: '회피·선공 · 추격·도주·잠입 판정' },
+  { id: '강인', group: '신체', desc: 'HP·피해 감소 · 버티기·독·추위 판정' },
+  { id: '검술', group: '전투술', desc: '근접 무기 스킬 위력 · 결투 판정' },
+  { id: '사격', group: '전투술', desc: '활·투척 스킬 위력 · 견제·사냥 판정' },
+  { id: '마법', group: '전투술', desc: '주문 스킬 위력 · 결계·마법 장치 판정' },
+  { id: '신성', group: '전투술', desc: '회복·축복 위력 · 정화·망령 판정' },
+  { id: '통찰', group: '비전투', desc: '약점 간파 · 함정·거짓·기척 판정' },
+  { id: '화술', group: '비전투', desc: '설득·흥정·위협 판정' },
+  { id: '학식', group: '비전투', desc: '고대 문자·지름길·기연 해석 판정' },
+];
+export const REGRESSION_STAT_IDS = REGRESSION_STATS.map(s => s.id);
+export const REGRESSION_START_POINTS = 12;
+export const REGRESSION_START_CAP = 5;
+export const REGRESSION_STAT_MAX = 10;
+
+// 직업 = 초상화 + 프리셋 (PM 확정). 합계 12
+export const REGRESSION_PRESETS = {
+  wanderer:   { 검술: 4, 민첩: 3, 근력: 2, 통찰: 2, 강인: 1 },
+  sage:       { 마법: 5, 학식: 4, 통찰: 2, 민첩: 1 },
+  demonblood: { 근력: 5, 강인: 4, 검술: 2, 화술: 1 },
+  elf:        { 사격: 5, 민첩: 4, 통찰: 2, 학식: 1 },
+  priest:     { 신성: 5, 강인: 3, 화술: 2, 학식: 2 },
+};
+export function emptyRegressionStats() {
+  return Object.fromEntries(REGRESSION_STAT_IDS.map(k => [k, 0]));
+}
+export function regressionPresetStats(classId) {
+  return { ...emptyRegressionStats(), ...(REGRESSION_PRESETS[classId] || {}) };
+}
+export function regressionRandomStats(rng = Math.random) {
+  const st = emptyRegressionStats();
+  let left = REGRESSION_START_POINTS;
+  while (left > 0) {
+    const k = REGRESSION_STAT_IDS[Math.floor(rng() * REGRESSION_STAT_IDS.length)];
+    if (st[k] < REGRESSION_START_CAP) { st[k] += 1; left -= 1; }
+  }
+  return st;
+}
+export function regressionStatsSpent(stats) {
+  return REGRESSION_STAT_IDS.reduce((a, k) => a + (stats?.[k] || 0), 0);
+}
+// 구세이브(1.180.0 이전 생)는 stats가 없음 → 직업 프리셋으로 보정
+export function regressionRunStats(run) {
+  return { ...emptyRegressionStats(), ...(run?.stats || regressionPresetStats(run?.classId)) };
+}
+
+// 경험치·레벨 — 판정 성공·전투로 획득. 레벨마다 추가 능력치 +1
+export const REGRESSION_EXP = { check: 15, normal: 20, elite: 40, event: 5 };
+export function regressionExpToNext(level = 0) { return 30 + level * 15; }
+export function gainRegressionExp(run, amount = 0) {
+  let next = { ...run, exp: (run.exp || 0) + amount, level: run.level || 0, statPoints: run.statPoints || 0 };
+  const before = next.level;
+  while (next.exp >= regressionExpToNext(next.level)) {
+    next.exp -= regressionExpToNext(next.level);
+    next.level += 1;
+    next.statPoints += 1;
+  }
+  return { run: next, levelUps: next.level - before, from: before };
+}
+export function spendRegressionStatPoint(run, statId) {
+  const st = regressionRunStats(run);
+  if (!(run.statPoints > 0) || !REGRESSION_STAT_IDS.includes(statId) || st[statId] >= REGRESSION_STAT_MAX) return run;
+  return { ...run, stats: { ...st, [statId]: st[statId] + 1 }, statPoints: run.statPoints - 1 };
+}
+
+// 명성 경로 — 판정에 가장 많이 성공한 능력치 (원작 「검술로 알려지는 중」)
+export function regressionFamePath(run) {
+  const entries = Object.entries(run?.fameBy || {}).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
+  return entries.length ? entries[0][0] : null;
+}
+
+// PR B(전용 전투) 전까지 본편 CombatScreen에 넘기는 환산 능력치 — 커스텀이 전투에도 바로 반영되도록
+export function regressionLegacyCombatStats(stats) {
+  const s = { ...emptyRegressionStats(), ...stats };
+  return {
+    근력: 10 + Math.max(s.근력, s.검술) * 2,
+    민첩: 10 + Math.max(s.민첩, s.사격) * 2,
+    지능: 10 + Math.max(s.마법, s.학식) * 2,
+    매력: 10 + Math.max(s.신성, s.화술) * 2,
+  };
+}
+export function regressionMaxHpBonusFromStats(stats) {
+  return (stats?.강인 || 0) * 12;
 }
