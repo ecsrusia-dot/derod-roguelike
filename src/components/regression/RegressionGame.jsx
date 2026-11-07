@@ -35,6 +35,7 @@ import {
   REGRESSION_ECON, REGRESSION_GEAR, REGRESSION_GEAR_SLOTS, REGRESSION_GEAR_GRADES, regressionGearLabel, regressionGearStatText, regressionGearFx, regressionGearStats,
   regressionEffectiveStats, equipRegressionGear, unequipRegressionGear, offerRegressionUnique, resolveRegressionUnique, regressionUniqueChance, regressionUniqueIntro,
   regressionAptitude, buildRegressionShopStock, rerollRegressionShop, regressionShopOfferPrice, buyRegressionOffer,
+  REGRESSION_START_TRAITS, REGRESSION_TRAIT_TUNING, aggregateRegressionStartTraits, unlockRegressionStartTrait, toggleRegressionStartTrait,
   REGRESSION_TRAITS, REGRESSION_MAIN_STORY, regressionEventById, regressionChoiceVisible, regressionTopTrait,
   REGRESSION_DAY, rollRegressionDay, passRegressionDay, hideFromRegressionEnemy, fightRegressionToday, restRegressionShelter, trainRegressionShelter,
   askRegressionHermit, regressionDayEnemyMult, regressionDayTable, regressionFortuneWeight, REGRESSION_TODAY_INTRO,
@@ -204,6 +205,12 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
               ))}
             </div>
           </GlassPanel>
+          <GlassPanel style={{ padding: 12 }}>
+            <div className="flex items-center justify-between">
+              <span className="text-[12px] font-bold" style={{ color: PALETTE.dawn }}>🔔 잔향 +{settle.echoGain}</span>
+              <span className="text-[11px]" style={{ color: PALETTE.textDim }}>보유 {settle.meta.echo} · 시작 특성 해금에 쓴다</span>
+            </div>
+          </GlassPanel>
           {settle.gainedMemories.length > 0 && (
             <GlassPanel style={{ padding: 14 }}>
               <div className="text-[12px] font-bold mb-2" style={{ color: PALETTE.legendary }}>🧩 새 기억 조각 {settle.gainedMemories.length}개</div>
@@ -289,7 +296,15 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
         hpPct: regressionPostCombatHpPct(loadout.hp, loadout.maxHp, taken), observations, intStat: combatStats.지능 || 10,
       });
       let next = afterCombat;
-      if (!win) { saveRun(next); return; }
+      if (!win) {
+        // 1.187.0~ 생환 — 쓰러졌지만 일어났다
+        if (next.revivedNow) {
+          const { revivedNow, ...rest } = next;
+          saveRun({ ...rest, scene: regressionResultScene(`[전투 당신 vs ${label}] - 패배`, '눈앞이 캄캄해졌다 — 그런데 촛불 하나가 꺼지지 않는다. 숨이 돌아온다. 아직은 끝이 아니다.', [{ text: '🕯 생환 — HP 30%로 일어났다', tone: 'gold' }, { text: '이번 생의 생환 소진', tone: 'bad' }]) });
+          return;
+        }
+        saveRun(next); return;
+      }
       const tags = [];
       tags.push({ text: `명성 +${next.fame - run.fame}`, tone: 'gold' });
       const gold = regressionVictoryGold(next, enemyKey);
@@ -358,8 +373,10 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
     const startLife = () => { setBanner(null); setCustomStats(regressionPresetStats(pickClass)); setCustomSkills(REGRESSION_SKILL_PRESETS[pickClass] || []); };
     // ===== 시작 커스텀 — 능력치 배분 (원작 「남은 능력치」 화면) =====
     if (customStats) {
+      const tfx = aggregateRegressionStartTraits(reg.equippedTraits || []);
+      const skillCount = REGRESSION_START_SKILL_COUNT + (tfx.startSkills || 0);
       const spent = regressionStatsSpent(customStats);
-      const left = REGRESSION_START_POINTS - spent;
+      const left = REGRESSION_START_POINTS + (tfx.startPoints || 0) - spent;
       const adj = (k, d) => {
         const v = customStats[k] + d;
         if (v < 0 || v > REGRESSION_START_CAP || (d > 0 && left <= 0)) return;
@@ -401,15 +418,15 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
             </div>
             <GlassPanel style={{ padding: 12 }}>
               <div className="flex justify-between items-center mb-1">
-                <div className="text-[12px] font-bold" style={{ color: PALETTE.dawn }}>✦ 일반 스킬 — {REGRESSION_START_SKILL_COUNT}개 선택</div>
-                <span className="text-[12px] tabular-nums" style={{ color: customSkills.length === REGRESSION_START_SKILL_COUNT ? PALETTE.legendary : PALETTE.textDim }}>{customSkills.length}/{REGRESSION_START_SKILL_COUNT}</span>
+                <div className="text-[12px] font-bold" style={{ color: PALETTE.dawn }}>✦ 일반 스킬 — {skillCount}개 선택</div>
+                <span className="text-[12px] tabular-nums" style={{ color: customSkills.length === skillCount ? PALETTE.legendary : PALETTE.textDim }}>{customSkills.length}/{skillCount}</span>
               </div>
               <div className="text-[11px] mb-2" style={{ color: PALETTE.textDim }}>육성 방향을 정한다. 스킬 위력은 관련 능력치에 비례하니, 쓰려는 스킬에 맞춰 능력치를 배분하는 편이 유리하다. 전투 중에는 조건이 맞을 때 각 1번만 자동 발동한다.</div>
               <div className="space-y-1.5">
                 {REGRESSION_NORMAL_SKILLS.map(id => {
                   const sk = REGRESSION_SKILLS[id];
                   const on = customSkills.includes(id);
-                  const full = !on && customSkills.length >= REGRESSION_START_SKILL_COUNT;
+                  const full = !on && customSkills.length >= skillCount;
                   const rel = Object.keys(sk.scale || sk.scaleMult || sk.reflect?.scale || {});
                   return (
                     <button key={id} disabled={full} onClick={() => setCustomSkills(on ? customSkills.filter(x => x !== id) : [...customSkills, id])}
@@ -421,9 +438,9 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
                 })}
               </div>
             </GlassPanel>
-            <UIButton variant="primary" className="w-full ui-sheen" disabled={left !== 0 || customSkills.length !== REGRESSION_START_SKILL_COUNT}
-              onClick={() => { onSave({ run: createRegressionRun(reg, pickClass, customStats, customSkills) }); setCustomStats(null); }}>
-              {left !== 0 ? `능력치를 ${left} 더 배분하세요` : customSkills.length !== REGRESSION_START_SKILL_COUNT ? `일반 스킬을 ${REGRESSION_START_SKILL_COUNT - customSkills.length}개 더 고르세요` : (reg.loops === 0 ? '여명의 마을에서 눈을 뜬다' : `${reg.loops + 1}번째 생을 시작한다`)}
+            <UIButton variant="primary" className="w-full ui-sheen" disabled={left !== 0 || customSkills.length !== skillCount}
+              onClick={() => { onSave({ run: createRegressionRun(reg, pickClass, customStats, customSkills, reg.equippedTraits || []) }); setCustomStats(null); }}>
+              {left !== 0 ? `능력치를 ${left} 더 배분하세요` : customSkills.length !== skillCount ? `일반 스킬을 ${skillCount - customSkills.length}개 더 고르세요` : (reg.loops === 0 ? '여명의 마을에서 눈을 뜬다' : `${reg.loops + 1}번째 생을 시작한다`)}
             </UIButton>
           </div>
         </div>
@@ -474,6 +491,34 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
                 );
               })}
             </div>
+          </GlassPanel>
+
+          <GlassPanel style={{ padding: 14 }}>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[12px] font-bold" style={{ color: PALETTE.dawn }}>🔔 시작 특성 — 한 생에 {REGRESSION_TRAIT_TUNING.slots}개</span>
+              <span className="text-[11px] tabular-nums" style={{ color: PALETTE.legendary }}>잔향 {reg.echo || 0}</span>
+            </div>
+            <div className="space-y-1.5">
+              {REGRESSION_START_TRAITS.map(t => {
+                const owned = (reg.unlockedTraits || []).includes(t.id);
+                const on = (reg.equippedTraits || []).includes(t.id);
+                const full = !on && (reg.equippedTraits || []).length >= REGRESSION_TRAIT_TUNING.slots;
+                const canBuy = !owned && (reg.echo || 0) >= t.cost;
+                return (
+                  <button key={t.id} disabled={owned ? full : !canBuy} className="ui-press w-full flex items-center gap-2 px-2.5 text-left"
+                    onClick={() => onSave(owned ? toggleRegressionStartTrait(reg, t.id) : unlockRegressionStartTrait(reg, t.id))}
+                    style={{ minHeight: 48, borderRadius: 'var(--r-chip, 8px)', background: on ? `${PALETTE.legendary}18` : PALETTE.panelLight, border: `1px solid ${on ? PALETTE.legendary : PALETTE.panelBorder}`, opacity: (owned ? full : !canBuy) ? 0.5 : 1 }}>
+                    <span className="text-[18px]">{t.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[12px] font-bold" style={{ color: on ? PALETTE.legendary : owned ? PALETTE.text : PALETTE.textDim }}>{t.name}</div>
+                      <div className="text-[11px]" style={{ color: PALETTE.textDim }}>{t.desc}</div>
+                    </div>
+                    <span className="text-[11px] font-bold flex-none" style={{ color: on ? PALETTE.legendary : owned ? PALETTE.dawn : PALETTE.legendary }}>{on ? '장착' : owned ? '장착하기' : `해금 ${t.cost}`}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="text-[11px] mt-2" style={{ color: PALETTE.textDim }}>잔향은 생을 마칠 때마다 쌓인다 — 명성 10당 1 · 메인 스토리 1편당 2 · 첨탑 1층당 3 · 정복 10 · 새 엔딩 10.</div>
           </GlassPanel>
 
           <GlassPanel style={{ padding: 14 }}>
