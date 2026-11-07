@@ -1479,6 +1479,8 @@ export function getRegression(meta) {
     unlockedTraits: Array.isArray(r.unlockedTraits) ? r.unlockedTraits : [],
     equippedTraits: Array.isArray(r.equippedTraits) ? r.equippedTraits : [],
     echo: Number.isFinite(r.echo) ? r.echo : 0,
+    traitLv: (r.traitLv && typeof r.traitLv === 'object') ? r.traitLv : {},
+    traitSlotsBought: Number.isFinite(r.traitSlotsBought) ? r.traitSlotsBought : 0,
     recordsEver: (r.recordsEver && typeof r.recordsEver === 'object') ? r.recordsEver : {},
     run: r.run || null,
   };

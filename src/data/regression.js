@@ -222,7 +222,9 @@ export const EMPTY_REGRESSION = {
   spireClears: 0,
   echo: 0,             // 1.187.0~ 잔향 — 시작 특성 해금 재화
   unlockedTraits: [],  // 1.187.0~ 해금한 시작 특성 id
-  equippedTraits: [],  // 1.187.0~ 다음 생에 들고 갈 시작 특성 (최대 2)
+  equippedTraits: [],  // 1.187.0~ 다음 생에 들고 갈 시작 특성 (슬롯 수만큼)
+  traitLv: {},         // 1.191.0~ 특성 레벨 { id: 1~5 } (구세이브 = unlockedTraits → Lv.1)
+  traitSlotsBought: 0, // 1.191.0~ 잔향으로 산 추가 슬롯 수
 };
 
 export function regressionCarrySlots(metaR) {
@@ -230,7 +232,7 @@ export function regressionCarrySlots(metaR) {
 }
 
 // =========== 런 생성 ===========
-export function createRegressionRun(metaR = EMPTY_REGRESSION, classId, stats = null, skills = null, startTraits = []) {
+export function createRegressionRun(metaR = EMPTY_REGRESSION, classId, stats = null, skills = null, startTraits = [], provisions = []) {
   const T = REGRESSION_TUNING;
   const fx = aggregateRegressionMemories(metaR.memories);
   const records = {};
@@ -278,7 +280,7 @@ export function createRegressionRun(metaR = EMPTY_REGRESSION, classId, stats = n
     over: null,            // null | 'death' | 'timeout' | 'spireLose' | 'victory'
     log: [],
   };
-  return applyRegressionStartTraits({ ...run, shop: buildRegressionShopStock(run) }, startTraits);
+  return applyRegressionProvisions(applyRegressionStartTraits({ ...run, shop: buildRegressionShopStock(run) }, startTraits, metaR), provisions);
 }
 
 // =========== 날짜·이동 ===========
@@ -392,7 +394,7 @@ export function applyRegressionCombat(run, result) {
   } else if ((run.revives || 0) > 0) {
     // 1.187.0~ 시작 특성 「생환」 — 한 번은 죽음 대신 일어난다 (그날은 그대로 지나감)
     next.revives = run.revives - 1;
-    next.hpPct = REGRESSION_TRAIT_TUNING.reviveHpPct;
+    next.hpPct = run.reviveHpPct || REGRESSION_TRAIT_TUNING.reviveHpPct;
     next = advanceDays(next, run.pending?.fromEvent ? 0 : 1, `${name}에게 쓰러졌으나 생환`);
     next.revivedNow = true;
   } else {
@@ -1718,35 +1720,75 @@ export function regressionChoiceVisible(choice, run, memories = []) {
 // 잔향(회귀할 때마다 쌓이는 영구 재화)으로 영구 해금 → 한 생에 최대 2개를 골라 들고 시작.
 // 밸런스는 REGRESSION_TRAIT_TUNING + REGRESSION_START_TRAITS 한 곳.
 export const REGRESSION_TRAIT_TUNING = {
-  slots: 2,
+  slots: 2,                          // 기본 장착 슬롯 (1.191.0~ 잔향으로 3·4칸 확장)
+  slotCosts: [120, 300],             // 3번째 · 4번째 슬롯 해금 비용
+  maxLv: 5,
+  upgradeMult: [1, 1.5, 2, 2.5],     // Lv.2~5 강화 비용 = 해금 비용 × 배율
   reviveHpPct: 0.3,
   echo: { per10Fame: 1, perStory: 2, spireRound: 3, victory: 10, newEnding: 10, min: 3 },
 };
+// fxAt(lv) — 레벨별 효과 (1.191.0~ 특성 강화 Lv.1~5). desc(lv)는 그 레벨의 설명
 export const REGRESSION_START_TRAITS = [
-  { id: 'st_revive', name: '생환', icon: '🕯', cost: 40, desc: '한 생에 한 번, 전투에서 쓰러지면 HP 30%로 일어난다 (첨탑 제외)', fx: { revives: 1 } },
-  { id: 'st_purse', name: '노잣돈', icon: '💰', cost: 12, desc: '시작 은화 +150', fx: { gold: 150 } },
-  { id: 'st_talent', name: '타고난 재능', icon: '📊', cost: 30, desc: '시작 능력치 배분 +2 (12 → 14)', fx: { startPoints: 2 } },
-  { id: 'st_tome', name: '비전서', icon: '📕', cost: 30, desc: '시작 일반 스킬을 1개 더 고른다 (3 → 4)', fx: { startSkills: 1 } },
-  { id: 'st_luck', name: '기연의 별', icon: '✨', cost: 20, desc: '기연이 더 자주 찾아온다 (기연 가중 +4)', fx: { fortuneBonus: 4 } },
-  { id: 'st_bond', name: '익숙한 얼굴', icon: '🤝', cost: 20, desc: '모든 동료의 호감 +20으로 시작한다 (전생에서 알던 사이)', fx: { affinityAll: 20 } },
+  { id: 'st_revive', name: '생환', icon: '🕯', cost: 40,
+    fxAt: (lv) => ({ revives: 1, reviveHpPct: 0.3 + 0.05 * (lv - 1) }),
+    desc: (lv) => `한 생에 한 번, 전투에서 쓰러지면 HP ${30 + 5 * (lv - 1)}%로 일어난다 (첨탑 제외)` },
+  { id: 'st_purse', name: '노잣돈', icon: '💰', cost: 12,
+    fxAt: (lv) => ({ gold: 150 + 50 * (lv - 1) }),
+    desc: (lv) => `시작 은화 +${150 + 50 * (lv - 1)}` },
+  { id: 'st_talent', name: '타고난 재능', icon: '📊', cost: 30,
+    fxAt: (lv) => ({ startPoints: 2 + Math.floor((lv - 1) / 2) }),
+    desc: (lv) => `시작 능력치 배분 +${2 + Math.floor((lv - 1) / 2)}` },
+  { id: 'st_tome', name: '비전서', icon: '📕', cost: 30,
+    fxAt: (lv) => ({ startSkills: lv >= 5 ? 2 : 1, startExp: (lv - 1) * 10 }),
+    desc: (lv) => `시작 일반 스킬 +${lv >= 5 ? 2 : 1}${lv > 1 ? ` · 시작 경험치 +${(lv - 1) * 10}` : ''}` },
+  { id: 'st_luck', name: '기연의 별', icon: '✨', cost: 20,
+    fxAt: (lv) => ({ fortuneBonus: 4 + 2 * (lv - 1) }),
+    desc: (lv) => `기연이 더 자주 찾아온다 (기연 가중 +${4 + 2 * (lv - 1)})` },
+  { id: 'st_bond', name: '익숙한 얼굴', icon: '🤝', cost: 20,
+    fxAt: (lv) => ({ affinityAll: 20 + 5 * (lv - 1) }),
+    desc: (lv) => `모든 동료의 호감 +${20 + 5 * (lv - 1)}으로 시작한다 (전생에서 알던 사이)` },
 ];
 export function getRegressionStartTrait(id) { return REGRESSION_START_TRAITS.find(t => t.id === id) || null; }
-export function aggregateRegressionStartTraits(ids = []) {
-  const fx = { revives: 0, gold: 0, startPoints: 0, startSkills: 0, fortuneBonus: 0, affinityAll: 0 };
-  for (const id of ids) { const t = getRegressionStartTrait(id); if (t) for (const [k, v] of Object.entries(t.fx)) fx[k] = (fx[k] || 0) + v; }
+// 특성 레벨 — 1.187.0 구세이브는 unlockedTraits만 있으므로 Lv.1로 본다
+export function regressionTraitLevel(metaR, id) {
+  const lv = metaR?.traitLv?.[id];
+  if (lv) return lv;
+  return (metaR?.unlockedTraits || []).includes(id) ? 1 : 0;
+}
+export function regressionTraitSlots(metaR) { return REGRESSION_TRAIT_TUNING.slots + (metaR?.traitSlotsBought || 0); }
+// 다음 행동 비용 — Lv.0이면 해금 비용, 그 외 강화 비용, 만렙이면 null
+export function regressionTraitNextCost(metaR, id) {
+  const t = getRegressionStartTrait(id); if (!t) return null;
+  const lv = regressionTraitLevel(metaR, id);
+  if (lv <= 0) return t.cost;
+  if (lv >= REGRESSION_TRAIT_TUNING.maxLv) return null;
+  return Math.round(t.cost * REGRESSION_TRAIT_TUNING.upgradeMult[lv - 1]);
+}
+export function regressionNextSlotCost(metaR) {
+  return REGRESSION_TRAIT_TUNING.slotCosts[metaR?.traitSlotsBought || 0] ?? null;
+}
+export function aggregateRegressionStartTraits(ids = [], metaR = null) {
+  const fx = { revives: 0, reviveHpPct: 0, gold: 0, startPoints: 0, startSkills: 0, startExp: 0, fortuneBonus: 0, affinityAll: 0 };
+  for (const id of ids) {
+    const t = getRegressionStartTrait(id); if (!t) continue;
+    const lv = Math.max(1, metaR ? regressionTraitLevel(metaR, id) : 1);
+    for (const [k, v] of Object.entries(t.fxAt(lv))) fx[k] = k === 'reviveHpPct' ? Math.max(fx[k], v) : (fx[k] || 0) + v;
+  }
   return fx;
 }
-function applyRegressionStartTraits(run, ids = []) {
-  const picked = (ids || []).filter(id => getRegressionStartTrait(id)).slice(0, REGRESSION_TRAIT_TUNING.slots);
-  const fx = aggregateRegressionStartTraits(picked);
+function applyRegressionStartTraits(run, ids = [], metaR = null) {
+  const picked = (ids || []).filter(id => getRegressionStartTrait(id)).slice(0, regressionTraitSlots(metaR));
+  const fx = aggregateRegressionStartTraits(picked, metaR);
   const affinity = { ...(run.affinity || {}) };
   if (fx.affinityAll) for (const c of REGRESSION_COMPANIONS) affinity[c.id] = Math.min(100, (affinity[c.id] || 0) + fx.affinityAll);
-  return {
-    ...run, startTraits: picked, revives: fx.revives,
+  let next = {
+    ...run, startTraits: picked, revives: fx.revives, reviveHpPct: fx.reviveHpPct || REGRESSION_TRAIT_TUNING.reviveHpPct,
     gold: (run.gold || 0) + fx.gold,
     fortuneBonus: (run.fortuneBonus || 0) + fx.fortuneBonus,
     affinity,
   };
+  if (fx.startExp) next = gainRegressionExp(next, fx.startExp).run;
+  return next;
 }
 // 잔향 — 생을 마칠 때. 명성·메인 스토리·첨탑 진행·정복·새 엔딩
 export function regressionEchoGain(metaR, run) {
@@ -1758,17 +1800,26 @@ export function regressionEchoGain(metaR, run) {
   return Math.max(E.min, Math.floor((run.fame || 0) / 10) * E.per10Fame + stories * E.perStory + rounds * E.spireRound
     + (run.over === 'victory' ? E.victory : 0) + (newEnding ? E.newEnding : 0));
 }
+// 해금(Lv.0→1) 또는 강화(Lv.n→n+1)
 export function unlockRegressionStartTrait(metaR, id) {
-  const t = getRegressionStartTrait(id);
   const r = { ...EMPTY_REGRESSION, ...metaR };
-  if (!t || (r.unlockedTraits || []).includes(id) || (r.echo || 0) < t.cost) return metaR;
-  return { ...r, echo: r.echo - t.cost, unlockedTraits: [...(r.unlockedTraits || []), id] };
+  const cost = regressionTraitNextCost(r, id);
+  if (cost == null || (r.echo || 0) < cost) return metaR;
+  const lv = regressionTraitLevel(r, id) + 1;
+  return { ...r, echo: r.echo - cost, traitLv: { ...(r.traitLv || {}), [id]: lv },
+    unlockedTraits: (r.unlockedTraits || []).includes(id) ? r.unlockedTraits : [...(r.unlockedTraits || []), id] };
+}
+export function buyRegressionTraitSlot(metaR) {
+  const r = { ...EMPTY_REGRESSION, ...metaR };
+  const cost = regressionNextSlotCost(r);
+  if (cost == null || (r.echo || 0) < cost) return metaR;
+  return { ...r, echo: r.echo - cost, traitSlotsBought: (r.traitSlotsBought || 0) + 1 };
 }
 export function toggleRegressionStartTrait(metaR, id) {
   const r = { ...EMPTY_REGRESSION, ...metaR };
   const eq = r.equippedTraits || [];
   if (eq.includes(id)) return { ...r, equippedTraits: eq.filter(x => x !== id) };
-  if (!(r.unlockedTraits || []).includes(id) || eq.length >= REGRESSION_TRAIT_TUNING.slots) return metaR;
+  if (regressionTraitLevel(r, id) <= 0 || eq.length >= regressionTraitSlots(r)) return metaR;
   return { ...r, equippedTraits: [...eq, id] };
 }
 
@@ -1820,4 +1871,31 @@ export function regressionCombatBonus(run) {
   const c = run?.affinity ? aggregateRegressionCompanions(run) : {};
   for (const k of ['dmgDealt', 'dmgTaken', 'critRate', 'dodge']) if (c[k]) out[k] = (out[k] || 0) + c[k];
   return out;
+}
+
+
+// ============================================
+// 1.191.0~ 출발 준비물 (PM 결정 B) — 매 생 출발 전 잔향으로 사는 일회용 준비. 종류당 한 생 1개
+// ============================================
+export const REGRESSION_PROVISIONS = [
+  { id: 'pv_potions', name: '회복약 꾸러미', icon: '🧪', cost: 8, desc: '회복 물약(중) 2개를 들고 시작한다' },
+  { id: 'pv_gear', name: '낡은 장비 상자', icon: '🎁', cost: 12, desc: '고급~보물 장비 1개를 들고 시작한다' },
+  { id: 'pv_flame', name: '여분의 불꽃', icon: '🔥', cost: 15, desc: '생명의 불꽃 +1 (강한 전투 태세를 한 번 더)' },
+  { id: 'pv_tutor', name: '경험의 서', icon: '📖', cost: 10, desc: '경험치 +30으로 시작한다' },
+  { id: 'pv_rumor', name: '앞선 소문', icon: '📣', cost: 10, desc: '시작 명성 +10' },
+];
+export function getRegressionProvision(id) { return REGRESSION_PROVISIONS.find(p => p.id === id) || null; }
+export function regressionProvisionsCost(ids = []) {
+  return [...new Set(ids)].reduce((a, id) => a + (getRegressionProvision(id)?.cost || 0), 0);
+}
+export function applyRegressionProvisions(run, ids = [], rng = Math.random) {
+  let next = { ...run, potions: { ...(run.potions || {}) } };
+  for (const id of [...new Set(ids || [])]) {
+    if (id === 'pv_potions') next.potions.hp_medium = (next.potions.hp_medium || 0) + 2;
+    else if (id === 'pv_gear') next = addRegressionGear(next, rollRegressionGear(REGRESSION_ECON.gradeWeights.event, rng));
+    else if (id === 'pv_flame') next.flames = (next.flames ?? 3) + 1;
+    else if (id === 'pv_tutor') next = gainRegressionExp(next, 30).run;
+    else if (id === 'pv_rumor') next.fame = (next.fame || 0) + 10;
+  }
+  return { ...next, provisions: [...new Set(ids || [])] };
 }
