@@ -18,6 +18,8 @@ import {
   rollRegressionEnemy, startRegressionCombat, applyRegressionCombat,
   isRegressionSpireDay, isRegressionSpireEligible, isRegressionEliteOpen,
   enterRegressionSpire, applyRegressionSpireResult, buildRegressionSpireEnemy,
+  REGRESSION_ROUTES, REGRESSION_ROUTE_BOSSES, REGRESSION_ROUTE_REWARDS, REGRESSION_ROUTE_BOSS_DAY_IN_REGION, REGRESSION_ROUTE_FROM_REGION,
+  buildRegressionRouteBoss, applyRegressionRouteReward, regressionSpireChain, regressionSpireEnemyFor, regressionRouteFor, REGRESSION_GEAR as __RG_GEAR,
   settleRegression, setRegressionCarry, regressionCarrySlots, buildRegressionLoadout,
   describeRegressionRecord, getRegressionMemory,
   POTIONS, AUTO_SPEED_SKIP, rollRegressionLoot, applyRegressionLoot, describeRegressionLoot,
@@ -269,11 +271,13 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
   // 흐름: 적 확정(pending / spireRound) → 전투 준비(태세·벨트) → 자동 전투 재생(개입 불가) → 결과 장면
   const inSpire = run && run.spireRound != null && !run.over;
   if (run && loadout && (run.pending || (inSpire && !run.scene && !run.pendingLearn && !run.pendingGear))) {
-    const spireKey = inSpire ? REGRESSION_SPIRE_CHAIN[run.spireRound] : null;
-    const enemyKey = inSpire ? spireKey : run.pending.enemyKey;
     const compFx = aggregateRegressionCompanions(run);
-    const override = inSpire ? buildRegressionSpireEnemy(run.spireRound, run.memoryCount, compFx.spireWeakness) : null;
+    // 1.194.0~ 첨탑은 길(spireRoute)마다 구성이 다르고, 길목의 군주는 일러스트를 빌린 전용 적
+    const spireEnemy = inSpire ? regressionSpireEnemyFor(run, run.spireRound, compFx.spireWeakness) : null;
+    const enemyKey = inSpire ? spireEnemy.key : run.pending.enemyKey;
+    const override = inSpire ? spireEnemy.obj : (run.pending.routeBoss ? buildRegressionRouteBoss(run.pending.route, run.pending.routeBoss) : null);
     const enemyObj = override || ENEMIES[enemyKey];
+    const spireLen = regressionSpireChain(run).length;
     const committed = inSpire ? (run.spirePrepared || null) : (run.pending.prepared || null);
     const tier = inSpire ? 'boss' : run.pending.tier;
     const lo = run.loadout || {};
@@ -287,9 +291,9 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
       next = { ...next, spirePrepared: null };
       if (win && !next.over) {
         const hpLoss = Math.round((run.hpPct - next.hpPct) * 100);
-        next.scene = regressionResultScene(`[전투 당신 vs ${regressionEnemyLabel(enemyKey, 'boss')}] - 승리!`,
+        next.scene = regressionResultScene(`[전투 당신 vs ${regressionEnemyLabel(enemyKey, 'boss', enemyObj)}] - 승리!`,
           `첨탑 ${run.spireRound + 1}층의 주인이 무너졌다. 계단 위에서 더 짙은 황혼이 내려다보고 있다.`,
-          [hpLoss > 0 ? { text: `HP -${hpLoss}%`, tone: 'bad' } : null, { text: `다음 층 ${run.spireRound + 2}/${REGRESSION_SPIRE_CHAIN.length}`, tone: 'gold' }]);
+          [hpLoss > 0 ? { text: `HP -${hpLoss}%`, tone: 'bad' } : null, { text: `다음 층 ${run.spireRound + 2}/${spireLen}`, tone: 'gold' }]);
         // 1.183.0~ 군주 격파 = 기연의 기회 (적성 판정)
         const offer = offerRegressionLearn(next, 'boss', enemyKey);
         if (offer) { next.pendingLearn = offer; next.scene.tags.push({ text: '흩어지는 힘 속에서 깨달음이 스친다', tone: 'gold' }); }
@@ -298,7 +302,8 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
     };
     const finishExplore = (win, taken, observations, usedPotions = []) => {
       const tier = run.pending.tier;
-      const label = regressionEnemyLabel(enemyKey, tier);
+      const label = regressionEnemyLabel(enemyKey, tier, override);
+      const enemyName = enemyObj?.name || enemyKey;
       const { run: afterCombat, learnedNow } = applyRegressionCombat(consumeRegressionPotions(run, usedPotions), {
         enemyKey, tier, win,
         hpPct: regressionPostCombatHpPct(loadout.hp, loadout.maxHp, taken), observations, intStat: combatStats.지능 || 10,
@@ -331,7 +336,16 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
       }
       const hpLoss = Math.round((run.hpPct - next.hpPct) * 100);
       if (hpLoss > 0) tags.push({ text: `HP -${hpLoss}%`, tone: 'bad' });
-      const lines = [`${ENEMIES[enemyKey].name}이(가) 쓰러졌다. 숨을 고르고 주위를 살핀다.`, `${ENEMIES[enemyKey].name}의 마지막 일격을 흘려 내고, 승부를 끝냈다.`, `쓰러진 ${ENEMIES[enemyKey].name} 곁에서 쓸 만한 것을 챙겨 길을 나선다.`];
+      const lines = [`${enemyName}이(가) 쓰러졌다. 숨을 고르고 주위를 살핀다.`, `${enemyName}의 마지막 일격을 흘려 내고, 승부를 끝냈다.`, `쓰러진 ${enemyName} 곁에서 쓸 만한 것을 챙겨 길을 나선다.`];
+      // 1.194.0~ 길목의 군주 — 길마다 다른 보상 + 기연 기회 확정
+      if (run.pending.routeBoss) {
+        const rr = applyRegressionRouteReward(next, run.pending.route, run.pending.routeBoss);
+        next = rr.run; tags.push(...rr.tags);
+        const bo = offerRegressionLearn(next, 'boss', enemyKey);
+        if (bo) { next.pendingLearn = bo; tags.push({ text: '군주의 힘이 흩어지며 깨달음이 스친다', tone: 'gold' }); }
+        next.scene = regressionResultScene(`[길목의 군주 ${enemyName}] - 승리!`, `${enemyName}이(가) 무너졌다. ${REGRESSION_ROUTES[run.pending.route]?.name || '이 길'}이 한층 선명해진다.`, tags);
+        saveRun(next); return;
+      }
       // 1.183.0~ 배울 기회 — 일반 몹 12% (일반 스킬) / 강적 60% (고급 스킬). 실제 습득은 적성 판정
       const offer = offerRegressionLearn(next, tier === 'elite' ? 'elite' : 'normal', enemyKey);
       if (offer) { next.pendingLearn = offer; tags.push({ text: tier === 'elite' ? '비급서를 발견했다' : '기술 하나를 엿봤다', tone: 'gold' }); }
@@ -352,10 +366,10 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
         classData={classData}
         enemyKey={enemyKey}
         enemyObj={enemyObj}
-        enemyLabel={regressionEnemyLabel(enemyKey, tier)}
+        enemyLabel={regressionEnemyLabel(enemyKey, tier, override)}
         regionKey={inSpire ? 'spire' : run.region}
         enemyMult={inSpire ? 1 : regressionDayEnemyMult(run.day)}
-        intro={inSpire ? `첨탑 ${run.spireRound + 1}층. ${regressionEnemyLabel(enemyKey, 'boss')}이(가) 길을 막아선다.` : `${regressionEnemyLabel(enemyKey, tier)}이(가) 앞을 막아선다. 피할 수는 없다.`}
+        intro={inSpire ? `첨탑 ${run.spireRound + 1}/${spireLen}층. ${regressionEnemyLabel(enemyKey, 'boss', enemyObj)}이(가) 길을 막아선다.` : `${regressionEnemyLabel(enemyKey, tier, override)}이(가) 앞을 막아선다. 피할 수는 없다.`}
         stats={storyStats}
         level={run.level || 0}
         maxHp={loadout.maxHp}
@@ -773,6 +787,10 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
           {ok ? `마침내 ${run.maxDays + 1}일째. 하늘이 붉게 타오르고, 첨탑의 문이 이름을 알린 자를 부른다.${run.memoryCount >= REGRESSION_TUNING.spireWeaknessMemories || compFx.spireWeakness ? '\n기억의 조각들이 첨탑 주인의 약점을 비춘다.' : ''}`
             : `${run.maxDays + 1}일째. 황혼이 대륙을 덮는다. 이름 없는 자에게 첨탑의 문은 열리지 않았다.`}
         </div>
+        {ok && (() => { const R = REGRESSION_ROUTES[run.route || 'none']; return (
+          <div className="text-[12px] px-3 py-2" style={{ borderRadius: 'var(--r-chip, 8px)', background: PALETTE.panelLight, border: `1px solid ${R.color}` }}>
+            <b style={{ color: R.color }}>{R.icon} {R.name}</b><div style={{ color: PALETTE.textDim }}>{R.spire}</div>
+          </div>); })()}
         <Choice text={ok ? '첨탑에 오른다 (4연전, 층 사이 회복 없음)' : '황혼을 맞는다'} onClick={() => saveRun(enterRegressionSpire(run))} />
       </div>
     );
@@ -822,6 +840,12 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
           <Choice text="밤새 단련한다" sub={`경험치 +${REGRESSION_DAY.trainExp}`} onClick={() => { const r = trainRegressionShelter(run); saveRun({ ...r.run, scene: sceneOf('쉼터', '잠을 줄이고 검을 휘둘렀다. 몸이 조금 더 기억한다.', [{ text: `경험치 +${REGRESSION_DAY.trainExp}`, tone: 'good' }, r.levelUps > 0 ? { text: `레벨 상승 ${r.from}→${r.run.level}`, tone: 'gold' } : null, r.levelUps > 0 ? { text: `추가 능력치 +${r.levelUps}`, tone: 'gold' } : null]) }); }} />
         </>
       );
+    } else if (t.kind === 'routeBoss') {
+      const rw = REGRESSION_ROUTE_REWARDS[t.route]?.[t.routeBoss] || {};
+      const rwTxt = rw.stats ? Object.entries(rw.stats).map(([k, v]) => `${k} +${v}`).join(' · ') : rw.gear ? `여정 장비 「${__RG_GEAR[rw.gear]?.name}」` : rw.affinityAll ? `만난 동료 호감 +${rw.affinityAll}` : rw.text || (rw.gold ? `은화 +${rw.gold} · 회복약` : '');
+      choices = (
+        <Choice text="맞선다 — 피할 수 없다" sub={`승리 시 명성 +${Math.round(REGRESSION_TUNING.fameGain.boss * (REGRESSION_TUNING.regionFameMult[run.region] || 1))} · 경험치 +${REGRESSION_EXP.boss} · ${rwTxt} · 기연 기회`} onClick={() => saveRun(fightRegressionToday(run))} />
+      );
     } else if (t.kind === 'hermit') {
       const sk = REGRESSION_SKILLS[t.skillId];
       choices = (
@@ -834,7 +858,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
     body = (
       <div className="space-y-3 ui-screen-enter">
         <div className="flex items-center justify-between">
-          <div className="text-[12px] font-bold" style={{ color: PALETTE.dawn }}>D{run.day} — 오늘의 일</div>
+          <div className="text-[12px] font-bold" style={{ color: t.kind === 'routeBoss' ? PALETTE.accent : PALETTE.dawn }}>D{run.day} — {t.kind === 'routeBoss' ? `${REGRESSION_ROUTES[t.route]?.icon} 길목의 군주` : '오늘의 일'}</div>
           <div className="text-[11px]" style={{ color: PALETTE.textDim }}>기연의 기운 <b style={{ color: PALETTE.legendary }}>{Math.round((regressionDayTable(run).fortune || 0) * 100)}%</b> · 적 강도 ×{regressionDayEnemyMult(run.day).toFixed(2)}</div>
         </div>
         <div className="text-[14px] leading-relaxed" style={{ color: PALETTE.textDim }}>{regressionNarration(run)}</div>
@@ -926,6 +950,20 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
               );
             })()}
             <div className="text-[11px] mt-2" style={{ color: PALETTE.textDim }}>판정에 성공하거나 전투에서 이기면 경험치를 얻는다. 레벨이 오를 때마다 추가 능력치 +1.</div>
+            {(() => {
+              const cur = run.route || null;
+              const next = regressionRouteFor(run);
+              const R = REGRESSION_ROUTES[cur || next];
+              const nextRegion = REGRESSION_ROUTE_BOSS_DAY_IN_REGION;
+              return (
+                <div className="mt-3 px-2.5 py-2" style={{ borderRadius: 'var(--r-chip, 8px)', background: PALETTE.panelLight, border: `1px solid ${R.color}` }}>
+                  <div className="text-[12px] font-bold" style={{ color: R.color }}>{R.icon} {cur ? R.name : `아직 길이 정해지지 않음 (지금이면 「${R.name}」)`}</div>
+                  <div className="text-[11px]" style={{ color: PALETTE.textDim }}>{REGRESSION_ROUTE_FROM_REGION}지역부터 지역에 들어설 때마다 가장 높은 성향으로 길이 정해진다. 길마다 각 지역 {nextRegion}일째 「길목의 군주」·보상·첨탑 3~4층·엔딩이 달라진다.</div>
+                  {cur && [2, 3, 4].map(rg => { const b = REGRESSION_ROUTE_BOSSES[cur]?.[rg]; const done = (run.routeBossDone || []).includes(rg); return b && <div key={rg} className="text-[11px]" style={{ color: done ? PALETTE.green : PALETTE.textDim }}>{done ? '✓' : '·'} {rg}지역 — {b.name}</div>; })}
+                  <div className="text-[11px] mt-0.5" style={{ color: PALETTE.textDim }}>첨탑: {R.spire}</div>
+                </div>
+              );
+            })()}
             <div className="text-[12px] font-bold mt-3 mb-1" style={{ color: PALETTE.text }}>성향 (메인 스토리 선택)</div>
             <div className="flex gap-1.5">
               {Object.entries(REGRESSION_TRAITS).map(([k, tr]) => (
@@ -935,7 +973,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
                 </div>
               ))}
             </div>
-            <div className="text-[11px] mt-1" style={{ color: PALETTE.textDim }}>가장 높은 성향이 첨탑 정복 후의 엔딩을 가른다. 메인 스토리는 각 지역 {8}일째와 마지막 날 찾아온다.</div>
+            <div className="text-[11px] mt-1" style={{ color: PALETTE.textDim }}>가장 높은 성향이 길(루트)을 정하고, 첨탑에 오른 길이 엔딩을 가른다. 메인 스토리는 각 지역 {8}일째와 마지막 날 찾아온다.</div>
             <div className="text-[12px] font-bold mt-3 mb-1" style={{ color: PALETTE.text }}>보유 스킬 {regressionRunSkills(run).length}개</div>
             <div className="space-y-1">
               {regressionRunSkills(run).map(id => {

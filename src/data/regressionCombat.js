@@ -26,7 +26,7 @@ export const REGRESSION_COMBAT = {
   enemyDodge: { normal: 8, elite: 10, boss: 6 },
   // 적 강도 — 지역별 (본편 수치 × 배율). 체감 조정은 여기서
   // 1.190.0 PM 피드백 「전투·첨탑이 너무 쉽다」 — 시뮬 목표: 하급 승률 92~98%·승리 시 HP 27~47% 소모 / 강적 73~92% / 첨탑 진입 대비 정복 ~31%
-  enemyHp: { 1: 1.15, 2: 1.05, 3: 0.9, 4: 0.82, spire: 1.35 },
+  enemyHp: { 1: 1.15, 2: 1.05, 3: 0.9, 4: 0.82, spire: 1.55 },
   enemyDmg: { 1: 1.2, 2: 1.0, 3: 0.8, 4: 0.72, spire: 1.15 },
   tierMult: { normal: { hp: 1.05, dmg: 1.15 }, elite: { hp: 1, dmg: 1 } },
   maxTurns: 30,
