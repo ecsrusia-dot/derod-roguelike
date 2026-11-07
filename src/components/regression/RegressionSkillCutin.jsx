@@ -9,11 +9,12 @@
 import React from 'react';
 import { REGRESSION_SKILLS } from '../../data.js';
 
-export const REGRESSION_CUTIN_MS = { normal: 1100, advanced: 1450, fortune: 2000 };
+export const REGRESSION_CUTIN_MS = { normal: 1100, advanced: 1450, fortune: 2000, bond: 1450 };
 const TIER = {
   normal: { label: '일반 스킬', color: '#e8dccb', glow: '#c9b8a4', size: 30 },
   advanced: { label: '고급 스킬', color: '#dff0ff', glow: '#5fa8e8', size: 34 },
   fortune: { label: '기 연', color: '#ffe9a8', glow: '#ffb02e', size: 40 },
+  bond: { label: '유대 스킬', color: '#e6ffe9', glow: '#6fd38a', size: 34, look: 'advanced' },   // 1.200.0~ 고급 연출 + 초록
 };
 
 export default function RegressionSkillCutin({ skillId, durMs, nonce }) {
@@ -23,7 +24,7 @@ export default function RegressionSkillCutin({ skillId, durMs, nonce }) {
   const t = TIER[tierId];
   const style = { '--rg-cut-dur': `${Math.max(250, durMs)}ms`, '--rg-glow': t.glow };
   return (
-    <div key={nonce} className={`rg-cut rg-cut-${tierId}`} style={style} aria-live="polite">
+    <div key={nonce} className={`rg-cut rg-cut-${t.look || tierId}`} style={style} aria-live="polite">
       <div className="rg-cut-flash" />
       {tierId !== 'normal' && <div className="rg-cut-vignette" />}
       {tierId === 'fortune' && <div className="rg-cut-rays" />}

@@ -1004,6 +1004,14 @@ export function applyRegressionEvent(run, eventId, res, { maxHp = 300, rng = Mat
     next.traits = { ...(next.traits || {}) };
     for (const [k, v] of Object.entries(res.trait)) { next.traits[k] = (next.traits[k] || 0) + v; notes.push(`${REGRESSION_TRAITS[k]?.name} +${v}`); }
   }
+  if (res?.quest) {
+    // 1.200.0~ 동료 개인 퀘스트 단계 완수 — 2단계 완수 = 유대 스킬 확정 습득
+    const { c, s: st } = res.quest;
+    next.questStage = { ...(next.questStage || {}), [c]: Math.max(next.questStage?.[c] || 0, st) };
+    const qc = getRegressionCompanion(c);
+    notes.push(`${qc?.name} 개인 이야기 ${st}/2`);
+    if (st >= 2 && qc?.bondSkill) { const a = addRegressionSkill(next, qc.bondSkill); next = a.run; notes.push(`유대 스킬 「${__RSK[qc.bondSkill]?.name}」${a.upgraded ? ` Lv.${a.lv}` : ' 습득'}`); }
+  }
   if (res?.flag) next.storyFlags = { ...(next.storyFlags || {}), [res.flag]: true };
   const ev = regressionEventById(eventId);
   next.log = [...next.log, `D${run.day}: 사건 「${ev?.title || eventId}」${notes.length ? ` (${notes.filter(Boolean).join(' · ')})` : ''}`];
@@ -1136,6 +1144,9 @@ export function resolveRegressionChoice(choice, stats = {}, rng = Math.random) {
     res.trait = { [choice.trait]: (choice.traitValue || 1) + (br?.traitBonus || 0) };
   }
   if (choice.flag) res.flag = choice.flag;
+  // 1.200.0~ 동료 개인 퀘스트 — 성공 갈래의 quest 필드 { c: 동료, s: 단계 }
+  const qb = res.check === 'ok' ? choice.success : res.check == null ? choice : null;
+  if (qb?.quest) res.quest = qb.quest;
   return res;
 }
 
@@ -1754,7 +1765,12 @@ export function rollRegressionDay(run, memories = [], rng = Math.random) {
   }
   if (kind === 'companion') {
     const cands = regressionCompanionCandidates(run, region);
-    if (cands.length) return { ...run, today: { kind, companionId: cands[Math.floor(rng() * cands.length)].id } };
+    if (cands.length) {
+      const c = cands[Math.floor(rng() * cands.length)];
+      const q = regressionCompanionQuestFor(run, c.id);   // 1.200.0~ 호감이 쌓였으면 대화 대신 개인 퀘스트
+      if (q) return { ...run, today: null, pendingEvent: q.id };
+      return { ...run, today: { kind, companionId: c.id } };
+    }
     kind = 'shelter';
   }
   if (kind === 'merchant') return { ...run, today: { kind }, shop: buildRegressionShopStock(run, rng) };
@@ -1839,7 +1855,7 @@ export const REGRESSION_MAIN_STORY = [
   ] },
 ];
 export function regressionEventById(id) {
-  return REGRESSION_EVENTS.find(e => e.id === id) || REGRESSION_MAIN_STORY.find(e => e.id === id) || null;
+  return REGRESSION_EVENTS.find(e => e.id === id) || REGRESSION_MAIN_STORY.find(e => e.id === id) || REGRESSION_COMPANION_QUESTS.find(e => e.id === id) || null;
 }
 // 오늘 확정 등장할 메인 스토리 (없으면 null)
 export function regressionMainStoryFor(run) {
@@ -2314,4 +2330,55 @@ export function regressionEndingMilestoneGain(metaR, run) {
   const before = (metaR?.endings || []).length;
   const after = e && !(metaR?.endings || []).includes(e.id) ? before + 1 : before;
   return REGRESSION_ENDING_MILESTONES.filter(m => before < m.n && after >= m.n).reduce((a, m) => a + m.echo, 0);
+}
+
+
+// ============================================
+// 1.200.0~ 동료 개인 퀘스트 (PM 선택 재미 요소 6) — 동료가 효과 숫자가 아니라 이야기가 된다
+// ============================================
+// 동료 카드가 뜰 때 호감이 단계 기준에 닿아 있으면 대화 대신 개인 이야기(사건). 1단계 호감 60 / 2단계 호감 80 + 1단계 완수.
+// 판정에 성공해야 단계가 넘어간다(실패하면 다음 만남에 다시). 2단계 완수 = 동료의 유대 스킬 확정 습득.
+export const REGRESSION_QUEST_AFFINITY = { 1: 60, 2: 80 };
+export const REGRESSION_COMPANION_BOND_SKILL = { knight: 'knight_aegis', healer: 'healer_lullaby', archivist: 'archivist_mark', broker: 'broker_deal' };
+for (const c of REGRESSION_COMPANIONS) c.bondSkill = REGRESSION_COMPANION_BOND_SKILL[c.id];
+export const REGRESSION_COMPANION_QUESTS = [
+  { id: 'cq_knight_1', quest: { c: 'knight', s: 1 }, title: '발터 — 무너진 초소', text: '발터가 지도를 펼친다. "북쪽 초소가 연락이 끊겼다. 내 부하들이 있던 곳이다. 같이 가 주겠나."\n초소에는 얼어붙은 깃발과, 아직 따뜻한 발자국이 남아 있다.', choices: [
+    { text: '발자국을 쫓아 생존자를 찾는다', stat: '통찰', dc: 15, trait: 'bond', success: { text: '눈 동굴 안에서 떨고 있는 병사 둘을 찾았다. 발터가 말없이 그들을 끌어안는다.', quest: { c: 'knight', s: 1 }, reward: { type: 'affinity', name: 'knight', value: 10 } }, fail: { text: '발자국은 눈보라 속에서 끊겼다. 발터의 어깨가 무겁다.', penalty: { hp: -15 } } },
+    { text: '초소를 다시 세우는 일을 돕는다', stat: '근력', dc: 15, trait: 'bond', success: { text: '깃발을 다시 세웠다. "…이걸 보면 돌아올 거다." 발터의 목소리가 떨린다.', quest: { c: 'knight', s: 1 }, reward: { type: 'affinity', name: 'knight', value: 10 } }, fail: { text: '얼어붙은 기둥이 꿈쩍도 하지 않는다.', penalty: { hp: -20 } } },
+  ] },
+  { id: 'cq_knight_2', quest: { c: 'knight', s: 2 }, title: '발터 — 기사의 맹세', text: '모닥불 앞에서 발터가 검을 뽑아 무릎 위에 올린다. "나는 한 번 부하들을 버렸다. 황혼이 왔을 때, 도망쳤지."\n그가 검을 내민다. "이번에는 끝까지 서 있겠다. 증인이 되어 주겠나."', choices: [
+    { text: '검을 맞대고 함께 맹세한다', stat: '강인', dc: 16, trait: 'bond', success: { text: '두 검이 부딪히는 소리가 밤을 가른다. "이 방패는 이제 네 등을 지킨다."', quest: { c: 'knight', s: 2 }, reward: { type: 'affinity', name: 'knight', value: 10 } }, fail: { text: '팔이 먼저 떨렸다. 발터가 웃는다. "아직은 둘 다 부족하군. 다음에 다시."' } },
+    { text: '「도망친 것도 살기 위해서였다」고 말한다', stat: '화술', dc: 15, trait: 'bond', success: { text: '발터가 오래 불을 바라본다. "…그런가. 그럼 이번엔 살리기 위해 서 있지."', quest: { c: 'knight', s: 2 }, reward: { type: 'affinity', name: 'knight', value: 10 } }, fail: { text: '"위로는 필요 없다." 발터가 검을 거둔다.' } },
+  ] },
+  { id: 'cq_healer_1', quest: { c: 'healer', s: 1 }, title: '세레나 — 이름 없는 아이', text: '세레나가 작은 망령 하나를 품에 안고 있다. "이 아이, 자기 이름을 잊어버렸어요. 이름을 찾아 주면 편히 잠들 수 있을 텐데."', choices: [
+    { text: '숲의 묘비를 하나하나 읽어 본다', stat: '학식', dc: 15, trait: 'bond', success: { text: '이끼 아래에서 아이의 이름을 찾았다. 이름을 불러 주자 망령이 웃으며 흩어진다.', quest: { c: 'healer', s: 1 }, reward: { type: 'affinity', name: 'healer', value: 10 } }, fail: { text: '묘비의 글씨가 모두 지워져 있다.', penalty: { hp: -10 } } },
+    { text: '아이와 놀아 주며 기억을 끌어낸다', stat: '화술', dc: 15, trait: 'bond', success: { text: '"…엄마가 부르던 노래!" 아이가 노래를 따라 부르다 빛이 되어 사라진다.', quest: { c: 'healer', s: 1 }, reward: { type: 'affinity', name: 'healer', value: 10 } }, fail: { text: '아이가 울음을 터뜨렸다. 세레나가 한숨을 쉰다.' } },
+  ] },
+  { id: 'cq_healer_2', quest: { c: 'healer', s: 2 }, title: '세레나 — 마지막 환자', text: '세레나의 손이 떨린다. "제가 처음 살리지 못한 사람이… 저기 있어요." 숲 깊은 곳, 망자의 군주가 된 사내가 서 있다.\n"그를 쓰러뜨리지 말고, 잠들게 해 주세요."', choices: [
+    { text: '세레나의 노래에 맞춰 기도한다', stat: '신성', dc: 16, trait: 'bond', success: { text: '노래와 기도가 겹친다. 사내가 무릎을 꿇고 세레나의 손을 잡는다. "…고마워." 그가 잠든다.', quest: { c: 'healer', s: 2 }, reward: { type: 'affinity', name: 'healer', value: 10 } }, fail: { text: '기도가 닿지 않았다. 사내가 숲 속으로 사라진다.', penalty: { hp: -20 } } },
+    { text: '그의 공격을 몸으로 받아 내며 다가간다', stat: '강인', dc: 16, trait: 'bond', success: { text: '마지막 일격을 견디고 그를 껴안았다. 세레나가 그 위에 손을 얹는다. 둘 다 울고 있다.', quest: { c: 'healer', s: 2 }, reward: { type: 'affinity', name: 'healer', value: 10 } }, fail: { text: '버티지 못하고 쓰러졌다. 세레나가 급히 치료한다.', penalty: { hp: -30 } } },
+  ] },
+  { id: 'cq_archivist_1', quest: { c: 'archivist', s: 1 }, title: '오렌 — 사라진 한 장', text: '오렌이 책장을 뒤지며 중얼거린다. "열두 번째 일지에 한 장이 비어. 누군가 찢어 갔어. 그 장에 고리의 시작이 적혀 있었을 텐데."', choices: [
+    { text: '찢긴 자국의 종이 질을 감정한다', stat: '통찰', dc: 15, trait: 'truth', success: { text: '찢긴 종이는 신전 안뜰 우물 속에서 발견됐다. 오렌의 눈이 반짝인다.', quest: { c: 'archivist', s: 1 }, reward: { type: 'affinity', name: 'archivist', value: 10 } }, fail: { text: '단서는 먼지처럼 흩어졌다.' } },
+    { text: '남은 문장으로 사라진 장을 추론한다', stat: '학식', dc: 16, trait: 'truth', success: { text: '"…세상에. 그 장은 일부러 비워 둔 거야. 다음 회귀자가 쓰라고." 오렌이 펜을 쥔다.', quest: { c: 'archivist', s: 1 }, reward: { type: 'affinity', name: 'archivist', value: 10 } }, fail: { text: '추론이 엉뚱한 곳으로 흘렀다.', penalty: { hp: -10 } } },
+  ] },
+  { id: 'cq_archivist_2', quest: { c: 'archivist', s: 2 }, title: '오렌 — 기록관의 선택', text: '오렌이 봉인된 서고 문 앞에 선다. "이 안의 기록을 꺼내면, 신전은 무너진다. 그래도 나는 알고 싶네. 자네는?"', choices: [
+    { text: '함께 봉인을 풀고 기록을 지켜 낸다', stat: '마법', dc: 16, trait: 'truth', success: { text: '무너지는 서고에서 마지막 기록을 안고 빠져나왔다. 오렌이 숨을 몰아쉬며 웃는다. "이제 자네 차례야."', quest: { c: 'archivist', s: 2 }, reward: { type: 'affinity', name: 'archivist', value: 10 } }, fail: { text: '봉인이 튕겨 냈다. 아직 열 때가 아니다.', penalty: { hp: -20 } } },
+    { text: '기록 대신 오렌을 지킨다고 말한다', stat: '화술', dc: 15, trait: 'bond', success: { text: '오렌이 문에서 손을 뗀다. "…기록보다 사람이 먼저라니. 그것도 기록해 두지."', quest: { c: 'archivist', s: 2 }, reward: { type: 'affinity', name: 'archivist', value: 10 } }, fail: { text: '"자네는 모르는군." 오렌이 등을 돌린다.' } },
+  ] },
+  { id: 'cq_broker_1', quest: { c: 'broker', s: 1 }, title: '니아 — 빚쟁이', text: '니아가 드물게 굳은 얼굴이다. "마족 상인한테 빚이 좀 있어. 오늘 밤까지 못 갚으면… 뭐, 귀찮아지지."', choices: [
+    { text: '상인과 흥정해 빚을 줄인다', stat: '화술', dc: 15, trait: 'bond', success: { text: '빚이 절반으로 줄었다. 니아가 휘파람을 분다. "너, 이쪽 일 해도 되겠는데?"', quest: { c: 'broker', s: 1 }, reward: { type: 'affinity', name: 'broker', value: 10 } }, fail: { text: '상인이 이를 드러낸다. 결국 은화로 갚았다.', penalty: { gold: -60 } } },
+    { text: '상인의 장부를 몰래 바꿔 놓는다', stat: '민첩', dc: 16, trait: 'power', success: { text: '장부의 숫자가 사라졌다. 니아가 배를 잡고 웃는다. "최고야, 회귀자."', quest: { c: 'broker', s: 1 }, reward: { type: 'affinity', name: 'broker', value: 10 } }, fail: { text: '들켰다. 도망치며 한 대 맞았다.', penalty: { hp: -20 } } },
+  ] },
+  { id: 'cq_broker_2', quest: { c: 'broker', s: 2 }, title: '니아 — 마지막 거래', text: '니아가 작은 상자를 내민다. "이거, 첨탑 주인의 비밀이 들어 있대. 대신 누군가 한 명을 팔아야 해. …나는 너를 팔 생각이었어. 처음엔."', choices: [
+    { text: '「그럼 나를 팔아라」라고 말한다', stat: '화술', dc: 16, trait: 'bond', success: { text: '니아가 상자를 균열 속으로 던져 버린다. "손해 보는 장사는 안 한다니까. 너는 안 팔아."', quest: { c: 'broker', s: 2 }, reward: { type: 'affinity', name: 'broker', value: 10 } }, fail: { text: '니아가 눈을 피한다. "…생각 좀 해 볼게."' } },
+    { text: '거래 상대를 속여 상자만 빼앗는다', stat: '통찰', dc: 16, trait: 'power', success: { text: '상자는 비어 있었다. 니아가 웃는다. "역시 사기였네. 우리 둘 다 안 팔렸어."', quest: { c: 'broker', s: 2 }, reward: { type: 'affinity', name: 'broker', value: 10 } }, fail: { text: '거래 상대가 사라졌다. 상자도, 은화도 함께.', penalty: { gold: -40 } } },
+  ] },
+];
+// 동료 카드에서 열 개인 퀘스트 (없으면 null)
+export function regressionCompanionQuestFor(run, companionId) {
+  const stage = (run.questStage?.[companionId] || 0) + 1;
+  if (stage > 2) return null;
+  if ((run.affinity?.[companionId] || 0) < REGRESSION_QUEST_AFFINITY[stage]) return null;
+  return REGRESSION_COMPANION_QUESTS.find(q => q.quest.c === companionId && q.quest.s === stage) || null;
 }
