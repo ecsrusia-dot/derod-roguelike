@@ -53,6 +53,7 @@ export const REGRESSION_SKILL_TIERS = {
   normal: { name: '일반', color: '#c9b8a4' },
   advanced: { name: '고급', color: '#7ba3c4' },
   fortune: { name: '기연', color: '#e8b04a' },
+  bond: { name: '유대', color: '#9ad4a3' },   // 1.200.0~ 동료 개인 퀘스트 전용
 };
 export const REGRESSION_SKILLS = {
   // ── 일반 12 (시작 커스텀에서 3개 선택) ──
@@ -84,6 +85,11 @@ export const REGRESSION_SKILLS = {
   dawn_miracle: { tier: 'fortune', name: '여명의 기적', trigger: 'lethal', effect: 'revive', base: 0.3, scaleMult: { 신성: 0.03 }, desc: '쓰러질 때 1회 — HP 30% (신성 1당 +3%)로 부활' },
   titan_body:   { tier: 'fortune', name: '거인의 육체', trigger: 'battleStart', effect: 'shield', base: 20, scale: { 강인: 8, 근력: 2 }, desc: '전투 시작 — 강인·근력 비례 거대 보호막' },
   sage_eye:     { tier: 'fortune', name: '현자의 눈', trigger: 'enemyHeavy', effect: 'guard', base: 1, reflect: { base: 10, scale: { 통찰: 4, 학식: 3 } }, desc: '적이 대공격을 준비하면 — 그 공격을 완전히 막고 반사' },
+  // ── 1.200.0~ 유대 4 (동료 개인 퀘스트 완수 — 확정 습득, 습득 기회·상점에는 안 나온다) ──
+  knight_aegis:   { tier: 'bond', name: '기사단의 방패', trigger: 'firstHit', effect: 'guard', base: 0.6, reflect: { base: 6, scale: { 강인: 3, 근력: 2 } }, desc: '처음 공격받으면 — 피해 60% 감소 + 강인·근력 비례 반사 (발터)' },
+  healer_lullaby: { tier: 'bond', name: '망자의 자장가', trigger: 'selfHp', at: 0.35, effect: 'heal', base: 25, scale: { 신성: 6, 화술: 2 }, desc: 'HP 35% 이하 — 신성·화술 비례 대회복 (세레나)' },
+  archivist_mark: { tier: 'bond', name: '기록된 약점', trigger: 'battleStart', effect: 'buff', base: 0.3, turns: 4, scaleMult: { 학식: 0.03, 통찰: 0.02 }, desc: '전투 시작 — 4턴 공격 +30% (학식·통찰 비례) (오렌)' },
+  broker_deal:    { tier: 'bond', name: '그림자 거래', trigger: 'enemyHp', at: 0.25, effect: 'strike', base: 30, scale: { 화술: 5, 민첩: 3 }, desc: '적 HP 25% 이하 — 화술·민첩 비례 암습 (니아)' },
   // ── 1.193.0~ 기연 +14 (능력치당 2종 — 위 6종 포함 20종) ──
   giant_fist:   { tier: 'fortune', name: '거신의 철권', trigger: 'turn', at: 2, effect: 'strike', base: 22, scale: { 근력: 6 }, desc: '2턴째 — 근력 비례 거대한 주먹' },
   earthshaker:  { tier: 'fortune', name: '대지 가르기', trigger: 'enemyHeavy', effect: 'stun', base: 16, scale: { 근력: 5 }, desc: '적이 대공격을 준비하면 — 땅을 갈라 저지 + 근력 비례 피해' },

@@ -19,7 +19,7 @@ import {
   isRegressionSpireDay, isRegressionSpireEligible, isRegressionEliteOpen,
   enterRegressionSpire, applyRegressionSpireResult, buildRegressionSpireEnemy,
   REGRESSION_ROUTES, REGRESSION_ROUTE_BOSSES, REGRESSION_ROUTE_REWARDS, REGRESSION_ROUTE_BOSS_DAY_IN_REGION, REGRESSION_ROUTE_FROM_REGION,
-  REGRESSION_ENDING_MILESTONES, REGRESSION_EPILOGUES,
+  REGRESSION_ENDING_MILESTONES, REGRESSION_EPILOGUES, REGRESSION_QUEST_AFFINITY,
   REGRESSION_OATHS, REGRESSION_OATH_UNLOCK_LOOPS, regressionOathFx, regressionOathEchoMult, regressionOathEnemyMult, regressionFameGate,
   buildRegressionRouteBoss, applyRegressionRouteReward, REGRESSION_RED_MOON, regressionDaysToRedMoon, REGRESSION_GRAVE, resolveRegressionGrave, regressionSpireChain, regressionSpireEnemyFor, regressionRouteFor, REGRESSION_GEAR as __RG_GEAR,
   settleRegression, setRegressionCarry, regressionCarrySlots, buildRegressionLoadout,
@@ -1012,7 +1012,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
         </div>
         {menu === 'party' && (
           <GlassPanel style={{ padding: 12 }}>
-            <div className="text-[11px] mb-1.5" style={{ color: PALETTE.textDim }}>호감은 대화(+20)·사건·메인 스토리로 오른다. <b style={{ color: PALETTE.text }}>40 = 동행</b>(효과 발동 + 다른 지역까지 따라옴) · <b style={{ color: PALETTE.legendary }}>100 = 맹약</b>(효과 추가 + 유대 엔딩). 효과는 둘 다 겹쳐 적용된다.</div>
+            <div className="text-[11px] mb-1.5" style={{ color: PALETTE.textDim }}>호감은 대화(+20)·사건·메인 스토리·개인 이야기로 오른다. <b style={{ color: PALETTE.text }}>40 = 동행</b>(효과 발동 + 다른 지역까지 따라옴) · <b style={{ color: PALETTE.legendary }}>100 = 맹약</b>(효과 추가 + 유대 엔딩). 효과는 둘 다 겹쳐 적용된다.</div>
             <div className="space-y-1">
               {REGRESSION_COMPANIONS.map(c => {
                 const aff = run.affinity?.[c.id] || 0;
@@ -1020,6 +1020,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
                   <div key={c.id} className="text-[11px]" style={{ color: aff > 0 ? PALETTE.text : PALETTE.textDim }}>
                     <b style={{ color: aff > 0 ? c.color : PALETTE.textDim }}>{c.name}</b> {c.title} · {getRegressionRegion(c.region).name} · {regressionCompanionTier(aff).name} {aff}{aff >= 40 && aff < 100 ? ' · 함께 다니는 중' : ''}
                     <span style={{ color: PALETTE.textDim }}> — 동행: {c.perkText.ally} / 맹약: {c.perkText.oath}</span>
+                    <div style={{ color: (run.questStage?.[c.id] || 0) >= 2 ? PALETTE.green : PALETTE.textDim }}>📜 개인 이야기 {run.questStage?.[c.id] || 0}/2 (호감 {REGRESSION_QUEST_AFFINITY[1]}·{REGRESSION_QUEST_AFFINITY[2]}에서 만나면) → 유대 스킬 「{REGRESSION_SKILLS[c.bondSkill]?.name}」{(run.questStage?.[c.id] || 0) >= 2 ? ' ✓' : ''}</div>
                   </div>
                 );
               })}
