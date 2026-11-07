@@ -20,6 +20,7 @@ import {
   enterRegressionSpire, applyRegressionSpireResult, buildRegressionSpireEnemy,
   REGRESSION_ROUTES, REGRESSION_ROUTE_BOSSES, REGRESSION_ROUTE_REWARDS, REGRESSION_ROUTE_BOSS_DAY_IN_REGION, REGRESSION_ROUTE_FROM_REGION,
   REGRESSION_ENDING_MILESTONES, REGRESSION_EPILOGUES, REGRESSION_QUEST_AFFINITY,
+  REGRESSION_CHALLENGES, getRegressionChallenge, regressionTitleName, setRegressionTitle,
   REGRESSION_RIVAL, buildRegressionRival, duelRegressionRival, raceRegressionRival, yieldRegressionRival, loseRegressionRivalDuel,
   REGRESSION_SECRET, REGRESSION_SECRET_PLACES, discoverRegressionSecret, solveRegressionSecretPuzzle, fightRegressionSecretGuardian, claimRegressionSecretTreasure, leaveRegressionSecret,
   REGRESSION_OATHS, REGRESSION_OATH_UNLOCK_LOOPS, regressionOathFx, regressionOathEchoMult, regressionOathEnemyMult, regressionFameGate,
@@ -58,6 +59,49 @@ import RegressionSkillInfo from './RegressionSkillInfo.jsx';
 
 const CLASS_IDS = ['wanderer', 'sage', 'demonblood', 'elf', 'priest'];
 const classById = (id) => CLASSES.find(c => c.id === id) || null;
+
+// 1.203.0~ 도전 과제 — 묶음별 목록 + 칭호 고르기
+function ChallengeBook({ reg, onPick, onClose }) {
+  const done = new Set(reg.challenges || []);
+  const groups = [...new Set(REGRESSION_CHALLENGES.map(c => c.group))];
+  const owned = (reg.titles || []).filter(id => regressionTitleName(id));
+  return (
+    <BottomSheet title="🏆 도전 과제" onClose={onClose}>
+      <div className="space-y-3 pb-3 px-1">
+        <div className="text-[12px]" style={{ color: PALETTE.textDim }}><b style={{ color: PALETTE.legendary }}>{done.size} / {REGRESSION_CHALLENGES.length}</b> 달성 · 생을 마칠 때 판정되고, 새로 달성하면 잔향을 받는다.</div>
+        <div>
+          <div className="text-[12px] font-bold mb-1" style={{ color: PALETTE.dawn }}>칭호 ({owned.length}개)</div>
+          {owned.length === 0 ? <div className="text-[11px]" style={{ color: PALETTE.textDim }}>칭호가 붙은 도전 과제를 달성하면 얻는다.</div> : (
+            <div className="flex flex-wrap gap-1.5">
+              <button className="ui-press text-[11px] px-2.5" onClick={() => onPick(null)} style={{ minHeight: 36, borderRadius: 999, background: !reg.title ? `${PALETTE.legendary}22` : PALETTE.panelLight, border: `1px solid ${!reg.title ? PALETTE.legendary : PALETTE.panelBorder}`, color: PALETTE.text }}>달지 않음</button>
+              {owned.map(id => (
+                <button key={id} className="ui-press text-[11px] px-2.5" onClick={() => onPick(id)} style={{ minHeight: 36, borderRadius: 999, background: reg.title === id ? `${PALETTE.legendary}22` : PALETTE.panelLight, border: `1px solid ${reg.title === id ? PALETTE.legendary : PALETTE.panelBorder}`, color: reg.title === id ? PALETTE.legendary : PALETTE.text }}>「{regressionTitleName(id)}」</button>
+              ))}
+            </div>
+          )}
+        </div>
+        {groups.map(g => (
+          <div key={g}>
+            <div className="text-[12px] font-bold mb-1" style={{ color: PALETTE.dawn }}>{g}</div>
+            <div className="space-y-1">
+              {REGRESSION_CHALLENGES.filter(c => c.group === g).map(c => {
+                const ok = done.has(c.id);
+                return (
+                  <div key={c.id} className="px-2.5 py-1.5" style={{ borderRadius: 'var(--r-chip, 8px)', background: PALETTE.panelLight, border: `1px solid ${ok ? `${PALETTE.green}88` : PALETTE.panelBorder}` }}>
+                    <div className="text-[12px] font-bold" style={{ color: ok ? PALETTE.green : PALETTE.text }}>{ok ? '✓ ' : '◇ '}{c.name}</div>
+                    <div className="text-[11px]" style={{ color: PALETTE.textDim }}>{c.desc} · 잔향 +{c.echo}{c.title ? ` · 칭호 「${c.title}」` : ''}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+        <button className="ui-press w-full text-[13px] font-bold" onClick={onClose}
+          style={{ minHeight: 44, borderRadius: 'var(--r-btn, 13px)', background: PALETTE.panelLight, border: `1px solid ${PALETTE.panelBorder}`, color: PALETTE.text }}>닫기</button>
+      </div>
+    </BottomSheet>
+  );
+}
 
 // 1.198.0~ 엔딩 도감 — 갈래별 묶음 · 본 엔딩은 본문 + 후일담 + 처음 본 생
 function EndingCodex({ reg, onClose }) {
@@ -191,6 +235,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
   const [oaths, setOaths] = useState([]);                // 1.197.0~ 황혼의 맹세
   const [showBook, setShowBook] = useState(false);
   const [showEndings, setShowEndings] = useState(false);   // 1.198.0~ 엔딩 도감
+  const [showChallenges, setShowChallenges] = useState(false);   // 1.203.0~ 도전 과제
   const [banner, setBanner] = useState(null);
   const [carrySel, setCarrySel] = useState([]);
   const [autoSpeed, setAutoSpeed] = useState(() => {
@@ -278,6 +323,12 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
               <span className="text-[11px]" style={{ color: PALETTE.textDim }}>보유 {settle.meta.echo} · 시작 특성 해금에 쓴다</span>
             </div>
           </GlassPanel>
+          {settle.newChallenges?.length > 0 && (
+            <GlassPanel style={{ padding: 12, border: `1px solid ${PALETTE.legendary}66` }}>
+              <div className="text-[12px] font-bold mb-1" style={{ color: PALETTE.legendary }}>🏆 새 도전 과제 {settle.newChallenges.length}개 · 잔향 +{settle.challengeEcho}</div>
+              {settle.newChallenges.map(id => { const c = getRegressionChallenge(id); return <div key={id} className="text-[11px]" style={{ color: PALETTE.text }}>◆ {c.name} <span style={{ color: PALETTE.textDim }}>— {c.desc} · 잔향 +{c.echo}{c.title ? ` · 칭호 「${c.title}」` : ''}</span></div>; })}
+            </GlassPanel>
+          )}
           {settle.grave && (
             <GlassPanel style={{ padding: 12 }}>
               <div className="text-[12px] font-bold" style={{ color: PALETTE.legendary }}>⚱ 유품이 묻혔다 — 다음 생 D{settle.grave.day}</div>
@@ -703,6 +754,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
             <div className="text-[11px] mt-2" style={{ color: PALETTE.textDim }}>잔향은 생을 마칠 때마다 쌓인다 — 명성 10당 1 · 메인 스토리 1편당 2 · 첨탑 1층당 3 · 정복 10 · 새 엔딩 10.</div>
           </GlassPanel>
 
+          <ActionButton icon={BookOpen} title={`🏆 도전 과제 ${(reg.challenges || []).length}/${REGRESSION_CHALLENGES.length}`} sub={reg.title && regressionTitleName(reg.title) ? `칭호 「${regressionTitleName(reg.title)}」 장착 중` : `칭호 ${(reg.titles || []).length}개 보유 — 하나를 골라 달 수 있다`} onClick={() => setShowChallenges(true)} />
           {reg.rival?.met > 0 && (
             <GlassPanel style={{ padding: 12 }}>
               <div className="text-[12px] font-bold" style={{ color: '#f0a59c' }}>⚔ 라이벌 카엘 — Lv.{reg.rival.level || 0}</div>
@@ -717,6 +769,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
         </div>
         {showBook && <RecordBook reg={reg} run={null} onClose={() => setShowBook(false)} />}
         {showEndings && <EndingCodex reg={reg} onClose={() => setShowEndings(false)} />}
+        {showChallenges && <ChallengeBook reg={reg} onPick={(id) => onSave(setRegressionTitle(reg, id))} onClose={() => setShowChallenges(false)} />}
       </div>
     );
   }
@@ -1064,7 +1117,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
           <Chip icon={<Hourglass size={12} />} color={daysLeft <= 5 ? PALETTE.accent : PALETTE.dawn}>{spireDay ? '첨탑의 날' : `D${run.day}/${run.maxDays}`}</Chip>
         </div>
         <div className="flex items-center gap-2 mt-2">
-          <div className="text-[12px] font-bold flex-none" style={{ color: PALETTE.text }}>{classData.name} <span style={{ color: PALETTE.dawn }}>Lv.{run.level || 0}</span></div>
+          <div className="text-[12px] font-bold flex-none" style={{ color: PALETTE.text }}>{reg.title && regressionTitleName(reg.title) ? <span style={{ color: PALETTE.legendary }}>「{regressionTitleName(reg.title)}」 </span> : null}{classData.name} <span style={{ color: PALETTE.dawn }}>Lv.{run.level || 0}</span></div>
           <div className="flex-1"><Bar label="" value={loadout.hp} max={loadout.maxHp} color={PALETTE.accent} right="" /></div>
           <div className="text-[11px] tabular-nums flex-none" style={{ color: PALETTE.text }}>{loadout.hp}/{loadout.maxHp}</div>
           <div className="text-[11px] tabular-nums flex-none" style={{ color: PALETTE.legendary }}>{run.gold || 0}G</div>
