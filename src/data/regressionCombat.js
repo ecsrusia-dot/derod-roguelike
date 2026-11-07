@@ -147,12 +147,12 @@ export function regressionSkillValue(id, stats, lv = 1) {
 // 회피형 두 직업은 HP가 낮아 하급전 피해가 컸다 → 회피 보정 + 고유 반격/선제. 밸런스는 이 표 한 곳.
 // dodge: 회피 +%p · counterPct: 내가 회피하면 평타 × N 반격 · openerPct: 전투 시작 평타 × N 선제 · openerDodgeTurns: 선제 후 N턴 회피 추가
 export const REGRESSION_CLASS_PERKS = {
-  wanderer: { name: '검객의 직감', dodge: 6, critRate: 6, counterPct: 0.8, desc: '회피 +6% · 치명 +6% · 공격을 피하면 즉시 반격 (평타의 80%)' },
+  wanderer: { name: '검객의 직감', dodge: 8, critRate: 6, counterPct: 1.0, desc: '회피 +8% · 치명 +6% · 공격을 피하면 즉시 반격 (평타의 100%)' },
   elf: { name: '정령의 가호', dodge: 6, openerPct: 1.3, counterPct: 0.5, desc: '회피 +6% · 전투 시작 정령 화살 (평타의 130%) · 피하면 정령 화살 (평타의 50%)' },
   // 1.199.0~ 나머지 3직업 (PM 선택 재미 요소 5) — 이미 강한 직업이라 수치는 작게, 개성 위주
-  sage: { name: '마력 순환', skillPowerPct: 8, desc: '스킬 위력 +8%' },
-  demonblood: { name: '혈광', berserkBelow: 0.5, berserkPct: 15, lifesteal: 2, desc: 'HP 50% 이하일 때 공격 +15% · 흡혈 2%' },
-  priest: { name: '수신의 가호', regenPct: 0.5, desc: '매 턴 끝에 최대 HP 0.5% 회복' },
+  sage: { name: '마력 순환', skillPowerPct: 5, desc: '스킬 위력 +5%' },
+  demonblood: { name: '혈광', berserkBelow: 0.5, berserkPct: 20, lifesteal: 2, desc: 'HP 50% 이하일 때 공격 +20% · 흡혈 2%' },
+  priest: { name: '수신의 가호', regenPct: 0.4, desc: '매 턴 끝에 최대 HP 0.4% 회복' },
 };
 export function getRegressionClassPerk(classId) { return REGRESSION_CLASS_PERKS[classId] || null; }
 
@@ -168,16 +168,16 @@ export const REGRESSION_AWAKENINGS = {
     { id: 'aw_elf_wind', name: '바람 걸음', desc: '회피 +10% · 피하면 정령 화살 +30%p', fx: { dodge: 10, counterPct: 0.3 } },
   ],
   sage: [
-    { id: 'aw_sage_blaze', name: '겁화', desc: '스킬 위력 +15%p (총 +23%)', fx: { skillPowerPct: 15 } },
-    { id: 'aw_sage_ward', name: '마나 방벽', desc: '전투 시작 최대 HP 10% 보호막', fx: { startShieldPct: 10 } },
+    { id: 'aw_sage_blaze', name: '겁화', desc: '스킬 위력 +10%p (총 +15%)', fx: { skillPowerPct: 10 } },
+    { id: 'aw_sage_ward', name: '마나 방벽', desc: '전투 시작 최대 HP 7% 보호막', fx: { startShieldPct: 7 } },
   ],
   demonblood: [
-    { id: 'aw_demon_fury', name: '혈마', desc: '광폭 조건 HP 65% 이하 · 광폭 공격 +15%p (총 +30%)', fx: { berserkBelow: 0.65, berserkPct: 15 } },
+    { id: 'aw_demon_fury', name: '혈마', desc: '광폭 조건 HP 65% 이하 · 광폭 공격 +15%p (총 +35%)', fx: { berserkBelow: 0.65, berserkPct: 15 } },
     { id: 'aw_demon_undying', name: '불사', desc: '쓰러질 때 1회 HP 20%로 일어난다 (전투마다)', fx: { reviveOncePct: 0.2 } },
   ],
   priest: [
-    { id: 'aw_priest_sanctum', name: '성역', desc: '턴마다 회복 +0.5%p (총 1%)', fx: { regenPct: 0.5 } },
-    { id: 'aw_priest_judgment', name: '심판', desc: '3턴마다 신성한 일격 (평타의 90%)', fx: { turnStrikeEvery: 3, turnStrikePct: 0.9 } },
+    { id: 'aw_priest_sanctum', name: '성역', desc: '턴마다 회복 +0.25%p (총 0.65%)', fx: { regenPct: 0.25 } },
+    { id: 'aw_priest_judgment', name: '심판', desc: '4턴마다 신성한 일격 (평타의 70%)', fx: { turnStrikeEvery: 4, turnStrikePct: 0.7 } },
   ],
 };
 export function getRegressionAwakening(id) {
