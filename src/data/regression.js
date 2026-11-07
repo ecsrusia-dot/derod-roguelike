@@ -1692,6 +1692,7 @@ export function regressionDayTable(run) {
     companion: regressionCompanionCandidates(run, region).length ? W.companion + REGRESSION_DAY.followerWeight * regressionCompanionFollowers(run).length : 0,
     merchant: W.merchant,
     shelter: W.shelter,
+    secret: regressionSecretAvailable({ ...run, region }) ? REGRESSION_SECRET.weight : 0,   // 1.201.0~ 숨겨진 장소
     fortune: regressionFortuneWeight(run),
   };
   const total = Object.values(w).reduce((a, b) => a + b, 0);
@@ -1774,6 +1775,7 @@ export function rollRegressionDay(run, memories = [], rng = Math.random) {
     kind = 'shelter';
   }
   if (kind === 'merchant') return { ...run, today: { kind }, shop: buildRegressionShopStock(run, rng) };
+  if (kind === 'secret') return { ...run, today: { kind }, secretSeen: [...(run.secretSeen || []), region] };
   return { ...run, today: { kind: 'shelter' } };
 }
 // 하루 넘기기 (오늘의 일을 끝냄) — 날짜 +1
@@ -1810,6 +1812,7 @@ export const REGRESSION_TODAY_INTRO = {
   merchant: () => '짐마차를 끄는 떠돌이 상인이 손을 흔든다. "구경은 공짜요, 회귀자 양반."',
   shelter: () => '버려진 오두막을 찾았다. 지붕은 새지만 하룻밤 머물 만하다.',
   hermit: () => '누더기를 걸친 은자가 길가에 앉아 있다. "기다렸네. 자네가 배울 것이 하나 있지."',
+  secret: (r) => REGRESSION_SECRET_PLACES[r.region]?.hint || '',
   grave: (r) => `길가에 낯익은 돌무덤이 있다. 비석에 새겨진 것은 — 내 이름이다.\n${r.grave?.life || '?'}번째 생의 내가 ${r.grave?.cause || '이곳에서'} 쓰러진 자리. 흙 아래에서 무언가 희미하게 빛난다.`,
   routeBoss: (r) => { const b = REGRESSION_ROUTE_BOSSES[r.today.route]?.[r.today.routeBoss]; return b ? `${b.line}\n\n길목의 군주 「${b.name}」. 이 길을 계속 가려면 피할 수 없다.` : ''; },
 };
@@ -2381,4 +2384,64 @@ export function regressionCompanionQuestFor(run, companionId) {
   if (stage > 2) return null;
   if ((run.affinity?.[companionId] || 0) < REGRESSION_QUEST_AFFINITY[stage]) return null;
   return REGRESSION_COMPANION_QUESTS.find(q => q.quest.c === companionId && q.quest.s === stage) || null;
+}
+
+
+// ============================================
+// 1.201.0~ 숨겨진 장소 (PM 선택 재미 요소 7) — 통찰·학식이 여는 3층 비밀 던전
+// ============================================
+// 지역마다 한 번, 지역 5일째부터 「수상한 흔적」 카드(가중 weight). 통찰 또는 학식 판정에 성공하면 입장 (실패 = 하루가 지나고 그 지역 기회 끝).
+// 1층 수수께끼(통찰·학식·민첩 중 택1 판정) → 2층 수호자(그 지역 강적, 1지역은 일반 적 · ×guardianMult) → 3층 보물(여정 밖 보물 장비 + 유니크 기회 + 기연 기회).
+// 던전 안은 하루로 친다 — 나올 때(보물 획득 또는 물러남) 날짜 +1. 수호자 전투는 fromEvent(날짜 미소모).
+export const REGRESSION_SECRET = { weight: 5, minRegionDay: 5, dc: 15, puzzleDc: 16, puzzleGold: 80, puzzleFailHp: 15, guardianMult: 1.0 };
+export const REGRESSION_SECRET_PLACES = {
+  1: { name: '얼어붙은 왕릉', hint: '눈더미 아래로 돌계단 끝이 삐죽 나와 있다. 계단 옆 얼음에 왕관 문양이 새겨져 있다.', puzzle: '왕릉 입구에 얼음 거울 세 개가 서 있다. 하나만 진짜 문이다.', guard: '왕의 시신을 지키던 것이 깨어났다.', treasure: '석관 위에 왕의 부장품이 놓여 있다.' },
+  2: { name: '뿌리 아래 성소', hint: '거대한 고목 뿌리 사이로 희미한 녹색 빛이 새어 나온다. 뿌리에 오래된 기도문이 감겨 있다.', puzzle: '뿌리가 얽힌 통로가 세 갈래로 갈라진다. 숨 쉬는 뿌리가 길을 바꾼다.', guard: '성소를 삼킨 것이 뿌리를 털고 일어선다.', treasure: '뿌리에 감싸인 성물함이 열려 있다.' },
+  3: { name: '시간이 멈춘 방', hint: '회랑 벽의 한 구간만 먼지가 쌓이지 않았다. 그 앞에서는 모래시계가 거꾸로 흐른다.', puzzle: '방 안의 시계 바늘 세 개가 서로 다른 시간을 가리킨다. 맞춰야 문이 열린다.', guard: '멈춘 시간 속에서 수호자가 움직이기 시작한다.', treasure: '멈춘 시간 한가운데에 보물이 그대로 떠 있다.' },
+  4: { name: '균열 너머의 보물고', hint: '균열 틈 사이로 금빛이 번쩍인다. 마족 문자로 「주인 외 출입 금지」라고 적혀 있다.', puzzle: '보물고 문에 마족 자물쇠가 셋 달려 있다. 하나라도 틀리면 함정이 작동한다.', guard: '보물고의 문지기가 사슬을 끊고 달려든다.', treasure: '금화 더미 사이에 주인 없는 무구가 잠들어 있다.' },
+};
+export function regressionSecretAvailable(run) {
+  const region = run.region;
+  if (!REGRESSION_SECRET_PLACES[region] || (run.secretSeen || []).includes(region)) return false;
+  const pos = ((run.day - 1) % REGRESSION_DAY.regionDays) + 1;
+  return pos >= REGRESSION_SECRET.minRegionDay;
+}
+// 입구 찾기 — stat: '통찰' | '학식'
+export function discoverRegressionSecret(run, stat, rng = Math.random) {
+  const res = resolveRegressionChoice({ stat, dc: REGRESSION_SECRET.dc, success: {}, fail: {} }, regressionEffectiveStats(run), rng);
+  if (res.check === 'ok') return { run: { ...run, today: null, secret: { region: run.region, floor: 1 } }, ok: true };
+  return { run: passRegressionDay(run, `${REGRESSION_SECRET_PLACES[run.region]?.name}의 입구를 찾지 못함`), ok: false };
+}
+// 1층 수수께끼 — 성공: 은화, 실패: HP. 어느 쪽이든 2층으로
+export function solveRegressionSecretPuzzle(run, stat, rng = Math.random) {
+  const S = REGRESSION_SECRET;
+  const res = resolveRegressionChoice({ stat, dc: S.puzzleDc, success: {}, fail: {} }, regressionEffectiveStats(run), rng);
+  const ok = res.check === 'ok';
+  const next = ok ? { ...run, gold: (run.gold || 0) + S.puzzleGold } : { ...run, hpPct: Math.max(0.01, (run.hpPct ?? 1) - S.puzzleFailHp / 100) };
+  return { run: { ...next, secret: { ...run.secret, floor: 2 } }, ok, tags: ok ? [{ text: `${stat} - 성공!`, tone: 'gold' }, { text: `은화 +${S.puzzleGold}`, tone: 'good' }] : [{ text: `${stat} - 실패`, tone: 'bad' }, { text: `HP -${S.puzzleFailHp}%`, tone: 'bad' }] };
+}
+// 2층 수호자 — 그 지역 강적 (없으면 일반)
+export function fightRegressionSecretGuardian(run, rng = Math.random) {
+  const region = run.secret?.region || run.region;
+  // 1지역은 아직 약할 때라 일반 적이 수호자 (강적 승률 60%대로 너무 치명적이었음)
+  const tier = region === 1 ? 'normal' : 'elite';
+  const key = rollRegressionEnemy(region, tier, rng) || rollRegressionEnemy(region, 'normal', rng);
+  return startRegressionCombat(run, key, tier, { secret: true, fromEvent: true });
+}
+// 3층 보물 — 보물 등급 장비 확정 + 유니크 판정 기회 + 기연 기회, 그리고 던전을 나선다 (하루 소모)
+export function claimRegressionSecretTreasure(run, rng = Math.random) {
+  const tags = [];
+  const tr = Object.keys(REGRESSION_GEAR).filter(k => REGRESSION_GEAR[k].grade === 'treasure' && !(run.bag || []).includes(k));
+  let next = { ...run, secret: null, secretDone: [...(run.secretDone || []), run.secret?.region] };
+  if (tr.length) { const id = tr[Math.floor(rng() * tr.length)]; next = addRegressionGear(next, id); tags.push({ text: `${regressionGearLabel(id)} 획득`, tone: 'gold' }); }
+  let first = true;
+  const gateRng = () => (first ? ((first = false), 0) : rng());
+  const uq = offerRegressionUnique(next, null, gateRng);
+  if (uq) { next.pendingGear = uq; tags.push({ text: '주인을 고르는 무구가 울린다', tone: 'gold' }); }
+  const lo = offerRegressionLearn(next, 'boss', null, rng);
+  if (lo && !next.pendingGear) { next.pendingLearn = lo; tags.push({ text: '벽화에서 깨달음이 스친다', tone: 'gold' }); }
+  return { run: passRegressionDay(next, `${REGRESSION_SECRET_PLACES[run.secret?.region]?.name} 탐사 완료`), tags };
+}
+export function leaveRegressionSecret(run) {
+  return passRegressionDay({ ...run, secret: null }, '숨겨진 장소에서 물러남');
 }
