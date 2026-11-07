@@ -25,8 +25,10 @@ export const REGRESSION_COMBAT = {
   variance: 0.15,
   enemyDodge: { normal: 8, elite: 10, boss: 6 },
   // 적 강도 — 지역별 (본편 수치 × 배율). 체감 조정은 여기서
-  enemyHp: { 1: 0.85, 2: 0.8, 3: 0.75, 4: 0.7, spire: 0.45 },
-  enemyDmg: { 1: 0.85, 2: 0.75, 3: 0.68, 4: 0.62, spire: 0.42 },
+  // 1.190.0 PM 피드백 「전투·첨탑이 너무 쉽다」 — 시뮬 목표: 하급 승률 92~98%·승리 시 HP 27~47% 소모 / 강적 73~92% / 첨탑 진입 대비 정복 ~31%
+  enemyHp: { 1: 1.15, 2: 1.05, 3: 0.9, 4: 0.82, spire: 1.3 },
+  enemyDmg: { 1: 1.2, 2: 1.0, 3: 0.8, 4: 0.72, spire: 1.15 },
+  tierMult: { normal: { hp: 1.05, dmg: 1.15 }, elite: { hp: 1, dmg: 1 } },
   maxTurns: 30,
   potionBelowPct: 0.5,
 };
@@ -127,7 +129,8 @@ export function regressionEnemyCombatant(enemyKey, enemyObj, regionKey, dayMult 
   const C = REGRESSION_COMBAT;
   const e = enemyObj || ENEMIES[enemyKey];
   const tier = e.tier || 'normal';
-  const hpMult = (C.enemyHp[regionKey] ?? 1) * dayMult, dmgMult = (C.enemyDmg[regionKey] ?? 1) * dayMult;
+  const tm = C.tierMult?.[tier] || { hp: 1, dmg: 1 };   // 1.190.0~ 등급 배율 (하급만 따로 조일 수 있게)
+  const hpMult = (C.enemyHp[regionKey] ?? 1) * dayMult * tm.hp, dmgMult = (C.enemyDmg[regionKey] ?? 1) * dayMult * tm.dmg;
   const hp = Math.round(e.hp * hpMult);
   return {
     key: enemyKey, name: e.name, tier, maxHp: hp, hp,
