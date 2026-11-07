@@ -35,7 +35,7 @@ import {
   REGRESSION_ECON, REGRESSION_GEAR, REGRESSION_GEAR_SLOTS, REGRESSION_GEAR_GRADES, regressionGearLabel, regressionGearStatText, regressionGearFx, regressionGearStats,
   regressionEffectiveStats, equipRegressionGear, unequipRegressionGear, offerRegressionUnique, resolveRegressionUnique, regressionUniqueChance, regressionUniqueIntro,
   regressionAptitude, buildRegressionShopStock, rerollRegressionShop, regressionShopOfferPrice, buyRegressionOffer,
-  regressionStatSources, regressionSellableGear, sellRegressionGear, regressionGearSellPrice,
+  regressionCombatBonus, regressionCompanionFollowers, regressionStatSources, regressionSellableGear, sellRegressionGear, regressionGearSellPrice,
   REGRESSION_START_TRAITS, REGRESSION_TRAIT_TUNING, aggregateRegressionStartTraits, unlockRegressionStartTrait, toggleRegressionStartTrait,
   REGRESSION_TRAITS, REGRESSION_MAIN_STORY, regressionEventById, regressionChoiceVisible, regressionTopTrait,
   REGRESSION_DAY, rollRegressionDay, passRegressionDay, hideFromRegressionEnemy, fightRegressionToday, restRegressionShelter, trainRegressionShelter,
@@ -276,7 +276,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
     const relicBonus = {};
     activeRelics.forEach(r => Object.entries(r.statBonus || {}).forEach(([k, v]) => { relicBonus[k] = (relicBonus[k] || 0) + v; }));
     // 1.188.0~ 패시브 폐지 — 기록서·동료·구 패시브는 실효 능력치(regressionEffectiveStats)로 반영된다
-    for (const [k, v] of Object.entries(regressionGearFx(run))) relicBonus[k] = (relicBonus[k] || 0) + v; // 1.184.0~ 유니크 장비 전투 효과
+    for (const [k, v] of Object.entries(regressionCombatBonus(run))) relicBonus[k] = (relicBonus[k] || 0) + v; // 1.190.0~ 유니크 장비 + 동료 전투 효과
     const finishSpire = (win, taken, usedPotions = []) => {
       let next = applyRegressionSpireResult(consumeRegressionPotions(run, usedPotions), { win, hpPct: regressionPostCombatHpPct(loadout.hp, loadout.maxHp, taken, true, compFx.spireWoundCut) });
       next = { ...next, spirePrepared: null };
@@ -746,7 +746,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
       const aff = run.affinity?.[c.id] || 0;
       choices = (
         <>
-          <Choice text="곁에 앉아 이야기를 나눈다" sub={`호감 ${aff}/100 「${regressionCompanionTier(aff).name}」 · 동행: ${c.perkText.ally}`} onClick={() => {
+          <Choice text="곁에 앉아 이야기를 나눈다" sub={`호감 ${aff}/100 「${regressionCompanionTier(aff).name}」${aff >= 40 ? ' · 함께 다니는 중' : ' · 40이 되면 다른 지역까지 따라온다'} · 다음 단계: ${aff >= 40 ? c.perkText.oath : c.perkText.ally}`} onClick={() => {
             const next = applyRegressionTalk(run, c.id, combatStats.매력 || 10);
             const after = next.affinity[c.id];
             const upTier = regressionCompanionTier(after).id !== regressionCompanionTier(aff).id;
@@ -832,12 +832,13 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
         </div>
         {menu === 'party' && (
           <GlassPanel style={{ padding: 12 }}>
+            <div className="text-[11px] mb-1.5" style={{ color: PALETTE.textDim }}>호감은 대화(+20)·사건·메인 스토리로 오른다. <b style={{ color: PALETTE.text }}>40 = 동행</b>(효과 발동 + 다른 지역까지 따라옴) · <b style={{ color: PALETTE.legendary }}>100 = 맹약</b>(효과 추가 + 유대 엔딩). 효과는 둘 다 겹쳐 적용된다.</div>
             <div className="space-y-1">
               {REGRESSION_COMPANIONS.map(c => {
                 const aff = run.affinity?.[c.id] || 0;
                 return (
                   <div key={c.id} className="text-[11px]" style={{ color: aff > 0 ? PALETTE.text : PALETTE.textDim }}>
-                    <b style={{ color: aff > 0 ? c.color : PALETTE.textDim }}>{c.name}</b> {c.title} · {getRegressionRegion(c.region).name} · {regressionCompanionTier(aff).name} {aff}
+                    <b style={{ color: aff > 0 ? c.color : PALETTE.textDim }}>{c.name}</b> {c.title} · {getRegressionRegion(c.region).name} · {regressionCompanionTier(aff).name} {aff}{aff >= 40 && aff < 100 ? ' · 함께 다니는 중' : ''}
                     <span style={{ color: PALETTE.textDim }}> — 동행: {c.perkText.ally} / 맹약: {c.perkText.oath}</span>
                   </div>
                 );

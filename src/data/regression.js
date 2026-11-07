@@ -592,23 +592,23 @@ export const REGRESSION_COMPANION_TIERS = [
 export const REGRESSION_COMPANIONS = [
   { id: 'knight', name: '발터', title: '몰락한 기사단장', region: 1, color: '#7ba3c4',
     desc: '눈보라 속에 사라진 기사단의 마지막 생존자. 지킬 것을 찾고 있다.',
-    perks: { ally: { stats: { 강인: 1 } }, oath: { stats: { 강인: 2 }, spireWoundCut: 0.1 } },
-    perkText: { ally: '강인 +1', oath: '강인 +2 추가 · 첨탑 상처 -10%p' },
+    perks: { ally: { stats: { 강인: 2 }, dmgTaken: -5 }, oath: { stats: { 근력: 2 }, dmgTaken: -10, spireWoundCut: 0.15 } },
+    perkText: { ally: '강인 +2 · 받는 피해 -5%', oath: '근력 +2 · 받는 피해 -10% 추가 · 첨탑 상처 -15%p' },
     ending: { id: 'ending_knight', name: '눈 속의 기사단', text: '발터와 함께 북부에 새 기사단의 깃발을 세웠다. 황혼은 걷혔고, 지킬 것이 생겼다.' } },
   { id: 'healer', name: '세레나', title: '떠돌이 치유사', region: 2, color: '#9ad4a3',
     desc: '망자의 숲에서 살아 있는 자를 돌보는 치유사. 죽음을 미워한다.',
-    perks: { ally: { restHealPct: 20 }, oath: { spireRestPct: 20, potionCap: 1 } },
-    perkText: { ally: '야영 회복 +20%p', oath: '첨탑 층 사이 HP +20% · 포션 벨트 +1' },
+    perks: { ally: { restHealPct: 20, dailyHealPct: 5 }, oath: { stats: { 신성: 2 }, spireRestPct: 30, potionCap: 1 } },
+    perkText: { ally: '쉼터 회복 +20%p · 아침 회복 +5%p', oath: '신성 +2 · 첨탑 층 사이 HP +30% · 포션 벨트 +1' },
     ending: { id: 'ending_healer', name: '은둔의 숲', text: '세레나와 함께 숲 깊은 곳에 치료소를 열었다. 더는 아무도 그 숲에서 길을 잃지 않는다.' } },
   { id: 'archivist', name: '오렌', title: '신전 기록관', region: 3, color: '#c9b8ff',
     desc: '봉인된 신전의 마지막 기록관. 회귀하는 자에 대한 기록을 찾고 있다.',
-    perks: { ally: { recordBonusPct: 20 }, oath: { spireWeakness: true } },
-    perkText: { ally: '기록 게이지 +20%', oath: '첨탑 주인의 약점 즉시 개방' },
+    perks: { ally: { stats: { 학식: 2 }, recordBonusPct: 30 }, oath: { critRate: 10, spireWeakness: true } },
+    perkText: { ally: '학식 +2 · 기록 게이지 +30%', oath: '치명 +10% · 첨탑 주인의 약점 즉시 개방' },
     ending: { id: 'ending_archivist', name: '마지막 기록', text: '오렌은 회귀의 고리를 처음부터 끝까지 기록했다. 그 책의 마지막 장에는 내 이름이 적혀 있다.' } },
   { id: 'broker', name: '니아', title: '균열의 정보상', region: 4, color: '#e8b04a',
     desc: '균열 가장자리에서 마족과도 거래하는 정보상. 손해 보는 장사는 하지 않는다.',
-    perks: { ally: { goldPct: 50 }, oath: { famePerWin: 1 } },
-    perkText: { ally: '전투 승리 골드 +50%', oath: '전투 승리마다 명성 +1 추가' },
+    perks: { ally: { goldPct: 50, critRate: 5 }, oath: { dmgDealt: 10, famePerWin: 2 } },
+    perkText: { ally: '전투 은화 +50% · 치명 +5%', oath: '공격 +10% · 전투 승리마다 명성 +2' },
     ending: { id: 'ending_broker', name: '그림자 시장의 주인', text: '니아와 함께 균열의 시장을 손에 넣었다. 대륙의 모든 소문이 이제 내 귀로 먼저 들어온다.' } },
 ];
 export const REGRESSION_ENDING_SPIRE = { id: 'ending_spire', name: '황혼을 끊은 자', branch: '정복', hint: '첨탑을 정복한다 (성향이 한쪽으로 기울지 않음)', text: '홀로 첨탑에 올라 황혼을 끊었다. 회귀의 고리가 멈추고, 처음으로 황혼 다음 날 아침이 밝았다.' };
@@ -638,7 +638,7 @@ export function regressionCompanionAt(regionId) {
 
 // 동료 효과 합산 (fx bag) — 단계가 오르면 하위 단계 효과도 유지
 export function aggregateRegressionCompanions(run) {
-  const fx = { passive: {}, stats: {}, restHealPct: 0, spireRestPct: 0, potionCap: 0, recordBonusPct: 0, spireWeakness: false, goldPct: 0, famePerWin: 0, spireWoundCut: 0 };
+  const fx = { passive: {}, stats: {}, restHealPct: 0, dailyHealPct: 0, spireRestPct: 0, potionCap: 0, recordBonusPct: 0, spireWeakness: false, goldPct: 0, famePerWin: 0, spireWoundCut: 0, dmgDealt: 0, dmgTaken: 0, critRate: 0, dodge: 0 };
   for (const c of REGRESSION_COMPANIONS) {
     const aff = run.affinity?.[c.id] || 0;
     const tiers = [];
@@ -1536,6 +1536,7 @@ export const REGRESSION_DAY = {
   fortune: { base: 4, perDay: 0.37 },   // 기연 가중 — D1 ≈4% → D60 ≈17% (+ 기억 조각 보너스)
   enemyRamp: 0.015,                     // 하루당 적 HP·피해 +1.5% (D60 ×1.89) — 지역 단계 상승과 곱
   hideDc: { battle: 14, elite: 15 },    // 몸을 숨겨 피하기 판정
+  followerWeight: 4,                    // 1.190.0~ 따라오는 동료 1명당 동료 카드 가중 +
   trainExp: 25,                         // 쉼터에서 단련
   dailyHealPct: 10,                     // 아침마다 자연 회복 (최대 HP %)
   checkFame: 3,                         // 판정 성공 명성
@@ -1559,7 +1560,7 @@ export function regressionDayTable(run) {
     battle: W.battle,
     elite: isRegressionEliteOpen({ ...run, region }, region) ? W.elite : 0,
     event: REGRESSION_EVENTS.some(e => e.region === region && !e.fortune && !(run.seenEvents || []).includes(e.id)) ? W.event : 0,
-    companion: comp && (run.affinity?.[comp.id] || 0) < 100 ? W.companion : 0,
+    companion: regressionCompanionCandidates(run, region).length ? W.companion + REGRESSION_DAY.followerWeight * regressionCompanionFollowers(run).length : 0,
     merchant: W.merchant,
     shelter: W.shelter,
     fortune: regressionFortuneWeight(run),
@@ -1584,7 +1585,7 @@ export function rollRegressionDay(run, memories = [], rng = Math.random) {
   const story = regressionMainStoryFor(run);
   if (story) return { ...run, today: null, pendingEvent: story.id };
   // 아침 — 하룻밤 자며 조금 회복 (하루 1회)
-  if (run.healedDay !== run.day) run = { ...run, healedDay: run.day, hpPct: Math.min(1, (run.hpPct ?? 1) + REGRESSION_DAY.dailyHealPct / 100) };
+  if (run.healedDay !== run.day) run = { ...run, healedDay: run.day, hpPct: Math.min(1, (run.hpPct ?? 1) + (REGRESSION_DAY.dailyHealPct + (run.affinity ? aggregateRegressionCompanions(run).dailyHealPct : 0)) / 100) };
   const table = regressionDayTable(run);
   let x = rng(), kind = 'battle';
   for (const [k, p] of Object.entries(table)) { x -= p; if (x < 0) { kind = k; break; } }
@@ -1607,7 +1608,11 @@ export function rollRegressionDay(run, memories = [], rng = Math.random) {
     if (enemyKey) return { ...run, today: { kind, tier, enemyKey } };
     kind = 'shelter';
   }
-  if (kind === 'companion') return { ...run, today: { kind, companionId: regressionCompanionAt(region).id } };
+  if (kind === 'companion') {
+    const cands = regressionCompanionCandidates(run, region);
+    if (cands.length) return { ...run, today: { kind, companionId: cands[Math.floor(rng() * cands.length)].id } };
+    kind = 'shelter';
+  }
   if (kind === 'merchant') return { ...run, today: { kind }, shop: buildRegressionShopStock(run, rng) };
   return { ...run, today: { kind: 'shelter' } };
 }
@@ -1792,5 +1797,27 @@ export function regressionSellableGear(run) {
     const n = bag.filter(x => x === id).length - equipped.filter(x => x === id).length;
     if (n > 0) out.push({ id, count: n });
   }
+  return out;
+}
+
+
+// ============================================
+// 1.190.0~ 동료가 따라온다 (PM 결정) — 호감 40(동행)이 되면 지역이 바뀌어도 함께 다닌다
+// ============================================
+export function regressionCompanionFollowers(run) {
+  return REGRESSION_COMPANIONS.filter(c => { const a = run?.affinity?.[c.id] || 0; return a >= 40 && a < 100; });
+}
+// 오늘 만날 수 있는 동료 — 이 지역의 동료(맹약 전) + 따라오는 동료
+export function regressionCompanionCandidates(run, region) {
+  const here = regressionCompanionAt(region);
+  const out = regressionCompanionFollowers(run);
+  if (here && (run?.affinity?.[here.id] || 0) < 100 && !out.includes(here)) out.push(here);
+  return out;
+}
+// 1.190.0~ 전투 보정 합산 — 장비(유니크) + 동료 (relicBonus 어휘: dmgDealt/dmgTaken/critRate/dodge/lifesteal)
+export function regressionCombatBonus(run) {
+  const out = { ...regressionGearFx(run) };
+  const c = run?.affinity ? aggregateRegressionCompanions(run) : {};
+  for (const k of ['dmgDealt', 'dmgTaken', 'critRate', 'dodge']) if (c[k]) out[k] = (out[k] || 0) + c[k];
   return out;
 }
