@@ -11,6 +11,7 @@ import {
   POTIONS, REGRESSION_STANCES, REGRESSION_SKILLS, REGRESSION_SKILL_TIERS, getRegressionStance,
   regressionSkillValue, regressionPlayerCombatant, regressionEnemyCombatant, simulateRegressionCombat,
 } from '../../data.js';
+import RegressionSkillInfo from './RegressionSkillInfo.jsx';
 import { ScreenHeader, GlassPanel, Chip, UIButton } from '../ui/CommonUI.jsx';
 
 const TRIGGER_TEXT = {
@@ -36,6 +37,7 @@ export default function RegressionBattle({
   potions, beltSlots, defaultBelt, flames, committed, speed, onCycleSpeed, onCommit, onFinish, speedLabel,
 }) {
   const [stanceId, setStanceId] = useState(committed?.stanceId || 'calm');
+  const [infoId, setInfoId] = useState(null);   // 1.188.0~ 스킬 정보 시트
   const [beltSel, setBeltSel] = useState(null);
   const [run, setRun] = useState(null);        // { res, idx }
   const timer = useRef(null);
@@ -77,7 +79,7 @@ export default function RegressionBattle({
   if (!run) {
     const can = (st) => (st.flames || 0) <= flames;
     return (
-      <div className="h-full flex flex-col ui-screen-enter" style={{ background: PALETTE.bgDeep }}>
+      <div className="h-full flex flex-col ui-screen-enter" style={{ background: PALETTE.bgDeep, position: 'relative' }}>
         <ScreenHeader title="전투 준비" subtitle={enemyLabel} />
         <div className="flex-1 overflow-y-auto px-4 pb-6 space-y-3">
           <div className="text-[14px] leading-relaxed" style={{ color: PALETTE.text }}>{intro}</div>
@@ -121,8 +123,8 @@ export default function RegressionBattle({
                 const sk = REGRESSION_SKILLS[id]; if (!sk) return null;
                 const tier = REGRESSION_SKILL_TIERS[sk.tier];
                 return (
-                  <div key={id} className="px-2.5 py-1.5" style={{ borderRadius: 'var(--r-chip, 8px)', background: PALETTE.panelLight }}>
-                    <div className="text-[12px] font-bold" style={{ color: tier.color }}>{sk.name} <span className="font-normal text-[11px]" style={{ color: PALETTE.textDim }}>[{tier.name}] · {regressionTriggerText(id)} · 위력 {regressionSkillValue(id, stats)}{['buff', 'revive', 'guard'].includes(sk.effect) ? '%' : ''}</span></div>
+                  <div key={id} role="button" onClick={() => setInfoId(id)} className="ui-press px-2.5 py-1.5" style={{ borderRadius: 'var(--r-chip, 8px)', background: PALETTE.panelLight, cursor: 'pointer' }}>
+                    <div className="text-[12px] font-bold" style={{ color: tier.color }}>ⓘ {sk.name} <span className="font-normal text-[11px]" style={{ color: PALETTE.textDim }}>[{tier.name}] · {regressionTriggerText(id)} · 위력 {regressionSkillValue(id, stats)}{['buff', 'revive', 'guard'].includes(sk.effect) ? '%' : ''}</span></div>
                     <div className="text-[11px]" style={{ color: PALETTE.textDim }}>{sk.desc}</div>
                   </div>
                 );
@@ -148,6 +150,7 @@ export default function RegressionBattle({
           <div className="text-[11px] px-1" style={{ color: PALETTE.textDim }}>전투는 자동으로 진행되며 개입할 수 없다. HP {hp}/{maxHp}로 출전.</div>
           <UIButton variant="primary" className="w-full ui-sheen" onClick={() => { onCommit({ stanceId, belt }); startFight(stanceId, belt); }}>▶ 전투 시작</UIButton>
         </div>
+        {infoId && <RegressionSkillInfo skillId={infoId} stats={stats} onClose={() => setInfoId(null)} />}
       </div>
     );
   }
@@ -217,7 +220,7 @@ export default function RegressionBattle({
           const sk = REGRESSION_SKILLS[id]; if (!sk) return null;
           const on = activeId === id, used = usedIds.has(id) && !on;
           return (
-            <div key={id} className="px-2 py-1.5" style={{ borderRadius: 10, minHeight: 52, background: PALETTE.panelLight, border: `1px solid ${on ? PALETTE.legendary : PALETTE.panelBorder}`, boxShadow: on ? `0 0 14px ${PALETTE.legendary}66` : 'none', opacity: used ? 0.45 : 1 }}>
+            <div key={id} role="button" onClick={() => setInfoId(id)} className="px-2 py-1.5" style={{ cursor: 'pointer', borderRadius: 10, minHeight: 52, background: PALETTE.panelLight, border: `1px solid ${on ? PALETTE.legendary : PALETTE.panelBorder}`, boxShadow: on ? `0 0 14px ${PALETTE.legendary}66` : 'none', opacity: used ? 0.45 : 1 }}>
               <div className="text-[11px] font-bold truncate" style={{ color: on ? PALETTE.legendary : REGRESSION_SKILL_TIERS[sk.tier].color }}>{sk.name}</div>
               <div className="text-[11px] truncate" style={{ color: on ? PALETTE.legendary : PALETTE.textDim }}>{on ? '발동!' : used ? '사용함 1/1' : regressionTriggerText(id)}</div>
             </div>
@@ -235,6 +238,7 @@ export default function RegressionBattle({
           <div className="text-[12px]" style={{ color: PALETTE.textDim }}>이야기로 돌아갑니다</div>
         </div>
       )}
+        {infoId && <RegressionSkillInfo skillId={infoId} stats={stats} onClose={() => setInfoId(null)} />}
     </div>
   );
 }

@@ -84,36 +84,37 @@ export function regressionEnemyPool(regionId, tier) {
 }
 
 // =========== 기록자의 눈 — 적 → 기록 보상 ===========
-// type: 'passive' (공용 패시브 Lv +n, maxLv 클램프) / 'maxHp' (최대 HP +n)
+// type: 'stat' (영구 능력치 +n — 1.188.0 PM 결정: 패시브 폐지) / 'maxHp' (최대 HP +n)
 // 직업 전용 액티브 스킬은 직업별 풀이라 MVP에서는 패시브·HP만 (설계서 3.1 — 액티브 해금은 후속 검토)
 export const REGRESSION_RECORDS = {
   // 북부 극지대
-  goblin:        { reward: { type: 'passive', id: '가속', n: 1 } },
-  iceWolf:       { reward: { type: 'passive', id: '정밀', n: 1 } },
-  tundraRaider:  { reward: { type: 'passive', id: '강타', n: 1 } },
-  wraith:        { reward: { type: 'passive', id: '심안', n: 1 } },
-  frostGiant:    { reward: { type: 'passive', id: '수비', n: 2 } },
+  goblin:        { reward: { type: 'stat', id: '민첩', n: 1 } },
+  iceWolf:       { reward: { type: 'stat', id: '통찰', n: 1 } },
+  tundraRaider:  { reward: { type: 'stat', id: '근력', n: 1 } },
+  wraith:        { reward: { type: 'stat', id: '통찰', n: 1 } },
+  frostGiant:    { reward: { type: 'stat', id: '강인', n: 2 } },
   // 죽은 자의 숲
-  fallenElf:     { reward: { type: 'passive', id: '회피', n: 1 } },
-  shadowWolf:    { reward: { type: 'passive', id: '잔혹', n: 1 } },
+  fallenElf:     { reward: { type: 'stat', id: '민첩', n: 1 } },
+  shadowWolf:    { reward: { type: 'stat', id: '근력', n: 1 } },
   corruptSpider: { reward: { type: 'maxHp', n: 20 } },
-  forestSpirit:  { reward: { type: 'passive', id: '재생', n: 2 } },
+  forestSpirit:  { reward: { type: 'stat', id: '신성', n: 2 } },
   forestTyrant:  { reward: { type: 'maxHp', n: 30 } },  // 1.178.0 강타+2 → HP (자동 전투 실측: 강타 Lv.3+ 다단히트 = 기절 고정)
   // 봉인된 신전
-  timeKeeper:    { reward: { type: 'passive', id: '가속', n: 1 } },
-  brokenGolem:   { reward: { type: 'passive', id: '수비', n: 1 } },
-  sealMage:      { reward: { type: 'passive', id: '마력', n: 1 } },
-  ancientPriest: { reward: { type: 'passive', id: '신앙', n: 2 } },
+  timeKeeper:    { reward: { type: 'stat', id: '민첩', n: 1 } },
+  brokenGolem:   { reward: { type: 'stat', id: '강인', n: 1 } },
+  sealMage:      { reward: { type: 'stat', id: '마법', n: 1 } },
+  ancientPriest: { reward: { type: 'stat', id: '신성', n: 2 } },
   // 마계의 균열
-  demonScout:    { reward: { type: 'passive', id: '정밀', n: 1 } },
-  wrathDemon:    { reward: { type: 'passive', id: '잔혹', n: 1 } },
-  riftBreach:    { reward: { type: 'passive', id: '운명', n: 1 } },
-  demonApostle:  { reward: { type: 'passive', id: '마력', n: 2 } },
+  demonScout:    { reward: { type: 'stat', id: '사격', n: 1 } },
+  wrathDemon:    { reward: { type: 'stat', id: '근력', n: 1 } },
+  riftBreach:    { reward: { type: 'stat', id: '학식', n: 1 } },
+  demonApostle:  { reward: { type: 'stat', id: '마법', n: 2 } },
 };
 
 export function describeRegressionRecord(enemyKey) {
   const r = REGRESSION_RECORDS[enemyKey]?.reward;
   if (!r) return '';
+  if (r.type === 'stat') return `${r.id} +${r.n} (이번 생 영구)`;
   if (r.type === 'passive') return `패시브 「${r.id}」 +${r.n}Lv`;
   if (r.type === 'maxHp') return `최대 HP +${r.n}`;
   return '';
@@ -591,8 +592,8 @@ export const REGRESSION_COMPANION_TIERS = [
 export const REGRESSION_COMPANIONS = [
   { id: 'knight', name: '발터', title: '몰락한 기사단장', region: 1, color: '#7ba3c4',
     desc: '눈보라 속에 사라진 기사단의 마지막 생존자. 지킬 것을 찾고 있다.',
-    perks: { ally: { passive: { 수비: 1 } }, oath: { passive: { 수비: 2 }, spireWoundCut: 0.1 } },
-    perkText: { ally: '패시브 「수비」 +1', oath: '「수비」 +2 추가 · 첨탑 상처 -10%p' },
+    perks: { ally: { stats: { 강인: 1 } }, oath: { stats: { 강인: 2 }, spireWoundCut: 0.1 } },
+    perkText: { ally: '강인 +1', oath: '강인 +2 추가 · 첨탑 상처 -10%p' },
     ending: { id: 'ending_knight', name: '눈 속의 기사단', text: '발터와 함께 북부에 새 기사단의 깃발을 세웠다. 황혼은 걷혔고, 지킬 것이 생겼다.' } },
   { id: 'healer', name: '세레나', title: '떠돌이 치유사', region: 2, color: '#9ad4a3',
     desc: '망자의 숲에서 살아 있는 자를 돌보는 치유사. 죽음을 미워한다.',
@@ -637,7 +638,7 @@ export function regressionCompanionAt(regionId) {
 
 // 동료 효과 합산 (fx bag) — 단계가 오르면 하위 단계 효과도 유지
 export function aggregateRegressionCompanions(run) {
-  const fx = { passive: {}, restHealPct: 0, spireRestPct: 0, potionCap: 0, recordBonusPct: 0, spireWeakness: false, goldPct: 0, famePerWin: 0, spireWoundCut: 0 };
+  const fx = { passive: {}, stats: {}, restHealPct: 0, spireRestPct: 0, potionCap: 0, recordBonusPct: 0, spireWeakness: false, goldPct: 0, famePerWin: 0, spireWoundCut: 0 };
   for (const c of REGRESSION_COMPANIONS) {
     const aff = run.affinity?.[c.id] || 0;
     const tiers = [];
@@ -646,6 +647,7 @@ export function aggregateRegressionCompanions(run) {
     for (const t of tiers) {
       for (const [k, v] of Object.entries(c.perks[t] || {})) {
         if (k === 'passive') for (const [n, lv] of Object.entries(v)) fx.passive[n] = (fx.passive[n] || 0) + lv;
+        else if (k === 'stats') for (const [n, lv] of Object.entries(v)) fx.stats[n] = (fx.stats[n] || 0) + lv;
         else if (typeof v === 'boolean') fx[k] = fx[k] || v;
         else fx[k] = (fx[k] || 0) + v;
       }
@@ -1380,8 +1382,17 @@ export function regressionGearFx(run) {
 // 실효 능력치 = 기본 + 사건 보너스 + 장비
 export function regressionEffectiveStats(run) {
   const st = { ...regressionRunStats(run) };
-  for (const src of [run?.statBonus || {}, regressionGearStats(run)]) for (const [k, v] of Object.entries(src)) if (k in st) st[k] += v;
+  for (const src of Object.values(regressionStatSources(run))) for (const [k, v] of Object.entries(src)) if (k in st) st[k] += v;
   return st;
+}
+// 1.188.0~ 능력치 보너스 출처 (능력치 창 「+N」 내역) — 사건 · 장비 · 기록서 · 동료 · 구 패시브(레거시 환산)
+export const REGRESSION_LEGACY_PASSIVE_STAT = { 가속: '민첩', 정밀: '통찰', 강타: '근력', 심안: '통찰', 수비: '강인', 회피: '민첩', 잔혹: '근력', 재생: '신성', 마력: '마법', 신앙: '신성', 운명: '학식' };
+export function regressionStatSources(run) {
+  const records = {};
+  for (const k of run?.learned || []) { const r = REGRESSION_RECORDS[k]?.reward; if (r?.type === 'stat') records[r.id] = (records[r.id] || 0) + r.n; }
+  const legacy = {};
+  for (const [n, lv] of Object.entries(run?.bonusSkills || {})) { const st = REGRESSION_LEGACY_PASSIVE_STAT[n]; if (st) legacy[st] = (legacy[st] || 0) + lv; }
+  return { 사건: run?.statBonus || {}, 장비: regressionGearStats(run), 기록서: records, 동료: run?.affinity ? aggregateRegressionCompanions(run).stats : {}, '이전 패시브': legacy };
 }
 // 장비 획득 — 가방에 넣고, 그 칸이 비어 있으면 바로 장착
 export function addRegressionGear(run, id) {
@@ -1754,4 +1765,32 @@ export function toggleRegressionStartTrait(metaR, id) {
   if (eq.includes(id)) return { ...r, equippedTraits: eq.filter(x => x !== id) };
   if (!(r.unlockedTraits || []).includes(id) || eq.length >= REGRESSION_TRAIT_TUNING.slots) return metaR;
   return { ...r, equippedTraits: [...eq, id] };
+}
+
+
+// ============================================
+// 1.188.0~ 떠돌이 상인에게 장비 판매 (PM 요청: 미사용 장비 판매)
+// ============================================
+export const REGRESSION_SELL_PRICE = { normal: 40, advanced: 90, treasure: 190, unique: 300 };
+export function regressionGearSellPrice(id) { return REGRESSION_SELL_PRICE[REGRESSION_GEAR[id]?.grade] || 0; }
+// 장착 중이 아닌 가방 장비 1개 판매
+export function sellRegressionGear(run, id) {
+  const bag = [...(run.bag || [])];
+  const equipped = Object.values(run.gear || {}).filter(Boolean);
+  const owned = bag.filter(x => x === id).length;
+  const inUse = equipped.filter(x => x === id).length;
+  if (owned - inUse <= 0) return { run, sold: 0 };
+  bag.splice(bag.lastIndexOf(id), 1);
+  const price = regressionGearSellPrice(id);
+  return { run: { ...run, bag, gold: (run.gold || 0) + price, log: [...(run.log || []), `D${run.day}: 판매 — ${REGRESSION_GEAR[id]?.name} (+${price}G)`] }, sold: price };
+}
+export function regressionSellableGear(run) {
+  const bag = run?.bag || [];
+  const equipped = Object.values(run?.gear || {}).filter(Boolean);
+  const out = [];
+  for (const id of [...new Set(bag)]) {
+    const n = bag.filter(x => x === id).length - equipped.filter(x => x === id).length;
+    if (n > 0) out.push({ id, count: n });
+  }
+  return out;
 }
