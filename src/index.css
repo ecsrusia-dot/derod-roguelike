@@ -686,3 +686,43 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .fx-b-shake, .fx-b-slash, .fx-b-burst, .fx-b-critring, .fx-b-punch, .fx-b-hurt, .fx-b-healglow { animation: none; opacity: 0; }
 }
+
+/* ============================================
+   1.189.0~ 회귀의 탐험가 — 스킬 발동 컷인 (RegressionSkillCutin)
+   ============================================ */
+.rg-cut { position: absolute; inset: 0; z-index: 40; pointer-events: none; overflow: hidden; }
+.rg-cut-center { position: absolute; inset: 0; display: flex; align-items: center; }
+.rg-cut-band { position: relative; width: 100%; text-align: center; padding: 14px 12px; background: linear-gradient(90deg, transparent, rgba(0,0,0,.78) 18%, rgba(0,0,0,.78) 82%, transparent);
+  animation: rg-cut-band var(--rg-cut-dur) cubic-bezier(.2,.8,.3,1) both; }
+.rg-cut-tier { font-size: 12px; font-weight: 700; letter-spacing: .3em; margin-bottom: 2px; }
+.rg-cut-name { font-weight: 900; letter-spacing: .06em; line-height: 1.15; animation: rg-cut-name var(--rg-cut-dur) cubic-bezier(.2,.9,.3,1.2) both; }
+.rg-cut-flash { position: absolute; inset: 0; background: radial-gradient(circle, var(--rg-glow) 0%, transparent 70%); opacity: 0; animation: rg-cut-flash var(--rg-cut-dur) ease-out both; }
+.rg-cut-normal .rg-cut-flash { animation-name: rg-cut-flash-soft; }
+.rg-cut-vignette { position: absolute; inset: 0; box-shadow: inset 0 0 120px 40px var(--rg-glow); opacity: 0; animation: rg-cut-flash var(--rg-cut-dur) ease-out both; }
+.rg-cut-streaks, .rg-cut-sparks { position: absolute; inset: 0; }
+.rg-cut-streaks span { position: absolute; left: -60%; width: 60%; height: 3px; background: linear-gradient(90deg, transparent, #fff, var(--rg-glow), transparent);
+  transform: rotate(-12deg); box-shadow: 0 0 10px var(--rg-glow); animation: rg-cut-streak calc(var(--rg-cut-dur) * .55) ease-out both; }
+.rg-cut-rays { position: absolute; left: 50%; top: 50%; width: 720px; height: 720px; margin: -360px 0 0 -360px; background: repeating-conic-gradient(from 0deg, rgba(255,200,90,.28) 0deg 6deg, transparent 6deg 20deg);
+  border-radius: 50%; animation: rg-cut-rays var(--rg-cut-dur) linear both; mask-image: radial-gradient(circle, #000 20%, transparent 62%); -webkit-mask-image: radial-gradient(circle, #000 20%, transparent 62%); }
+.rg-cut-ring { position: absolute; left: 50%; top: 50%; margin: -30px 0 0 -30px; width: 60px; height: 60px; border-radius: 50%; border: 3px solid #ffd27a; box-shadow: 0 0 18px #ffb02e; animation: rg-cut-ring calc(var(--rg-cut-dur) * .6) ease-out both; }
+.rg-cut-ring2 { animation-delay: calc(var(--rg-cut-dur) * .14); border-color: #fff3c4; }
+.rg-cut-sparks span { position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px; border-radius: 50%; background: #ffe08a; box-shadow: 0 0 8px #ffb02e;
+  animation: rg-cut-spark calc(var(--rg-cut-dur) * .7) ease-out both; }
+.rg-cut-advanced { animation: rg-cut-shake-s calc(var(--rg-cut-dur) * .3) ease-in-out both; }
+.rg-cut-fortune { animation: rg-cut-shake calc(var(--rg-cut-dur) * .35) ease-in-out both; }
+.rg-cut-fortune .rg-cut-name { background: linear-gradient(180deg, #fff6d6, #ffcf5a 55%, #e08a1e); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 10px #ffb02e) drop-shadow(0 0 24px #ff8a00); text-shadow: none !important; }
+@keyframes rg-cut-band { 0% { transform: translateX(-30%) scaleY(.2); opacity: 0; } 14% { transform: none; opacity: 1; } 82% { opacity: 1; } 100% { transform: translateX(12%); opacity: 0; } }
+@keyframes rg-cut-name { 0% { transform: scale(1.8); opacity: 0; letter-spacing: .5em; } 18% { transform: scale(1); opacity: 1; letter-spacing: .06em; } 85% { opacity: 1; } 100% { transform: scale(1.04); opacity: 0; } }
+@keyframes rg-cut-flash { 0% { opacity: 0; } 8% { opacity: .95; } 30% { opacity: .35; } 100% { opacity: 0; } }
+@keyframes rg-cut-flash-soft { 0% { opacity: 0; } 12% { opacity: .35; } 100% { opacity: 0; } }
+@keyframes rg-cut-streak { 0% { left: -60%; opacity: 0; } 20% { opacity: 1; } 100% { left: 110%; opacity: 0; } }
+@keyframes rg-cut-rays { 0% { transform: rotate(0deg) scale(.3); opacity: 0; } 15% { opacity: 1; } 80% { opacity: .8; } 100% { transform: rotate(70deg) scale(1.1); opacity: 0; } }
+@keyframes rg-cut-ring { 0% { transform: scale(.2); opacity: 1; } 100% { transform: scale(9); opacity: 0; } }
+@keyframes rg-cut-spark { 0% { transform: rotate(var(--a)) translateX(0); opacity: 1; } 100% { transform: rotate(var(--a)) translateX(var(--d)); opacity: 0; } }
+@keyframes rg-cut-shake-s { 0%, 100% { transform: none; } 30% { transform: translate(3px, -2px); } 60% { transform: translate(-3px, 2px); } }
+@keyframes rg-cut-shake { 0%, 100% { transform: none; } 15% { transform: translate(7px, -5px); } 35% { transform: translate(-7px, 4px); } 55% { transform: translate(5px, 3px); } 75% { transform: translate(-4px, -3px); } }
+@media (prefers-reduced-motion: reduce) {
+  .rg-cut, .rg-cut * { animation: none !important; }
+  .rg-cut-rays, .rg-cut-ring, .rg-cut-sparks, .rg-cut-streaks, .rg-cut-flash, .rg-cut-vignette { display: none; }
+}

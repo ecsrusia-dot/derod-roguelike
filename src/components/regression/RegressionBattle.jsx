@@ -12,6 +12,7 @@ import {
   regressionSkillValue, regressionPlayerCombatant, regressionEnemyCombatant, simulateRegressionCombat,
 } from '../../data.js';
 import RegressionSkillInfo from './RegressionSkillInfo.jsx';
+import RegressionSkillCutin, { REGRESSION_CUTIN_MS } from './RegressionSkillCutin.jsx';
 import { ScreenHeader, GlassPanel, Chip, UIButton } from '../ui/CommonUI.jsx';
 
 const TRIGGER_TEXT = {
@@ -70,7 +71,8 @@ export default function RegressionBattle({
       return;
     }
     const ev = run.res.events[run.idx];
-    const base = ev.t === 'skill' ? 1100 : ev.t === 'turn' ? 250 : ev.t === 'warn' ? 900 : 650;
+    // 1.189.0~ 스킬 컷인은 등급별 길이 (일반 1.1초 · 고급 1.45초 · 기연 2초, 배속 적용)
+    const base = ev.t === 'skill' ? (REGRESSION_CUTIN_MS[REGRESSION_SKILLS[ev.id]?.tier] || 1100) : ev.t === 'turn' ? 250 : ev.t === 'warn' ? 900 : 650;
     timer.current = setTimeout(() => setRun(r => ({ ...r, idx: r.idx + 1 })), speed >= 100 ? 0 : base / speed);
     return () => clearTimeout(timer.current);
   }, [run, speed]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -227,10 +229,8 @@ export default function RegressionBattle({
           );
         })}
       </div>
-      {activeId && !ended && (
-        <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', pointerEvents: 'none' }}>
-          <span className="ui-screen-enter" style={{ fontSize: 20, fontWeight: 700, color: PALETTE.legendary, textShadow: `0 0 18px ${PALETTE.legendary}`, background: '#000a', padding: '6px 14px', borderRadius: 10 }}>★ {REGRESSION_SKILLS[activeId].name}</span>
-        </div>
+      {activeId && !ended && speed < 100 && (
+        <RegressionSkillCutin skillId={activeId} nonce={run.idx} durMs={(REGRESSION_CUTIN_MS[REGRESSION_SKILLS[activeId]?.tier] || 1100) / speed} />
       )}
       {ended && (
         <div className="ui-screen-enter" style={{ position: 'absolute', inset: 0, background: '#050304e0', display: 'grid', placeContent: 'center', gap: 6, textAlign: 'center' }}>
