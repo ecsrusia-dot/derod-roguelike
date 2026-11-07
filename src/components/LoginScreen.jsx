@@ -11,7 +11,7 @@ import React, { useState } from 'react';
 import { PALETTE } from '../utils/helpers.js';
 import { GAME_VERSION } from '../data.js';
 
-export default function LoginScreen({ onSelectLocal, onSelectGuest, onSelectGoogle }) {
+export default function LoginScreen({ onSelectLocal, onSelectGuest, onSelectGoogle, onSwitchGame = null }) {
   const [loading, setLoading] = useState(null);  // null | 'guest' | 'google'
   const [error, setError] = useState(null);
   
@@ -121,6 +121,11 @@ export default function LoginScreen({ onSelectLocal, onSelectGuest, onSelectGoog
         </div>
       )}
       
+      {onSwitchGame && (
+        <button onClick={onSwitchGame} className="ui-press mb-2" style={{ background: 'transparent', border: 'none', color: PALETTE.dawn, fontSize: 12, letterSpacing: '0.12em', padding: '8px 12px' }}>
+          ⇄ 게임 선택
+        </button>
+      )}
       {/* 버전 정보 */}
       <div className="text-[9px] tracking-[0.3em]" style={{ color: PALETTE.textDim, opacity: 0.5 }}>
         v{GAME_VERSION}
