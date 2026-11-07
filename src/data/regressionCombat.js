@@ -14,11 +14,14 @@ import { ENEMIES } from './enemies.js';
 import { POTIONS } from './potions.js';
 
 export const REGRESSION_COMBAT = {
-  baseHp: 100, hpPerVit: 12, hpPerLevel: 6,
-  baseAtk: 6, atkPerStr: 1.2, atkPerWeapon: 1.8,       // 평타 = 6 + 근력×1.2 + max(검술·사격·마법·신성)×1.8
+  baseHp: 100, hpPerVit: 10, hpPerLevel: 6,           // 1.184.0 강인 HP 12→10 (강인 빌드 독주 완화)
+  baseAtk: 6, atkPerStr: 1.2,       // 평타 = 6 + 근력×1.2 + max(무기 능력치 × 계열 계수)
+  // 1.184.0~ 계열 계수 (직업 밸런스 — 능력치 역할 기준): 주문은 강하고, 신성은 회복을 겸하니 공격이 약하다
+  weaponMult: { 검술: 2.0, 사격: 1.8, 마법: 2.2, 신성: 1.3 },
+  lorePower: 0.04,                                       // 1.184.0~ 학식 1당 스킬 위력·회복·보호막 +4%
   dodgeBase: 5, dodgePerAgi: 2.5, dodgeCap: 45,          // %
   critBase: 5, critPerInsight: 2, critMult: 1.5,          // %
-  defPerVit: 0.8,                                         // 받는 피해 고정 감소
+  defPerVit: 0.6,                                         // 받는 피해 고정 감소
   variance: 0.15,
   enemyDodge: { normal: 8, elite: 10, boss: 6 },
   // 적 강도 — 지역별 (본편 수치 × 배율). 체감 조정은 여기서
@@ -100,21 +103,22 @@ export function regressionSkillValue(id, stats) {
   if (sk.effect === 'buff') return Math.round((sk.base + scaled(0, sk.scaleMult, stats)) * 100);
   if (sk.effect === 'revive') return Math.round((sk.base + scaled(0, sk.scaleMult, stats)) * 100);
   if (sk.effect === 'guard') return Math.round(sk.base * 100);
-  return Math.round(scaled(sk.base, sk.scale, stats));
+  return Math.round(scaled(sk.base, sk.scale, stats) * (1 + (stats.학식 || 0) * REGRESSION_COMBAT.lorePower));
 }
 
 // =========== 전투 참가자 ===========
 export function regressionPlayerCombatant({ stats, level = 0, maxHp, hp, skills = [], belt = [], relicBonus = {} }) {
   const C = REGRESSION_COMBAT;
-  const weapon = Math.max(stats.검술 || 0, stats.사격 || 0, stats.마법 || 0, stats.신성 || 0);
+  const weapon = Math.max(...Object.entries(C.weaponMult).map(([k, m]) => (stats[k] || 0) * m));
   return {
     maxHp, hp,
-    atk: (C.baseAtk + (stats.근력 || 0) * C.atkPerStr + weapon * C.atkPerWeapon + level * 0.5) * (1 + (relicBonus.dmgDealt || 0) / 100),
+    atk: (C.baseAtk + (stats.근력 || 0) * C.atkPerStr + weapon + level * 0.5) * (1 + (relicBonus.dmgDealt || 0) / 100),
     dodge: Math.min(C.dodgeCap, C.dodgeBase + (stats.민첩 || 0) * C.dodgePerAgi + (relicBonus.dodge || 0)),
     crit: C.critBase + (stats.통찰 || 0) * C.critPerInsight + (relicBonus.critRate || 0),
     def: (stats.강인 || 0) * C.defPerVit,
     takenMult: 1 + (relicBonus.dmgTaken || 0) / 100,
     lifesteal: relicBonus.lifesteal || 0,
+    skillPower: 1 + (stats.학식 || 0) * C.lorePower,
     stats, skills, belt: [...belt],
   };
 }
@@ -166,13 +170,14 @@ export function simulateRegressionCombat({ player: P0, enemy: E0, stanceId = 'ca
     P.used.add(id);
     ev.push({ t: 'skill', id, p: P.hp, e: E.hp });
     const st = P.stats;
-    if (sk.effect === 'strike') dealToEnemy(vary(scaled(sk.base, sk.scale, st) * stance.mult), sk.name);
-    else if (sk.effect === 'heal') { const h = Math.round(scaled(sk.base, sk.scale, st)); P.hp = Math.min(P.maxHp, P.hp + h); ev.push({ t: 'heal', amt: h, label: sk.name, p: P.hp, e: E.hp }); }
-    else if (sk.effect === 'shield') { const s = Math.round(scaled(sk.base, sk.scale, st)); P.shield += s; ev.push({ t: 'shield', amt: s, label: sk.name, p: P.hp, e: E.hp }); }
+    const sp = P.skillPower || 1;
+    if (sk.effect === 'strike') dealToEnemy(vary(scaled(sk.base, sk.scale, st) * sp * stance.mult), sk.name);
+    else if (sk.effect === 'heal') { const h = Math.round(scaled(sk.base, sk.scale, st) * sp); P.hp = Math.min(P.maxHp, P.hp + h); ev.push({ t: 'heal', amt: h, label: sk.name, p: P.hp, e: E.hp }); }
+    else if (sk.effect === 'shield') { const s = Math.round(scaled(sk.base, sk.scale, st) * sp); P.shield += s; ev.push({ t: 'shield', amt: s, label: sk.name, p: P.hp, e: E.hp }); }
     else if (sk.effect === 'buff') { P.buffMult = 1 + sk.base + scaled(0, sk.scaleMult, st); P.buffTurns = sk.turns || 2; ev.push({ t: 'buff', pct: Math.round((P.buffMult - 1) * 100), turns: P.buffTurns, label: sk.name }); }
-    else if (sk.effect === 'stun') { const d = Math.round(scaled(sk.base, sk.scale, st)); if (d > 0) dealToEnemy(vary(d * stance.mult), sk.name); E.stunned = 1; if (E.heavyNext) E.heavyNext = null; ev.push({ t: 'stun', label: sk.name, p: P.hp, e: E.hp }); }
+    else if (sk.effect === 'stun') { const d = Math.round(scaled(sk.base, sk.scale, st) * sp); if (d > 0) dealToEnemy(vary(d * stance.mult), sk.name); E.stunned = 1; if (E.heavyNext) E.heavyNext = null; ev.push({ t: 'stun', label: sk.name, p: P.hp, e: E.hp }); }
     else if (sk.effect === 'sure') P.sureBonus = Math.round(scaled(sk.base, sk.scale, st));
-    else if (sk.effect === 'guard') { P.guardNext = sk.base; if (sk.reflect) P.reflectNext = Math.round(scaled(sk.reflect.base, sk.reflect.scale, st)); }
+    else if (sk.effect === 'guard') { P.guardNext = sk.base; if (sk.reflect) P.reflectNext = Math.round(scaled(sk.reflect.base, sk.reflect.scale, st) * sp); }
     return true;
   };
   const checkHpTriggers = () => {
