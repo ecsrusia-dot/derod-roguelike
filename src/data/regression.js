@@ -385,10 +385,11 @@ export function applyRegressionCombat(run, result) {
   const name = ENEMIES[enemyKey]?.name || enemyKey;
   if (win) {
     const regionMult = T.regionFameMult[run.region] || 1;
-    const fame = Math.round((T.fameGain[tier] || 0) * regionMult) + (run.affinity ? aggregateRegressionCompanions(run).famePerWin : 0);
+    const moon = run.pending?.redMoon ? REGRESSION_RED_MOON.rewardMult : 1;   // 1.195.0~ 붉은 달 보상 배율
+    const fame = Math.round((T.fameGain[tier] || 0) * regionMult * moon) + (run.affinity ? aggregateRegressionCompanions(run).famePerWin : 0);
     next.fame += fame;
     next.kills[tier] = (next.kills[tier] || 0) + 1;
-    next = gainRegressionExp(next, REGRESSION_EXP[tier] || 0).run;
+    next = gainRegressionExp(next, (REGRESSION_EXP[tier] || 0) * moon).run;
     next.hpPct = Math.min(1, Math.max(0.01, result.hpPct ?? next.hpPct)); // 1.178.0 상한 — 전투 화면 최대 HP(근력 보너스 포함)가 더 커서 100% 초과 누적되던 버그
     // 사건에서 이어진 전투는 사건이 이미 하루를 썼으므로 날짜 미소모
     next = advanceDays(next, run.pending?.fromEvent ? 0 : 1, `${name} 처치 (명성 +${fame})${learnedNow.length ? ' · 기록 완성' : ''}`);
@@ -1699,6 +1700,13 @@ export function rollRegressionDay(run, memories = [], rng = Math.random) {
   // 1.194.0~ 길목의 군주 — 루트별 확정 보스 (2~4지역 13일째)
   const rb = regressionRouteBossToday(run);
   if (rb) return { ...run, today: { kind: 'routeBoss', tier: 'boss', enemyKey: rb.key, routeBoss: rb.region, route: rb.route } };
+  // 1.195.0~ 붉은 달의 날 — 지역 11일째, 반드시 전투 (적 강화 · 보상 2배)
+  if (isRegressionRedMoonDay(run.day)) {
+    const RM = REGRESSION_RED_MOON;
+    const tier = isRegressionEliteOpen({ ...run, region }, region) && rng() < RM.eliteChance ? 'elite' : 'normal';
+    const enemyKey = rollRegressionEnemy(region, tier, rng);
+    if (enemyKey) return { ...run, today: { kind: tier === 'elite' ? 'elite' : 'battle', tier, enemyKey, redMoon: true } };
+  }
   // 아침 — 하룻밤 자며 조금 회복 (하루 1회)
   if (run.healedDay !== run.day) run = { ...run, healedDay: run.day, hpPct: Math.min(1, (run.hpPct ?? 1) + (REGRESSION_DAY.dailyHealPct + (run.affinity ? aggregateRegressionCompanions(run).dailyHealPct : 0)) / 100) };
   const table = regressionDayTable(run);
@@ -1741,11 +1749,11 @@ export function hideFromRegressionEnemy(run, rng = Math.random) {
   const st = t.tier === 'elite' ? '통찰' : '민첩';
   const res = resolveRegressionChoice({ stat: st, dc: REGRESSION_DAY.hideDc[t.kind] || 14, success: {}, fail: {} }, regressionEffectiveStats(run), rng);
   if (res.check === 'ok') return { run: passRegressionDay(run, `${ENEMIES[t.enemyKey]?.name}을(를) 피해 지나감`), ok: true, stat: st };
-  return { run: { ...startRegressionCombat({ ...run, today: null }, t.enemyKey, t.tier) }, ok: false, stat: st };
+  return { run: { ...startRegressionCombat({ ...run, today: null }, t.enemyKey, t.tier, t.redMoon ? { redMoon: true } : {}) }, ok: false, stat: st };
 }
 export function fightRegressionToday(run) {
   const t = run.today; if (!t?.enemyKey) return run;
-  return startRegressionCombat({ ...run, today: null }, t.enemyKey, t.tier, t.routeBoss ? { routeBoss: t.routeBoss, route: t.route } : {});
+  return startRegressionCombat({ ...run, today: null }, t.enemyKey, t.tier, t.routeBoss ? { routeBoss: t.routeBoss, route: t.route } : t.redMoon ? { redMoon: true } : {});
 }
 export function restRegressionShelter(run) {
   return { ...applyRegressionRest({ ...run, today: null }) };
@@ -2164,4 +2172,20 @@ export function regressionSpireEnemyFor(run, round, forceWeak = false) {
   if (f.apostleBlood && run.spireRoute === 'power') hpMult *= RT.apostleBloodHpMult;
   if (run.spireRoute === 'bond') hpMult *= 1 - RT.allyHpCutPerCompanion * Math.min(RT.allyHpCutMax, regressionCompanionFollowers(run).length);
   return { key, obj: { ...obj, hp: Math.round(obj.hp * hpMult) } };
+}
+
+
+// ============================================
+// 1.195.0~ 붉은 달의 날 (PM 선택 재미 요소 1) — 지역마다 11일째(D11·D26·D41·D56)
+// ============================================
+// 그날은 반드시 전투 카드(강적 30%). 적 HP·피해 ×enemyMult, 승리 시 명성·경험치·은화 ×rewardMult, 전리품 2번 굴림.
+export const REGRESSION_RED_MOON = { dayInRegion: 11, enemyMult: 1.15, rewardMult: 2, eliteChance: 0.3 };
+export function isRegressionRedMoonDay(day = 1) {
+  return ((day - 1) % REGRESSION_DAY.regionDays) + 1 === REGRESSION_RED_MOON.dayInRegion;
+}
+// 다음 붉은 달까지 남은 날 (0 = 오늘)
+export function regressionDaysToRedMoon(day = 1) {
+  const pos = ((day - 1) % REGRESSION_DAY.regionDays) + 1;
+  const d = REGRESSION_RED_MOON.dayInRegion - pos;
+  return d >= 0 ? d : d + REGRESSION_DAY.regionDays;
 }
