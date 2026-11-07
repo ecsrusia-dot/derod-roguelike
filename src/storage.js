@@ -1482,6 +1482,7 @@ export function getRegression(meta) {
     traitLv: (r.traitLv && typeof r.traitLv === 'object') ? r.traitLv : {},
     traitSlotsBought: Number.isFinite(r.traitSlotsBought) ? r.traitSlotsBought : 0,
     grave: (r.grave && typeof r.grave === 'object') ? r.grave : null,   // 1.196.0~ 전생의 유품
+    endingLog: (r.endingLog && typeof r.endingLog === 'object') ? r.endingLog : {},   // 1.198.0~ 엔딩 도감
     recordsEver: (r.recordsEver && typeof r.recordsEver === 'object') ? r.recordsEver : {},
     run: r.run || null,
   };

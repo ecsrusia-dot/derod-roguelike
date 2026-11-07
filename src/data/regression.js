@@ -213,6 +213,7 @@ export function buildRegressionSpireEnemy(round, memoryCount = 0, forceWeak = fa
 // =========== 메타 (meta.regression) ===========
 export const EMPTY_REGRESSION = {
   grave: null,         // 1.196.0~ 전생의 유품 { gearId, gold, day, life, cause }
+  endingLog: {},       // 1.198.0~ 엔딩 도감 { endingId: { life, classId, day } }
   loops: 0,            // 누적 회귀 횟수
   memories: [],        // 획득 기억 조각 id
   carry: [],           // 다음 생에 들고 갈 기록 (enemyKey) — carrySlots 개까지
@@ -459,12 +460,15 @@ export function settleRegression(metaR = EMPTY_REGRESSION, run) {
       bestFame: Math.max(base.bestFame, run.fame),
       bestDay: Math.max(base.bestDay, Math.min(run.day, run.maxDays)),
       spireClears: base.spireClears + (cause === 'victory' ? 1 : 0),
-      echo: (base.echo || 0) + regressionEchoGain(base, run),
+      echo: (base.echo || 0) + regressionEchoGain(base, run) + regressionEndingMilestoneGain(base, run),
       // 1.196.0~ 전생의 유품 — 죽으면 새 무덤이 생긴다(이전 무덤은 덮인다). 정복했으면 회수 여부만 반영
       grave: cause !== 'victory' ? buildRegressionGrave(run, base.loops + 1) : (run.graveRecovered ? null : base.grave || null),
       endings: (() => { const e = regressionEndingFor(run); return e && !base.endings.includes(e.id) ? [...base.endings, e.id] : base.endings; })(),
+      // 1.198.0~ 엔딩 도감 — 처음 본 생·직업·날 기록 + 수집 보상(잔향)
+      endingLog: (() => { const e = regressionEndingFor(run); const log = { ...(base.endingLog || {}) }; if (e && !log[e.id]) log[e.id] = { life: base.loops + 1, classId: run.classId, day: Math.min(run.day, run.maxDays) }; return log; })(),
     },
     gainedMemories: gained,
+    endingReward: regressionEndingMilestoneGain(base, run),
     grave: cause !== 'victory' ? buildRegressionGrave(run, base.loops + 1) : null,
     echoGain: regressionEchoGain(base, run),
     carryOptions: [...run.learned],
@@ -2275,4 +2279,33 @@ export function regressionOathEnemyMult(run, inSpire = false) {
   const fx = regressionOathFx(run?.oaths);
   const day = inSpire ? 1 : 1 + (regressionDayEnemyMult(run.day) - 1) * fx.rampMult;
   return { hp: day * (1 + fx.enemyHp), dmg: day * (1 + fx.enemyDmg) };
+}
+
+
+// ============================================
+// 1.198.0~ 엔딩 도감 + 에필로그 (PM 선택 재미 요소 4)
+// ============================================
+// 엔딩마다 후일담(그 후) + 수집 보상: 모은 엔딩 수가 단계에 닿으면 잔향 (settleRegression이 정산 — 정산 결과 meta에 반영)
+export const REGRESSION_ENDING_MILESTONES = [{ n: 3, echo: 30 }, { n: 6, echo: 60 }, { n: 10, echo: 100 }, { n: 14, echo: 200 }];
+export const REGRESSION_EPILOGUES = {
+  ending_spire: '그 후 — 대륙 사람들은 황혼이 왜 사라졌는지 모른다. 다만 매년 그날이 오면, 마을 언덕 위 이름 없는 비석에 누군가 꽃을 놓고 간다.',
+  ending_loop_end: '그 후 — 기억은 모두 흩어졌다. 여명의 마을에서 눈을 뜬 청년은 자신이 누구였는지 모른다. 다만 첨탑이 있던 자리를 보면 이유 없이 눈물이 난다.',
+  ending_truth: '그 후 — 「회귀자의 기록」 열세 권째가 서고에 꽂혔다. 오렌은 그 책을 금서로 지정하지 않았다. 다음에 올 누군가가 반드시 읽어야 하니까.',
+  ending_heir: '그 후 — 대륙은 평화로워졌다. 밤이 오지 않는 땅에서 사람들은 새 군주를 「황혼의 왕」이라 부른다. 왕은 가끔 첨탑 꼭대기에서 아무도 없는 지평선을 오래 바라본다.',
+  ending_knight: '그 후 — 북부 기사단의 깃발은 눈 속에서도 꺾이지 않았다. 발터는 신입 기사에게 늘 같은 말을 한다. "우리 단장은 한 번 죽어 본 사람이다. 그래서 겁이 없지."',
+  ending_healer: '그 후 — 숲의 치료소에는 망령도 찾아온다. 세레나는 산 자와 죽은 자를 가리지 않고 돌본다. 나는 약초를 캐고, 그녀는 노래한다.',
+  ending_archivist: '그 후 — 오렌의 책은 끝내 출간되지 않았다. 그는 원고를 내게 건네며 말했다. "다음 생에 자네가 읽게. 이번엔 자네가 마지막 장을 쓰는 거야."',
+  ending_broker: '그 후 — 그림자 시장에서는 이제 마족과 인간이 같은 저울을 쓴다. 니아는 장부를 덮으며 웃는다. "손해 보는 장사는 안 한다니까. 너만 빼고."',
+  ending_bond_road: '그 후 — 첨탑 아래 작은 마을이 생겼다. 길 위에서 만난 이들이 하나둘 모여든 곳이다. 이름은 아직 없다. 모두가 「우리 마을」이라고만 부른다.',
+  ending_spire_name: '그 후 — 다음 생의 나는 첨탑 벽에서 내 이름을 찾아낼 것이다. 그리고 그 옆에 한 줄을 더 새기겠지. 「이번에는 넘는다.」',
+  ending_lost_record: '그 후 — 빈 열세 번째 표지 위에 먼지가 쌓인다. 하지만 오렌은 매일 그 책을 닦는다. 언젠가 누군가 채워 넣을 것이라고 믿으면서.',
+  ending_devoured: '그 후 — 대륙은 여전히 황혼에 잠겨 있다. 다만 첨탑 꼭대기의 그림자는 이제 낯익은 검을 쥐고 있다. 다음 회귀자는 나를 쓰러뜨려야 할 것이다.',
+  ending_fallen_together: '그 후 — 첨탑 계단참에 무기 여러 자루가 나란히 꽂혀 있다. 지나가는 이들은 그 앞에서 잠시 멈춘다. 누구도 혼자 쓰러지지 않았다는 표식이다.',
+  ending_dusk: '그 후 — 황혼은 끝나지 않았다. 사람들은 해가 지지 않는 저녁에 익숙해져 갔다. 그리고 나는, 다시 여명의 마을에서 눈을 뜬다.',
+};
+export function regressionEndingMilestoneGain(metaR, run) {
+  const e = regressionEndingFor(run);
+  const before = (metaR?.endings || []).length;
+  const after = e && !(metaR?.endings || []).includes(e.id) ? before + 1 : before;
+  return REGRESSION_ENDING_MILESTONES.filter(m => before < m.n && after >= m.n).reduce((a, m) => a + m.echo, 0);
 }
