@@ -37,6 +37,8 @@ import {
   regressionAptitude, buildRegressionShopStock, rerollRegressionShop, regressionShopOfferPrice, buyRegressionOffer,
   regressionCombatBonus, regressionCompanionFollowers, regressionStatSources, regressionSellableGear, sellRegressionGear, regressionGearSellPrice,
   REGRESSION_START_TRAITS, REGRESSION_TRAIT_TUNING, aggregateRegressionStartTraits, unlockRegressionStartTrait, toggleRegressionStartTrait,
+  regressionTraitLevel, regressionTraitSlots, regressionTraitNextCost, regressionNextSlotCost, buyRegressionTraitSlot,
+  REGRESSION_PROVISIONS, regressionProvisionsCost,
   REGRESSION_TRAITS, REGRESSION_MAIN_STORY, regressionEventById, regressionChoiceVisible, regressionTopTrait,
   REGRESSION_DAY, rollRegressionDay, passRegressionDay, hideFromRegressionEnemy, fightRegressionToday, restRegressionShelter, trainRegressionShelter,
   askRegressionHermit, regressionDayEnemyMult, regressionDayTable, regressionFortuneWeight, REGRESSION_TODAY_INTRO,
@@ -133,6 +135,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
   const [pickClass, setPickClass] = useState('wanderer');
   const [customStats, setCustomStats] = useState(null); // 시작 커스텀 화면 (null = 로비)
   const [customSkills, setCustomSkills] = useState([]);  // 시작 일반 스킬 3개
+  const [provisions, setProvisions] = useState([]);      // 1.191.0~ 이번 생 출발 준비물 (잔향 소모)
   const [showBook, setShowBook] = useState(false);
   const [banner, setBanner] = useState(null);
   const [carrySel, setCarrySel] = useState([]);
@@ -376,7 +379,8 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
     const startLife = () => { setBanner(null); setCustomStats(regressionPresetStats(pickClass)); setCustomSkills(REGRESSION_SKILL_PRESETS[pickClass] || []); };
     // ===== 시작 커스텀 — 능력치 배분 (원작 「남은 능력치」 화면) =====
     if (customStats) {
-      const tfx = aggregateRegressionStartTraits(reg.equippedTraits || []);
+      const tfx = aggregateRegressionStartTraits(reg.equippedTraits || [], reg);
+      const provCost = regressionProvisionsCost(provisions);
       const skillCount = REGRESSION_START_SKILL_COUNT + (tfx.startSkills || 0);
       const spent = regressionStatsSpent(customStats);
       const left = REGRESSION_START_POINTS + (tfx.startPoints || 0) - spent;
@@ -441,8 +445,33 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
                 })}
               </div>
             </GlassPanel>
+            <GlassPanel style={{ padding: 12 }}>
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="text-[12px] font-bold" style={{ color: PALETTE.dawn }}>🎒 출발 준비물 — 이번 생에만</div>
+                <span className="text-[11px] tabular-nums" style={{ color: PALETTE.legendary }}>잔향 {(reg.echo || 0) - provCost} / {reg.echo || 0}</span>
+              </div>
+              <div className="space-y-1.5">
+                {REGRESSION_PROVISIONS.map(pv => {
+                  const on = provisions.includes(pv.id);
+                  const can = on || (reg.echo || 0) - provCost >= pv.cost;
+                  return (
+                    <button key={pv.id} disabled={!can} onClick={() => setProvisions(on ? provisions.filter(x => x !== pv.id) : [...provisions, pv.id])}
+                      className="ui-press w-full flex items-center gap-2 px-2.5 text-left"
+                      style={{ minHeight: 44, borderRadius: 'var(--r-chip, 8px)', background: on ? `${PALETTE.legendary}18` : PALETTE.panelLight, border: `1px solid ${on ? PALETTE.legendary : PALETTE.panelBorder}`, opacity: can ? 1 : 0.45 }}>
+                      <span className="text-[16px]">{pv.icon}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[12px] font-bold" style={{ color: on ? PALETTE.legendary : PALETTE.text }}>{pv.name}</div>
+                        <div className="text-[11px]" style={{ color: PALETTE.textDim }}>{pv.desc}</div>
+                      </div>
+                      <span className="text-[11px] font-bold flex-none" style={{ color: PALETTE.legendary }}>{on ? '✓ ' : ''}{pv.cost}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="text-[11px] mt-1.5" style={{ color: PALETTE.textDim }}>잔향은 출발할 때 빠져나간다. 준비물은 이번 생에서만 쓴다.</div>
+            </GlassPanel>
             <UIButton variant="primary" className="w-full ui-sheen" disabled={left !== 0 || customSkills.length !== skillCount}
-              onClick={() => { onSave({ run: createRegressionRun(reg, pickClass, customStats, customSkills, reg.equippedTraits || []) }); setCustomStats(null); }}>
+              onClick={() => { onSave({ run: createRegressionRun(reg, pickClass, customStats, customSkills, reg.equippedTraits || [], provisions), echo: Math.max(0, (reg.echo || 0) - provCost) }); setProvisions([]); setCustomStats(null); }}>
               {left !== 0 ? `능력치를 ${left} 더 배분하세요` : customSkills.length !== skillCount ? `일반 스킬을 ${skillCount - customSkills.length}개 더 고르세요` : (reg.loops === 0 ? '여명의 마을에서 눈을 뜬다' : `${reg.loops + 1}번째 생을 시작한다`)}
             </UIButton>
           </div>
@@ -498,28 +527,44 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
 
           <GlassPanel style={{ padding: 14 }}>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[12px] font-bold" style={{ color: PALETTE.dawn }}>🔔 시작 특성 — 한 생에 {REGRESSION_TRAIT_TUNING.slots}개</span>
+              <span className="text-[12px] font-bold" style={{ color: PALETTE.dawn }}>🔔 시작 특성 — 장착 {(reg.equippedTraits || []).length}/{regressionTraitSlots(reg)}</span>
               <span className="text-[11px] tabular-nums" style={{ color: PALETTE.legendary }}>잔향 {reg.echo || 0}</span>
             </div>
             <div className="space-y-1.5">
               {REGRESSION_START_TRAITS.map(t => {
-                const owned = (reg.unlockedTraits || []).includes(t.id);
+                const lv = regressionTraitLevel(reg, t.id);
                 const on = (reg.equippedTraits || []).includes(t.id);
-                const full = !on && (reg.equippedTraits || []).length >= REGRESSION_TRAIT_TUNING.slots;
-                const canBuy = !owned && (reg.echo || 0) >= t.cost;
+                const full = !on && (reg.equippedTraits || []).length >= regressionTraitSlots(reg);
+                const next = regressionTraitNextCost(reg, t.id);
+                const canBuy = next != null && (reg.echo || 0) >= next;
                 return (
-                  <button key={t.id} disabled={owned ? full : !canBuy} className="ui-press w-full flex items-center gap-2 px-2.5 text-left"
-                    onClick={() => onSave(owned ? toggleRegressionStartTrait(reg, t.id) : unlockRegressionStartTrait(reg, t.id))}
-                    style={{ minHeight: 48, borderRadius: 'var(--r-chip, 8px)', background: on ? `${PALETTE.legendary}18` : PALETTE.panelLight, border: `1px solid ${on ? PALETTE.legendary : PALETTE.panelBorder}`, opacity: (owned ? full : !canBuy) ? 0.5 : 1 }}>
+                  <div key={t.id} className="flex items-center gap-2 px-2.5 py-1.5"
+                    style={{ minHeight: 52, borderRadius: 'var(--r-chip, 8px)', background: on ? `${PALETTE.legendary}18` : PALETTE.panelLight, border: `1px solid ${on ? PALETTE.legendary : PALETTE.panelBorder}` }}>
                     <span className="text-[18px]">{t.icon}</span>
                     <div className="flex-1 min-w-0">
-                      <div className="text-[12px] font-bold" style={{ color: on ? PALETTE.legendary : owned ? PALETTE.text : PALETTE.textDim }}>{t.name}</div>
-                      <div className="text-[11px]" style={{ color: PALETTE.textDim }}>{t.desc}</div>
+                      <div className="text-[12px] font-bold" style={{ color: on ? PALETTE.legendary : lv > 0 ? PALETTE.text : PALETTE.textDim }}>{t.name} {lv > 0 && <span className="text-[11px]" style={{ color: PALETTE.dawn }}>Lv.{lv}/{REGRESSION_TRAIT_TUNING.maxLv}</span>}</div>
+                      <div className="text-[11px]" style={{ color: PALETTE.textDim }}>{t.desc(Math.max(1, lv))}</div>
+                      {lv > 0 && lv < REGRESSION_TRAIT_TUNING.maxLv && <div className="text-[11px]" style={{ color: PALETTE.green }}>다음 Lv: {t.desc(lv + 1)}</div>}
                     </div>
-                    <span className="text-[11px] font-bold flex-none" style={{ color: on ? PALETTE.legendary : owned ? PALETTE.dawn : PALETTE.legendary }}>{on ? '장착' : owned ? '장착하기' : `해금 ${t.cost}`}</span>
-                  </button>
+                    <div className="flex flex-col gap-1 flex-none">
+                      {lv > 0 && (
+                        <button disabled={full} className="ui-press text-[11px] px-2" onClick={() => onSave(toggleRegressionStartTrait(reg, t.id))}
+                          style={{ minHeight: 30, borderRadius: 8, background: on ? `${PALETTE.legendary}33` : 'transparent', border: `1px solid ${on ? PALETTE.legendary : PALETTE.panelBorder}`, color: on ? PALETTE.legendary : PALETTE.dawn, opacity: full ? 0.45 : 1 }}>{on ? '장착 중' : '장착'}</button>
+                      )}
+                      {next != null && (
+                        <button disabled={!canBuy} className="ui-press text-[11px] px-2" onClick={() => onSave(unlockRegressionStartTrait(reg, t.id))}
+                          style={{ minHeight: 30, borderRadius: 8, background: 'transparent', border: `1px solid ${PALETTE.panelBorder}`, color: PALETTE.legendary, opacity: canBuy ? 1 : 0.45 }}>{lv > 0 ? `강화 ${next}` : `해금 ${next}`}</button>
+                      )}
+                    </div>
+                  </div>
                 );
               })}
+              {regressionNextSlotCost(reg) != null && (
+                <button disabled={(reg.echo || 0) < regressionNextSlotCost(reg)} className="ui-press w-full text-[12px] font-bold" onClick={() => onSave(buyRegressionTraitSlot(reg))}
+                  style={{ minHeight: 42, borderRadius: 'var(--r-chip, 8px)', background: 'transparent', border: `1px dashed ${PALETTE.legendary}`, color: PALETTE.legendary, opacity: (reg.echo || 0) >= regressionNextSlotCost(reg) ? 1 : 0.45 }}>
+                  ＋ 장착 슬롯 {regressionTraitSlots(reg) + 1}번째 열기 — 잔향 {regressionNextSlotCost(reg)}
+                </button>
+              )}
             </div>
             <div className="text-[11px] mt-2" style={{ color: PALETTE.textDim }}>잔향은 생을 마칠 때마다 쌓인다 — 명성 10당 1 · 메인 스토리 1편당 2 · 첨탑 1층당 3 · 정복 10 · 새 엔딩 10.</div>
           </GlassPanel>
