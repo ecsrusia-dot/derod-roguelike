@@ -46,7 +46,8 @@ import {
   REGRESSION_TRAITS, REGRESSION_MAIN_STORY, regressionEventById, regressionChoiceVisible, regressionTopTrait,
   REGRESSION_DAY, rollRegressionDay, passRegressionDay, hideFromRegressionEnemy, fightRegressionToday, restRegressionShelter, trainRegressionShelter,
   askRegressionHermit, regressionDayEnemyMult, regressionDayTable, regressionFortuneWeight, REGRESSION_TODAY_INTRO,
-  REGRESSION_LEARN, offerRegressionLearn, resolveRegressionLearn, regressionLearnChance, regressionLearnIntro, regressionSkillAptitude, regressionRunSkillLv, getRegressionClassPerk, regressionSkillStats,
+  REGRESSION_LEARN, offerRegressionLearn, resolveRegressionLearn, regressionLearnChance, regressionLearnIntro, regressionSkillAptitude, regressionRunSkillLv, getRegressionClassPerk,
+  REGRESSION_AWAKENINGS, REGRESSION_AWAKEN_LEVEL, getRegressionAwakening, chooseRegressionAwakening, regressionSkillStats,
 } from '../../data.js';
 import { AP_TUNING } from '../../combat/initCombat.js';
 import { ScreenHeader, GlassPanel, Chip, UIButton, BottomSheet } from '../ui/CommonUI.jsx';
@@ -214,7 +215,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
 
   const saveRun = (nextRun, extra = {}) => onSave({ run: nextRun, ...extra });
   // 1.185.0~ 오늘의 일 — 할 일이 없으면 랜덤 카드 1장을 굴린다 (렌더 밖에서 1회, 결과는 저장돼 새로고침해도 같다)
-  const needRoll = !!run && !run.over && !run.today && !run.scene && !run.pending && !run.pendingEvent && !run.pendingLearn && !run.pendingGear
+  const needRoll = !!run && !run.over && !run.today && !run.scene && !run.pending && !run.pendingEvent && !run.pendingLearn && !run.pendingGear && !run.pendingAwaken
     && run.spireRound == null && !isRegressionSpireDay(run);
   useEffect(() => {
     if (!needRoll) return;
@@ -327,7 +328,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
   // ===== 전투 (탐험 / 첨탑) — 1.182.0~ 전용 전투 (시안 2, RegressionBattle) =====
   // 흐름: 적 확정(pending / spireRound) → 전투 준비(태세·벨트) → 자동 전투 재생(개입 불가) → 결과 장면
   const inSpire = run && run.spireRound != null && !run.over;
-  if (run && loadout && (run.pending || (inSpire && !run.scene && !run.pendingLearn && !run.pendingGear))) {
+  if (run && loadout && (run.pending || (inSpire && !run.scene && !run.pendingLearn && !run.pendingGear && !run.pendingAwaken))) {
     const compFx = aggregateRegressionCompanions(run);
     // 1.194.0~ 첨탑은 길(spireRoute)마다 구성이 다르고, 길목의 군주는 일러스트를 빌린 전용 적
     const spireEnemy = inSpire ? regressionSpireEnemyFor(run, run.spireRound, compFx.spireWeakness) : null;
@@ -438,6 +439,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
         hp={loadout.hp}
         skills={regressionRunSkills(run)}
         skillLv={run.skillLv || {}}
+        awakenId={run.awaken || null}
         relicBonus={relicBonus}
         potions={run.potions || {}}
         beltSlots={regressionBeltSlots(run.classId, run)}
@@ -775,6 +777,20 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
         <Choice text="다음" onClick={nextScene} />
       </div>
     );
+  } else if (run.pendingAwaken && (REGRESSION_AWAKENINGS[run.classId] || []).length) {
+    // 1.199.0~ 각성 분기 — 2택 1, 이번 생 동안 유지
+    const perk = getRegressionClassPerk(run.classId);
+    body = (
+      <div className="space-y-3 ui-screen-enter">
+        <div className="text-[14px] font-bold" style={{ color: PALETTE.legendary }}>✦ 각성 — Lv.{REGRESSION_AWAKEN_LEVEL}</div>
+        <div className="text-[14px] leading-relaxed" style={{ color: PALETTE.text }}>몸 깊은 곳에서 무언가 깨어난다. {perk ? `「${perk.name}」이(가) 두 갈래로 갈라진다.` : ''} 하나만 고를 수 있다 — 이번 생이 끝날 때까지.</div>
+        <div className="space-y-1.5">
+          {REGRESSION_AWAKENINGS[run.classId].map(a => (
+            <Choice key={a.id} text={`「${a.name}」`} sub={a.desc} onClick={() => saveRun({ ...chooseRegressionAwakening(run, a.id), scene: regressionResultScene(`각성 — ${a.name}`, '힘의 결이 하나로 모였다. 싸움의 방식이 달라질 것이다.', [{ text: a.desc, tone: 'gold' }]) })} />
+          ))}
+        </div>
+      </div>
+    );
   } else if (run.pendingLearn && REGRESSION_SKILLS[run.pendingLearn.skillId]) {
     // 1.183.0~ 스킬 습득 기회 — 적성(관련 능력치 ÷ 내 최고 능력치)으로 성공률 결정
     const pl = run.pendingLearn;
@@ -1063,6 +1079,8 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
             </div>
             <div className="text-[11px] mt-1" style={{ color: PALETTE.textDim }}>가장 높은 성향이 길(루트)을 정하고, 첨탑에 오른 길이 엔딩을 가른다. 메인 스토리는 각 지역 {8}일째와 마지막 날 찾아온다.</div>
             {getRegressionClassPerk(run.classId) && <div className="text-[11px] mt-3" style={{ color: PALETTE.textDim }}><b style={{ color: PALETTE.legendary }}>◆ 직업 특성 「{getRegressionClassPerk(run.classId).name}」</b> — {getRegressionClassPerk(run.classId).desc}</div>}
+            {run.awaken && getRegressionAwakening(run.awaken) && <div className="text-[11px] mt-1" style={{ color: PALETTE.textDim }}><b style={{ color: PALETTE.legendary }}>✦ 각성 「{getRegressionAwakening(run.awaken).name}」</b> — {getRegressionAwakening(run.awaken).desc}</div>}
+            {!run.awaken && <div className="text-[11px] mt-1" style={{ color: PALETTE.textDim }}>✦ Lv.{REGRESSION_AWAKEN_LEVEL}에 각성 — 두 갈래 중 하나를 고른다</div>}
             <div className="text-[12px] font-bold mt-3 mb-1" style={{ color: PALETTE.text }}>보유 스킬 {regressionRunSkills(run).length}개</div>
             <div className="space-y-1">
               {regressionRunSkills(run).map(id => {

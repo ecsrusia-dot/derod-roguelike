@@ -1210,6 +1210,8 @@ export function gainRegressionExp(run, amount = 0) {
     next.level += 1;
     next.statPoints += 1;
   }
+  // 1.199.0~ 각성 분기 — 처음 각성 레벨에 닿으면 2택 카드
+  if (before < __RAWL && next.level >= __RAWL && !next.awaken && __RAW[next.classId]) next.pendingAwaken = true;
   return { run: next, levelUps: next.level - before, from: before };
 }
 export function spendRegressionStatPoint(run, statId) {
@@ -1239,7 +1241,11 @@ export function regressionMaxHpBonusFromStats(stats) {
 }
 
 // 1.182.0~ 보유 스킬 (시작 커스텀 3개 + 습득). 구세이브는 직업 프리셋
-import { REGRESSION_SKILL_PRESETS as __RSP, REGRESSION_FLAMES_PER_LIFE as __RFL, REGRESSION_SKILLS as __RSK, regressionSkillStats as __rss, REGRESSION_COMBAT as __RCB, REGRESSION_SKILL_LV as __RSLV, regressionSkillLevel as __rsl } from './regressionCombat.js';
+import { REGRESSION_SKILL_PRESETS as __RSP, REGRESSION_FLAMES_PER_LIFE as __RFL, REGRESSION_SKILLS as __RSK, regressionSkillStats as __rss, REGRESSION_COMBAT as __RCB, REGRESSION_SKILL_LV as __RSLV, regressionSkillLevel as __rsl, REGRESSION_AWAKEN_LEVEL as __RAWL, REGRESSION_AWAKENINGS as __RAW } from './regressionCombat.js';
+export function chooseRegressionAwakening(run, id) {
+  const ok = (__RAW[run.classId] || []).some(a => a.id === id);
+  return ok ? { ...run, awaken: id, pendingAwaken: false, log: [...(run.log || []), `D${run.day}: 각성 — ${(__RAW[run.classId].find(a => a.id === id)).name}`] } : run;
+}
 export function regressionRunSkills(run) {
   return Array.isArray(run?.skills) && run.skills.length ? run.skills : (__RSP[run?.classId] || []);
 }

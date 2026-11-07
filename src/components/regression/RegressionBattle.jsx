@@ -9,7 +9,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { PALETTE, getEnemyImageSrc } from '../../utils/helpers.js';
 import {
   POTIONS, REGRESSION_STANCES, REGRESSION_SKILLS, REGRESSION_SKILL_TIERS, getRegressionStance,
-  regressionSkillValue, regressionSkillLevel, regressionPlayerCombatant, getRegressionClassPerk, regressionEnemyCombatant, simulateRegressionCombat,
+  regressionSkillValue, regressionSkillLevel, regressionPlayerCombatant, getRegressionClassPerk, getRegressionAwakening, regressionEnemyCombatant, simulateRegressionCombat,
 } from '../../data.js';
 import RegressionSkillInfo from './RegressionSkillInfo.jsx';
 import RegressionSkillCutin, { REGRESSION_CUTIN_MS } from './RegressionSkillCutin.jsx';
@@ -45,7 +45,7 @@ function StateChip({ color, children }) {
 }
 
 export default function RegressionBattle({
-  classData, enemyKey, enemyObj, enemyLabel, regionKey, enemyMult = 1, enemyExtra = null, intro, stats, level, maxHp, hp, skills, skillLv = {}, relicBonus,
+  classData, enemyKey, enemyObj, enemyLabel, regionKey, enemyMult = 1, enemyExtra = null, intro, stats, level, maxHp, hp, skills, skillLv = {}, awakenId = null, relicBonus,
   potions, beltSlots, defaultBelt, flames, committed, speed, onCycleSpeed, onCommit, onFinish, speedLabel, speedOptions = [], onSetSpeed,
 }) {
   const [stanceId, setStanceId] = useState(committed?.stanceId || 'calm');
@@ -66,7 +66,7 @@ export default function RegressionBattle({
   const remaining = { ...inv }; belt.forEach(id => { remaining[id] -= 1; });
 
   const startFight = (stId, beltArr) => {
-    const player = regressionPlayerCombatant({ stats, level, maxHp, hp, skills, skillLv, belt: beltArr, relicBonus, classId: classData.id });
+    const player = regressionPlayerCombatant({ stats, level, maxHp, hp, skills, skillLv, belt: beltArr, relicBonus, classId: classData.id, awakenId });
     const res = simulateRegressionCombat({ player, enemy: enemyBase, stanceId: stId });
     finished.current = false;
     setRun({ res, idx: 0 });
@@ -133,6 +133,7 @@ export default function RegressionBattle({
             {getRegressionClassPerk(classData.id) && (
               <div className="text-[11px] mb-2 px-2.5 py-1.5" style={{ borderRadius: 'var(--r-chip, 8px)', background: PALETTE.panelLight, color: PALETTE.textDim }}>
                 <b style={{ color: PALETTE.legendary }}>◆ {getRegressionClassPerk(classData.id).name}</b> (직업 특성) — {getRegressionClassPerk(classData.id).desc}
+                {awakenId && getRegressionAwakening(awakenId) && <div><b style={{ color: PALETTE.legendary }}>✦ {getRegressionAwakening(awakenId).name}</b> (각성) — {getRegressionAwakening(awakenId).desc}</div>}
               </div>
             )}
             <div className="text-[12px] font-bold mb-2" style={{ color: PALETTE.dawn }}>✦ 스킬 — 조건이 맞으면 전투당 1번 자동 발동</div>

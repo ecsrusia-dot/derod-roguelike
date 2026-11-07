@@ -26,7 +26,7 @@ export const REGRESSION_COMBAT = {
   enemyDodge: { normal: 8, elite: 10, boss: 6 },
   // 적 강도 — 지역별 (본편 수치 × 배율). 체감 조정은 여기서
   // 1.190.0 PM 피드백 「전투·첨탑이 너무 쉽다」 — 시뮬 목표: 하급 승률 92~98%·승리 시 HP 27~47% 소모 / 강적 73~92% / 첨탑 진입 대비 정복 ~31%
-  enemyHp: { 1: 1.15, 2: 1.05, 3: 0.9, 4: 0.82, spire: 1.55 },
+  enemyHp: { 1: 1.15, 2: 1.05, 3: 0.9, 4: 0.82, spire: 1.7 },
   enemyDmg: { 1: 1.2, 2: 1.0, 3: 0.8, 4: 0.72, spire: 1.15 },
   tierMult: { normal: { hp: 1.05, dmg: 1.15 }, elite: { hp: 1, dmg: 1 } },
   maxTurns: 30,
@@ -143,24 +143,67 @@ export function regressionSkillValue(id, stats, lv = 1) {
 export const REGRESSION_CLASS_PERKS = {
   wanderer: { name: '검객의 직감', dodge: 6, critRate: 6, counterPct: 0.8, desc: '회피 +6% · 치명 +6% · 공격을 피하면 즉시 반격 (평타의 80%)' },
   elf: { name: '정령의 가호', dodge: 6, openerPct: 1.3, counterPct: 0.5, desc: '회피 +6% · 전투 시작 정령 화살 (평타의 130%) · 피하면 정령 화살 (평타의 50%)' },
+  // 1.199.0~ 나머지 3직업 (PM 선택 재미 요소 5) — 이미 강한 직업이라 수치는 작게, 개성 위주
+  sage: { name: '마력 순환', skillPowerPct: 8, desc: '스킬 위력 +8%' },
+  demonblood: { name: '혈광', berserkBelow: 0.5, berserkPct: 15, lifesteal: 2, desc: 'HP 50% 이하일 때 공격 +15% · 흡혈 2%' },
+  priest: { name: '수신의 가호', regenPct: 0.5, desc: '매 턴 끝에 최대 HP 0.5% 회복' },
 };
 export function getRegressionClassPerk(classId) { return REGRESSION_CLASS_PERKS[classId] || null; }
 
+// 1.199.0~ 각성 분기 — REGRESSION_AWAKEN_LEVEL에 2택 1 (한 생에 한 번). fx 어휘는 직업 특성과 같다
+export const REGRESSION_AWAKEN_LEVEL = 7;
+export const REGRESSION_AWAKENINGS = {
+  wanderer: [
+    { id: 'aw_wanderer_shadow', name: '무영보', desc: '회피 +8% · 반격 위력 +40%p', fx: { dodge: 8, counterPct: 0.4 } },
+    { id: 'aw_wanderer_flash', name: '일섬', desc: '치명 +10% · 치명 피해 ×1.5 → ×1.9', fx: { critRate: 10, critMultBonus: 0.4 } },
+  ],
+  elf: [
+    { id: 'aw_elf_sky', name: '천공 사격', desc: '전투 시작 정령 화살 +100%p (총 평타의 230%)', fx: { openerPct: 1.0 } },
+    { id: 'aw_elf_wind', name: '바람 걸음', desc: '회피 +10% · 피하면 정령 화살 +30%p', fx: { dodge: 10, counterPct: 0.3 } },
+  ],
+  sage: [
+    { id: 'aw_sage_blaze', name: '겁화', desc: '스킬 위력 +15%p (총 +23%)', fx: { skillPowerPct: 15 } },
+    { id: 'aw_sage_ward', name: '마나 방벽', desc: '전투 시작 최대 HP 10% 보호막', fx: { startShieldPct: 10 } },
+  ],
+  demonblood: [
+    { id: 'aw_demon_fury', name: '혈마', desc: '광폭 조건 HP 65% 이하 · 광폭 공격 +15%p (총 +30%)', fx: { berserkBelow: 0.65, berserkPct: 15 } },
+    { id: 'aw_demon_undying', name: '불사', desc: '쓰러질 때 1회 HP 20%로 일어난다 (전투마다)', fx: { reviveOncePct: 0.2 } },
+  ],
+  priest: [
+    { id: 'aw_priest_sanctum', name: '성역', desc: '턴마다 회복 +0.5%p (총 1%)', fx: { regenPct: 0.5 } },
+    { id: 'aw_priest_judgment', name: '심판', desc: '3턴마다 신성한 일격 (평타의 90%)', fx: { turnStrikeEvery: 3, turnStrikePct: 0.9 } },
+  ],
+};
+export function getRegressionAwakening(id) {
+  for (const list of Object.values(REGRESSION_AWAKENINGS)) { const a = list.find(x => x.id === id); if (a) return a; }
+  return null;
+}
+// 직업 특성 + 각성 합산 (berserkBelow는 큰 값, 나머지는 합)
+export function regressionClassFx(classId, awakenId = null) {
+  const fx = { ...(getRegressionClassPerk(classId) || {}) };
+  const aw = getRegressionAwakening(awakenId)?.fx || {};
+  for (const [k, v] of Object.entries(aw)) fx[k] = k === 'berserkBelow' ? Math.max(fx[k] || 0, v) : (fx[k] || 0) + v;
+  return fx;
+}
+
 // =========== 전투 참가자 ===========
-export function regressionPlayerCombatant({ stats, level = 0, maxHp, hp, skills = [], skillLv = {}, belt = [], relicBonus = {}, classId = null }) {
+export function regressionPlayerCombatant({ stats, level = 0, maxHp, hp, skills = [], skillLv = {}, belt = [], relicBonus = {}, classId = null, awakenId = null }) {
   const C = REGRESSION_COMBAT;
-  const perk = getRegressionClassPerk(classId) || {};
+  const perk = regressionClassFx(classId, awakenId);
   const weapon = Math.max(...Object.entries(C.weaponMult).map(([k, m]) => (stats[k] || 0) * m));
   return {
     maxHp, hp,
     atk: (C.baseAtk + (stats.근력 || 0) * C.atkPerStr + weapon + level * 0.5) * (1 + (relicBonus.dmgDealt || 0) / 100),
     dodge: Math.min(C.dodgeCap, C.dodgeBase + (stats.민첩 || 0) * C.dodgePerAgi + (relicBonus.dodge || 0) + (perk.dodge || 0)),
     counterPct: perk.counterPct || 0, openerPct: perk.openerPct || 0, perkName: perk.name || null,
+    berserkBelow: perk.berserkBelow || 0, berserkPct: perk.berserkPct || 0, regenPct: perk.regenPct || 0,
+    startShieldPct: perk.startShieldPct || 0, critMultBonus: perk.critMultBonus || 0, reviveOncePct: perk.reviveOncePct || 0,
+    turnStrikeEvery: perk.turnStrikeEvery || 0, turnStrikePct: perk.turnStrikePct || 0,
     crit: C.critBase + (stats.통찰 || 0) * C.critPerInsight + (relicBonus.critRate || 0) + (perk.critRate || 0),
     def: (stats.강인 || 0) * C.defPerVit,
     takenMult: 1 + (relicBonus.dmgTaken || 0) / 100,
-    lifesteal: relicBonus.lifesteal || 0,
-    skillPower: 1 + (stats.학식 || 0) * C.lorePower,
+    lifesteal: (relicBonus.lifesteal || 0) + (perk.lifesteal || 0),
+    skillPower: (1 + (stats.학식 || 0) * C.lorePower) * (1 + (perk.skillPowerPct || 0) / 100),
     stats, skills, skillLv: { ...skillLv }, belt: [...belt],
   };
 }
@@ -246,15 +289,18 @@ export function simulateRegressionCombat({ player: P0, enemy: E0, stanceId = 'ca
     ev.push({ t: 'potion', id: pid, amt: h, p: P.hp, e: E.hp });
   };
 
+  if (P.startShieldPct) { const s0 = Math.round(P.maxHp * P.startShieldPct / 100); P.shield += s0; ev.push({ t: 'shield', amt: s0, label: '마나 방벽', p: P.hp, e: E.hp }); }
   if (P.openerPct) dealToEnemy(vary(P.atk * P.openerPct * stance.mult), P.perkName || '선제');
   for (const id of skillsBy('battleStart')) fire(id);
 
   for (let turn = 1; turn <= C.maxTurns && P.hp > 0 && E.hp > 0; turn++) {
     ev.push({ t: 'turn', n: turn });
     for (const id of skillsBy('turn')) if (REGRESSION_SKILLS[id].at === turn) fire(id);
+    if (P.turnStrikeEvery && turn % P.turnStrikeEvery === 0 && E.hp > 0) dealToEnemy(vary(P.atk * P.turnStrikePct * stance.mult), '심판');
     if (E.hp <= 0) break;
     // 플레이어 평타
-    const mult = stance.mult * (P.buffTurns > 0 ? P.buffMult : 1);
+    const berserk = P.berserkBelow && P.hp / P.maxHp <= P.berserkBelow ? 1 + P.berserkPct / 100 : 1;
+    const mult = stance.mult * (P.buffTurns > 0 ? P.buffMult : 1) * berserk;
     if (P.sureBonus != null) {
       const bonus = P.sureBonus; P.sureBonus = null;
       dealToEnemy(vary(P.atk * mult) + bonus, `필중 평타 (+${bonus})`);
@@ -263,7 +309,7 @@ export function simulateRegressionCombat({ player: P0, enemy: E0, stanceId = 'ca
       for (const id of skillsBy('enemyDodge')) fire(id);
     } else {
       const crit = rng() * 100 < P.crit;
-      dealToEnemy(vary(P.atk * mult * (crit ? C.critMult : 1)), crit ? '치명타' : '평타', crit ? 'crit' : 'hit');
+      dealToEnemy(vary(P.atk * mult * (crit ? C.critMult + P.critMultBonus : 1)), crit ? '치명타' : berserk > 1 ? '광폭 평타' : '평타', crit ? 'crit' : 'hit');
     }
     if (P.buffTurns > 0) P.buffTurns -= 1;
     checkHpTriggers();
@@ -304,12 +350,14 @@ export function simulateRegressionCombat({ player: P0, enemy: E0, stanceId = 'ca
           if (P.reflectNext) { const r = P.reflectNext; P.reflectNext = 0; dealToEnemy(r, '반사'); }
           if (P.hp <= 0) {
             const rv = skillsBy('lethal')[0];
+            if (!rv && P.reviveOncePct && !P.revivedOnce) { P.revivedOnce = true; P.hp = Math.round(P.maxHp * P.reviveOncePct); ev.push({ t: 'revive', p: P.hp, e: E.hp, label: '불사' }); }
             if (rv) { fire(rv); const sk = REGRESSION_SKILLS[rv]; P.hp = Math.round(P.maxHp * (sk.base + (regressionSkillLevel(P.skillLv, rv) - 1) * REGRESSION_SKILL_LV.revivePerLv + scaled(0, sk.scaleMult, P.stats))); ev.push({ t: 'revive', p: P.hp, e: E.hp }); }
           }
         }
       }
     }
     checkHpTriggers();
+    if (P.regenPct && P.hp > 0 && P.hp < P.maxHp && E.hp > 0) { const h = Math.max(1, Math.round(P.maxHp * P.regenPct / 100)); P.hp = Math.min(P.maxHp, P.hp + h); ev.push({ t: 'heal', amt: h, label: '수신의 가호', p: P.hp, e: E.hp }); }
     tryPotion();
   }
   const win = E.hp <= 0 && P.hp > 0;
