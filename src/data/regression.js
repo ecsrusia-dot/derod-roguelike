@@ -803,13 +803,43 @@ export const REGRESSION_EVENTS = [
     { text: '목소리를 따라간다', stat: '신성', dc: 16, success: { text: '목소리들이 물러나며 힘을 남긴다.', reward: { type: 'skill_random_lv' } }, fail: { text: '목소리가 발톱이 되어 할퀸다.', penalty: { hp: -40 } } },
     { text: '「전생의 기억」 — 상흔이 길을 안다', requireMemory: 'mem_rift_scar', result: '몸이 기억하는 길로 균열을 빠져나오며 은화를 주웠다.', reward: { type: 'gold', value: 120 } },
   ] },
+  // ── 1.183.0~ 기연 사건 6종 (fortune: 배울 수 있는 기연 스킬 — 빌드 가중·적성 판정) ──
+  { id: 'rg_fortune_swordgrave', region: 1, fortune: 'saint_flash', title: '검객의 얼음 무덤', text: '얼음 속에 한 검객이 검을 내리친 자세 그대로 잠들어 있다.\n검끝이 가리키는 바위에 한 줄기 베인 자국이 남아 있다.', choices: [
+    { text: '그 자국을 따라 검을 휘둘러 본다', stat: '검술', dc: 15, success: { text: '바람이 멎는다. 검객의 마지막 일격이 눈앞에 그려진다.', reward: { type: 'learn', name: 'saint_flash' } }, fail: { text: '검이 얼음에 박혀 손목이 꺾였다.', penalty: { hp: -25 } } },
+    { text: '검객에게 묵념한다', result: '무덤가에 놓인 은화 몇 닢을 그대로 두고 떠났다. 마음이 가볍다.', reward: { type: 'fame', value: 3 } },
+  ] },
+  { id: 'rg_fortune_titan', region: 1, fortune: 'titan_body', title: '거인의 뼈', text: '눈밭에 집채만 한 갈비뼈가 솟아 있다. 뼈 사이로 뜨거운 김이 피어오른다.', choices: [
+    { text: '김이 나는 골수 곁에서 버틴다', stat: '강인', dc: 15, success: { text: '살갗이 타는 듯하더니 몸 깊은 곳이 단단해진다.', reward: { type: 'learn', name: 'titan_body' } }, fail: { text: '열기를 견디지 못하고 쓰러졌다.', penalty: { hp: -30 } } },
+    { text: '뼈 조각을 떼어 간다', result: '마을 대장장이가 좋은 값을 쳐 줄 것이다.', reward: { type: 'gold', value: 40 } },
+  ] },
+  { id: 'rg_fortune_archer_spirit', region: 2, fortune: 'sky_volley', title: '고대 궁수의 혼', text: '썩은 나무 꼭대기에 빛나는 궁수가 앉아 있다. "내 화살을 피해 보아라."', choices: [
+    { text: '쏟아지는 화살 사이에서 맞받아 쏜다', stat: '사격', dc: 15, success: { text: '"…좋은 눈이다." 궁수가 하늘을 가리킨다. 화살비의 궤적이 보인다.', reward: { type: 'learn', name: 'sky_volley' } }, fail: { text: '화살 하나가 어깨를 꿰뚫었다.', penalty: { hp: -30 } } },
+    { text: '나무 뒤로 몸을 숨긴다', result: '궁수가 웃음소리만 남기고 사라졌다.' },
+  ] },
+  { id: 'rg_fortune_dawn_chapel', region: 3, fortune: 'dawn_miracle', title: '여명의 예배당', text: '봉인된 신전 깊은 곳, 햇빛이 들지 않는데도 밝은 예배당이 있다.\n제단에 「한 번 꺼진 불도 다시 타오른다」라고 새겨져 있다.', choices: [
+    { text: '제단 앞에 무릎 꿇고 기도한다', stat: '신성', dc: 15, success: { text: '빛이 가슴에 스며든다. 죽음의 문턱에서 돌아오는 길이 보인다.', reward: { type: 'learn', name: 'dawn_miracle' } }, fail: { text: '빛이 잦아든다. 아직 응답할 때가 아닌 모양이다.', reward: { type: 'heal_pct', value: 15 } } },
+    { text: '촛대를 챙긴다', result: '은촛대 한 쌍. 신의 노여움은 없었다 — 아마도.', reward: { type: 'gold', value: 50 } },
+  ] },
+  { id: 'rg_fortune_sage_tome', region: 3, fortune: 'sage_eye', title: '현자의 마지막 책', text: '서고 맨 안쪽 책상 위에 펼쳐진 채 굳은 책이 있다.\n마지막 문장이 중간에서 끊겨 있다.', choices: [
+    { text: '끊긴 문장을 이어 읽는다', stat: '학식', dc: 15, success: { text: '문장이 스스로 완성된다. 적의 일격이 오기 전에 그 끝이 보인다.', reward: { type: 'learn', name: 'sage_eye' } }, fail: { text: '글자가 눈을 찌르는 듯하다.', penalty: { hp: -25 } } },
+    { text: '책을 덮어 둔다', result: '어떤 지식은 아직 이르다.' },
+  ] },
+  { id: 'rg_fortune_dragon_ash', region: 4, fortune: 'dragon_breath', title: '용의 재', text: '균열 바닥에 아직 식지 않은 검은 재가 쌓여 있다. 재 속에서 불씨가 숨을 쉰다.', choices: [
+    { text: '불씨에 마력을 불어넣는다', stat: '마법', dc: 15, success: { text: '불씨가 손바닥 위에서 용의 형상으로 타오른다.', reward: { type: 'learn', name: 'dragon_breath' } }, fail: { text: '불씨가 폭발했다.', penalty: { hp: -40 } } },
+    { text: '재를 모아 판다', result: '연금술사들이 탐내는 재다.', reward: { type: 'gold', value: 60 } },
+  ] },
 ];
 
 // 지역 사건 고르기 — 이번 생에 본 사건 제외, 기억 조각 요구 선택지는 미보유 시 숨김
 export function rollRegressionEvent(run, memories = [], rng = Math.random) {
   const pool = REGRESSION_EVENTS.filter(e => e.region === run.region && !(run.seenEvents || []).includes(e.id));
   if (!pool.length) return null;
-  const ev = pool[Math.floor(rng() * pool.length)];
+  // 1.183.0~ 빌드 가중 — 내 능력치로 풀 수 있는 사건·내 빌드에 맞는 기연이 더 자주 (PM 요청 4: 육성 방향대로 랜덤)
+  const stats = regressionRunStats(run);
+  const weights = pool.map(e => regressionEventWeight(e, stats));
+  let roll = rng() * weights.reduce((a, b) => a + b, 0);
+  let ev = pool[pool.length - 1];
+  for (let i = 0; i < pool.length; i++) { roll -= weights[i]; if (roll < 0) { ev = pool[i]; break; } }
   return { ...ev, choices: ev.choices.filter(c => !c.requireMemory || memories.includes(c.requireMemory)) };
 }
 
@@ -833,14 +863,28 @@ export function applyRegressionEvent(run, eventId, res, { maxHp = 300, rng = Mat
     else if (r.type === 'skill_specific') { next = applyRegressionLoot(next, { passive: r.name }); notes.push(`「${r.name}」 +1Lv`); }
     else if (r.type === 'skill_random_lv') { const n = REGRESSION_PASSIVE_POOL[Math.floor(rng() * REGRESSION_PASSIVE_POOL.length)]; next = applyRegressionLoot(next, { passive: n }); notes.push(`「${n}」 +1Lv`); }
     else if (r.type === 'stat') { next.statBonus[r.name] = (next.statBonus[r.name] || 0) + r.value; notes.push(`${r.name} +${r.value}`); }
+    else if (r.type === 'learn') {
+      // 1.183.0~ 기연 — 배울 기회만 연다. 실제 습득은 적성 판정 (resolveRegressionLearn)
+      const owned = regressionRunSkills(next);
+      if (owned.includes(r.name)) { const g = gainRegressionExp(next, REGRESSION_LEARN.knownExp); next = g.run; notes.push(`이미 아는 깨달음 — 경험치 +${REGRESSION_LEARN.knownExp}`); }
+      else if (owned.length >= REGRESSION_LEARN.skillCap) { notes.push('더 이상 새 기술을 담을 여유가 없다'); }
+      else { next.pendingLearn = { skillId: r.name, source: 'fortune', from: eventId }; notes.push(`기연 — 「${__RSK[r.name]?.name}」`); }
+    }
   }
   // 1.181.0~ 판정 성공 = 경험치 + 명성 + 명성 경로 (원작: 주사위 성공으로 이름이 알려진다)
   if (res?.check === 'ok' && res.stat) {
-    const g = gainRegressionExp(next, REGRESSION_EXP.check);
+    // 1.183.0~ 어려운 판정일수록 경험치 ↑ (DC 15부터 +3씩) + 낮은 확률로 덤 (회복약)
+    const exp = regressionCheckExp(res.dc);
+    const g = gainRegressionExp(next, exp);
     next = g.run;
     next.fame += 2;
     next.fameBy = { ...(next.fameBy || {}), [res.stat]: ((next.fameBy || {})[res.stat] || 0) + 1 };
-    notes.push(`경험치 +${REGRESSION_EXP.check}`, '명성 +2');
+    notes.push(`경험치 +${exp}`, '명성 +2');
+    if (rng() < REGRESSION_LEARN.checkPotionChance) {
+      const id = REGRESSION_POTION_POOL[Math.floor(rng() * REGRESSION_POTION_POOL.length)];
+      next = applyRegressionLoot(next, { potion: id });
+      notes.push(`덤 — ${POTIONS[id]?.name}`);
+    }
     if (g.levelUps > 0) notes.push(`레벨 상승 ${g.from}→${next.level}`, `추가 능력치 +${g.levelUps}`);
   } else if (!res?.check) {
     const g = gainRegressionExp(next, REGRESSION_EXP.event);
@@ -968,6 +1012,7 @@ export function resolveRegressionChoice(choice, stats = {}, rng = Math.random) {
     res.combat = br?.combat || null;
     res.check = ok ? 'ok' : 'fail';
     res.stat = choice.stat;
+    res.dc = choice.dc;
   } else {
     res.text = choice.result || '';
     res.reward = choice.reward || null;
@@ -1077,8 +1122,118 @@ export function regressionMaxHpBonusFromStats(stats) {
 }
 
 // 1.182.0~ 보유 스킬 (시작 커스텀 3개 + 습득). 구세이브는 직업 프리셋
-import { REGRESSION_SKILL_PRESETS as __RSP, REGRESSION_FLAMES_PER_LIFE as __RFL } from './regressionCombat.js';
+import { REGRESSION_SKILL_PRESETS as __RSP, REGRESSION_FLAMES_PER_LIFE as __RFL, REGRESSION_SKILLS as __RSK, regressionSkillStats as __rss } from './regressionCombat.js';
 export function regressionRunSkills(run) {
   return Array.isArray(run?.skills) && run.skills.length ? run.skills : (__RSP[run?.classId] || []);
 }
 export function regressionRunFlames(run) { return run?.flames ?? __RFL; }
+
+
+// ============================================
+// 1.183.0~ 2.0 PR C — 스킬 습득 개연성 (docs/regression-v2-design.md 2.4)
+// ============================================
+// 습득 성공률 = 등급 기본률 × (하한 + (1−하한) × 적성²) + 학식 보정.
+// 적성 = 스킬 관련 능력치 평균 ÷ 내 최고 능력치 — 검술·근력 빌드가 마법 기연을 만나면 적성 0 → 약 3%.
+// 밸런스는 REGRESSION_LEARN 한 곳.
+export const REGRESSION_LEARN = {
+  base: { normal: 0.85, advanced: 0.7, fortune: 0.55 },
+  floor: 0.05,              // 적성 0일 때 기본률에 곱해지는 하한
+  lorePerPoint: 0.01,       // 학식 1당 +1%p (배우는 머리)
+  min: 0.02, max: 0.95,
+  skillCap: 6,              // 한 생에 담을 수 있는 스킬 수 (시작 3 + 습득 3)
+  offer: { normal: 0.12, elite: 0.6, boss: 1 },  // 승리 후 배울 기회가 열릴 확률
+  offFocusWeight: 0.15,     // 기회가 열릴 때 빌드와 무관한 스킬이 뽑힐 기본 가중 (개연성 드라마)
+  learnExp: 10,             // 습득 성공 경험치
+  knownExp: 20,             // 이미 아는 기연을 다시 만나면
+  checkPotionChance: 0.1,   // 판정 성공 덤 (회복약)
+};
+const LEARN_SOURCE_TIER = { normal: 'normal', elite: 'advanced', boss: 'fortune', fortune: 'fortune' };
+
+export function regressionCheckExp(dc = 14) {
+  return REGRESSION_EXP.check + Math.max(0, (dc || 14) - 14) * 3;
+}
+export function regressionSkillAptitude(skillId, stats = {}) {
+  const rel = __rss(skillId);
+  if (!rel.length) return 0;
+  const top = Math.max(1, ...REGRESSION_STAT_IDS.map(k => stats[k] || 0));
+  const avg = rel.reduce((a, k) => a + (stats[k] || 0), 0) / rel.length;
+  return Math.max(0, Math.min(1, avg / top));
+}
+export function regressionLearnChance(skillId, stats = {}) {
+  const L = REGRESSION_LEARN;
+  const sk = __RSK[skillId]; if (!sk) return 0;
+  const apt = regressionSkillAptitude(skillId, stats);
+  const p = (L.base[sk.tier] || 0.5) * (L.floor + (1 - L.floor) * apt * apt) + (stats.학식 || 0) * L.lorePerPoint;
+  return Math.max(L.min, Math.min(L.max, p));
+}
+// 사건 가중 — 판정 능력치가 높을수록, 기연은 적성이 맞을수록 자주
+export function regressionEventWeight(ev, stats = {}) {
+  if (ev.fortune) return 0.3 + 2 * regressionSkillAptitude(ev.fortune, stats);
+  const checks = ev.choices.filter(c => c.stat);
+  return 1 + checks.reduce((a, c) => a + (stats[c.stat] || 0) / 5, 0) / Math.max(1, checks.length);
+}
+// 배울 기회 — 승리 직후 호출. 반환 pendingLearn | null
+export function offerRegressionLearn(run, source = 'normal', enemyKey = null, rng = Math.random) {
+  const L = REGRESSION_LEARN;
+  const owned = regressionRunSkills(run);
+  if (owned.length >= L.skillCap) return null;
+  if (rng() >= (L.offer[source] ?? 0)) return null;
+  const tier = LEARN_SOURCE_TIER[source];
+  const stats = regressionRunStats(run);
+  const cands = Object.keys(__RSK).filter(k => __RSK[k].tier === tier && !owned.includes(k));
+  if (!cands.length) return null;
+  const w = cands.map(k => L.offFocusWeight + regressionSkillAptitude(k, stats));
+  let roll = rng() * w.reduce((a, b) => a + b, 0);
+  let pick = cands[cands.length - 1];
+  for (let i = 0; i < cands.length; i++) { roll -= w[i]; if (roll < 0) { pick = cands[i]; break; } }
+  return { skillId: pick, source, from: enemyKey };
+}
+const LEARN_FAIL_TEXT = {
+  근력: '자세를 흉내 내 보지만 힘이 실리지 않는다. 몸이 이 기술을 받아들이지 못한다.',
+  민첩: '발이 꼬였다. 이 움직임은 아직 내 것이 아니다.',
+  강인: '몸이 버티지 못하고 무너진다. 이 기술은 단련된 육체를 요구한다.',
+  검술: '검의 궤적을 따라가 보지만 손목이 따라가지 못한다.',
+  사격: '시위를 당기는 손이 떨려 화살이 엉뚱한 곳에 꽂힌다.',
+  마법: '주문이 머릿속에 들어오지 않는다. 글자가 눈앞에서 흩어진다.',
+  신성: '기도문을 외워도 아무런 빛이 내려오지 않는다.',
+  통찰: '무엇을 봐야 하는지조차 보이지 않는다.',
+  화술: '목소리에 힘이 실리지 않는다. 아무도 움츠러들지 않는다.',
+  학식: '문장의 뜻을 끝내 헤아리지 못했다.',
+};
+export const REGRESSION_LEARN_SOURCE = {
+  normal: { title: '엿본 기술', intro: (en, sk) => `${en}의 움직임에서 「${sk}」의 요령을 엿봤다. 몸에 익힐 수 있을까?` },
+  elite: { title: '강적의 비급', intro: (en, sk) => `쓰러진 ${en}의 품에서 낡은 비급서가 나왔다. 표지에 「${sk}」이라 적혀 있다.` },
+  boss: { title: '기연 — 군주의 잔향', intro: (en, sk) => `무너지는 ${en}의 힘이 흩어지며 한 줄기 깨달음이 스친다. 「${sk}」.` },
+  fortune: { title: '기연', intro: (_en, sk) => `눈앞에 「${sk}」의 깨달음이 손에 잡힐 듯 걸려 있다.` },
+};
+export function regressionLearnIntro(pl) {
+  const src = REGRESSION_LEARN_SOURCE[pl?.source] || REGRESSION_LEARN_SOURCE.fortune;
+  const en = (pl?.from && ENEMIES[pl.from]?.name) || '적';
+  return { title: src.title, text: src.intro(en, __RSK[pl?.skillId]?.name || '?') };
+}
+// 습득 시도 / 포기 — 날짜 소모 없음. 반환 { run, scene }
+export function resolveRegressionLearn(run, accept, rng = Math.random) {
+  const pl = run.pendingLearn;
+  const base = { ...run, pendingLearn: null };
+  const sk = pl && __RSK[pl.skillId];
+  if (!sk) return { run: base, scene: null };
+  if (!accept) return { run: base, scene: regressionResultScene(sk.name, '욕심을 접었다. 지금의 길을 끝까지 걷기로 한다.', []) };
+  const stats = regressionRunStats(run);
+  const p = regressionLearnChance(pl.skillId, stats);
+  const owned = regressionRunSkills(run);
+  if (rng() < p) {
+    let next = { ...base, skills: [...owned, pl.skillId] };
+    const g = gainRegressionExp(next, REGRESSION_LEARN.learnExp);
+    next = g.run;
+    next.log = [...(next.log || []), `D${run.day}: 「${sk.name}」 습득`];
+    const tags = [{ text: `「${sk.name}」 습득!`, tone: 'gold' }, { text: `경험치 +${REGRESSION_LEARN.learnExp}`, tone: 'good' }];
+    if (g.levelUps > 0) tags.push({ text: `레벨 상승 ${g.from}→${next.level}`, tone: 'gold' }, { text: `추가 능력치 +${g.levelUps}`, tone: 'gold' });
+    return { run: next, scene: regressionResultScene(`${sk.name} - 성공!`, '몸 깊은 곳에 새 기술이 새겨졌다. 이제 싸움 속에서 저절로 나올 것이다.', tags) };
+  }
+  const apt = regressionSkillAptitude(pl.skillId, stats);
+  const rel = __rss(pl.skillId);
+  const weakest = rel.slice().sort((a, b) => (stats[a] || 0) - (stats[b] || 0))[0];
+  const text = apt < 0.5 ? (LEARN_FAIL_TEXT[weakest] || LEARN_FAIL_TEXT.학식) : '거의 손에 잡힐 듯했지만, 끝내 깨달음은 오지 않았다.';
+  const next = { ...base, log: [...(base.log || []), `D${run.day}: 「${sk.name}」 습득 실패`] };
+  return { run: next, scene: regressionResultScene(`${sk.name} - 실패!`, text, [{ text: `${rel.join('·')} 적성 ${Math.round(apt * 100)}%`, tone: 'bad' }]) };
+}

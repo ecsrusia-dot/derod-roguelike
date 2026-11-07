@@ -32,10 +32,11 @@ import {
   regressionExpToNext, spendRegressionStatPoint, regressionFamePath, regressionLegacyCombatStats,
   REGRESSION_SKILLS, REGRESSION_SKILL_TIERS, REGRESSION_NORMAL_SKILLS, REGRESSION_START_SKILL_COUNT, REGRESSION_SKILL_PRESETS,
   REGRESSION_FLAMES_PER_LIFE, getRegressionStance, regressionRunSkills, regressionSkillValue, REGRESSION_COMBAT,
+  REGRESSION_LEARN, offerRegressionLearn, resolveRegressionLearn, regressionLearnChance, regressionLearnIntro, regressionSkillAptitude, regressionSkillStats,
 } from '../../data.js';
 import { AP_TUNING } from '../../combat/initCombat.js';
 import { ScreenHeader, GlassPanel, Chip, UIButton, BottomSheet } from '../ui/CommonUI.jsx';
-import RegressionBattle from './RegressionBattle.jsx';
+import RegressionBattle, { regressionTriggerText } from './RegressionBattle.jsx';
 
 const CLASS_IDS = ['wanderer', 'sage', 'demonblood', 'elf', 'priest'];
 const classById = (id) => CLASSES.find(c => c.id === id) || null;
@@ -229,7 +230,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
   // ===== 전투 (탐험 / 첨탑) — 1.182.0~ 전용 전투 (시안 2, RegressionBattle) =====
   // 흐름: 적 확정(pending / spireRound) → 전투 준비(태세·벨트) → 자동 전투 재생(개입 불가) → 결과 장면
   const inSpire = run && run.spireRound != null && !run.over;
-  if (run && loadout && (run.pending || inSpire)) {
+  if (run && loadout && (run.pending || (inSpire && !run.scene && !run.pendingLearn))) {
     const spireKey = inSpire ? REGRESSION_SPIRE_CHAIN[run.spireRound] : null;
     const enemyKey = inSpire ? spireKey : run.pending.enemyKey;
     const compFx = aggregateRegressionCompanions(run);
@@ -253,6 +254,9 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
         next.scene = regressionResultScene(`[전투 당신 vs ${regressionEnemyLabel(enemyKey, 'boss')}] - 승리!`,
           `첨탑 ${run.spireRound + 1}층의 주인이 무너졌다. 계단 위에서 더 짙은 황혼이 내려다보고 있다.`,
           [hpLoss > 0 ? { text: `HP -${hpLoss}%`, tone: 'bad' } : null, { text: `다음 층 ${run.spireRound + 2}/${REGRESSION_SPIRE_CHAIN.length}`, tone: 'gold' }]);
+        // 1.183.0~ 군주 격파 = 기연의 기회 (적성 판정)
+        const offer = offerRegressionLearn(next, 'boss', enemyKey);
+        if (offer) { next.pendingLearn = offer; next.scene.tags.push({ text: '흩어지는 힘 속에서 깨달음이 스친다', tone: 'gold' }); }
       }
       saveRun(next);
     };
@@ -284,6 +288,9 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
       const hpLoss = Math.round((run.hpPct - next.hpPct) * 100);
       if (hpLoss > 0) tags.push({ text: `HP -${hpLoss}%`, tone: 'bad' });
       const lines = [`${ENEMIES[enemyKey].name}이(가) 쓰러졌다. 숨을 고르고 주위를 살핀다.`, `${ENEMIES[enemyKey].name}의 마지막 일격을 흘려 내고, 승부를 끝냈다.`, `쓰러진 ${ENEMIES[enemyKey].name} 곁에서 쓸 만한 것을 챙겨 길을 나선다.`];
+      // 1.183.0~ 배울 기회 — 일반 몹 12% (일반 스킬) / 강적 60% (고급 스킬). 실제 습득은 적성 판정
+      const offer = offerRegressionLearn(next, tier === 'elite' ? 'elite' : 'normal', enemyKey);
+      if (offer) { next.pendingLearn = offer; tags.push({ text: tier === 'elite' ? '비급서를 발견했다' : '기술 하나를 엿봤다', tone: 'gold' }); }
       next.scene = regressionResultScene(`[전투 당신 vs ${label}] - 승리!`, lines[run.day % lines.length], tags);
       saveRun(next);
     };
@@ -546,6 +553,38 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
         <Choice text="다음" onClick={nextScene} />
       </div>
     );
+  } else if (run.pendingLearn && REGRESSION_SKILLS[run.pendingLearn.skillId]) {
+    // 1.183.0~ 스킬 습득 기회 — 적성(관련 능력치 ÷ 내 최고 능력치)으로 성공률 결정
+    const pl = run.pendingLearn;
+    const sk = REGRESSION_SKILLS[pl.skillId];
+    const tierInfo = REGRESSION_SKILL_TIERS[sk.tier];
+    const intro = regressionLearnIntro(pl);
+    const p = regressionLearnChance(pl.skillId, storyStats);
+    const apt = regressionSkillAptitude(pl.skillId, storyStats);
+    const lab = regressionChanceLabel(p);
+    body = (
+      <div className="space-y-3 ui-screen-enter">
+        <div className="text-[14px] font-bold" style={{ color: tierInfo.color }}>◆ {intro.title}</div>
+        <div className="text-[14px] leading-relaxed whitespace-pre-line" style={{ color: PALETTE.text }}>{intro.text}</div>
+        <GlassPanel style={{ padding: 12 }}>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] px-1.5 rounded" style={{ color: tierInfo.color, border: `1px solid ${tierInfo.color}` }}>{tierInfo.name}</span>
+            <b className="text-[13px]" style={{ color: PALETTE.text }}>{sk.name}</b>
+          </div>
+          <div className="text-[12px] mt-1" style={{ color: PALETTE.dawn }}>발동: {regressionTriggerText(pl.skillId)}</div>
+          <div className="text-[11px] mt-0.5" style={{ color: PALETTE.textDim }}>{sk.desc}</div>
+          <div className="text-[11px] mt-1.5" style={{ color: PALETTE.textDim }}>
+            관련 능력치 {regressionSkillStats(pl.skillId).map(k => `${k} ${storyStats[k] || 0}`).join(' · ')} → 적성 <b style={{ color: apt >= 0.6 ? PALETTE.green : apt >= 0.3 ? PALETTE.dawn : PALETTE.accent }}>{Math.round(apt * 100)}%</b>
+          </div>
+        </GlassPanel>
+        <div className="space-y-1.5">
+          <Choice text="익혀 본다" label={{ stat: '습득', text: `${lab.text} ${Math.round(p * 100)}%`, color: lab.color }}
+            sub={apt < 0.3 ? '내 빌드와 거리가 먼 기술이다 — 실패하면 기회는 사라진다' : '실패하면 기회는 사라진다 · 날짜 소모 없음'}
+            onClick={() => { const r = resolveRegressionLearn(run, true); saveRun({ ...r.run, scene: r.scene }); }} />
+          <Choice text="지나친다" onClick={() => { const r = resolveRegressionLearn(run, false); saveRun({ ...r.run, scene: r.scene }); }} />
+        </div>
+      </div>
+    );
   } else if (pendingEv) {
     const choices = pendingEv.choices.filter(c => !c.requireMemory || reg.memories.includes(c.requireMemory));
     body = (
@@ -681,6 +720,19 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
               ))}
             </div>
             <div className="text-[11px] mt-2" style={{ color: PALETTE.textDim }}>판정에 성공하거나 전투에서 이기면 경험치를 얻는다. 레벨이 오를 때마다 추가 능력치 +1.</div>
+            <div className="text-[12px] font-bold mt-3 mb-1" style={{ color: PALETTE.text }}>보유 스킬 {regressionRunSkills(run).length}/{REGRESSION_LEARN.skillCap}</div>
+            <div className="space-y-1">
+              {regressionRunSkills(run).map(id => {
+                const sk = REGRESSION_SKILLS[id]; if (!sk) return null;
+                const t = REGRESSION_SKILL_TIERS[sk.tier];
+                return (
+                  <div key={id} className="text-[11px]" style={{ color: PALETTE.textDim }}>
+                    <b style={{ color: t.color }}>[{t.name}] {sk.name}</b> — {regressionTriggerText(id)}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="text-[11px] mt-1" style={{ color: PALETTE.textDim }}>강적의 비급·군주 격파·기연 사건으로 새 스킬을 배울 기회가 온다. 성공률은 스킬의 관련 능력치가 내 빌드와 얼마나 맞는지(적성)로 정해진다.</div>
           </GlassPanel>
         )}
         {menu === 'log' && (
