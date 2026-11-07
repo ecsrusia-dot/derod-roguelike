@@ -1476,6 +1476,9 @@ export function getRegression(meta) {
     memories: Array.isArray(r.memories) ? r.memories : [],
     carry: Array.isArray(r.carry) ? r.carry : [],
     endings: Array.isArray(r.endings) ? r.endings : [],
+    unlockedTraits: Array.isArray(r.unlockedTraits) ? r.unlockedTraits : [],
+    equippedTraits: Array.isArray(r.equippedTraits) ? r.equippedTraits : [],
+    echo: Number.isFinite(r.echo) ? r.echo : 0,
     recordsEver: (r.recordsEver && typeof r.recordsEver === 'object') ? r.recordsEver : {},
     run: r.run || null,
   };

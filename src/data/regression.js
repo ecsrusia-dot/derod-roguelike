@@ -219,6 +219,9 @@ export const EMPTY_REGRESSION = {
   bestDay: 0,
   endings: [],         // 도달 엔딩 id
   spireClears: 0,
+  echo: 0,             // 1.187.0~ 잔향 — 시작 특성 해금 재화
+  unlockedTraits: [],  // 1.187.0~ 해금한 시작 특성 id
+  equippedTraits: [],  // 1.187.0~ 다음 생에 들고 갈 시작 특성 (최대 2)
 };
 
 export function regressionCarrySlots(metaR) {
@@ -226,7 +229,7 @@ export function regressionCarrySlots(metaR) {
 }
 
 // =========== 런 생성 ===========
-export function createRegressionRun(metaR = EMPTY_REGRESSION, classId, stats = null, skills = null) {
+export function createRegressionRun(metaR = EMPTY_REGRESSION, classId, stats = null, skills = null, startTraits = []) {
   const T = REGRESSION_TUNING;
   const fx = aggregateRegressionMemories(metaR.memories);
   const records = {};
@@ -274,7 +277,7 @@ export function createRegressionRun(metaR = EMPTY_REGRESSION, classId, stats = n
     over: null,            // null | 'death' | 'timeout' | 'spireLose' | 'victory'
     log: [],
   };
-  return { ...run, shop: buildRegressionShopStock(run) };
+  return applyRegressionStartTraits({ ...run, shop: buildRegressionShopStock(run) }, startTraits);
 }
 
 // =========== 날짜·이동 ===========
@@ -385,6 +388,12 @@ export function applyRegressionCombat(run, result) {
     next.hpPct = Math.min(1, Math.max(0.01, result.hpPct ?? next.hpPct)); // 1.178.0 상한 — 전투 화면 최대 HP(근력 보너스 포함)가 더 커서 100% 초과 누적되던 버그
     // 사건에서 이어진 전투는 사건이 이미 하루를 썼으므로 날짜 미소모
     next = advanceDays(next, run.pending?.fromEvent ? 0 : 1, `${name} 처치 (명성 +${fame})${learnedNow.length ? ' · 기록 완성' : ''}`);
+  } else if ((run.revives || 0) > 0) {
+    // 1.187.0~ 시작 특성 「생환」 — 한 번은 죽음 대신 일어난다 (그날은 그대로 지나감)
+    next.revives = run.revives - 1;
+    next.hpPct = REGRESSION_TRAIT_TUNING.reviveHpPct;
+    next = advanceDays(next, run.pending?.fromEvent ? 0 : 1, `${name}에게 쓰러졌으나 생환`);
+    next.revivedNow = true;
   } else {
     next.hpPct = 0;
     next.over = 'death';
@@ -438,9 +447,11 @@ export function settleRegression(metaR = EMPTY_REGRESSION, run) {
       bestFame: Math.max(base.bestFame, run.fame),
       bestDay: Math.max(base.bestDay, Math.min(run.day, run.maxDays)),
       spireClears: base.spireClears + (cause === 'victory' ? 1 : 0),
+      echo: (base.echo || 0) + regressionEchoGain(base, run),
       endings: (() => { const e = regressionEndingFor(run); return e && !base.endings.includes(e.id) ? [...base.endings, e.id] : base.endings; })(),
     },
     gainedMemories: gained,
+    echoGain: regressionEchoGain(base, run),
     carryOptions: [...run.learned],
   };
 }
@@ -1682,4 +1693,65 @@ export function regressionChoiceVisible(choice, run, memories = []) {
   if (choice.requireMemory && !memories.includes(choice.requireMemory)) return false;
   if (choice.requireTrait) for (const [k, v] of Object.entries(choice.requireTrait)) if ((run?.traits?.[k] || 0) < v) return false;
   return true;
+}
+
+
+// ============================================
+// 1.187.0~ 시작 특성 (원작 「생환·노잣돈·시작 무공」 → 판타지 각색)
+// ============================================
+// 잔향(회귀할 때마다 쌓이는 영구 재화)으로 영구 해금 → 한 생에 최대 2개를 골라 들고 시작.
+// 밸런스는 REGRESSION_TRAIT_TUNING + REGRESSION_START_TRAITS 한 곳.
+export const REGRESSION_TRAIT_TUNING = {
+  slots: 2,
+  reviveHpPct: 0.3,
+  echo: { per10Fame: 1, perStory: 2, spireRound: 3, victory: 10, newEnding: 10, min: 3 },
+};
+export const REGRESSION_START_TRAITS = [
+  { id: 'st_revive', name: '생환', icon: '🕯', cost: 40, desc: '한 생에 한 번, 전투에서 쓰러지면 HP 30%로 일어난다 (첨탑 제외)', fx: { revives: 1 } },
+  { id: 'st_purse', name: '노잣돈', icon: '💰', cost: 12, desc: '시작 은화 +150', fx: { gold: 150 } },
+  { id: 'st_talent', name: '타고난 재능', icon: '📊', cost: 30, desc: '시작 능력치 배분 +2 (12 → 14)', fx: { startPoints: 2 } },
+  { id: 'st_tome', name: '비전서', icon: '📕', cost: 30, desc: '시작 일반 스킬을 1개 더 고른다 (3 → 4)', fx: { startSkills: 1 } },
+  { id: 'st_luck', name: '기연의 별', icon: '✨', cost: 20, desc: '기연이 더 자주 찾아온다 (기연 가중 +4)', fx: { fortuneBonus: 4 } },
+  { id: 'st_bond', name: '익숙한 얼굴', icon: '🤝', cost: 20, desc: '모든 동료의 호감 +20으로 시작한다 (전생에서 알던 사이)', fx: { affinityAll: 20 } },
+];
+export function getRegressionStartTrait(id) { return REGRESSION_START_TRAITS.find(t => t.id === id) || null; }
+export function aggregateRegressionStartTraits(ids = []) {
+  const fx = { revives: 0, gold: 0, startPoints: 0, startSkills: 0, fortuneBonus: 0, affinityAll: 0 };
+  for (const id of ids) { const t = getRegressionStartTrait(id); if (t) for (const [k, v] of Object.entries(t.fx)) fx[k] = (fx[k] || 0) + v; }
+  return fx;
+}
+function applyRegressionStartTraits(run, ids = []) {
+  const picked = (ids || []).filter(id => getRegressionStartTrait(id)).slice(0, REGRESSION_TRAIT_TUNING.slots);
+  const fx = aggregateRegressionStartTraits(picked);
+  const affinity = { ...(run.affinity || {}) };
+  if (fx.affinityAll) for (const c of REGRESSION_COMPANIONS) affinity[c.id] = Math.min(100, (affinity[c.id] || 0) + fx.affinityAll);
+  return {
+    ...run, startTraits: picked, revives: fx.revives,
+    gold: (run.gold || 0) + fx.gold,
+    fortuneBonus: (run.fortuneBonus || 0) + fx.fortuneBonus,
+    affinity,
+  };
+}
+// 잔향 — 생을 마칠 때. 명성·메인 스토리·첨탑 진행·정복·새 엔딩
+export function regressionEchoGain(metaR, run) {
+  const E = REGRESSION_TRAIT_TUNING.echo;
+  const stories = (run.seenEvents || []).filter(id => id.startsWith('ms_')).length;
+  const rounds = run.spireRound || 0;
+  const end = regressionEndingFor(run);
+  const newEnding = end && !(metaR?.endings || []).includes(end.id);
+  return Math.max(E.min, Math.floor((run.fame || 0) / 10) * E.per10Fame + stories * E.perStory + rounds * E.spireRound
+    + (run.over === 'victory' ? E.victory : 0) + (newEnding ? E.newEnding : 0));
+}
+export function unlockRegressionStartTrait(metaR, id) {
+  const t = getRegressionStartTrait(id);
+  const r = { ...EMPTY_REGRESSION, ...metaR };
+  if (!t || (r.unlockedTraits || []).includes(id) || (r.echo || 0) < t.cost) return metaR;
+  return { ...r, echo: r.echo - t.cost, unlockedTraits: [...(r.unlockedTraits || []), id] };
+}
+export function toggleRegressionStartTrait(metaR, id) {
+  const r = { ...EMPTY_REGRESSION, ...metaR };
+  const eq = r.equippedTraits || [];
+  if (eq.includes(id)) return { ...r, equippedTraits: eq.filter(x => x !== id) };
+  if (!(r.unlockedTraits || []).includes(id) || eq.length >= REGRESSION_TRAIT_TUNING.slots) return metaR;
+  return { ...r, equippedTraits: [...eq, id] };
 }
