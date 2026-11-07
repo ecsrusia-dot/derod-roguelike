@@ -17,7 +17,7 @@ export const REGRESSION_COMBAT = {
   baseHp: 100, hpPerVit: 10, hpPerLevel: 6,           // 1.184.0 강인 HP 12→10 (강인 빌드 독주 완화)
   baseAtk: 6, atkPerStr: 1.2,       // 평타 = 6 + 근력×1.2 + max(무기 능력치 × 계열 계수)
   // 1.184.0~ 계열 계수 (직업 밸런스 — 능력치 역할 기준): 주문은 강하고, 신성은 회복을 겸하니 공격이 약하다
-  weaponMult: { 검술: 2.0, 사격: 1.8, 마법: 2.2, 신성: 1.3 },
+  weaponMult: { 검술: 2.0, 사격: 1.8, 마법: 2.2, 신성: 1.5 },
   lorePower: 0.04,                                       // 1.184.0~ 학식 1당 스킬 위력·회복·보호막 +4%
   dodgeBase: 5, dodgePerAgi: 2.5, dodgeCap: 45,          // %
   critBase: 5, critPerInsight: 2, critMult: 1.5,          // %
@@ -122,11 +122,12 @@ export function regressionPlayerCombatant({ stats, level = 0, maxHp, hp, skills 
     stats, skills, belt: [...belt],
   };
 }
-export function regressionEnemyCombatant(enemyKey, enemyObj, regionKey) {
+// dayMult — 1.185.0~ 날이 갈수록 강해지는 적 (regressionDayEnemyMult, 첨탑은 1)
+export function regressionEnemyCombatant(enemyKey, enemyObj, regionKey, dayMult = 1) {
   const C = REGRESSION_COMBAT;
   const e = enemyObj || ENEMIES[enemyKey];
   const tier = e.tier || 'normal';
-  const hpMult = C.enemyHp[regionKey] ?? 1, dmgMult = C.enemyDmg[regionKey] ?? 1;
+  const hpMult = (C.enemyHp[regionKey] ?? 1) * dayMult, dmgMult = (C.enemyDmg[regionKey] ?? 1) * dayMult;
   const hp = Math.round(e.hp * hpMult);
   return {
     key: enemyKey, name: e.name, tier, maxHp: hp, hp,

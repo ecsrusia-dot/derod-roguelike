@@ -35,6 +35,8 @@ import {
   REGRESSION_ECON, REGRESSION_GEAR, REGRESSION_GEAR_SLOTS, REGRESSION_GEAR_GRADES, regressionGearLabel, regressionGearStatText, regressionGearFx, regressionGearStats,
   regressionEffectiveStats, equipRegressionGear, unequipRegressionGear, offerRegressionUnique, resolveRegressionUnique, regressionUniqueChance, regressionUniqueIntro,
   regressionAptitude, buildRegressionShopStock, rerollRegressionShop, regressionShopOfferPrice, buyRegressionOffer,
+  REGRESSION_DAY, rollRegressionDay, passRegressionDay, hideFromRegressionEnemy, fightRegressionToday, restRegressionShelter, trainRegressionShelter,
+  askRegressionHermit, regressionDayEnemyMult, regressionDayTable, regressionFortuneWeight, REGRESSION_TODAY_INTRO,
   REGRESSION_LEARN, offerRegressionLearn, resolveRegressionLearn, regressionLearnChance, regressionLearnIntro, regressionSkillAptitude, regressionSkillStats,
 } from '../../data.js';
 import { AP_TUNING } from '../../combat/initCombat.js';
@@ -147,6 +149,19 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
   const combatMeta = useMemo(() => ({ ...(meta || {}), upgrades: {} }), [meta]);
 
   const saveRun = (nextRun, extra = {}) => onSave({ run: nextRun, ...extra });
+  // 1.185.0~ 오늘의 일 — 할 일이 없으면 랜덤 카드 1장을 굴린다 (렌더 밖에서 1회, 결과는 저장돼 새로고침해도 같다)
+  const needRoll = !!run && !run.over && !run.today && !run.scene && !run.pending && !run.pendingEvent && !run.pendingLearn && !run.pendingGear
+    && run.spireRound == null && !isRegressionSpireDay(run);
+  useEffect(() => {
+    if (!needRoll) return;
+    let next = rollRegressionDay(run, reg.memories || []);
+    if (next.scene && run.day === 1 && run.region === REGRESSION_HUB) {
+      const wake = (reg.loops || 0) === 0 ? '눈을 뜨자 낯선 마을의 천장이 보였다. 분명 죽었을 텐데 — 몸에는 상처 하나 없다.' : `또다시 여명의 마을에서 눈을 떴다. ${(reg.loops || 0) + 1}번째 아침이다. 기억은 아직 선명하다.`;
+      next = { ...next, scene: { ...next.scene, text: `${wake}\n\n${next.scene.text}` } };
+    }
+    saveRun(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [needRoll, run?.day]);
   // 1.181.0~ 능력치 10종. combatStats(구 4능력치 환산)는 동료 화술 판정·기록 게이지 보정에만 남음
   const storyStats = run ? regressionEffectiveStats(run) : {};   // 1.184.0~ 실효 능력치 (기본 + 사건 + 장비)
   const baseStats = run ? regressionRunStats(run) : {};
@@ -315,6 +330,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
         enemyObj={enemyObj}
         enemyLabel={regressionEnemyLabel(enemyKey, tier)}
         regionKey={inSpire ? 'spire' : run.region}
+        enemyMult={inSpire ? 1 : regressionDayEnemyMult(run.day)}
         intro={inSpire ? `첨탑 ${run.spireRound + 1}층. ${regressionEnemyLabel(enemyKey, 'boss')}이(가) 길을 막아선다.` : `${regressionEnemyLabel(enemyKey, tier)}이(가) 앞을 막아선다. 피할 수는 없다.`}
         stats={storyStats}
         level={run.level || 0}
@@ -647,44 +663,75 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
         <Choice text={ok ? '첨탑에 오른다 (4연전, 층 사이 회복 없음)' : '황혼을 맞는다'} onClick={() => saveRun(enterRegressionSpire(run))} />
       </div>
     );
-  } else if (menu === 'travel') {
+  } else if (run.today) {
+    // 1.185.0~ 오늘의 일 — 랜덤 카드 1장. 선택지는 그 카드의 것뿐
+    const t = run.today;
+    const intro = (REGRESSION_TODAY_INTRO[t.kind] || (() => ''))(run);
+    const stats = storyStats;
+    const sceneOf = (title, text, tags) => regressionResultScene(title, text, tags);
+    let choices = null;
+    if (t.kind === 'battle' || t.kind === 'elite') {
+      const st = t.kind === 'elite' ? '통찰' : '민첩';
+      const hide = regressionChanceLabel(regressionCheckChance(stats[st] || 0, REGRESSION_DAY.hideDc[t.kind] || 14));
+      choices = (
+        <>
+          <Choice text="맞서 싸운다" sub={`승리 시 명성 +${Math.round(REGRESSION_TUNING.fameGain[t.tier] * (REGRESSION_TUNING.regionFameMult[run.region] || 1))} · 경험치 +${REGRESSION_EXP[t.tier]}${t.kind === 'elite' ? ' · 장비 35% · 비급·유니크 기회' : ''}`} onClick={() => saveRun(fightRegressionToday(run))} />
+          <Choice text="몸을 숨기고 지나간다" label={{ stat: st, ...hide }} sub="실패하면 들킨 채로 싸운다 · 성공하면 아무것도 얻지 못한다"
+            onClick={() => { const r = hideFromRegressionEnemy(run); saveRun(r.ok ? { ...r.run, scene: sceneOf('숨어서 지나감', '숨을 죽이고 그림자 속에 몸을 묻었다. 적은 끝내 이쪽을 보지 못했다.', [{ text: `${st} - 성공!`, tone: 'gold' }]) } : r.run); }} />
+        </>
+      );
+    } else if (t.kind === 'companion') {
+      const c = getRegressionCompanion(t.companionId);
+      const aff = run.affinity?.[c.id] || 0;
+      choices = (
+        <>
+          <Choice text="곁에 앉아 이야기를 나눈다" sub={`호감 ${aff}/100 「${regressionCompanionTier(aff).name}」 · 동행: ${c.perkText.ally}`} onClick={() => {
+            const next = applyRegressionTalk(run, c.id, combatStats.매력 || 10);
+            const after = next.affinity[c.id];
+            const upTier = regressionCompanionTier(after).id !== regressionCompanionTier(aff).id;
+            saveRun({ ...next, scene: sceneOf(`${c.name} — ${c.title}`, regressionCompanionLine(c.id, after), [{ text: `호감 +${after - aff} (${after}/100)`, tone: 'good' }, upTier ? { text: `「${regressionCompanionTier(after).name}」 달성`, tone: 'gold' } : null]) });
+          }} />
+          <Choice text="가볍게 인사만 하고 지나간다" onClick={() => saveRun({ ...passRegressionDay(run, `${c.name}과 스쳐 지나감`), scene: sceneOf(c.name, '고개만 끄덕이고 길을 재촉했다.', []) })} />
+        </>
+      );
+    } else if (t.kind === 'merchant') {
+      choices = (
+        <>
+          <Choice text="물건을 본다" sub={`보유 ${run.gold || 0}G · 진열 ${(run.shop?.offers || []).filter(o => !o.sold).length}개 · 진열 바꾸기 ${REGRESSION_ECON.shopResets - (run.shop?.resets || 0)}회`} onClick={() => setShowShop(true)} />
+          <Choice text="상인과 헤어진다 (하루를 마친다)" onClick={() => saveRun({ ...passRegressionDay(run, '떠돌이 상인과 만남'), scene: sceneOf('떠돌이 상인', '"다음에 또 봅시다. 살아 있다면 말이오." 짐마차가 멀어진다.', []) })} />
+        </>
+      );
+    } else if (t.kind === 'shelter') {
+      const heal = REGRESSION_TUNING.restHealPct + compFx.restHealPct;
+      choices = (
+        <>
+          <Choice text="불을 피우고 푹 쉰다" sub={`HP +${heal}%`} onClick={() => { const before = run.hpPct; const next = restRegressionShelter(run); saveRun({ ...next, scene: sceneOf('쉼터', '모처럼 깊이 잠들었다. 상처가 아물어 간다.', [{ text: `HP +${Math.round((next.hpPct - before) * 100)}%`, tone: 'good' }]) }); }} />
+          <Choice text="밤새 단련한다" sub={`경험치 +${REGRESSION_DAY.trainExp}`} onClick={() => { const r = trainRegressionShelter(run); saveRun({ ...r.run, scene: sceneOf('쉼터', '잠을 줄이고 검을 휘둘렀다. 몸이 조금 더 기억한다.', [{ text: `경험치 +${REGRESSION_DAY.trainExp}`, tone: 'good' }, r.levelUps > 0 ? { text: `레벨 상승 ${r.from}→${r.run.level}`, tone: 'gold' } : null, r.levelUps > 0 ? { text: `추가 능력치 +${r.levelUps}`, tone: 'gold' } : null]) }); }} />
+        </>
+      );
+    } else if (t.kind === 'hermit') {
+      const sk = REGRESSION_SKILLS[t.skillId];
+      choices = (
+        <>
+          <Choice text={`가르침을 청한다 — 「${sk?.name}」`} sub={`${REGRESSION_SKILL_TIERS[sk?.tier]?.name} 스킬 · 습득 ${Math.round(regressionLearnChance(t.skillId, stats) * 100)}% (적성 판정)`} onClick={() => saveRun(askRegressionHermit(run))} />
+          <Choice text="정중히 사양한다" onClick={() => saveRun({ ...passRegressionDay(run, '떠도는 은자를 지나침'), scene: sceneOf('떠도는 은자', '"인연이 아니었군." 은자가 연기처럼 사라졌다.', []) })} />
+        </>
+      );
+    }
     body = (
       <div className="space-y-3 ui-screen-enter">
-        <div className="text-[14px] leading-relaxed" style={{ color: PALETTE.text }}>어디로 향할까. 길 위에서 보내는 날도 황혼은 기다려 주지 않는다.</div>
-        <div className="space-y-1.5">
-          {[REGRESSION_HUB, ...REGRESSION_REGIONS.map(r => r.id)].filter(to => to !== run.region).map(to => {
-            const days = regressionTravelCost(run, to);
-            const rr = getRegressionRegion(to);
-            return <Choice key={to} text={`${regionLabel(to)}(으)로 간다 (${days}일)`} sub={rr ? `위험 ${'★'.repeat(rr.danger)} · ${regressionCompanionAt(to)?.name || ''} 머무는 곳` : '상점 · 휴식'} onClick={() => travel(to)} />;
-          })}
-          <Choice text="생각을 고쳐먹는다" onClick={() => setMenu(null)} />
+        <div className="flex items-center justify-between">
+          <div className="text-[12px] font-bold" style={{ color: PALETTE.dawn }}>D{run.day} — 오늘의 일</div>
+          <div className="text-[11px]" style={{ color: PALETTE.textDim }}>기연의 기운 <b style={{ color: PALETTE.legendary }}>{Math.round((regressionDayTable(run).fortune || 0) * 100)}%</b> · 적 강도 ×{regressionDayEnemyMult(run.day).toFixed(2)}</div>
         </div>
+        <div className="text-[14px] leading-relaxed" style={{ color: PALETTE.textDim }}>{regressionNarration(run)}</div>
+        <div className="text-[14px] leading-relaxed whitespace-pre-line" style={{ color: PALETTE.text }}>{intro}</div>
+        {gimmick && (t.kind === 'battle' || t.kind === 'elite') && <div className="text-[11px]" style={{ color: PALETTE.dawn }}>◈ {gimmick.name} — {gimmick.desc}</div>}
+        <div className="space-y-1.5">{choices}</div>
       </div>
     );
   } else {
-    body = (
-      <div className="space-y-3 ui-screen-enter">
-        <div className="text-[14px] leading-relaxed" style={{ color: PALETTE.text }}>
-          {run.day === 1 && run.region === REGRESSION_HUB
-            ? (reg.loops === 0 ? '눈을 뜨자 낯선 마을의 천장이 보였다. 분명 죽었을 텐데 — 몸에는 상처 하나 없다.\n\n' : `또다시 여명의 마을에서 눈을 떴다. ${reg.loops + 1}번째 아침이다. 기억은 아직 선명하다.\n\n`)
-            : ''}
-          {regressionNarration(run)}
-        </div>
-        {gimmick && <div className="text-[11px]" style={{ color: PALETTE.dawn }}>◈ {gimmick.name} — {gimmick.desc}</div>}
-        <div className="space-y-1.5">
-          {region && <Choice text="주변을 탐색한다 (1일)" sub={`하급 적과 마주친다 · 명성 +${Math.round(REGRESSION_TUNING.fameGain.normal * (REGRESSION_TUNING.regionFameMult[run.region] || 1))} · 기록할 적 ${unrecorded('normal')}종`} onClick={() => explore('normal')} />}
-          {region && isRegressionEliteOpen(run, run.region) && <Choice text="강적의 흔적을 쫓는다 (1일)" sub={`상급 적 · 명성 +${Math.round(REGRESSION_TUNING.fameGain.elite * (REGRESSION_TUNING.regionFameMult[run.region] || 1))} · 장비 드랍 35% · 기록할 적 ${unrecorded('elite')}종`} onClick={() => explore('elite')} />}
-          {region && eventsLeft > 0 && <Choice text="수상한 기척을 살핀다 (1일)" sub={`이 지역의 남은 사건 ${eventsLeft}개`} onClick={startEvent} />}
-          {companion && (() => {
-            const aff = run.affinity?.[companion.id] || 0;
-            return <Choice text={`${companion.name}에게 말을 건다 (1일)`} disabled={aff >= 100} sub={`${companion.title} · 호감 ${aff}/100 「${regressionCompanionTier(aff).name}」`} onClick={talk} />;
-          })()}
-          {run.region === REGRESSION_HUB && <Choice text="마을 상점에 들른다" sub={`보유 ${run.gold || 0}G · 오늘의 진열 ${(run.shop?.offers || []).filter(o => !o.sold).length}개 · 날짜 소모 없음`} onClick={() => { if (!run.shop) saveRun({ ...run, shop: buildRegressionShopStock(run) }); setShowShop(true); }} />}
-          <Choice text="모닥불을 피우고 쉰다 (1일)" sub={`HP +${REGRESSION_TUNING.restHealPct + compFx.restHealPct}%`} onClick={rest} />
-          <Choice text="길을 떠난다" sub="다른 지역으로 이동" onClick={() => setMenu('travel')} />
-        </div>
-      </div>
-    );
+    body = <div className="text-[13px]" style={{ color: PALETTE.textDim }}>…</div>;
   }
 
   return (
@@ -816,7 +863,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
         )}
       </div>
       {showShop && (
-        <BottomSheet title={`🛒 마을 상점 — ${run.gold || 0}G`} onClose={() => setShowShop(false)}>
+        <BottomSheet title={`🛒 떠돌이 상인 — ${run.gold || 0}G`} onClose={() => setShowShop(false)}>
           <div className="space-y-1.5 pb-2">
             <div className="flex items-center justify-between">
               <div className="text-[12px] font-bold" style={{ color: PALETTE.text }}>오늘의 진열</div>
@@ -835,7 +882,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
               const color = isSkill ? REGRESSION_SKILL_TIERS[sk.tier].color : REGRESSION_GEAR_GRADES[g.grade].color;
               return (
                 <button key={idx} disabled={!can} className="ui-press w-full flex items-center gap-2 px-3 text-left"
-                  onClick={() => { const r = buyRegressionOffer(run, idx); if (r.bought) { setShowShop(false); saveRun({ ...r.run, scene: regressionResultScene('마을 상점', isSkill ? '늙은 교관이 며칠 치 수업을 하루에 몰아 가르쳐 주었다.' : '상인이 물건을 건네며 고개를 끄덕인다. "살아서 돌아오시오."', [{ text: r.bought, tone: 'good' }, { text: `-${r.price}G`, tone: 'bad' }]) }); } }}
+                  onClick={() => { const r = buyRegressionOffer(run, idx); if (r.bought) { setShowShop(false); saveRun({ ...r.run, scene: regressionResultScene('떠돌이 상인', isSkill ? '늙은 교관이 며칠 치 수업을 하루에 몰아 가르쳐 주었다.' : '상인이 물건을 건네며 고개를 끄덕인다. "살아서 돌아오시오."', [{ text: r.bought, tone: 'good' }, { text: `-${r.price}G`, tone: 'bad' }]) }); } }}
                   style={{ minHeight: 52, borderRadius: 'var(--r-chip, 8px)', background: PALETTE.panelLight, border: `1px solid ${PALETTE.panelBorder}`, opacity: o.sold ? 0.3 : (can ? 1 : 0.5) }}>
                   <div className="flex-1 min-w-0">
                     <div className="text-[12px] font-bold" style={{ color }}>{isSkill ? `[${REGRESSION_SKILL_TIERS[sk.tier].name} 스킬] ${sk.name}` : regressionGearLabel(o.id)}{o.sold ? ' — 판매됨' : ''}</div>
@@ -854,7 +901,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
               const can = (run.gold || 0) >= it.price;
               return (
                 <button key={it.id} disabled={!can} className="ui-press w-full flex items-center gap-2 px-3 text-left"
-                  onClick={() => { const r = buyRegressionShop(run, it.id); if (r.bought) { setShowShop(false); saveRun({ ...r.run, scene: regressionResultScene('마을 상점', '상인이 물건을 건네며 고개를 끄덕인다. "살아서 돌아오시오."', [{ text: r.bought, tone: 'good' }, { text: `-${it.price}G`, tone: 'bad' }]) }); } }}
+                  onClick={() => { const r = buyRegressionShop(run, it.id); if (r.bought) { setShowShop(false); saveRun({ ...r.run, scene: regressionResultScene('떠돌이 상인', '상인이 물건을 건네며 고개를 끄덕인다. "살아서 돌아오시오."', [{ text: r.bought, tone: 'good' }, { text: `-${it.price}G`, tone: 'bad' }]) }); } }}
                   style={{ minHeight: 48, borderRadius: 'var(--r-chip, 8px)', background: PALETTE.panelLight, border: `1px solid ${PALETTE.panelBorder}`, opacity: can ? 1 : 0.45 }}>
                   <div className="flex-1 min-w-0">
                     <div className="text-[12px] font-bold" style={{ color: PALETTE.text }}>{name}</div>
@@ -864,7 +911,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
                 </button>
               );
             })}
-            <div className="text-[11px] pt-1" style={{ color: PALETTE.textDim }}>진열은 마을에 돌아올 때마다 새로 짜인다. 기연 스킬과 유니크 무구는 팔지 않는다.</div>
+            <div className="text-[11px] pt-1" style={{ color: PALETTE.textDim }}>진열은 상인을 만날 때마다 새로 짜인다. 기연 스킬과 유니크 무구는 팔지 않는다.</div>
           </div>
         </BottomSheet>
       )}

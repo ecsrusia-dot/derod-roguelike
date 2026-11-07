@@ -22,7 +22,7 @@ export const REGRESSION_TUNING = {
   days: 40,                 // 한 생의 길이 (PM 확정). 41일째 = 황혼의 첨탑
   fameGate: 100,            // 첨탑 입장 자격
   eliteFameGate: 30,        // 강적 출현 명성
-  fameGain: { normal: 2, elite: 5 },
+  fameGain: { normal: 3, elite: 8 },    // 1.185.0 랜덤 하루 구조 — 2/5 → 3/8
   regionFameMult: { 1: 1.0, 2: 1.15, 3: 1.3, 4: 1.5 },
   recordPerPattern: 15,     // 적 행동 1회 관찰당 기록 게이지 %
   recordIntPerPoint: 0.5,   // 지능 (스탯-10) 1포인트당 추가 %
@@ -136,8 +136,8 @@ export const REGRESSION_MEMORIES = [
   { id: 'mem_seal_glyph', name: '봉인의 문양', desc: '신전 벽의 문양이 눈을 감아도 보인다.',
     hint: '봉인된 신전에서 쓰러진다', effect: { eliteUnlock: 3 },
     trigger: (m, run, cause) => cause === 'death' && run.region === 3 },
-  { id: 'mem_rift_scar', name: '균열의 상흔', desc: '균열로 가는 지름길을 몸이 기억한다.',
-    hint: '마계의 균열에서 쓰러진다', effect: { travelDiscount: 4 },
+  { id: 'mem_rift_scar', name: '균열의 상흔', desc: '균열 너머의 기연이 어디 숨어 있는지 몸이 기억한다.',
+    hint: '마계의 균열에서 쓰러진다', effect: { fortuneBonus: 4 }, // 1.185.0~ 이동 폐지 → 기연이 더 자주
     trigger: (m, run, cause) => cause === 'death' && run.region === 4 },
   { id: 'mem_chronicler', name: '기록자의 각성', desc: '보는 것만으로 더 깊이 새긴다.',
     hint: '한 생에서 적 5종을 완전히 기록한다', effect: { recordBonusPct: 10 },
@@ -249,6 +249,8 @@ export function createRegressionRun(metaR = EMPTY_REGRESSION, classId, stats = n
     travelDiscount: fx.travelDiscount,
     recordBonusPct: fx.recordBonusPct,
     spireRestPct: fx.spireRestPct,
+    fortuneBonus: fx.fortuneBonus || 0,   // 1.185.0~ 기연 가중 +
+    today: null,           // 1.185.0~ 오늘의 일 (랜덤 카드) — 새로고침해도 같은 카드
     memoryCount: (metaR.memories || []).length,
     spireRound: null,      // 첨탑 진입 후 0~3
     pending: null,         // 진행 중 전투 { enemyKey, tier } — 새로고침 복원용
@@ -291,7 +293,7 @@ export function isRegressionSpireEligible(run) {
 }
 
 function advanceDays(run, n, logLine) {
-  const next = { ...run, day: run.day + n, log: logLine ? [...run.log, `D${run.day}: ${logLine}`] : run.log };
+  const next = { ...run, day: run.day + n, today: null, log: logLine ? [...run.log, `D${run.day}: ${logLine}`] : run.log };
   return next;
 }
 
@@ -640,7 +642,7 @@ export function applyRegressionTalk(run, companionId, charisma = 10) {
   const after = Math.min(100, before + gain);
   const up = regressionCompanionTier(after).id !== regressionCompanionTier(before).id ? ` — 「${regressionCompanionTier(after).name}」` : '';
   return {
-    ...run, day: run.day + 1, affinity: { ...(run.affinity || {}), [companionId]: after },
+    ...run, today: null, day: run.day + 1, affinity: { ...(run.affinity || {}), [companionId]: after },
     log: [...run.log, `D${run.day}: ${c.name}와 교류 (호감 ${after})${up}`],
   };
 }
@@ -813,8 +815,9 @@ export const REGRESSION_EVENTS = [
 ];
 
 // 지역 사건 고르기 — 이번 생에 본 사건 제외, 기억 조각 요구 선택지는 미보유 시 숨김
-export function rollRegressionEvent(run, memories = [], rng = Math.random) {
-  const pool = REGRESSION_EVENTS.filter(e => e.region === run.region && !(run.seenEvents || []).includes(e.id));
+export function rollRegressionEvent(run, memories = [], rng = Math.random, { fortune = null } = {}) {
+  const pool = REGRESSION_EVENTS.filter(e => e.region === run.region && !(run.seenEvents || []).includes(e.id)
+    && (fortune == null || !!e.fortune === fortune));
   if (!pool.length) return null;
   // 1.183.0~ 빌드 가중 — 내 능력치로 풀 수 있는 사건·내 빌드에 맞는 기연이 더 자주 (PM 요청 4: 육성 방향대로 랜덤)
   const stats = regressionEffectiveStats(run);
@@ -858,9 +861,9 @@ export function applyRegressionEvent(run, eventId, res, { maxHp = 300, rng = Mat
     const exp = regressionCheckExp(res.dc);
     const g = gainRegressionExp(next, exp);
     next = g.run;
-    next.fame += 2;
+    next.fame += REGRESSION_DAY.checkFame;
     next.fameBy = { ...(next.fameBy || {}), [res.stat]: ((next.fameBy || {})[res.stat] || 0) + 1 };
-    notes.push(`경험치 +${exp}`, '명성 +2');
+    notes.push(`경험치 +${exp}`, `명성 +${REGRESSION_DAY.checkFame}`);
     if (rng() < REGRESSION_LEARN.checkPotionChance) {
       const id = REGRESSION_POTION_POOL[Math.floor(rng() * REGRESSION_POTION_POOL.length)];
       next = applyRegressionLoot(next, { potion: id });
@@ -1064,7 +1067,7 @@ export function regressionRunStats(run) {
 }
 
 // 경험치·레벨 — 판정 성공·전투로 획득. 레벨마다 추가 능력치 +1
-export const REGRESSION_EXP = { check: 15, normal: 20, elite: 40, event: 5 };
+export const REGRESSION_EXP = { check: 20, normal: 30, elite: 60, event: 8 };  // 1.185.0 랜덤 하루 구조로 상향
 export function regressionExpToNext(level = 0) { return 30 + level * 15; }
 export function gainRegressionExp(run, amount = 0) {
   let next = { ...run, exp: (run.exp || 0) + amount, level: run.level || 0, statPoints: run.statPoints || 0 };
@@ -1459,3 +1462,124 @@ export function buyRegressionOffer(run, idx) {
   else { next = addRegressionGear(next, offer.id); bought = `${regressionGearLabel(offer.id)} 획득`; }
   return { run: { ...next, log: [...next.log, `D${run.day}: 구매 — ${bought} (-${price}G)`] }, bought, price };
 }
+
+
+// ============================================
+// 1.185.0~ 하루 = 랜덤 이벤트 1개 (PM 결정: 매일 선택지를 다 공개하지 않는다)
+// ============================================
+// 흐름: 지역은 날짜로 자동 진행 (D1~10 극지대 → 11~20 숲 → 21~30 신전 → 31~40 균열) →
+//       「오늘의 일」 카드 1장이 가중 랜덤으로 찾아옴 → 그 카드의 선택지만 고른다 → 하루가 지난다.
+// 날이 갈수록: 적 HP·피해 +enemyRamp/일, 기연 가중 +fortune.perDay/일. 밸런스는 REGRESSION_DAY 한 곳.
+export const REGRESSION_DAY = {
+  regionDays: 10,
+  weights: { battle: 32, elite: 12, event: 26, companion: 9, merchant: 7, shelter: 10 },
+  fortune: { base: 4, perDay: 0.55 },   // 기연 가중 — D1 ≈4% → D40 ≈17% (+ 기억 조각 보너스)
+  enemyRamp: 0.012,                     // 하루당 적 HP·피해 +1.2% (D40 ×1.47) — 지역 단계 상승과 곱
+  hideDc: { battle: 14, elite: 15 },    // 몸을 숨겨 피하기 판정
+  trainExp: 25,                         // 쉼터에서 단련
+  dailyHealPct: 10,                     // 아침마다 자연 회복 (최대 HP %)
+  checkFame: 3,                         // 판정 성공 명성
+};
+export function regressionRegionForDay(day = 1) {
+  return Math.min(REGRESSION_REGIONS.length, Math.max(1, Math.ceil(day / REGRESSION_DAY.regionDays)));
+}
+export function regressionDayEnemyMult(day = 1) {
+  return 1 + Math.max(0, day - 1) * REGRESSION_DAY.enemyRamp;
+}
+export function regressionFortuneWeight(run) {
+  const F = REGRESSION_DAY.fortune;
+  return F.base + Math.max(0, (run.day || 1) - 1) * F.perDay + (run.fortuneBonus || 0);
+}
+// 오늘의 일 확률표 (UI 안내·시뮬용) — { kind: 확률 }
+export function regressionDayTable(run) {
+  const W = REGRESSION_DAY.weights;
+  const region = regressionRegionForDay(run.day);
+  const comp = regressionCompanionAt(region);
+  const w = {
+    battle: W.battle,
+    elite: isRegressionEliteOpen({ ...run, region }, region) ? W.elite : 0,
+    event: REGRESSION_EVENTS.some(e => e.region === region && !e.fortune && !(run.seenEvents || []).includes(e.id)) ? W.event : 0,
+    companion: comp && (run.affinity?.[comp.id] || 0) < 100 ? W.companion : 0,
+    merchant: W.merchant,
+    shelter: W.shelter,
+    fortune: regressionFortuneWeight(run),
+  };
+  const total = Object.values(w).reduce((a, b) => a + b, 0);
+  return Object.fromEntries(Object.entries(w).map(([k, v]) => [k, v / total]));
+}
+const REGION_ENTER_TEXT = {
+  1: (first) => (first ? '' : '') + '마을을 떠나 북쪽으로 향한다. 숨결이 하얗게 얼어붙는다 — 북부 극지대다.',
+  2: () => '눈길이 끝나고 검게 썩은 나무들이 나타났다. 죽은 자의 숲. 열흘 안에 지나가야 한다.',
+  3: () => '숲 너머로 거대한 석조 신전이 모습을 드러낸다. 봉인된 신전 — 시간이 느리게 흐르는 곳.',
+  4: () => '신전의 마지막 문을 지나자 하늘이 찢어져 있다. 마계의 균열. 황혼의 첨탑이 그 너머에 서 있다.',
+};
+// 오늘의 일 굴림 — 반환: 갱신된 run (today 카드 / pendingEvent / 지역 전환 장면 중 하나)
+export function rollRegressionDay(run, memories = [], rng = Math.random) {
+  const region = regressionRegionForDay(run.day);
+  if (run.region !== region) {
+    const wake = run.region === REGRESSION_HUB && run.day === 1;
+    return { ...run, region, today: null, scene: regressionResultScene(getRegressionRegion(region).name, REGION_ENTER_TEXT[region](wake), [{ text: `D${run.day} — 이곳에서 ${REGRESSION_DAY.regionDays}일`, tone: 'gold' }]) };
+  }
+  // 아침 — 하룻밤 자며 조금 회복 (하루 1회)
+  if (run.healedDay !== run.day) run = { ...run, healedDay: run.day, hpPct: Math.min(1, (run.hpPct ?? 1) + REGRESSION_DAY.dailyHealPct / 100) };
+  const table = regressionDayTable(run);
+  let x = rng(), kind = 'battle';
+  for (const [k, p] of Object.entries(table)) { x -= p; if (x < 0) { kind = k; break; } }
+  if (kind === 'event') {
+    const ev = rollRegressionEvent(run, memories, rng, { fortune: false });
+    if (ev) return { ...run, today: null, pendingEvent: ev.id };
+    kind = 'battle';
+  }
+  if (kind === 'fortune') {
+    const ev = rollRegressionEvent(run, memories, rng, { fortune: true });
+    if (ev) return { ...run, today: null, pendingEvent: ev.id };
+    // 지역 기연 사건을 다 봤으면 떠도는 은자 — 기연(없으면 고급) 스킬의 가르침
+    const offer = offerRegressionLearn(run, 'boss', null, rng) || offerRegressionLearn({ ...run }, 'elite', null, () => 0);
+    if (offer) return { ...run, today: { kind: 'hermit', skillId: offer.skillId } };
+    kind = 'shelter';
+  }
+  if (kind === 'battle' || kind === 'elite') {
+    const tier = kind === 'elite' ? 'elite' : 'normal';
+    const enemyKey = rollRegressionEnemy(region, tier, rng);
+    if (enemyKey) return { ...run, today: { kind, tier, enemyKey } };
+    kind = 'shelter';
+  }
+  if (kind === 'companion') return { ...run, today: { kind, companionId: regressionCompanionAt(region).id } };
+  if (kind === 'merchant') return { ...run, today: { kind }, shop: buildRegressionShopStock(run, rng) };
+  return { ...run, today: { kind: 'shelter' } };
+}
+// 하루 넘기기 (오늘의 일을 끝냄) — 날짜 +1
+export function passRegressionDay(run, logLine) {
+  return { ...run, today: null, day: run.day + 1, log: logLine ? [...run.log, `D${run.day}: ${logLine}`] : run.log };
+}
+// 숨어서 피하기 — 성공 = 하루 넘김, 실패 = 전투 (pending)
+export function hideFromRegressionEnemy(run, rng = Math.random) {
+  const t = run.today; if (!t?.enemyKey) return { run, ok: false };
+  const st = t.tier === 'elite' ? '통찰' : '민첩';
+  const res = resolveRegressionChoice({ stat: st, dc: REGRESSION_DAY.hideDc[t.kind] || 14, success: {}, fail: {} }, regressionEffectiveStats(run), rng);
+  if (res.check === 'ok') return { run: passRegressionDay(run, `${ENEMIES[t.enemyKey]?.name}을(를) 피해 지나감`), ok: true, stat: st };
+  return { run: { ...startRegressionCombat({ ...run, today: null }, t.enemyKey, t.tier) }, ok: false, stat: st };
+}
+export function fightRegressionToday(run) {
+  const t = run.today; if (!t?.enemyKey) return run;
+  return startRegressionCombat({ ...run, today: null }, t.enemyKey, t.tier);
+}
+export function restRegressionShelter(run) {
+  return { ...applyRegressionRest({ ...run, today: null }) };
+}
+export function trainRegressionShelter(run) {
+  const g = gainRegressionExp(run, REGRESSION_DAY.trainExp);
+  return { run: passRegressionDay(g.run, `단련 (경험치 +${REGRESSION_DAY.trainExp})`), levelUps: g.levelUps, from: g.from };
+}
+export function askRegressionHermit(run) {
+  const id = run.today?.skillId;
+  return passRegressionDay({ ...run, pendingLearn: id ? { skillId: id, source: 'fortune', from: null } : null }, `떠도는 은자를 만남`);
+}
+export const REGRESSION_TODAY_INTRO = {
+  battle: (r) => `${regressionEnemyLabel(r.today.enemyKey, 'normal')}이(가) 길을 막아선다.`,
+  elite: (r) => `땅이 울린다. 무거운 기척 — ${regressionEnemyLabel(r.today.enemyKey, 'elite')}의 흔적이다.`,
+  companion: (r) => { const c = getRegressionCompanion(r.today.companionId); return `${c.name}(${c.title})이(가) 모닥불 곁에 앉아 있다. 이쪽을 알아보고 고개를 든다.`; },
+  merchant: () => '짐마차를 끄는 떠돌이 상인이 손을 흔든다. "구경은 공짜요, 회귀자 양반."',
+  shelter: () => '버려진 오두막을 찾았다. 지붕은 새지만 하룻밤 머물 만하다.',
+  hermit: () => '누더기를 걸친 은자가 길가에 앉아 있다. "기다렸네. 자네가 배울 것이 하나 있지."',
+};
