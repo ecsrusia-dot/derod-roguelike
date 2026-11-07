@@ -45,7 +45,7 @@ function StateChip({ color, children }) {
 }
 
 export default function RegressionBattle({
-  classData, enemyKey, enemyObj, enemyLabel, regionKey, enemyMult = 1, intro, stats, level, maxHp, hp, skills, skillLv = {}, relicBonus,
+  classData, enemyKey, enemyObj, enemyLabel, regionKey, enemyMult = 1, enemyExtra = null, intro, stats, level, maxHp, hp, skills, skillLv = {}, relicBonus,
   potions, beltSlots, defaultBelt, flames, committed, speed, onCycleSpeed, onCommit, onFinish, speedLabel, speedOptions = [], onSetSpeed,
 }) {
   const [stanceId, setStanceId] = useState(committed?.stanceId || 'calm');
@@ -55,7 +55,7 @@ export default function RegressionBattle({
   const timer = useRef(null);
   const finished = useRef(false);
 
-  const enemyBase = useMemo(() => regressionEnemyCombatant(enemyKey, enemyObj, regionKey, enemyMult), [enemyKey, enemyObj, regionKey, enemyMult]);
+  const enemyBase = useMemo(() => regressionEnemyCombatant(enemyKey, enemyObj, regionKey, enemyMult, enemyExtra), [enemyKey, enemyObj, regionKey, enemyMult, enemyExtra?.hp, enemyExtra?.dmg]);
   const enemySrc = getEnemyImageSrc(enemyKey, enemyObj, 'combat');
   const heroSrc = `./classes/combat/${classData.id}_combat.jpg`;
 
