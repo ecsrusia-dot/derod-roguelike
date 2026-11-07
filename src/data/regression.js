@@ -22,7 +22,7 @@ export const REGRESSION_TUNING = {
   days: 60,                 // 한 생의 길이 (1.186.0 PM 결정: 40 → 60, 지역당 15일). 61일째 = 황혼의 첨탑
   fameGate: 140,            // 첨탑 입장 자격
   eliteFameGate: 30,        // 강적 출현 명성
-  fameGain: { normal: 3, elite: 8 },    // 1.185.0 랜덤 하루 구조 — 2/5 → 3/8
+  fameGain: { normal: 3, elite: 8, boss: 15 },   // 1.194.0~ boss = 길목의 군주 (루트 보스)    // 1.185.0 랜덤 하루 구조 — 2/5 → 3/8
   regionFameMult: { 1: 1.0, 2: 1.15, 3: 1.3, 4: 1.5 },
   recordPerPattern: 15,     // 적 행동 1회 관찰당 기록 게이지 %
   recordIntPerPoint: 0.5,   // 지능 (스탯-10) 1포인트당 추가 %
@@ -359,8 +359,8 @@ export function regressionRecordGain(run, observations = [], intStat = 10) {
 }
 
 // 전투 시작 기록 — 전투 중 새로고침해도 같은 적과 재전투 (도주 불가, 무덤의 유산·제령사와 동일 원칙)
-export function startRegressionCombat(run, enemyKey, tier) {
-  return { ...run, pending: { enemyKey, tier } };
+export function startRegressionCombat(run, enemyKey, tier, extra = {}) {
+  return { ...run, pending: { enemyKey, tier, ...extra } };
 }
 
 // 전투 결과 반영 — CombatScreen onVictory/onDefeat에서 호출 (MVP 2차)
@@ -411,18 +411,21 @@ export function applyRegressionCombat(run, result) {
 export function enterRegressionSpire(run) {
   if (!isRegressionSpireDay(run)) return run;
   if (!isRegressionSpireEligible(run)) return { ...run, over: 'timeout', log: [...run.log, `D${run.day}: 명성 부족 — 첨탑의 문이 열리지 않는다`] };
-  return { ...run, spireRound: 0, log: [...run.log, `D${run.day}: 황혼의 첨탑 진입`] };
+  // 1.194.0~ 첨탑 구성은 마지막으로 걸은 길(run.route)로 정해진다
+  const spireRoute = run.route || 'none';
+  return { ...run, spireRound: 0, spireRoute, log: [...run.log, `D${run.day}: 황혼의 첨탑 진입 (${REGRESSION_ROUTES[spireRoute].name})`] };
 }
 
 export function applyRegressionSpireResult(run, { win, hpPct }) {
   if (run.spireRound == null) return run;
   if (!win) return { ...run, hpPct: 0, over: 'spireLose', log: [...run.log, `첨탑 ${run.spireRound + 1}층에서 패배`] };
   const round = run.spireRound + 1;
-  if (round >= REGRESSION_SPIRE_CHAIN.length) {
+  if (round >= regressionSpireChain(run).length) {
     return { ...run, hpPct: Math.min(1, hpPct), spireRound: round, over: 'victory', log: [...run.log, '황혼의 첨탑 정복'] };
   }
   const compRest = run.affinity ? aggregateRegressionCompanions(run).spireRestPct : 0;
-  const healed = Math.min(1, Math.min(1, hpPct) + ((run.spireRestPct || 0) + compRest) / 100);
+  const rally = run.storyFlags?.alliesRally ? REGRESSION_ROUTE_TUNING.alliesRallyRestPct : 0;
+  const healed = Math.min(1, Math.min(1, hpPct) + ((run.spireRestPct || 0) + compRest + rally) / 100);
   return { ...run, hpPct: healed, spireRound: round, log: [...run.log, `첨탑 ${round}층 돌파`] };
 }
 
@@ -614,16 +617,20 @@ export const REGRESSION_COMPANIONS = [
     perkText: { ally: '전투 은화 +50% · 치명 +5%', oath: '공격 +10% · 전투 승리마다 명성 +2' },
     ending: { id: 'ending_broker', name: '그림자 시장의 주인', text: '니아와 함께 균열의 시장을 손에 넣었다. 대륙의 모든 소문이 이제 내 귀로 먼저 들어온다.' } },
 ];
-export const REGRESSION_ENDING_SPIRE = { id: 'ending_spire', name: '황혼을 끊은 자', branch: '정복', hint: '첨탑을 정복한다 (성향이 한쪽으로 기울지 않음)', text: '홀로 첨탑에 올라 황혼을 끊었다. 회귀의 고리가 멈추고, 처음으로 황혼 다음 날 아침이 밝았다.' };
+export const REGRESSION_ENDING_SPIRE = { id: 'ending_spire', name: '황혼을 끊은 자', branch: '정복', hint: '방랑의 길(성향이 한쪽으로 기울지 않음)로 첨탑을 정복한다', text: '홀로 첨탑에 올라 황혼을 끊었다. 회귀의 고리가 멈추고, 처음으로 황혼 다음 날 아침이 밝았다.' };
 // 1.186.0~ 메인 스토리 분기 엔딩 (PM 결정: 진실·힘·유대 3성향 누적, 동료 엔딩은 유대 갈래로 흡수)
 export const REGRESSION_STORY_ENDINGS = [
   { id: 'ending_loop_end', name: '회귀의 끝', branch: '진실', hint: '진실을 끝까지 좇아 결전 전야에 고리를 끊을 방법을 찾고, 첨탑을 정복한다', text: '첨탑 꼭대기에서 황혼을 부른 자의 이름을 불렀다 — 그것은 첫 번째 생의 나였다. 고리를 끊자 기억이 하나씩 흩어진다. 이번에는 정말로, 다시 돌아오지 않는다.' },
-  { id: 'ending_truth', name: '진실의 기록자', branch: '진실', hint: '진실 성향이 가장 높은 채로 첨탑을 정복한다', text: '황혼은 끊었지만, 그것이 왜 왔는지는 아무도 모른다 — 나 말고는. 나는 펜을 들었다. 다음에 올 회귀자가 같은 길을 걷지 않도록.' },
-  { id: 'ending_heir', name: '황혼의 계승자', branch: '힘', hint: '힘 성향이 가장 높은 채로 첨탑을 정복한다', text: '첨탑의 주인이 쓰러지자 황혼이 내 안으로 흘러들었다. 하늘은 다시 맑아졌지만, 내 그림자는 해 질 녘처럼 붉다. 이제 황혼은 나다.' },
-  { id: 'ending_spire_name', name: '첨탑에 남은 이름', branch: '패배', hint: '첨탑에서 쓰러진다', text: '마지막 계단 앞에서 무릎이 꺾였다. 첨탑 벽에 내 이름이 새겨진다 — 먼저 쓰러진 수많은 이름들 사이에.' },
+  { id: 'ending_truth', name: '진실의 기록자', branch: '진실', hint: '진실의 길로 첨탑을 정복한다', text: '황혼은 끊었지만, 그것이 왜 왔는지는 아무도 모른다 — 나 말고는. 나는 펜을 들었다. 다음에 올 회귀자가 같은 길을 걷지 않도록.' },
+  { id: 'ending_heir', name: '황혼의 계승자', branch: '힘', hint: '힘의 길로 첨탑을 정복한다', text: '첨탑의 주인이 쓰러지자 황혼이 내 안으로 흘러들었다. 하늘은 다시 맑아졌지만, 내 그림자는 해 질 녘처럼 붉다. 이제 황혼은 나다.' },
+  { id: 'ending_bond_road', name: '함께 걸은 길', branch: '유대', hint: '유대의 길로 첨탑을 정복한다 (맹약 동료 없음)', text: '맹약을 맺은 이는 없었다. 그래도 길 위에서 만난 얼굴들이 첨탑 아래에서 기다리고 있었다. 내려가자, 모두 함께 첫 아침을 맞았다.' },
+  { id: 'ending_spire_name', name: '첨탑에 남은 이름', branch: '패배', hint: '방랑의 길로 첨탑에서 쓰러진다', text: '마지막 계단 앞에서 무릎이 꺾였다. 첨탑 벽에 내 이름이 새겨진다 — 먼저 쓰러진 수많은 이름들 사이에.' },
+  { id: 'ending_lost_record', name: '기록되지 않은 열세 번째', branch: '패배', hint: '진실의 길로 첨탑에서 쓰러진다', text: '첫 번째 회귀자의 얼굴을 보았다 — 그리고 무너졌다. 서고의 열세 번째 표지는 끝내 빈 채로 남는다. 다음 생의 나는 이 사실을 기억할까.' },
+  { id: 'ending_devoured', name: '황혼에 삼켜진 자', branch: '패배', hint: '힘의 길로 첨탑에서 쓰러진다', text: '받아들인 힘이 나를 삼켰다. 첨탑 꼭대기의 옥좌가 새 주인을 맞는다 — 내 얼굴을 한, 내가 아닌 무언가를.' },
+  { id: 'ending_fallen_together', name: '함께 쓰러진 자들', branch: '패배', hint: '유대의 길로 첨탑에서 쓰러진다', text: '마지막 계단에서 동료들과 함께 쓰러졌다. 누구도 혼자 남지 않았다는 것만이 위안이었다.' },
   { id: 'ending_dusk', name: '황혼에 잠긴 대륙', branch: '패배', hint: '이름을 알리지 못한 채 마지막 날을 넘긴다', text: '이름 없는 자에게 첨탑은 문을 열지 않았다. 황혼이 대륙을 덮고, 나는 마을 언덕에서 그것을 끝까지 지켜보았다.' },
 ];
-export const REGRESSION_ENDINGS = [REGRESSION_ENDING_SPIRE, ...REGRESSION_STORY_ENDINGS.slice(0, 3), ...REGRESSION_COMPANIONS.map(c => ({ ...c.ending, branch: '유대', hint: `유대 성향이 가장 높고 ${c.name}와 맹약을 맺은 채 첨탑을 정복한다` })), ...REGRESSION_STORY_ENDINGS.slice(3)];
+export const REGRESSION_ENDINGS = [REGRESSION_ENDING_SPIRE, ...REGRESSION_STORY_ENDINGS.slice(0, 3), ...REGRESSION_COMPANIONS.map(c => ({ ...c.ending, branch: '유대', hint: `유대의 길로 ${c.name}와 맹약을 맺은 채 첨탑을 정복한다` })), ...REGRESSION_STORY_ENDINGS.slice(3)];
 
 export const REGRESSION_COMPANION_TUNING = { affinityPerTalk: 20, charismaBonus: 5, charismaGate: 15 };
 
@@ -681,10 +688,11 @@ export function regressionTopTrait(run) {
 }
 export function regressionEndingFor(run) {
   const byId = (id) => REGRESSION_ENDINGS.find(e => e.id === id);
-  if (run.over === 'spireLose') return byId('ending_spire_name');
+  // 1.194.0~ 첨탑에 오른 길(spireRoute) 기준. 구세이브(루트 없음)는 가장 높은 성향으로 대체
+  const top = run.spireRoute || run.route || regressionTopTrait(run) || 'none';
+  if (run.over === 'spireLose') return byId({ truth: 'ending_lost_record', power: 'ending_devoured', bond: 'ending_fallen_together' }[top] || 'ending_spire_name');
   if (run.over === 'timeout') return byId('ending_dusk');
   if (run.over !== 'victory') return null;
-  const top = regressionTopTrait(run);
   if (top === 'truth' && run.storyFlags?.breakLoop) return byId('ending_loop_end');
   if (top === 'truth') return byId('ending_truth');
   if (top === 'power') return byId('ending_heir');
@@ -692,6 +700,7 @@ export function regressionEndingFor(run) {
     const oaths = REGRESSION_COMPANIONS.filter(c => (run.affinity?.[c.id] || 0) >= 100)
       .sort((a, b) => (run.affinity?.[b.id] || 0) - (run.affinity?.[a.id] || 0));
     if (oaths.length) return { ...oaths[0].ending, branch: '유대' };
+    return byId('ending_bond_road');
   }
   return REGRESSION_ENDING_SPIRE;
 }
@@ -1012,8 +1021,8 @@ export function regressionFameStage(fame = 0) {
 
 // 적 등급 표기 — [하급] 얼음 늑대
 export const REGRESSION_ENEMY_GRADES = { normal: '하급', elite: '상급', boss: '군주' };
-export function regressionEnemyLabel(enemyKey, tierOverride = null) {
-  const e = ENEMIES[enemyKey] || (enemyKey === 'spireLord' ? REGRESSION_SPIRE_LORD : null);
+export function regressionEnemyLabel(enemyKey, tierOverride = null, obj = null) {
+  const e = obj || ENEMIES[enemyKey] || (enemyKey === 'spireLord' ? REGRESSION_SPIRE_LORD : null);
   const tier = tierOverride || e?.tier || 'normal';
   return `[${REGRESSION_ENEMY_GRADES[tier] || '하급'}] ${e?.name || enemyKey}`;
 }
@@ -1177,7 +1186,7 @@ export function regressionRunStats(run) {
 }
 
 // 경험치·레벨 — 판정 성공·전투로 획득. 레벨마다 추가 능력치 +1
-export const REGRESSION_EXP = { check: 20, normal: 30, elite: 60, event: 8 };  // 1.185.0 랜덤 하루 구조로 상향
+export const REGRESSION_EXP = { check: 20, normal: 30, elite: 60, boss: 100, event: 8 };  // 1.185.0 랜덤 하루 구조로 상향
 export function regressionExpToNext(level = 0) { return 30 + level * 15; }
 export function gainRegressionExp(run, amount = 0) {
   let next = { ...run, exp: (run.exp || 0) + amount, level: run.level || 0, statPoints: run.statPoints || 0 };
@@ -1388,6 +1397,7 @@ export const REGRESSION_GEAR_GRADES = {
   advanced: { name: '고급', color: '#7ba3c4' },
   treasure: { name: '보물', color: '#b58ad6' },
   unique: { name: '유니크', color: '#e8b04a' },
+  route: { name: '여정', color: '#ff9a6a' },   // 1.194.0~ 루트 보스 전용 (랜덤 드랍·상점 없음)
 };
 // fx: 전투 보정 (relicBonus 어휘 — dmgDealt/critRate/dodge/lifesteal/dmgTaken). rel: 유니크를 다루는 데 필요한 능력치
 export const REGRESSION_GEAR = {
@@ -1428,6 +1438,11 @@ export const REGRESSION_GEAR = {
   titan_heart:     { slot: 'armor', grade: 'unique', name: '거인 심장 갑주', stats: { 강인: 3, 근력: 2 }, fx: { dmgTaken: -15 }, rel: ['강인', '근력'], fxText: '받는 피해 -15%' },
   saint_relic:     { slot: 'accessory', grade: 'unique', name: '성자의 성물', stats: { 신성: 3, 화술: 1 }, fx: { lifesteal: 8 }, rel: ['신성'], fxText: '흡혈 8%' },
   oracle_eye:      { slot: 'accessory', grade: 'unique', name: '예언자의 눈', stats: { 통찰: 3, 학식: 2 }, fx: { critRate: 12 }, rel: ['통찰', '학식'], fxText: '치명 +12%' },
+  // 1.194.0~ 여정 장비 — 루트 보스(길목의 군주) 2번째 격파 보상 전용
+  route_truth_lens:  { slot: 'accessory', grade: 'route', name: '진실의 단안경', stats: { 통찰: 3, 학식: 2 }, fx: { critRate: 12, dmgDealt: 5 }, rel: ['통찰', '학식'], fxText: '치명 +12% · 공격 +5%' },
+  route_dusk_blade:  { slot: 'weapon', grade: 'route', name: '황혼을 먹은 대검', stats: { 근력: 3, 검술: 2 }, fx: { dmgDealt: 18, lifesteal: 4 }, rel: ['근력', '검술'], fxText: '공격 +18% · 흡혈 4%' },
+  route_oath_cloak:  { slot: 'armor', grade: 'route', name: '맹약의 망토', stats: { 강인: 3, 화술: 2 }, fx: { dmgTaken: -15, dodge: 4 }, rel: ['강인', '화술'], fxText: '받는 피해 -15% · 회피 +4%' },
+  route_wander_boots:{ slot: 'accessory', grade: 'route', name: '방랑자의 장화', stats: { 민첩: 3, 강인: 1 }, fx: { dodge: 8, dmgTaken: -5 }, rel: ['민첩'], fxText: '회피 +8% · 받는 피해 -5%' },
 };
 // 1.184.0~ 사건 「패시브 +1Lv」 보상 → 영구 능력치 +1로 환산 (패시브 시스템은 이 모드에서 단계적 폐지)
 export const REGRESSION_PASSIVE_TO_STAT = { 수비: '강인', 강타: '근력', 신앙: '신성', 잔혹: '근력' };
@@ -1662,11 +1677,28 @@ export function rollRegressionDay(run, memories = [], rng = Math.random) {
   const region = regressionRegionForDay(run.day);
   if (run.region !== region) {
     const wake = run.region === REGRESSION_HUB && run.day === 1;
-    return { ...run, region, today: null, scene: regressionResultScene(getRegressionRegion(region).name, REGION_ENTER_TEXT[region](wake), [{ text: `D${run.day} — 이곳에서 ${REGRESSION_DAY.regionDays}일`, tone: 'gold' }]) };
+    const tags = [{ text: `D${run.day} — 이곳에서 ${REGRESSION_DAY.regionDays}일`, tone: 'gold' }];
+    let next = { ...run, region, today: null };
+    // 1.194.0~ 성향 루트 — 2지역부터 지역에 들어설 때마다 가장 높은 성향으로 길이 정해진다
+    let text = REGION_ENTER_TEXT[region](wake);
+    if (region >= REGRESSION_ROUTE_FROM_REGION) {
+      const route = regressionRouteFor(run);
+      const R = REGRESSION_ROUTES[route];
+      const changed = run.route && run.route !== route;
+      next = { ...next, route, routeHistory: [...(run.routeHistory || []), route] };
+      const boss = REGRESSION_ROUTE_BOSSES[route]?.[region];
+      text += `\n\n${R.icon} ${changed ? '길이 바뀌었다 — ' : ''}「${R.name}」. ${R.enter}`;
+      tags.push({ text: `${R.icon} ${R.name}`, tone: 'gold' });
+      if (boss) tags.push({ text: `${REGRESSION_ROUTE_BOSS_DAY_IN_REGION}일째 — 길목의 군주 「${boss.name}」`, tone: 'bad' });
+    }
+    return { ...next, scene: regressionResultScene(getRegressionRegion(region).name, text, tags) };
   }
   // 1.186.0~ 메인 스토리 — 정해진 날 확정 등장
   const story = regressionMainStoryFor(run);
   if (story) return { ...run, today: null, pendingEvent: story.id };
+  // 1.194.0~ 길목의 군주 — 루트별 확정 보스 (2~4지역 13일째)
+  const rb = regressionRouteBossToday(run);
+  if (rb) return { ...run, today: { kind: 'routeBoss', tier: 'boss', enemyKey: rb.key, routeBoss: rb.region, route: rb.route } };
   // 아침 — 하룻밤 자며 조금 회복 (하루 1회)
   if (run.healedDay !== run.day) run = { ...run, healedDay: run.day, hpPct: Math.min(1, (run.hpPct ?? 1) + (REGRESSION_DAY.dailyHealPct + (run.affinity ? aggregateRegressionCompanions(run).dailyHealPct : 0)) / 100) };
   const table = regressionDayTable(run);
@@ -1713,7 +1745,7 @@ export function hideFromRegressionEnemy(run, rng = Math.random) {
 }
 export function fightRegressionToday(run) {
   const t = run.today; if (!t?.enemyKey) return run;
-  return startRegressionCombat({ ...run, today: null }, t.enemyKey, t.tier);
+  return startRegressionCombat({ ...run, today: null }, t.enemyKey, t.tier, t.routeBoss ? { routeBoss: t.routeBoss, route: t.route } : {});
 }
 export function restRegressionShelter(run) {
   return { ...applyRegressionRest({ ...run, today: null }) };
@@ -1733,6 +1765,7 @@ export const REGRESSION_TODAY_INTRO = {
   merchant: () => '짐마차를 끄는 떠돌이 상인이 손을 흔든다. "구경은 공짜요, 회귀자 양반."',
   shelter: () => '버려진 오두막을 찾았다. 지붕은 새지만 하룻밤 머물 만하다.',
   hermit: () => '누더기를 걸친 은자가 길가에 앉아 있다. "기다렸네. 자네가 배울 것이 하나 있지."',
+  routeBoss: (r) => { const b = REGRESSION_ROUTE_BOSSES[r.today.route]?.[r.today.routeBoss]; return b ? `${b.line}\n\n길목의 군주 「${b.name}」. 이 길을 계속 가려면 피할 수 없다.` : ''; },
 };
 
 
@@ -1916,7 +1949,7 @@ export function toggleRegressionStartTrait(metaR, id) {
 // ============================================
 // 1.188.0~ 떠돌이 상인에게 장비 판매 (PM 요청: 미사용 장비 판매)
 // ============================================
-export const REGRESSION_SELL_PRICE = { normal: 40, advanced: 90, treasure: 190, unique: 300 };
+export const REGRESSION_SELL_PRICE = { normal: 40, advanced: 90, treasure: 190, unique: 300, route: 250 };
 export function regressionGearSellPrice(id) { return REGRESSION_SELL_PRICE[REGRESSION_GEAR[id]?.grade] || 0; }
 // 장착 중이 아닌 가방 장비 1개 판매
 export function sellRegressionGear(run, id) {
@@ -1987,4 +2020,148 @@ export function applyRegressionProvisions(run, ids = [], rng = Math.random) {
     else if (id === 'pv_rumor') next.fame = (next.fame || 0) + 10;
   }
   return { ...next, provisions: [...new Set(ids || [])] };
+}
+
+
+// ============================================
+// 1.194.0~ 성향 루트 (PM 결정 「성향 루트제」) — 진행 과정에 따라 보스·보상·첨탑·엔딩이 달라진다
+// ============================================
+// 2지역부터 지역에 들어설 때마다 가장 높은 성향(regressionTopTrait)으로 길이 정해진다 (동점·0 = 방랑의 길).
+// 길마다: 지역 13일째 「길목의 군주」(확정 보스) → 승리 보상(능력치 / 여정 장비 / 첨탑 효과) → 첨탑 3·4층 구성 → 엔딩.
+// 밸런스는 REGRESSION_ROUTE_TUNING 한 곳.
+export const REGRESSION_ROUTE_FROM_REGION = 2;
+export const REGRESSION_ROUTE_BOSS_DAY_IN_REGION = 13;
+export const REGRESSION_ROUTE_TUNING = {
+  bossHpMult: { 2: 0.6, 3: 0.75, 4: 0.75 },   // 길목의 군주 HP = 지역 기준 보스(아래 ref) × 이 값 (지역·날짜 배율은 전투가 따로 곱함)
+  bossDmgMult: { 2: 0.7, 3: 0.8, 4: 0.8 },    // 공격력 = 기준 보스 평균 최대 피해 × 이 값
+  unmaskedHpMult: 0.85,      // 진실: 「가면 벗기기」 — 첨탑 3·4층 HP
+  apostleBloodHpMult: 0.9,   // 힘: 「사도의 피」 — 첨탑 전 층 HP (내가 더 세게 친다)
+  allyHpCutPerCompanion: 0.04, allyHpCutMax: 3,  // 유대: 동행 중인 동료 1명당 첨탑 적 HP -4% (최대 3명)
+  alliesRallyRestPct: 10,    // 유대: 「원군」 — 첨탑 층 사이 HP +10%p
+};
+export const REGRESSION_ROUTE_BOSS_REF = { 2: 'twilightChild', 3: 'oblivionSealer', 4: 'nakzelionShadow' };
+export const REGRESSION_ROUTES = {
+  truth: { id: 'truth', name: '진실의 길', icon: '📜', color: '#9cc4e8', enter: '황혼을 부른 자를 좇는다. 진실을 덮으려는 자들이 길목을 지킨다.', spire: '3층의 「가면 쓴 첨탑 주인」을 넘으면 꼭대기에서 「첫 번째 회귀자」가 기다린다' },
+  power: { id: 'power', name: '힘의 길', icon: '🗡', color: '#e0705c', enter: '황혼의 힘을 거둬들이며 나아간다. 힘을 탐하는 자들이 앞을 막는다.', spire: '3층은 「황혼의 사도」가 지키고, 꼭대기에서 「황혼의 옥좌」가 새 주인을 기다린다' },
+  bond: { id: 'bond', name: '유대의 길', icon: '🤝', color: '#9ad4a3', enter: '함께 걷는 이들을 지키며 나아간다. 외로움에 삼켜진 자들이 길목에 서 있다.', spire: '동행 중인 동료가 원군으로 오른다 (1명당 적 HP -4%). 꼭대기의 주인은 망자들을 거느렸다' },
+  none: { id: 'none', name: '방랑의 길', icon: '🧭', color: '#c9b8a4', enter: '어느 쪽에도 기울지 않은 채 걷는다. 이름 없는 강자들이 길목을 차지하고 있다.', spire: '정해진 4연전 — 꼭대기에 「황혼의 첨탑 주인」' },
+};
+export function regressionRouteFor(run) { return regressionTopTrait(run) || 'none'; }
+// key = 일러스트를 빌려 오는 적 / name·line = 이 길에서의 정체
+export const REGRESSION_ROUTE_BOSSES = {
+  truth: {
+    2: { key: 'champ_forest_witch', name: '진실을 삼킨 마녀', line: '숲 한가운데서 웃음소리가 번진다. "그 편지를 읽었구나. 그럼 돌려보낼 수 없지."' },
+    3: { key: 'ancientPriest', name: '기록을 불태우는 사제', line: '서고 앞에 횃불을 든 사제가 서 있다. "열세 번째 기록은 쓰이지 않는다."' },
+    4: { key: 'champ_frost_elite4', name: '얼어붙은 열두 번째 회귀자', line: '균열 가장자리, 얼음에 갇힌 사내가 눈을 뜬다. 열두 번째 일지의 필체와 같은 손이 지팡이를 든다.' },
+  },
+  power: {
+    2: { key: 'champ_forest_elite2', name: '망자를 삼키는 폭군', line: '망자들의 행렬 끝에서 거대한 그림자가 그들을 집어삼키고 있다. "그 힘은 내 것이다."' },
+    3: { key: 'champ_frost_boss3', name: '황혼을 먹은 한기룡', line: '깨진 봉인 너머에서 붉게 물든 용이 고개를 든다. 봉인의 힘을 먼저 먹은 것은 그였다.' },
+    4: { key: 'demonApostle', name: '황혼의 사도', line: '사도가 손뼉을 친다. "손을 잡았으니 시험을 치러야지. 옥좌는 한 자리뿐이다."' },
+  },
+  bond: {
+    2: { key: 'champ_forest_boss1', name: '시든 자들의 어머니', line: '잃어버린 아이들을 찾아 헤매는 거대한 망령. 세레나가 이를 악문다. "저건… 구할 수 없어요."' },
+    3: { key: 'champ_frost_boss2', name: '홀로 남은 빙왕', line: '신전 지하, 신하를 모두 잃은 왕이 얼음 옥좌에서 일어선다. "너도 결국 혼자가 될 것이다."' },
+    4: { key: 'champ_frost_boss4', name: '모든 것을 얼린 군주', line: '균열 앞의 군주는 곁에 있던 모든 이를 얼려 조각으로 남겼다. "함께라는 건 약점일 뿐."' },
+  },
+  none: {
+    2: { key: 'forestTyrant', name: '숲의 폭군', line: '썩은 숲의 주인이 길을 막는다. 이유는 없다. 그저 지나가는 자를 부순다.' },
+    3: { key: 'champ_frost_elite3', name: '빙하 폭군', line: '신전 회랑이 통째로 얼어 있다. 그 끝에서 빙하가 일어선다.' },
+    4: { key: 'champ_forest_boss4', name: '광기의 종말 마에스트로', line: '균열 앞, 지휘봉을 든 자가 황혼을 연주하고 있다. 마지막 악장에 당신의 비명이 필요하다고 한다.' },
+  },
+};
+// 길목의 군주 보상 — 지역 2: 능력치 / 지역 3: 여정 장비 / 지역 4: 첨탑 효과 (storyFlags)
+export const REGRESSION_ROUTE_REWARDS = {
+  truth: { 2: { stats: { 통찰: 2, 학식: 1 } }, 3: { gear: 'route_truth_lens' }, 4: { flag: 'lordUnmasked', text: '첨탑의 가면이 벗겨진다 — 3·4층 HP -15%' } },
+  power: { 2: { stats: { 근력: 2, 검술: 1 } }, 3: { gear: 'route_dusk_blade' }, 4: { flag: 'apostleBlood', text: '사도의 피 — 첨탑 전 층 HP -10%' } },
+  bond: { 2: { affinityAll: 20 }, 3: { gear: 'route_oath_cloak' }, 4: { flag: 'alliesRally', text: '원군의 약속 — 첨탑 층 사이 HP +10%' } },
+  none: { 2: { gold: 150, potion: 'hp_medium' }, 3: { gear: 'route_wander_boots' }, 4: { flames: 1, text: '홀로 선 각오 — 생명의 불꽃 +1' } },
+};
+function avgMaxDmg(e) {
+  const atk = (e?.patterns || []).filter(p => p.type !== 'defend' && p.dmg);
+  return atk.length ? atk.reduce((a, p) => a + p.dmg[1], 0) / atk.length : 10;
+}
+// 일러스트는 artKey 적, 수치는 기준(ref) 적에 맞춘다
+function regressionScaleEnemy(artKey, ref, name, hpMult = 1, dmgMult = 1) {
+  const art = ENEMIES[artKey] || ref;
+  const k = (avgMaxDmg(ref) / avgMaxDmg(art)) * dmgMult;
+  const hp = Math.round(ref.hp * hpMult);
+  return {
+    ...art, name, hp, tier: 'boss', isBoss: true,
+    patterns: (art.patterns || []).map(p => ({ ...p, dmg: p.dmg ? p.dmg.map(d => Math.round(d * k)) : p.dmg, defense: p.defense ? Math.round(p.defense * hp / art.hp) : p.defense })),
+  };
+}
+export function regressionRouteBossToday(run) {
+  const region = regressionRegionForDay(run.day);
+  if (region < REGRESSION_ROUTE_FROM_REGION || region !== run.region) return null;
+  const day = (region - 1) * REGRESSION_DAY.regionDays + REGRESSION_ROUTE_BOSS_DAY_IN_REGION;
+  if (run.day !== day || (run.routeBossDone || []).includes(region)) return null;
+  const route = run.route || 'none';
+  const b = REGRESSION_ROUTE_BOSSES[route]?.[region];
+  return b ? { key: b.key, region, route } : null;
+}
+export function buildRegressionRouteBoss(route, region) {
+  const b = REGRESSION_ROUTE_BOSSES[route]?.[region]; if (!b) return null;
+  const T = REGRESSION_ROUTE_TUNING;
+  return { ...regressionScaleEnemy(b.key, ENEMIES[REGRESSION_ROUTE_BOSS_REF[region]], b.name, T.bossHpMult[region] ?? 0.75, T.bossDmgMult[region] ?? 0.8), routeBoss: region };
+}
+// 길목의 군주 승리 — 보상 적용. 반환 { run, tags }
+export function applyRegressionRouteReward(run, route, region) {
+  const rw = REGRESSION_ROUTE_REWARDS[route]?.[region] || {};
+  let next = { ...run, routeBossDone: [...(run.routeBossDone || []), region], statBonus: { ...(run.statBonus || {}) }, storyFlags: { ...(run.storyFlags || {}) } };
+  const tags = [];
+  if (rw.stats) for (const [k, v] of Object.entries(rw.stats)) { next.statBonus[k] = (next.statBonus[k] || 0) + v; tags.push({ text: `${k} +${v} (영구)`, tone: 'gold' }); }
+  if (rw.affinityAll) {
+    const aff = { ...(next.affinity || {}) };
+    for (const c of REGRESSION_COMPANIONS) if (aff[c.id] > 0) aff[c.id] = Math.min(100, aff[c.id] + rw.affinityAll);
+    next.affinity = aff; tags.push({ text: `만난 동료 모두 호감 +${rw.affinityAll}`, tone: 'gold' });
+  }
+  if (rw.gold) { next.gold = (next.gold || 0) + rw.gold; tags.push({ text: `은화 +${rw.gold}`, tone: 'good' }); }
+  if (rw.potion) { next = applyRegressionLoot(next, { potion: rw.potion }); tags.push({ text: POTIONS[rw.potion]?.name || '회복약', tone: 'good' }); }
+  if (rw.gear) { next = addRegressionGear(next, rw.gear); tags.push({ text: `${regressionGearLabel(rw.gear)} 획득`, tone: 'gold' }); }
+  if (rw.flag) next.storyFlags[rw.flag] = true;
+  if (rw.flames) next.flames = regressionRunFlames(next) + rw.flames;
+  if (rw.text) tags.push({ text: rw.text, tone: 'gold' });
+  return { run: next, tags };
+}
+// 첨탑 — 길마다 3·4층이 다르다 (1·2층은 공통)
+export const REGRESSION_SPIRE_ROUTES = {
+  none: ['iceMage', 'twilightChild', 'oblivionSealer', 'spireLord'],
+  truth: ['iceMage', 'twilightChild', 'falseLord', 'firstSelf'],
+  power: ['iceMage', 'twilightChild', 'duskApostle', 'duskThrone'],
+  bond: ['iceMage', 'twilightChild', 'oblivionSealer', 'hollowLord'],
+};
+// 특수 층: art = 일러스트를 빌려 오는 적, ref = 수치 기준
+const REGRESSION_SPIRE_SPECIAL = {
+  falseLord: { art: 'spireLord', ref: 'spireLord', name: '가면 쓴 첨탑 주인', hpMult: 0.8, dmgMult: 0.9 },
+  firstSelf: { art: 'nakzelionShadow', ref: 'spireLord', name: '첫 번째 회귀자', hpMult: 0.95, dmgMult: 1 },
+  duskApostle: { art: 'demonApostle', ref: 'oblivionSealer', name: '황혼의 사도', hpMult: 0.95, dmgMult: 0.88 },
+  duskThrone: { art: 'champ_forest_boss4', ref: 'spireLord', name: '황혼의 옥좌', hpMult: 1, dmgMult: 1.05 },
+  hollowLord: { art: 'champ_forest_boss2', ref: 'spireLord', name: '망자를 거느린 첨탑 주인', hpMult: 1.1, dmgMult: 1.05 },
+};
+export function regressionSpireChain(run) {
+  return REGRESSION_SPIRE_ROUTES[run?.spireRoute] || REGRESSION_SPIRE_CHAIN;
+}
+function spireBase(key) {
+  if (key === 'spireLord') return REGRESSION_SPIRE_LORD;
+  const T = REGRESSION_TUNING, base = ENEMIES[key];
+  return { ...base, hp: Math.round(base.hp * T.spireHpMult), patterns: base.patterns.map(p => ({ ...p, dmg: p.dmg.map(d => Math.round(d * T.spireAtkMult)) })) };
+}
+// 반환 { key: 일러스트 키, obj: 실효 적 } — 마지막 층은 기억 조각·동료(오렌) 약점 규칙을 그대로 받는다
+export function regressionSpireEnemyFor(run, round, forceWeak = false) {
+  const chain = regressionSpireChain(run);
+  const id = chain[round]; if (!id) return null;
+  const T = REGRESSION_TUNING, RT = REGRESSION_ROUTE_TUNING;
+  const sp = REGRESSION_SPIRE_SPECIAL[id];
+  let key = id, obj;
+  if (sp) { key = sp.art; obj = regressionScaleEnemy(sp.art === 'spireLord' ? null : sp.art, spireBase(sp.ref), sp.name, sp.hpMult, sp.dmgMult); if (sp.art === 'spireLord') obj = { ...REGRESSION_SPIRE_LORD, ...obj, patterns: REGRESSION_SPIRE_LORD.patterns.map(p => ({ ...p, dmg: p.dmg.map(d => Math.round(d * sp.dmgMult)) })) }; }
+  else obj = spireBase(id);
+  let hpMult = 1;
+  const last = round === chain.length - 1;
+  if (last && (forceWeak || (run.memoryCount || 0) >= T.spireWeaknessMemories)) { hpMult /= 1 + T.spireWeaknessTakenPct / 100; obj = { ...obj, weaknessRevealed: true }; }
+  const f = run.storyFlags || {};
+  if (f.lordUnmasked && (id === 'falseLord' || id === 'firstSelf')) hpMult *= RT.unmaskedHpMult;
+  if (f.apostleBlood && run.spireRoute === 'power') hpMult *= RT.apostleBloodHpMult;
+  if (run.spireRoute === 'bond') hpMult *= 1 - RT.allyHpCutPerCompanion * Math.min(RT.allyHpCutMax, regressionCompanionFollowers(run).length);
+  return { key, obj: { ...obj, hp: Math.round(obj.hp * hpMult) } };
 }
