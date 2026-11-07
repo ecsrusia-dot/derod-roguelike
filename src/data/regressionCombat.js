@@ -137,15 +137,26 @@ export function regressionSkillValue(id, stats, lv = 1) {
   return Math.round(scaled(sk.base, sk.scale, stats) * (1 + (stats.학식 || 0) * REGRESSION_COMBAT.lorePower) * regressionSkillLvMult(lv));
 }
 
+// =========== 1.195.0~ 직업 고유 특성 (PM 지시: 방랑검사·정령사 보정) ===========
+// 회피형 두 직업은 HP가 낮아 하급전 피해가 컸다 → 회피 보정 + 고유 반격/선제. 밸런스는 이 표 한 곳.
+// dodge: 회피 +%p · counterPct: 내가 회피하면 평타 × N 반격 · openerPct: 전투 시작 평타 × N 선제 · openerDodgeTurns: 선제 후 N턴 회피 추가
+export const REGRESSION_CLASS_PERKS = {
+  wanderer: { name: '검객의 직감', dodge: 6, critRate: 6, counterPct: 0.8, desc: '회피 +6% · 치명 +6% · 공격을 피하면 즉시 반격 (평타의 80%)' },
+  elf: { name: '정령의 가호', dodge: 6, openerPct: 1.3, counterPct: 0.5, desc: '회피 +6% · 전투 시작 정령 화살 (평타의 130%) · 피하면 정령 화살 (평타의 50%)' },
+};
+export function getRegressionClassPerk(classId) { return REGRESSION_CLASS_PERKS[classId] || null; }
+
 // =========== 전투 참가자 ===========
-export function regressionPlayerCombatant({ stats, level = 0, maxHp, hp, skills = [], skillLv = {}, belt = [], relicBonus = {} }) {
+export function regressionPlayerCombatant({ stats, level = 0, maxHp, hp, skills = [], skillLv = {}, belt = [], relicBonus = {}, classId = null }) {
   const C = REGRESSION_COMBAT;
+  const perk = getRegressionClassPerk(classId) || {};
   const weapon = Math.max(...Object.entries(C.weaponMult).map(([k, m]) => (stats[k] || 0) * m));
   return {
     maxHp, hp,
     atk: (C.baseAtk + (stats.근력 || 0) * C.atkPerStr + weapon + level * 0.5) * (1 + (relicBonus.dmgDealt || 0) / 100),
-    dodge: Math.min(C.dodgeCap, C.dodgeBase + (stats.민첩 || 0) * C.dodgePerAgi + (relicBonus.dodge || 0)),
-    crit: C.critBase + (stats.통찰 || 0) * C.critPerInsight + (relicBonus.critRate || 0),
+    dodge: Math.min(C.dodgeCap, C.dodgeBase + (stats.민첩 || 0) * C.dodgePerAgi + (relicBonus.dodge || 0) + (perk.dodge || 0)),
+    counterPct: perk.counterPct || 0, openerPct: perk.openerPct || 0, perkName: perk.name || null,
+    crit: C.critBase + (stats.통찰 || 0) * C.critPerInsight + (relicBonus.critRate || 0) + (perk.critRate || 0),
     def: (stats.강인 || 0) * C.defPerVit,
     takenMult: 1 + (relicBonus.dmgTaken || 0) / 100,
     lifesteal: relicBonus.lifesteal || 0,
@@ -233,6 +244,7 @@ export function simulateRegressionCombat({ player: P0, enemy: E0, stanceId = 'ca
     ev.push({ t: 'potion', id: pid, amt: h, p: P.hp, e: E.hp });
   };
 
+  if (P.openerPct) dealToEnemy(vary(P.atk * P.openerPct * stance.mult), P.perkName || '선제');
   for (const id of skillsBy('battleStart')) fire(id);
 
   for (let turn = 1; turn <= C.maxTurns && P.hp > 0 && E.hp > 0; turn++) {
@@ -276,6 +288,7 @@ export function simulateRegressionCombat({ player: P0, enemy: E0, stanceId = 'ca
         if (rng() * 100 < P.dodge * stance.mult ** 0.5) {
           obs.countered = !!pat.heavy;
           ev.push({ t: 'miss', who: 'E', name: pat.name, p: P.hp, e: E.hp });
+          if (P.counterPct && E.hp > 0) dealToEnemy(vary(P.atk * P.counterPct * stance.mult), P.perkName ? `${P.perkName} 반격` : '반격');
           for (const id of skillsBy('selfDodge')) fire(id);
         } else {
           if (!P.hitTaken) { P.hitTaken = true; for (const id of skillsBy('firstHit')) fire(id); }
