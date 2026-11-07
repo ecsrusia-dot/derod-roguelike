@@ -32,6 +32,9 @@ import {
   regressionExpToNext, spendRegressionStatPoint, regressionFamePath, regressionLegacyCombatStats,
   REGRESSION_SKILLS, REGRESSION_SKILL_TIERS, REGRESSION_NORMAL_SKILLS, REGRESSION_START_SKILL_COUNT, REGRESSION_SKILL_PRESETS,
   REGRESSION_FLAMES_PER_LIFE, getRegressionStance, regressionRunSkills, regressionSkillValue, REGRESSION_COMBAT,
+  REGRESSION_ECON, REGRESSION_GEAR, REGRESSION_GEAR_SLOTS, REGRESSION_GEAR_GRADES, regressionGearLabel, regressionGearStatText, regressionGearFx, regressionGearStats,
+  regressionEffectiveStats, equipRegressionGear, unequipRegressionGear, offerRegressionUnique, resolveRegressionUnique, regressionUniqueChance, regressionUniqueIntro,
+  regressionAptitude, buildRegressionShopStock, rerollRegressionShop, regressionShopOfferPrice, buyRegressionOffer,
   REGRESSION_LEARN, offerRegressionLearn, resolveRegressionLearn, regressionLearnChance, regressionLearnIntro, regressionSkillAptitude, regressionSkillStats,
 } from '../../data.js';
 import { AP_TUNING } from '../../combat/initCombat.js';
@@ -145,7 +148,8 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
 
   const saveRun = (nextRun, extra = {}) => onSave({ run: nextRun, ...extra });
   // 1.181.0~ 능력치 10종. combatStats(구 4능력치 환산)는 동료 화술 판정·기록 게이지 보정에만 남음
-  const storyStats = run ? regressionRunStats(run) : {};
+  const storyStats = run ? regressionEffectiveStats(run) : {};   // 1.184.0~ 실효 능력치 (기본 + 사건 + 장비)
+  const baseStats = run ? regressionRunStats(run) : {};
   const combatStats = run ? regressionLegacyCombatStats(storyStats) : {};
 
 
@@ -230,7 +234,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
   // ===== 전투 (탐험 / 첨탑) — 1.182.0~ 전용 전투 (시안 2, RegressionBattle) =====
   // 흐름: 적 확정(pending / spireRound) → 전투 준비(태세·벨트) → 자동 전투 재생(개입 불가) → 결과 장면
   const inSpire = run && run.spireRound != null && !run.over;
-  if (run && loadout && (run.pending || (inSpire && !run.scene && !run.pendingLearn))) {
+  if (run && loadout && (run.pending || (inSpire && !run.scene && !run.pendingLearn && !run.pendingGear))) {
     const spireKey = inSpire ? REGRESSION_SPIRE_CHAIN[run.spireRound] : null;
     const enemyKey = inSpire ? spireKey : run.pending.enemyKey;
     const compFx = aggregateRegressionCompanions(run);
@@ -246,6 +250,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
     const startLv = Object.values(classData.startSkills || {}).reduce((x, y) => x + y, 0);
     const passiveLv = Math.max(0, Object.values(loadout.skills).reduce((x, y) => x + (y || 0), 0) - startLv);
     relicBonus.dmgDealt = (relicBonus.dmgDealt || 0) + passiveLv * 2;
+    for (const [k, v] of Object.entries(regressionGearFx(run))) relicBonus[k] = (relicBonus[k] || 0) + v; // 1.184.0~ 유니크 장비 전투 효과
     const finishSpire = (win, taken, usedPotions = []) => {
       let next = applyRegressionSpireResult(consumeRegressionPotions(run, usedPotions), { win, hpPct: regressionPostCombatHpPct(loadout.hp, loadout.maxHp, taken, true, compFx.spireWoundCut) });
       next = { ...next, spirePrepared: null };
@@ -291,6 +296,9 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
       // 1.183.0~ 배울 기회 — 일반 몹 12% (일반 스킬) / 강적 60% (고급 스킬). 실제 습득은 적성 판정
       const offer = offerRegressionLearn(next, tier === 'elite' ? 'elite' : 'normal', enemyKey);
       if (offer) { next.pendingLearn = offer; tags.push({ text: tier === 'elite' ? '비급서를 발견했다' : '기술 하나를 엿봤다', tone: 'gold' }); }
+      // 1.184.0~ 강적 8% — 유니크 무구 (적성 판정)
+      const uq = tier === 'elite' ? offerRegressionUnique(next, enemyKey) : null;
+      if (uq) { next.pendingGear = uq; tags.push({ text: '주인을 고르는 무구가 울린다', tone: 'gold' }); }
       next.scene = regressionResultScene(`[전투 당신 vs ${label}] - 승리!`, lines[run.day % lines.length], tags);
       saveRun(next);
     };
@@ -585,6 +593,33 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
         </div>
       </div>
     );
+  } else if (run.pendingGear && REGRESSION_GEAR[run.pendingGear.gearId]) {
+    // 1.184.0~ 유니크 — 다룰 수 있는지 적성 판정
+    const pg = run.pendingGear;
+    const g = REGRESSION_GEAR[pg.gearId];
+    const intro = regressionUniqueIntro(pg);
+    const p = regressionUniqueChance(pg.gearId, storyStats);
+    const apt = regressionAptitude(g.rel || [], storyStats);
+    const lab = regressionChanceLabel(p);
+    body = (
+      <div className="space-y-3 ui-screen-enter">
+        <div className="text-[14px] font-bold" style={{ color: REGRESSION_GEAR_GRADES.unique.color }}>◆ {intro.title}</div>
+        <div className="text-[14px] leading-relaxed whitespace-pre-line" style={{ color: PALETTE.text }}>{intro.text}</div>
+        <GlassPanel style={{ padding: 12 }}>
+          <div className="text-[13px] font-bold" style={{ color: REGRESSION_GEAR_GRADES.unique.color }}>{regressionGearLabel(pg.gearId)} <span className="text-[11px] font-normal" style={{ color: PALETTE.textDim }}>· {REGRESSION_GEAR_SLOTS.find(x => x.id === g.slot)?.name}</span></div>
+          <div className="text-[12px] mt-1" style={{ color: PALETTE.dawn }}>{regressionGearStatText(pg.gearId)}</div>
+          <div className="text-[11px] mt-1.5" style={{ color: PALETTE.textDim }}>
+            다루는 능력치 {(g.rel || []).map(k => `${k} ${storyStats[k] || 0}`).join(' · ')} → 적성 <b style={{ color: apt >= 0.6 ? PALETTE.green : apt >= 0.3 ? PALETTE.dawn : PALETTE.accent }}>{Math.round(apt * 100)}%</b>
+          </div>
+        </GlassPanel>
+        <div className="space-y-1.5">
+          <Choice text="손에 쥐어 본다" label={{ stat: '획득', text: `${lab.text} ${Math.round(p * 100)}%`, color: lab.color }}
+            sub="실패하면 무구는 빛을 잃는다 · 날짜 소모 없음"
+            onClick={() => { const r = resolveRegressionUnique(run, true); saveRun({ ...r.run, scene: r.scene }); }} />
+          <Choice text="두고 간다" onClick={() => { const r = resolveRegressionUnique(run, false); saveRun({ ...r.run, scene: r.scene }); }} />
+        </div>
+      </div>
+    );
   } else if (pendingEv) {
     const choices = pendingEv.choices.filter(c => !c.requireMemory || reg.memories.includes(c.requireMemory));
     body = (
@@ -638,13 +673,13 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
         {gimmick && <div className="text-[11px]" style={{ color: PALETTE.dawn }}>◈ {gimmick.name} — {gimmick.desc}</div>}
         <div className="space-y-1.5">
           {region && <Choice text="주변을 탐색한다 (1일)" sub={`하급 적과 마주친다 · 명성 +${Math.round(REGRESSION_TUNING.fameGain.normal * (REGRESSION_TUNING.regionFameMult[run.region] || 1))} · 기록할 적 ${unrecorded('normal')}종`} onClick={() => explore('normal')} />}
-          {region && isRegressionEliteOpen(run, run.region) && <Choice text="강적의 흔적을 쫓는다 (1일)" sub={`상급 적 · 명성 +${Math.round(REGRESSION_TUNING.fameGain.elite * (REGRESSION_TUNING.regionFameMult[run.region] || 1))} · 유물 확정 · 기록할 적 ${unrecorded('elite')}종`} onClick={() => explore('elite')} />}
+          {region && isRegressionEliteOpen(run, run.region) && <Choice text="강적의 흔적을 쫓는다 (1일)" sub={`상급 적 · 명성 +${Math.round(REGRESSION_TUNING.fameGain.elite * (REGRESSION_TUNING.regionFameMult[run.region] || 1))} · 장비 드랍 35% · 기록할 적 ${unrecorded('elite')}종`} onClick={() => explore('elite')} />}
           {region && eventsLeft > 0 && <Choice text="수상한 기척을 살핀다 (1일)" sub={`이 지역의 남은 사건 ${eventsLeft}개`} onClick={startEvent} />}
           {companion && (() => {
             const aff = run.affinity?.[companion.id] || 0;
             return <Choice text={`${companion.name}에게 말을 건다 (1일)`} disabled={aff >= 100} sub={`${companion.title} · 호감 ${aff}/100 「${regressionCompanionTier(aff).name}」`} onClick={talk} />;
           })()}
-          {run.region === REGRESSION_HUB && <Choice text="마을 상점에 들른다" sub={`보유 ${run.gold || 0}G · 날짜 소모 없음`} onClick={() => setShowShop(true)} />}
+          {run.region === REGRESSION_HUB && <Choice text="마을 상점에 들른다" sub={`보유 ${run.gold || 0}G · 오늘의 진열 ${(run.shop?.offers || []).filter(o => !o.sold).length}개 · 날짜 소모 없음`} onClick={() => { if (!run.shop) saveRun({ ...run, shop: buildRegressionShopStock(run) }); setShowShop(true); }} />}
           <Choice text="모닥불을 피우고 쉰다 (1일)" sub={`HP +${REGRESSION_TUNING.restHealPct + compFx.restHealPct}%`} onClick={rest} />
           <Choice text="길을 떠난다" sub="다른 지역으로 이동" onClick={() => setMenu('travel')} />
         </div>
@@ -684,6 +719,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
           <button className="ui-press flex-1 text-[12px]" onClick={() => setShowBook(true)} style={{ minHeight: 40, borderRadius: 'var(--r-chip, 8px)', background: 'transparent', border: `1px solid ${PALETTE.panelBorder}`, color: PALETTE.textDim }}>📖 기록서 {run.learned.length}</button>
           <button className="ui-press flex-1 text-[12px]" onClick={() => setMenu(menu === 'party' ? null : 'party')} style={{ minHeight: 40, borderRadius: 'var(--r-chip, 8px)', background: 'transparent', border: `1px solid ${PALETTE.panelBorder}`, color: PALETTE.textDim }}>🤝 동료</button>
           <button className="ui-press flex-1 text-[12px]" onClick={() => setMenu(menu === 'stats' ? null : 'stats')} style={{ minHeight: 40, borderRadius: 'var(--r-chip, 8px)', background: run.statPoints > 0 ? `${PALETTE.legendary}22` : 'transparent', border: `1px solid ${run.statPoints > 0 ? PALETTE.legendary : PALETTE.panelBorder}`, color: run.statPoints > 0 ? PALETTE.legendary : PALETTE.textDim }}>📊 능력치{run.statPoints > 0 ? ` +${run.statPoints}` : ''}</button>
+          <button className="ui-press flex-1 text-[12px]" onClick={() => setMenu(menu === 'gear' ? null : 'gear')} style={{ minHeight: 40, borderRadius: 'var(--r-chip, 8px)', background: 'transparent', border: `1px solid ${PALETTE.panelBorder}`, color: PALETTE.textDim }}>🎒 장비</button>
           <button className="ui-press flex-1 text-[12px]" onClick={() => setMenu(menu === 'log' ? null : 'log')} style={{ minHeight: 40, borderRadius: 'var(--r-chip, 8px)', background: 'transparent', border: `1px solid ${PALETTE.panelBorder}`, color: PALETTE.textDim }}>📜 지난 일</button>
         </div>
         {menu === 'party' && (
@@ -711,8 +747,8 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
               {REGRESSION_STATS.map(st => (
                 <div key={st.id} className="flex items-center gap-2 px-2" style={{ minHeight: 40, borderRadius: 'var(--r-chip, 8px)', background: PALETTE.panelLight }}>
                   <span className="text-[12px] flex-1" style={{ color: PALETTE.text }}>{st.id}</span>
-                  <b className="text-[13px] tabular-nums" style={{ color: PALETTE.dawn }}>{storyStats[st.id]}</b>
-                  {run.statPoints > 0 && storyStats[st.id] < REGRESSION_STAT_MAX && (
+                  <b className="text-[13px] tabular-nums" style={{ color: PALETTE.dawn }}>{storyStats[st.id]}{storyStats[st.id] !== baseStats[st.id] && <span className="text-[10px] font-normal" style={{ color: PALETTE.green }}> (+{storyStats[st.id] - baseStats[st.id]})</span>}</b>
+                  {run.statPoints > 0 && baseStats[st.id] < REGRESSION_STAT_MAX && (
                     <button aria-label={`${st.id} 올리기`} className="ui-press text-[13px] font-bold" onClick={() => saveRun(spendRegressionStatPoint(run, st.id))}
                       style={{ width: 32, height: 32, borderRadius: 8, background: `${PALETTE.legendary}22`, border: `1px solid ${PALETTE.legendary}`, color: PALETTE.legendary }}>+</button>
                   )}
@@ -720,7 +756,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
               ))}
             </div>
             <div className="text-[11px] mt-2" style={{ color: PALETTE.textDim }}>판정에 성공하거나 전투에서 이기면 경험치를 얻는다. 레벨이 오를 때마다 추가 능력치 +1.</div>
-            <div className="text-[12px] font-bold mt-3 mb-1" style={{ color: PALETTE.text }}>보유 스킬 {regressionRunSkills(run).length}/{REGRESSION_LEARN.skillCap}</div>
+            <div className="text-[12px] font-bold mt-3 mb-1" style={{ color: PALETTE.text }}>보유 스킬 {regressionRunSkills(run).length}개</div>
             <div className="space-y-1">
               {regressionRunSkills(run).map(id => {
                 const sk = REGRESSION_SKILLS[id]; if (!sk) return null;
@@ -735,6 +771,41 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
             <div className="text-[11px] mt-1" style={{ color: PALETTE.textDim }}>강적의 비급·군주 격파·기연 사건으로 새 스킬을 배울 기회가 온다. 성공률은 스킬의 관련 능력치가 내 빌드와 얼마나 맞는지(적성)로 정해진다.</div>
           </GlassPanel>
         )}
+        {menu === 'gear' && (
+          <GlassPanel style={{ padding: 12 }}>
+            <div className="space-y-1.5">
+              {REGRESSION_GEAR_SLOTS.map(sl => {
+                const id = run.gear?.[sl.id];
+                const g = id && REGRESSION_GEAR[id];
+                return (
+                  <div key={sl.id} className="flex items-center gap-2 px-2" style={{ minHeight: 44, borderRadius: 'var(--r-chip, 8px)', background: PALETTE.panelLight }}>
+                    <span className="text-[11px] w-12 flex-none" style={{ color: PALETTE.textDim }}>{sl.name}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[12px] font-bold truncate" style={{ color: g ? REGRESSION_GEAR_GRADES[g.grade].color : PALETTE.textDim }}>{g ? regressionGearLabel(id) : '— 비어 있음'}</div>
+                      {g && <div className="text-[11px]" style={{ color: PALETTE.textDim }}>{regressionGearStatText(id)}</div>}
+                    </div>
+                    {g && <button className="ui-press text-[11px] px-2" onClick={() => saveRun(unequipRegressionGear(run, sl.id))} style={{ minHeight: 32, borderRadius: 8, background: 'transparent', border: `1px solid ${PALETTE.panelBorder}`, color: PALETTE.textDim }}>해제</button>}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="text-[12px] font-bold mt-3 mb-1" style={{ color: PALETTE.text }}>가방</div>
+            <div className="space-y-1">
+              {[...new Set(run.bag || [])].filter(id => !Object.values(run.gear || {}).includes(id)).map(id => (
+                <button key={id} className="ui-press w-full flex items-center gap-2 px-2 text-left" onClick={() => saveRun(equipRegressionGear(run, id))}
+                  style={{ minHeight: 40, borderRadius: 'var(--r-chip, 8px)', background: PALETTE.panelLight, border: `1px solid ${PALETTE.panelBorder}` }}>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[12px]" style={{ color: REGRESSION_GEAR_GRADES[REGRESSION_GEAR[id].grade].color }}>{regressionGearLabel(id)} <span style={{ color: PALETTE.textDim }}>· {REGRESSION_GEAR_SLOTS.find(x => x.id === REGRESSION_GEAR[id].slot)?.name}</span></div>
+                    <div className="text-[11px]" style={{ color: PALETTE.textDim }}>{regressionGearStatText(id)}</div>
+                  </div>
+                  <span className="text-[11px]" style={{ color: PALETTE.dawn }}>장착</span>
+                </button>
+              ))}
+              {![...new Set(run.bag || [])].some(id => !Object.values(run.gear || {}).includes(id)) && <div className="text-[11px]" style={{ color: PALETTE.textDim }}>남는 장비가 없다.</div>}
+            </div>
+            <div className="text-[11px] mt-2" style={{ color: PALETTE.textDim }}>장비의 능력치는 전투·판정·적성에 모두 더해진다. 장비는 전투(하급 8% · 강적 35%)·사건·상점에서 얻는다.</div>
+          </GlassPanel>
+        )}
         {menu === 'log' && (
           <GlassPanel style={{ padding: 12 }}>
             <div className="space-y-0.5">
@@ -747,6 +818,36 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
       {showShop && (
         <BottomSheet title={`🛒 마을 상점 — ${run.gold || 0}G`} onClose={() => setShowShop(false)}>
           <div className="space-y-1.5 pb-2">
+            <div className="flex items-center justify-between">
+              <div className="text-[12px] font-bold" style={{ color: PALETTE.text }}>오늘의 진열</div>
+              {(() => {
+                const left = REGRESSION_ECON.shopResets - (run.shop?.resets || 0);
+                return <button disabled={left <= 0} className="ui-press text-[11px] px-2.5" onClick={() => saveRun(rerollRegressionShop(run))}
+                  style={{ minHeight: 32, borderRadius: 8, background: 'transparent', border: `1px solid ${PALETTE.panelBorder}`, color: left > 0 ? PALETTE.dawn : PALETTE.textDim, opacity: left > 0 ? 1 : 0.5 }}>↻ 진열 바꾸기 ({left}/{REGRESSION_ECON.shopResets})</button>;
+              })()}
+            </div>
+            {(run.shop?.offers || []).map((o, idx) => {
+              const price = regressionShopOfferPrice(run, o);
+              const can = !o.sold && (run.gold || 0) >= price;
+              const isSkill = o.kind === 'skill';
+              const sk = isSkill ? REGRESSION_SKILLS[o.id] : null;
+              const g = !isSkill ? REGRESSION_GEAR[o.id] : null;
+              const color = isSkill ? REGRESSION_SKILL_TIERS[sk.tier].color : REGRESSION_GEAR_GRADES[g.grade].color;
+              return (
+                <button key={idx} disabled={!can} className="ui-press w-full flex items-center gap-2 px-3 text-left"
+                  onClick={() => { const r = buyRegressionOffer(run, idx); if (r.bought) { setShowShop(false); saveRun({ ...r.run, scene: regressionResultScene('마을 상점', isSkill ? '늙은 교관이 며칠 치 수업을 하루에 몰아 가르쳐 주었다.' : '상인이 물건을 건네며 고개를 끄덕인다. "살아서 돌아오시오."', [{ text: r.bought, tone: 'good' }, { text: `-${r.price}G`, tone: 'bad' }]) }); } }}
+                  style={{ minHeight: 52, borderRadius: 'var(--r-chip, 8px)', background: PALETTE.panelLight, border: `1px solid ${PALETTE.panelBorder}`, opacity: o.sold ? 0.3 : (can ? 1 : 0.5) }}>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[12px] font-bold" style={{ color }}>{isSkill ? `[${REGRESSION_SKILL_TIERS[sk.tier].name} 스킬] ${sk.name}` : regressionGearLabel(o.id)}{o.sold ? ' — 판매됨' : ''}</div>
+                    <div className="text-[11px]" style={{ color: PALETTE.textDim }}>
+                      {isSkill ? `${regressionTriggerText(o.id)} · 교습비는 적성 ${Math.round(regressionSkillAptitude(o.id, storyStats) * 100)}% 기준` : `${REGRESSION_GEAR_SLOTS.find(x => x.id === g.slot)?.name} · ${regressionGearStatText(o.id)}`}
+                    </div>
+                  </div>
+                  <span className="text-[12px] font-bold tabular-nums" style={{ color: PALETTE.legendary }}>{price}G</span>
+                </button>
+              );
+            })}
+            <div className="text-[12px] font-bold pt-2" style={{ color: PALETTE.text }}>늘 파는 것</div>
             {REGRESSION_SHOP.map(it => {
               const name = it.kind === 'potion' ? `${POTIONS[it.id].icon} ${POTIONS[it.id].name}` : it.name;
               const desc = it.kind === 'potion' ? POTIONS[it.id].desc : it.desc;
@@ -763,6 +864,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
                 </button>
               );
             })}
+            <div className="text-[11px] pt-1" style={{ color: PALETTE.textDim }}>진열은 마을에 돌아올 때마다 새로 짜인다. 기연 스킬과 유니크 무구는 팔지 않는다.</div>
           </div>
         </BottomSheet>
       )}

@@ -233,7 +233,7 @@ export function createRegressionRun(metaR = EMPTY_REGRESSION, classId, stats = n
   for (const k of (metaR.carry || []).slice(0, regressionCarrySlots(metaR))) {
     if (REGRESSION_RECORDS[k]) records[k] = T.carryRecordPct;
   }
-  return {
+  const run = {
     classId,
     day: 1,
     maxDays: T.days + fx.extraDays,
@@ -263,10 +263,14 @@ export function createRegressionRun(metaR = EMPTY_REGRESSION, classId, stats = n
     flames: 3,                                        // 1.182.0~ 생명의 불꽃 (강한 전투 태세 자원, 한 생 3개)
     fameBy: {},                                       // 1.181.0~ 판정 성공 능력치 집계 → 명성 경로
     seenEvents: [],        // 1.179.0~ 이번 생에 본 사건 id
-    statBonus: {},         // 1.179.0~ 사건 능력치 보너스 { 근력: n }
+    statBonus: {},         // 1.179.0~ 사건 능력치 보너스 { 근력: n } (1.184.0~ 실효 능력치에 반영)
+    gear: { weapon: null, armor: null, accessory: null }, // 1.184.0~ 장착 장비 id
+    bag: [],               // 1.184.0~ 보유 장비 id (장착분 포함)
+    shop: null,            // 1.184.0~ 마을 상점 진열 { offers, resets } — 생성 직후 채움
     over: null,            // null | 'death' | 'timeout' | 'spireLose' | 'victory'
     log: [],
   };
+  return { ...run, shop: buildRegressionShopStock(run) };
 }
 
 // =========== 날짜·이동 ===========
@@ -311,10 +315,11 @@ export function isRegressionEliteOpen(run, regionId) {
   return run.fame >= REGRESSION_TUNING.eliteFameGate || (run.eliteUnlocked || []).includes(regionId);
 }
 
-export function applyRegressionTravel(run, to) {
+export function applyRegressionTravel(run, to, rng = Math.random) {
   const cost = regressionTravelCost(run, to);
   const name = to === REGRESSION_HUB ? '여명의 마을' : getRegressionRegion(to)?.name;
-  return { ...advanceDays(run, cost, `${name}(으)로 이동 (${cost}일)`), region: to };
+  const next = { ...advanceDays(run, cost, `${name}(으)로 이동 (${cost}일)`), region: to };
+  return to === REGRESSION_HUB ? { ...next, shop: buildRegressionShopStock(next, rng) } : next;
 }
 
 export function applyRegressionRest(run) {
@@ -448,7 +453,7 @@ export function setRegressionCarry(metaR, enemyKeys = []) {
 // classStartSkills: CLASSES[].startSkills, baseMaxHp: GAME_CONFIG.startHp
 export function buildRegressionLoadout(run, classStartSkills = {}, baseMaxHp = 300) {
   const skills = { ...classStartSkills };
-  let maxHp = baseMaxHp + (run.maxHpBonus || 0) + regressionMaxHpBonusFromStats(regressionRunStats(run));
+  let maxHp = baseMaxHp + (run.maxHpBonus || 0) + regressionMaxHpBonusFromStats(regressionEffectiveStats(run));
   const compPassive = run.affinity ? aggregateRegressionCompanions(run).passive : {};
   for (const [name, lv] of [...Object.entries(run.bonusSkills || {}), ...Object.entries(compPassive)]) {
     const maxLv = PASSIVE_SKILLS[name]?.maxLv ?? 7;
@@ -496,30 +501,13 @@ export function regressionBeltSlots(classId, run = null) {
 }
 
 // 승리 보상 굴림 — rng 주입 (setMeta updater 밖에서 호출)
+// 1.184.0~ PR D: 유물·패시브 드랍 폐지 → 장비(낮은 확률) + 회복약. 확률은 REGRESSION_ECON.drop
 export function rollRegressionLoot(run, tier = 'normal', rng = Math.random) {
-  const T = REGRESSION_TUNING;
+  const D = REGRESSION_ECON.drop[tier === 'elite' ? 'elite' : 'normal'];
   const loot = {};
-  const pickRelic = () => {
-    const pool = REGRESSION_RELIC_POOL.filter(r => !(run.relics || []).includes(r.name));
-    if (!pool.length) return null;
-    const total = pool.reduce((a, r) => a + r.weight, 0);
-    let x = rng() * total;
-    for (const r of pool) { x -= r.weight; if (x < 0) return r.name; }
-    return pool[pool.length - 1].name;
-  };
-  const pickPassive = () => REGRESSION_PASSIVE_POOL[Math.floor(rng() * REGRESSION_PASSIVE_POOL.length)];
-  const pickPotion = () => REGRESSION_POTION_POOL[Math.floor(rng() * REGRESSION_POTION_POOL.length)];
-  if (tier === 'elite') {
-    loot.relic = pickRelic();
-    if (rng() < T.lootElite.passive) loot.passive = pickPassive(); else loot.potion = pickPotion();
-  } else {
-    const x = rng();
-    const L = T.lootNormal;
-    if (x < L.relic) loot.relic = pickRelic();
-    else if (x < L.relic + L.passive) loot.passive = pickPassive();
-    else if (x < L.relic + L.passive + L.potion) loot.potion = pickPotion();
-  }
-  if (!loot.relic) delete loot.relic;
+  if (rng() < D.gear) loot.gear = rollRegressionGear(REGRESSION_ECON.gradeWeights[tier === 'elite' ? 'elite' : 'normal'], rng);
+  if (rng() < D.potion) loot.potion = REGRESSION_POTION_POOL[Math.floor(rng() * REGRESSION_POTION_POOL.length)];
+  if (!loot.gear) delete loot.gear;
   return loot;
 }
 
@@ -528,11 +516,13 @@ export function applyRegressionLoot(run, loot = {}) {
   if (loot.relic && !next.relics.includes(loot.relic)) next.relics.push(loot.relic);
   if (loot.passive) next.bonusSkills[loot.passive] = (next.bonusSkills[loot.passive] || 0) + 1;
   if (loot.potion) next.potions[loot.potion] = (next.potions[loot.potion] || 0) + 1;
+  if (loot.gear) return addRegressionGear(next, loot.gear);
   return next;
 }
 
 export function describeRegressionLoot(loot = {}) {
   const out = [];
+  if (loot.gear) out.push(regressionGearLabel(loot.gear));
   if (loot.relic) out.push(`유물 「${loot.relic}」`);
   if (loot.passive) out.push(`패시브 「${loot.passive}」 +1Lv`);
   if (loot.potion) out.push(`${POTIONS[loot.potion]?.icon || ''} ${POTIONS[loot.potion]?.name || loot.potion}`);
@@ -662,28 +652,20 @@ export function regressionEndingFor(run) {
 }
 
 // =========== 상점 (여명의 마을) ===========
+// 1.184.0~ PR D: 고정 상품(회복약·치료소) + 랜덤 진열(스킬·장비 4개, 리셋 1회). 진열은 마을에 도착할 때마다 새로 짜인다
 export const REGRESSION_SHOP = [
-  { id: 'hp_small', kind: 'potion', price: 50 },
-  { id: 'hp_medium', kind: 'potion', price: 100 },
-  { id: 'hp_large', kind: 'potion', price: 180 },
-  { id: 'relic', kind: 'relic', name: '유물 상자', desc: '전투 효과 유물 1개 (미보유 중 랜덤)', price: 160 },
-  { id: 'passive', kind: 'passive', name: '수련 교본', desc: '공용 패시브 1개 +1Lv (랜덤)', price: 180 },
-  { id: 'clinic', kind: 'heal', name: '마을 치료소', desc: 'HP 50% 회복', price: 70 },
+  { id: 'hp_small', kind: 'potion', price: 70 },
+  { id: 'hp_medium', kind: 'potion', price: 130 },
+  { id: 'hp_large', kind: 'potion', price: 220 },
+  { id: 'clinic', kind: 'heal', name: '마을 치료소', desc: 'HP 50% 회복', price: 100 },
 ];
-export function buyRegressionShop(run, itemId, rng = Math.random) {
+export function buyRegressionShop(run, itemId) {
   const item = REGRESSION_SHOP.find(x => x.id === itemId);
   if (!item || (run.gold || 0) < item.price) return { run, bought: null };
   let next = { ...run, gold: run.gold - item.price };
   let bought = '';
   if (item.kind === 'potion') { next = applyRegressionLoot(next, { potion: item.id }); bought = POTIONS[item.id]?.name; }
-  else if (item.kind === 'relic') {
-    const loot = rollRegressionLoot(next, 'elite', rng);
-    if (!loot.relic) return { run, bought: null };
-    next = applyRegressionLoot(next, { relic: loot.relic }); bought = `유물 「${loot.relic}」`;
-  } else if (item.kind === 'passive') {
-    const name = REGRESSION_PASSIVE_POOL[Math.floor(rng() * REGRESSION_PASSIVE_POOL.length)];
-    next = applyRegressionLoot(next, { passive: name }); bought = `패시브 「${name}」 +1Lv`;
-  } else if (item.kind === 'heal') { next.hpPct = Math.min(1, next.hpPct + 0.5); bought = 'HP 50% 회복'; }
+  else if (item.kind === 'heal') { next.hpPct = Math.min(1, next.hpPct + 0.5); bought = 'HP 50% 회복'; }
   return { run: { ...next, log: [...next.log, `D${run.day}: 구매 — ${bought} (-${item.price}G)`] }, bought };
 }
 
@@ -692,7 +674,7 @@ export function regressionVictoryGold(run, enemyKey, rng = Math.random) {
   const g = ENEMIES[enemyKey]?.drop?.gold || [10, 20];
   const base = g[0] + Math.floor(rng() * (g[1] - g[0] + 1));
   const pct = aggregateRegressionCompanions(run).goldPct;
-  return Math.round(base * (1 + pct / 100));
+  return Math.max(1, Math.round(base * REGRESSION_ECON.goldMult * (1 + pct / 100)));
 }
 
 // =========== 지역 사건 24개 (본편 EventScreen 포맷) ===========
@@ -835,7 +817,7 @@ export function rollRegressionEvent(run, memories = [], rng = Math.random) {
   const pool = REGRESSION_EVENTS.filter(e => e.region === run.region && !(run.seenEvents || []).includes(e.id));
   if (!pool.length) return null;
   // 1.183.0~ 빌드 가중 — 내 능력치로 풀 수 있는 사건·내 빌드에 맞는 기연이 더 자주 (PM 요청 4: 육성 방향대로 랜덤)
-  const stats = regressionRunStats(run);
+  const stats = regressionEffectiveStats(run);
   const weights = pool.map(e => regressionEventWeight(e, stats));
   let roll = rng() * weights.reduce((a, b) => a + b, 0);
   let ev = pool[pool.length - 1];
@@ -858,16 +840,15 @@ export function applyRegressionEvent(run, eventId, res, { maxHp = 300, rng = Mat
     else if (r.type === 'record') {
       if (!next.learned.includes(r.name)) { next.records = { ...next.records, [r.name]: Math.min(99, (next.records[r.name] || 0) + r.value) }; notes.push(`${ENEMIES[r.name]?.name} 기록 +${r.value}%`); }
     }
-    else if (r.type === 'random_relic') { const l = rollRegressionLoot(next, 'elite', rng); if (l.relic) { next = applyRegressionLoot(next, { relic: l.relic }); notes.push(`유물 「${l.relic}」`); } else { next.gold = (next.gold || 0) + 80; notes.push('+80G'); } }
+    else if (r.type === 'random_relic') { const id = rollRegressionGear(REGRESSION_ECON.gradeWeights.event, rng); next = addRegressionGear(next, id); notes.push(regressionGearLabel(id)); }
     else if (r.type === 'potion_random') { const id = REGRESSION_POTION_POOL[Math.floor(rng() * REGRESSION_POTION_POOL.length)]; next = applyRegressionLoot(next, { potion: id }); notes.push(POTIONS[id]?.name); }
-    else if (r.type === 'skill_specific') { next = applyRegressionLoot(next, { passive: r.name }); notes.push(`「${r.name}」 +1Lv`); }
-    else if (r.type === 'skill_random_lv') { const n = REGRESSION_PASSIVE_POOL[Math.floor(rng() * REGRESSION_PASSIVE_POOL.length)]; next = applyRegressionLoot(next, { passive: n }); notes.push(`「${n}」 +1Lv`); }
+    else if (r.type === 'skill_specific') { const st = REGRESSION_PASSIVE_TO_STAT[r.name] || '강인'; next.statBonus[st] = (next.statBonus[st] || 0) + 1; notes.push(`${st} +1 (영구)`); }
+    else if (r.type === 'skill_random_lv') { const g = gainRegressionExp(next, 25); next = g.run; notes.push('깨달음 — 경험치 +25'); if (g.levelUps > 0) notes.push(`레벨 상승 ${g.from}→${next.level}`, `추가 능력치 +${g.levelUps}`); }
     else if (r.type === 'stat') { next.statBonus[r.name] = (next.statBonus[r.name] || 0) + r.value; notes.push(`${r.name} +${r.value}`); }
     else if (r.type === 'learn') {
       // 1.183.0~ 기연 — 배울 기회만 연다. 실제 습득은 적성 판정 (resolveRegressionLearn)
       const owned = regressionRunSkills(next);
       if (owned.includes(r.name)) { const g = gainRegressionExp(next, REGRESSION_LEARN.knownExp); next = g.run; notes.push(`이미 아는 깨달음 — 경험치 +${REGRESSION_LEARN.knownExp}`); }
-      else if (owned.length >= REGRESSION_LEARN.skillCap) { notes.push('더 이상 새 기술을 담을 여유가 없다'); }
       else { next.pendingLearn = { skillId: r.name, source: 'fortune', from: eventId }; notes.push(`기연 — 「${__RSK[r.name]?.name}」`); }
     }
   }
@@ -1118,11 +1099,11 @@ export function regressionLegacyCombatStats(stats) {
   };
 }
 export function regressionMaxHpBonusFromStats(stats) {
-  return (stats?.강인 || 0) * 12;
+  return (stats?.강인 || 0) * __RCB.hpPerVit;
 }
 
 // 1.182.0~ 보유 스킬 (시작 커스텀 3개 + 습득). 구세이브는 직업 프리셋
-import { REGRESSION_SKILL_PRESETS as __RSP, REGRESSION_FLAMES_PER_LIFE as __RFL, REGRESSION_SKILLS as __RSK, regressionSkillStats as __rss } from './regressionCombat.js';
+import { REGRESSION_SKILL_PRESETS as __RSP, REGRESSION_FLAMES_PER_LIFE as __RFL, REGRESSION_SKILLS as __RSK, regressionSkillStats as __rss, REGRESSION_COMBAT as __RCB } from './regressionCombat.js';
 export function regressionRunSkills(run) {
   return Array.isArray(run?.skills) && run.skills.length ? run.skills : (__RSP[run?.classId] || []);
 }
@@ -1140,7 +1121,6 @@ export const REGRESSION_LEARN = {
   floor: 0.05,              // 적성 0일 때 기본률에 곱해지는 하한
   lorePerPoint: 0.01,       // 학식 1당 +1%p (배우는 머리)
   min: 0.02, max: 0.95,
-  skillCap: 6,              // 한 생에 담을 수 있는 스킬 수 (시작 3 + 습득 3)
   offer: { normal: 0.12, elite: 0.6, boss: 1 },  // 승리 후 배울 기회가 열릴 확률
   offFocusWeight: 0.15,     // 기회가 열릴 때 빌드와 무관한 스킬이 뽑힐 기본 가중 (개연성 드라마)
   learnExp: 10,             // 습득 성공 경험치
@@ -1153,7 +1133,10 @@ export function regressionCheckExp(dc = 14) {
   return REGRESSION_EXP.check + Math.max(0, (dc || 14) - 14) * 3;
 }
 export function regressionSkillAptitude(skillId, stats = {}) {
-  const rel = __rss(skillId);
+  return regressionAptitude(__rss(skillId), stats);
+}
+// 관련 능력치 목록 기준 적성 (스킬·유니크 장비 공용)
+export function regressionAptitude(rel = [], stats = {}) {
   if (!rel.length) return 0;
   const top = Math.max(1, ...REGRESSION_STAT_IDS.map(k => stats[k] || 0));
   const avg = rel.reduce((a, k) => a + (stats[k] || 0), 0) / rel.length;
@@ -1176,10 +1159,9 @@ export function regressionEventWeight(ev, stats = {}) {
 export function offerRegressionLearn(run, source = 'normal', enemyKey = null, rng = Math.random) {
   const L = REGRESSION_LEARN;
   const owned = regressionRunSkills(run);
-  if (owned.length >= L.skillCap) return null;
   if (rng() >= (L.offer[source] ?? 0)) return null;
   const tier = LEARN_SOURCE_TIER[source];
-  const stats = regressionRunStats(run);
+  const stats = regressionEffectiveStats(run);
   const cands = Object.keys(__RSK).filter(k => __RSK[k].tier === tier && !owned.includes(k));
   if (!cands.length) return null;
   const w = cands.map(k => L.offFocusWeight + regressionSkillAptitude(k, stats));
@@ -1218,7 +1200,7 @@ export function resolveRegressionLearn(run, accept, rng = Math.random) {
   const sk = pl && __RSK[pl.skillId];
   if (!sk) return { run: base, scene: null };
   if (!accept) return { run: base, scene: regressionResultScene(sk.name, '욕심을 접었다. 지금의 길을 끝까지 걷기로 한다.', []) };
-  const stats = regressionRunStats(run);
+  const stats = regressionEffectiveStats(run);
   const p = regressionLearnChance(pl.skillId, stats);
   const owned = regressionRunSkills(run);
   if (rng() < p) {
@@ -1236,4 +1218,244 @@ export function resolveRegressionLearn(run, accept, rng = Math.random) {
   const text = apt < 0.5 ? (LEARN_FAIL_TEXT[weakest] || LEARN_FAIL_TEXT.학식) : '거의 손에 잡힐 듯했지만, 끝내 깨달음은 오지 않았다.';
   const next = { ...base, log: [...(base.log || []), `D${run.day}: 「${sk.name}」 습득 실패`] };
   return { run: next, scene: regressionResultScene(`${sk.name} - 실패!`, text, [{ text: `${rel.join('·')} 적성 ${Math.round(apt * 100)}%`, tone: 'bad' }]) };
+}
+
+
+// ============================================
+// 1.184.0~ 2.0 PR D — 장비 3칸 · 유니크 적성 판정 · 상점 랜덤 진열 · 경제 (docs/regression-v2-design.md 2.5·2.6)
+// ============================================
+// 밸런스는 REGRESSION_ECON 한 곳. 장비 = 능력치 보너스(원작 「귀면갑: 힘 +1, 외공 +2」 방식, 이름은 오리지널).
+// 실효 능력치(regressionEffectiveStats) = 기본 + 사건 보너스 + 장비 → 전투·판정·적성 모두 이것을 쓴다.
+// 능력치 배분(spendRegressionStatPoint)은 기본 능력치만 — 장비 수치가 기본에 굳지 않도록.
+export const REGRESSION_ECON = {
+  goldMult: 0.5,             // 전투 승리 은화 배율 (1.183.0 대비 절반)
+  drop: {
+    normal: { gear: 0.08, potion: 0.15 },
+    elite: { gear: 0.35, potion: 0.25, unique: 0.08 },  // unique = 유니크를 다뤄 볼 기회 (적성 판정)
+  },
+  gradeWeights: {
+    normal: { normal: 85, advanced: 15 },
+    elite: { normal: 30, advanced: 55, treasure: 15 },
+    event: { advanced: 70, treasure: 30 },
+    shop: { normal: 50, advanced: 40, treasure: 10 },
+  },
+  shopOffers: 4,             // 랜덤 진열 수 (스킬·장비)
+  shopResets: 1,             // 진열 바꾸기 횟수 (마을 방문마다)
+  shopSkillShare: 0.4,       // 진열 중 스킬 비율
+  prices: {
+    skill: { normal: 140, advanced: 320 },
+    gear: { normal: 80, advanced: 180, treasure: 380 },
+  },
+  offBuildPriceMult: 1.5,    // 스킬 교습비 — 적성 0이면 ×2.5 (빌드와 먼 기술은 가르치기도 비싸다)
+  uniqueBase: 0.6,           // 유니크 다루기 기본률 (스킬 적성 공식과 같은 하한·학식 보정)
+};
+export const REGRESSION_GEAR_SLOTS = [
+  { id: 'weapon', name: '무기' },
+  { id: 'armor', name: '방어구' },
+  { id: 'accessory', name: '장신구' },
+];
+export const REGRESSION_GEAR_GRADES = {
+  normal: { name: '일반', color: '#c9b8a4' },
+  advanced: { name: '고급', color: '#7ba3c4' },
+  treasure: { name: '보물', color: '#b58ad6' },
+  unique: { name: '유니크', color: '#e8b04a' },
+};
+// fx: 전투 보정 (relicBonus 어휘 — dmgDealt/critRate/dodge/lifesteal/dmgTaken). rel: 유니크를 다루는 데 필요한 능력치
+export const REGRESSION_GEAR = {
+  // ── 무기 ──
+  rusty_sword:     { slot: 'weapon', grade: 'normal', name: '녹슨 장검', stats: { 검술: 1 } },
+  hunting_bow:     { slot: 'weapon', grade: 'normal', name: '사냥꾼의 활', stats: { 사격: 1 } },
+  oak_staff:       { slot: 'weapon', grade: 'normal', name: '참나무 지팡이', stats: { 마법: 1 } },
+  iron_mace:       { slot: 'weapon', grade: 'normal', name: '쇠 철퇴', stats: { 근력: 1 } },
+  prayer_censer:   { slot: 'weapon', grade: 'normal', name: '기도 향로', stats: { 신성: 1 } },
+  knight_blade:    { slot: 'weapon', grade: 'advanced', name: '기사의 장검', stats: { 검술: 1, 근력: 1 } },
+  elm_longbow:     { slot: 'weapon', grade: 'advanced', name: '느릅나무 장궁', stats: { 사격: 1, 민첩: 1 } },
+  rune_staff:      { slot: 'weapon', grade: 'advanced', name: '룬 지팡이', stats: { 마법: 1, 학식: 1 } },
+  blessed_hammer:  { slot: 'weapon', grade: 'advanced', name: '축복받은 망치', stats: { 신성: 1, 근력: 1 } },
+  moonsteel_saber: { slot: 'weapon', grade: 'treasure', name: '월철 곡도', stats: { 검술: 2, 민첩: 1, 통찰: 1 } },
+  stormstring_bow: { slot: 'weapon', grade: 'treasure', name: '폭풍현 활', stats: { 사격: 2, 민첩: 1, 통찰: 1 } },
+  ember_scepter:   { slot: 'weapon', grade: 'treasure', name: '잔불의 홀', stats: { 마법: 2, 학식: 1, 통찰: 1 } },
+  sun_mace:        { slot: 'weapon', grade: 'treasure', name: '태양 철퇴', stats: { 신성: 2, 근력: 1, 강인: 1 } },
+  // ── 방어구 ──
+  leather_vest:    { slot: 'armor', grade: 'normal', name: '가죽 조끼', stats: { 민첩: 1 } },
+  chain_mail:      { slot: 'armor', grade: 'normal', name: '사슬 갑옷', stats: { 강인: 1 } },
+  traveler_robe:   { slot: 'armor', grade: 'normal', name: '여행자의 로브', stats: { 학식: 1 } },
+  scale_armor:     { slot: 'armor', grade: 'advanced', name: '비늘 갑옷', stats: { 강인: 2 } },
+  shadow_cloak:    { slot: 'armor', grade: 'advanced', name: '그림자 망토', stats: { 민첩: 1, 통찰: 1 } },
+  pilgrim_vestment:{ slot: 'armor', grade: 'advanced', name: '순례자의 법의', stats: { 신성: 1, 강인: 1 } },
+  frost_plate:     { slot: 'armor', grade: 'treasure', name: '서리 판금', stats: { 근력: 1, 강인: 2, 통찰: 1 } },
+  archmage_robe:   { slot: 'armor', grade: 'treasure', name: '대마도사의 예복', stats: { 마법: 2, 학식: 1, 강인: 1 } },
+  // ── 장신구 ──
+  bone_charm:      { slot: 'accessory', grade: 'normal', name: '뼈 부적', stats: { 통찰: 1 } },
+  silver_ring:     { slot: 'accessory', grade: 'normal', name: '은반지', stats: { 화술: 1 } },
+  old_compass:     { slot: 'accessory', grade: 'normal', name: '낡은 나침반', stats: { 학식: 1 } },
+  hawk_feather:    { slot: 'accessory', grade: 'advanced', name: '매의 깃털', stats: { 민첩: 1, 사격: 1 } },
+  merchant_seal:   { slot: 'accessory', grade: 'advanced', name: '상인의 인장', stats: { 화술: 2 } },
+  star_amulet:     { slot: 'accessory', grade: 'treasure', name: '별의 목걸이', stats: { 신성: 1, 마법: 1, 학식: 1, 화술: 1 } },
+  // ── 유니크 (상점·일반 드랍 없음 — 강적 8% / 기연 사건, 적성 판정으로만 손에 넣는다) ──
+  dawnbreaker:     { slot: 'weapon', grade: 'unique', name: '여명을 가르는 검', stats: { 검술: 2, 근력: 1, 민첩: 1 }, fx: { dmgDealt: 15 }, rel: ['검술', '근력'], fxText: '공격 +15%' },
+  void_grimoire:   { slot: 'weapon', grade: 'unique', name: '공허의 마도서', stats: { 마법: 3, 학식: 2 }, fx: { critRate: 10 }, rel: ['마법', '학식'], fxText: '치명 +10%' },
+  skywarden_bow:   { slot: 'weapon', grade: 'unique', name: '하늘지기의 활', stats: { 사격: 3, 민첩: 2 }, fx: { dodge: 8 }, rel: ['사격', '민첩'], fxText: '회피 +8%' },
+  titan_heart:     { slot: 'armor', grade: 'unique', name: '거인 심장 갑주', stats: { 강인: 3, 근력: 2 }, fx: { dmgTaken: -15 }, rel: ['강인', '근력'], fxText: '받는 피해 -15%' },
+  saint_relic:     { slot: 'accessory', grade: 'unique', name: '성자의 성물', stats: { 신성: 3, 화술: 1 }, fx: { lifesteal: 8 }, rel: ['신성'], fxText: '흡혈 8%' },
+  oracle_eye:      { slot: 'accessory', grade: 'unique', name: '예언자의 눈', stats: { 통찰: 3, 학식: 2 }, fx: { critRate: 12 }, rel: ['통찰', '학식'], fxText: '치명 +12%' },
+};
+// 1.184.0~ 사건 「패시브 +1Lv」 보상 → 영구 능력치 +1로 환산 (패시브 시스템은 이 모드에서 단계적 폐지)
+export const REGRESSION_PASSIVE_TO_STAT = { 수비: '강인', 강타: '근력', 신앙: '신성', 잔혹: '근력' };
+
+export function regressionGearLabel(id) {
+  const g = REGRESSION_GEAR[id];
+  return g ? `[${REGRESSION_GEAR_GRADES[g.grade].name}] ${g.name}` : id;
+}
+export function regressionGearStatText(id) {
+  const g = REGRESSION_GEAR[id]; if (!g) return '';
+  const st = Object.entries(g.stats || {}).map(([k, v]) => `${k} +${v}`).join(', ');
+  return g.fxText ? `${st} · ${g.fxText}` : st;
+}
+export function regressionEquippedGear(run) {
+  return REGRESSION_GEAR_SLOTS.map(s => run?.gear?.[s.id]).filter(id => id && REGRESSION_GEAR[id]);
+}
+export function regressionGearStats(run) {
+  const out = {};
+  for (const id of regressionEquippedGear(run)) for (const [k, v] of Object.entries(REGRESSION_GEAR[id].stats || {})) out[k] = (out[k] || 0) + v;
+  return out;
+}
+export function regressionGearFx(run) {
+  const out = {};
+  for (const id of regressionEquippedGear(run)) for (const [k, v] of Object.entries(REGRESSION_GEAR[id].fx || {})) out[k] = (out[k] || 0) + v;
+  return out;
+}
+// 실효 능력치 = 기본 + 사건 보너스 + 장비
+export function regressionEffectiveStats(run) {
+  const st = { ...regressionRunStats(run) };
+  for (const src of [run?.statBonus || {}, regressionGearStats(run)]) for (const [k, v] of Object.entries(src)) if (k in st) st[k] += v;
+  return st;
+}
+// 장비 획득 — 가방에 넣고, 그 칸이 비어 있으면 바로 장착
+export function addRegressionGear(run, id) {
+  const g = REGRESSION_GEAR[id]; if (!g) return run;
+  const gear = { weapon: null, armor: null, accessory: null, ...(run.gear || {}) };
+  if (!gear[g.slot]) gear[g.slot] = id;
+  return { ...run, bag: [...(run.bag || []), id], gear };
+}
+export function equipRegressionGear(run, id) {
+  const g = REGRESSION_GEAR[id];
+  if (!g || !(run.bag || []).includes(id)) return run;
+  return { ...run, gear: { weapon: null, armor: null, accessory: null, ...(run.gear || {}), [g.slot]: id } };
+}
+export function unequipRegressionGear(run, slot) {
+  return { ...run, gear: { weapon: null, armor: null, accessory: null, ...(run.gear || {}), [slot]: null } };
+}
+function pickWeighted(weights, rng) {
+  const ent = Object.entries(weights);
+  let x = rng() * ent.reduce((a, [, w]) => a + w, 0);
+  for (const [k, w] of ent) { x -= w; if (x < 0) return k; }
+  return ent[ent.length - 1][0];
+}
+export function rollRegressionGear(gradeWeights = REGRESSION_ECON.gradeWeights.normal, rng = Math.random) {
+  const grade = pickWeighted(gradeWeights, rng);
+  const pool = Object.keys(REGRESSION_GEAR).filter(k => REGRESSION_GEAR[k].grade === grade);
+  return pool[Math.floor(rng() * pool.length)];
+}
+
+// ── 유니크 — 다룰 수 있는지 적성 판정 (스킬 습득과 같은 공식) ──
+export function regressionUniqueChance(id, stats = {}) {
+  const g = REGRESSION_GEAR[id]; if (!g) return 0;
+  const L = REGRESSION_LEARN;
+  const apt = regressionAptitude(g.rel || [], stats);
+  const p = REGRESSION_ECON.uniqueBase * (L.floor + (1 - L.floor) * apt * apt) + (stats.학식 || 0) * L.lorePerPoint;
+  return Math.max(L.min, Math.min(L.max, p));
+}
+// 강적 승리 후 호출 — 미보유 유니크 중 빌드 가중 (적성이 맞는 쪽이 더 자주, 가끔은 엉뚱한 것)
+export function offerRegressionUnique(run, enemyKey = null, rng = Math.random) {
+  if (rng() >= REGRESSION_ECON.drop.elite.unique) return null;
+  const stats = regressionEffectiveStats(run);
+  const cands = Object.keys(REGRESSION_GEAR).filter(k => REGRESSION_GEAR[k].grade === 'unique' && !(run.bag || []).includes(k));
+  if (!cands.length) return null;
+  const w = cands.map(k => REGRESSION_LEARN.offFocusWeight + regressionAptitude(REGRESSION_GEAR[k].rel, stats));
+  let roll = rng() * w.reduce((a, b) => a + b, 0);
+  let pick = cands[cands.length - 1];
+  for (let i = 0; i < cands.length; i++) { roll -= w[i]; if (roll < 0) { pick = cands[i]; break; } }
+  return { gearId: pick, from: enemyKey };
+}
+const UNIQUE_FAIL_TEXT = {
+  검술: '칼자루가 손을 밀어낸다. 이 검은 검사를 원한다.',
+  근력: '들어 올리는 것조차 버겁다. 이 무게를 감당할 힘이 없다.',
+  민첩: '시위가 손보다 빠르게 튕겨 나간다.',
+  강인: '갑주가 살을 짓누른다. 몸이 이 무게를 버티지 못한다.',
+  사격: '활이 손안에서 뒤틀린다. 이 활은 사수를 원한다.',
+  마법: '책장이 넘어가지 않는다. 마력 없는 손에는 빈 종이일 뿐이다.',
+  신성: '성물이 차갑게 식는다. 기도가 닿지 않는다.',
+  통찰: '눈이 흐려진다. 보아야 할 것이 보이지 않는다.',
+  학식: '새겨진 문자를 읽지 못해 힘을 깨우지 못했다.',
+  화술: '성물이 응답하지 않는다.',
+};
+export function regressionUniqueIntro(pg) {
+  const g = REGRESSION_GEAR[pg?.gearId];
+  const en = (pg?.from && ENEMIES[pg.from]?.name) || '강적';
+  return { title: '유니크 — 주인을 고르는 무구', text: `쓰러진 ${en}이(가) 지니고 있던 「${g?.name}」. 무구가 새 주인을 시험하듯 낮게 울린다.` };
+}
+// 다뤄 본다 / 두고 간다 — 날짜 소모 없음. 실패하면 무구는 부서지듯 빛을 잃는다 (기회 소멸)
+export function resolveRegressionUnique(run, accept, rng = Math.random) {
+  const pg = run.pendingGear;
+  const base = { ...run, pendingGear: null };
+  const g = pg && REGRESSION_GEAR[pg.gearId];
+  if (!g) return { run: base, scene: null };
+  if (!accept) return { run: base, scene: regressionResultScene(g.name, '손을 거두었다. 감당할 수 없는 힘은 화를 부른다.', []) };
+  const stats = regressionEffectiveStats(run);
+  if (rng() < regressionUniqueChance(pg.gearId, stats)) {
+    let next = addRegressionGear(base, pg.gearId);
+    next = { ...next, gear: { ...next.gear, [g.slot]: pg.gearId } };
+    next.log = [...(next.log || []), `D${run.day}: 유니크 「${g.name}」 획득`];
+    return { run: next, scene: regressionResultScene(`${g.name} - 성공!`, '무구가 손에 녹아들 듯 감긴다. 이제 이것은 내 것이다. (바로 장착했다)',
+      [{ text: `${regressionGearLabel(pg.gearId)} 획득`, tone: 'gold' }, { text: regressionGearStatText(pg.gearId), tone: 'good' }]) };
+  }
+  const apt = regressionAptitude(g.rel || [], stats);
+  const weakest = (g.rel || []).slice().sort((a, b) => (stats[a] || 0) - (stats[b] || 0))[0];
+  const text = apt < 0.5 ? (UNIQUE_FAIL_TEXT[weakest] || '무구가 응답하지 않는다.') : '한순간 손에 감기는 듯했지만, 무구는 끝내 빛을 잃었다.';
+  return { run: { ...base, log: [...(base.log || []), `D${run.day}: 유니크 「${g.name}」 실패`] },
+    scene: regressionResultScene(`${g.name} - 실패!`, text, [{ text: `${(g.rel || []).join('·')} 적성 ${Math.round(apt * 100)}%`, tone: 'bad' }]) };
+}
+
+// ── 상점 랜덤 진열 — 스킬(일반·고급) + 장비(일반~보물). 기연·유니크는 상점 불가 ──
+export function regressionSkillShopPrice(skillId, stats = {}) {
+  const sk = __RSK[skillId]; if (!sk) return 0;
+  const E = REGRESSION_ECON;
+  return Math.round((E.prices.skill[sk.tier] || 200) * (1 + (1 - regressionSkillAptitude(skillId, stats)) * E.offBuildPriceMult) / 10) * 10;
+}
+export function buildRegressionShopStock(run, rng = Math.random, resets = 0) {
+  const E = REGRESSION_ECON;
+  const owned = regressionRunSkills(run);
+  const skillPool = Object.keys(__RSK).filter(k => ['normal', 'advanced'].includes(__RSK[k].tier) && !owned.includes(k));
+  const offers = [];
+  for (let i = 0; i < E.shopOffers * 4 && offers.length < E.shopOffers; i++) {
+    if (skillPool.length && rng() < E.shopSkillShare) {
+      const id = skillPool[Math.floor(rng() * skillPool.length)];
+      if (!offers.some(o => o.id === id)) offers.push({ kind: 'skill', id });
+    } else {
+      const id = rollRegressionGear(E.gradeWeights.shop, rng);
+      if (!offers.some(o => o.id === id)) offers.push({ kind: 'gear', id, price: E.prices.gear[REGRESSION_GEAR[id].grade] });
+    }
+  }
+  return { offers, resets };
+}
+export function rerollRegressionShop(run, rng = Math.random) {
+  const used = run.shop?.resets || 0;
+  if (used >= REGRESSION_ECON.shopResets) return run;
+  return { ...run, shop: buildRegressionShopStock(run, rng, used + 1) };
+}
+export function regressionShopOfferPrice(run, offer) {
+  return offer.kind === 'skill' ? regressionSkillShopPrice(offer.id, regressionEffectiveStats(run)) : offer.price;
+}
+// 진열 상품 구매 — 스킬은 교습(적성에 따라 값이 다를 뿐 확정 습득), 장비는 가방으로
+export function buyRegressionOffer(run, idx) {
+  const offer = run.shop?.offers?.[idx];
+  if (!offer || offer.sold) return { run, bought: null };
+  const price = regressionShopOfferPrice(run, offer);
+  if ((run.gold || 0) < price) return { run, bought: null };
+  let next = { ...run, gold: run.gold - price, shop: { ...run.shop, offers: run.shop.offers.map((o, i) => (i === idx ? { ...o, sold: true } : o)) } };
+  let bought;
+  if (offer.kind === 'skill') { next.skills = [...regressionRunSkills(run), offer.id]; bought = `「${__RSK[offer.id].name}」 습득`; }
+  else { next = addRegressionGear(next, offer.id); bought = `${regressionGearLabel(offer.id)} 획득`; }
+  return { run: { ...next, log: [...next.log, `D${run.day}: 구매 — ${bought} (-${price}G)`] }, bought, price };
 }
