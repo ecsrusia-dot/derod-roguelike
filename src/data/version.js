@@ -3,6 +3,6 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.184.0';
+export const GAME_VERSION = '1.185.0';
 export const VERSION_DATE = '2026-11-07';
-export const VERSION_LABEL = '🌀 회귀의 탐험가 — 장비 3칸 · 상점 진열 · 경제 개편';
+export const VERSION_LABEL = '🌀 회귀의 탐험가 — 하루 한 번, 랜덤한 오늘의 일';

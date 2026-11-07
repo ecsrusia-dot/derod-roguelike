@@ -32,7 +32,7 @@ function HpBar({ value, max, color }) {
 }
 
 export default function RegressionBattle({
-  classData, enemyKey, enemyObj, enemyLabel, regionKey, intro, stats, level, maxHp, hp, skills, relicBonus,
+  classData, enemyKey, enemyObj, enemyLabel, regionKey, enemyMult = 1, intro, stats, level, maxHp, hp, skills, relicBonus,
   potions, beltSlots, defaultBelt, flames, committed, speed, onCycleSpeed, onCommit, onFinish, speedLabel,
 }) {
   const [stanceId, setStanceId] = useState(committed?.stanceId || 'calm');
@@ -41,7 +41,7 @@ export default function RegressionBattle({
   const timer = useRef(null);
   const finished = useRef(false);
 
-  const enemyBase = useMemo(() => regressionEnemyCombatant(enemyKey, enemyObj, regionKey), [enemyKey, enemyObj, regionKey]);
+  const enemyBase = useMemo(() => regressionEnemyCombatant(enemyKey, enemyObj, regionKey, enemyMult), [enemyKey, enemyObj, regionKey, enemyMult]);
   const enemySrc = getEnemyImageSrc(enemyKey, enemyObj, 'combat');
   const heroSrc = `./classes/combat/${classData.id}_combat.jpg`;
 
