@@ -20,6 +20,7 @@ import {
   enterRegressionSpire, applyRegressionSpireResult, buildRegressionSpireEnemy,
   REGRESSION_ROUTES, REGRESSION_ROUTE_BOSSES, REGRESSION_ROUTE_REWARDS, REGRESSION_ROUTE_BOSS_DAY_IN_REGION, REGRESSION_ROUTE_FROM_REGION,
   REGRESSION_ENDING_MILESTONES, REGRESSION_EPILOGUES, REGRESSION_QUEST_AFFINITY,
+  REGRESSION_RIVAL, buildRegressionRival, duelRegressionRival, raceRegressionRival, yieldRegressionRival, loseRegressionRivalDuel,
   REGRESSION_SECRET, REGRESSION_SECRET_PLACES, discoverRegressionSecret, solveRegressionSecretPuzzle, fightRegressionSecretGuardian, claimRegressionSecretTreasure, leaveRegressionSecret,
   REGRESSION_OATHS, REGRESSION_OATH_UNLOCK_LOOPS, regressionOathFx, regressionOathEchoMult, regressionOathEnemyMult, regressionFameGate,
   buildRegressionRouteBoss, applyRegressionRouteReward, REGRESSION_RED_MOON, regressionDaysToRedMoon, REGRESSION_GRAVE, resolveRegressionGrave, regressionSpireChain, regressionSpireEnemyFor, regressionRouteFor, REGRESSION_GEAR as __RG_GEAR,
@@ -334,7 +335,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
     // 1.194.0~ 첨탑은 길(spireRoute)마다 구성이 다르고, 길목의 군주는 일러스트를 빌린 전용 적
     const spireEnemy = inSpire ? regressionSpireEnemyFor(run, run.spireRound, compFx.spireWeakness) : null;
     const enemyKey = inSpire ? spireEnemy.key : run.pending.enemyKey;
-    const override = inSpire ? spireEnemy.obj : (run.pending.routeBoss ? buildRegressionRouteBoss(run.pending.route, run.pending.routeBoss) : null);
+    const override = inSpire ? spireEnemy.obj : (run.pending.routeBoss ? buildRegressionRouteBoss(run.pending.route, run.pending.routeBoss) : run.pending.rival ? buildRegressionRival(run) : null);
     const enemyObj = override || ENEMIES[enemyKey];
     const spireLen = regressionSpireChain(run).length;
     const committed = inSpire ? (run.spirePrepared || null) : (run.pending.prepared || null);
@@ -363,6 +364,21 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
       const tier = run.pending.tier;
       const label = regressionEnemyLabel(enemyKey, tier, override);
       const enemyName = enemyObj?.name || enemyKey;
+      // 1.202.0~ 라이벌 결투 — 져도 죽지 않는다 / 이기면 기연 기회 + 명성
+      if (run.pending.rival) {
+        if (!win) {
+          const r = loseRegressionRivalDuel(consumeRegressionPotions(run, usedPotions));
+          saveRun({ ...r.run, scene: regressionResultScene('[결투 카엘] - 패배', '무릎이 꺾였다. 카엘이 검을 거두며 등을 돌린다. "죽이진 않아. 너는 다음 생에도 필요하거든."', [{ text: 'HP 30%', tone: 'bad' }, r.lost ? { text: `은화 -${r.lost}`, tone: 'bad' } : null, { text: '카엘이 더 강해졌다 (다음 생)', tone: 'bad' }]) });
+          return;
+        }
+        let next = applyRegressionCombat(consumeRegressionPotions(run, usedPotions), { enemyKey, tier, win, hpPct: regressionPostCombatHpPct(loadout.hp, loadout.maxHp, taken), observations, intStat: combatStats.지능 || 10 }).run;
+        next = { ...next, fame: next.fame + REGRESSION_RIVAL.winFame, rivalWins: (run.rivalWins || 0) + 1 };
+        const tags = [{ text: `명성 +${next.fame - run.fame}`, tone: 'gold' }];
+        const bo = offerRegressionLearn(next, 'boss', null);
+        if (bo) { next.pendingLearn = bo; tags.push({ text: '카엘이 노리던 기연이 손에 닿는다', tone: 'gold' }); }
+        saveRun({ ...next, scene: regressionResultScene('[결투 카엘] - 승리!', '카엘이 검을 떨어뜨린다. "…이번 생은 네 거다. 다음엔 아닐 거고."', tags) });
+        return;
+      }
       const { run: afterCombat, learnedNow } = applyRegressionCombat(consumeRegressionPotions(run, usedPotions), {
         enemyKey, tier, win,
         hpPct: regressionPostCombatHpPct(loadout.hp, loadout.maxHp, taken), observations, intStat: combatStats.지능 || 10,
@@ -687,6 +703,12 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
             <div className="text-[11px] mt-2" style={{ color: PALETTE.textDim }}>잔향은 생을 마칠 때마다 쌓인다 — 명성 10당 1 · 메인 스토리 1편당 2 · 첨탑 1층당 3 · 정복 10 · 새 엔딩 10.</div>
           </GlassPanel>
 
+          {reg.rival?.met > 0 && (
+            <GlassPanel style={{ padding: 12 }}>
+              <div className="text-[12px] font-bold" style={{ color: '#f0a59c' }}>⚔ 라이벌 카엘 — Lv.{reg.rival.level || 0}</div>
+              <div className="text-[11px]" style={{ color: PALETTE.textDim }}>마주친 생 {reg.rival.met}번 · 내가 앞선 횟수 {reg.rival.defeats || 0}번 · 그가 앞설 때마다 다음 생에 강해진다 (최대 Lv.{REGRESSION_RIVAL.maxLevel})</div>
+            </GlassPanel>
+          )}
           <ActionButton icon={BookOpen} title={`👑 엔딩 도감 ${reg.endings.length}/${REGRESSION_ENDINGS.length}`} sub={(() => { const m = REGRESSION_ENDING_MILESTONES.find(x => reg.endings.length < x.n); return m ? `${m.n}종 모으면 잔향 +${m.echo}` : '모든 엔딩을 모았다'; })()} onClick={() => setShowEndings(true)} />
           <ActionButton icon={BookOpen} title={`기록서 (전생 포함 ${learnedEver}/${Object.keys(REGRESSION_RECORDS).length}종)`} sub="적별 기록 보상 보기" onClick={() => setShowBook(true)} />
           <UIButton variant="primary" className="w-full ui-sheen" onClick={startLife}>
@@ -986,6 +1008,15 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
           <Choice text="지나친다" onClick={() => saveRun({ ...passRegressionDay(run, '수상한 흔적을 지나침'), scene: sceneOf('수상한 흔적', '괜한 위험은 피하기로 했다.', []) })} />
         </>
       );
+    } else if (t.kind === 'rival') {
+      const race = regressionChanceLabel(regressionCheckChance(stats.민첩 || 0, REGRESSION_RIVAL.raceDc));
+      choices = (
+        <>
+          <Choice text="결투를 신청한다" sub={`이기면 기연 기회 + 명성 +${REGRESSION_RIVAL.winFame} · 져도 죽지 않는다 (HP 30%, 은화 30% 빼앗김)`} onClick={() => saveRun(duelRegressionRival(run))} />
+          <Choice text="그보다 먼저 기연에 닿는다" label={{ stat: '민첩', ...race }} sub="성공: 기연 기회 / 실패: 카엘이 가져가고 다음 생에 더 강해진다" onClick={() => { const r = raceRegressionRival(run); saveRun({ ...r.run, scene: sceneOf('카엘', r.ok ? '한 발 먼저 닿았다. 카엘이 혀를 찬다. "…빠르군."' : '카엘이 먼저 손을 뻗었다. "늦었어. 다음 생에 보자."', [{ text: `민첩 - ${r.ok ? '성공!' : '실패'}`, tone: r.ok ? 'gold' : 'bad' }]) }); }} />
+          <Choice text="양보하고 물러난다" sub="HP +10% · 카엘이 다음 생에 더 강해진다" onClick={() => saveRun({ ...yieldRegressionRival(run), scene: sceneOf('카엘', '"현명하군." 카엘이 기연을 품에 넣고 사라진다.', []) })} />
+        </>
+      );
     } else if (t.kind === 'routeBoss') {
       const rw = REGRESSION_ROUTE_REWARDS[t.route]?.[t.routeBoss] || {};
       const rwTxt = rw.stats ? Object.entries(rw.stats).map(([k, v]) => `${k} +${v}`).join(' · ') : rw.gear ? `여정 장비 「${__RG_GEAR[rw.gear]?.name}」` : rw.affinityAll ? `만난 동료 호감 +${rw.affinityAll}` : rw.text || (rw.gold ? `은화 +${rw.gold} · 회복약` : '');
@@ -1004,7 +1035,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
     body = (
       <div className="space-y-3 ui-screen-enter">
         <div className="flex items-center justify-between">
-          <div className="text-[12px] font-bold" style={{ color: t.kind === 'routeBoss' || t.redMoon ? PALETTE.accent : PALETTE.dawn }}>D{run.day} — {t.kind === 'routeBoss' ? `${REGRESSION_ROUTES[t.route]?.icon} 길목의 군주` : t.redMoon ? '🌕 붉은 달의 날' : t.kind === 'grave' ? '⚱ 전생의 무덤' : t.kind === 'secret' ? '🗝 수상한 흔적' : '오늘의 일'}</div>
+          <div className="text-[12px] font-bold" style={{ color: t.kind === 'routeBoss' || t.redMoon ? PALETTE.accent : PALETTE.dawn }}>D{run.day} — {t.kind === 'routeBoss' ? `${REGRESSION_ROUTES[t.route]?.icon} 길목의 군주` : t.redMoon ? '🌕 붉은 달의 날' : t.kind === 'grave' ? '⚱ 전생의 무덤' : t.kind === 'secret' ? '🗝 수상한 흔적' : t.kind === 'rival' ? '⚔ 라이벌 — 카엘' : '오늘의 일'}</div>
           <div className="text-[11px]" style={{ color: PALETTE.textDim }}>기연의 기운 <b style={{ color: PALETTE.legendary }}>{Math.round((regressionDayTable(run).fortune || 0) * 100)}%</b> · 적 강도 ×{regressionDayEnemyMult(run.day).toFixed(2)}{regressionDaysToRedMoon(run.day) > 0 ? ` · 🌕 붉은 달까지 ${regressionDaysToRedMoon(run.day)}일` : ''}</div>
         </div>
         <div className="text-[14px] leading-relaxed" style={{ color: PALETTE.textDim }}>{regressionNarration(run)}</div>
