@@ -1483,6 +1483,7 @@ export function getRegression(meta) {
     traitSlotsBought: Number.isFinite(r.traitSlotsBought) ? r.traitSlotsBought : 0,
     grave: (r.grave && typeof r.grave === 'object') ? r.grave : null,   // 1.196.0~ 전생의 유품
     endingLog: (r.endingLog && typeof r.endingLog === 'object') ? r.endingLog : {},   // 1.198.0~ 엔딩 도감
+    rival: (r.rival && typeof r.rival === 'object') ? r.rival : null,   // 1.202.0~ 라이벌 { level, met, defeats }
     recordsEver: (r.recordsEver && typeof r.recordsEver === 'object') ? r.recordsEver : {},
     run: r.run || null,
   };

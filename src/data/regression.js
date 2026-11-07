@@ -283,7 +283,8 @@ export function createRegressionRun(metaR = EMPTY_REGRESSION, classId, stats = n
     over: null,            // null | 'death' | 'timeout' | 'spireLose' | 'victory'
     log: [],
   };
-  const withGrave = metaR.grave ? { ...run, grave: { ...metaR.grave } } : run;   // 1.196.0~ 전생의 유품
+  const withGrave0 = metaR.grave ? { ...run, grave: { ...metaR.grave } } : run;   // 1.196.0~ 전생의 유품
+  const withGrave = { ...withGrave0, rival: { level: metaR.rival?.level || 0, met: metaR.rival?.met || 0, defeats: metaR.rival?.defeats || 0 } };   // 1.202.0~ 라이벌
   const made = applyRegressionProvisions(applyRegressionStartTraits({ ...withGrave, shop: buildRegressionShopStock(withGrave) }, startTraits, metaR), provisions);
   const ok = (oaths || []).filter(id => REGRESSION_OATHS[id]);
   return ok.length ? { ...made, oaths: ok, gold: regressionOathFx(ok).startGoldZero ? 0 : made.gold } : made;   // 1.197.0~ 황혼의 맹세
@@ -461,6 +462,12 @@ export function settleRegression(metaR = EMPTY_REGRESSION, run) {
       bestDay: Math.max(base.bestDay, Math.min(run.day, run.maxDays)),
       spireClears: base.spireClears + (cause === 'victory' ? 1 : 0),
       echo: (base.echo || 0) + regressionEchoGain(base, run) + regressionEndingMilestoneGain(base, run),
+      // 1.202.0~ 라이벌 — 그가 이기면 강해지고, 내가 이기면 기록된다 (생을 넘어 이어진다)
+      rival: {
+        level: Math.min(REGRESSION_RIVAL.maxLevel, (base.rival?.level || 0) + (run.rivalGain || 0)),
+        met: (base.rival?.met || 0) + ((run.rivalMet || []).length ? 1 : 0),
+        defeats: (base.rival?.defeats || 0) + (run.rivalWins || 0),
+      },
       // 1.196.0~ 전생의 유품 — 죽으면 새 무덤이 생긴다(이전 무덤은 덮인다). 정복했으면 회수 여부만 반영
       grave: cause !== 'victory' ? buildRegressionGrave(run, base.loops + 1) : (run.graveRecovered ? null : base.grave || null),
       endings: (() => { const e = regressionEndingFor(run); return e && !base.endings.includes(e.id) ? [...base.endings, e.id] : base.endings; })(),
@@ -1733,6 +1740,8 @@ export function rollRegressionDay(run, memories = [], rng = Math.random) {
   if (rb) return { ...run, today: { kind: 'routeBoss', tier: 'boss', enemyKey: rb.key, routeBoss: rb.region, route: rb.route } };
   // 1.196.0~ 전생의 유품 — 지난 생이 쓰러진 날(또는 그 뒤 첫 빈 날)에 무덤을 만난다
   if (run.grave && !run.graveDone && run.day >= run.grave.day) return { ...run, today: { kind: 'grave' } };
+  // 1.202.0~ 라이벌 회귀자 — 지역 1~3의 정해진 날
+  if (regressionRivalToday(run)) return { ...run, today: { kind: 'rival' }, rivalMet: [...(run.rivalMet || []), run.region] };
   // 1.195.0~ 붉은 달의 날 — 지역 11일째, 반드시 전투 (적 강화 · 보상 2배)
   if (isRegressionRedMoonDay(run.day)) {
     const RM = REGRESSION_RED_MOON;
@@ -1812,6 +1821,7 @@ export const REGRESSION_TODAY_INTRO = {
   merchant: () => '짐마차를 끄는 떠돌이 상인이 손을 흔든다. "구경은 공짜요, 회귀자 양반."',
   shelter: () => '버려진 오두막을 찾았다. 지붕은 새지만 하룻밤 머물 만하다.',
   hermit: () => '누더기를 걸친 은자가 길가에 앉아 있다. "기다렸네. 자네가 배울 것이 하나 있지."',
+  rival: (r) => regressionRivalLine(r),
   secret: (r) => REGRESSION_SECRET_PLACES[r.region]?.hint || '',
   grave: (r) => `길가에 낯익은 돌무덤이 있다. 비석에 새겨진 것은 — 내 이름이다.\n${r.grave?.life || '?'}번째 생의 내가 ${r.grave?.cause || '이곳에서'} 쓰러진 자리. 흙 아래에서 무언가 희미하게 빛난다.`,
   routeBoss: (r) => { const b = REGRESSION_ROUTE_BOSSES[r.today.route]?.[r.today.routeBoss]; return b ? `${b.line}\n\n길목의 군주 「${b.name}」. 이 길을 계속 가려면 피할 수 없다.` : ''; },
@@ -2444,4 +2454,67 @@ export function claimRegressionSecretTreasure(run, rng = Math.random) {
 }
 export function leaveRegressionSecret(run) {
   return passRegressionDay({ ...run, secret: null }, '숨겨진 장소에서 물러남');
+}
+
+
+// ============================================
+// 1.202.0~ 라이벌 회귀자 (PM 선택 재미 요소 8) — 생을 넘어 이어지는 악연
+// ============================================
+// 「카엘」 — 같은 고리에 갇힌 또 다른 회귀자. 지역 1~3의 정해진 날(REGRESSION_RIVAL.dayInRegion) 같은 기연을 다투러 나타난다.
+// 결투(승리 = 기연 기회·명성) / 먼저 차지하기(민첩 판정) / 양보. 그가 이기면(패배·실패·양보) 다음 생부터 강해진다(meta.rival.level).
+// 결투에서 져도 죽지 않는다 — HP 30%로 남고 은화 30%를 빼앗긴다.
+export const REGRESSION_RIVAL = {
+  name: '카엘', title: '또 다른 회귀자', art: 'champ_frost_brute',
+  dayInRegion: 6, regions: [1, 2, 3],
+  ref: { 1: 'frostGiant', 2: 'forestTyrant', 3: 'ancientPriest' },
+  hpMult: 0.75, dmgMult: 0.75, growthPerLevel: 0.08, maxLevel: 10,
+  raceDc: 16, winFame: 8, loseHpPct: 0.3, loseGoldPct: 0.3,
+};
+export function regressionRivalToday(run) {
+  const R = REGRESSION_RIVAL;
+  if (!R.regions.includes(run.region) || (run.rivalMet || []).includes(run.region)) return false;
+  const pos = ((run.day - 1) % REGRESSION_DAY.regionDays) + 1;
+  return pos >= R.dayInRegion;
+}
+export function buildRegressionRival(run) {
+  const R = REGRESSION_RIVAL;
+  const lv = run.rival?.level || 0;
+  const k = 1 + lv * R.growthPerLevel;
+  const ref = ENEMIES[R.ref[run.region] || 'forestTyrant'];
+  return { ...regressionScaleEnemy(R.art, ref, `${R.name}${lv ? ` Lv.${lv}` : ''}`, R.hpMult * k, R.dmgMult * k), tier: 'elite', rival: true };
+}
+const RIVAL_LINES = [
+  '눈앞을 가로막은 사내가 피식 웃는다. "너도 보이는구나, 저 기연이. 나는 카엘. …너처럼 같은 날을 되풀이하는 사람이지."',
+  '"또 만났군." 카엘이 검을 어깨에 걸친다. "지난 생에도 여기서 마주쳤지. 이번엔 누가 가져갈까?"',
+  '카엘이 먼저 와 있었다. "몇 번째 생이지? 나는 세는 걸 그만뒀다. 그래도 너만은 기억나더군."',
+  '"지겹지도 않나." 카엘의 눈이 지쳐 있다. "우리 둘 중 하나가 고리를 끊어야 해. 그게 내가 될 거고."',
+];
+export function regressionRivalLine(run) {
+  const met = (run.rival?.met || 0) + Math.max(0, (run.rivalMet || []).length - 1);
+  const line = RIVAL_LINES[Math.min(RIVAL_LINES.length - 1, met)];
+  const lv = run.rival?.level || 0;
+  return `${line}\n\n${lv ? `(카엘은 지난 생들에서 ${lv}번 앞서 나갔다 — 그만큼 강해졌다)` : '(아직 그의 실력은 알 수 없다)'}`;
+}
+// 먼저 차지하기 — 민첩 판정. 성공: 기연 기회 / 실패: 카엘이 가져가고 강해진다. 하루 소모
+export function raceRegressionRival(run, rng = Math.random) {
+  const R = REGRESSION_RIVAL;
+  const res = resolveRegressionChoice({ stat: '민첩', dc: R.raceDc, success: {}, fail: {} }, regressionEffectiveStats(run), rng);
+  if (res.check === 'ok') {
+    const offer = offerRegressionLearn(run, 'boss', null, rng);
+    return { run: passRegressionDay({ ...run, today: null, rivalWins: (run.rivalWins || 0) + 1, pendingLearn: offer || null }, '카엘보다 먼저 기연에 닿음'), ok: true };
+  }
+  return { run: passRegressionDay({ ...run, today: null, rivalGain: (run.rivalGain || 0) + 1 }, '카엘에게 기연을 빼앗김'), ok: false };
+}
+export function yieldRegressionRival(run) {
+  return passRegressionDay({ ...run, today: null, rivalGain: (run.rivalGain || 0) + 1, hpPct: Math.min(1, (run.hpPct ?? 1) + 0.1) }, '카엘에게 기연을 양보함');
+}
+export function duelRegressionRival(run) {
+  return startRegressionCombat({ ...run, today: null }, REGRESSION_RIVAL.art, 'elite', { rival: true });
+}
+// 결투 패배 — 죽지 않는다
+export function loseRegressionRivalDuel(run) {
+  const R = REGRESSION_RIVAL;
+  const lost = Math.round((run.gold || 0) * R.loseGoldPct);
+  const next = passRegressionDay({ ...run, pending: null, hpPct: R.loseHpPct, gold: (run.gold || 0) - lost, rivalGain: (run.rivalGain || 0) + 1 }, '카엘과의 결투에서 패배');
+  return { run: next, lost };
 }
