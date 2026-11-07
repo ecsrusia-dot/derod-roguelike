@@ -35,7 +35,7 @@ function HpBar({ value, max, color }) {
 
 export default function RegressionBattle({
   classData, enemyKey, enemyObj, enemyLabel, regionKey, enemyMult = 1, intro, stats, level, maxHp, hp, skills, relicBonus,
-  potions, beltSlots, defaultBelt, flames, committed, speed, onCycleSpeed, onCommit, onFinish, speedLabel,
+  potions, beltSlots, defaultBelt, flames, committed, speed, onCycleSpeed, onCommit, onFinish, speedLabel, speedOptions = [], onSetSpeed,
 }) {
   const [stanceId, setStanceId] = useState(committed?.stanceId || 'calm');
   const [infoId, setInfoId] = useState(null);   // 1.188.0~ 스킬 정보 시트
@@ -150,6 +150,21 @@ export default function RegressionBattle({
           </GlassPanel>
 
           <div className="text-[11px] px-1" style={{ color: PALETTE.textDim }}>전투는 자동으로 진행되며 개입할 수 없다. HP {hp}/{maxHp}로 출전.</div>
+          {speedOptions.length > 0 && onSetSpeed && (
+            <GlassPanel style={{ padding: 12 }}>
+              <div className="text-[12px] font-bold mb-2" style={{ color: PALETTE.dawn }}>⏱ 전투 속도</div>
+              <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${speedOptions.length}, 1fr)` }}>
+                {speedOptions.map(o => {
+                  const on = o.value === speed;
+                  return (
+                    <button key={o.value} onClick={() => onSetSpeed(o.value)} className="ui-press text-[13px] font-bold"
+                      style={{ minHeight: 40, borderRadius: 'var(--r-chip, 8px)', background: on ? `${PALETTE.legendary}26` : PALETTE.panelLight, border: `1px solid ${on ? PALETTE.legendary : PALETTE.panelBorder}`, color: on ? PALETTE.legendary : PALETTE.text }}>{o.label}</button>
+                  );
+                })}
+              </div>
+              <div className="text-[11px] mt-1.5" style={{ color: PALETTE.textDim }}>⏩ 스킵은 연출 없이 결과만 보여 준다. 고른 속도는 다음 전투에도 유지된다.</div>
+            </GlassPanel>
+          )}
           <UIButton variant="primary" className="w-full ui-sheen" onClick={() => { onCommit({ stanceId, belt }); startFight(stanceId, belt); }}>▶ 전투 시작</UIButton>
         </div>
         {infoId && <RegressionSkillInfo skillId={infoId} stats={stats} onClose={() => setInfoId(null)} />}

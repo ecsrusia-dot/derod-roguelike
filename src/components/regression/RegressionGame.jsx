@@ -147,6 +147,8 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
     try { localStorage.setItem('regressionSpeed', String(nx)); } catch { /* 저장 불가 무시 */ }
     return nx;
   });
+  // 1.191.1~ 전투 준비 화면에서 배속을 바로 고른다 (PM 요청)
+  const setSpeed = (v) => { setAutoSpeed(v); try { localStorage.setItem('regressionSpeed', String(v)); } catch { /* 저장 불가 무시 */ } };
   const [showShop, setShowShop] = useState(false);
   const [skillInfo, setSkillInfo] = useState(null);
   const [shopLog, setShopLog] = useState([]);       // 1.188.1~ 이번 상인 방문 거래 내역 (상인을 떠날 때까지 창 유지)   // 1.188.0~ 스킬 정보 시트
@@ -368,6 +370,8 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
         speed={autoSpeed}
         speedLabel={autoSpeed >= AUTO_SPEED_SKIP ? '⏩ 스킵' : `배속 ×${autoSpeed}`}
         onCycleSpeed={cycleSpeed}
+        speedOptions={AUTO_SPEEDS.map(v => ({ value: v, label: v >= AUTO_SPEED_SKIP ? '⏩ 스킵' : `×${v}` }))}
+        onSetSpeed={setSpeed}
         onCommit={commit}
         onFinish={(res) => (inSpire ? finishSpire(res.win, res.damageTaken, res.usedPotions) : finishExplore(res.win, res.damageTaken, res.observations, res.usedPotions))}
       />
