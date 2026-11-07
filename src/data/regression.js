@@ -214,6 +214,7 @@ export function buildRegressionSpireEnemy(round, memoryCount = 0, forceWeak = fa
 export const EMPTY_REGRESSION = {
   grave: null,         // 1.196.0~ 전생의 유품 { gearId, gold, day, life, cause }
   endingLog: {},       // 1.198.0~ 엔딩 도감 { endingId: { life, classId, day } }
+  challenges: [], titles: [], title: null,   // 1.203.0~ 도전 과제·칭호
   loops: 0,            // 누적 회귀 횟수
   memories: [],        // 획득 기억 조각 id
   carry: [],           // 다음 생에 들고 갈 기록 (enemyKey) — carrySlots 개까지
@@ -392,6 +393,7 @@ export function applyRegressionCombat(run, result) {
   if (win) {
     const regionMult = T.regionFameMult[run.region] || 1;
     const moon = run.pending?.redMoon ? REGRESSION_RED_MOON.rewardMult : 1;   // 1.195.0~ 붉은 달 보상 배율
+    if (run.pending?.redMoon) next.redMoonWins = (run.redMoonWins || 0) + 1;   // 1.203.0~ 도전 과제
     const fame = Math.round((T.fameGain[tier] || 0) * regionMult * moon) + (run.affinity ? aggregateRegressionCompanions(run).famePerWin : 0);
     next.fame += fame;
     next.kills[tier] = (next.kills[tier] || 0) + 1;
@@ -451,8 +453,7 @@ export function settleRegression(metaR = EMPTY_REGRESSION, run) {
   }
   const recordsEver = { ...base.recordsEver };
   for (const k of run.learned) recordsEver[k] = true;
-  return {
-    meta: {
+  const meta0 = {
       ...base,
       loops: cause === 'victory' ? base.loops : base.loops + 1,
       memories: [...base.memories, ...gained],
@@ -473,7 +474,20 @@ export function settleRegression(metaR = EMPTY_REGRESSION, run) {
       endings: (() => { const e = regressionEndingFor(run); return e && !base.endings.includes(e.id) ? [...base.endings, e.id] : base.endings; })(),
       // 1.198.0~ 엔딩 도감 — 처음 본 생·직업·날 기록 + 수집 보상(잔향)
       endingLog: (() => { const e = regressionEndingFor(run); const log = { ...(base.endingLog || {}) }; if (e && !log[e.id]) log[e.id] = { life: base.loops + 1, classId: run.classId, day: Math.min(run.day, run.maxDays) }; return log; })(),
-    },
+  };
+  // 1.203.0~ 도전 과제 — 이번 생 결과 + 갱신된 메타로 판정, 새로 달성한 것만 잔향·칭호
+  const newChallenges = REGRESSION_CHALLENGES.filter(c => !(base.challenges || []).includes(c.id) && c.check(run, meta0, cause));
+  const challengeEcho = newChallenges.reduce((a, c) => a + c.echo, 0);
+  const meta = {
+    ...meta0,
+    echo: meta0.echo + challengeEcho,
+    challenges: [...(base.challenges || []), ...newChallenges.map(c => c.id)],
+    titles: [...(base.titles || []), ...newChallenges.filter(c => c.title).map(c => c.id)],
+  };
+  return {
+    meta,
+    newChallenges: newChallenges.map(c => c.id),
+    challengeEcho,
     gainedMemories: gained,
     endingReward: regressionEndingMilestoneGain(base, run),
     grave: cause !== 'victory' ? buildRegressionGrave(run, base.loops + 1) : null,
@@ -2517,4 +2531,61 @@ export function loseRegressionRivalDuel(run) {
   const lost = Math.round((run.gold || 0) * R.loseGoldPct);
   const next = passRegressionDay({ ...run, pending: null, hpPct: R.loseHpPct, gold: (run.gold || 0) - lost, rivalGain: (run.rivalGain || 0) + 1 }, '카엘과의 결투에서 패배');
   return { run: next, lost };
+}
+
+
+// ============================================
+// 1.203.0~ 도전 과제·칭호 (PM 선택 재미 요소 9) — 반복 플레이 목표
+// ============================================
+// 생을 마칠 때(settleRegression) 판정 — 새로 달성하면 잔향 + (있으면) 칭호. 칭호는 로비에서 하나 골라 단다(meta.title, 표시용).
+// check(run, meta, cause): meta는 이번 생 정산이 반영된 값 (엔딩·라이벌 누적 판정용)
+const won = (c) => c === 'victory';
+const classClear = (cls) => (r, _m, c) => won(c) && r.classId === cls;
+const fortuneCount = (r) => regressionRunSkills(r).filter(id => __RSK[id]?.tier === 'fortune').length;
+const bondCount = (r) => regressionRunSkills(r).filter(id => __RSK[id]?.tier === 'bond').length;
+export const REGRESSION_CHALLENGES = [
+  // ── 정복 ──
+  { id: 'ch_first_clear', group: '정복', name: '황혼을 끊다', desc: '첨탑을 처음 정복한다', echo: 30, title: '첨탑을 넘은 자', check: (r, m, c) => won(c) },
+  { id: 'ch_clear_wanderer', group: '정복', name: '검의 길', desc: '방랑검사로 정복한다', echo: 20, title: '검의 회귀자', check: classClear('wanderer') },
+  { id: 'ch_clear_sage', group: '정복', name: '불꽃의 길', desc: '술법사로 정복한다', echo: 20, title: '불꽃의 회귀자', check: classClear('sage') },
+  { id: 'ch_clear_demonblood', group: '정복', name: '피의 길', desc: '혼혈 마족으로 정복한다', echo: 20, title: '피의 회귀자', check: classClear('demonblood') },
+  { id: 'ch_clear_elf', group: '정복', name: '바람의 길', desc: '숲의 정령사로 정복한다', echo: 20, title: '바람의 회귀자', check: classClear('elf') },
+  { id: 'ch_clear_priest', group: '정복', name: '여명의 길', desc: '여명의 사제로 정복한다', echo: 20, title: '여명의 회귀자', check: classClear('priest') },
+  { id: 'ch_clear_truth', group: '정복', name: '진실의 끝', desc: '진실의 길로 정복한다', echo: 20, check: (r, m, c) => won(c) && r.spireRoute === 'truth' },
+  { id: 'ch_clear_power', group: '정복', name: '힘의 끝', desc: '힘의 길로 정복한다', echo: 20, check: (r, m, c) => won(c) && r.spireRoute === 'power' },
+  { id: 'ch_clear_bond', group: '정복', name: '유대의 끝', desc: '유대의 길로 정복한다', echo: 20, check: (r, m, c) => won(c) && r.spireRoute === 'bond' },
+  { id: 'ch_clear_wander', group: '정복', name: '방랑의 끝', desc: '방랑의 길(성향이 기울지 않음)로 정복한다', echo: 30, title: '어디에도 속하지 않은 자', check: (r, m, c) => won(c) && (r.spireRoute || 'none') === 'none' },
+  // ── 제약 ──
+  { id: 'ch_unarmed', group: '제약', name: '맨손', desc: '무기를 장착하지 않은 채 정복한다', echo: 50, title: '맨손의 전설', check: (r, m, c) => won(c) && !r.gear?.weapon },
+  { id: 'ch_alone', group: '제약', name: '고독한 첨탑', desc: '동행 중인 동료 없이(호감 40 미만) 정복한다', echo: 40, title: '고독한 자', check: (r, m, c) => won(c) && REGRESSION_COMPANIONS.every(k => (r.affinity?.[k.id] || 0) < 40) },
+  { id: 'ch_low_level', group: '제약', name: '무명의 기적', desc: 'Lv.8 이하로 정복한다', echo: 50, title: '무명의 기적', check: (r, m, c) => won(c) && (r.level || 0) <= 8 },
+  { id: 'ch_oath3', group: '제약', name: '맹세의 무게', desc: '황혼의 맹세 3개 이상을 걸고 정복한다', echo: 60, title: '맹세의 화신', check: (r, m, c) => won(c) && (r.oaths || []).length >= 3 },
+  { id: 'ch_oath_all', group: '제약', name: '모든 족쇄', desc: '황혼의 맹세 7개를 모두 걸고 정복한다', echo: 150, title: '황혼을 삼킨 자', check: (r, m, c) => won(c) && (r.oaths || []).length >= Object.keys(REGRESSION_OATHS).length },
+  // ── 성장 ──
+  { id: 'ch_fame200', group: '성장', name: '대륙의 이름', desc: '한 생에 명성 200을 넘긴다', echo: 20, check: (r) => (r.fame || 0) >= 200 },
+  { id: 'ch_lv15', group: '성장', name: '정점', desc: '한 생에 Lv.15에 도달한다', echo: 30, check: (r) => (r.level || 0) >= 15 },
+  { id: 'ch_skills10', group: '성장', name: '만능', desc: '한 생에 스킬 10개를 보유한다', echo: 30, title: '만능', check: (r) => regressionRunSkills(r).length >= 10 },
+  { id: 'ch_skill_lv5', group: '성장', name: '숙련의 끝', desc: '스킬 하나를 Lv.5까지 올린다', echo: 30, title: '숙련의 끝', check: (r) => Object.values(r.skillLv || {}).some(v => v >= 5) },
+  { id: 'ch_fortune5', group: '성장', name: '기연의 총아', desc: '한 생에 기연 스킬 5개를 보유한다', echo: 40, title: '기연의 총아', check: (r) => fortuneCount(r) >= 5 },
+  { id: 'ch_records10', group: '성장', name: '기록광', desc: '한 생에 기록 10종을 완성한다', echo: 30, check: (r) => (r.learned || []).length >= 10 },
+  // ── 인연 ──
+  { id: 'ch_bond1', group: '인연', name: '첫 유대', desc: '동료의 개인 이야기를 끝까지 마친다', echo: 20, check: (r) => bondCount(r) >= 1 },
+  { id: 'ch_bond4', group: '인연', name: '모두의 친구', desc: '한 생에 유대 스킬 4개를 모두 얻는다', echo: 80, title: '모두의 친구', check: (r) => bondCount(r) >= 4 },
+  { id: 'ch_oath2', group: '인연', name: '두 개의 맹약', desc: '한 생에 동료 2명과 맹약(호감 100)을 맺는다', echo: 40, check: (r) => REGRESSION_COMPANIONS.filter(k => (r.affinity?.[k.id] || 0) >= 100).length >= 2 },
+  { id: 'ch_rival3', group: '인연', name: '카엘의 숙적', desc: '한 생에 카엘을 3번 앞선다', echo: 40, title: '카엘의 숙적', check: (r) => (r.rivalWins || 0) >= 3 },
+  { id: 'ch_rival_max', group: '인연', name: '키워 버린 적', desc: '카엘이 Lv.10에 도달한다', echo: 30, title: '카엘의 그림자', check: (r, m) => (m.rival?.level || 0) >= REGRESSION_RIVAL.maxLevel },
+  // ── 탐험 ──
+  { id: 'ch_secret4', group: '탐험', name: '보물 사냥꾼', desc: '한 생에 숨겨진 장소 4곳의 보물을 모두 얻는다', echo: 60, title: '보물 사냥꾼', check: (r) => new Set(r.secretDone || []).size >= 4 },
+  { id: 'ch_redmoon4', group: '탐험', name: '핏빛 달의 사냥꾼', desc: '한 생에 붉은 달 전투를 4번 이긴다', echo: 40, title: '핏빛 달의 사냥꾼', check: (r) => (r.redMoonWins || 0) >= 4 },
+  { id: 'ch_route3', group: '탐험', name: '길목의 지배자', desc: '한 생에 길목의 군주 3명을 모두 쓰러뜨린다', echo: 30, check: (r) => (r.routeBossDone || []).length >= 3 },
+  { id: 'ch_grave', group: '탐험', name: '나에게서 받은 것', desc: '전생의 유품을 회수한다', echo: 10, check: (r) => !!r.graveRecovered },
+  { id: 'ch_endings_all', group: '탐험', name: '모든 결말', desc: '엔딩 14종을 모두 본다', echo: 100, title: '모든 결말을 본 자', check: (r, m) => (m.endings || []).length >= REGRESSION_ENDINGS.length },
+  // ── 그 외 ──
+  { id: 'ch_hasty', group: '그 외', name: '성급한 회귀자', desc: '3일째가 되기 전에 쓰러진다', echo: 5, title: '성급한 회귀자', check: (r, m, c) => c === 'death' && (r.day || 1) < 3 },
+];
+export function getRegressionChallenge(id) { return REGRESSION_CHALLENGES.find(c => c.id === id) || null; }
+export function regressionTitleName(id) { return getRegressionChallenge(id)?.title || null; }
+export function setRegressionTitle(metaR, id) {
+  if (id && !(metaR.titles || []).includes(id)) return metaR;
+  return { ...metaR, title: id || null };
 }
