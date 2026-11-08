@@ -10,7 +10,7 @@ import { ChevronLeft, Coins } from 'lucide-react';
 import { PALETTE } from '../utils/helpers.js';
 import { GlassPanel, UIButton, BottomSheet } from '../components/ui/CommonUI.jsx';
 import {
-  CHRONICLE_TITLE, CHRONICLE_SUB, CHRONICLE_SAVE_KEY, CHRONICLE_SAVE_KEY_V1, CHRONICLE_TUNING, CHRONICLE_CLASSES, CHRONICLE_FIELDS,
+  CHRONICLE_TITLE, CHRONICLE_SUB, CHRONICLE_PARTS, CHRONICLE_SAVE_KEY, CHRONICLE_SAVE_KEY_V1, CHRONICLE_TUNING, CHRONICLE_CLASSES, CHRONICLE_FIELDS,
   CHRONICLE_DUNGEON, CHRONICLE_DUNGEONS, DUNGEON_TIERS, dungeonDef, STAT_META, STAT_KEYS, SKILL_MAX_LV, MASTERY_PCT, BOSS_DAILY_LIMIT, DUNGEON_KEYS, GRADES, gradeIdx, SLOTS, FORGE, UNIQUE_CHANCE, UNIQUE_ITEMS,
   chronicleClass, classSkills, describeSkill, chronicleEnemyArt,
 } from './data.js';
@@ -275,7 +275,7 @@ function TownView({ save, go, onExit, onSwitchChar }) {
   const main = Q.currentMainQuest(save);
   const goal = nextField
     ? `${main ? `[${main.title}] ` : ''}${nextField.name} — 처치 ${Math.min(save.progress.fieldKills[nextField.id] || 0, nextField.bossKills)}/${nextField.bossKills} 후 보스`
-    : main ? `[${main.title}] 보상을 받으러 게시판으로` : '1부 완결! 던전에서 에픽 장비를 노리자';
+    : main ? `[${main.title}] 보상을 받으러 게시판으로` : '2부 완결! 던전·보스 재도전으로 유니크를 노리자';
   const qBadge = Q.questBadgeCount(save);
   const tiles = [
     { id: 'quests', icon: '📜', label: '의뢰 게시판', sub: qBadge ? `새 소식 ${qBadge}건` : '메인 · 의뢰 · 이야기', badge: qBadge > 0 },
@@ -335,6 +335,7 @@ function FieldView({ save, onBack, onFight, playScene, sceneOpen }) {
   const [sel, setSel] = useState(() => [...CHRONICLE_FIELDS].reverse().find(f => E.fieldUnlocked(save, f.id))?.id || 1);
   useEffect(() => { if (!sceneOpen) playScene({ at: 'field', fieldId: sel }); }, [sel, sceneOpen]); // eslint-disable-line react-hooks/exhaustive-deps
   const f = CHRONICLE_FIELDS[sel - 1];
+  const part = CHRONICLE_PARTS.find(p => p.fields.includes(sel)) || CHRONICLE_PARTS[0];
   const kills = save.progress.fieldKills[f.id] || 0;
   const bossReady = kills >= f.bossKills;
   const cleared = !!save.progress.bossCleared[f.id];
@@ -342,11 +343,23 @@ function FieldView({ save, onBack, onFight, playScene, sceneOpen }) {
     <div className="absolute inset-0 flex flex-col">
       <Header title="사냥터" onBack={onBack} right={<Wallet save={save} />} />
       <div className="flex gap-1.5 px-3 pt-2 flex-none">
-        {CHRONICLE_FIELDS.map(x => {
+        {CHRONICLE_PARTS.map(p => {
+          const open = E.fieldUnlocked(save, p.fields[0]);
+          const on = p.id === part.id;
+          const last = [...p.fields].reverse().find(id => E.fieldUnlocked(save, id)) || p.fields[0];
+          return (
+            <button key={p.id} disabled={!open} onClick={() => setSel(last)} className="ui-press flex-1" style={{ height: 34, borderRadius: 10, fontSize: 12, fontWeight: 600, border: `1px solid ${on ? PALETTE.legendary : 'var(--ui-line)'}`, color: open ? (on ? PALETTE.legendary : PALETTE.text) : PALETTE.textDim, background: on ? 'rgba(232,176,74,0.10)' : 'transparent', opacity: open ? 1 : 0.4 }}>
+              {open ? p.name : `🔒 ${p.name.split(' · ')[0]} — ${CHRONICLE_FIELDS[p.fields[0] - 2].name} 보스 후`}
+            </button>
+          );
+        })}
+      </div>
+      <div className="flex gap-1.5 px-3 pt-1.5 flex-none">
+        {CHRONICLE_FIELDS.filter(x => part.fields.includes(x.id)).map(x => {
           const open = E.fieldUnlocked(save, x.id);
           return (
             <button key={x.id} disabled={!open} onClick={() => setSel(x.id)} className="ui-press flex-1" style={{ height: 40, borderRadius: 10, fontSize: 12, border: `1px solid ${sel === x.id ? x.color : 'var(--ui-line)'}`, color: open ? (sel === x.id ? x.color : PALETTE.text) : PALETTE.textDim, background: sel === x.id ? `${x.color}1c` : 'transparent', opacity: open ? 1 : 0.4 }}>
-              {open ? `${x.id}. ${x.name.split(' ').pop()}` : '🔒'}
+              {open ? `${x.id}. ${x.name.split(' ').pop()}` : `🔒 ${x.id}`}
             </button>
           );
         })}
@@ -848,7 +861,7 @@ function TitleView({ acc, onSelect, onCreate, onExit }) {
                 <div className="flex-1 min-w-0">
                   <div className="font-semibold" style={{ fontSize: 14, color: ch ? PALETTE.text : PALETTE.textDim }}>{c.name} <span style={{ fontSize: 11, color: c.color }}>{c.role}</span></div>
                   <div style={{ fontSize: 11.5, color: ch ? PALETTE.legendary : PALETTE.textDim }}>
-                    {ch ? `Lv.${ch.unit.lv} · 보스 ${Object.keys(ch.progress.bossCleared || {}).length}/4 처치` : '비어 있음 — 눌러서 만들기'}
+                    {ch ? `Lv.${ch.unit.lv} · 보스 ${Object.keys(ch.progress.bossCleared || {}).length}/${CHRONICLE_FIELDS.length} 처치` : '비어 있음 — 눌러서 만들기'}
                   </div>
                 </div>
                 <span style={{ fontSize: 12, color: ch ? PALETTE.dawn : PALETTE.textDim }}>{ch ? (last === c.id ? '이어하기 ▸' : '선택 ▸') : '＋'}</span>

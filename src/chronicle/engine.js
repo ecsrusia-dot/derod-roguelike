@@ -89,13 +89,17 @@ export function dungeonTierUnlocked(save, id, tierIdx) {
 }
 
 // ===== 장비 (2.0 — 직업 전용 4칸 · 직업별 옵션 · 유니크) =====
-const tierOf = (ilv) => Math.min(3, Math.floor((Math.max(1, ilv) - 1) / 15));
+const tierOf = (ilv) => Math.min(6, Math.floor((Math.max(1, ilv) - 1) / 15));
+// 2부(아이템 레벨 61+) 이름 — 4단계 이름의 「균열의/심연의」를 2부 지역 접두어로 바꾼다
+const LATE_PREFIX = ['성역의', '핏빛', '황혼의'];
 export const itemUsable = (item, classId) => !!item && (item.cls === 'common' || item.cls === classId);
 export const uniqueDef = (item) => (item?.named ? UNIQUE_ITEMS[item.named] : null);
 export const epicOptOf = (item) => (item?.eopt ? EPIC_OPTIONS[item.eopt] : null);
 export function itemName(item) {
   if (item.named) return UNIQUE_ITEMS[item.named]?.name || '유니크';
-  const base = (CLASS_GEAR_NAMES[item.cls] || CLASS_GEAR_NAMES.common)[item.slot]?.[tierOf(item.ilv)] || '장비';
+  const names = (CLASS_GEAR_NAMES[item.cls] || CLASS_GEAR_NAMES.common)[item.slot] || [];
+  const t = tierOf(item.ilv);
+  const base = (t <= 3 ? names[t] : names[3] && `${LATE_PREFIX[t - 4]} ${names[3].replace(/^(균열의|심연의) /, '')}`) || '장비';
   return item.grade === 'epic' ? `${EPIC_PREFIX[item.set] || EPIC_PREFIX.field} ${base}` : base;
 }
 function rollOption(rng, cls, gradeId, have) {
