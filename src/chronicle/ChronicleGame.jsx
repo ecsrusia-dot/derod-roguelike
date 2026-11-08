@@ -11,7 +11,7 @@ import { PALETTE } from '../utils/helpers.js';
 import { GlassPanel, UIButton, BottomSheet } from '../components/ui/CommonUI.jsx';
 import {
   CHRONICLE_TITLE, CHRONICLE_SUB, CHRONICLE_SAVE_KEY, CHRONICLE_TUNING, CHRONICLE_CLASSES, CHRONICLE_FIELDS,
-  CHRONICLE_DUNGEON, STAT_META, STAT_KEYS, SKILL_MAX_LV, GRADES, gradeIdx, SLOTS, FORGE,
+  CHRONICLE_DUNGEON, STAT_META, STAT_KEYS, SKILL_MAX_LV, MASTERY_PCT, BOSS_DAILY_LIMIT, GRADES, gradeIdx, SLOTS, FORGE,
   chronicleClass, classSkills, describeSkill, chronicleEnemyArt,
 } from './data.js';
 import * as E from './engine.js';
@@ -355,13 +355,21 @@ function FieldView({ save, onBack, onFight, playScene, sceneOpen }) {
           <div className="mt-1"><Bar v={Math.min(kills, f.bossKills)} max={f.bossKills} color={f.color} h={6} /></div>
           <div className="mt-2" style={{ fontSize: 11.5, color: PALETTE.textDim, lineHeight: 1.5 }}>
             출몰: 일반 {f.normals.length}종 · 강적 {Math.round(CHRONICLE_TUNING.eliteChance * 100)}% 확률<br />
-            {cleared ? '보스 처치 완료 — 재도전 가능 (희귀 장비 확정)' : nextComp && !save.units[nextComp] ? `보스를 쓰러뜨리면 ${iga(chronicleClass(nextComp).name)} 동료가 된다` : '보스를 쓰러뜨리면 다음 지역이 열린다'}
+            {cleared ? `보스 처치 완료 — 재도전은 하루 ${BOSS_DAILY_LIMIT}회 (희귀 장비 확정)` : nextComp && !save.units[nextComp] ? `보스를 쓰러뜨리면 ${iga(chronicleClass(nextComp).name)} 동료가 된다` : '보스를 쓰러뜨리면 다음 지역이 열린다'}
           </div>
         </GlassPanel>
         <UIButton onClick={() => onFight(f, false)}>사냥 시작</UIButton>
-        <UIButton variant="gold" disabled={!bossReady && !cleared} onClick={() => onFight(f, true)}>
-          {bossReady || cleared ? `보스 도전 — ${E.rollFieldEncounter(f, () => 0, true).enemies[0].name}` : `보스 잠김 (처치 ${f.bossKills - kills} 남음)`}
-        </UIButton>
+        {(() => {
+          const left = E.bossAttemptsLeft(save, f.id);
+          const bossName = E.rollFieldEncounter(f, () => 0, true).enemies[0].name;
+          if (!bossReady && !cleared) return <UIButton variant="gold" disabled>{`보스 잠김 (처치 ${f.bossKills - kills} 남음)`}</UIButton>;
+          if (cleared && left <= 0) return <UIButton variant="gold" disabled>보스 재도전 — 오늘 횟수 소진 (0시 초기화)</UIButton>;
+          return (
+            <UIButton variant="gold" onClick={() => onFight(f, true)}>
+              {cleared ? `보스 재도전 — ${bossName} (오늘 ${left}/${BOSS_DAILY_LIMIT})` : `보스 도전 — ${bossName}`}
+            </UIButton>
+          );
+        })()}
       </div>
     </div>
   );
@@ -510,6 +518,14 @@ function PartyView({ save, setSave, onBack }) {
               </div>
             );
           })}
+          <div className="flex items-center gap-2 mt-3 pt-2" style={{ borderTop: '1px solid var(--ui-line)' }}>
+            <div className="flex-1 min-w-0">
+              <div style={{ fontSize: 13, color: u.mastery ? PALETTE.text : PALETTE.textDim }}>마스터리 <span style={{ fontSize: 11, color: PALETTE.legendary }}>Lv.{u.mastery || 0}</span></div>
+              <div style={{ fontSize: 11, color: PALETTE.textDim }}>포인트 1개당 공격력·최대 HP +{Math.round(MASTERY_PCT * 100)}% · 상한 없음 (현재 +{Math.round((u.mastery || 0) * MASTERY_PCT * 100)}%)</div>
+            </div>
+            <button disabled={!u.sp} onClick={() => setSave(E.addMastery(save, cid, 1))} className="ui-press flex-none" style={{ height: 34, padding: '0 10px', borderRadius: 9, border: `1px solid ${u.sp ? PALETTE.legendary : 'var(--ui-line)'}`, color: u.sp ? PALETTE.legendary : PALETTE.textDim, background: 'transparent', fontSize: 12, opacity: u.sp ? 1 : 0.4 }}>+1</button>
+            {u.sp > 1 && <button onClick={() => setSave(E.addMastery(save, cid, u.sp))} className="ui-press flex-none" style={{ height: 34, padding: '0 10px', borderRadius: 9, border: `1px solid ${PALETTE.legendary}`, color: PALETTE.legendary, background: 'transparent', fontSize: 12 }}>전부</button>}
+          </div>
         </GlassPanel>
 
         {/* 장비 */}
@@ -880,6 +896,7 @@ export default function ChronicleGame({ onExit }) {
 
   // 전투 시작: 끝까지 계산 → 저장 반영 → 재생
   const fightField = (field, boss) => {
+    if (boss && E.bossAttemptsLeft(save, field.id) <= 0) { flash('오늘 보스 재도전 횟수를 모두 썼습니다'); return; }
     if (boss && playScene({ at: 'bossPre', fieldId: field.id }, () => flash('준비되면 「보스 도전」을 누르세요'))) return; // 보스 앞 장면 먼저 (저장 반영 후 다시 도전)
     lastFieldRef.current = field;
     const enc = E.rollFieldEncounter(field, rng, boss, E.partyLevel(save));

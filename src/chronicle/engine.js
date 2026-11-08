@@ -6,7 +6,7 @@
 // ============================================
 import {
   CHRONICLE_TUNING as T, CHRONICLE_CLASSES, CHRONICLE_SKILLS, CHRONICLE_FIELDS, CHRONICLE_DUNGEON,
-  STAT_KEYS, SKILL_MAX_LV, GRADES, gradeIdx, SLOTS, SLOT_NAMES, EPIC_NAMES, FORGE, DROP_TABLE,
+  STAT_KEYS, SKILL_MAX_LV, MASTERY_PCT, BOSS_DAILY_LIMIT, GRADES, gradeIdx, SLOTS, SLOT_NAMES, EPIC_NAMES, FORGE, DROP_TABLE,
   chronicleClass, classSkills, buildChronicleEnemy,
 } from './data.js';
 
@@ -49,7 +49,7 @@ export function autoGrowUnit(u0) {
   let guard = 0;
   while (u.sp > 0 && guard++ < 50) {
     const learnable = classSkills(u.classId).filter(s => s.reqLv <= u.lv && (u.skills[s.id] || 0) < SKILL_MAX_LV);
-    if (!learnable.length) break;
+    if (!learnable.length) { u.mastery = (u.mastery || 0) + u.sp; u.sp = 0; break; }
     learnable.sort((a, b) => (u.skills[a.id] || 0) - (u.skills[b.id] || 0) || a.reqLv - b.reqLv);
     const s = learnable[0];
     u.skills[s.id] = (u.skills[s.id] || 0) + 1; u.sp -= 1;
@@ -141,10 +141,11 @@ export function deriveUnit(save, classId) {
   const fx = passiveFx(u);
   const st = u.stats;
   const main = cls.main === 'int' ? st.int : cls.main === 'agi' ? st.agi : st.str;
-  const atk = (main * 2.2 + u.lv * 1.5 + g.atk) * (1 + (fx.atkPct || 0) + g.atkPct);
+  const mast = (u.mastery || 0) * MASTERY_PCT;
+  const atk = (main * 2.2 + u.lv * 1.5 + g.atk) * (1 + (fx.atkPct || 0) + g.atkPct + mast);
   return {
     id: classId, classId, name: cls.name, side: 'party', lv: u.lv, magic: cls.magic,
-    maxHp: Math.round((50 + st.vit * 10 + u.lv * 6 + g.hp) * (1 + (fx.hpPct || 0) + g.hpPct)),
+    maxHp: Math.round((50 + st.vit * 10 + u.lv * 6 + g.hp) * (1 + (fx.hpPct || 0) + g.hpPct + mast)),
     atk: Math.round(atk),
     healPower: Math.round(st.int * 2.2 + u.lv * 1.5 + g.atk * 0.5),
     def: Math.round((st.vit * 0.8 + g.def) * (1 + (fx.defPct || 0))),
@@ -191,6 +192,32 @@ export function learnSkill(save0, classId, skillId) {
   u.skills[skillId] = (u.skills[skillId] || 0) + 1; u.sp -= 1;
   return save;
 }
+export function addMastery(save0, classId, n = 1) {
+  const u0 = save0.units[classId];
+  if (!u0 || u0.sp < n) return save0;
+  const save = clone(save0);
+  const u = save.units[classId];
+  u.sp -= n; u.mastery = (u.mastery || 0) + n;
+  return save;
+}
+
+// ===== 보스 재도전 일일 제한 (1.207.0) =====
+export function kstDateKey(now = Date.now()) {
+  return new Date(now + 9 * 3600 * 1000).toISOString().slice(0, 10);
+}
+// 첫 처치 전 = 무제한(Infinity), 이후 = 오늘 남은 횟수
+export function bossAttemptsLeft(save, fieldId, now = Date.now()) {
+  if (!save.progress.bossCleared[fieldId]) return Infinity;
+  const d = save.bossDaily;
+  const used = d && d.date === kstDateKey(now) ? (d.counts[fieldId] || 0) : 0;
+  return Math.max(0, BOSS_DAILY_LIMIT - used);
+}
+function useBossAttempt(save, fieldId, now = Date.now()) {
+  const key = kstDateKey(now);
+  if (!save.bossDaily || save.bossDaily.date !== key) save.bossDaily = { date: key, counts: {} };
+  save.bossDaily.counts[fieldId] = (save.bossDaily.counts[fieldId] || 0) + 1;
+}
+
 // 경험치 — 레벨업 횟수 반환
 function gainExp(u, n) {
   let ups = 0;
@@ -388,7 +415,10 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
     const foes = alive('enemy');
     const has = (k) => ready.find(x => x.s.kind === k);
     const lowAlly = allies.find(a => a.hp < a.maxHp * 0.55);
+    const hurt = allies.filter(a => a.hp < a.maxHp * 0.7).length;
+    if (hurt >= 2 && has('healAll')) return has('healAll');
     if (lowAlly && has('heal')) return has('heal');
+    if (lowAlly && has('healAll')) return has('healAll');
     if (has('shield') && !allies.some(a => a.shield > 0)) return has('shield');
     if (has('buffAtk') && !allies.some(a => a.buffs.bless?.t > 0)) return has('buffAtk');
     if (has('rage') && !(u.buffs.rage?.t > 0)) return has('rage');
@@ -475,6 +505,9 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
         hits.push({ t: t.id, h });
         break;
       }
+      case 'healAll':
+        for (const a of allies) { const h = Math.round(u.healPower * v); a.hp = Math.min(a.maxHp, a.hp + h); hits.push({ t: a.id, h }); }
+        break;
       case 'shield':
         for (const a of allies) { const sh = Math.round(u.healPower * v); a.shield = Math.max(a.shield, sh); hits.push({ t: a.id, s: sh }); }
         break;
@@ -544,6 +577,8 @@ export function applyBattle(save0, ctx, battle, rng = Math.random) {
   const save = clone(save0);
   save.stats.battles += 1;
   const summary = { result: battle.result, exp: 0, gold: 0, items: [], essence: 0, shard: 0, levelUps: {}, recruit: null, unlocks: [] };
+  // 이미 처치한 보스 재도전은 결과와 관계없이 하루 횟수 1회 소모
+  if (ctx.kind === 'field' && ctx.type === 'boss' && save.progress.bossCleared[ctx.fieldId]) useBossAttempt(save, ctx.fieldId);
   if (battle.result !== 'win') {
     if (ctx.kind === 'field') {
       const loss = Math.floor(save.gold * T.fieldDefeatGoldLoss);

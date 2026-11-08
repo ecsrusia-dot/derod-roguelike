@@ -81,8 +81,23 @@ export const CHRONICLE_SKILLS = {
   p_bless: S('p_bless', 'priest', '축복', 'buffAtk', 3, 5, 0.15, 0.04, { turns: 3 }),
   p_shield: S('p_shield', 'priest', '가호', 'shield', 5, 5, 1.2, 0.2),
   p_light: S('p_light', 'priest', '신성 광선', 'strike', 8, 3, 1.6, 0.15),
+  // ── 1.207.0 후반 스킬 (Lv.15 · Lv.25) — 남는 스킬 포인트 해소
+  w_flash: S('w_flash', 'wanderer', '일섬', 'strike', 15, 3, 2.6, 0.25),
+  w_unyield: S('w_unyield', 'wanderer', '불굴', 'passive', 25, 0, 0, 0, { fx: (lv) => ({ hpPct: 0.05 * lv, defPct: 0.04 * lv }) }),
+  s_surge: S('s_surge', 'sage', '마력 폭주', 'rage', 15, 5, 0.35, 0.07, { turns: 3 }),
+  s_starfall: S('s_starfall', 'sage', '운석 낙하', 'aoe', 25, 6, 2.4, 0.25),
+  d_moon: S('d_moon', 'demonblood', '혈월참', 'lifesteal', 15, 4, 2.4, 0.22, { steal: 0.4 }),
+  d_undying: S('d_undying', 'demonblood', '불멸의 피', 'passive', 25, 0, 0, 0, { fx: (lv) => ({ hpPct: 0.06 * lv, lowHpDmg: 0.1 * lv }) }),
+  e_spirits: S('e_spirits', 'elf', '정령 소환', 'dot', 15, 4, 0.6, 0.07, { turns: 3, all: true }),
+  e_divine: S('e_divine', 'elf', '신궁', 'multi', 25, 4, 0.45, 0.05, { hits: 7 }),
+  p_dawn: S('p_dawn', 'priest', '여명의 기도', 'healAll', 15, 4, 0.9, 0.12),
+  p_judge: S('p_judge', 'priest', '심판', 'aoe', 25, 4, 1.6, 0.15),
 };
 export const SKILL_MAX_LV = 5;
+// 마스터리 (1.207.0) — 남는 스킬 포인트 1개당 공격·최대 HP +1%, 상한 없음
+export const MASTERY_PCT = 0.01;
+// 보스 재도전 (1.207.0) — 첫 처치 후 보스마다 하루 3회 (한국 시간 0시 초기화)
+export const BOSS_DAILY_LIMIT = 3;
 export const classSkills = (classId) => Object.values(CHRONICLE_SKILLS).filter(s => s.cls === classId);
 
 const pct = (x) => `${Math.round(x * 100)}%`;
@@ -96,6 +111,7 @@ export function describeSkill(s, lv = 1) {
     case 'dot': return `${s.all ? '적 전체' : '적 1명'}에게 ${s.turns}턴간 매 턴 공격력 ${pct(v)} 피해`;
     case 'lifesteal': return `적 1명에게 공격력 ${pct(v)} 피해, 피해의 ${pct(s.steal)} 회복`;
     case 'heal': return `HP가 가장 낮은 아군을 지능 기반 ${pct(v)} 회복`;
+    case 'healAll': return `아군 전체를 지능 기반 ${pct(v)} 회복`;
     case 'shield': return `아군 전체에 지능 기반 ${pct(v)} 보호막`;
     case 'buffAtk': return `${s.turns}턴간 아군 전체 공격력 +${pct(v)}`;
     case 'rage': return `${s.turns}턴간 자신의 공격력 +${pct(v)}`;
