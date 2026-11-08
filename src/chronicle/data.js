@@ -99,6 +99,14 @@ export const SKILL_MAX_LV = 5;
 export const MASTERY_PCT = 0.01;
 // 보스 재도전 (1.207.0) — 첫 처치 후 보스마다 하루 3회 (한국 시간 0시 초기화)
 export const BOSS_DAILY_LIMIT = 3;
+// 🗝 던전 열쇠 (1.209.0) — 입장 시 소모(난이도별 keyCost), 후퇴·전멸해도 돌려받지 못함
+export const DUNGEON_KEYS = {
+  dailyRefill: 3,        // 매일 한국 시간 0시, 보유량이 3개 미만이면 3개까지 채움
+  max: 10,               // 최대 보유
+  eliteDrop: 0.1,        // 사냥터 강적 1마리 처치당 10%
+  shopPrice: 400,        // 상점 구매 가격 (골드)
+  shopDailyLimit: 2,     // 하루 구매 한도
+};
 export const classSkills = (classId) => Object.values(CHRONICLE_SKILLS).filter(s => s.cls === classId);
 
 const pct = (x) => `${Math.round(x * 100)}%`;
@@ -173,9 +181,9 @@ export const dungeonDef = (id) => CHRONICLE_DUNGEONS.find(d => d.id === id) || C
 
 // 난이도 — 이전 단계 보스를 쓰러뜨리면 다음 단계 개방
 export const DUNGEON_TIERS = [
-  { id: 'normal', label: '일반', color: '#a89a88', lv: 0, hp: 1, atk: 1, epicMult: 1, shardMult: 1 },
-  { id: 'heroic', label: '영웅', color: '#6aa6e0', lv: 5, hp: 2.2, atk: 1.7, epicMult: 1.6, shardMult: 2 },
-  { id: 'legend', label: '전설', color: '#e8b04a', lv: 10, hp: 3.6, atk: 2.4, epicMult: 2.4, shardMult: 3 },
+  { id: 'normal', label: '일반', color: '#a89a88', lv: 0, hp: 1, atk: 1, epicMult: 1, shardMult: 1, keyCost: 1 },
+  { id: 'heroic', label: '영웅', color: '#6aa6e0', lv: 5, hp: 2.2, atk: 1.7, epicMult: 1.6, shardMult: 2, keyCost: 2 },
+  { id: 'legend', label: '전설', color: '#e8b04a', lv: 10, hp: 3.6, atk: 2.4, epicMult: 2.4, shardMult: 3, keyCost: 3 },
 ];
 
 // 적 일러 경로 (본편 헬퍼와 같은 규칙, ./ 상대 경로)

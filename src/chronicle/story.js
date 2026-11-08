@@ -206,14 +206,14 @@ export const RECRUIT_SCENES = {
 export const QUESTS = [
   // ── 메인
   { id: 'm1', kind: 'main', title: '북부의 이변', desc: '북부 극지대에서 서리를 내리는 자를 찾아 쓰러뜨려라.', goal: { type: 'boss', field: 1 }, reward: { gold: 150, essence: 6 } },
-  { id: 'm2', kind: 'main', req: { main: 'm1' }, title: '황혼의 자녀', desc: '마녀가 남긴 말을 따라 죽은 자의 숲으로 가라.', goal: { type: 'boss', field: 2 }, reward: { gold: 350, essence: 12, item: { grade: 'rare' } } },
+  { id: 'm2', kind: 'main', req: { main: 'm1' }, title: '황혼의 자녀', desc: '마녀가 남긴 말을 따라 죽은 자의 숲으로 가라.', goal: { type: 'boss', field: 2 }, reward: { gold: 350, essence: 12, item: { grade: 'rare' }, keys: 3 } },
   { id: 'm3', kind: 'main', req: { main: 'm2' }, title: '봉인의 진실', desc: '봉인된 신전의 문지기를 만나 하늘이 멈춘 이유를 알아내라.', goal: { type: 'boss', field: 3 }, reward: { gold: 700, essence: 20, shard: 2 } },
   { id: 'm4', kind: 'main', req: { main: 'm3' }, title: '마지막 등불', desc: '균열 너머의 그림자를 쓰러뜨려 여명을 되찾아라.', goal: { type: 'boss', field: 4 }, reward: { gold: 1500, shard: 6, item: { grade: 'epic' } } },
 
   // ── 사냥터 1
   { id: 's1a', kind: 'side', req: { field: 1 }, title: '늑대 사냥', desc: '양치기 노인: "늑대가 마을 울타리까지 내려와. 몇 마리만 잡아 주게."', goal: { type: 'killKey', key: 'iceWolf', n: 6 }, reward: { gold: 60, exp: 60, essence: 3 } },
   { id: 's1b', kind: 'side', req: { field: 1 }, title: '약탈자 소탕', desc: '상인 조합: "동토의 약탈자들이 짐마차를 노린다. 쫓아내 주시오."', goal: { type: 'killKey', key: 'tundraRaider', n: 6 }, reward: { gold: 80, exp: 80, item: { grade: 'uncommon' } } },
-  { id: 's1c', kind: 'side', req: { field: 1 }, title: '눈 속의 거인', desc: '사냥꾼: "평소보다 큰 놈들이 보였어. 강적을 처치해 줘."', goal: { type: 'elites', n: 2 }, reward: { gold: 120, essence: 6 } },
+  { id: 's1c', kind: 'side', req: { field: 1 }, title: '눈 속의 거인', desc: '사냥꾼: "평소보다 큰 놈들이 보였어. 강적을 처치해 줘."', goal: { type: 'elites', n: 2 }, reward: { gold: 120, essence: 6, keys: 1 } },
   // ── 사냥터 2
   { id: 's2a', kind: 'side', req: { field: 2 }, title: '그림자 늑대 무리', desc: '나무꾼: "숲 입구에 그림자 같은 늑대가 들끓어."', goal: { type: 'killKey', key: 'shadowWolf', n: 10 }, reward: { gold: 180, exp: 300, essence: 6 } },
   { id: 's2b', kind: 'side', req: { field: 2 }, title: '거미줄 걷기', desc: '약초꾼: "약초밭이 거미줄로 덮였어요. 부패한 거미를 없애 주세요."', goal: { type: 'killKey', key: 'corruptSpider', n: 10 }, reward: { gold: 200, exp: 300, item: { grade: 'rare' } } },
@@ -225,16 +225,16 @@ export const QUESTS = [
   // ── 사냥터 4
   { id: 's4a', kind: 'side', req: { field: 4 }, title: '정찰병 차단', desc: '파수대장: "마계 정찰병이 우리 위치를 넘기고 있다. 막아라."', goal: { type: 'killKey', key: 'demonScout', n: 15 }, reward: { gold: 800, exp: 3000, essence: 15 } },
   { id: 's4b', kind: 'side', req: { field: 4 }, title: '분노의 근원', desc: '사제단: "분노한 악마가 균열을 넓히고 있습니다."', goal: { type: 'killKey', key: 'wrathDemon', n: 12 }, reward: { gold: 900, shard: 2 } },
-  { id: 's4c', kind: 'side', req: { field: 4 }, title: '사도의 증표', desc: '촌장: "마왕의 사도를 쓰러뜨렸다는 증표를 가져오게."', goal: { type: 'elites', n: 4 }, reward: { gold: 1000, item: { grade: 'rare' }, shard: 1 } },
+  { id: 's4c', kind: 'side', req: { field: 4 }, title: '사도의 증표', desc: '촌장: "마왕의 사도를 쓰러뜨렸다는 증표를 가져오게."', goal: { type: 'elites', n: 4 }, reward: { gold: 1000, item: { grade: 'rare' }, shard: 1, keys: 2 } },
   // ── 성장 · 던전
   { id: 'g1', kind: 'side', title: '대장장이의 시험', desc: '대장장이: "강화가 뭔지 보여 주지. 장비 하나를 +3까지 올려 와."', goal: { type: 'enhance', n: 3 }, reward: { gold: 100, essence: 8 } },
   { id: 'g2', kind: 'side', req: { main: 'm1' }, title: '등급을 넘어', desc: '대장장이: "이제 승급이다. 희귀 등급 장비를 하나 만들어 봐."', goal: { type: 'grade', grade: 'rare' }, reward: { gold: 300, essence: 15 } },
   { id: 'g3', kind: 'side', req: { field: 2 }, title: '이름을 알리다', desc: '촌장: "자네 이름이 마을 밖까지 퍼지려면 아직 멀었네." — 주인공 Lv.15 달성', goal: { type: 'level', n: 15 }, reward: { gold: 400, essence: 10 } },
-  { id: 'd1', kind: 'side', req: { main: 'm2' }, title: '왕의 무덤', desc: '촌장: "서리 왕의 무덤 끝까지 내려가 보게."', goal: { type: 'dungeon', n: 1 }, reward: { gold: 600, shard: 3 } },
+  { id: 'd1', kind: 'side', req: { main: 'm2' }, title: '왕의 무덤', desc: '촌장: "서리 왕의 무덤 끝까지 내려가 보게."', goal: { type: 'dungeon', n: 1 }, reward: { gold: 600, shard: 3, keys: 2 } },
   { id: 'd2', kind: 'side', req: { main: 'm2' }, title: '전설의 무구', desc: '대장장이: "에픽 장비를 하나 손에 넣어 와. 내 눈으로 봐야겠어."', goal: { type: 'grade', grade: 'epic' }, reward: { gold: 1000, essence: 30 } },
 
   // ── 1.208.0 던전 확장
-  { id: 'd3', kind: 'side', req: { main: 'm3' }, title: '광기의 심장', desc: '숲의 파수꾼: "숲 가장 깊은 곳에서 음악이 들린다네. 멈춰 주게."', goal: { type: 'dungeonTier', id: 'forestHeart', tier: 0 }, reward: { gold: 1500, shard: 4, essence: 20 } },
+  { id: 'd3', kind: 'side', req: { main: 'm3' }, title: '광기의 심장', desc: '숲의 파수꾼: "숲 가장 깊은 곳에서 음악이 들린다네. 멈춰 주게."', goal: { type: 'dungeonTier', id: 'forestHeart', tier: 0 }, reward: { gold: 1500, shard: 4, essence: 20, keys: 2 } },
   { id: 'd4', kind: 'side', req: { main: 'm2' }, title: '영웅의 증명', desc: '대장장이: "무덤을 영웅 난이도로 끝까지 내려가면, 진짜 대장장이 일을 보여 주지."', goal: { type: 'dungeonTier', id: 'frostTomb', tier: 1 }, reward: { gold: 1200, shard: 5 } },
   { id: 'd5', kind: 'side', req: { main: 'm3' }, title: '전설이 되다', desc: '촌장: "전설 난이도를 넘은 자는 아직 없다네."', goal: { type: 'dungeonTier', id: 'frostTomb', tier: 2 }, reward: { gold: 3000, shard: 8, item: { grade: 'epic' } } },
 

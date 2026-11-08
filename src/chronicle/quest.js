@@ -7,7 +7,7 @@
 // ============================================
 import { QUESTS, SCENES, RECRUIT_SCENES } from './story.js';
 import { GRADES, gradeIdx, CHRONICLE_TUNING as T, uniqueIdsFor, DUNGEON_TIERS } from './data.js';
-import { rollItem, autoGrowUnit } from './engine.js';
+import { rollItem, autoGrowUnit, refreshDungeonKeys, _addKeys } from './engine.js';
 
 const clone = (o) => (typeof structuredClone === 'function' ? structuredClone(o) : JSON.parse(JSON.stringify(o)));
 
@@ -32,7 +32,7 @@ export function ensureQuestFields(save) {
       it.set = it.set || 'frost';
     }
   }
-  return s;
+  return refreshDungeonKeys(s);
 }
 
 export const questDef = (id) => QUESTS.find(q => q.id === id);
@@ -120,6 +120,7 @@ export function claimQuest(save0, id, rng = Math.random) {
   save.gold += r.gold || 0;
   save.mats.essence += r.essence || 0;
   save.mats.shard += r.shard || 0;
+  if (r.keys) gained.keysGot = _addKeys(save, r.keys);
   if (r.exp) {
     for (const cid of save.party) {
       const u = save.units[cid];
@@ -158,6 +159,7 @@ export function rewardText(r) {
   if (r.exp) p.push(`경험치 ${r.exp}`);
   if (r.essence) p.push(`✦ ${r.essence}`);
   if (r.shard) p.push(`◆ ${r.shard}`);
+  if (r.keys) p.push(`🗝 ${r.keys}`);
   if (r.item) p.push(`${GRADES[gradeIdx(r.item.grade)].label} 장비`);
   if (r.growth) p.push(`능력치 +${r.growth.points} · 스킬 포인트 +${r.growth.sp}`);
   return p.join(' · ');
