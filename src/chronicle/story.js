@@ -88,6 +88,14 @@ export const SCENES = [
     ],
   },
   {
+    id: 'dungeon2_open', title: '광기의 숲 심장부', bg: './enemies/championship/forest/chapter4/champ_forest_boss4_intro.jpg',
+    when: (s, c) => !!s.progress.bossCleared[3] && c.at === 'town',
+    lines: [
+      { sp: 'elder', t: '봉인이 깨지자 죽은 자의 숲 깊은 곳에서 음악 소리가 들려온다는구먼.' },
+      { sp: 'elder', t: '광기에 물든 자들이 그 음악에 맞춰 춤추고 있다지. 숲의 심장부, 거기에 또 하나의 무구가 잠들어 있을 게다.' },
+    ],
+  },
+  {
     id: 'f3_enter', title: '봉인된 신전', bg: './enemies/classic/chapter_3/timeKeeper_combat.jpg',
     when: (s, c) => c.at === 'field' && c.fieldId === 3,
     lines: [
@@ -224,6 +232,11 @@ export const QUESTS = [
   { id: 'g3', kind: 'side', req: { field: 2 }, title: '이름을 알리다', desc: '촌장: "자네 이름이 마을 밖까지 퍼지려면 아직 멀었네." — 주인공 Lv.15 달성', goal: { type: 'level', n: 15 }, reward: { gold: 400, essence: 10 } },
   { id: 'd1', kind: 'side', req: { main: 'm2' }, title: '왕의 무덤', desc: '촌장: "서리 왕의 무덤 끝까지 내려가 보게."', goal: { type: 'dungeon', n: 1 }, reward: { gold: 600, shard: 3 } },
   { id: 'd2', kind: 'side', req: { main: 'm2' }, title: '전설의 무구', desc: '대장장이: "에픽 장비를 하나 손에 넣어 와. 내 눈으로 봐야겠어."', goal: { type: 'grade', grade: 'epic' }, reward: { gold: 1000, essence: 30 } },
+
+  // ── 1.208.0 던전 확장
+  { id: 'd3', kind: 'side', req: { main: 'm3' }, title: '광기의 심장', desc: '숲의 파수꾼: "숲 가장 깊은 곳에서 음악이 들린다네. 멈춰 주게."', goal: { type: 'dungeonTier', id: 'forestHeart', tier: 0 }, reward: { gold: 1500, shard: 4, essence: 20 } },
+  { id: 'd4', kind: 'side', req: { main: 'm2' }, title: '영웅의 증명', desc: '대장장이: "무덤을 영웅 난이도로 끝까지 내려가면, 진짜 대장장이 일을 보여 주지."', goal: { type: 'dungeonTier', id: 'frostTomb', tier: 1 }, reward: { gold: 1200, shard: 5 } },
+  { id: 'd5', kind: 'side', req: { main: 'm3' }, title: '전설이 되다', desc: '촌장: "전설 난이도를 넘은 자는 아직 없다네."', goal: { type: 'dungeonTier', id: 'frostTomb', tier: 2 }, reward: { gold: 3000, shard: 8, item: { grade: 'epic' } } },
 
   // ── 동료 개인 의뢰 (합류 후) — 보상: 그 동료 능력치 +4 · 스킬 포인트 +1
   { id: 'c_wanderer', kind: 'companion', req: { companion: 'wanderer' }, title: '검이 기억하는 길', desc: '방랑검사: "보이지 않아도 베어 온 수는 기억해. 함께 마흔을 베자."', goal: { type: 'kills', n: 40 }, reward: { gold: 200, growth: { points: 4, sp: 1 } } },

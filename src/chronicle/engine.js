@@ -5,7 +5,7 @@
 // 전투는 simulateChronicleBattle이 끝까지 계산해 사건 목록을 돌려주고, UI는 재생만 한다 (풀오토 관전).
 // ============================================
 import {
-  CHRONICLE_TUNING as T, CHRONICLE_CLASSES, CHRONICLE_SKILLS, CHRONICLE_FIELDS, CHRONICLE_DUNGEON,
+  CHRONICLE_TUNING as T, CHRONICLE_CLASSES, CHRONICLE_SKILLS, CHRONICLE_FIELDS, CHRONICLE_DUNGEON, CHRONICLE_DUNGEONS, DUNGEON_TIERS, dungeonDef, EPIC_SETS, UNIQUE_OPTIONS, uniqueIdsFor,
   STAT_KEYS, SKILL_MAX_LV, MASTERY_PCT, BOSS_DAILY_LIMIT, GRADES, gradeIdx, SLOTS, SLOT_NAMES, EPIC_NAMES, FORGE, DROP_TABLE,
   chronicleClass, classSkills, buildChronicleEnemy,
 } from './data.js';
@@ -75,8 +75,15 @@ export function companionOrder(heroId) {
 export function fieldUnlocked(save, fieldId) {
   return fieldId === 1 || !!save.progress.bossCleared[fieldId - 1];
 }
-export function dungeonUnlocked(save) {
-  return !!save.progress.bossCleared[CHRONICLE_DUNGEON.unlockField];
+export function dungeonUnlocked(save, id = null) {
+  if (id) return !!save.progress.bossCleared[dungeonDef(id).unlockField];
+  return CHRONICLE_DUNGEONS.some(d => !!save.progress.bossCleared[d.unlockField]);
+}
+// 난이도 개방 — 0(일반)은 항상, 이후는 직전 단계 보스 처치
+export function dungeonTierUnlocked(save, id, tierIdx) {
+  if (tierIdx <= 0) return true;
+  const best = save.progress.dungeonTier?.[id];
+  return best != null && best >= tierIdx - 1;
 }
 
 // ===== 장비 =====
@@ -97,29 +104,34 @@ export function itemStats(item) {
   return out;
 }
 export function itemName(item) {
-  if (item.grade === 'epic') return EPIC_NAMES[item.slot];
+  if (item.grade === 'epic') return (EPIC_SETS[item.set] || EPIC_NAMES)[item.slot];
   const tier = Math.min(3, Math.floor((item.ilv - 1) / 8));
   return SLOT_NAMES[item.slot][tier];
 }
 export function itemPower(item) {
   const s = itemStats(item);
-  return Math.round((s.atk || 0) * 2 + (s.def || 0) * 2 + (s.hp || 0) * 0.3 + (s.crit || 0) * 300 + (s.spd || 0) * 3 + (s.critDmg || 0) * 60 + (s.hpPct || 0) * 200 + (s.atkPct || 0) * 300);
+  return Math.round((s.atk || 0) * 2 + (s.def || 0) * 2 + (s.hp || 0) * 0.3 + (s.crit || 0) * 300 + (s.spd || 0) * 3 + (s.critDmg || 0) * 60 + (s.hpPct || 0) * 200 + (s.atkPct || 0) * 300) + (item.unique ? 40 + item.ilv * 2 : 0);
 }
-export function rollItem(rng, grade, ilv, slot = null) {
-  return {
+export function rollItem(rng, grade, ilv, slot = null, set = 'frost') {
+  const it = {
     slot: slot || pick(rng, SLOTS).id, grade, ilv: Math.max(1, ilv), plus: 0,
     roll: +(0.9 + rng() * 0.2).toFixed(3),
   };
+  if (grade === 'epic') { it.set = set; it.unique = pick(rng, uniqueIdsFor(it.slot)); }
+  return it;
 }
+export const uniqueOf = (item) => (item?.unique ? UNIQUE_OPTIONS[item.unique] : null);
 
 function gearTotals(save, u) {
-  const t = { atk: 0, def: 0, hp: 0, crit: 0, spd: 0, critDmg: 0, hpPct: 0, atkPct: 0 };
+  const t = { atk: 0, def: 0, hp: 0, crit: 0, spd: 0, critDmg: 0, hpPct: 0, atkPct: 0, uniq: {} };
   for (const slot of Object.keys(u.equip)) {
     const uid = u.equip[slot];
     const it = uid != null ? save.inventory.find(i => i.uid === uid) : null;
     if (!it) continue;
     const s = itemStats(it);
-    for (const k of Object.keys(t)) t[k] += s[k] || 0;
+    for (const k of Object.keys(t)) if (k !== 'uniq') t[k] += s[k] || 0;
+    const uo = uniqueOf(it);
+    if (uo) for (const [k, v] of Object.entries(uo.fx)) t.uniq[k] = (t.uniq[k] || 0) + v;
   }
   return t;
 }
@@ -142,16 +154,20 @@ export function deriveUnit(save, classId) {
   const st = u.stats;
   const main = cls.main === 'int' ? st.int : cls.main === 'agi' ? st.agi : st.str;
   const mast = (u.mastery || 0) * MASTERY_PCT;
-  const atk = (main * 2.2 + u.lv * 1.5 + g.atk) * (1 + (fx.atkPct || 0) + g.atkPct + mast);
+  const uq = g.uniq;
+  const atk = (main * 2.2 + u.lv * 1.5 + g.atk) * (1 + (fx.atkPct || 0) + g.atkPct + mast + (uq.atkPct || 0));
   return {
     id: classId, classId, name: cls.name, side: 'party', lv: u.lv, magic: cls.magic,
     maxHp: Math.round((50 + st.vit * 10 + u.lv * 6 + g.hp) * (1 + (fx.hpPct || 0) + g.hpPct + mast)),
     atk: Math.round(atk),
     healPower: Math.round(st.int * 2.2 + u.lv * 1.5 + g.atk * 0.5),
     def: Math.round((st.vit * 0.8 + g.def) * (1 + (fx.defPct || 0))),
-    spd: +(8 + st.agi * 0.6 + g.spd).toFixed(1),
-    crit: Math.min(0.5, 0.05 + st.agi * 0.004 + g.crit + (fx.critAdd || 0)),
-    critMult: T.critMult + g.critDmg,
+    spd: +((8 + st.agi * 0.6 + g.spd) * (1 + (uq.spdPct || 0))).toFixed(1),
+    crit: Math.min(0.6, 0.05 + st.agi * 0.004 + g.crit + (fx.critAdd || 0) + (uq.critAdd || 0)),
+    critMult: T.critMult + g.critDmg + (uq.critDmg || 0),
+    // 에픽 고유 옵션 (1.208.0)
+    execute: uq.execute || 0, lifesteal: uq.lifesteal || 0, chain: uq.chain || 0, armorPen: Math.min(0.8, uq.armorPen || 0),
+    thornsPct: uq.thornsPct || 0, regenPct: uq.regenPct || 0, startShieldPct: uq.startShieldPct || 0, guts: uq.guts ? 1 : 0, cdr: uq.cdr || 0,
     dodge: Math.min(0.3, st.agi * 0.002 + (fx.dodgeAdd || 0)),
     counterPct: fx.counterPct || 0, lowHpDmg: fx.lowHpDmg || 0,
     skills: Object.entries(u.skills)
@@ -313,7 +329,7 @@ export function canPromote(save, item) {
   const c = item && promoteCost(item);
   return !!c && save.gold >= c.gold && save.mats.essence >= c.essence && save.mats.shard >= c.shard;
 }
-export function promoteItem(save0, uid) {
+export function promoteItem(save0, uid, rng = Math.random) {
   const it0 = save0.inventory.find(i => i.uid === uid);
   if (!canPromote(save0, it0)) return save0;
   const save = clone(save0);
@@ -321,7 +337,11 @@ export function promoteItem(save0, uid) {
   const c = promoteCost(it);
   save.gold -= c.gold; save.mats.essence -= c.essence; save.mats.shard -= c.shard;
   it.grade = nextGrade(it);
-  if (it.grade === 'epic') save.stats.epics += 1;
+  if (it.grade === 'epic') {
+    save.stats.epics += 1;
+    it.set = it.set || 'frost';
+    if (!it.unique) it.unique = pick(rng, uniqueIdsFor(it.slot));
+  }
   return save;
 }
 
@@ -353,19 +373,24 @@ export function rollFieldEncounter(field, rng, boss = false, partyLv = null) {
   for (let i = 0; i < n; i++) enemies.push(buildChronicleEnemy(pick(rng, field.normals), lv(), `e${i}`, field.area));
   return { type: 'normal', enemies };
 }
-export function dungeonEncounter(floorIdx, rng) {
-  const f = CHRONICLE_DUNGEON.floors[floorIdx];
-  if (f.boss) return { type: 'dungeonBoss', enemies: [buildChronicleEnemy(f.enemies[0], f.lv, 'e0', CHRONICLE_DUNGEON.area)] };
+// d = save.dungeon {id, tier, floor}
+export function dungeonEncounter(d, rng) {
+  const D = dungeonDef(d.id);
+  const tier = DUNGEON_TIERS[d.tier || 0];
+  const f = D.floors[d.floor];
+  const area = { hpMult: D.area.hpMult * tier.hp, atkMult: D.area.atkMult * tier.atk };
+  const lv = f.lv + tier.lv;
+  if (f.boss) return { type: 'dungeonBoss', enemies: [buildChronicleEnemy(f.enemies[0], lv, 'e0', area)] };
   const n = Math.min(3, 2 + (rng() < 0.5 ? 1 : 0));
   const enemies = [];
-  for (let i = 0; i < n; i++) enemies.push(buildChronicleEnemy(pick(rng, f.enemies), f.lv, `e${i}`, CHRONICLE_DUNGEON.area));
+  for (let i = 0; i < n; i++) enemies.push(buildChronicleEnemy(pick(rng, f.enemies), lv, `e${i}`, area));
   return { type: 'dungeonFloor', enemies };
 }
 
 // ===== 전투 시뮬 (풀오토) =====
 export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
   const units = [
-    ...party0.map(p => ({ ...p, buffs: {}, shield: 0, taunt: 0, tauntDef: 0, dots: [], cds: {}, turn: 0 })),
+    ...party0.map(p => ({ ...p, buffs: {}, shield: Math.round((p.startShieldPct || 0) * p.maxHp), taunt: 0, tauntDef: 0, dots: [], cds: {}, turn: 0 })),
     ...enemies0.map(e => ({ ...e, buffs: {}, shield: 0, taunt: 0, tauntDef: 0, dots: [], cds: {}, turn: 0, skills: [] })),
   ];
   const events = [];
@@ -382,14 +407,24 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
   const damage = (att, def, mult, { noDodge = false } = {}) => {
     if (!noDodge && rng() < (def.dodge || 0)) return { miss: true, d: 0 };
     let raw = att.atk * mult * atkMod(att) * (0.9 + rng() * 0.2);
+    if (att.execute && def.hp < def.maxHp * 0.3) raw *= 1 + att.execute;
     const crit = rng() < (att.crit || 0);
     if (crit) raw *= att.critMult || T.critMult;
-    const defV = (def.def || 0) * (1 + (def.taunt > 0 ? def.tauntDef : 0));
+    const defV = (def.def || 0) * (1 + (def.taunt > 0 ? def.tauntDef : 0)) * (1 - (att.armorPen || 0));
     let d = Math.max(1, Math.round(raw * T.defK / (T.defK + defV)));
     let absorbed = 0;
     if (def.shield > 0) { absorbed = Math.min(def.shield, d); def.shield -= absorbed; d -= absorbed; }
     def.hp = Math.max(0, def.hp - d);
+    if (def.hp <= 0 && def.guts > 0) { def.hp = 1; def.guts = 0; }
+    if (att.lifesteal && d > 0 && att.hp > 0) att.hp = Math.min(att.maxHp, att.hp + Math.round(d * att.lifesteal));
+    if (def.thornsPct && d > 0 && att.hp > 0) att.hp = Math.max(0, att.hp - Math.max(1, Math.round(d * def.thornsPct)));
     return { d, crit, absorbed };
+  };
+  // 연격 — 단일 공격 뒤 추가 타격
+  const chainHit = (u, t, hits) => {
+    if (!u.chain || !t || t.hp <= 0 || rng() >= u.chain) return;
+    const r = damage(u, t, 0.5, { noDodge: true });
+    hits.push({ t: t.id, d: r.d, c: r.crit, chain: true });
   };
   const pickEnemyTarget = (u) => {
     const foes = alive(u.side === 'party' ? 'enemy' : 'party');
@@ -457,12 +492,14 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
       const t = pickEnemyTarget(u);
       if (!t) return;
       const r = damage(u, t, 1);
-      push({ a: u.id, n: '공격', k: 'attack', hits: [{ t: t.id, d: r.d, c: r.crit, m: r.miss }] });
+      const hits = [{ t: t.id, d: r.d, c: r.crit, m: r.miss }];
+      if (!r.miss) chainHit(u, t, hits);
+      push({ a: u.id, n: '공격', k: 'attack', hits });
       return;
     }
     const { s, lv } = choice;
     const v = s.base + s.perLv * (lv - 1);
-    u.cds[s.id] = s.cd + 1;
+    u.cds[s.id] = Math.max(1, s.cd + 1 - (u.cdr || 0));
     const hits = [];
     const foes = alive('enemy');
     const allies = alive('party');
@@ -471,6 +508,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
         const t = pickEnemyTarget(u);
         const r = damage(u, t, v);
         hits.push({ t: t.id, d: r.d, c: r.crit, m: r.miss });
+        if (!r.miss) chainHit(u, t, hits);
         if (s.kind === 'lifesteal' && r.d > 0) {
           const h = Math.round(r.d * s.steal);
           u.hp = Math.min(u.maxHp, u.hp + h);
@@ -534,6 +572,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
     for (const u of order) {
       if (u.hp <= 0) continue;
       // 지속 피해 → 행동
+      if (u.regenPct && u.hp < u.maxHp) u.hp = Math.min(u.maxHp, u.hp + Math.round(u.maxHp * u.regenPct));
       if (u.dots.length) {
         const total = u.dots.reduce((s, d) => s + d.v, 0);
         u.hp = Math.max(0, u.hp - total);
@@ -558,17 +597,19 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
 
 // ===== 전투 보상 =====
 function rollGrade(rng, grades) { return weighted(rng, grades); }
-export function battleRewards(enemies, type, rng) {
+export function battleRewards(enemies, type, rng, mods = {}) {
   const exp = enemies.reduce((s, e) => s + Math.round((6 + e.lv * 3) * (e.rewardMult || 1) * (e.tier === 'boss' ? 10 : e.tier === 'elite' ? 3 : 1)), 0);
   const gold = enemies.reduce((s, e) => s + Math.round((3 + e.lv * 2) * (e.tier === 'boss' ? 8 : e.tier === 'elite' ? 3 : 1) * (0.85 + rng() * 0.3)), 0);
   const tableKey = type === 'normal' ? 'normal' : type;
-  const tbl = DROP_TABLE[tableKey] || DROP_TABLE.normal;
+  const base = DROP_TABLE[tableKey] || DROP_TABLE.normal;
+  const tbl = { ...base, grades: { ...base.grades } };
+  if (tbl.grades.epic && mods.epicMult) tbl.grades.epic = tbl.grades.epic * mods.epicMult;
   const ilv = Math.max(...enemies.map(e => e.lv));
   const items = [];
   const count = tbl.items || 1;
-  for (let i = 0; i < count; i++) if (rng() < tbl.itemChance) items.push(rollItem(rng, rollGrade(rng, tbl.grades), ilv));
+  for (let i = 0; i < count; i++) if (rng() < tbl.itemChance) items.push(rollItem(rng, rollGrade(rng, tbl.grades), ilv, null, mods.set || 'frost'));
   const essence = ri(rng, tbl.essence[0], tbl.essence[1]);
-  const shard = tbl.shard ? ri(rng, tbl.shard[0], tbl.shard[1]) : 0;
+  const shard = tbl.shard ? Math.round(ri(rng, tbl.shard[0], tbl.shard[1]) * (mods.shardMult || 1)) : 0;
   return { exp, gold, items, essence, shard };
 }
 
@@ -593,7 +634,12 @@ export function applyBattle(save0, ctx, battle, rng = Math.random) {
   save.progress.killsByKey = save.progress.killsByKey || {};
   for (const e of ctx.enemies) save.progress.killsByKey[e.key] = (save.progress.killsByKey[e.key] || 0) + 1;
   save.stats.elites = (save.stats.elites || 0) + ctx.enemies.filter(e => e.tier === 'elite').length;
-  const r = battleRewards(ctx.enemies, ctx.type, rng);
+  let mods = {};
+  if (ctx.kind === 'dungeon' && save.dungeon) {
+    const tier = DUNGEON_TIERS[save.dungeon.tier || 0];
+    mods = { epicMult: tier.epicMult, shardMult: tier.shardMult, set: dungeonDef(save.dungeon.id).set };
+  }
+  const r = battleRewards(ctx.enemies, ctx.type, rng, mods);
   summary.exp = r.exp; summary.gold = r.gold; summary.essence = r.essence; summary.shard = r.shard;
   save.gold += r.gold; save.mats.essence += r.essence; save.mats.shard += r.shard;
   for (const cid of save.party) {
@@ -623,22 +669,28 @@ export function applyBattle(save0, ctx, battle, rng = Math.random) {
         summary.recruit = cid;
       }
       if (fid < CHRONICLE_FIELDS.length) summary.unlocks.push(`사냥터 「${CHRONICLE_FIELDS[fid].name}」`);
-      if (fid === CHRONICLE_DUNGEON.unlockField) summary.unlocks.push(`던전 「${CHRONICLE_DUNGEON.name}」`);
+      for (const D of CHRONICLE_DUNGEONS) if (fid === D.unlockField) summary.unlocks.push(`던전 「${D.name}」`);
     }
   }
   if (ctx.kind === 'dungeon' && save.dungeon) {
     save.dungeon.hp = battle.finalHp;
-    if (ctx.type === 'dungeonBoss') { save.dungeon = null; save.progress.dungeonClears += 1; summary.dungeonClear = true; }
+    if (ctx.type === 'dungeonBoss') {
+      const { id, tier = 0 } = save.dungeon;
+      save.progress.dungeonTier = save.progress.dungeonTier || {};
+      const prev = save.progress.dungeonTier[id];
+      if (prev == null || tier > prev) { save.progress.dungeonTier[id] = tier; if (tier < DUNGEON_TIERS.length - 1) summary.unlocks.push(`${dungeonDef(id).name} 「${DUNGEON_TIERS[tier + 1].label}」 난이도`); }
+      save.dungeon = null; save.progress.dungeonClears += 1; summary.dungeonClear = true;
+    }
     else save.dungeon.floor += 1;
   }
   return { save, summary };
 }
 
 // ===== 던전 =====
-export function startDungeon(save0) {
-  if (!dungeonUnlocked(save0)) return save0;
+export function startDungeon(save0, id = 'frostTomb', tier = 0) {
+  if (!dungeonUnlocked(save0, id) || !dungeonTierUnlocked(save0, id, tier)) return save0;
   const save = clone(save0);
-  save.dungeon = { floor: 0, hp: null };
+  save.dungeon = { id, tier, floor: 0, hp: null };
   return save;
 }
 export function leaveDungeon(save0) {

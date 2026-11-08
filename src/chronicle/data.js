@@ -8,6 +8,7 @@
 // ============================================
 import { CLASSES } from '../data/classes.js';
 import { ENEMIES } from '../data/enemies.js';
+import { getEnemyImageSrc } from '../utils/helpers.js';
 
 export const CHRONICLE_TITLE = '황혼 연대기';
 export const CHRONICLE_SUB = 'Twilight Chronicle';
@@ -140,24 +141,47 @@ export const CHRONICLE_FIELDS = [
   { id: 3, name: '봉인된 신전', lv: [15, 21], bossLv: 23, bossKills: 45, area: { hpMult: 5.0, atkMult: 2.6 }, color: '#d4a574', normals: mob(3, 'normal'), elites: mob(3, 'elite'), boss: 'oblivionSealer' },
   { id: 4, name: '마계의 균열', lv: [23, 30], bossLv: 32, bossKills: 60, area: { hpMult: 7.0, atkMult: 3.3 }, color: '#c4453d', normals: mob(4, 'normal'), elites: mob(4, 'elite'), boss: 'nakzelionShadow' },
 ];
-export const CHRONICLE_DUNGEON = {
-  id: 'frostTomb', name: '서리 왕의 무덤', unlockField: 2, recLv: 22, color: '#9cc4e4', area: { hpMult: 4.4, atkMult: 2.4 },
-  desc: '층마다 HP가 이어진다. 끝까지 내려가면 절대영도의 군주가 에픽 장비를 지키고 있다.',
-  floors: [
-    { lv: 17, enemies: ['champ_frost_imp', 'champ_frost_wolf', 'champ_frost_shaman'] },
-    { lv: 18, enemies: ['champ_frost_lurker', 'champ_frost_revenant', 'champ_frost_brute'] },
-    { lv: 19, enemies: ['champ_frost_juggernaut', 'champ_frost_seer'] },
-    { lv: 20, enemies: ['champ_frost_avatar', 'champ_frost_elite4'] },
-    { lv: 22, enemies: ['champ_frost_boss4'], boss: true },
-  ],
-};
+// 던전 (1.208.0 — 2곳 × 난이도 3단계). set = 에픽 장비 이름 세트
+export const CHRONICLE_DUNGEONS = [
+  {
+    id: 'frostTomb', name: '서리 왕의 무덤', unlockField: 2, recLv: 22, color: '#9cc4e4', area: { hpMult: 4.4, atkMult: 2.4 }, set: 'frost',
+    desc: '층마다 HP가 이어진다. 끝까지 내려가면 절대영도의 군주가 에픽 장비를 지키고 있다.',
+    art: 'champ_frost_boss4',
+    floors: [
+      { lv: 17, enemies: ['champ_frost_imp', 'champ_frost_wolf', 'champ_frost_shaman'] },
+      { lv: 18, enemies: ['champ_frost_lurker', 'champ_frost_revenant', 'champ_frost_brute'] },
+      { lv: 19, enemies: ['champ_frost_juggernaut', 'champ_frost_seer'] },
+      { lv: 20, enemies: ['champ_frost_avatar', 'champ_frost_elite4'] },
+      { lv: 22, enemies: ['champ_frost_boss4'], boss: true },
+    ],
+  },
+  {
+    id: 'forestHeart', name: '광기의 숲 심장부', unlockField: 3, recLv: 32, color: '#9fd18a', area: { hpMult: 7.2, atkMult: 3.4 }, set: 'forest',
+    desc: '광기에 물든 숲의 가장 깊은 곳. 종말의 마에스트로가 마지막 악장을 연주한다.',
+    art: 'champ_forest_boss4',
+    floors: [
+      { lv: 28, enemies: ['champ_forest_husk', 'champ_forest_leopard', 'champ_forest_dryad'] },
+      { lv: 29, enemies: ['champ_forest_revenant', 'champ_forest_treant', 'champ_forest_tiger'] },
+      { lv: 30, enemies: ['champ_forest_chimera', 'champ_forest_thornling', 'champ_forest_elite2'] },
+      { lv: 31, enemies: ['champ_forest_avatar', 'champ_forest_elite4'] },
+      { lv: 34, enemies: ['champ_forest_boss4'], boss: true },
+    ],
+  },
+];
+export const CHRONICLE_DUNGEON = CHRONICLE_DUNGEONS[0]; // 1.205~1.207 호환 (이야기·의뢰가 참조)
+export const dungeonDef = (id) => CHRONICLE_DUNGEONS.find(d => d.id === id) || CHRONICLE_DUNGEONS[0];
+
+// 난이도 — 이전 단계 보스를 쓰러뜨리면 다음 단계 개방
+export const DUNGEON_TIERS = [
+  { id: 'normal', label: '일반', color: '#a89a88', lv: 0, hp: 1, atk: 1, epicMult: 1, shardMult: 1 },
+  { id: 'heroic', label: '영웅', color: '#6aa6e0', lv: 5, hp: 2.2, atk: 1.7, epicMult: 1.6, shardMult: 2 },
+  { id: 'legend', label: '전설', color: '#e8b04a', lv: 10, hp: 3.6, atk: 2.4, epicMult: 2.4, shardMult: 3 },
+];
 
 // 적 일러 경로 (본편 헬퍼와 같은 규칙, ./ 상대 경로)
 export function chronicleEnemyArt(key, kind = 'combat') {
   const e = ENEMIES[key];
-  if (!e) return null;
-  if (typeof e.chapter === 'string') return `./enemies/championship/${e.chapter.split('_')[0]}/${key}_${kind}.jpg`;
-  return `./enemies/classic/chapter_${e.chapter}/${key}_${kind}.jpg`;
+  return e ? getEnemyImageSrc(key, e, kind) : null; // forest는 chapterN 하위 폴더 — 본편 헬퍼에 위임
 }
 
 // 본편 적 → 연대기 적 (레벨 적용)
@@ -209,6 +233,27 @@ export const SLOT_NAMES = {
   accessory: ['낡은 반지', '은 목걸이', '룬 부적', '심연의 인장'],
 };
 export const EPIC_NAMES = { weapon: '절대영도의 검', armor: '서리 왕의 갑주', accessory: '영원한 겨울의 심장' };
+export const EPIC_SETS = {
+  frost: EPIC_NAMES,
+  forest: { weapon: '광란의 가시검', armor: '망자 군주의 갑주', accessory: '종말의 악보' },
+};
+
+// 에픽 고유 옵션 (1.208.0) — 에픽이 될 때(드랍·승급·의뢰 보상) 부위별 풀에서 1개
+export const UNIQUE_OPTIONS = {
+  w_exec: { slot: 'weapon', name: '처형자', desc: 'HP 30% 이하인 적에게 피해 +50%', fx: { execute: 0.5 } },
+  w_vamp: { slot: 'weapon', name: '흡혈', desc: '준 피해의 8%만큼 회복', fx: { lifesteal: 0.08 } },
+  w_chain: { slot: 'weapon', name: '연격', desc: '단일 공격 후 25% 확률로 50% 추가 타격', fx: { chain: 0.25 } },
+  w_pierce: { slot: 'weapon', name: '관통', desc: '적 방어 40% 무시', fx: { armorPen: 0.4 } },
+  a_thorn: { slot: 'armor', name: '가시', desc: '받은 피해의 25%를 되돌려 줌', fx: { thornsPct: 0.25 } },
+  a_regen: { slot: 'armor', name: '재생', desc: '내 차례마다 최대 HP 4% 회복', fx: { regenPct: 0.04 } },
+  a_bulwark: { slot: 'armor', name: '성채', desc: '전투 시작 시 최대 HP 15% 보호막', fx: { startShieldPct: 0.15 } },
+  a_guts: { slot: 'armor', name: '불굴', desc: '전투당 1회, 쓰러질 피해를 HP 1로 버팀', fx: { guts: 1 } },
+  c_haste: { slot: 'accessory', name: '신속', desc: '속도 +25%', fx: { spdPct: 0.25 } },
+  c_focus: { slot: 'accessory', name: '집중', desc: '치명 +10% · 치명 피해 +30%', fx: { critAdd: 0.1, critDmg: 0.3 } },
+  c_time: { slot: 'accessory', name: '시간의 모래', desc: '스킬 재사용 대기 -1턴', fx: { cdr: 1 } },
+  c_fury: { slot: 'accessory', name: '분노', desc: '공격력 +12%', fx: { atkPct: 0.12 } },
+};
+export const uniqueIdsFor = (slot) => Object.keys(UNIQUE_OPTIONS).filter(id => UNIQUE_OPTIONS[id].slot === slot);
 
 export const FORGE = {
   maxEnhance: 10,
