@@ -17,6 +17,7 @@ import {
 import * as E from './engine.js';
 import * as Q from './quest.js';
 import * as A from './account.js';
+import * as F from './familiar.js';
 import { NPCS } from './story.js';
 import { ENEMIES } from '../data/enemies.js';
 
@@ -105,6 +106,11 @@ function ItemRow({ save, item, onClick, right }) {
       {right ?? (by && <span className="flex-none" style={{ fontSize: 11, color: PALETTE.dawn }}>착용 중</span>)}
     </button>
   );
+}
+// 전투·던전 유닛 아이콘 — 사역마는 원본 적 그림
+function UnitIcon({ u, size = 38, dim = false }) {
+  if (!u.fam) return <Portrait cid={u.classId} size={size} dim={dim} />;
+  return <img src={chronicleEnemyArt(u.famKey)} alt={u.name} className="object-cover flex-none" style={{ width: size, height: size, borderRadius: 12, border: '1.5px solid #d07ae8', filter: dim ? 'grayscale(1) brightness(.5)' : 'none' }} draggable={false} />;
 }
 function Portrait({ cid, size = 44, dim = false }) {
   const c = chronicleClass(cid);
@@ -211,7 +217,7 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain }) {
           const acting = cur?.a === p.id;
           return (
             <div key={p.id} className={`relative flex items-center gap-2 ${hitFor(p.id).some(h => h.d > 0) ? 'arc-shake' : ''}`} style={{ padding: 7, borderRadius: 12, background: acting ? `${chronicleClass(p.classId).color}26` : 'rgba(255,255,255,0.03)', border: `1px solid ${acting ? chronicleClass(p.classId).color : 'var(--ui-line)'}` }}>
-              <Portrait cid={p.classId} size={38} dim={hp <= 0} />
+              <UnitIcon u={p} size={38} dim={hp <= 0} />
               <div className="flex-1 min-w-0">
                 <div className="truncate" style={{ fontSize: 11.5, color: PALETTE.text }}>Lv.{p.lv} {p.name}</div>
                 <Bar v={hp} max={p.maxHp} shield={shOf(p)} color="linear-gradient(90deg,#3d7a3a,#7fcf6a)" h={7} />
@@ -242,6 +248,7 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain }) {
                 {summary.autoDismantled ? <div className="text-center" style={{ color: PALETTE.textDim }}>가방이 가득 차 {summary.autoDismantled}개 자동 분해</div> : null}
                 {summary.unlocks.map(u => <div key={u} className="text-center" style={{ color: '#9cc4e4' }}>🔓 {u} 개방</div>)}
                 {summary.dungeonClear && <div className="text-center font-semibold" style={{ color: '#c08ae8' }}>던전 정복!</div>}
+                {summary.famShards ? <div className="text-center" style={{ color: '#d07ae8' }}>📜 계약서 조각 +{summary.famShards}</div> : null}
                 {summary.keys ? <div className="text-center font-semibold" style={{ color: PALETTE.legendary }}>🗝 던전 열쇠 +{summary.keys}</div> : null}
                 {(summary.questsDone || []).map(t => <div key={t} className="text-center font-semibold" style={{ color: PALETTE.dawn }}>📜 의뢰 완료: {t} — 게시판에서 보상</div>)}
               </div>
@@ -283,6 +290,7 @@ function TownView({ save, go, onExit, onSwitchChar }) {
     { id: 'dungeon', icon: '🕳', label: '던전', sub: save.dungeon ? `${dungeonDef(save.dungeon.id).name} 진행 중` : E.dungeonUnlocked(save) ? `🗝 열쇠 ${E.keyCount(save)}개 · ${CHRONICLE_DUNGEONS.filter(d => E.dungeonUnlocked(save, d.id)).length}곳` : '죽은 자의 숲 보스 후 개방', locked: !E.dungeonUnlocked(save) },
     { id: 'party', icon: '🧭', label: '성장', sub: '능력치 · 스킬 · 장비', badge: alertParty },
     { id: 'bag', icon: '🎒', label: '가방', sub: `${save.inventory.length}/${CHRONICLE_TUNING.inventoryMax}${save.inventory.some(i => !E.itemUsable(i, save.hero)) ? ' · 다른 직업 장비 있음' : ''}` },
+    { id: 'fam', icon: '🐾', label: '사역마', sub: E.famSlotOpen(save, 'main') ? `📜 ${save.mats.famShard || 0} · 보유 ${Object.keys(save.fams || {}).length}` : `Lv.${F.FAM_TUNING.slotLv.main}부터 동행`, badge: (save.mats.famShard || 0) >= F.FAM_TUNING.shardsPerSummon || (save.mats.sealPlus || 0) > 0 },
     { id: 'stash', icon: '🏛', label: '공용 창고', sub: `${(save.stash || []).length}/${A.STASH_MAX} · 모든 캐릭터 공유` },
     { id: 'forge', icon: '⚒', label: '대장간', sub: '강화 · 등급 승급' },
   ];
@@ -464,7 +472,7 @@ function DungeonView({ save, onBack, onEnter, onFight, onLeave, onBuyKey }) {
           </div>
           {party.map(p => (
             <div key={p.id} className="flex items-center gap-2">
-              <Portrait cid={p.classId} size={30} dim={p.hp <= 0} />
+              <UnitIcon u={p} size={30} dim={p.hp <= 0} />
               <div className="flex-1"><Bar v={p.hp} max={p.maxHp} color="linear-gradient(90deg,#3d7a3a,#7fcf6a)" h={7} /></div>
               <span style={{ fontSize: 11, color: PALETTE.textDim, width: 70, textAlign: 'right' }}>{p.hp}/{p.maxHp}</span>
             </div>
@@ -695,6 +703,170 @@ function BagView({ save, setSave, onBack, flash }) {
   );
 }
 
+// ===== 사역마 (1.212.0) — 조각 소환(가챠) · 강화 · 진화 · 편성 =====
+const famColor = (g) => F.famGrade(g).color;
+function FamCard({ k, f, onClick, right, size = 46 }) {
+  const g = F.famGrade(f.grade);
+  const role = F.FAM_ROLES[F.famRole(k)];
+  return (
+    <button onClick={onClick} className="ui-press w-full flex items-center gap-2.5 text-left" style={{ padding: '7px 10px', borderRadius: 12, background: `${g.color}12`, border: `1px solid ${g.color}66` }}>
+      <img src={chronicleEnemyArt(k)} alt="" className="object-cover flex-none" style={{ width: size, height: size, borderRadius: 10, border: `1.5px solid ${g.color}` }} />
+      <div className="flex-1 min-w-0">
+        <div className="truncate font-semibold" style={{ fontSize: 13, color: g.color }}>{F.famName(k)}{f.plus ? ` +${f.plus}` : ''} <span style={{ fontSize: 11, color: PALETTE.textDim, fontWeight: 400 }}>{g.label} · {role.icon} {role.label}</span></div>
+        <div className="truncate" style={{ fontSize: 11, color: PALETTE.textDim }}>보조 효과: {F.famSubText(k, f)}</div>
+      </div>
+      {right}
+    </button>
+  );
+}
+function FamiliarView({ save, setSave, onBack, flash }) {
+  const [tab, setTab] = useState('summon');
+  const [results, setResults] = useState(null);
+  const [sel, setSel] = useState(null);
+  const [pickSlot, setPickSlot] = useState(null);
+  const fams = save.fams || {};
+  const shards = save.mats.famShard || 0;
+  const tickets = save.mats.sealPlus || 0;
+  const souls = save.mats.famSoul || 0;
+  const per = F.FAM_TUNING.shardsPerSummon;
+  const pool = F.famPool(save.progress);
+  const pity = save.famPity || { total: 0, sinceViolet: 0 };
+  const team = save.famTeam || {};
+  const list = Object.entries(fams).sort((a, b) => F.famGradeIdx(b[1].grade) - F.famGradeIdx(a[1].grade) || b[1].plus - a[1].plus);
+  const doSummon = (n, ticket) => {
+    const r = E.summonFam(save, n, ticket);
+    if (!r.results) { flash(ticket ? '소환권이 부족합니다' : '계약서 조각이 부족합니다'); return; }
+    setSave(r.save); setResults(r.results);
+  };
+  const slots = [
+    { id: 'main', label: '동행', desc: '전투에 함께 싸운다' },
+    { id: 'sub1', label: '보조 1', desc: '패시브 효과만' },
+    { id: 'sub2', label: '보조 2', desc: '패시브 효과만' },
+  ];
+  const selF = sel && fams[sel];
+  const tabBtn = (id, label) => <button key={id} onClick={() => setTab(id)} className="ui-press flex-1" style={{ height: 36, borderRadius: 10, fontSize: 12, border: `1px solid ${tab === id ? PALETTE.legendary : 'var(--ui-line)'}`, color: tab === id ? PALETTE.legendary : PALETTE.text, background: 'transparent' }}>{label}</button>;
+  return (
+    <div className="absolute inset-0 flex flex-col">
+      <Header title="사역마" onBack={onBack} right={<div className="flex items-center gap-2" style={{ fontSize: 12 }}><span style={{ color: '#d07ae8' }}>📜{shards}</span><span style={{ color: PALETTE.legendary }}>🎫{tickets}</span><span style={{ color: '#9cc4e4' }}>🔮{souls}</span></div>} />
+      <div className="flex gap-1.5 px-3 pt-2 flex-none">{tabBtn('summon', '소환')}{tabBtn('list', `보관함 ${list.length}`)}{tabBtn('team', '편성')}</div>
+      <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
+        {tab === 'summon' && (
+          <>
+            <GlassPanel className="p-3">
+              <div className="font-semibold" style={{ fontSize: 13.5, color: PALETTE.text }}>계약의 제단</div>
+              <div className="mt-1" style={{ fontSize: 11.5, color: PALETTE.textDim, lineHeight: 1.6 }}>
+                📜 계약서 조각 {per}개로 1회 소환 · 사냥터·던전에서 떨어진다 (보스 확정)<br />
+                10연 소환은 청령 이상 1마리 확정 · 누적 {F.FAM_TUNING.violetPity}회 안에 자령 확정{pool.violet.length ? ` (지금 ${pity.sinceViolet}/${F.FAM_TUNING.violetPity})` : ' — 던전 보스나 2부 보스를 쓰러뜨리면 자령이 소환 목록에 들어온다'}
+              </div>
+              <div className="grid grid-cols-5 gap-1 mt-2">
+                {F.FAM_GRADES.map(g => (
+                  <div key={g.id} className="text-center" style={{ padding: '5px 0', borderRadius: 8, border: `1px solid ${g.color}55`, opacity: pool[g.id].length ? 1 : 0.35 }}>
+                    <div style={{ fontSize: 12, color: g.color, fontWeight: 600 }}>{g.label}</div>
+                    <div style={{ fontSize: 11, color: PALETTE.textDim }}>{Math.round(g.rate * 1000) / 10}%</div>
+                    <div style={{ fontSize: 10.5, color: PALETTE.textDim }}>{pool[g.id].length}종</div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-1.5" style={{ fontSize: 11, color: PALETTE.textDim }}>소환 목록은 진행한 지역의 적만 — 보스를 잡을수록 늘어난다. 아직 없는 등급이 뽑히면 한 단계 아래로.</div>
+            </GlassPanel>
+            <div className="grid grid-cols-2 gap-2">
+              <UIButton variant="ghost" disabled={shards < per} onClick={() => doSummon(1, false)}>1회 소환 📜{per}</UIButton>
+              <UIButton disabled={shards < per * 10} onClick={() => doSummon(10, false)}>10연 소환 📜{per * 10}</UIButton>
+            </div>
+            {tickets > 0 && <UIButton variant="gold" onClick={() => doSummon(1, true)}>🎫 소환권으로 1회 소환 (남은 {tickets}장)</UIButton>}
+            <GlassPanel className="p-3" style={{ fontSize: 11.5, color: PALETTE.textDim, lineHeight: 1.6 }}>
+              <b style={{ color: PALETTE.text }}>중복</b> → 🔮 사역혼 (적 1 · 녹 3 · 청 10 · 남 30 · 자 100). 더 높은 등급으로 중복이 나오면 그 등급으로 올라간다.<br />
+              <b style={{ color: PALETTE.text }}>강화</b> +1~+{F.FAM_TUNING.maxPlus} (단계당 능력치 +{Math.round(F.FAM_TUNING.plusStatPct * 100)}%) → <b style={{ color: PALETTE.text }}>+{F.FAM_TUNING.maxPlus}에서 진화</b> 도전 — 실패하면 강화 -{F.FAM_TUNING.evolveFailDrop}단계.
+            </GlassPanel>
+          </>
+        )}
+        {tab === 'list' && (
+          <>
+            {list.map(([k, f]) => <FamCard key={k} k={k} f={f} onClick={() => setSel(k)} right={['main', 'sub1', 'sub2'].find(sl => team[sl] === k) && <span style={{ fontSize: 11, color: PALETTE.dawn }}>{slots.find(x => x.id === ['main', 'sub1', 'sub2'].find(sl => team[sl] === k)).label}</span>} />)}
+            {!list.length && <div className="text-center py-10" style={{ fontSize: 12.5, color: PALETTE.textDim }}>아직 사역마가 없습니다 — 계약서 조각을 모아 소환하세요</div>}
+          </>
+        )}
+        {tab === 'team' && slots.map(sl => {
+          const open = E.famSlotOpen(save, sl.id);
+          const k = team[sl.id];
+          const f = k && fams[k];
+          return (
+            <div key={sl.id}>
+              <div style={{ fontSize: 12, color: PALETTE.text, marginBottom: 4 }}><b>{sl.label}</b> <span style={{ color: PALETTE.textDim }}>— {sl.desc}</span></div>
+              {!open ? <div style={{ padding: 12, borderRadius: 12, border: '1px dashed var(--ui-line)', color: PALETTE.textDim, fontSize: 12.5 }}>🔒 주인공 Lv.{F.FAM_TUNING.slotLv[sl.id]}에 개방</div>
+                : f ? <FamCard k={k} f={f} onClick={() => setPickSlot(sl.id)} right={<span style={{ fontSize: 11, color: PALETTE.dawn }}>교체</span>} />
+                  : <button onClick={() => setPickSlot(sl.id)} className="ui-press w-full text-left" style={{ padding: 12, borderRadius: 12, border: '1px dashed var(--ui-line-strong)', background: 'transparent', color: PALETTE.textDim, fontSize: 12.5 }}>＋ 비어 있음 (눌러서 편성)</button>}
+            </div>
+          );
+        })}
+        {tab === 'team' && <div style={{ fontSize: 11.5, color: PALETTE.textDim, lineHeight: 1.6 }}>동행 사역마는 주인공 능력치에 비례해 강해진다 (역할·등급·강화 반영). 주인공이 쓰러지면 패배. 사역마는 모든 캐릭터가 함께 쓴다.</div>}
+      </div>
+
+      {results && (
+        <BottomSheet title="소환 결과" onClose={() => setResults(null)} maxHeight="80%">
+          <div className="grid grid-cols-2 gap-1.5">
+            {results.map((r, i) => {
+              const g = F.famGrade(r.grade);
+              return (
+                <div key={i} className={`flex items-center gap-2 ${F.famGradeIdx(r.grade) >= 3 ? 'ui-sheen' : ''}`} style={{ padding: 6, borderRadius: 10, border: `1px solid ${g.color}`, background: `${g.color}1a`, animationDelay: `${i * 60}ms` }}>
+                  <img src={chronicleEnemyArt(r.key)} alt="" className="object-cover flex-none" style={{ width: 36, height: 36, borderRadius: 8 }} />
+                  <div className="min-w-0">
+                    <div className="truncate" style={{ fontSize: 12, color: g.color, fontWeight: 600 }}>{g.label} {F.famName(r.key)}</div>
+                    <div style={{ fontSize: 10.5, color: r.isNew ? '#8fe08a' : r.upgraded ? PALETTE.legendary : PALETTE.textDim }}>{r.isNew ? 'NEW!' : r.upgraded ? '등급 상승!' : `중복 → 🔮+${r.soul}`}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-4"><UIButton onClick={() => setResults(null)}>확인</UIButton></div>
+        </BottomSheet>
+      )}
+      {selF && (() => {
+        const g = F.famGrade(selF.grade);
+        const gi = F.famGradeIdx(selF.grade);
+        const maxed = selF.plus >= F.FAM_TUNING.maxPlus;
+        const ec = F.FAM_TUNING.enhanceCost(selF.plus, selF.grade);
+        const vc = F.FAM_TUNING.evolveCost(selF.grade);
+        const last = gi >= F.FAM_GRADES.length - 1;
+        return (
+          <BottomSheet title={`${F.famName(sel)}${selF.plus ? ` +${selF.plus}` : ''}`} onClose={() => setSel(null)} maxHeight="80%">
+            <img src={chronicleEnemyArt(sel)} alt="" className="w-full object-cover" style={{ aspectRatio: '16 / 8', borderRadius: 12, border: `1px solid ${g.color}` }} />
+            <div className="text-center mt-2" style={{ fontSize: 13, color: g.color, fontWeight: 600 }}>{g.label} · {F.FAM_ROLES[F.famRole(sel)].icon} {F.FAM_ROLES[F.famRole(sel)].label}</div>
+            <div className="text-center" style={{ fontSize: 12, color: PALETTE.textDim }}>보조 효과: {F.famSubText(sel, selF)}</div>
+            <div className="text-center" style={{ fontSize: 12, color: PALETTE.textDim }}>동행 스킬: {F.FAM_SKILLS[F.famRole(sel)].map(x => x.name).join(' · ')}</div>
+            <div className="flex gap-1 mt-3 justify-center">{Array.from({ length: F.FAM_TUNING.maxPlus }, (_, i) => <span key={i} style={{ width: 18, height: 6, borderRadius: 3, background: i < selF.plus ? g.color : '#ffffff1a' }} />)}</div>
+            <div className="mt-3 flex flex-col gap-2">
+              {!maxed && <UIButton disabled={souls < ec} onClick={() => setSave(E.enhanceFam(save, sel))}>강화 +{selF.plus} → +{selF.plus + 1} (🔮{ec} / 보유 {souls})</UIButton>}
+              {maxed && !last && (
+                <UIButton variant="gold" disabled={souls < vc} onClick={() => {
+                  const r = E.evolveFam(save, sel);
+                  if (!r.result) return;
+                  setSave(r.save);
+                  flash(r.result === 'success' ? `진화 성공! ${F.FAM_GRADES[gi + 1].label}(으)로` : `진화 실패… 강화 -${F.FAM_TUNING.evolveFailDrop}단계`);
+                }}>
+                  {F.FAM_GRADES[gi + 1].label}(으)로 진화 — 성공률 {Math.round(g.evolve * 100)}% (🔮{vc})
+                </UIButton>
+              )}
+              {maxed && last && <div className="text-center" style={{ fontSize: 12.5, color: g.color }}>최고 등급 · 최대 강화</div>}
+              <UIButton variant="ghost" style={{ height: 40 }} onClick={() => setSel(null)}>닫기</UIButton>
+            </div>
+          </BottomSheet>
+        );
+      })()}
+      {pickSlot && (
+        <BottomSheet title={`${slots.find(x => x.id === pickSlot).label} 편성`} onClose={() => setPickSlot(null)} maxHeight="75%">
+          <div className="flex flex-col gap-1.5">
+            {team[pickSlot] && <UIButton variant="ghost" style={{ height: 40 }} onClick={() => { setSave(E.setFamTeam(save, pickSlot, null)); setPickSlot(null); }}>편성 해제</UIButton>}
+            {list.filter(([k]) => k !== team[pickSlot]).map(([k, f]) => <FamCard key={k} k={k} f={f} onClick={() => { setSave(E.setFamTeam(save, pickSlot, k)); setPickSlot(null); }} />)}
+            {!list.length && <div className="text-center py-6" style={{ fontSize: 12.5, color: PALETTE.textDim }}>보유한 사역마가 없습니다</div>}
+            <UIButton variant="ghost" style={{ height: 40 }} onClick={() => setPickSlot(null)}>닫기</UIButton>
+          </div>
+        </BottomSheet>
+      )}
+    </div>
+  );
+}
+
 // ===== 공용 창고 (계정 공유) =====
 function StashView({ save, setSave, onBack, flash }) {
   const [filter, setFilter] = useState('mine');
@@ -886,7 +1058,7 @@ function GiftNotice({ acc, onClose }) {
         <GlassPanel className="p-3 mt-3">
           <div>🪙 골드 {g.gold.toLocaleString()}</div>
           <div>🗝 던전 열쇠 +{g.keys}</div>
-          <div>📜 상급 봉인부 {g.sealPlus}장 <span style={{ color: PALETTE.textDim }}>— 다음 업데이트(사역마)에서 사용</span></div>
+          <div>🎫 사역마 소환권 {g.sealPlus}장</div>
           <div>🎁 첫 캐릭터 직업 희귀 장비 {g.rareBoxes}개</div>
         </GlassPanel>
         <div className="mt-2" style={{ fontSize: 11.5, color: PALETTE.textDim }}>{Object.keys(acc.chars || {}).length ? '보상은 지급되었습니다.' : '첫 캐릭터를 만들면 지급됩니다.'}</div>
@@ -1112,6 +1284,8 @@ export default function ChronicleGame({ onExit }) {
     content = <PartyView save={save} setSave={setSave} onBack={() => setView('town')} />;
   } else if (view === 'bag') {
     content = <BagView save={save} setSave={setSave} onBack={() => setView('town')} flash={flash} />;
+  } else if (view === 'fam') {
+    content = <FamiliarView save={save} setSave={setSave} onBack={() => setView('town')} flash={flash} />;
   } else if (view === 'stash') {
     content = <StashView save={save} setSave={setSave} onBack={() => setView('town')} flash={flash} />;
   } else if (view === 'forge') {

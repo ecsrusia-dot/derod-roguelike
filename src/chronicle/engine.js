@@ -4,6 +4,7 @@
 // 저장 객체(save)를 받아 새 save를 돌려주는 순수 함수 + 전투 시뮬.
 // 전투는 simulateChronicleBattle이 끝까지 계산해 사건 목록을 돌려주고, UI는 재생만 한다 (풀오토 관전).
 // ============================================
+import { famCombatant, famSubFx, rollFamShards, FAM_TUNING, summonFamiliars, enhanceFamiliar, evolveFamiliar } from './familiar.js';
 import {
   CHRONICLE_TUNING as T, CHRONICLE_CLASSES, CHRONICLE_SKILLS, CHRONICLE_FIELDS, CHRONICLE_DUNGEON, CHRONICLE_DUNGEONS, DUNGEON_TIERS, dungeonDef,
   STAT_KEYS, SKILL_MAX_LV, MASTERY_PCT, BOSS_DAILY_LIMIT, DUNGEON_KEYS, GRADES, gradeIdx, SLOTS, CLASS_SLOTS, FORGE, DROP_TABLE,
@@ -220,6 +221,8 @@ export function deriveUnit(save, classId) {
   const u = save.units[classId];
   const cls = chronicleClass(classId);
   const g = gearTotals(save, u);
+  // 보조 사역마 패시브 (1.212.0) — 장비 합산과 같은 키로 더한다
+  for (const [k, v] of Object.entries(famSubFx(save.fams, activeSubs(save)))) g[k] = (g[k] || 0) + v;
   const G = (k) => g[k] || 0;
   const fx = passiveFx(u);
   const st = u.stats;
@@ -498,13 +501,71 @@ export function promoteItem(save0, uid, rng = Math.random) {
   return save;
 }
 
+// ===== 사역마 편성 (1.212.0) — 칸은 주인공 레벨로 개방 =====
+export function famSlotOpen(save, slot) {
+  const lv = save.units[save.hero]?.lv || 1;
+  return lv >= FAM_TUNING.slotLv[slot];
+}
+export function activeSubs(save) {
+  const t = save.famTeam || {};
+  return [famSlotOpen(save, 'sub1') ? t.sub1 : null, famSlotOpen(save, 'sub2') ? t.sub2 : null].filter(k => k && save.fams?.[k]);
+}
+export function activeMain(save) {
+  const k = save.famTeam?.main;
+  return k && save.fams?.[k] && famSlotOpen(save, 'main') ? k : null;
+}
+
+// 소환 — n회. useTicket이면 소환권(mats.sealPlus) 1장 = 1회. → { save, results, souls } (재료 부족이면 results null)
+export function summonFam(save0, n, useTicket = false, rng = Math.random) {
+  const m = save0.mats;
+  if (useTicket ? (m.sealPlus || 0) < n : (m.famShard || 0) < n * FAM_TUNING.shardsPerSummon) return { save: save0, results: null };
+  const save = clone(save0);
+  if (useTicket) save.mats.sealPlus -= n; else save.mats.famShard -= n * FAM_TUNING.shardsPerSummon;
+  const r = summonFamiliars(save.fams || {}, save.famPity, save.progress, n, rng);
+  save.fams = r.fams; save.famPity = r.pity;
+  save.mats.famSoul = (save.mats.famSoul || 0) + r.souls;
+  return { save, results: r.results, souls: r.souls };
+}
+export function enhanceFam(save0, key) {
+  const r = enhanceFamiliar(save0.fams, save0.mats.famSoul || 0, key);
+  if (!r.ok) return save0;
+  const save = clone(save0);
+  save.fams = r.fams; save.mats.famSoul = r.souls;
+  return save;
+}
+export function evolveFam(save0, key, rng = Math.random) {
+  const r = evolveFamiliar(save0.fams, save0.mats.famSoul || 0, key, rng);
+  if (!r.result) return { save: save0, result: null };
+  const save = clone(save0);
+  save.fams = r.fams; save.mats.famSoul = r.souls;
+  return { save, result: r.result };
+}
+// slot: 'main' | 'sub1' | 'sub2' — 같은 사역마는 한 칸에만
+export function setFamTeam(save0, slot, key) {
+  const save = clone(save0);
+  const t = { ...(save.famTeam || {}) };
+  for (const k of ['main', 'sub1', 'sub2']) if (key && t[k] === key) t[k] = null;
+  t[slot] = key || null;
+  save.famTeam = t;
+  return save;
+}
+
 // ===== 전투 준비 =====
 export function partyCombatants(save, hpMap = null) {
-  return save.party.map(cid => {
+  const list = save.party.map(cid => {
     const d = deriveUnit(save, cid);
     const hp = hpMap && hpMap[cid] != null ? Math.min(d.maxHp, hpMap[cid]) : d.maxHp;
-    return { ...d, hp };
+    return { ...d, hp, leader: cid === save.hero };
   });
+  const mk = activeMain(save);
+  if (mk) {
+    const hero = list.find(u => u.leader) || list[0];
+    const fam = famCombatant(mk, save.fams[mk], hero, hero.famPct || 0);
+    // 던전 층 사이: 쓰러진 사역마는 다음 층에서 HP 30%로 일어난다
+    if (hpMap && hpMap.fam != null) fam.hp = Math.max(Math.round(fam.maxHp * 0.3), Math.min(fam.maxHp, hpMap.fam));
+    list.push(fam);
+  }
+  return list;
 }
 // partyLv: 파티 평균 레벨 — 몹 레벨은 그 근처(±1)에서 사냥터 범위 안으로 맞춘다
 export function partyLevel(save) {
@@ -616,6 +677,9 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
     if (u.side === 'enemy') {
       const t = foes.find(f => f.taunt > 0);
       if (t && rng() < 0.85) return t;
+      // 사역마가 있어도 적은 주인공을 노린다 (70%) — 동행이 방패막이로만 쓰이지 않게 (1.212.0)
+      const leader = foes.find(f => f.leader);
+      if (leader && foes.length > 1 && rng() < 0.7) return leader;
       return pick(rng, foes);
     }
     return foes.slice().sort((a, b) => a.hp - b.hp)[0];
@@ -645,7 +709,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
     if (has('shield') && !allies.some(a => a.shield > 0)) return has('shield');
     if (has('buffAtk') && !allies.some(a => a.buffs.bless?.t > 0)) return has('buffAtk');
     if (has('rage') && !(u.buffs.rage?.t > 0)) return has('rage');
-    if (has('taunt') && !(u.taunt > 0) && u.hp < u.maxHp * 0.6) return has('taunt'); // 솔로: 도발 = 방어 태세 (위급하거나 강적·보스전에서만)
+    if (has('taunt') && !(u.taunt > 0) && (u.fam || u.hp < u.maxHp * 0.6)) return has('taunt'); // 솔로: 도발 = 방어 태세 (위급하거나 강적·보스전에서만)
     if (foes.length >= 2) {
       const aoe = has('aoe') || ready.find(x => x.s.kind === 'dot' && x.s.all);
       if (aoe) return aoe;
@@ -793,6 +857,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
         u.dots = u.dots.map(d => ({ ...d, t: d.t - 1 })).filter(d => d.t > 0);
         push({ a: u.id, n: '지속 피해', k: 'dotTick', hits: [{ t: u.id, d: total, dot: true }] });
         if (!alive('enemy').length) { result = 'win'; break; }
+        if (u.leader && u.hp <= 0) { result = 'lose'; break; }
         if (u.hp <= 0) continue;
       }
       act(u);
@@ -801,7 +866,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
       for (const b of Object.values(u.buffs)) if (b.t > 0) b.t -= 1;
       if (u.taunt > 0) u.taunt -= 1;
       if (!alive('enemy').length) { result = 'win'; break; }
-      if (!alive('party').length) { result = 'lose'; break; }
+      if (!alive('party').length || units.some(x => x.leader && x.hp <= 0)) { result = 'lose'; break; }
     }
     if (result) break;
   }
@@ -868,6 +933,9 @@ export function applyBattle(save0, ctx, battle, rng = Math.random) {
     const tier = DUNGEON_TIERS[ti];
     mods = { ...mods, epicMult: tier.epicMult, shardMult: tier.shardMult, set: dungeonDef(save.dungeon.id).set, uniqueChance: UNIQUE_CHANCE.dungeonBoss[ti] || 0 };
   }
+  // 📜 계약서 조각 (1.212.0 — 사역마 소환 재료, 계정 공유)
+  const fs = rollFamShards(ctx.enemies, ctx.type, rng, save.dungeon?.tier || 0);
+  if (fs) { save.mats.famShard = (save.mats.famShard || 0) + fs; summary.famShards = fs; }
   const r = battleRewards(ctx.enemies, ctx.type, rng, mods);
   // 장비 옵션 — 경험치·골드 % (주인공 기준)
   const hd = deriveUnit(save, save.hero);
