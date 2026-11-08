@@ -153,6 +153,20 @@ const champField = (id, name, concept, lv, bossLv, bossKills, color, boss) => ({
   id, part: 2, concept, name, lv, bossLv, bossKills, area: { hpMult: 1, atkMult: 1 }, color,
   normals: champMob(concept, 'normal'), elites: champMob(concept, 'elite'), boss,
 });
+// ===== 스테이지 (1.213.0 — PM 결정: 지역당 6스테이지 · 처치 목표 + 관문 강적) =====
+// 스테이지마다 몹 레벨 고정 → 같은 지역 안에서도 뒤 스테이지일수록 강해진다.
+// 처치 목표를 채우면 「관문 강적」 개방 → 이기면 다음 스테이지 · 6스테이지 관문 뒤에 지역 보스.
+export const FIELD_STAGES = 6;
+export const STAGE_TUNING = { gateLvAdd: 1, gateEliteMult: 1.0 };
+export function fieldStages(field) {
+  const [a, b] = field.lv;
+  const need = Math.ceil(field.bossKills / FIELD_STAGES);
+  return Array.from({ length: FIELD_STAGES }, (_, i) => ({ idx: i, lv: a + Math.round(i * (b - a) / (FIELD_STAGES - 1)), kills: need }));
+}
+
+// ===== ×4 배속 이용권 (1.213.0 — PM 결정: 골드로 시간 구매) =====
+export const BOOST = { minutes: 30, cost: (lv) => 300 + 15 * lv, maxStackMin: 180 };
+
 export const CHRONICLE_PARTS = [
   { id: 1, name: '1부 · 끝나지 않는 황혼', fields: [1, 2, 3, 4] },
   { id: 2, name: '2부 · 여명의 배신', fields: [5, 6, 7, 8, 9] },
@@ -378,6 +392,7 @@ export const FORGE = {
 export const DROP_TABLE = {
   normal: { itemChance: 0.18, grades: { common: 70, uncommon: 25, rare: 5 }, essence: [1, 2] },
   elite: { itemChance: 1, grades: { common: 25, uncommon: 50, rare: 25 }, essence: [3, 5] },
+  gate: { itemChance: 1, grades: { uncommon: 55, rare: 45 }, essence: [4, 6] }, // 1.213.0 관문 강적
   boss: { itemChance: 1, grades: { uncommon: 30, rare: 70 }, essence: [8, 12] },
   dungeonFloor: { itemChance: 0.5, grades: { uncommon: 40, rare: 55, epic: 5 }, essence: [3, 5], shard: [1, 2] },
   dungeonBoss: { itemChance: 1, items: 2, grades: { rare: 55, epic: 45 }, essence: [10, 15], shard: [3, 5] },

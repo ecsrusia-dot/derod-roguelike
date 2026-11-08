@@ -50,7 +50,7 @@ function run(classId, seed) {
   const rng = mulberry(seed);
   let save = E.newChronicleSave(classId);
   save.fams = {}; save.famTeam = {}; save.famPity = { total: 0, sinceViolet: 0 }; save.mats = { ...save.mats, famShard: 0, famSoul: 0 };
-  const log = {}; const wr = { normal: [0, 0], elite: [0, 0], boss: [0, 0] }; let hpLoss = [];
+  const log = {}; const wr = { normal: [0, 0], elite: [0, 0], boss: [0, 0], gate: [0, 0] }; let hpLoss = [];
   let battles = 0; const failLv = {}; // 보스 패배 시 1레벨 더 올리고 재도전 (사람처럼)
   while (battles < 6000) {
     if (save.progress.bossCleared[LAST]) break;
@@ -58,16 +58,22 @@ function run(classId, seed) {
     const field = CHRONICLE_FIELDS[fid - 1];
     save = upkeep(save, rng);
     const lv = save.units[classId].lv;
-    const tryBoss = (save.progress.fieldKills[fid] || 0) >= field.bossKills && lv >= field.bossLv - 2 && lv > (failLv[fid] ?? -1) && E.bossAttemptsLeft(save, fid) > 0;
-    const enc = E.rollFieldEncounter(field, rng, tryBoss, E.partyLevel(save));
+    // 1.213.0 스테이지: 가장 높은 개방 스테이지에서 사냥 → 처치 목표 달성 시 관문 → 6관문 뒤 보스
+    const st = E.stageState(save, fid);
+    const si = Math.min(st.cleared, 5);
+    const gateKey = `${fid}:${si}`;
+    const tryBoss = E.bossReady(save, fid) && lv >= field.bossLv - 2 && lv > (failLv[fid] ?? -1) && E.bossAttemptsLeft(save, fid) > 0;
+    const tryGate = !tryBoss && E.gateReady(save, fid, si) && lv > (failLv[gateKey] ?? -1);
+    const enc = tryGate ? { ...E.rollGateEncounter(field, si, rng), stage: si } : E.rollFieldEncounter(field, rng, tryBoss, null, tryBoss ? null : si);
     const party = E.partyCombatants(save);
     const b = E.simulateChronicleBattle(party, enc.enemies, rng);
     battles++;
     const t = enc.type;
     wr[t][1]++; if (b.result === 'win') { wr[t][0]++; if (t === 'normal') hpLoss.push(1 - b.finalHp[classId] / party[0].maxHp); }
-    const r = E.applyBattle(save, { kind: 'field', fieldId: fid, type: enc.type, enemies: enc.enemies }, b, rng);
+    const r = E.applyBattle(save, { kind: 'field', fieldId: fid, type: enc.type, enemies: enc.enemies, stage: enc.stage }, b, rng);
     save = r.save;
     if (b.result !== 'win' && t === 'boss') failLv[fid] = lv;
+    if (b.result !== 'win' && t === 'gate') failLv[gateKey] = lv;
     if (b.result === 'win' && t === 'boss') log[fid] = { battles, lv: save.units[classId].lv };
   }
   const avg = (a) => a.length ? Math.round(a.reduce((x, y) => x + y, 0) / a.length * 100) : 0;
@@ -80,5 +86,5 @@ for (const c of CHRONICLE_CLASSES) {
   const rs = []; for (let i = 0; i < N; i++) rs.push(run(c.id, i * 97 + 3));
   const med = (f) => { const v = rs.map(f).filter(x => x != null).sort((a, b) => a - b); return v.length ? v[Math.floor(v.length / 2)] : '-'; };
   const rate = (t) => { const w = rs.reduce((s, r) => s + r.wr[t][0], 0); const n = rs.reduce((s, r) => s + r.wr[t][1], 0); return n ? Math.round(w / n * 100) + '%' : '-'; };
-  console.log(`${c.name.padEnd(7)} | ` + CHRONICLE_FIELDS.map(f => f.id).map(f => `보스${f} ${med(r => r.log[f]?.battles)}전 Lv${med(r => r.log[f]?.lv)}`).join(' | ') + ` | 완주 ${rs.filter(r => r.log[LAST]).length}/${N} | 승률 일반 ${rate('normal')}(HP-${med(r => r.hpLoss)}%) 강적 ${rate('elite')} 보스 ${rate('boss')} | 소환 ${med(r => r.summons)}회 보유 ${med(r => r.famCount)} 최고 ${(FAM_GRADES[med(r => r.best)] || {}).label || '-'} 동행 ${rs.map(r => r.mainFam ? FAM_GRADES[famGradeIdx(r.mainFam.grade)].label + '+' + r.mainFam.plus : '-').join(',')}`);
+  console.log(`${c.name.padEnd(7)} | ` + CHRONICLE_FIELDS.map(f => f.id).map(f => `보스${f} ${med(r => r.log[f]?.battles)}전 Lv${med(r => r.log[f]?.lv)}`).join(' | ') + ` | 완주 ${rs.filter(r => r.log[LAST]).length}/${N} | 승률 일반 ${rate('normal')}(HP-${med(r => r.hpLoss)}%) 강적 ${rate('elite')} 보스 ${rate('boss')} 관문 ${rate('gate')} | 소환 ${med(r => r.summons)}회 보유 ${med(r => r.famCount)} 최고 ${(FAM_GRADES[med(r => r.best)] || {}).label || '-'} 동행 ${rs.map(r => r.mainFam ? FAM_GRADES[famGradeIdx(r.mainFam.grade)].label + '+' + r.mainFam.plus : '-').join(',')}`);
 }

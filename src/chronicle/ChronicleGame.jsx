@@ -11,7 +11,7 @@ import { PALETTE } from '../utils/helpers.js';
 import { GlassPanel, UIButton, BottomSheet } from '../components/ui/CommonUI.jsx';
 import {
   CHRONICLE_TITLE, CHRONICLE_SUB, CHRONICLE_PARTS, CHRONICLE_SAVE_KEY, CHRONICLE_SAVE_KEY_V1, CHRONICLE_TUNING, CHRONICLE_CLASSES, CHRONICLE_FIELDS,
-  CHRONICLE_DUNGEON, CHRONICLE_DUNGEONS, DUNGEON_TIERS, dungeonDef, STAT_META, STAT_KEYS, SKILL_MAX_LV, MASTERY_PCT, BOSS_DAILY_LIMIT, DUNGEON_KEYS, GRADES, gradeIdx, SLOTS, FORGE, UNIQUE_CHANCE, UNIQUE_ITEMS,
+  CHRONICLE_DUNGEON, CHRONICLE_DUNGEONS, DUNGEON_TIERS, dungeonDef, STAT_META, STAT_KEYS, SKILL_MAX_LV, MASTERY_PCT, BOSS_DAILY_LIMIT, DUNGEON_KEYS, GRADES, gradeIdx, SLOTS, FORGE, UNIQUE_CHANCE, UNIQUE_ITEMS, fieldStages, FIELD_STAGES, BOOST,
   chronicleClass, classSkills, describeSkill, chronicleEnemyArt,
 } from './data.js';
 import * as E from './engine.js';
@@ -119,10 +119,12 @@ function Portrait({ cid, size = 44, dim = false }) {
 
 // ===== 전투 재생 =====
 const SPEEDS = [1, 2, 4];
-function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain }) {
+function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boostLeft = 0, onAskBoost }) {
   const { sim, enemies, party, summary, ctx } = battle;
   const [idx, setIdx] = useState(0);
-  const [speed, setSpeed] = useState(() => { try { return +localStorage.getItem('chronicleSpeed') || 2; } catch { return 2; } });
+  const [speedPref, setSpeed] = useState(() => { try { return +localStorage.getItem('chronicleSpeed') || 2; } catch { return 2; } });
+  // ×4는 이용권이 있을 때만 (1.213.0) — 만료되면 ×2로
+  const speed = speedPref === 4 && boostLeft <= 0 ? 2 : speedPref;
   const done = idx >= sim.events.length;
   useEffect(() => {
     if (done) return undefined;
@@ -166,9 +168,14 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain }) {
       <div className="relative flex items-center gap-2 px-3 pt-2 flex-none" style={{ minHeight: 44 }}>
         <span style={{ fontSize: 12, color: PALETTE.textDim }}>{ctx.label} · {round}라운드</span>
         <div className="flex-1" />
-        {SPEEDS.map(s => (
-          <button key={s} onClick={() => setSp(s)} className="ui-press" style={{ fontSize: 12, padding: '4px 9px', borderRadius: 8, border: `1px solid ${speed === s ? PALETTE.legendary : 'var(--ui-line)'}`, color: speed === s ? PALETTE.legendary : PALETTE.textDim, background: 'transparent' }}>×{s}</button>
-        ))}
+        {SPEEDS.map(s => {
+          const locked = s === 4 && boostLeft <= 0;
+          return (
+            <button key={s} onClick={() => (locked ? onAskBoost?.() : setSp(s))} className="ui-press" style={{ fontSize: 12, padding: '4px 9px', borderRadius: 8, border: `1px solid ${speed === s ? PALETTE.legendary : 'var(--ui-line)'}`, color: speed === s ? PALETTE.legendary : PALETTE.textDim, background: 'transparent', opacity: locked ? 0.6 : 1 }}>
+              {locked ? '×4 🔒' : s === 4 ? `×4 ${Math.ceil(boostLeft / 60000)}분` : `×${s}`}
+            </button>
+          );
+        })}
         {!done && <button onClick={() => setIdx(sim.events.length)} className="ui-press" style={{ fontSize: 12, padding: '4px 9px', borderRadius: 8, border: '1px solid var(--ui-line)', color: PALETTE.dawn, background: 'transparent' }}>⏩</button>}
       </div>
 
@@ -248,6 +255,8 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain }) {
                 {summary.autoDismantled ? <div className="text-center" style={{ color: PALETTE.textDim }}>가방이 가득 차 {summary.autoDismantled}개 자동 분해</div> : null}
                 {summary.unlocks.map(u => <div key={u} className="text-center" style={{ color: '#9cc4e4' }}>🔓 {u} 개방</div>)}
                 {summary.dungeonClear && <div className="text-center font-semibold" style={{ color: '#c08ae8' }}>던전 정복!</div>}
+                {summary.gateOpen ? <div className="text-center font-semibold" style={{ color: PALETTE.legendary }}>⚔ 처치 목표 달성 — 관문 도전 가능!</div> : null}
+                {summary.stageClear ? <div className="text-center font-semibold" style={{ color: '#9cc4e4' }}>🔓 스테이지 {summary.stageClear} 관문 통과!</div> : null}
                 {summary.famShards ? <div className="text-center" style={{ color: '#d07ae8' }}>📜 계약서 조각 +{summary.famShards}</div> : null}
                 {summary.keys ? <div className="text-center font-semibold" style={{ color: PALETTE.legendary }}>🗝 던전 열쇠 +{summary.keys}</div> : null}
                 {(summary.questsDone || []).map(t => <div key={t} className="text-center font-semibold" style={{ color: PALETTE.dawn }}>📜 의뢰 완료: {t} — 게시판에서 보상</div>)}
@@ -281,7 +290,7 @@ function TownView({ save, go, onExit, onSwitchChar }) {
   const nextField = CHRONICLE_FIELDS.find(f => !save.progress.bossCleared[f.id]);
   const main = Q.currentMainQuest(save);
   const goal = nextField
-    ? `${main ? `[${main.title}] ` : ''}${nextField.name} — 처치 ${Math.min(save.progress.fieldKills[nextField.id] || 0, nextField.bossKills)}/${nextField.bossKills} 후 보스`
+    ? `${main ? `[${main.title}] ` : ''}${nextField.name} — ${E.bossReady(save, nextField.id) ? '보스 도전 가능' : `스테이지 ${E.stageState(save, nextField.id).cleared + 1}/${FIELD_STAGES}`}`
     : main ? `[${main.title}] 보상을 받으러 게시판으로` : '2부 완결! 던전·보스 재도전으로 유니크를 노리자';
   const qBadge = Q.questBadgeCount(save);
   const tiles = [
@@ -338,15 +347,25 @@ function TownView({ save, go, onExit, onSwitchChar }) {
   );
 }
 
-// ===== 사냥터 =====
+// ===== 사냥터 (1.213.0 — 지역당 6스테이지 · 처치 목표 + 관문 강적 → 보스) =====
 function FieldView({ save, onBack, onFight, playScene, sceneOpen }) {
   const [sel, setSel] = useState(() => [...CHRONICLE_FIELDS].reverse().find(f => E.fieldUnlocked(save, f.id))?.id || 1);
   useEffect(() => { if (!sceneOpen) playScene({ at: 'field', fieldId: sel }); }, [sel, sceneOpen]); // eslint-disable-line react-hooks/exhaustive-deps
   const f = CHRONICLE_FIELDS[sel - 1];
   const part = CHRONICLE_PARTS.find(p => p.fields.includes(sel)) || CHRONICLE_PARTS[0];
-  const kills = save.progress.fieldKills[f.id] || 0;
-  const bossReady = kills >= f.bossKills;
+  const st = E.stageState(save, f.id);
+  const stages = fieldStages(f);
+  const [stage, setStage] = useState(() => Math.min(st.cleared, FIELD_STAGES - 1));
+  useEffect(() => { setStage(Math.min(E.stageState(save, sel).cleared, FIELD_STAGES - 1)); }, [sel]); // eslint-disable-line react-hooks/exhaustive-deps
   const cleared = !!save.progress.bossCleared[f.id];
+  const bossOpen = E.bossReady(save, f.id);
+  const S = stages[stage];
+  const sKills = Math.min(st.kills[stage] || 0, S.kills);
+  const gateDone = st.cleared > stage;
+  const gateOk = E.gateReady(save, f.id, stage);
+  const gateEnemy = f.elites[stage % f.elites.length];
+  const heroLv = save.units[save.hero].lv;
+  const lvColor = (lv) => (lv > heroLv + 2 ? '#e06a5f' : lv > heroLv ? '#e8b04a' : '#8fe08a');
   return (
     <div className="absolute inset-0 flex flex-col">
       <Header title="사냥터" onBack={onBack} right={<Wallet save={save} />} />
@@ -373,33 +392,64 @@ function FieldView({ save, onBack, onFight, playScene, sceneOpen }) {
         })}
       </div>
       <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
-        <div className="relative overflow-hidden" style={{ borderRadius: 16, aspectRatio: '16 / 9', border: `1px solid ${f.color}88` }}>
-          <img src={chronicleEnemyArt(f.normals[0])} alt="" className="absolute inset-0 w-full h-full object-cover" />
-          <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, transparent 40%, #0a0608)' }} />
+        <div className="relative overflow-hidden" style={{ borderRadius: 16, aspectRatio: '16 / 7', border: `1px solid ${f.color}88` }}>
+          <img src={chronicleEnemyArt(f.normals[Math.min(stage, f.normals.length - 1)])} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, transparent 35%, #0a0608)' }} />
           <div className="absolute bottom-2 left-3 right-3">
-            <div className="font-bold" style={{ fontSize: 18, color: PALETTE.text }}>{f.name}</div>
-            <div style={{ fontSize: 12, color: f.color }}>몹 Lv.{f.lv[0]}~{f.lv[1]} · 보스 Lv.{f.bossLv}</div>
+            <div className="font-bold" style={{ fontSize: 17, color: PALETTE.text }}>{f.name} <span style={{ fontSize: 13, color: f.color }}>· 스테이지 {stage + 1}</span></div>
+            <div style={{ fontSize: 12, color: PALETTE.textDim }}>몹 <b style={{ color: lvColor(S.lv) }}>Lv.{S.lv}</b> · 강적 Lv.{S.lv + 1} · 보스 Lv.{f.bossLv}</div>
           </div>
         </div>
+
+        {/* 스테이지 지도 — 이전 스테이지 관문을 넘으면 다음 스테이지 개방 */}
+        <div className="flex items-center gap-1">
+          {stages.map((x, i) => {
+            const open = E.stageUnlocked(save, f.id, i);
+            const done = st.cleared > i;
+            const on = stage === i;
+            return (
+              <React.Fragment key={i}>
+                <button disabled={!open} onClick={() => setStage(i)} className="ui-press flex-1 flex flex-col items-center justify-center" style={{ height: 52, borderRadius: 10, border: `1.5px solid ${on ? f.color : done ? `${f.color}66` : 'var(--ui-line)'}`, background: on ? `${f.color}22` : done ? `${f.color}0d` : 'transparent', opacity: open ? 1 : 0.35 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: on ? f.color : PALETTE.text }}>{open ? (done ? '✓' : i + 1) : '🔒'}</span>
+                  <span style={{ fontSize: 10.5, color: open ? lvColor(x.lv) : PALETTE.textDim }}>Lv.{x.lv}</span>
+                </button>
+                {i < stages.length - 1 && <span style={{ color: PALETTE.textDim, fontSize: 10 }}>›</span>}
+              </React.Fragment>
+            );
+          })}
+          <span style={{ color: PALETTE.textDim, fontSize: 10 }}>›</span>
+          <div className="flex-1 flex flex-col items-center justify-center" style={{ height: 52, borderRadius: 10, border: `1.5px solid ${bossOpen ? '#c4453d' : 'var(--ui-line)'}`, opacity: bossOpen ? 1 : 0.35 }}>
+            <span style={{ fontSize: 13 }}>👑</span>
+            <span style={{ fontSize: 10.5, color: PALETTE.textDim }}>Lv.{f.bossLv}</span>
+          </div>
+        </div>
+
         <GlassPanel className="p-3">
           <div className="flex justify-between" style={{ fontSize: 12.5, color: PALETTE.text }}>
-            <span>보스 도전까지 처치</span><span className="font-semibold">{Math.min(kills, f.bossKills)}/{f.bossKills}</span>
+            <span>스테이지 {stage + 1} 처치 목표</span><span className="font-semibold">{sKills}/{S.kills}</span>
           </div>
-          <div className="mt-1"><Bar v={Math.min(kills, f.bossKills)} max={f.bossKills} color={f.color} h={6} /></div>
+          <div className="mt-1"><Bar v={sKills} max={S.kills} color={f.color} h={6} /></div>
           <div className="mt-2" style={{ fontSize: 11.5, color: PALETTE.textDim, lineHeight: 1.5 }}>
-            출몰: 일반 {f.normals.length}종 · 강적 {Math.round(CHRONICLE_TUNING.eliteChance * 100)}% 확률<br />
-            {cleared ? `보스 처치 완료 — 재도전은 하루 ${BOSS_DAILY_LIMIT}회 (희귀 장비 확정 · 유니크 0.5%)` : '보스를 쓰러뜨리면 다음 지역이 열린다'}
+            {gateDone ? '관문 통과 — 이 스테이지는 자유롭게 사냥할 수 있다'
+              : gateOk ? `처치 목표 달성! 관문 강적 「${ENEMIES[gateEnemy]?.name}」(Lv.${S.lv + 1})을 쓰러뜨리면 ${stage + 1 < FIELD_STAGES ? `스테이지 ${stage + 2}` : '보스'} 개방`
+                : `처치 목표를 채우면 관문 강적이 나타난다 · 강적 ${Math.round(CHRONICLE_TUNING.eliteChance * 100)}% 확률로 출몰`}
+            {cleared && <><br />보스 처치 완료 — 재도전은 하루 {BOSS_DAILY_LIMIT}회</>}
           </div>
         </GlassPanel>
-        <UIButton onClick={() => onFight(f, false)}>사냥 시작</UIButton>
+        <UIButton onClick={() => onFight(f, 'hunt', stage)}>스테이지 {stage + 1} 사냥 (Lv.{S.lv})</UIButton>
+        {!gateDone && (
+          <UIButton variant="gold" disabled={!gateOk} onClick={() => onFight(f, 'gate', stage)}>
+            {gateOk ? `⚔ 관문 도전 — ${ENEMIES[gateEnemy]?.name} Lv.${S.lv + 1}` : `관문 잠김 (처치 ${S.kills - sKills} 남음)`}
+          </UIButton>
+        )}
         {(() => {
           const left = E.bossAttemptsLeft(save, f.id);
-          const bossName = E.rollFieldEncounter(f, () => 0, true).enemies[0].name;
-          if (!bossReady && !cleared) return <UIButton variant="gold" disabled>{`보스 잠김 (처치 ${f.bossKills - kills} 남음)`}</UIButton>;
+          const bossName = ENEMIES[f.boss]?.name;
+          if (!bossOpen) return <UIButton variant="ghost" disabled>{`👑 보스 — 스테이지 ${FIELD_STAGES} 관문을 넘으면 개방`}</UIButton>;
           if (cleared && left <= 0) return <UIButton variant="gold" disabled>보스 재도전 — 오늘 횟수 소진 (0시 초기화)</UIButton>;
           return (
-            <UIButton variant="gold" onClick={() => onFight(f, true)}>
-              {cleared ? `보스 재도전 — ${bossName} (오늘 ${left}/${BOSS_DAILY_LIMIT})` : `보스 도전 — ${bossName}`}
+            <UIButton variant="gold" onClick={() => onFight(f, 'boss', null)}>
+              {cleared ? `👑 보스 재도전 — ${bossName} (오늘 ${left}/${BOSS_DAILY_LIMIT})` : `👑 보스 도전 — ${bossName} Lv.${f.bossLv}`}
             </UIButton>
           );
         })()}
@@ -1176,6 +1226,114 @@ function QuestView({ save, setSave, onBack, flash, onReplay }) {
   );
 }
 
+// ===== 반복 사냥 보고서 (1.213.0) =====
+function huntRecord(sim, party, enc, summary) {
+  const dmg = E.battleDamageStats(sim, party);
+  const units = {};
+  for (const p of party) units[p.id] = { id: p.id, name: p.name, fam: !!p.fam, famKey: p.famKey, classId: p.classId, dmg: dmg.byUnit[p.id] || 0 };
+  return {
+    win: sim.result === 'win', type: enc.type, rounds: dmg.rounds,
+    kills: sim.result === 'win' ? enc.enemies.reduce((m, e) => ({ ...m, [e.tier]: (m[e.tier] || 0) + 1 }), {}) : {},
+    units, skills: dmg.bySkill,
+    exp: summary.exp || 0, gold: summary.gold || 0, essence: summary.essence || 0, famShards: summary.famShards || 0,
+    items: (summary.items || []).map(i => i.grade), levelUps: Object.keys(summary.levelUps || {}).length,
+  };
+}
+function newHuntStats() {
+  return { battles: 0, wins: 0, losses: 0, rounds: 0, types: {}, kills: {}, units: {}, skills: {}, exp: 0, gold: 0, essence: 0, famShards: 0, items: {}, levelUps: 0, startedAt: Date.now() };
+}
+function addHuntRecord(st, r) {
+  st.battles += 1; if (r.win) st.wins += 1; else st.losses += 1;
+  st.rounds += r.rounds;
+  st.types[r.type] = (st.types[r.type] || 0) + 1;
+  for (const [k, v] of Object.entries(r.kills)) st.kills[k] = (st.kills[k] || 0) + v;
+  for (const u of Object.values(r.units)) {
+    const key = u.fam ? `fam:${u.famKey}` : u.id;
+    const cur = st.units[key] || { ...u, dmg: 0, rounds: 0 };
+    cur.dmg += u.dmg; cur.rounds += r.rounds;
+    st.units[key] = cur;
+  }
+  for (const [k, v] of Object.entries(r.skills)) {
+    const [id, sn] = k.split('|');
+    const u = r.units[id];
+    const key = `${u?.fam ? `fam:${u.famKey}` : id}|${sn}`;
+    st.skills[key] = (st.skills[key] || 0) + v;
+  }
+  st.exp += r.exp; st.gold += r.gold; st.essence += r.essence; st.famShards += r.famShards; st.levelUps += r.levelUps;
+  for (const g of r.items) st.items[g] = (st.items[g] || 0) + 1;
+}
+const TIER_LABEL = { normal: '일반 몹', elite: '강적', boss: '보스' };
+function HuntReport({ report: r, onClose }) {
+  const units = Object.entries(r.units).map(([key, u]) => ({ key, ...u })).sort((a, b) => b.dmg - a.dmg);
+  const total = units.reduce((t, u) => t + u.dmg, 0) || 1;
+  const skills = Object.entries(r.skills).map(([k, v]) => { const [uk, sn] = k.split('|'); return { uk, sn, v }; }).sort((a, b) => b.v - a.v).slice(0, 6);
+  const mins = Math.max(1, Math.round((r.endedAt - r.startedAt) / 60000));
+  const row = { display: 'flex', justifyContent: 'space-between', fontSize: 12.5, color: PALETTE.text, padding: '3px 0' };
+  return (
+    <BottomSheet title="📊 사냥 보고서" onClose={onClose} maxHeight="85%">
+      <div className="flex flex-col gap-3">
+        <GlassPanel className="p-3">
+          <div className="font-semibold mb-1" style={{ fontSize: 13, color: PALETTE.legendary }}>사냥 {r.battles}회 · 승리 {r.wins} · 패배 {r.losses} <span style={{ color: PALETTE.textDim, fontWeight: 400 }}>· 약 {mins}분</span></div>
+          {['normal', 'elite', 'boss'].filter(t => r.kills[t]).map(t => <div key={t} style={row}><span>{TIER_LABEL[t]} 처치</span><b>{r.kills[t]}마리</b></div>)}
+          {r.types.gate ? <div style={row}><span>관문 전투</span><b>{r.types.gate}회</b></div> : null}
+        </GlassPanel>
+        <GlassPanel className="p-3">
+          <div className="font-semibold mb-2" style={{ fontSize: 13, color: PALETTE.text }}>기여도 · 라운드당 피해(DPS) 순위</div>
+          {units.map((u, i) => {
+            const pct = Math.round(u.dmg / total * 100);
+            const dps = Math.round(u.dmg / Math.max(1, u.rounds));
+            return (
+              <div key={u.key} className="flex items-center gap-2 mb-2">
+                <span style={{ width: 18, fontSize: 13, fontWeight: 700, color: i === 0 ? PALETTE.legendary : PALETTE.textDim }}>{i + 1}</span>
+                <UnitIcon u={u} size={30} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between" style={{ fontSize: 12, color: PALETTE.text }}><span className="truncate">{u.fam ? `🐾 ${u.name}` : u.name}</span><span>{pct}%</span></div>
+                  <Bar v={u.dmg} max={total} color={u.fam ? '#d07ae8' : PALETTE.legendary} h={6} />
+                  <div style={{ fontSize: 11, color: PALETTE.textDim }}>총 {u.dmg.toLocaleString()} · 라운드당 {dps.toLocaleString()}</div>
+                </div>
+              </div>
+            );
+          })}
+          {skills.length > 0 && <div className="mt-1" style={{ fontSize: 11.5, color: PALETTE.textDim }}>스킬별 피해 상위</div>}
+          {skills.map((x, i) => (
+            <div key={i} style={{ ...row, fontSize: 12 }}><span>{i + 1}. {x.sn} <span style={{ color: PALETTE.textDim }}>({r.units[x.uk]?.fam ? '사역마' : '주인공'})</span></span><span>{x.v.toLocaleString()} ({Math.round(x.v / total * 100)}%)</span></div>
+          ))}
+        </GlassPanel>
+        <GlassPanel className="p-3">
+          <div className="font-semibold mb-1" style={{ fontSize: 13, color: PALETTE.text }}>획득</div>
+          <div style={row}><span>경험치</span><b>{r.exp.toLocaleString()}</b></div>
+          <div style={row}><span>골드</span><b>🪙 {r.gold.toLocaleString()}</b></div>
+          <div style={row}><span>정수</span><b>✦ {r.essence}</b></div>
+          {r.famShards ? <div style={row}><span>계약서 조각</span><b>📜 {r.famShards}</b></div> : null}
+          {r.levelUps ? <div style={row}><span>레벨 업</span><b>▲ {r.levelUps}</b></div> : null}
+          <div style={row}><span>장비</span><b>{GRADES.filter(g => r.items[g.id]).map(g => <span key={g.id} style={{ color: g.color, marginLeft: 6 }}>{g.label} {r.items[g.id]}</span>)}{!Object.keys(r.items).length && '없음'}</b></div>
+        </GlassPanel>
+        <UIButton onClick={onClose}>확인</UIButton>
+      </div>
+    </BottomSheet>
+  );
+}
+// ×4 배속 이용권 구매 창
+function BoostSheet({ save, onClose, onBuy }) {
+  const left = E.boostLeftMs(save);
+  const c = E.boostCost(save);
+  return (
+    <BottomSheet title="⏩ ×4 배속 이용권" onClose={onClose} maxHeight="55%">
+      <div className="text-center" style={{ fontSize: 12.5, color: PALETTE.textDim, lineHeight: 1.6 }}>
+        기본 배속은 ×1 · ×2. 이용권이 있는 동안 전투를 ×4로 볼 수 있다.<br />
+        {BOOST.minutes}분 = 🪙 {c.toLocaleString()} (레벨에 따라 가격 상승) · 최대 {BOOST.maxStackMin / 60}시간까지 쌓인다 · 모든 캐릭터 공유
+      </div>
+      <div className="text-center mt-3 font-semibold" style={{ fontSize: 15, color: left ? PALETTE.legendary : PALETTE.textDim }}>
+        {left ? `남은 시간 ${Math.ceil(left / 60000)}분` : '이용권 없음'}
+      </div>
+      <div className="flex flex-col gap-2 mt-4">
+        <UIButton variant="gold" disabled={save.gold < c} onClick={onBuy}>{BOOST.minutes}분 구매 — 🪙 {c.toLocaleString()} (보유 {save.gold.toLocaleString()})</UIButton>
+        <UIButton variant="ghost" style={{ height: 40 }} onClick={onClose}>닫기</UIButton>
+      </div>
+    </BottomSheet>
+  );
+}
+
 // ===== 메인 =====
 export default function ChronicleGame({ onExit }) {
   const [acc, setAcc] = useState(loadAccount);
@@ -1187,6 +1345,21 @@ export default function ChronicleGame({ onExit }) {
   const [scene, setScene] = useState(null); // { scene, replay, after }
   const lastFieldRef = useRef(null);
   const rng = Math.random;
+  // 반복 사냥 보고서 (1.213.0)
+  const repStatsRef = useRef(null);
+  const lastRecRef = useRef(null);
+  const [report, setReport] = useState(null);
+  const [boostSheet, setBoostSheet] = useState(false);
+  const toggleRepeat = () => {
+    if (!repeat) { repStatsRef.current = newHuntStats(); if (lastRecRef.current) addHuntRecord(repStatsRef.current, lastRecRef.current); }
+    setRepeat(r => !r);
+  };
+  useEffect(() => {
+    if (repeat || !repStatsRef.current) return;
+    const st = repStatsRef.current;
+    repStatsRef.current = null;
+    if (st.battles > 1) setReport({ ...st, endedAt: Date.now() });
+  }, [repeat]);
 
   useEffect(() => { writeAccount(acc); }, [acc]);
   // 🗝 날짜가 바뀌면 열쇠 충전 (화면 이동 때마다 확인)
@@ -1219,18 +1392,24 @@ export default function ChronicleGame({ onExit }) {
   }, [view, save, scene, battle]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 전투 시작: 끝까지 계산 → 저장 반영 → 재생
-  const fightField = (field, boss) => {
+  // mode: 'hunt' | 'gate' | 'boss' · stage: 스테이지 번호
+  const fightField = (field, mode = 'hunt', stage = 0) => {
+    const boss = mode === 'boss';
     if (boss && E.bossAttemptsLeft(save, field.id) <= 0) { flash('오늘 보스 재도전 횟수를 모두 썼습니다'); return; }
     if (boss && playScene({ at: 'bossPre', fieldId: field.id }, () => flash('준비되면 「보스 도전」을 누르세요'))) return; // 보스 앞 장면 먼저 (저장 반영 후 다시 도전)
-    lastFieldRef.current = field;
-    const enc = E.rollFieldEncounter(field, rng, boss, E.partyLevel(save));
+    if (mode === 'hunt') lastFieldRef.current = { field, stage };
+    const enc = mode === 'gate' ? E.rollGateEncounter(field, stage, rng) : E.rollFieldEncounter(field, rng, boss, null, boss ? null : stage);
     const party = E.partyCombatants(save);
     const sim = E.simulateChronicleBattle(party, enc.enemies, rng);
-    const ctx = { kind: 'field', fieldId: field.id, type: enc.type, enemies: enc.enemies, label: boss ? `${field.name} 보스` : field.name };
+    const ctx = { kind: 'field', fieldId: field.id, type: enc.type, enemies: enc.enemies, stage: boss ? null : stage, label: boss ? `${field.name} 보스` : mode === 'gate' ? `${field.name} ${stage + 1} 관문` : `${field.name} ${stage + 1}` };
     const r = E.applyBattle(save, ctx, sim, rng);
     r.summary.questsDone = Q.newlyDoneQuests(save, r.save);
+    if (mode === 'hunt' && !E.gateReady(save, field.id, stage) && E.gateReady(r.save, field.id, stage)) r.summary.gateOpen = true;
     setSave(r.save);
-    if (boss || sim.result !== 'win' || r.summary.questsDone.length) setRepeat(false);
+    const rec = huntRecord(sim, party, enc, r.summary);
+    lastRecRef.current = rec;
+    if (repStatsRef.current) addHuntRecord(repStatsRef.current, rec);
+    if (mode !== 'hunt' || sim.result !== 'win' || r.summary.questsDone.length) setRepeat(false);
     setBattle({ sim, enemies: enc.enemies, party, summary: r.summary, ctx, key: Date.now() });
     setView('battle');
   };
@@ -1265,8 +1444,9 @@ export default function ChronicleGame({ onExit }) {
   } else if (view === 'battle' && battle) {
     content = (
       <BattleView key={battle.key} battle={battle} save={save} onDone={afterBattle}
-        repeat={repeat} onToggleRepeat={() => setRepeat(r => !r)}
-        onAgain={() => lastFieldRef.current && fightField(lastFieldRef.current, false)} />
+        repeat={repeat} onToggleRepeat={toggleRepeat}
+        onAgain={() => lastFieldRef.current && fightField(lastFieldRef.current.field, 'hunt', lastFieldRef.current.stage)}
+        boostLeft={E.boostLeftMs(save)} onAskBoost={() => setBoostSheet(true)} />
     );
   } else if (view === 'field') {
     content = <FieldView save={save} onBack={() => { setRepeat(false); setView('town'); }} onFight={fightField} playScene={playScene} sceneOpen={!!scene} />;
@@ -1297,6 +1477,8 @@ export default function ChronicleGame({ onExit }) {
   return (
     <div className="absolute inset-0" style={{ background: PALETTE.bg, fontFamily: '"Noto Serif KR", serif', color: PALETTE.text }}>
       <div key={view} className="ui-screen-enter absolute inset-0">{content}</div>
+      {report && <HuntReport report={report} save={save} onClose={() => setReport(null)} />}
+      {boostSheet && save && <BoostSheet save={save} onClose={() => setBoostSheet(false)} onBuy={() => { const n = E.buyBoost(save); if (n === save) { flash(save.gold < E.boostCost(save) ? '골드가 부족합니다' : `최대 ${BOOST.maxStackMin / 60}시간까지 쌓을 수 있습니다`); return; } setSave(n); flash(`⏩ ×4 배속 +${BOOST.minutes}분`); }} />}
       {acc.giftNotice && view === 'title' && <GiftNotice acc={acc} onClose={() => setAcc(a => ({ ...a, giftNotice: false }))} />}
       {scene && <SceneView key={scene.scene.id} save={save} scene={scene.scene} onEnd={endScene} />}
       {toast && (
