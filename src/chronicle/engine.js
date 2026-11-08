@@ -4,6 +4,7 @@
 // 저장 객체(save)를 받아 새 save를 돌려주는 순수 함수 + 전투 시뮬.
 // 전투는 simulateChronicleBattle이 끝까지 계산해 사건 목록을 돌려주고, UI는 재생만 한다 (풀오토 관전).
 // ============================================
+import { fieldStages, FIELD_STAGES, STAGE_TUNING, BOOST } from './data.js';
 import { famCombatant, famSubFx, rollFamShards, FAM_TUNING, summonFamiliars, enhanceFamiliar, evolveFamiliar } from './familiar.js';
 import {
   CHRONICLE_TUNING as T, CHRONICLE_CLASSES, CHRONICLE_SKILLS, CHRONICLE_FIELDS, CHRONICLE_DUNGEON, CHRONICLE_DUNGEONS, DUNGEON_TIERS, dungeonDef,
@@ -571,8 +572,55 @@ export function partyCombatants(save, hpMap = null) {
 export function partyLevel(save) {
   return Math.round(save.party.reduce((s, c) => s + save.units[c].lv, 0) / Math.max(1, save.party.length));
 }
-export function rollFieldEncounter(field, rng, boss = false, partyLv = null) {
+// ===== 스테이지 진행 (1.213.0) =====
+// progress.stages[fid] = { cleared: 0~6, kills: [6] } — cleared = 관문을 넘은 스테이지 수
+export function stageState(save, fid) {
+  const st = save.progress.stages?.[fid];
+  if (st) return st;
+  // 구 저장: 보스를 잡은 지역은 전부 클리어, 진행 중인 지역은 누적 처치 수로 환산 (관문 통과로 간주)
+  const field = CHRONICLE_FIELDS[fid - 1];
+  const need = fieldStages(field)[0].kills;
+  const cleared = save.progress.bossCleared[fid] ? FIELD_STAGES : Math.min(FIELD_STAGES, Math.floor((save.progress.fieldKills?.[fid] || 0) / need));
+  return { cleared, kills: Array.from({ length: FIELD_STAGES }, (_, i) => (i < cleared ? need : 0)) };
+}
+export const stageUnlocked = (save, fid, i) => i === 0 || stageState(save, fid).cleared >= i;
+export function gateReady(save, fid, i) {
+  const st = stageState(save, fid);
+  return st.cleared === i && (st.kills[i] || 0) >= fieldStages(CHRONICLE_FIELDS[fid - 1])[i].kills;
+}
+export const bossReady = (save, fid) => stageState(save, fid).cleared >= FIELD_STAGES;
+// 관문 강적 — 그 스테이지 강적 1 + 일반 1, 레벨 +1
+export function rollGateEncounter(field, stageIdx, rng) {
+  const lv = fieldStages(field)[stageIdx].lv + STAGE_TUNING.gateLvAdd;
+  const area = { hpMult: field.area.hpMult * STAGE_TUNING.gateEliteMult, atkMult: field.area.atkMult };
+  return { type: 'gate', enemies: [buildChronicleEnemy(field.elites[stageIdx % field.elites.length], lv, 'e0', area), buildChronicleEnemy(pick(rng, field.normals), lv - 1, 'e1', field.area)] };
+}
+
+// ===== ×4 배속 이용권 (계정 공유, boostUntil = 만료 시각 ms) =====
+export const boostLeftMs = (save, now = Date.now()) => Math.max(0, (save.boostUntil || 0) - now);
+export const boostCost = (save) => BOOST.cost(save.units[save.hero]?.lv || 1);
+export function buyBoost(save0, now = Date.now()) {
+  const c = boostCost(save0);
+  if (save0.gold < c || boostLeftMs(save0, now) + BOOST.minutes * 60000 > BOOST.maxStackMin * 60000) return save0;
+  const save = clone(save0);
+  save.gold -= c;
+  save.boostUntil = Math.max(now, save.boostUntil || 0) + BOOST.minutes * 60000;
+  return save;
+}
+
+// stage: 스테이지 번호(0~5) — 주면 몹 레벨을 그 스테이지로 고정 (강적은 +1)
+export function rollFieldEncounter(field, rng, boss = false, partyLv = null, stage = null) {
   if (boss) return { type: 'boss', enemies: [buildChronicleEnemy(field.boss, field.bossLv, 'e0', field.area)] };
+  if (stage != null) {
+    const slv = fieldStages(field)[stage].lv;
+    if (rng() < T.eliteChance && field.elites.length) {
+      const list = [buildChronicleEnemy(pick(rng, field.elites), slv + 1, 'e0', field.area)];
+      if (rng() < 0.5) list.push(buildChronicleEnemy(pick(rng, field.normals), slv, 'e1', field.area));
+      return { type: 'elite', enemies: list, stage };
+    }
+    const n = rng() < 0.35 ? 1 : rng() < 0.75 ? 2 : 3;
+    return { type: 'normal', stage, enemies: Array.from({ length: n }, (_, i) => buildChronicleEnemy(pick(rng, field.normals), slv, `e${i}`, field.area)) };
+  }
   const lv = () => {
     if (partyLv == null) return ri(rng, field.lv[0], field.lv[1]);
     return Math.max(field.lv[0], Math.min(field.lv[1], partyLv + ri(rng, -1, 1)));
@@ -690,7 +738,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
       const times = def.counterDouble && rng() < def.counterDouble ? 2 : 1;
       for (let i = 0; i < times && att.hp > 0; i++) {
         const r = damage(def, att, 0.6 * (1 + (def.counterDmg || 0)), { noDodge: true });
-        hits.push({ t: att.id, d: r.d, c: r.crit, counter: true });
+        hits.push({ t: att.id, d: r.d, c: r.crit, counter: true, by: def.id });
       }
       if (def.critAfterCounter) def.critNext = true;
     }
@@ -794,7 +842,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
       case 'dot': {
         const targets = s.all ? foes : [pickEnemyTarget(u)];
         for (const t of targets) {
-          t.dots.push({ v: Math.max(1, Math.round(u.atk * v * atkMod(u) * (1 + (u.dotDmg || 0)))), t: s.turns * (u.dotTurnsMult || 1) });
+          t.dots.push({ v: Math.max(1, Math.round(u.atk * v * atkMod(u) * (1 + (u.dotDmg || 0)))), t: s.turns * (u.dotTurnsMult || 1), src: u.id, sn: s.name });
           hits.push({ t: t.id, dot: true });
         }
         break;
@@ -838,7 +886,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
   }
   // 전투 시작 효과 — 이프리트의 계약서
   for (const p of units.filter(x => x.side === 'party' && x.openInferno)) {
-    for (const e of units.filter(x => x.side === 'enemy')) e.dots.push({ v: Math.max(1, Math.round(p.atk * p.openInferno)), t: 3 * (p.dotTurnsMult || 1) });
+    for (const e of units.filter(x => x.side === 'enemy')) e.dots.push({ v: Math.max(1, Math.round(p.atk * p.openInferno)), t: 3 * (p.dotTurnsMult || 1), src: p.id, sn: '겁화(계약서)' });
   }
 
   let round = 0;
@@ -853,9 +901,11 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
       if (u.regenPct && u.hp < u.maxHp) u.hp = Math.min(u.maxHp, u.hp + Math.round(u.maxHp * u.regenPct));
       if (u.dots.length) {
         const total = u.dots.reduce((s, d) => s + d.v, 0);
+        const dotSrc = {};
+        for (const d of u.dots) if (d.src) { const k = `${d.src}|${d.sn || '지속 피해'}`; dotSrc[k] = (dotSrc[k] || 0) + Math.min(d.v, Math.max(0, u.hp)); }
         u.hp = Math.max(0, u.hp - total);
         u.dots = u.dots.map(d => ({ ...d, t: d.t - 1 })).filter(d => d.t > 0);
-        push({ a: u.id, n: '지속 피해', k: 'dotTick', hits: [{ t: u.id, d: total, dot: true }] });
+        push({ a: u.id, n: '지속 피해', k: 'dotTick', hits: [{ t: u.id, d: total, dot: true }], dotSrc });
         if (!alive('enemy').length) { result = 'win'; break; }
         if (u.leader && u.hp <= 0) { result = 'lose'; break; }
         if (u.hp <= 0) continue;
@@ -958,6 +1008,17 @@ export function applyBattle(save0, ctx, battle, rng = Math.random) {
   if (ctx.kind === 'field') {
     const fid = ctx.fieldId;
     save.progress.fieldKills[fid] = (save.progress.fieldKills[fid] || 0) + ctx.enemies.length;
+    // 스테이지 진행 (1.213.0)
+    if (ctx.stage != null && ctx.type !== 'boss') {
+      save.progress.stages = save.progress.stages || {};
+      const st = clone(stageState(save, fid));
+      if (ctx.type === 'gate') {
+        if (st.cleared === ctx.stage) { st.cleared += 1; summary.stageClear = ctx.stage + 1; }
+      } else {
+        st.kills[ctx.stage] = (st.kills[ctx.stage] || 0) + ctx.enemies.length;
+      }
+      save.progress.stages[fid] = st;
+    }
     if (ctx.type === 'boss' && !save.progress.bossCleared[fid]) {
       save.progress.bossCleared[fid] = true;
       if (fid < CHRONICLE_FIELDS.length) summary.unlocks.push(`사냥터 「${CHRONICLE_FIELDS[fid].name}」`);
@@ -994,4 +1055,26 @@ export function leaveDungeon(save0) {
   const save = clone(save0);
   save.dungeon = null;
   return save;
+}
+
+// ===== 사냥 보고서 (1.213.0) — 전투 사건에서 아군별·스킬별 피해 집계 =====
+// 반환: { byUnit: {id: dmg}, bySkill: {'id|스킬': dmg}, rounds }
+export function battleDamageStats(sim, party) {
+  const ids = new Set(party.map(p => p.id));
+  const byUnit = {}; const bySkill = {};
+  const add = (id, skill, d) => {
+    if (!ids.has(id) || !(d > 0)) return;
+    byUnit[id] = (byUnit[id] || 0) + d;
+    const k = `${id}|${skill}`; bySkill[k] = (bySkill[k] || 0) + d;
+  };
+  for (const e of sim.events) {
+    if (e.k === 'dotTick') { for (const [k, d] of Object.entries(e.dotSrc || {})) { const [id, sn] = k.split('|'); add(id, sn, d); } continue; }
+    if (!e.a || !e.hits) continue;
+    for (const h of e.hits) {
+      if (!(h.d > 0) || ids.has(h.t)) continue;
+      if (h.counter) add(h.by, '반격', h.d);
+      else add(e.a, h.chain ? `${e.n}(추가타)` : e.n, h.d);
+    }
+  }
+  return { byUnit, bySkill, rounds: sim.rounds || 1 };
 }
