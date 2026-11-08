@@ -35,7 +35,7 @@ function run(classId, seed) {
       dungeonTries++;
       save = E.startDungeon(save);
       while (save.dungeon) {
-        const enc = E.dungeonEncounter(save.dungeon.floor, rng);
+        const enc = E.dungeonEncounter(save.dungeon, rng);
         const b = E.simulateChronicleBattle(E.partyCombatants(save, save.dungeon.hp), enc.enemies, rng);
         battles++;
         const r = E.applyBattle(save, { kind: 'dungeon', type: enc.type, enemies: enc.enemies }, b, rng);

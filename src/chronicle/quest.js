@@ -6,7 +6,7 @@
 // 완료 여부는 저장하지 않고 매번 goal로 계산한다 (저장 꼬임 방지).
 // ============================================
 import { QUESTS, SCENES, RECRUIT_SCENES } from './story.js';
-import { GRADES, gradeIdx, CHRONICLE_TUNING as T } from './data.js';
+import { GRADES, gradeIdx, CHRONICLE_TUNING as T, uniqueIdsFor, DUNGEON_TIERS } from './data.js';
 import { rollItem, autoGrowUnit } from './engine.js';
 
 const clone = (o) => (typeof structuredClone === 'function' ? structuredClone(o) : JSON.parse(JSON.stringify(o)));
@@ -14,14 +14,24 @@ const clone = (o) => (typeof structuredClone === 'function' ? structuredClone(o)
 // 구 저장 보정 — 1.205.0 저장에는 quests/story/killsByKey가 없다
 export function ensureQuestFields(save) {
   if (!save) return save;
-  if (save.quests && save.story && save.progress?.killsByKey && save.stats?.elites != null) return save;
   const s = clone(save);
   s.quests = s.quests || {};
   // 1.205.0에서 이미 진행한 저장은 서장을 본 것으로 처리하지 않는다 — 첫 진입 때 한 번 보여 준다
   s.story = s.story || { seen: {}, recruitSeen: {} };
   s.story.recruitSeen = s.story.recruitSeen || {};
   s.progress.killsByKey = s.progress.killsByKey || {};
+  s.progress.dungeonTier = s.progress.dungeonTier || {};
   s.stats.elites = s.stats.elites ?? 0;
+  // 1.208.0: 던전 진행 중 저장은 서리 왕의 무덤 일반으로, 이전 에픽은 고유 옵션 부여 (uid로 고정 선택)
+  if (s.dungeon && !s.dungeon.id) s.dungeon = { ...s.dungeon, id: 'frostTomb', tier: 0 };
+  if (s.progress.dungeonClears > 0 && s.progress.dungeonTier.frostTomb == null) s.progress.dungeonTier.frostTomb = 0;
+  for (const it of s.inventory || []) {
+    if (it.grade === 'epic' && !it.unique) {
+      const pool = uniqueIdsFor(it.slot);
+      it.unique = pool[it.uid % pool.length];
+      it.set = it.set || 'frost';
+    }
+  }
   return s;
 }
 
@@ -58,6 +68,7 @@ export function questProgress(save, q) {
     case 'dungeon': return { cur: Math.min(g.n, c.dungeon - base.dungeon), max: g.n };
     case 'level': return { cur: Math.min(g.n, save.units[save.hero].lv), max: g.n };
     case 'enhance': return { cur: Math.min(g.n, Math.max(0, ...save.inventory.map(i => i.plus || 0))), max: g.n };
+    case 'dungeonTier': { const best = save.progress.dungeonTier?.[g.id]; return { cur: best != null && best >= g.tier ? 1 : 0, max: 1 }; }
     case 'grade': return { cur: save.inventory.some(i => gradeIdx(i.grade) >= gradeIdx(g.grade)) ? 1 : 0, max: 1 };
     default: return { cur: 0, max: 1 };
   }
@@ -121,7 +132,7 @@ export function claimQuest(save0, id, rng = Math.random) {
   }
   if (r.item) {
     const heroLv = save.units[save.hero].lv;
-    const it = { ...rollItem(rng, r.item.grade, heroLv), uid: save.nextUid++ };
+    const it = { ...rollItem(rng, r.item.grade, heroLv, null, r.item.set || 'frost'), uid: save.nextUid++ };
     save.inventory.push(it);
     if (it.grade === 'epic') save.stats.epics += 1;
     gained.item = it;
