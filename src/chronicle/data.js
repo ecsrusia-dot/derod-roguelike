@@ -355,7 +355,7 @@ export const UNIQUE_ITEMS = {
   u_p_vest: U('u_p_vest', 'priest', 'armor', '빛의 법의', { shieldPct: 0.08, dmgReduce: 0.05 }, { shieldReduce: 0.2 }, '보호막이 남아 있는 동안 받는 피해 -20%'),
   u_p_rosary: U('u_p_rosary', 'priest', 'accessory', '축복의 묵주', { healPct: 0.10, hpPct: 0.08 }, { blessMult: 2, blessTurns: 2 }, '「축복」 효과 2배, 지속 +2턴'),
   u_c_ring: U('u_c_ring', 'common', 'accessory', '황혼의 반지', { hpPct: 0.06, atkPct: 0.06 }, { atkPct: 0.08, hpPct: 0.08, defPct: 0.08 }, '공격력·최대 HP·방어 +8%'),
-  u_c_collar: U('u_c_collar', 'common', 'accessory', '사역마의 목걸이', { hpPct: 0.06, spd: 2 }, { famPct: 0.3 }, '사역마 피해·HP +30% (사역마 업데이트와 함께 등장)', { disabled: true }),
+  u_c_collar: U('u_c_collar', 'common', 'accessory', '사역마의 목걸이', { hpPct: 0.06, spd: 2 }, { famPct: 0.3 }, '동행 사역마의 공격력·HP +30%'),
   u_c_charm: U('u_c_charm', 'common', 'accessory', '여행자의 부적', { hpPct: 0.06, atkPct: 0.05 }, { expPct: 0.2 }, '경험치 +20%'),
   u_c_coin: U('u_c_coin', 'common', 'accessory', '탐욕의 금화', { atkPct: 0.06, crit: 0.03 }, { goldPct: 0.4, dmgTakenUp: 0.1 }, '골드 +40%, 받는 피해 +10%'),
 };

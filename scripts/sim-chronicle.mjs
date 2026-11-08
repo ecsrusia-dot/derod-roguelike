@@ -3,11 +3,31 @@
 // 장비는 봇이 실제로 얻은 것만 사용 (1.208 교훈 — 이상적 장비 가정 금지)
 import * as E from '../src/chronicle/engine.js';
 import { CHRONICLE_FIELDS, CHRONICLE_CLASSES, CHRONICLE_SKILLS } from '../src/chronicle/data.js';
+import { FAM_GRADES, FAM_ROLES, famRole, famGradeIdx } from '../src/chronicle/familiar.js';
+const USE_FAM = process.env.FAM !== '0'; // FAM=0 이면 사역마 없이 (1.211.0 기준선 비교용)
 function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const N = +process.argv[2] || 10;
 const LAST = CHRONICLE_FIELDS[CHRONICLE_FIELDS.length - 1].id;
 
-function upkeep(save) {
+// 사역마 봇: 조각 생기면 소환 · 가장 강한 맹공/주술을 동행, 나머지 상위 2마리 보조 · 사역혼은 동행에 몰아서 강화·진화
+const famScore = (k, f) => FAM_GRADES[famGradeIdx(f.grade)].mult * (1 + 0.08 * f.plus) * (FAM_ROLES[famRole(k)].atk + FAM_ROLES[famRole(k)].hp * 0.5);
+function famUpkeep(save, rng) {
+  while ((save.mats.famShard || 0) >= 10) { const r = E.summonFam(save, save.mats.famShard >= 100 ? 10 : 1, false, rng); save = r.save; }
+  const ranked = Object.entries(save.fams).sort((a, b) => famScore(b[0], b[1]) - famScore(a[0], a[1])).map(x => x[0]);
+  if (!ranked.length) return save;
+  save = E.setFamTeam(save, 'main', ranked[0]);
+  if (ranked[1]) save = E.setFamTeam(save, 'sub1', ranked[1]);
+  if (ranked[2]) save = E.setFamTeam(save, 'sub2', ranked[2]);
+  let g = 0;
+  while (g++ < 30) {
+    const f = save.fams[ranked[0]];
+    if (f.plus >= 10) { const r = E.evolveFam(save, ranked[0], rng); if (!r.result) break; save = r.save; }
+    else { const n = E.enhanceFam(save, ranked[0]); if (n === save) break; save = n; }
+  }
+  return save;
+}
+function upkeep(save, rng) {
+  if (USE_FAM) save = famUpkeep(save, rng);
   const cid = save.hero;
   save = E.autoAllocate(save, cid);
   let g = 0;
@@ -29,13 +49,14 @@ function upkeep(save) {
 function run(classId, seed) {
   const rng = mulberry(seed);
   let save = E.newChronicleSave(classId);
+  save.fams = {}; save.famTeam = {}; save.famPity = { total: 0, sinceViolet: 0 }; save.mats = { ...save.mats, famShard: 0, famSoul: 0 };
   const log = {}; const wr = { normal: [0, 0], elite: [0, 0], boss: [0, 0] }; let hpLoss = [];
   let battles = 0; const failLv = {}; // 보스 패배 시 1레벨 더 올리고 재도전 (사람처럼)
   while (battles < 6000) {
     if (save.progress.bossCleared[LAST]) break;
     const fid = CHRONICLE_FIELDS.map(f => f.id).reverse().find(f => E.fieldUnlocked(save, f));
     const field = CHRONICLE_FIELDS[fid - 1];
-    save = upkeep(save);
+    save = upkeep(save, rng);
     const lv = save.units[classId].lv;
     const tryBoss = (save.progress.fieldKills[fid] || 0) >= field.bossKills && lv >= field.bossLv - 2 && lv > (failLv[fid] ?? -1) && E.bossAttemptsLeft(save, fid) > 0;
     const enc = E.rollFieldEncounter(field, rng, tryBoss, E.partyLevel(save));
@@ -50,12 +71,14 @@ function run(classId, seed) {
     if (b.result === 'win' && t === 'boss') log[fid] = { battles, lv: save.units[classId].lv };
   }
   const avg = (a) => a.length ? Math.round(a.reduce((x, y) => x + y, 0) / a.length * 100) : 0;
-  return { log, battles, lv: save.units[classId].lv, wr, hpLoss: avg(hpLoss) };
+  const fams = Object.values(save.fams || {});
+  const best = fams.length ? Math.max(...fams.map(f => famGradeIdx(f.grade))) : -1;
+  return { log, battles, lv: save.units[classId].lv, wr, hpLoss: avg(hpLoss), summons: save.famPity?.total || 0, famCount: fams.length, best, mainFam: save.famTeam?.main && save.fams[save.famTeam.main] };
 }
 
 for (const c of CHRONICLE_CLASSES) {
   const rs = []; for (let i = 0; i < N; i++) rs.push(run(c.id, i * 97 + 3));
   const med = (f) => { const v = rs.map(f).filter(x => x != null).sort((a, b) => a - b); return v.length ? v[Math.floor(v.length / 2)] : '-'; };
   const rate = (t) => { const w = rs.reduce((s, r) => s + r.wr[t][0], 0); const n = rs.reduce((s, r) => s + r.wr[t][1], 0); return n ? Math.round(w / n * 100) + '%' : '-'; };
-  console.log(`${c.name.padEnd(7)} | ` + CHRONICLE_FIELDS.map(f => f.id).map(f => `보스${f} ${med(r => r.log[f]?.battles)}전 Lv${med(r => r.log[f]?.lv)}`).join(' | ') + ` | 완주 ${rs.filter(r => r.log[LAST]).length}/${N} | 승률 일반 ${rate('normal')}(HP-${med(r => r.hpLoss)}%) 강적 ${rate('elite')} 보스 ${rate('boss')}`);
+  console.log(`${c.name.padEnd(7)} | ` + CHRONICLE_FIELDS.map(f => f.id).map(f => `보스${f} ${med(r => r.log[f]?.battles)}전 Lv${med(r => r.log[f]?.lv)}`).join(' | ') + ` | 완주 ${rs.filter(r => r.log[LAST]).length}/${N} | 승률 일반 ${rate('normal')}(HP-${med(r => r.hpLoss)}%) 강적 ${rate('elite')} 보스 ${rate('boss')} | 소환 ${med(r => r.summons)}회 보유 ${med(r => r.famCount)} 최고 ${(FAM_GRADES[med(r => r.best)] || {}).label || '-'} 동행 ${rs.map(r => r.mainFam ? FAM_GRADES[famGradeIdx(r.mainFam.grade)].label + '+' + r.mainFam.plus : '-').join(',')}`);
 }

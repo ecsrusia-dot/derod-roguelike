@@ -22,6 +22,10 @@ export function ensureQuestFields(save) {
   s.progress.dungeonTier = s.progress.dungeonTier || {};
   s.stats.elites = s.stats.elites ?? 0;
   s.stash = s.stash || [];
+  s.fams = s.fams || {};
+  s.famTeam = s.famTeam || {};
+  s.famPity = s.famPity || { total: 0, sinceViolet: 0 };
+  s.mats = { famShard: 0, famSoul: 0, sealPlus: 0, ...s.mats };
   return refreshDungeonKeys(s);
 }
 
