@@ -12,22 +12,26 @@ import { getEnemyImageSrc } from '../utils/helpers.js';
 
 export const CHRONICLE_TITLE = '황혼 연대기';
 export const CHRONICLE_SUB = 'Twilight Chronicle';
-export const CHRONICLE_SAVE_KEY = 'dnt_chronicle_v1';
+export const CHRONICLE_SAVE_KEY_V1 = 'dnt_chronicle_v1'; // 1.x 저장 (읽기 전용 — 시작 보상 판정)
+export const CHRONICLE_SAVE_KEY = 'dnt_chronicle_v2';    // 2.0 계정 저장
 
 export const CHRONICLE_TUNING = {
   pointsPerLevel: 4,          // 레벨업당 능력치 포인트
   spPerLevel: 1,              // 레벨업당 스킬 포인트
-  maxLevel: 40,
+  maxLevel: 60,
   expNeed: (lv) => Math.round(30 * Math.pow(lv, 1.6)),
   enemyHpBase: 30, enemyHpPerLv: 14,     // 일반 적 HP = (30 + 14×Lv) × 개성 × 등급 × 지역
   enemyAtkBase: 9, enemyAtkPerLv: 3.6,   // 일반 적 공격 = (9 + 3.6×Lv) × …
-  enemyTier: { normal: { hp: 1, atk: 1 }, elite: { hp: 2.6, atk: 1.25 }, boss: { hp: 4.5, atk: 1.4 } },
+  enemyTier: { normal: { hp: 1, atk: 1 }, elite: { hp: 3.2, atk: 1.4 }, boss: { hp: 3.8, atk: 1.35 } },
+  // 2.0 솔로 보정 — 적 전체 배율 · 경험치 배율 (난이도 체감 조정은 여기)
+  soloHp: 0.9, soloAtk: 1.3, soloGrowth: 0.055, expMult: 3,
   defK: 60,                   // 받는 피해 = raw × K/(K+방어)
   critMult: 1.6,
   maxRounds: 40,
   eliteChance: 0.12,
   fieldDefeatGoldLoss: 0.1,
-  inventoryMax: 60,
+  inventoryMax: 40,           // 캐릭터 개인 가방
+  stashMax: 100,              // 계정 공용 창고
 };
 
 // ===== 능력치 =====
@@ -41,11 +45,11 @@ export const STAT_KEYS = ['str', 'int', 'agi', 'vit'];
 
 // ===== 직업 =====
 const CLASS_EXTRA = {
-  wanderer:   { role: '탱커', main: 'str', base: { str: 8, int: 2, agi: 5, vit: 8 }, auto: { str: 2, vit: 2 }, magic: false },
-  sage:       { role: '광역 마법', main: 'int', base: { str: 2, int: 10, agi: 4, vit: 5 }, auto: { int: 3, vit: 1 }, magic: true },
-  demonblood: { role: '흡혈 전사', main: 'str', base: { str: 10, int: 2, agi: 4, vit: 7 }, auto: { str: 3, vit: 1 }, magic: false },
+  wanderer:   { role: '탱커', main: 'str', base: { str: 14, int: 2, agi: 5, vit: 10 }, auto: { str: 2, vit: 2 }, magic: false },
+  sage:       { role: '광역 마법', main: 'int', base: { str: 2, int: 10, agi: 4, vit: 6 }, auto: { int: 2, vit: 2 }, magic: true },
+  demonblood: { role: '흡혈 전사', main: 'str', base: { str: 10, int: 2, agi: 4, vit: 5 }, auto: { str: 3, vit: 1 }, magic: false },
   elf:        { role: '연사 딜러', main: 'agi', base: { str: 3, int: 4, agi: 10, vit: 5 }, auto: { agi: 3, vit: 1 }, magic: false },
-  priest:     { role: '치유사', main: 'int', base: { str: 3, int: 9, agi: 4, vit: 7 }, auto: { int: 2, vit: 2 }, magic: true },
+  priest:     { role: '치유사', main: 'int', base: { str: 3, int: 10, agi: 4, vit: 8 }, auto: { int: 2, vit: 2 }, magic: true },
 };
 export const CHRONICLE_CLASSES = CLASSES.map(c => ({
   id: c.id, name: c.name, color: c.color, image: c.image, combatImage: c.combatImage, quote: c.quote,
@@ -68,7 +72,7 @@ export const CHRONICLE_SKILLS = {
   s_amplify: S('s_amplify', 'sage', '마력 증폭', 'passive', 5, 0, 0, 0, { fx: (lv) => ({ atkPct: 0.06 * lv }) }),
   s_meteor: S('s_meteor', 'sage', '화염 폭풍', 'aoe', 8, 5, 1.5, 0.15),
   // 혼혈 마족
-  d_blood: S('d_blood', 'demonblood', '피의 일격', 'lifesteal', 1, 2, 1.7, 0.15, { steal: 0.3 }),
+  d_blood: S('d_blood', 'demonblood', '피의 일격', 'lifesteal', 1, 2, 1.7, 0.15, { steal: 0.2 }),
   d_rage: S('d_rage', 'demonblood', '광폭화', 'rage', 3, 5, 0.3, 0.06, { turns: 3 }),
   d_bloodlust: S('d_bloodlust', 'demonblood', '혈광', 'passive', 5, 0, 0, 0, { fx: (lv) => ({ lowHpDmg: 0.15 * lv, hpPct: 0.04 * lv }) }),
   d_slaughter: S('d_slaughter', 'demonblood', '학살', 'aoe', 8, 4, 1.1, 0.12),
@@ -78,7 +82,7 @@ export const CHRONICLE_SKILLS = {
   e_wind: S('e_wind', 'elf', '바람의 가호', 'passive', 5, 0, 0, 0, { fx: (lv) => ({ critAdd: 0.03 * lv, dodgeAdd: 0.02 * lv }) }),
   e_rain: S('e_rain', 'elf', '화살비', 'aoe', 8, 4, 1.0, 0.12),
   // 여명의 사제
-  p_heal: S('p_heal', 'priest', '치유의 빛', 'heal', 1, 2, 1.6, 0.2),
+  p_heal: S('p_heal', 'priest', '치유의 빛', 'heal', 1, 2, 1.5, 0.15),
   p_bless: S('p_bless', 'priest', '축복', 'buffAtk', 3, 5, 0.15, 0.04, { turns: 3 }),
   p_shield: S('p_shield', 'priest', '가호', 'shield', 5, 5, 1.2, 0.2),
   p_light: S('p_light', 'priest', '신성 광선', 'strike', 8, 3, 1.6, 0.15),
@@ -87,7 +91,7 @@ export const CHRONICLE_SKILLS = {
   w_unyield: S('w_unyield', 'wanderer', '불굴', 'passive', 25, 0, 0, 0, { fx: (lv) => ({ hpPct: 0.05 * lv, defPct: 0.04 * lv }) }),
   s_surge: S('s_surge', 'sage', '마력 폭주', 'rage', 15, 5, 0.35, 0.07, { turns: 3 }),
   s_starfall: S('s_starfall', 'sage', '운석 낙하', 'aoe', 25, 6, 2.4, 0.25),
-  d_moon: S('d_moon', 'demonblood', '혈월참', 'lifesteal', 15, 4, 2.4, 0.22, { steal: 0.4 }),
+  d_moon: S('d_moon', 'demonblood', '혈월참', 'lifesteal', 15, 4, 2.4, 0.22, { steal: 0.3 }),
   d_undying: S('d_undying', 'demonblood', '불멸의 피', 'passive', 25, 0, 0, 0, { fx: (lv) => ({ hpPct: 0.06 * lv, lowHpDmg: 0.1 * lv }) }),
   e_spirits: S('e_spirits', 'elf', '정령 소환', 'dot', 15, 4, 0.6, 0.07, { turns: 3, all: true }),
   e_divine: S('e_divine', 'elf', '신궁', 'multi', 25, 4, 0.45, 0.05, { hits: 7 }),
@@ -144,35 +148,35 @@ export function describeSkill(s, lv = 1) {
 // ===== 사냥터 · 던전 =====
 const mob = (chapter, tier) => Object.entries(ENEMIES).filter(([, e]) => e.chapter === chapter && e.tier === tier).map(([k]) => k);
 export const CHRONICLE_FIELDS = [
-  { id: 1, name: '북부 극지대', lv: [1, 6], bossLv: 8, bossKills: 15, area: { hpMult: 1, atkMult: 1 }, color: '#7ba3c4', normals: mob(1, 'normal'), elites: mob(1, 'elite'), boss: 'iceMage' },
-  { id: 2, name: '죽은 자의 숲', lv: [7, 13], bossLv: 15, bossKills: 30, area: { hpMult: 2.6, atkMult: 1.6 }, color: '#7a9a5e', normals: mob(2, 'normal'), elites: mob(2, 'elite'), boss: 'twilightChild' },
-  { id: 3, name: '봉인된 신전', lv: [15, 21], bossLv: 23, bossKills: 45, area: { hpMult: 5.0, atkMult: 2.6 }, color: '#d4a574', normals: mob(3, 'normal'), elites: mob(3, 'elite'), boss: 'oblivionSealer' },
-  { id: 4, name: '마계의 균열', lv: [23, 30], bossLv: 32, bossKills: 60, area: { hpMult: 7.0, atkMult: 3.3 }, color: '#c4453d', normals: mob(4, 'normal'), elites: mob(4, 'elite'), boss: 'nakzelionShadow' },
+  { id: 1, name: '북부 극지대', lv: [1, 12], bossLv: 14, bossKills: 30, area: { hpMult: 1, atkMult: 1 }, color: '#7ba3c4', normals: mob(1, 'normal'), elites: mob(1, 'elite'), boss: 'iceMage' },
+  { id: 2, name: '죽은 자의 숲', lv: [12, 24], bossLv: 26, bossKills: 50, area: { hpMult: 1, atkMult: 1 }, color: '#7a9a5e', normals: mob(2, 'normal'), elites: mob(2, 'elite'), boss: 'twilightChild' },
+  { id: 3, name: '봉인된 신전', lv: [24, 36], bossLv: 38, bossKills: 70, area: { hpMult: 1, atkMult: 1 }, color: '#d4a574', normals: mob(3, 'normal'), elites: mob(3, 'elite'), boss: 'oblivionSealer' },
+  { id: 4, name: '마계의 균열', lv: [36, 48], bossLv: 50, bossKills: 90, area: { hpMult: 1, atkMult: 1 }, color: '#c4453d', normals: mob(4, 'normal'), elites: mob(4, 'elite'), boss: 'nakzelionShadow' },
 ];
 // 던전 (1.208.0 — 2곳 × 난이도 3단계). set = 에픽 장비 이름 세트
 export const CHRONICLE_DUNGEONS = [
   {
-    id: 'frostTomb', name: '서리 왕의 무덤', unlockField: 2, recLv: 22, color: '#9cc4e4', area: { hpMult: 4.4, atkMult: 2.4 }, set: 'frost',
+    id: 'frostTomb', name: '서리 왕의 무덤', unlockField: 2, recLv: 30, color: '#9cc4e4', area: { hpMult: 1, atkMult: 1 }, set: 'frost',
     desc: '층마다 HP가 이어진다. 끝까지 내려가면 절대영도의 군주가 에픽 장비를 지키고 있다.',
     art: 'champ_frost_boss4',
     floors: [
-      { lv: 17, enemies: ['champ_frost_imp', 'champ_frost_wolf', 'champ_frost_shaman'] },
-      { lv: 18, enemies: ['champ_frost_lurker', 'champ_frost_revenant', 'champ_frost_brute'] },
-      { lv: 19, enemies: ['champ_frost_juggernaut', 'champ_frost_seer'] },
-      { lv: 20, enemies: ['champ_frost_avatar', 'champ_frost_elite4'] },
-      { lv: 22, enemies: ['champ_frost_boss4'], boss: true },
+      { lv: 28, enemies: ['champ_frost_imp', 'champ_frost_wolf', 'champ_frost_shaman'] },
+      { lv: 29, enemies: ['champ_frost_lurker', 'champ_frost_revenant', 'champ_frost_brute'] },
+      { lv: 30, enemies: ['champ_frost_juggernaut', 'champ_frost_seer'] },
+      { lv: 31, enemies: ['champ_frost_avatar', 'champ_frost_elite4'] },
+      { lv: 33, enemies: ['champ_frost_boss4'], boss: true },
     ],
   },
   {
-    id: 'forestHeart', name: '광기의 숲 심장부', unlockField: 3, recLv: 32, color: '#9fd18a', area: { hpMult: 7.2, atkMult: 3.4 }, set: 'forest',
+    id: 'forestHeart', name: '광기의 숲 심장부', unlockField: 3, recLv: 45, color: '#9fd18a', area: { hpMult: 1, atkMult: 1 }, set: 'forest',
     desc: '광기에 물든 숲의 가장 깊은 곳. 종말의 마에스트로가 마지막 악장을 연주한다.',
     art: 'champ_forest_boss4',
     floors: [
-      { lv: 28, enemies: ['champ_forest_husk', 'champ_forest_leopard', 'champ_forest_dryad'] },
-      { lv: 29, enemies: ['champ_forest_revenant', 'champ_forest_treant', 'champ_forest_tiger'] },
-      { lv: 30, enemies: ['champ_forest_chimera', 'champ_forest_thornling', 'champ_forest_elite2'] },
-      { lv: 31, enemies: ['champ_forest_avatar', 'champ_forest_elite4'] },
-      { lv: 34, enemies: ['champ_forest_boss4'], boss: true },
+      { lv: 43, enemies: ['champ_forest_husk', 'champ_forest_leopard', 'champ_forest_dryad'] },
+      { lv: 44, enemies: ['champ_forest_revenant', 'champ_forest_treant', 'champ_forest_tiger'] },
+      { lv: 45, enemies: ['champ_forest_chimera', 'champ_forest_thornling', 'champ_forest_elite2'] },
+      { lv: 46, enemies: ['champ_forest_avatar', 'champ_forest_elite4'] },
+      { lv: 48, enemies: ['champ_forest_boss4'], boss: true },
     ],
   },
 ];
@@ -182,8 +186,8 @@ export const dungeonDef = (id) => CHRONICLE_DUNGEONS.find(d => d.id === id) || C
 // 난이도 — 이전 단계 보스를 쓰러뜨리면 다음 단계 개방
 export const DUNGEON_TIERS = [
   { id: 'normal', label: '일반', color: '#a89a88', lv: 0, hp: 1, atk: 1, epicMult: 1, shardMult: 1, keyCost: 1 },
-  { id: 'heroic', label: '영웅', color: '#6aa6e0', lv: 5, hp: 2.2, atk: 1.7, epicMult: 1.6, shardMult: 2, keyCost: 2 },
-  { id: 'legend', label: '전설', color: '#e8b04a', lv: 10, hp: 3.6, atk: 2.4, epicMult: 2.4, shardMult: 3, keyCost: 3 },
+  { id: 'heroic', label: '영웅', color: '#6aa6e0', lv: 6, hp: 2.2, atk: 1.7, epicMult: 1.6, shardMult: 2, keyCost: 2 },
+  { id: 'legend', label: '전설', color: '#e8b04a', lv: 12, hp: 3.6, atk: 2.4, epicMult: 2.4, shardMult: 3, keyCost: 3 },
 ];
 
 // 적 일러 경로 (본편 헬퍼와 같은 규칙, ./ 상대 경로)
@@ -213,8 +217,9 @@ export function buildChronicleEnemy(key, lv, uid, area = { hpMult: 1, atkMult: 1
   const tier = T.enemyTier[e.tier] || T.enemyTier.normal;
   const hpR = e.tier === 'normal' ? clampR(e.hp / avg.hp) : 1;
   const atkR = e.tier === 'normal' ? clampR(avg.avgAtk(e) / avg.atk) : 1;
-  const hp = Math.round((T.enemyHpBase + lv * T.enemyHpPerLv) * hpR * tier.hp * area.hpMult);
-  const atk = Math.round((T.enemyAtkBase + lv * T.enemyAtkPerLv) * atkR * tier.atk * area.atkMult);
+  const grow = 1 + (T.soloGrowth || 0) * (lv - 1); // 2.0: 플레이어 성장(스탯·장비 배율)이 레벨보다 빠르므로 적도 가속
+  const hp = Math.round((T.enemyHpBase + lv * T.enemyHpPerLv) * hpR * tier.hp * area.hpMult * (T.soloHp || 1) * grow);
+  const atk = Math.round((T.enemyAtkBase + lv * T.enemyAtkPerLv) * atkR * tier.atk * area.atkMult * (T.soloAtk || 1) * grow);
   return {
     id: uid, key, name: e.name, tier: e.tier, lv, side: 'enemy', rewardMult: area.hpMult,
     hp, maxHp: hp, atk, def: Math.round(lv * 1.2),
@@ -222,46 +227,124 @@ export function buildChronicleEnemy(key, lv, uid, area = { hpMult: 1, atkMult: 1
   };
 }
 
-// ===== 장비 =====
+// ===== 장비 (2.0 — 직업 전용 4칸) =====
 export const GRADES = [
-  { id: 'common', label: '일반', color: '#a89a88', mult: 1.0, dismantle: 1 },
-  { id: 'uncommon', label: '고급', color: '#7fbf6a', mult: 1.2, dismantle: 3 },
-  { id: 'rare', label: '희귀', color: '#6aa6e0', mult: 1.45, dismantle: 8 },
-  { id: 'epic', label: '에픽', color: '#c08ae8', mult: 1.85, dismantle: 20, shard: 2 },
+  { id: 'common', label: '일반', color: '#a89a88', mult: 1.0, opts: 0, optMult: 1, dismantle: 1 },
+  { id: 'uncommon', label: '고급', color: '#7fbf6a', mult: 1.2, opts: 1, optMult: 1, dismantle: 3 },
+  { id: 'rare', label: '희귀', color: '#6aa6e0', mult: 1.45, opts: 2, optMult: 1.15, dismantle: 8 },
+  { id: 'epic', label: '에픽', color: '#c08ae8', mult: 1.8, opts: 3, optMult: 1.3, dismantle: 20, shard: 2 },
+  { id: 'unique', label: '유니크', color: '#f0883e', mult: 2.0, opts: 2, optMult: 1.45, dismantle: 40, shard: 5 },
 ];
 export const gradeIdx = (id) => GRADES.findIndex(g => g.id === id);
 export const SLOTS = [
   { id: 'weapon', label: '무기', icon: '⚔' },
+  { id: 'offhand', label: '보조', icon: '◈' },
   { id: 'armor', label: '갑옷', icon: '🛡' },
   { id: 'accessory', label: '장신구', icon: '💍' },
 ];
-export const SLOT_NAMES = {
-  weapon: ['녹슨 칼날', '강철 칼날', '룬 새김 칼날', '균열의 칼날'],
-  armor: ['가죽 갑옷', '사슬 갑옷', '룬 판금', '마계 판금'],
-  accessory: ['낡은 반지', '은 목걸이', '룬 부적', '심연의 인장'],
+export const CLASS_SLOTS = ['weapon', 'offhand', 'armor']; // 직업 전용 칸 (장신구는 공용)
+// 장비 이름 — 아이템 레벨 15 단위 4단계
+export const CLASS_GEAR_NAMES = {
+  wanderer: { weapon: ['녹슨 장검', '강철 장검', '룬 장검', '균열의 장검'], offhand: ['나무 방패', '강철 방패', '룬 방패', '균열의 방패'], armor: ['가죽 흉갑', '사슬 판금', '룬 판금', '균열의 판금'] },
+  sage: { weapon: ['참나무 지팡이', '수정 지팡이', '룬 지팡이', '균열의 지팡이'], offhand: ['낡은 마도서', '봉인 마도서', '룬 마도서', '균열의 마도서'], armor: ['수습생 로브', '비단 로브', '룬 로브', '균열의 로브'] },
+  demonblood: { weapon: ['녹슨 대검', '강철 대검', '피의 대검', '균열의 대검'], offhand: ['탁한 혈석', '붉은 혈석', '마혈석', '균열의 혈석'], armor: ['가죽 흉갑', '가시 흉갑', '피의 흉갑', '균열의 흉갑'] },
+  elf: { weapon: ['사냥꾼 활', '물푸레 활', '정령 활', '균열의 활'], offhand: ['가죽 화살통', '깃털 화살통', '정령 화살통', '균열의 화살통'], armor: ['누빈 가죽 갑옷', '잎새 가죽 갑옷', '정령 가죽 갑옷', '균열의 가죽 갑옷'] },
+  priest: { weapon: ['나무 홀', '은 홀', '여명의 홀', '균열의 홀'], offhand: ['순례 성물', '은 성물', '빛의 성물', '균열의 성물'], armor: ['수련 법의', '은사 법의', '빛의 법의', '균열의 법의'] },
+  common: { accessory: ['낡은 반지', '은 목걸이', '룬 부적', '심연의 인장'] },
 };
-export const EPIC_NAMES = { weapon: '절대영도의 검', armor: '서리 왕의 갑주', accessory: '영원한 겨울의 심장' };
-export const EPIC_SETS = {
-  frost: EPIC_NAMES,
-  forest: { weapon: '광란의 가시검', armor: '망자 군주의 갑주', accessory: '종말의 악보' },
+export const EPIC_PREFIX = { frost: '서리 왕의', forest: '광란의', field: '빛나는' };
+
+// 옵션 정의 — pct: % 표시 / v: 고급 기준 값 범위 [최소, 최대] (등급 optMult 곱)
+export const OPTION_DEFS = {
+  atkPct: { label: '공격력', pct: true, v: [0.03, 0.06] },
+  hpPct: { label: '최대 HP', pct: true, v: [0.04, 0.08] },
+  defPct: { label: '방어', pct: true, v: [0.05, 0.10] },
+  spd: { label: '속도', pct: false, v: [1, 3] },
+  crit: { label: '치명', pct: true, v: [0.02, 0.05] },
+  critDmg: { label: '치명 피해', pct: true, v: [0.10, 0.20] },
+  dodge: { label: '회피', pct: true, v: [0.02, 0.04] },
+  counterPct: { label: '반격 확률', pct: true, v: [0.03, 0.06] },
+  counterDmg: { label: '반격 피해', pct: true, v: [0.10, 0.20] },
+  dmgReduce: { label: '받는 피해 감소', pct: true, v: [0.02, 0.05] },
+  skillDmg: { label: '스킬 피해', pct: true, v: [0.05, 0.10] },
+  cdr: { label: '재사용 단축', pct: false, v: [1, 1], unit: '턴', rare: true },
+  dotDmg: { label: '지속 피해', pct: true, v: [0.10, 0.20] },
+  shieldPct: { label: '시작 보호막', pct: true, v: [0.04, 0.08] },
+  lifesteal: { label: '흡혈', pct: true, v: [0.02, 0.05] },
+  lowHpDmg: { label: '저체력 피해', pct: true, v: [0.05, 0.12] },
+  thornsPct: { label: '피해 반사', pct: true, v: [0.05, 0.10] },
+  chain: { label: '추가 타격 확률', pct: true, v: [0.05, 0.10] },
+  healPct: { label: '치유량', pct: true, v: [0.06, 0.12] },
+  holyDmg: { label: '치유→신성 피해', pct: true, v: [0.10, 0.20] },
+  expPct: { label: '경험치', pct: true, v: [0.05, 0.10] },
+  goldPct: { label: '골드', pct: true, v: [0.05, 0.10] },
+};
+// 직업별 옵션 풀 (가중치) — 그 직업 장비에서만 뽑힌다
+export const OPTION_POOLS = {
+  wanderer: { defPct: 4, counterPct: 4, counterDmg: 3, dmgReduce: 3, hpPct: 2, atkPct: 2 },
+  sage: { skillDmg: 4, cdr: 1, dotDmg: 3, shieldPct: 3, critDmg: 2, atkPct: 2 },
+  demonblood: { lifesteal: 4, hpPct: 3, lowHpDmg: 3, atkPct: 3, thornsPct: 2 },
+  elf: { crit: 4, dodge: 3, spd: 3, chain: 3, critDmg: 2 },
+  priest: { healPct: 4, shieldPct: 3, dmgReduce: 3, hpPct: 2, holyDmg: 3 },
+  common: { hpPct: 3, atkPct: 3, spd: 2, critDmg: 2, expPct: 1, goldPct: 1 },
+};
+// 직업 보조 칸 기본 능력치 (등급 배율만 적용, 레벨 무관 % + 레벨 비례 수치)
+export const OFFHAND_BASE = {
+  wanderer: { flat: { def: [1, 0.6] }, pct: { counterPct: 0.04 } },
+  sage: { flat: { atk: [1, 0.5] }, pct: { skillDmg: 0.06 } },
+  demonblood: { flat: { hp: [5, 3] }, pct: { lifesteal: 0.03 } },
+  elf: { flat: { spd: [0.5, 0.05] }, pct: { crit: 0.04 } },
+  priest: { flat: {}, pct: { healPct: 0.08, shieldPct: 0.05 } },
+};
+// 드랍 직업 분배 (PM 확정 70 / 25 / 5)
+export const CLASS_DROP = { own: 0.70, other: 0.25, common: 0.05 };
+
+// 에픽 장신구 전용 옵션 (1.208.0 고유 옵션 12종 → 2.0에서 에픽 장신구 전용)
+export const EPIC_OPTIONS = {
+  w_exec: { name: '처형자', desc: 'HP 30% 이하인 적에게 피해 +50%', fx: { execute: 0.5 } },
+  w_vamp: { name: '흡혈', desc: '준 피해의 8%만큼 회복', fx: { lifesteal: 0.08 } },
+  w_chain: { name: '연격', desc: '단일 공격 후 25% 확률로 50% 추가 타격', fx: { chain: 0.25 } },
+  w_pierce: { name: '관통', desc: '적 방어 40% 무시', fx: { armorPen: 0.4 } },
+  a_thorn: { name: '가시', desc: '받은 피해의 25%를 되돌려 줌', fx: { thornsPct: 0.25 } },
+  a_regen: { name: '재생', desc: '내 차례마다 최대 HP 4% 회복', fx: { regenPct: 0.04 } },
+  a_bulwark: { name: '성채', desc: '전투 시작 시 최대 HP 15% 보호막', fx: { shieldPct: 0.15 } },
+  a_guts: { name: '불굴', desc: '전투당 1회, 쓰러질 피해를 HP 1로 버팀', fx: { guts: 1 } },
+  c_haste: { name: '신속', desc: '속도 +25%', fx: { spdPct: 0.25 } },
+  c_focus: { name: '집중', desc: '치명 +10% · 치명 피해 +30%', fx: { crit: 0.1, critDmg: 0.3 } },
+  c_time: { name: '시간의 모래', desc: '스킬 재사용 대기 -1턴', fx: { cdr: 1 } },
+  c_fury: { name: '분노', desc: '공격력 +12%', fx: { atkPct: 0.12 } },
 };
 
-// 에픽 고유 옵션 (1.208.0) — 에픽이 될 때(드랍·승급·의뢰 보상) 부위별 풀에서 1개
-export const UNIQUE_OPTIONS = {
-  w_exec: { slot: 'weapon', name: '처형자', desc: 'HP 30% 이하인 적에게 피해 +50%', fx: { execute: 0.5 } },
-  w_vamp: { slot: 'weapon', name: '흡혈', desc: '준 피해의 8%만큼 회복', fx: { lifesteal: 0.08 } },
-  w_chain: { slot: 'weapon', name: '연격', desc: '단일 공격 후 25% 확률로 50% 추가 타격', fx: { chain: 0.25 } },
-  w_pierce: { slot: 'weapon', name: '관통', desc: '적 방어 40% 무시', fx: { armorPen: 0.4 } },
-  a_thorn: { slot: 'armor', name: '가시', desc: '받은 피해의 25%를 되돌려 줌', fx: { thornsPct: 0.25 } },
-  a_regen: { slot: 'armor', name: '재생', desc: '내 차례마다 최대 HP 4% 회복', fx: { regenPct: 0.04 } },
-  a_bulwark: { slot: 'armor', name: '성채', desc: '전투 시작 시 최대 HP 15% 보호막', fx: { startShieldPct: 0.15 } },
-  a_guts: { slot: 'armor', name: '불굴', desc: '전투당 1회, 쓰러질 피해를 HP 1로 버팀', fx: { guts: 1 } },
-  c_haste: { slot: 'accessory', name: '신속', desc: '속도 +25%', fx: { spdPct: 0.25 } },
-  c_focus: { slot: 'accessory', name: '집중', desc: '치명 +10% · 치명 피해 +30%', fx: { critAdd: 0.1, critDmg: 0.3 } },
-  c_time: { slot: 'accessory', name: '시간의 모래', desc: '스킬 재사용 대기 -1턴', fx: { cdr: 1 } },
-  c_fury: { slot: 'accessory', name: '분노', desc: '공격력 +12%', fx: { atkPct: 0.12 } },
+// 유니크 장비 24종 — 고정 옵션 2 + 고유 효과 (설계서 5절)
+const U = (id, cls, slot, name, opts, fx, desc, extra = {}) => ({ id, cls, slot, name, opts, fx, desc, ...extra });
+export const UNIQUE_ITEMS = {
+  u_w_blade: U('u_w_blade', 'wanderer', 'weapon', '눈먼 자의 칼', { counterDmg: 0.3, atkPct: 0.08 }, { counterDouble: 0.5 }, '반격이 50% 확률로 2회 연속'),
+  u_w_oath: U('u_w_oath', 'wanderer', 'offhand', '부동의 맹세', { defPct: 0.15, counterPct: 0.08 }, { tauntReduce: 0.3 }, '도발 중 받는 피해 -30%'),
+  u_w_cloak: U('u_w_cloak', 'wanderer', 'armor', '먼지 낀 망토', { dmgReduce: 0.06, hpPct: 0.10 }, { critAfterCounter: 1 }, '반격·회피 직후 다음 공격 치명 확정'),
+  u_w_beads: U('u_w_beads', 'wanderer', 'accessory', '스승의 염주', { hpPct: 0.10, defPct: 0.10 }, { emergencyHeal: 0.5 }, '전투당 1회, HP 30% 이하가 되면 HP 50% 회복'),
+  u_s_staff: U('u_s_staff', 'sage', 'weapon', '영겁의 지팡이', { skillDmg: 0.12, dotDmg: 0.2 }, { dotTurnsMult: 2 }, '지속 피해가 2배 길게 지속'),
+  u_s_pact: U('u_s_pact', 'sage', 'offhand', '이프리트의 계약서', { skillDmg: 0.10, atkPct: 0.08 }, { openInferno: 0.6 }, '전투 시작 시 적 전체에 「겁화」(3턴 지속 피해)'),
+  u_s_robe: U('u_s_robe', 'sage', 'armor', '재의 로브', { shieldPct: 0.08, hpPct: 0.08 }, { skillShield: 0.2 }, '스킬 사용 시 공격력 20%만큼 보호막'),
+  u_s_glass: U('u_s_glass', 'sage', 'accessory', '시간의 모래시계', { atkPct: 0.08, critDmg: 0.2 }, { resetEvery: 3 }, '3턴마다 무작위 스킬 재사용 대기 초기화'),
+  u_d_thirst: U('u_d_thirst', 'demonblood', 'weapon', '피의 갈망', { atkPct: 0.10, hpPct: 0.08 }, { lifesteal: 0.15, overhealShield: 1 }, '흡혈 15%, 최대 HP를 넘는 회복은 보호막으로'),
+  u_d_heart: U('u_d_heart', 'demonblood', 'offhand', '마왕의 심장 조각', { hpPct: 0.12, lowHpDmg: 0.1 }, { missingHpAtk: 0.06 }, '잃은 HP 10%마다 공격력 +6%'),
+  u_d_scar: U('u_d_scar', 'demonblood', 'armor', '흉터 갑주', { hpPct: 0.12, dmgReduce: 0.04 }, { thornsPct: 0.15 }, '받은 피해 15% 반사'),
+  u_d_brand: U('u_d_brand', 'demonblood', 'accessory', '광기의 낙인', { atkPct: 0.10, lifesteal: 0.04 }, { rageDouble: 1 }, '광폭화 중 모든 공격 2회'),
+  u_e_string: U('u_e_string', 'elf', 'weapon', '바람의 현', { crit: 0.06, chain: 0.08 }, { multiHitsAdd: 2 }, '「연속 화살」 타수 +2'),
+  u_e_quiver: U('u_e_quiver', 'elf', 'offhand', '정령 화살통', { crit: 0.05, spd: 3 }, { spiritArrow: 0.2 }, '공격 시 20% 확률로 정령 화살(공격력 80%)'),
+  u_e_leaf: U('u_e_leaf', 'elf', 'armor', '잎새 갑옷', { dodge: 0.05, hpPct: 0.08 }, { dodgeHeal: 0.05 }, '회피할 때마다 HP 5% 회복'),
+  u_e_hawk: U('u_e_hawk', 'elf', 'accessory', '매의 눈', { crit: 0.06, spd: 2 }, { critDmg: 0.6, firstCrit: 1 }, '치명 피해 +60%, 전투 첫 공격 치명 확정'),
+  u_p_scepter: U('u_p_scepter', 'priest', 'weapon', '여명의 홀', { healPct: 0.12, atkPct: 0.06 }, { holyDmg: 0.3 }, '회복량의 30%만큼 적에게 신성 피해'),
+  u_p_grail: U('u_p_grail', 'priest', 'offhand', '순례자의 성배', { healPct: 0.10, hpPct: 0.08 }, { revive: 0.4 }, '전투당 1회, 쓰러지면 HP 40%로 부활'),
+  u_p_vest: U('u_p_vest', 'priest', 'armor', '빛의 법의', { shieldPct: 0.08, dmgReduce: 0.05 }, { shieldReduce: 0.2 }, '보호막이 남아 있는 동안 받는 피해 -20%'),
+  u_p_rosary: U('u_p_rosary', 'priest', 'accessory', '축복의 묵주', { healPct: 0.10, hpPct: 0.08 }, { blessMult: 2, blessTurns: 2 }, '「축복」 효과 2배, 지속 +2턴'),
+  u_c_ring: U('u_c_ring', 'common', 'accessory', '황혼의 반지', { hpPct: 0.06, atkPct: 0.06 }, { atkPct: 0.08, hpPct: 0.08, defPct: 0.08 }, '공격력·최대 HP·방어 +8%'),
+  u_c_collar: U('u_c_collar', 'common', 'accessory', '사역마의 목걸이', { hpPct: 0.06, spd: 2 }, { famPct: 0.3 }, '사역마 피해·HP +30% (사역마 업데이트와 함께 등장)', { disabled: true }),
+  u_c_charm: U('u_c_charm', 'common', 'accessory', '여행자의 부적', { hpPct: 0.06, atkPct: 0.05 }, { expPct: 0.2 }, '경험치 +20%'),
+  u_c_coin: U('u_c_coin', 'common', 'accessory', '탐욕의 금화', { atkPct: 0.06, crit: 0.03 }, { goldPct: 0.4, dmgTakenUp: 0.1 }, '골드 +40%, 받는 피해 +10%'),
 };
-export const uniqueIdsFor = (slot) => Object.keys(UNIQUE_OPTIONS).filter(id => UNIQUE_OPTIONS[id].slot === slot);
+// 유니크 확률 — 장비 1개당 (설계서 5절)
+export const UNIQUE_CHANCE = { boss: 0.005, dungeonBoss: [0.02, 0.05, 0.10] };
 
 export const FORGE = {
   maxEnhance: 10,
@@ -273,6 +356,7 @@ export const FORGE = {
     rare: { gold: 400, essence: 15, shard: 0 },
     epic: { gold: 1200, essence: 30, shard: 5 },
   },
+  // 유니크는 승급 불가 (드랍 전용) — 강화는 가능
 };
 
 export const DROP_TABLE = {

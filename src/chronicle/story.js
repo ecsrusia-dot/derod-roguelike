@@ -51,7 +51,7 @@ export const SCENES = [
     when: (s) => bossDone(s, 1),
     lines: [
       { sp: 'iceMage', t: '…황혼의 자녀들이… 깨어난다… 숲에서…' },
-      { sp: 'narr', t: '마녀가 사라지자 극지대의 얼음벽 하나가 무너졌다. 그 안에 누군가 갇혀 있었다.' },
+      { sp: 'narr', t: '마녀가 사라지자 극지대의 얼음벽 하나가 무너졌다. 녹아내린 물 위로, 마녀가 부리던 혼들이 갈 곳을 잃고 떠돌았다.' },
     ],
   },
   {
@@ -238,10 +238,4 @@ export const QUESTS = [
   { id: 'd4', kind: 'side', req: { main: 'm2' }, title: '영웅의 증명', desc: '대장장이: "무덤을 영웅 난이도로 끝까지 내려가면, 진짜 대장장이 일을 보여 주지."', goal: { type: 'dungeonTier', id: 'frostTomb', tier: 1 }, reward: { gold: 1200, shard: 5 } },
   { id: 'd5', kind: 'side', req: { main: 'm3' }, title: '전설이 되다', desc: '촌장: "전설 난이도를 넘은 자는 아직 없다네."', goal: { type: 'dungeonTier', id: 'frostTomb', tier: 2 }, reward: { gold: 3000, shard: 8, item: { grade: 'epic' } } },
 
-  // ── 동료 개인 의뢰 (합류 후) — 보상: 그 동료 능력치 +4 · 스킬 포인트 +1
-  { id: 'c_wanderer', kind: 'companion', req: { companion: 'wanderer' }, title: '검이 기억하는 길', desc: '방랑검사: "보이지 않아도 베어 온 수는 기억해. 함께 마흔을 베자."', goal: { type: 'kills', n: 40 }, reward: { gold: 200, growth: { points: 4, sp: 1 } } },
-  { id: 'c_sage', kind: 'companion', req: { companion: 'sage' }, title: '꺼지지 않는 불씨', desc: '술법사: "서리 왕의 무덤 냉기, 내 불꽃으로 녹여 보고 싶어~"', goal: { type: 'dungeon', n: 1 }, reward: { gold: 300, growth: { points: 4, sp: 1 } } },
-  { id: 'c_demonblood', kind: 'companion', req: { companion: 'demonblood' }, title: '피의 증명', desc: '혼혈 마족: "강한 놈 셋. 내 피가 누구 편인지 보여 줄게."', goal: { type: 'elites', n: 3 }, reward: { gold: 250, growth: { points: 4, sp: 1 } } },
-  { id: 'c_elf', kind: 'companion', req: { companion: 'elf' }, title: '숲을 위한 화살', desc: '숲의 정령사: "숲을 더럽힌 것들을 쉰 마리. 바람에게 약속했어요."', goal: { type: 'kills', n: 50 }, reward: { gold: 250, growth: { points: 4, sp: 1 } } },
-  { id: 'c_priest', kind: 'companion', req: { companion: 'priest' }, title: '여명의 순례', desc: '여명의 사제: "강적 다섯을 정화하면, 가호가 더 깊어질 거예요."', goal: { type: 'elites', n: 5 }, reward: { gold: 250, growth: { points: 4, sp: 1 } } },
 ];
