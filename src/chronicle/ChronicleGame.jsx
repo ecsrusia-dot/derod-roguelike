@@ -5,27 +5,33 @@
 // (재생 중 새로고침해도 보상 중복·유실 없음).
 // 저장: localStorage CHRONICLE_SAVE_KEY — 본편·아르카나와 완전 분리.
 // ============================================
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, Coins } from 'lucide-react';
 import { PALETTE } from '../utils/helpers.js';
 import { GlassPanel, UIButton, BottomSheet } from '../components/ui/CommonUI.jsx';
 import {
-  CHRONICLE_TITLE, CHRONICLE_SUB, CHRONICLE_SAVE_KEY, CHRONICLE_TUNING, CHRONICLE_CLASSES, CHRONICLE_FIELDS,
-  CHRONICLE_DUNGEON, CHRONICLE_DUNGEONS, DUNGEON_TIERS, dungeonDef, STAT_META, STAT_KEYS, SKILL_MAX_LV, MASTERY_PCT, BOSS_DAILY_LIMIT, DUNGEON_KEYS, GRADES, gradeIdx, SLOTS, FORGE,
+  CHRONICLE_TITLE, CHRONICLE_SUB, CHRONICLE_SAVE_KEY, CHRONICLE_SAVE_KEY_V1, CHRONICLE_TUNING, CHRONICLE_CLASSES, CHRONICLE_FIELDS,
+  CHRONICLE_DUNGEON, CHRONICLE_DUNGEONS, DUNGEON_TIERS, dungeonDef, STAT_META, STAT_KEYS, SKILL_MAX_LV, MASTERY_PCT, BOSS_DAILY_LIMIT, DUNGEON_KEYS, GRADES, gradeIdx, SLOTS, FORGE, UNIQUE_CHANCE, UNIQUE_ITEMS,
   chronicleClass, classSkills, describeSkill, chronicleEnemyArt,
 } from './data.js';
 import * as E from './engine.js';
 import * as Q from './quest.js';
+import * as A from './account.js';
 import { NPCS } from './story.js';
 import { ENEMIES } from '../data/enemies.js';
 
 const FONT_TITLE = '"Cinzel", "Noto Serif KR", serif';
 
-function loadSave() {
-  try { const raw = localStorage.getItem(CHRONICLE_SAVE_KEY); return raw ? Q.ensureQuestFields(JSON.parse(raw)) : null; } catch { return null; }
+// 2.0 저장 = 계정(캐릭터 슬롯 + 공유 창고·재화). 1.x 저장(v1 키)은 읽기만 — 있었으면 시작 보상.
+function loadAccount() {
+  try {
+    const raw = localStorage.getItem(CHRONICLE_SAVE_KEY);
+    if (raw) return JSON.parse(raw);
+    return A.newAccount(!!localStorage.getItem(CHRONICLE_SAVE_KEY_V1));
+  } catch { return A.newAccount(false); }
 }
-function writeSave(s) {
-  try { if (s) localStorage.setItem(CHRONICLE_SAVE_KEY, JSON.stringify(s)); else localStorage.removeItem(CHRONICLE_SAVE_KEY); } catch { /* 저장 불가 */ }
+function writeAccount(acc) {
+  try { localStorage.setItem(CHRONICLE_SAVE_KEY, JSON.stringify(acc)); } catch { /* 저장 불가 */ }
 }
 
 // ===== 작은 부품 =====
@@ -33,16 +39,20 @@ const gradeOf = (id) => GRADES[gradeIdx(id)] || GRADES[0];
 // 받침 여부로 이/가 고르기
 const iga = (w) => { const c = w.charCodeAt(w.length - 1) - 0xac00; return c >= 0 && c <= 11171 && c % 28 ? `${w}이` : `${w}가`; };
 function statLine(st) {
-  const p = [];
-  if (st.atk) p.push(`공격 ${st.atk}`);
-  if (st.def) p.push(`방어 ${st.def}`);
-  if (st.hp) p.push(`HP ${st.hp}`);
-  if (st.crit) p.push(`치명 ${Math.round(st.crit * 1000) / 10}%`);
-  if (st.spd) p.push(`속도 ${st.spd}`);
-  if (st.critDmg) p.push(`치명 피해 +${Math.round(st.critDmg * 100)}%`);
-  if (st.hpPct) p.push(`HP +${Math.round(st.hpPct * 100)}%`);
-  if (st.atkPct) p.push(`공격 +${Math.round(st.atkPct * 100)}%`);
-  return p.join(' · ');
+  return Object.entries(st).filter(([, v]) => v).map(([k, v]) => E.statLabel(k, v)).join(' · ');
+}
+// 장비 소속 표시 — 직업 전용 / 공용
+const clsTag = (item) => (item.cls === 'common' ? '공용' : `${chronicleClass(item.cls).name} 전용`);
+// 특수 효과 한 줄 (유니크 고유 효과 · 에픽 장신구 옵션)
+function ItemSpecial({ item, center = false }) {
+  const ud = E.uniqueDef(item);
+  const eo = E.epicOptOf(item);
+  if (!ud && !eo) return null;
+  return (
+    <div className={center ? 'text-center mt-1' : 'truncate'} style={{ fontSize: center ? 12.5 : 11, color: ud ? '#f0a86a' : '#d7a8ff' }}>
+      ✦ {ud ? `고유 효과 — ${ud.desc}` : `「${eo.name}」 ${eo.desc}`}
+    </div>
+  );
 }
 function Header({ title, onBack, right }) {
   return (
@@ -78,7 +88,8 @@ function Bar({ v, max, color, h = 8, shield = 0 }) {
 }
 function ItemRow({ save, item, onClick, right }) {
   const g = gradeOf(item.grade);
-  const by = E.equippedBy(save, item.uid);
+  const by = save.inventory.some(i => i.uid === item.uid) ? E.equippedBy(save, item.uid) : null;
+  const usable = E.itemUsable(item, save.hero);
   const slot = SLOTS.find(s => s.id === item.slot);
   return (
     <button onClick={onClick} className="ui-press w-full flex items-center gap-2.5 text-left" style={{ padding: '8px 10px', borderRadius: 12, background: `${g.color}10`, border: `1px solid ${g.color}55` }}>
@@ -87,10 +98,11 @@ function ItemRow({ save, item, onClick, right }) {
         <div className="truncate font-semibold" style={{ fontSize: 13, color: g.color }}>
           {E.itemName(item)}{item.plus ? ` +${item.plus}` : ''} <span style={{ fontSize: 11, color: PALETTE.textDim, fontWeight: 400 }}>{g.label} · Lv.{item.ilv}</span>
         </div>
+        <div className="truncate" style={{ fontSize: 11, color: usable ? PALETTE.textDim : '#e06a5f' }}>{usable ? clsTag(item) : `🔒 ${clsTag(item)} — 창고에 보관해 두세요`}</div>
         <div className="truncate" style={{ fontSize: 11.5, color: PALETTE.textDim }}>{statLine(E.itemStats(item))}</div>
-        {E.uniqueOf(item) && <div className="truncate" style={{ fontSize: 11, color: '#d7a8ff' }}>✦ {E.uniqueOf(item).name} — {E.uniqueOf(item).desc}</div>}
+        <ItemSpecial item={item} />
       </div>
-      {right ?? (by && <span className="flex-none" style={{ fontSize: 11, color: PALETTE.dawn }}>{chronicleClass(by).name} 착용</span>)}
+      {right ?? (by && <span className="flex-none" style={{ fontSize: 11, color: PALETTE.dawn }}>착용 중</span>)}
     </button>
   );
 }
@@ -193,7 +205,7 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain }) {
       </div>
 
       {/* 파티 */}
-      <div className="relative grid grid-cols-2 gap-2 px-3 pb-2 flex-none">
+      <div className={`relative grid ${party.length > 1 ? 'grid-cols-2' : 'grid-cols-1'} gap-2 px-3 pb-2 flex-none`}>
         {party.map(p => {
           const hp = hpOf(p);
           const acting = cur?.a === p.id;
@@ -225,10 +237,9 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain }) {
                   <div key={cid} className="text-center" style={{ color: PALETTE.legendary }}>▲ {chronicleClass(cid).name} Lv.{lv} 달성!</div>
                 ))}
                 {summary.items.map(it => (
-                  <div key={it.uid} className="text-center" style={{ color: gradeOf(it.grade).color }}>획득: {E.itemName(it)} ({gradeOf(it.grade).label})</div>
+                  <div key={it.uid} className="text-center" style={{ color: gradeOf(it.grade).color, fontWeight: it.grade === 'unique' ? 700 : 400 }}>{it.grade === 'unique' ? '★ 유니크 획득: ' : '획득: '}{E.itemName(it)} ({gradeOf(it.grade).label}{E.itemUsable(it, save.hero) ? '' : ` · ${clsTag(it)}`})</div>
                 ))}
                 {summary.autoDismantled ? <div className="text-center" style={{ color: PALETTE.textDim }}>가방이 가득 차 {summary.autoDismantled}개 자동 분해</div> : null}
-                {summary.recruit && <div className="text-center font-semibold" style={{ color: '#9fd18a' }}>✚ {iga(chronicleClass(summary.recruit).name)} 동료가 되었다!</div>}
                 {summary.unlocks.map(u => <div key={u} className="text-center" style={{ color: '#9cc4e4' }}>🔓 {u} 개방</div>)}
                 {summary.dungeonClear && <div className="text-center font-semibold" style={{ color: '#c08ae8' }}>던전 정복!</div>}
                 {summary.keys ? <div className="text-center font-semibold" style={{ color: PALETTE.legendary }}>🗝 던전 열쇠 +{summary.keys}</div> : null}
@@ -256,9 +267,10 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain }) {
 }
 
 // ===== 마을 =====
-function TownView({ save, go, onExit }) {
+function TownView({ save, go, onExit, onSwitchChar }) {
   const hero = save.units[save.hero];
-  const alertParty = Object.values(save.units).some(u => u.points > 0 || u.sp > 0);
+  const alertParty = hero.points > 0 || hero.sp > 0;
+  const cls = chronicleClass(save.hero);
   const nextField = CHRONICLE_FIELDS.find(f => !save.progress.bossCleared[f.id]);
   const main = Q.currentMainQuest(save);
   const goal = nextField
@@ -269,8 +281,9 @@ function TownView({ save, go, onExit }) {
     { id: 'quests', icon: '📜', label: '의뢰 게시판', sub: qBadge ? `새 소식 ${qBadge}건` : '메인 · 의뢰 · 이야기', badge: qBadge > 0 },
     { id: 'field', icon: '⚔', label: '사냥터', sub: '몹 사냥 · 보스' },
     { id: 'dungeon', icon: '🕳', label: '던전', sub: save.dungeon ? `${dungeonDef(save.dungeon.id).name} 진행 중` : E.dungeonUnlocked(save) ? `🗝 열쇠 ${E.keyCount(save)}개 · ${CHRONICLE_DUNGEONS.filter(d => E.dungeonUnlocked(save, d.id)).length}곳` : '죽은 자의 숲 보스 후 개방', locked: !E.dungeonUnlocked(save) },
-    { id: 'party', icon: '👥', label: '파티 · 성장', sub: '능력치 · 스킬 · 장비', badge: alertParty },
-    { id: 'bag', icon: '🎒', label: '가방', sub: `${save.inventory.length}/${CHRONICLE_TUNING.inventoryMax}` },
+    { id: 'party', icon: '🧭', label: '성장', sub: '능력치 · 스킬 · 장비', badge: alertParty },
+    { id: 'bag', icon: '🎒', label: '가방', sub: `${save.inventory.length}/${CHRONICLE_TUNING.inventoryMax}${save.inventory.some(i => !E.itemUsable(i, save.hero)) ? ' · 다른 직업 장비 있음' : ''}` },
+    { id: 'stash', icon: '🏛', label: '공용 창고', sub: `${(save.stash || []).length}/${A.STASH_MAX} · 모든 캐릭터 공유` },
     { id: 'forge', icon: '⚒', label: '대장간', sub: '강화 · 등급 승급' },
   ];
   return (
@@ -285,15 +298,13 @@ function TownView({ save, go, onExit }) {
       </div>
       <div className="relative flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
         <GlassPanel className="p-3">
-          <div style={{ fontSize: 11, color: PALETTE.textDim }}>파티 ({save.party.length}/4)</div>
-          <div className="flex gap-2 mt-1.5">
-            {save.party.map(cid => (
-              <div key={cid} className="flex flex-col items-center" style={{ width: 60 }}>
-                <Portrait cid={cid} size={50} />
-                <div style={{ fontSize: 11, color: PALETTE.text }}>Lv.{save.units[cid].lv}</div>
-                <div className="truncate w-full text-center" style={{ fontSize: 10.5, color: PALETTE.textDim }}>{chronicleClass(cid).role}</div>
-              </div>
-            ))}
+          <div className="flex items-center gap-3">
+            <Portrait cid={save.hero} size={54} />
+            <div className="flex-1 min-w-0">
+              <div className="font-semibold" style={{ fontSize: 15, color: PALETTE.text }}>{cls.name} <span style={{ fontSize: 11.5, color: cls.color }}>{cls.role}</span></div>
+              <div style={{ fontSize: 12, color: PALETTE.legendary }}>Lv.{hero.lv} / {CHRONICLE_TUNING.maxLevel} · 전투력 {E.unitPower(save, save.hero)}</div>
+            </div>
+            <button onClick={onSwitchChar} className="ui-press flex-none" style={{ fontSize: 11.5, padding: '6px 10px', borderRadius: 9, border: '1px solid var(--ui-line-strong)', color: PALETTE.dawn, background: 'transparent' }}>캐릭터 변경</button>
           </div>
           <div className="mt-2" style={{ fontSize: 12, color: PALETTE.dawn }}>▶ {goal}</div>
           <div className="mt-1.5" style={{ fontSize: 11, color: PALETTE.textDim }}>경험치 {hero.exp}/{CHRONICLE_TUNING.expNeed(hero.lv)}</div>
@@ -327,7 +338,6 @@ function FieldView({ save, onBack, onFight, playScene, sceneOpen }) {
   const kills = save.progress.fieldKills[f.id] || 0;
   const bossReady = kills >= f.bossKills;
   const cleared = !!save.progress.bossCleared[f.id];
-  const nextComp = E.companionOrder(save.hero)[f.id - 1];
   return (
     <div className="absolute inset-0 flex flex-col">
       <Header title="사냥터" onBack={onBack} right={<Wallet save={save} />} />
@@ -357,7 +367,7 @@ function FieldView({ save, onBack, onFight, playScene, sceneOpen }) {
           <div className="mt-1"><Bar v={Math.min(kills, f.bossKills)} max={f.bossKills} color={f.color} h={6} /></div>
           <div className="mt-2" style={{ fontSize: 11.5, color: PALETTE.textDim, lineHeight: 1.5 }}>
             출몰: 일반 {f.normals.length}종 · 강적 {Math.round(CHRONICLE_TUNING.eliteChance * 100)}% 확률<br />
-            {cleared ? `보스 처치 완료 — 재도전은 하루 ${BOSS_DAILY_LIMIT}회 (희귀 장비 확정)` : nextComp && !save.units[nextComp] ? `보스를 쓰러뜨리면 ${iga(chronicleClass(nextComp).name)} 동료가 된다` : '보스를 쓰러뜨리면 다음 지역이 열린다'}
+            {cleared ? `보스 처치 완료 — 재도전은 하루 ${BOSS_DAILY_LIMIT}회 (희귀 장비 확정 · 유니크 0.5%)` : '보스를 쓰러뜨리면 다음 지역이 열린다'}
           </div>
         </GlassPanel>
         <UIButton onClick={() => onFight(f, false)}>사냥 시작</UIButton>
@@ -437,7 +447,7 @@ function DungeonView({ save, onBack, onEnter, onFight, onLeave, onBuyKey }) {
         </div>
         <GlassPanel className="p-3 flex flex-col gap-2">
           <div style={{ fontSize: 11.5, color: PALETTE.textDim }}>
-            {d ? '파티 상태 — 층 사이 회복 없음' : `권장 Lv.${D.recLv + T.lv} · 적 HP ×${T.hp} · 공격 ×${T.atk} · 에픽 확률 ×${T.epicMult} · ◆ ×${T.shardMult}`}
+            {d ? '내 상태 — 층 사이 회복 없음' : `권장 Lv.${D.recLv + T.lv} · 적 HP ×${T.hp} · 공격 ×${T.atk} · 에픽 확률 ×${T.epicMult} · ◆ ×${T.shardMult} · 보스 유니크 ${Math.round(UNIQUE_CHANCE.dungeonBoss[d ? d.tier || 0 : tier] * 100)}%`}
           </div>
           {party.map(p => (
             <div key={p.id} className="flex items-center gap-2">
@@ -477,49 +487,23 @@ function DungeonView({ save, onBack, onEnter, onFight, onLeave, onBuyKey }) {
 
 // ===== 파티 · 성장 =====
 function PartyView({ save, setSave, onBack }) {
-  const owned = Object.keys(save.units);
-  const [cid, setCid] = useState(save.hero);
+  const cid = save.hero;
   const [slotPick, setSlotPick] = useState(null);
   const [skillInfo, setSkillInfo] = useState(null);
   const u = save.units[cid];
   const cls = chronicleClass(cid);
   const d = E.deriveUnit(save, cid);
-  const inParty = save.party.includes(cid);
-  const toggleParty = () => {
-    if (cid === save.hero) return;
-    const next = inParty ? save.party.filter(x => x !== cid) : [...save.party, cid];
-    if (next.length > 4) return;
-    setSave(E.setParty(save, next.filter(x => x !== save.hero)));
-  };
   return (
     <div className="absolute inset-0 flex flex-col">
-      <Header title="파티 · 성장" onBack={onBack} right={<Wallet save={save} />} />
-      <div className="flex gap-2 px-3 pt-2 flex-none overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
-        {CHRONICLE_CLASSES.map(c => {
-          const have = owned.includes(c.id);
-          const pu = save.units[c.id];
-          return (
-            <button key={c.id} disabled={!have} onClick={() => setCid(c.id)} className="ui-press relative flex-none flex flex-col items-center" style={{ width: 62, opacity: have ? 1 : 0.35 }}>
-              <div style={{ borderRadius: 14, padding: 2, border: `2px solid ${cid === c.id ? c.color : 'transparent'}` }}><Portrait cid={c.id} size={48} dim={!have} /></div>
-              <div style={{ fontSize: 10.5, color: save.party.includes(c.id) ? PALETTE.legendary : PALETTE.textDim }}>{have ? (save.party.includes(c.id) ? `출전 Lv.${pu.lv}` : `대기 Lv.${pu.lv}`) : '미영입'}</div>
-              {have && (pu.points > 0 || pu.sp > 0) && <span className="absolute" style={{ top: 2, right: 6, width: 9, height: 9, borderRadius: 999, background: '#e06a5f' }} />}
-            </button>
-          );
-        })}
-      </div>
+      <Header title="성장" onBack={onBack} right={<Wallet save={save} />} />
       <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
         <div className="flex items-center gap-3">
           <img src={cls.combatImage} alt="" className="object-cover flex-none" style={{ width: 92, height: 92, borderRadius: 16, border: `1px solid ${cls.color}`, objectPosition: '50% 25%' }} />
           <div className="flex-1 min-w-0">
             <div className="font-bold" style={{ fontSize: 17, color: PALETTE.text }}>{cls.name} <span style={{ fontSize: 12, color: cls.color }}>{cls.role}</span></div>
-            <div style={{ fontSize: 12.5, color: PALETTE.legendary }}>Lv.{u.lv} · 전투력 {E.unitPower(save, cid)}</div>
+            <div style={{ fontSize: 12.5, color: PALETTE.legendary }}>Lv.{u.lv} / {CHRONICLE_TUNING.maxLevel} · 전투력 {E.unitPower(save, cid)}</div>
             <div className="mt-1"><Bar v={u.exp} max={CHRONICLE_TUNING.expNeed(u.lv)} color={PALETTE.legendary} h={5} /></div>
             <div style={{ fontSize: 10.5, color: PALETTE.textDim }}>경험치 {u.exp}/{CHRONICLE_TUNING.expNeed(u.lv)}</div>
-            {cid !== save.hero && (
-              <button onClick={toggleParty} className="ui-press mt-1" style={{ fontSize: 12, padding: '4px 10px', borderRadius: 8, border: `1px solid ${inParty ? '#e06a5f88' : PALETTE.legendary}`, color: inParty ? '#e06a5f' : PALETTE.legendary, background: 'transparent', opacity: !inParty && save.party.length >= 4 ? 0.4 : 1 }}>
-                {inParty ? '파티에서 빼기' : save.party.length >= 4 ? '파티 가득 (4/4)' : '파티에 넣기'}
-              </button>
-            )}
           </div>
         </div>
 
@@ -601,10 +585,10 @@ function PartyView({ save, setSave, onBack }) {
             {u.equip[slotPick] != null && (
               <UIButton variant="ghost" style={{ height: 40 }} onClick={() => { setSave(E.unequipItem(save, cid, slotPick)); setSlotPick(null); }}>장착 해제</UIButton>
             )}
-            {save.inventory.filter(i => i.slot === slotPick && i.uid !== u.equip[slotPick])
+            {save.inventory.filter(i => i.slot === slotPick && i.uid !== u.equip[slotPick] && E.itemUsable(i, cid))
               .sort((a, b) => E.itemPower(b) - E.itemPower(a))
               .map(it => <ItemRow key={it.uid} save={save} item={it} onClick={() => { setSave(E.equipItem(save, cid, it.uid)); setSlotPick(null); }} />)}
-            {!save.inventory.some(i => i.slot === slotPick && i.uid !== u.equip[slotPick]) && <div className="text-center py-4" style={{ fontSize: 12.5, color: PALETTE.textDim }}>가방에 해당 장비가 없습니다</div>}
+            {!save.inventory.some(i => i.slot === slotPick && i.uid !== u.equip[slotPick] && E.itemUsable(i, cid)) && <div className="text-center py-4" style={{ fontSize: 12.5, color: PALETTE.textDim }}>가방에 착용할 수 있는 장비가 없습니다{slotPick === 'accessory' ? '' : ` (${cls.name} 전용)`}</div>}
             <UIButton variant="ghost" style={{ height: 40 }} onClick={() => setSlotPick(null)}>닫기</UIButton>
           </div>
         </BottomSheet>
@@ -624,63 +608,126 @@ function PartyView({ save, setSave, onBack }) {
   );
 }
 
-// ===== 가방 =====
+// ===== 가방 (캐릭터 전용) =====
 function BagView({ save, setSave, onBack, flash }) {
   const [filter, setFilter] = useState('all');
   const [sel, setSel] = useState(null);
-  const list = save.inventory.filter(i => filter === 'all' || i.slot === filter)
-    .sort((a, b) => gradeIdx(b.grade) - gradeIdx(a.grade) || E.itemPower(b) - E.itemPower(a));
+  const hero = save.hero;
+  const list = save.inventory.filter(i => filter === 'all' || (filter === 'other' ? !E.itemUsable(i, hero) : i.slot === filter))
+    .sort((a, b) => (E.itemUsable(b, hero) ? 1 : 0) - (E.itemUsable(a, hero) ? 1 : 0) || gradeIdx(b.grade) - gradeIdx(a.grade) || E.itemPower(b) - E.itemPower(a));
   const item = sel != null ? save.inventory.find(i => i.uid === sel) : null;
+  const others = save.inventory.filter(i => !E.itemUsable(i, hero));
   const bulk = (maxGrade) => {
-    const uids = save.inventory.filter(i => gradeIdx(i.grade) <= maxGrade && !E.equippedBy(save, i.uid)).map(i => i.uid);
+    const uids = save.inventory.filter(i => gradeIdx(i.grade) <= maxGrade && !E.equippedBy(save, i.uid) && E.itemUsable(i, hero)).map(i => i.uid);
     if (!uids.length) return;
     const r = E.dismantleItems(save, uids);
     setSave(r.save);
     flash(`${uids.length}개 분해 → ✦ +${r.essence}`);
   };
+  const toStash = (uids) => {
+    const r = E.moveToStash(save, uids);
+    setSave(r.save);
+    flash(r.moved ? `창고로 ${r.moved}개 보관` : '창고가 가득 찼습니다');
+  };
+  const btn = { height: 34, borderRadius: 10, fontSize: 11.5, background: 'transparent' };
   return (
     <div className="absolute inset-0 flex flex-col">
       <Header title={`가방 ${save.inventory.length}/${CHRONICLE_TUNING.inventoryMax}`} onBack={onBack} right={<Wallet save={save} />} />
       <div className="flex gap-1.5 px-3 pt-2 flex-none">
-        {[{ id: 'all', label: '전체' }, ...SLOTS].map(s => (
-          <button key={s.id} onClick={() => setFilter(s.id)} className="ui-press flex-1" style={{ height: 36, borderRadius: 10, fontSize: 12, border: `1px solid ${filter === s.id ? PALETTE.legendary : 'var(--ui-line)'}`, color: filter === s.id ? PALETTE.legendary : PALETTE.text, background: 'transparent' }}>{s.label}</button>
+        {[{ id: 'all', label: '전체' }, ...SLOTS, { id: 'other', label: '타직업' }].map(s => (
+          <button key={s.id} onClick={() => setFilter(s.id)} className="ui-press flex-1" style={{ height: 36, borderRadius: 10, fontSize: 11.5, border: `1px solid ${filter === s.id ? PALETTE.legendary : 'var(--ui-line)'}`, color: filter === s.id ? PALETTE.legendary : PALETTE.text, background: 'transparent' }}>{s.label}</button>
         ))}
       </div>
       <div className="flex gap-1.5 px-3 pt-2 flex-none">
-        <button onClick={() => { setSave(E.autoEquip(save)); flash('파티 전원 더 강한 장비로 교체'); }} className="ui-press flex-1" style={{ height: 34, borderRadius: 10, fontSize: 11.5, border: `1px solid ${PALETTE.legendary}88`, color: PALETTE.legendary, background: 'transparent' }}>자동 장착</button>
-        <button onClick={() => bulk(0)} className="ui-press flex-1" style={{ height: 34, borderRadius: 10, fontSize: 11.5, border: '1px dashed var(--ui-line-strong)', color: PALETTE.textDim, background: 'transparent' }}>일반 분해</button>
-        <button onClick={() => bulk(1)} className="ui-press flex-1" style={{ height: 34, borderRadius: 10, fontSize: 11.5, border: '1px dashed var(--ui-line-strong)', color: PALETTE.textDim, background: 'transparent' }}>고급 이하 분해</button>
+        <button onClick={() => { setSave(E.autoEquip(save)); flash('더 강한 장비로 교체'); }} className="ui-press flex-1" style={{ ...btn, border: `1px solid ${PALETTE.legendary}88`, color: PALETTE.legendary }}>자동 장착</button>
+        <button disabled={!others.length} onClick={() => toStash(others.map(i => i.uid))} className="ui-press flex-1" style={{ ...btn, border: '1px solid #9cc4e488', color: '#9cc4e4', opacity: others.length ? 1 : 0.4 }}>타직업 → 창고 ({others.length})</button>
+      </div>
+      <div className="flex gap-1.5 px-3 pt-1.5 flex-none">
+        <button onClick={() => bulk(0)} className="ui-press flex-1" style={{ ...btn, border: '1px dashed var(--ui-line-strong)', color: PALETTE.textDim }}>일반 분해</button>
+        <button onClick={() => bulk(1)} className="ui-press flex-1" style={{ ...btn, border: '1px dashed var(--ui-line-strong)', color: PALETTE.textDim }}>고급 이하 분해</button>
       </div>
       <div className="flex-1 overflow-y-auto px-3 py-2 flex flex-col gap-1.5">
         {list.map(it => <ItemRow key={it.uid} save={save} item={it} onClick={() => setSel(it.uid)} />)}
         {!list.length && <div className="text-center py-10" style={{ fontSize: 12.5, color: PALETTE.textDim }}>비어 있습니다 — 사냥터에서 장비를 모아 보세요</div>}
       </div>
+      {item && (() => {
+        const usable = E.itemUsable(item, hero);
+        const by = E.equippedBy(save, item.uid);
+        const cur = save.inventory.find(i => i.uid === save.units[hero].equip[item.slot]);
+        const diff = E.itemPower(item) - (cur ? E.itemPower(cur) : 0);
+        return (
+          <BottomSheet title={E.itemName(item) + (item.plus ? ` +${item.plus}` : '')} onClose={() => setSel(null)} maxHeight="72%">
+            <div style={{ fontSize: 12.5, color: gradeOf(item.grade).color }} className="text-center">{gradeOf(item.grade).label} · Lv.{item.ilv} · {SLOTS.find(s => s.id === item.slot).label} · {clsTag(item)}</div>
+            <div className="text-center mt-1" style={{ fontSize: 12.5, color: PALETTE.text, lineHeight: 1.6 }}>{statLine(E.itemStats(item))}</div>
+            <ItemSpecial item={item} center />
+            {!usable && <div className="text-center mt-2" style={{ fontSize: 12, color: '#e06a5f' }}>{chronicleClass(save.hero).name}{'는 착용할 수 없습니다 — 공용 창고에 넣으면 '}{chronicleClass(item.cls).name} 캐릭터가 쓸 수 있습니다</div>}
+            <div className="mt-3 flex flex-col gap-2">
+              {usable && !by && (
+                <UIButton style={{ height: 42 }} onClick={() => { setSave(E.equipItem(save, hero, item.uid)); setSel(null); flash('장착'); }}>
+                  장착 {diff > 0 ? `(전투력 ▲ ${diff})` : diff < 0 ? `(전투력 ▼ ${-diff})` : ''}
+                </UIButton>
+              )}
+              <div className="flex gap-2">
+                <UIButton variant="ghost" style={{ height: 42 }} disabled={!!by} onClick={() => { toStash([item.uid]); setSel(null); }}>{by ? '착용 중' : '창고로'}</UIButton>
+                <UIButton variant="ghost" style={{ height: 42 }} disabled={!!by} onClick={() => { const r = E.dismantleItems(save, [item.uid]); setSave(r.save); setSel(null); flash(`분해 → ✦ +${r.essence}${r.shard ? ` ◆ +${r.shard}` : ''}`); }}>
+                  {by ? '착용 중' : `분해 ✦${gradeOf(item.grade).dismantle + (item.plus || 0)}`}
+                </UIButton>
+              </div>
+              <UIButton variant="ghost" style={{ height: 40 }} onClick={() => setSel(null)}>닫기</UIButton>
+            </div>
+          </BottomSheet>
+        );
+      })()}
+    </div>
+  );
+}
+
+// ===== 공용 창고 (계정 공유) =====
+function StashView({ save, setSave, onBack, flash }) {
+  const [filter, setFilter] = useState('mine');
+  const [sel, setSel] = useState(null);
+  const stash = save.stash || [];
+  const hero = save.hero;
+  const list = stash.filter(i => filter === 'all' || (filter === 'mine' ? E.itemUsable(i, hero) : filter === 'unique' ? i.grade === 'unique' : i.cls === filter))
+    .sort((a, b) => gradeIdx(b.grade) - gradeIdx(a.grade) || E.itemPower(b) - E.itemPower(a));
+  const item = sel != null ? stash.find(i => i.uid === sel) : null;
+  const bagFull = save.inventory.length >= CHRONICLE_TUNING.inventoryMax;
+  const tabs = [{ id: 'mine', label: '착용 가능' }, { id: 'unique', label: '유니크' }, { id: 'all', label: '전체' }];
+  return (
+    <div className="absolute inset-0 flex flex-col">
+      <Header title={`공용 창고 ${stash.length}/${A.STASH_MAX}`} onBack={onBack} right={<Wallet save={save} />} />
+      <div className="px-4 pt-2 flex-none" style={{ fontSize: 11.5, color: PALETTE.textDim, lineHeight: 1.5 }}>
+        모든 캐릭터가 함께 쓰는 창고 — 다른 직업 장비를 넣어 두면 그 직업 캐릭터가 꺼내 쓸 수 있습니다. (가방 {save.inventory.length}/{CHRONICLE_TUNING.inventoryMax})
+      </div>
+      <div className="flex gap-1.5 px-3 pt-2 flex-none">
+        {tabs.map(s => (
+          <button key={s.id} onClick={() => setFilter(s.id)} className="ui-press flex-1" style={{ height: 36, borderRadius: 10, fontSize: 12, border: `1px solid ${filter === s.id ? PALETTE.legendary : 'var(--ui-line)'}`, color: filter === s.id ? PALETTE.legendary : PALETTE.text, background: 'transparent' }}>{s.label}</button>
+        ))}
+      </div>
+      <div className="flex gap-1.5 px-3 pt-1.5 flex-none overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+        {CHRONICLE_CLASSES.map(c => (
+          <button key={c.id} onClick={() => setFilter(c.id)} className="ui-press flex-none" style={{ height: 32, padding: '0 10px', borderRadius: 9, fontSize: 11.5, border: `1px solid ${filter === c.id ? c.color : 'var(--ui-line)'}`, color: filter === c.id ? c.color : PALETTE.textDim, background: 'transparent' }}>
+            {c.name} {stash.filter(i => i.cls === c.id).length}
+          </button>
+        ))}
+      </div>
+      <div className="flex-1 overflow-y-auto px-3 py-2 flex flex-col gap-1.5">
+        {list.map(it => <ItemRow key={it.uid} save={save} item={it} onClick={() => setSel(it.uid)} />)}
+        {!list.length && <div className="text-center py-10" style={{ fontSize: 12.5, color: PALETTE.textDim }}>보관된 장비가 없습니다 — 가방에서 「창고로」를 눌러 보관하세요</div>}
+      </div>
       {item && (
         <BottomSheet title={E.itemName(item) + (item.plus ? ` +${item.plus}` : '')} onClose={() => setSel(null)} maxHeight="70%">
-          <div style={{ fontSize: 12.5, color: gradeOf(item.grade).color }} className="text-center">{gradeOf(item.grade).label} · Lv.{item.ilv} · {SLOTS.find(s => s.id === item.slot).label}</div>
-          <div className="text-center mt-1" style={{ fontSize: 12.5, color: PALETTE.text }}>{statLine(E.itemStats(item))}</div>
-          {E.uniqueOf(item) && <div className="text-center mt-1" style={{ fontSize: 12.5, color: '#d7a8ff' }}>✦ 고유 옵션 「{E.uniqueOf(item).name}」 — {E.uniqueOf(item).desc}</div>}
-          <div className="mt-3" style={{ fontSize: 12, color: PALETTE.textDim }}>누구에게 장착할까?</div>
-          <div className="grid grid-cols-2 gap-2 mt-1.5">
-            {Object.keys(save.units).map(cid => {
-              const cur = save.inventory.find(i => i.uid === save.units[cid].equip[item.slot]);
-              const diff = E.itemPower(item) - (cur ? E.itemPower(cur) : 0);
-              return (
-                <button key={cid} onClick={() => { setSave(E.equipItem(save, cid, item.uid)); setSel(null); flash(`${chronicleClass(cid).name}에게 장착`); }} className="ui-press flex items-center gap-2" style={{ padding: 8, borderRadius: 12, border: '1px solid var(--ui-line-strong)', background: 'transparent' }}>
-                  <Portrait cid={cid} size={30} />
-                  <div className="text-left">
-                    <div style={{ fontSize: 12, color: PALETTE.text }}>{chronicleClass(cid).name}</div>
-                    <div style={{ fontSize: 11, color: diff > 0 ? '#8fe08a' : diff < 0 ? '#e06a5f' : PALETTE.textDim }}>{diff > 0 ? `▲ ${diff}` : diff < 0 ? `▼ ${-diff}` : '='}</div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-          <div className="mt-3 flex gap-2">
-            <UIButton variant="ghost" style={{ height: 42 }} disabled={!!E.equippedBy(save, item.uid)} onClick={() => { const r = E.dismantleItems(save, [item.uid]); setSave(r.save); setSel(null); flash(`분해 → ✦ +${r.essence}${r.shard ? ` ◆ +${r.shard}` : ''}`); }}>
-              {E.equippedBy(save, item.uid) ? '착용 중 (분해 불가)' : `분해 ✦${gradeOf(item.grade).dismantle + (item.plus || 0)}`}
+          <div style={{ fontSize: 12.5, color: gradeOf(item.grade).color }} className="text-center">{gradeOf(item.grade).label} · Lv.{item.ilv} · {SLOTS.find(s => s.id === item.slot).label} · {clsTag(item)}</div>
+          <div className="text-center mt-1" style={{ fontSize: 12.5, color: PALETTE.text, lineHeight: 1.6 }}>{statLine(E.itemStats(item))}</div>
+          <ItemSpecial item={item} center />
+          <div className="mt-3 flex flex-col gap-2">
+            <UIButton style={{ height: 42 }} disabled={bagFull} onClick={() => { setSave(E.takeFromStash(save, item.uid)); setSel(null); flash('가방으로 꺼냄'); }}>
+              {bagFull ? '가방이 가득 찼습니다' : `가방으로 꺼내기${E.itemUsable(item, hero) ? '' : ' (지금 캐릭터는 착용 불가)'}`}
             </UIButton>
-            <UIButton variant="ghost" style={{ height: 42 }} onClick={() => setSel(null)}>닫기</UIButton>
+            <UIButton variant="ghost" style={{ height: 42 }} onClick={() => { const r = E.dismantleStash(save, [item.uid]); setSave(r.save); setSel(null); flash(`분해 → ✦ +${r.essence}${r.shard ? ` ◆ +${r.shard}` : ''}`); }}>
+              분해 ✦{gradeOf(item.grade).dismantle + (item.plus || 0)}
+            </UIButton>
+            <UIButton variant="ghost" style={{ height: 40 }} onClick={() => setSel(null)}>닫기</UIButton>
           </div>
         </BottomSheet>
       )}
@@ -700,7 +747,7 @@ function ForgeView({ save, setSave, onBack, flash }) {
     <div className="absolute inset-0 flex flex-col">
       <Header title="대장간" onBack={onBack} right={<Wallet save={save} />} />
       <div className="px-4 pt-3 flex-none" style={{ fontSize: 12, color: PALETTE.textDim, lineHeight: 1.55 }}>
-        <b style={{ color: PALETTE.text }}>강화</b> +1당 능력치 +{Math.round(FORGE.enhancePct * 100)}% (최대 +{FORGE.maxEnhance}) · <b style={{ color: PALETTE.text }}>승급</b> 다음 등급으로 — 에픽 승급은 던전의 ◆ 고대 파편 필요
+        <b style={{ color: PALETTE.text }}>강화</b> +1당 능력치 +{Math.round(FORGE.enhancePct * 100)}% (최대 +{FORGE.maxEnhance}) · <b style={{ color: PALETTE.text }}>승급</b> 다음 등급으로 + 옵션 1개 추가 — 에픽 승급은 던전의 ◆ 고대 파편 필요 · 유니크는 승급 불가(강화만)
       </div>
       <div className="flex-1 overflow-y-auto px-3 py-2 flex flex-col gap-1.5">
         {list.map(it => <ItemRow key={it.uid} save={save} item={it} onClick={() => setSel(it.uid)} />)}
@@ -710,7 +757,7 @@ function ForgeView({ save, setSave, onBack, flash }) {
         <BottomSheet title={E.itemName(item) + (item.plus ? ` +${item.plus}` : '')} onClose={() => setSel(null)} maxHeight="70%">
           <div className="text-center" style={{ fontSize: 12.5, color: gradeOf(item.grade).color }}>{gradeOf(item.grade).label} · Lv.{item.ilv}</div>
           <div className="text-center mt-1" style={{ fontSize: 12.5, color: PALETTE.text }}>{statLine(E.itemStats(item))}</div>
-          {E.uniqueOf(item) && <div className="text-center mt-1" style={{ fontSize: 12.5, color: '#d7a8ff' }}>✦ 고유 옵션 「{E.uniqueOf(item).name}」 — {E.uniqueOf(item).desc}</div>}
+          <ItemSpecial item={item} center />
           <div className="mt-3 flex flex-col gap-2">
             <GlassPanel className="p-3">
               <div style={{ fontSize: 13, color: PALETTE.text }} className="font-semibold">강화 +{item.plus || 0} → +{(item.plus || 0) + 1}</div>
@@ -726,9 +773,9 @@ function ForgeView({ save, setSave, onBack, flash }) {
               <div style={{ fontSize: 13, color: PALETTE.text }} className="font-semibold">등급 승급 {ng ? `→ ${gradeOf(ng).label}` : ''}</div>
               {ng ? (
                 <>
-                  <div style={{ fontSize: 12, color: PALETTE.textDim }}>결과: {statLine(E.itemStats({ ...item, grade: ng }))}{ng === 'epic' ? ' + 고유 옵션 1개 (무작위)' : ''}</div>
+                  <div style={{ fontSize: 12, color: PALETTE.textDim }}>결과: {statLine(E.itemStats({ ...item, grade: ng }))}{` + 무작위 옵션 1개`}{ng === 'epic' && item.slot === 'accessory' ? ' + 에픽 장신구 효과' : ''}</div>
                   <div style={{ fontSize: 12, color: PALETTE.textDim }}>비용: 🪙 {pc.gold} · ✦ {pc.essence}{pc.shard ? ` · ◆ ${pc.shard}` : ''}</div>
-                  <UIButton variant="gold" style={{ height: 40, marginTop: 8 }} disabled={!E.canPromote(save, item)} onClick={() => { const next = E.promoteItem(save, item.uid); setSave(next); const it2 = next.inventory.find(i => i.uid === item.uid); flash(E.uniqueOf(it2) ? `에픽 승급! 고유 옵션 「${E.uniqueOf(it2).name}」` : `${gradeOf(ng).label} 등급으로 승급!`); }}>승급</UIButton>
+                  <UIButton variant="gold" style={{ height: 40, marginTop: 8 }} disabled={!E.canPromote(save, item)} onClick={() => { const next = E.promoteItem(save, item.uid); setSave(next); const it2 = next.inventory.find(i => i.uid === item.uid); flash(E.epicOptOf(it2) ? `에픽 승급! 「${E.epicOptOf(it2).name}」` : `${gradeOf(ng).label} 등급으로 승급!`); }}>승급</UIButton>
                 </>
               ) : <div style={{ fontSize: 12, color: PALETTE.textDim }}>최고 등급</div>}
             </GlassPanel>
@@ -740,21 +787,22 @@ function ForgeView({ save, setSave, onBack, flash }) {
   );
 }
 
-// ===== 시작 =====
-function TitleView({ save, onStart, onContinue, onExit }) {
-  const [picking, setPicking] = useState(false);
-  const [sel, setSel] = useState('wanderer');
-  const [confirm, setConfirm] = useState(false);
-  const cls = chronicleClass(sel);
+// ===== 시작 · 캐릭터 슬롯 =====
+// 직업당 캐릭터 1명 (최대 5). 재화·열쇠·공용 창고는 모든 캐릭터가 공유한다.
+function TitleView({ acc, onSelect, onCreate, onExit }) {
+  const [picking, setPicking] = useState(null); // 새로 만들 직업 id
+  const chars = acc.chars || {};
+  const owned = CHRONICLE_CLASSES.filter(c => chars[c.id]);
+  const last = acc.active && chars[acc.active] ? acc.active : null;
   if (picking) {
+    const cls = chronicleClass(picking);
     return (
       <div className="absolute inset-0 flex flex-col">
-        <Header title="주인공 선택" onBack={() => setPicking(false)} />
+        <Header title="새 캐릭터" onBack={() => setPicking(null)} />
         <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
-          <div style={{ fontSize: 12, color: PALETTE.textDim }}>나머지 네 직업은 지역 보스를 쓰러뜨릴 때마다 동료로 합류한다.</div>
           <div className="flex gap-2">
             {CHRONICLE_CLASSES.map(c => (
-              <button key={c.id} onClick={() => setSel(c.id)} className="ui-press flex-1" style={{ borderRadius: 14, padding: 2, border: `2px solid ${sel === c.id ? c.color : 'transparent'}`, opacity: sel === c.id ? 1 : 0.55, background: 'transparent' }}>
+              <button key={c.id} disabled={!!chars[c.id]} onClick={() => setPicking(c.id)} className="ui-press flex-1" style={{ borderRadius: 14, padding: 2, border: `2px solid ${picking === c.id ? c.color : 'transparent'}`, opacity: chars[c.id] ? 0.25 : picking === c.id ? 1 : 0.55, background: 'transparent' }}>
                 <img src={c.image} alt={c.name} className="w-full object-cover" style={{ aspectRatio: '1', borderRadius: 11 }} />
               </button>
             ))}
@@ -769,39 +817,69 @@ function TitleView({ save, onStart, onContinue, onExit }) {
           </div>
           <GlassPanel className="p-3" style={{ fontSize: 12.5, color: PALETTE.text }}>
             <div className="font-semibold mb-1">스킬</div>
-            {classSkills(sel).map(s => <div key={s.id} style={{ color: PALETTE.textDim, lineHeight: 1.55 }}><b style={{ color: PALETTE.text }}>{s.name}</b> (Lv.{s.reqLv}) — {describeSkill(s, 1)}</div>)}
+            {classSkills(picking).map(s => <div key={s.id} style={{ color: PALETTE.textDim, lineHeight: 1.55 }}><b style={{ color: PALETTE.text }}>{s.name}</b> (Lv.{s.reqLv}) — {describeSkill(s, 1)}</div>)}
+          </GlassPanel>
+          <GlassPanel className="p-3" style={{ fontSize: 12, color: PALETTE.textDim, lineHeight: 1.6 }}>
+            <div className="font-semibold mb-1" style={{ color: PALETTE.text }}>전용 장비</div>
+            무기 · 보조({SLOTS[1].label}) · 갑옷은 {cls.name} 전용, 장신구는 공용. 유니크 {Object.values(UNIQUE_ITEMS).filter(u => u.cls === picking && !u.disabled).length}종.
           </GlassPanel>
         </div>
-        <div className="p-4 flex-none"><UIButton onClick={() => onStart(sel)}>이 주인공으로 시작</UIButton></div>
+        <div className="p-4 flex-none"><UIButton onClick={() => onCreate(picking)}>{cls.name}{'(으)로 시작'}</UIButton></div>
       </div>
     );
   }
   return (
     <div className="absolute inset-0 flex flex-col">
       <img src="./enemies/classic/chapter_1/iceMage_intro.jpg" alt="" className="absolute inset-0 w-full h-full object-cover" style={{ opacity: 0.5 }} />
-      <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, #0a0608cc 0%, #0a060844 35%, #0a0608 80%)' }} />
-      <div className="relative flex-1 flex flex-col px-6 pt-16 pb-6">
-        <div className="text-center">
+      <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, #0a0608cc 0%, #0a060844 30%, #0a0608 70%)' }} />
+      <div className="relative flex-1 flex flex-col px-5 pt-12 pb-5 min-h-0">
+        <div className="text-center flex-none">
           <div style={{ fontSize: 11, letterSpacing: '0.45em', color: '#9cc4e4' }}>{CHRONICLE_SUB.toUpperCase()}</div>
           <div className="font-bold mt-1" style={{ fontSize: 32, color: PALETTE.text, fontFamily: FONT_TITLE, textShadow: '0 4px 20px #000' }}>{CHRONICLE_TITLE}</div>
-          <div className="mt-2" style={{ fontSize: 12.5, color: PALETTE.textDim }}>레벨업 · 동료 · 파밍 · 던전 · 장비 승급 — 정통 RPG</div>
+          <div className="mt-2" style={{ fontSize: 12.5, color: PALETTE.textDim }}>홀로 걷는 정통 RPG — 레벨 {CHRONICLE_TUNING.maxLevel} · 직업 장비 · 유니크 · 공용 창고</div>
         </div>
-        <div className="mt-auto flex flex-col gap-2.5 ui-stagger">
-          {save && <UIButton onClick={onContinue}>이어하기 — {chronicleClass(save.hero).name} Lv.{save.units[save.hero].lv}</UIButton>}
-          <UIButton variant={save ? 'ghost' : 'primary'} onClick={() => (save ? setConfirm(true) : setPicking(true))}>새 모험</UIButton>
+        <div className="mt-auto flex flex-col gap-2 ui-stagger overflow-y-auto">
+          <div style={{ fontSize: 11.5, color: PALETTE.textDim }}>캐릭터 ({owned.length}/{CHRONICLE_CLASSES.length}) · 🪙{acc.gold} · 🗝{acc.keys?.count || 0} · 창고 {(acc.stash || []).length}</div>
+          {CHRONICLE_CLASSES.map(c => {
+            const ch = chars[c.id];
+            return (
+              <button key={c.id} onClick={() => (ch ? onSelect(c.id) : setPicking(c.id))} className="ui-press flex items-center gap-3 text-left" style={{ padding: 8, borderRadius: 14, background: last === c.id ? `${c.color}22` : 'rgba(10,6,8,0.7)', border: `1px solid ${ch ? c.color + '88' : 'var(--ui-line)'}` }}>
+                <Portrait cid={c.id} size={42} dim={!ch} />
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold" style={{ fontSize: 14, color: ch ? PALETTE.text : PALETTE.textDim }}>{c.name} <span style={{ fontSize: 11, color: c.color }}>{c.role}</span></div>
+                  <div style={{ fontSize: 11.5, color: ch ? PALETTE.legendary : PALETTE.textDim }}>
+                    {ch ? `Lv.${ch.unit.lv} · 보스 ${Object.keys(ch.progress.bossCleared || {}).length}/4 처치` : '비어 있음 — 눌러서 만들기'}
+                  </div>
+                </div>
+                <span style={{ fontSize: 12, color: ch ? PALETTE.dawn : PALETTE.textDim }}>{ch ? (last === c.id ? '이어하기 ▸' : '선택 ▸') : '＋'}</span>
+              </button>
+            );
+          })}
           <button onClick={onExit} className="ui-press" style={{ background: 'transparent', border: 'none', color: PALETTE.dawn, padding: 10, fontSize: 12.5 }}>⇄ 게임 선택</button>
         </div>
       </div>
-      {confirm && (
-        <BottomSheet title="새 모험을 시작할까요?" onClose={() => setConfirm(false)} maxHeight="45%">
-          <div className="text-center" style={{ fontSize: 12.5, color: PALETTE.textDim }}>지금 모험(레벨·동료·장비)은 사라집니다.</div>
-          <div className="flex gap-2 mt-4">
-            <UIButton variant="ghost" onClick={() => setConfirm(false)}>취소</UIButton>
-            <UIButton onClick={() => { setConfirm(false); setPicking(true); }}>새로 시작</UIButton>
-          </div>
-        </BottomSheet>
-      )}
     </div>
+  );
+}
+
+// 2.0 첫 진입 안내 (1.x 플레이어 — 초기화 + 시작 보상)
+function GiftNotice({ acc, onClose }) {
+  const g = A.V1_GIFT;
+  return (
+    <BottomSheet title="황혼 연대기 2.0" onClose={onClose} maxHeight="70%">
+      <div style={{ fontSize: 12.5, color: PALETTE.text, lineHeight: 1.7 }}>
+        파티제 → <b style={{ color: PALETTE.legendary }}>솔로 RPG</b>로 다시 태어났습니다. 직업 전용 장비 · 유니크 등급 · 공용 창고 · 레벨 {CHRONICLE_TUNING.maxLevel}.
+        <div className="mt-2" style={{ color: PALETTE.textDim }}>이전 버전(1.x) 진행은 새 구조와 맞지 않아 초기화되었습니다. 미안한 마음을 담아 시작 보상을 드립니다.</div>
+        <GlassPanel className="p-3 mt-3">
+          <div>🪙 골드 {g.gold.toLocaleString()}</div>
+          <div>🗝 던전 열쇠 +{g.keys}</div>
+          <div>📜 상급 봉인부 {g.sealPlus}장 <span style={{ color: PALETTE.textDim }}>— 다음 업데이트(사역마)에서 사용</span></div>
+          <div>🎁 첫 캐릭터 직업 희귀 장비 {g.rareBoxes}개</div>
+        </GlassPanel>
+        <div className="mt-2" style={{ fontSize: 11.5, color: PALETTE.textDim }}>{Object.keys(acc.chars || {}).length ? '보상은 지급되었습니다.' : '첫 캐릭터를 만들면 지급됩니다.'}</div>
+      </div>
+      <div className="mt-4"><UIButton onClick={onClose}>확인</UIButton></div>
+    </BottomSheet>
   );
 }
 
@@ -915,7 +993,8 @@ function QuestView({ save, setSave, onBack, flash, onReplay }) {
 
 // ===== 메인 =====
 export default function ChronicleGame({ onExit }) {
-  const [save, setSaveState] = useState(loadSave);
+  const [acc, setAcc] = useState(loadAccount);
+  const save = useMemo(() => A.toView(acc), [acc]);
   const [view, setView] = useState('title');
   const [battle, setBattle] = useState(null);
   const [repeat, setRepeat] = useState(false);
@@ -924,14 +1003,14 @@ export default function ChronicleGame({ onExit }) {
   const lastFieldRef = useRef(null);
   const rng = Math.random;
 
-  useEffect(() => { writeSave(save); }, [save]);
+  useEffect(() => { writeAccount(acc); }, [acc]);
   // 🗝 날짜가 바뀌면 열쇠 충전 (화면 이동 때마다 확인)
   useEffect(() => {
     if (!save) return;
     const next = E.refreshDungeonKeys(save);
-    if (next !== save) setSaveState(next);
+    if (next !== save) setAcc(a => A.fromView(a, next));
   }, [view]); // eslint-disable-line react-hooks/exhaustive-deps
-  const setSave = (next) => setSaveState(next);
+  const setSave = (next) => setAcc(a => A.fromView(a, next));
   const flash = (msg) => { setToast(msg); setTimeout(() => setToast(t => (t === msg ? null : t)), 1600); };
 
   // 이야기 — 조건에 맞는 장면이 있으면 띄우고 true
@@ -994,9 +1073,9 @@ export default function ChronicleGame({ onExit }) {
   let content;
   if (!save || view === 'title') {
     content = (
-      <TitleView save={save} onExit={onExit}
-        onContinue={() => setView('town')}
-        onStart={(cid) => { setSave(Q.ensureQuestFields(E.newChronicleSave(cid))); setView('town'); }} />
+      <TitleView acc={acc} onExit={onExit}
+        onSelect={(cid) => { setRepeat(false); setAcc(a => A.selectCharacter(a, cid)); setView('town'); }}
+        onCreate={(cid) => { setRepeat(false); setAcc(a => A.createCharacter(a, cid)); setView('town'); }} />
     );
   } else if (view === 'battle' && battle) {
     content = (
@@ -1020,15 +1099,18 @@ export default function ChronicleGame({ onExit }) {
     content = <PartyView save={save} setSave={setSave} onBack={() => setView('town')} />;
   } else if (view === 'bag') {
     content = <BagView save={save} setSave={setSave} onBack={() => setView('town')} flash={flash} />;
+  } else if (view === 'stash') {
+    content = <StashView save={save} setSave={setSave} onBack={() => setView('town')} flash={flash} />;
   } else if (view === 'forge') {
     content = <ForgeView save={save} setSave={setSave} onBack={() => setView('town')} flash={flash} />;
   } else {
-    content = <TownView save={save} go={(v) => setView(v === 'dungeon' && save.dungeon ? 'dungeon' : v)} onExit={onExit} />;
+    content = <TownView save={save} go={(v) => setView(v === 'dungeon' && save.dungeon ? 'dungeon' : v)} onExit={onExit} onSwitchChar={() => setView('title')} />;
   }
 
   return (
     <div className="absolute inset-0" style={{ background: PALETTE.bg, fontFamily: '"Noto Serif KR", serif', color: PALETTE.text }}>
       <div key={view} className="ui-screen-enter absolute inset-0">{content}</div>
+      {acc.giftNotice && view === 'title' && <GiftNotice acc={acc} onClose={() => setAcc(a => ({ ...a, giftNotice: false }))} />}
       {scene && <SceneView key={scene.scene.id} save={save} scene={scene.scene} onEnd={endScene} />}
       {toast && (
         <div className="absolute left-1/2 z-50 pointer-events-none" style={{ bottom: 90, transform: 'translateX(-50%)', padding: '8px 14px', borderRadius: 999, background: '#000d', border: '1px solid var(--ui-line-strong)', color: PALETTE.legendary, fontSize: 12.5, whiteSpace: 'nowrap' }}>{toast}</div>

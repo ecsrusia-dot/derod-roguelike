@@ -5,8 +5,9 @@
 // 전투는 simulateChronicleBattle이 끝까지 계산해 사건 목록을 돌려주고, UI는 재생만 한다 (풀오토 관전).
 // ============================================
 import {
-  CHRONICLE_TUNING as T, CHRONICLE_CLASSES, CHRONICLE_SKILLS, CHRONICLE_FIELDS, CHRONICLE_DUNGEON, CHRONICLE_DUNGEONS, DUNGEON_TIERS, dungeonDef, EPIC_SETS, UNIQUE_OPTIONS, uniqueIdsFor,
-  STAT_KEYS, SKILL_MAX_LV, MASTERY_PCT, BOSS_DAILY_LIMIT, DUNGEON_KEYS, GRADES, gradeIdx, SLOTS, SLOT_NAMES, EPIC_NAMES, FORGE, DROP_TABLE,
+  CHRONICLE_TUNING as T, CHRONICLE_CLASSES, CHRONICLE_SKILLS, CHRONICLE_FIELDS, CHRONICLE_DUNGEON, CHRONICLE_DUNGEONS, DUNGEON_TIERS, dungeonDef,
+  STAT_KEYS, SKILL_MAX_LV, MASTERY_PCT, BOSS_DAILY_LIMIT, DUNGEON_KEYS, GRADES, gradeIdx, SLOTS, CLASS_SLOTS, FORGE, DROP_TABLE,
+  CLASS_GEAR_NAMES, EPIC_PREFIX, OPTION_DEFS, OPTION_POOLS, OFFHAND_BASE, CLASS_DROP, EPIC_OPTIONS, UNIQUE_ITEMS, UNIQUE_CHANCE,
   chronicleClass, classSkills, buildChronicleEnemy,
 } from './data.js';
 
@@ -26,7 +27,7 @@ export function makeUnit(classId, lv = 1) {
   const cls = chronicleClass(classId);
   const u = {
     classId, lv: 1, exp: 0, points: 0, sp: 1, stats: { ...cls.base },
-    skills: {}, equip: { weapon: null, armor: null, accessory: null },
+    skills: {}, equip: { weapon: null, offhand: null, armor: null, accessory: null },
   };
   for (let l = 1; l < lv; l++) { u.lv += 1; u.points += T.pointsPerLevel; u.sp += T.spPerLevel; }
   return u;
@@ -87,52 +88,113 @@ export function dungeonTierUnlocked(save, id, tierIdx) {
   return best != null && best >= tierIdx - 1;
 }
 
-// ===== 장비 =====
+// ===== 장비 (2.0 — 직업 전용 4칸 · 직업별 옵션 · 유니크) =====
+const tierOf = (ilv) => Math.min(3, Math.floor((Math.max(1, ilv) - 1) / 15));
+export const itemUsable = (item, classId) => !!item && (item.cls === 'common' || item.cls === classId);
+export const uniqueDef = (item) => (item?.named ? UNIQUE_ITEMS[item.named] : null);
+export const epicOptOf = (item) => (item?.eopt ? EPIC_OPTIONS[item.eopt] : null);
+export function itemName(item) {
+  if (item.named) return UNIQUE_ITEMS[item.named]?.name || '유니크';
+  const base = (CLASS_GEAR_NAMES[item.cls] || CLASS_GEAR_NAMES.common)[item.slot]?.[tierOf(item.ilv)] || '장비';
+  return item.grade === 'epic' ? `${EPIC_PREFIX[item.set] || EPIC_PREFIX.field} ${base}` : base;
+}
+function rollOption(rng, cls, gradeId, have) {
+  const pool = { ...(OPTION_POOLS[cls] || OPTION_POOLS.common) };
+  for (const o of have) delete pool[o.k];
+  if (!Object.keys(pool).length) return null;
+  const k = weighted(rng, pool);
+  const d = OPTION_DEFS[k];
+  const gm = GRADES[gradeIdx(gradeId)]?.optMult || 1;
+  let v = (d.v[0] + rng() * (d.v[1] - d.v[0])) * gm;
+  v = d.pct ? +v.toFixed(3) : Math.max(1, Math.round(v));
+  if (k === 'cdr') v = 1;
+  return { k, v };
+}
+// 장비 생성 — cls: 직업 id 또는 'common'(장신구)
+export function makeItem(rng, { cls, slot, grade, ilv, set = 'field', named = null }) {
+  const it = { cls, slot, grade, ilv: Math.max(1, ilv), plus: 0, roll: +(0.9 + rng() * 0.2).toFixed(3), opts: [] };
+  if (named) {
+    const u = UNIQUE_ITEMS[named];
+    Object.assign(it, { cls: u.cls, slot: u.slot, grade: 'unique', named, roll: 1, opts: Object.entries(u.opts).map(([k, v]) => ({ k, v })) });
+    return it;
+  }
+  const n = GRADES[gradeIdx(grade)]?.opts || 0;
+  for (let i = 0; i < n; i++) { const o = rollOption(rng, cls, grade, it.opts); if (o) it.opts.push(o); }
+  if (grade === 'epic') { it.set = set; if (slot === 'accessory') it.eopt = pick(rng, Object.keys(EPIC_OPTIONS)); }
+  return it;
+}
+// 드랍 직업 분배 (현재 직업 70 / 다른 직업 25 / 공용 장신구 5)
+function rollDropClass(rng, heroCls) {
+  const r = rng();
+  if (r < CLASS_DROP.common) return 'common';
+  if (r < CLASS_DROP.common + CLASS_DROP.own) return heroCls;
+  return pick(rng, CHRONICLE_CLASSES.map(c => c.id).filter(id => id !== heroCls));
+}
+export function rollGear(rng, grade, ilv, heroCls, set = 'field') {
+  const cls = rollDropClass(rng, heroCls);
+  const slot = cls === 'common' ? 'accessory' : pick(rng, CLASS_SLOTS);
+  return makeItem(rng, { cls, slot, grade, ilv, set });
+}
+export function rollUniqueItem(rng, ilv, heroCls) {
+  const cls = rollDropClass(rng, heroCls);
+  const pool = Object.values(UNIQUE_ITEMS).filter(u => u.cls === cls && !u.disabled);
+  if (!pool.length) return null;
+  return makeItem(rng, { named: pick(rng, pool).id, ilv });
+}
+// 하위 호환 이름 (의뢰 보상 등)
+export function rollItem(rng, grade, ilv, slot = null, set = 'field', heroCls = 'wanderer') {
+  return rollGear(rng, grade, ilv, heroCls, set);
+}
+// 장비가 주는 수치 전부 (기본 능력치 + 옵션) — 고유 효과(fx)는 gearTotals에서 합산
 export function itemStats(item) {
   if (!item) return {};
   const g = GRADES[gradeIdx(item.grade)] || GRADES[0];
-  const m = g.mult * (1 + FORGE.enhancePct * (item.plus || 0)) * (item.roll || 1);
+  const gm = g.mult * (1 + FORGE.enhancePct * (item.plus || 0));
+  const m = gm * (item.roll || 1);
   const L = item.ilv;
   const out = {};
-  if (item.slot === 'weapon') out.atk = Math.round((4 + L * 1.7) * m);
-  if (item.slot === 'armor') { out.def = Math.round((2 + L * 1.1) * m); out.hp = Math.round((10 + L * 6) * m); }
-  if (item.slot === 'accessory') { out.hp = Math.round((6 + L * 3.5) * m); out.crit = +(0.01 + L * 0.0015 * m).toFixed(3); out.spd = +(0.5 + L * 0.08 * m).toFixed(1); }
-  if (item.grade === 'epic') {
-    if (item.slot === 'weapon') out.critDmg = 0.3;
-    if (item.slot === 'armor') out.hpPct = 0.1;
-    if (item.slot === 'accessory') out.atkPct = 0.08;
+  const add = (k, v) => { out[k] = +((out[k] || 0) + v).toFixed(3); };
+  if (item.slot === 'weapon') add('atk', Math.round((4 + L * 1.7) * m));
+  if (item.slot === 'armor') { add('def', Math.round((2 + L * 1.1) * m)); add('hp', Math.round((10 + L * 6) * m)); }
+  if (item.slot === 'accessory') add('hp', Math.round((6 + L * 3.5) * m));
+  if (item.slot === 'offhand') {
+    const b = OFFHAND_BASE[item.cls] || { flat: {}, pct: {} };
+    for (const [k, [a, per]] of Object.entries(b.flat)) add(k, k === 'spd' ? +((a + per * L) * m).toFixed(1) : Math.round((a + per * L) * m));
+    for (const [k, v] of Object.entries(b.pct)) add(k, +(v * gm).toFixed(3));
   }
+  const optM = 1 + 0.5 * FORGE.enhancePct * (item.plus || 0);
+  for (const o of item.opts || []) add(o.k, o.k === 'cdr' ? o.v : (OPTION_DEFS[o.k]?.pct ? +(o.v * optM).toFixed(3) : Math.round(o.v * optM)));
   return out;
-}
-export function itemName(item) {
-  if (item.grade === 'epic') return (EPIC_SETS[item.set] || EPIC_NAMES)[item.slot];
-  const tier = Math.min(3, Math.floor((item.ilv - 1) / 8));
-  return SLOT_NAMES[item.slot][tier];
 }
 export function itemPower(item) {
   const s = itemStats(item);
-  return Math.round((s.atk || 0) * 2 + (s.def || 0) * 2 + (s.hp || 0) * 0.3 + (s.crit || 0) * 300 + (s.spd || 0) * 3 + (s.critDmg || 0) * 60 + (s.hpPct || 0) * 200 + (s.atkPct || 0) * 300) + (item.unique ? 40 + item.ilv * 2 : 0);
+  let pctSum = 0;
+  for (const [k, v] of Object.entries(s)) if (OPTION_DEFS[k]?.pct) pctSum += v;
+  return Math.round((s.atk || 0) * 2 + (s.def || 0) * 2 + (s.hp || 0) * 0.3 + (s.spd || 0) * 3 + (s.cdr || 0) * 20 + pctSum * (30 + item.ilv * 5)
+    + (item.named ? 60 + item.ilv * 3 : 0) + (item.eopt ? 30 + item.ilv * 2 : 0));
 }
-export function rollItem(rng, grade, ilv, slot = null, set = 'frost') {
-  const it = {
-    slot: slot || pick(rng, SLOTS).id, grade, ilv: Math.max(1, ilv), plus: 0,
-    roll: +(0.9 + rng() * 0.2).toFixed(3),
-  };
-  if (grade === 'epic') { it.set = set; it.unique = pick(rng, uniqueIdsFor(it.slot)); }
-  return it;
+export function statLabel(k, v) {
+  const d = OPTION_DEFS[k];
+  if (k === 'atk') return `공격 ${v}`;
+  if (k === 'def') return `방어 ${v}`;
+  if (k === 'hp') return `HP ${v}`;
+  if (!d) return `${k} ${v}`;
+  if (d.pct) return `${d.label} +${Math.round(v * 1000) / 10}%`;
+  return `${d.label} ${k === 'cdr' ? '-' : '+'}${v}${d.unit || ''}`;
 }
-export const uniqueOf = (item) => (item?.unique ? UNIQUE_OPTIONS[item.unique] : null);
 
 function gearTotals(save, u) {
-  const t = { atk: 0, def: 0, hp: 0, crit: 0, spd: 0, critDmg: 0, hpPct: 0, atkPct: 0, uniq: {} };
+  const t = {};
+  const add = (k, v) => { t[k] = (t[k] || 0) + v; };
   for (const slot of Object.keys(u.equip)) {
     const uid = u.equip[slot];
     const it = uid != null ? save.inventory.find(i => i.uid === uid) : null;
-    if (!it) continue;
-    const s = itemStats(it);
-    for (const k of Object.keys(t)) if (k !== 'uniq') t[k] += s[k] || 0;
-    const uo = uniqueOf(it);
-    if (uo) for (const [k, v] of Object.entries(uo.fx)) t.uniq[k] = (t.uniq[k] || 0) + v;
+    if (!it || !itemUsable(it, u.classId)) continue;
+    for (const [k, v] of Object.entries(itemStats(it))) add(k, v);
+    const ud = uniqueDef(it);
+    if (ud) for (const [k, v] of Object.entries(ud.fx)) add(k, v);
+    const eo = epicOptOf(it);
+    if (eo) for (const [k, v] of Object.entries(eo.fx)) add(k, v);
   }
   return t;
 }
@@ -146,35 +208,41 @@ function passiveFx(u) {
   return fx;
 }
 
-// 전투 능력치
+// 전투 능력치 (2.0 — 장비 옵션·유니크 효과 합산)
+const PASS_KEYS = ['counterDouble', 'tauntReduce', 'critAfterCounter', 'emergencyHeal', 'dotTurnsMult', 'openInferno', 'skillShield', 'resetEvery',
+  'overhealShield', 'missingHpAtk', 'rageDouble', 'multiHitsAdd', 'spiritArrow', 'dodgeHeal', 'firstCrit', 'revive', 'shieldReduce', 'blessMult', 'blessTurns',
+  'execute', 'chain', 'holyDmg', 'regenPct', 'counterDmg', 'skillDmg', 'dotDmg', 'expPct', 'goldPct', 'famPct'];
 export function deriveUnit(save, classId) {
   const u = save.units[classId];
   const cls = chronicleClass(classId);
   const g = gearTotals(save, u);
+  const G = (k) => g[k] || 0;
   const fx = passiveFx(u);
   const st = u.stats;
   const main = cls.main === 'int' ? st.int : cls.main === 'agi' ? st.agi : st.str;
   const mast = (u.mastery || 0) * MASTERY_PCT;
-  const uq = g.uniq;
-  const atk = (main * 2.2 + u.lv * 1.5 + g.atk) * (1 + (fx.atkPct || 0) + g.atkPct + mast + (uq.atkPct || 0));
-  return {
+  const atk = (main * 2.2 + u.lv * 1.5 + G('atk')) * (1 + (fx.atkPct || 0) + G('atkPct') + mast);
+  const out = {
     id: classId, classId, name: cls.name, side: 'party', lv: u.lv, magic: cls.magic,
-    maxHp: Math.round((50 + st.vit * 10 + u.lv * 6 + g.hp) * (1 + (fx.hpPct || 0) + g.hpPct + mast)),
+    maxHp: Math.round((50 + st.vit * 10 + u.lv * 6 + G('hp')) * (1 + (fx.hpPct || 0) + G('hpPct') + mast)),
     atk: Math.round(atk),
-    healPower: Math.round(st.int * 2.2 + u.lv * 1.5 + g.atk * 0.5),
-    def: Math.round((st.vit * 0.8 + g.def) * (1 + (fx.defPct || 0))),
-    spd: +((8 + st.agi * 0.6 + g.spd) * (1 + (uq.spdPct || 0))).toFixed(1),
-    crit: Math.min(0.6, 0.05 + st.agi * 0.004 + g.crit + (fx.critAdd || 0) + (uq.critAdd || 0)),
-    critMult: T.critMult + g.critDmg + (uq.critDmg || 0),
-    // 에픽 고유 옵션 (1.208.0)
-    execute: uq.execute || 0, lifesteal: uq.lifesteal || 0, chain: uq.chain || 0, armorPen: Math.min(0.8, uq.armorPen || 0),
-    thornsPct: uq.thornsPct || 0, regenPct: uq.regenPct || 0, startShieldPct: uq.startShieldPct || 0, guts: uq.guts ? 1 : 0, cdr: uq.cdr || 0,
-    dodge: Math.min(0.3, st.agi * 0.002 + (fx.dodgeAdd || 0)),
-    counterPct: fx.counterPct || 0, lowHpDmg: fx.lowHpDmg || 0,
+    healPower: Math.round((st.int * 2.2 + u.lv * 1.5 + G('atk') * 0.5) * (1 + G('healPct'))),
+    def: Math.round((st.vit * 0.8 + G('def')) * (1 + (fx.defPct || 0) + G('defPct'))),
+    spd: +((8 + st.agi * 0.6 + G('spd')) * (1 + G('spdPct'))).toFixed(1),
+    crit: Math.min(0.6, 0.05 + st.agi * 0.004 + (fx.critAdd || 0) + G('crit')),
+    critMult: T.critMult + G('critDmg'),
+    dodge: Math.min(0.35, st.agi * 0.002 + (fx.dodgeAdd || 0) + G('dodge')),
+    counterPct: (fx.counterPct || 0) + G('counterPct'),
+    lowHpDmg: (fx.lowHpDmg || 0) + G('lowHpDmg'),
+    lifesteal: G('lifesteal'), thornsPct: G('thornsPct'), armorPen: Math.min(0.8, G('armorPen')),
+    startShieldPct: G('shieldPct'), guts: G('guts') ? 1 : 0, cdr: Math.min(2, G('cdr')),
+    dmgReduce: Math.min(0.5, G('dmgReduce')) - G('dmgTakenUp'),
     skills: Object.entries(u.skills)
       .map(([id, lv]) => ({ s: CHRONICLE_SKILLS[id], lv }))
       .filter(x => x.s && x.lv > 0 && x.s.kind !== 'passive'),
   };
+  for (const k of PASS_KEYS) if (G(k)) out[k] = G(k);
+  return out;
 }
 export function unitPower(save, classId) {
   const d = deriveUnit(save, classId);
@@ -294,7 +362,7 @@ export function equipItem(save0, classId, uid) {
   const save = clone(save0);
   const it = save.inventory.find(i => i.uid === uid);
   const u = save.units[classId];
-  if (!it || !u) return save0;
+  if (!it || !u || !itemUsable(it, classId)) return save0;
   // 다른 유닛이 끼고 있으면 해제
   for (const other of Object.values(save.units)) {
     for (const sl of Object.keys(other.equip)) if (other.equip[sl] === uid) other.equip[sl] = null;
@@ -322,7 +390,7 @@ export function dismantleItems(save0, uids) {
     if (idx < 0) continue;
     const it = save.inventory[idx];
     const g = GRADES[gradeIdx(it.grade)];
-    essence += g.dismantle + (it.plus || 0);
+    essence += g.dismantle + (it.plus || 0) * (it.grade === 'unique' ? 3 : 1);
     shard += g.shard || 0;
     save.inventory.splice(idx, 1);
   }
@@ -334,13 +402,50 @@ export function autoEquip(save0) {
   let save = clone(save0);
   for (const cid of save.party) {
     for (const sl of SLOTS.map(s => s.id)) {
-      const cur = save.inventory.find(i => i.uid === save.units[cid].equip[sl]);
-      const free = save.inventory.filter(i => i.slot === sl && !equippedBy(save, i.uid));
+      const cur = save.inventory.find(i => i.uid === save.units[cid].equip[sl] && itemUsable(i, cid));
+      const free = save.inventory.filter(i => i.slot === sl && itemUsable(i, cid) && !equippedBy(save, i.uid));
       free.sort((a, b) => itemPower(b) - itemPower(a));
       if (free[0] && (!cur || itemPower(free[0]) > itemPower(cur))) save = equipItem(save, cid, free[0].uid);
     }
   }
   return save;
+}
+
+// ===== 공용 창고 (2.0) — save.stash는 계정 공유 =====
+export function moveToStash(save0, uids) {
+  const save = clone(save0);
+  save.stash = save.stash || [];
+  let moved = 0;
+  for (const uid of uids) {
+    if (save.stash.length >= T.stashMax) break;
+    if (equippedBy(save, uid)) continue;
+    const idx = save.inventory.findIndex(i => i.uid === uid);
+    if (idx < 0) continue;
+    save.stash.push(save.inventory[idx]); save.inventory.splice(idx, 1); moved++;
+  }
+  return { save, moved };
+}
+export function takeFromStash(save0, uid) {
+  if (save0.inventory.length >= T.inventoryMax) return save0;
+  const idx = (save0.stash || []).findIndex(i => i.uid === uid);
+  if (idx < 0) return save0;
+  const save = clone(save0);
+  save.inventory.push(save.stash[idx]); save.stash.splice(idx, 1);
+  return save;
+}
+export function dismantleStash(save0, uids) {
+  const save = clone(save0);
+  let essence = 0; let shard = 0;
+  for (const uid of uids) {
+    const idx = (save.stash || []).findIndex(i => i.uid === uid);
+    if (idx < 0) continue;
+    const it = save.stash[idx];
+    const g = GRADES[gradeIdx(it.grade)];
+    essence += g.dismantle + (it.plus || 0); shard += g.shard || 0;
+    save.stash.splice(idx, 1);
+  }
+  save.mats.essence += essence; save.mats.shard += shard;
+  return { save, essence, shard };
 }
 
 // ===== 대장간 =====
@@ -360,7 +465,11 @@ export function enhanceItem(save0, uid) {
   it.plus = (it.plus || 0) + 1;
   return save;
 }
-export function nextGrade(item) { const i = gradeIdx(item.grade); return i < GRADES.length - 1 ? GRADES[i + 1].id : null; }
+export function nextGrade(item) {
+  if (item.grade === 'unique') return null; // 유니크는 승급 불가
+  const i = gradeIdx(item.grade);
+  return i < gradeIdx('epic') ? GRADES[i + 1].id : null;
+}
 export function promoteCost(item) { const n = nextGrade(item); return n ? FORGE.promoteCost[n] : null; }
 export function canPromote(save, item) {
   const c = item && promoteCost(item);
@@ -374,10 +483,13 @@ export function promoteItem(save0, uid, rng = Math.random) {
   const c = promoteCost(it);
   save.gold -= c.gold; save.mats.essence -= c.essence; save.mats.shard -= c.shard;
   it.grade = nextGrade(it);
+  it.opts = it.opts || [];
+  const o = rollOption(rng, it.cls, it.grade, it.opts); // 승급마다 옵션 +1
+  if (o) it.opts.push(o);
   if (it.grade === 'epic') {
     save.stats.epics += 1;
-    it.set = it.set || 'frost';
-    if (!it.unique) it.unique = pick(rng, uniqueIdsFor(it.slot));
+    it.set = it.set || 'field';
+    if (it.slot === 'accessory' && !it.eopt) it.eopt = pick(rng, Object.keys(EPIC_OPTIONS));
   }
   return save;
 }
@@ -427,7 +539,7 @@ export function dungeonEncounter(d, rng) {
 // ===== 전투 시뮬 (풀오토) =====
 export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
   const units = [
-    ...party0.map(p => ({ ...p, buffs: {}, shield: Math.round((p.startShieldPct || 0) * p.maxHp), taunt: 0, tauntDef: 0, dots: [], cds: {}, turn: 0 })),
+    ...party0.map(p => ({ ...p, buffs: {}, shield: Math.round((p.startShieldPct || 0) * p.maxHp), taunt: 0, tauntDef: 0, dots: [], cds: {}, turn: 0, critNext: false, firstDone: false, reviveUsed: false, emergencyUsed: false })),
     ...enemies0.map(e => ({ ...e, buffs: {}, shield: 0, taunt: 0, tauntDef: 0, dots: [], cds: {}, turn: 0, skills: [] })),
   ];
   const events = [];
@@ -439,23 +551,54 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
     let m = 1;
     for (const b of Object.values(u.buffs)) if (b.t > 0) m += b.v;
     if (u.lowHpDmg && u.hp < u.maxHp * 0.5) m += u.lowHpDmg;
+    if (u.missingHpAtk) m += Math.floor((1 - u.hp / u.maxHp) * 10) * u.missingHpAtk;
     return m;
   };
-  const damage = (att, def, mult, { noDodge = false } = {}) => {
-    if (!noDodge && rng() < (def.dodge || 0)) return { miss: true, d: 0 };
-    let raw = att.atk * mult * atkMod(att) * (0.9 + rng() * 0.2);
+  const healUnit = (t, h) => {
+    const before = t.hp;
+    t.hp = Math.min(t.maxHp, t.hp + h);
+    if (t.overhealShield) t.shield += Math.max(0, h - (t.hp - before));
+    return t.hp - before;
+  };
+  // 쓰러짐 직전 처리 — 불굴(guts) · 부활(revive) · 응급(emergencyHeal)
+  const onHurt = (def) => {
+    if (def.hp <= 0 && def.guts > 0) { def.hp = 1; def.guts = 0; }
+    if (def.hp <= 0 && def.revive && !def.reviveUsed) { def.reviveUsed = true; def.hp = Math.round(def.maxHp * def.revive); }
+    if (def.hp > 0 && def.emergencyHeal && !def.emergencyUsed && def.hp < def.maxHp * 0.3) { def.emergencyUsed = true; def.hp = Math.min(def.maxHp, def.hp + Math.round(def.maxHp * def.emergencyHeal)); }
+  };
+  const damage = (att, def, mult, { noDodge = false, skill = false } = {}) => {
+    if (!noDodge && rng() < (def.dodge || 0)) {
+      if (def.dodgeHeal) healUnit(def, Math.round(def.maxHp * def.dodgeHeal));
+      if (def.critAfterCounter) def.critNext = true;
+      return { miss: true, d: 0 };
+    }
+    let raw = att.atk * mult * atkMod(att) * (1 + (skill ? att.skillDmg || 0 : 0)) * (0.9 + rng() * 0.2);
     if (att.execute && def.hp < def.maxHp * 0.3) raw *= 1 + att.execute;
-    const crit = rng() < (att.crit || 0);
+    let crit = rng() < (att.crit || 0);
+    if (att.side === 'party' && (att.critNext || (att.firstCrit && !att.firstDone))) crit = true;
+    att.critNext = false; att.firstDone = true;
     if (crit) raw *= att.critMult || T.critMult;
     const defV = (def.def || 0) * (1 + (def.taunt > 0 ? def.tauntDef : 0)) * (1 - (att.armorPen || 0));
-    let d = Math.max(1, Math.round(raw * T.defK / (T.defK + defV)));
+    let d = raw * T.defK / (T.defK + defV);
+    d *= 1 - (def.dmgReduce || 0);
+    if (def.taunt > 0 && def.tauntReduce) d *= 1 - def.tauntReduce;
+    if (def.shield > 0 && def.shieldReduce) d *= 1 - def.shieldReduce;
+    d = Math.max(1, Math.round(d));
     let absorbed = 0;
     if (def.shield > 0) { absorbed = Math.min(def.shield, d); def.shield -= absorbed; d -= absorbed; }
     def.hp = Math.max(0, def.hp - d);
-    if (def.hp <= 0 && def.guts > 0) { def.hp = 1; def.guts = 0; }
-    if (att.lifesteal && d > 0 && att.hp > 0) att.hp = Math.min(att.maxHp, att.hp + Math.round(d * att.lifesteal));
+    onHurt(def);
+    if (att.lifesteal && d > 0 && att.hp > 0) healUnit(att, Math.round(d * att.lifesteal));
     if (def.thornsPct && d > 0 && att.hp > 0) att.hp = Math.max(0, att.hp - Math.max(1, Math.round(d * def.thornsPct)));
     return { d, crit, absorbed };
+  };
+  // 정령 화살 — 공격 뒤 확률 추가 타격 (유니크)
+  const spiritHit = (u, hits) => {
+    if (!u.spiritArrow || rng() >= u.spiritArrow) return;
+    const t = pickEnemyTarget(u);
+    if (!t) return;
+    const r = damage(u, t, 0.8, { noDodge: true });
+    hits.push({ t: t.id, d: r.d, c: r.crit, chain: true });
   };
   // 연격 — 단일 공격 뒤 추가 타격
   const chainHit = (u, t, hits) => {
@@ -476,8 +619,12 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
   const counterCheck = (def, att, hits) => {
     if (def.side !== 'party' || def.hp <= 0 || att.hp <= 0 || !def.counterPct) return;
     if (rng() < def.counterPct) {
-      const r = damage(def, att, 0.6, { noDodge: true });
-      hits.push({ t: att.id, d: r.d, c: r.crit, counter: true });
+      const times = def.counterDouble && rng() < def.counterDouble ? 2 : 1;
+      for (let i = 0; i < times && att.hp > 0; i++) {
+        const r = damage(def, att, 0.6 * (1 + (def.counterDmg || 0)), { noDodge: true });
+        hits.push({ t: att.id, d: r.d, c: r.crit, counter: true });
+      }
+      if (def.critAfterCounter) def.critNext = true;
     }
   };
 
@@ -494,7 +641,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
     if (has('shield') && !allies.some(a => a.shield > 0)) return has('shield');
     if (has('buffAtk') && !allies.some(a => a.buffs.bless?.t > 0)) return has('buffAtk');
     if (has('rage') && !(u.buffs.rage?.t > 0)) return has('rage');
-    if (has('taunt') && allies.length > 1 && !(u.taunt > 0)) return has('taunt');
+    if (has('taunt') && !(u.taunt > 0) && u.hp < u.maxHp * 0.6) return has('taunt'); // 솔로: 도발 = 방어 태세 (위급하거나 강적·보스전에서만)
     if (foes.length >= 2) {
       const aoe = has('aoe') || ready.find(x => x.s.kind === 'dot' && x.s.all);
       if (aoe) return aoe;
@@ -528,9 +675,14 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
     if (!choice) {
       const t = pickEnemyTarget(u);
       if (!t) return;
-      const r = damage(u, t, 1);
-      const hits = [{ t: t.id, d: r.d, c: r.crit, m: r.miss }];
-      if (!r.miss) chainHit(u, t, hits);
+      const times = u.rageDouble && u.buffs.rage?.t > 0 ? 2 : 1;
+      const hits = [];
+      for (let i = 0; i < times && t.hp > 0; i++) {
+        const r = damage(u, t, 1);
+        hits.push({ t: t.id, d: r.d, c: r.crit, m: r.miss });
+        if (!r.miss) chainHit(u, t, hits);
+      }
+      spiritHit(u, hits);
       push({ a: u.id, n: '공격', k: 'attack', hits });
       return;
     }
@@ -543,9 +695,14 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
     switch (s.kind) {
       case 'strike': case 'lifesteal': {
         const t = pickEnemyTarget(u);
-        const r = damage(u, t, v);
-        hits.push({ t: t.id, d: r.d, c: r.crit, m: r.miss });
-        if (!r.miss) chainHit(u, t, hits);
+        const times = u.rageDouble && u.buffs.rage?.t > 0 ? 2 : 1;
+        let r = { d: 0 };
+        for (let i = 0; i < times && t.hp > 0; i++) {
+          r = damage(u, t, v, { skill: true });
+          hits.push({ t: t.id, d: r.d, c: r.crit, m: r.miss });
+          if (!r.miss) chainHit(u, t, hits);
+        }
+        spiritHit(u, hits);
         if (s.kind === 'lifesteal' && r.d > 0) {
           const h = Math.round(r.d * s.steal);
           u.hp = Math.min(u.maxHp, u.hp + h);
@@ -554,21 +711,22 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
         break;
       }
       case 'multi': {
-        for (let i = 0; i < s.hits; i++) {
+        const n = s.hits + (s.id === 'e_volley' ? u.multiHitsAdd || 0 : 0);
+        for (let i = 0; i < n; i++) {
           const t = pickEnemyTarget(u);
           if (!t) break;
-          const r = damage(u, t, v);
+          const r = damage(u, t, v, { skill: true });
           hits.push({ t: t.id, d: r.d, c: r.crit, m: r.miss });
         }
         break;
       }
       case 'aoe':
-        for (const t of foes) { const r = damage(u, t, v); hits.push({ t: t.id, d: r.d, c: r.crit, m: r.miss }); }
+        for (const t of foes) { const r = damage(u, t, v, { skill: true }); hits.push({ t: t.id, d: r.d, c: r.crit, m: r.miss }); }
         break;
       case 'dot': {
         const targets = s.all ? foes : [pickEnemyTarget(u)];
         for (const t of targets) {
-          t.dots.push({ v: Math.max(1, Math.round(u.atk * v * atkMod(u))), t: s.turns });
+          t.dots.push({ v: Math.max(1, Math.round(u.atk * v * atkMod(u) * (1 + (u.dotDmg || 0)))), t: s.turns * (u.dotTurnsMult || 1) });
           hits.push({ t: t.id, dot: true });
         }
         break;
@@ -576,18 +734,19 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
       case 'heal': {
         const t = allies.slice().sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];
         const h = Math.round(u.healPower * v);
-        t.hp = Math.min(t.maxHp, t.hp + h);
+        healUnit(t, h);
         hits.push({ t: t.id, h });
+        holyHit(u, h, hits);
         break;
       }
       case 'healAll':
-        for (const a of allies) { const h = Math.round(u.healPower * v); a.hp = Math.min(a.maxHp, a.hp + h); hits.push({ t: a.id, h }); }
+        for (const a of allies) { const h = Math.round(u.healPower * v); healUnit(a, h); hits.push({ t: a.id, h }); holyHit(u, h, hits); }
         break;
       case 'shield':
         for (const a of allies) { const sh = Math.round(u.healPower * v); a.shield = Math.max(a.shield, sh); hits.push({ t: a.id, s: sh }); }
         break;
       case 'buffAtk':
-        for (const a of allies) { a.buffs.bless = { v, t: s.turns }; hits.push({ t: a.id, buff: true }); }
+        for (const a of allies) { a.buffs.bless = { v: v * (u.blessMult || 1), t: s.turns + (u.blessTurns || 0) }; hits.push({ t: a.id, buff: true }); }
         break;
       case 'rage':
         u.buffs.rage = { v, t: s.turns }; hits.push({ t: u.id, buff: true });
@@ -597,8 +756,22 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
         break;
       default: break;
     }
+    if (u.skillShield) u.shield += Math.round(u.atk * u.skillShield);
     push({ a: u.id, n: s.name, k: s.kind, skill: true, hits });
   };
+  // 치유 → 신성 피해 (사제 옵션·유니크)
+  function holyHit(u, h, hits) {
+    if (!u.holyDmg || h <= 0) return;
+    const t = pickEnemyTarget(u);
+    if (!t) return;
+    const d = Math.max(1, Math.round(h * u.holyDmg));
+    t.hp = Math.max(0, t.hp - d);
+    hits.push({ t: t.id, d, holy: true });
+  }
+  // 전투 시작 효과 — 이프리트의 계약서
+  for (const p of units.filter(x => x.side === 'party' && x.openInferno)) {
+    for (const e of units.filter(x => x.side === 'enemy')) e.dots.push({ v: Math.max(1, Math.round(p.atk * p.openInferno)), t: 3 * (p.dotTurnsMult || 1) });
+  }
 
   let round = 0;
   let result = null;
@@ -620,6 +793,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
       }
       act(u);
       for (const k of Object.keys(u.cds)) if (u.cds[k] > 0) u.cds[k] -= 1;
+      if (u.resetEvery && u.turn % u.resetEvery === 0) { const ks = Object.keys(u.cds).filter(k => u.cds[k] > 0); if (ks.length) u.cds[pick(rng, ks)] = 0; }
       for (const b of Object.values(u.buffs)) if (b.t > 0) b.t -= 1;
       if (u.taunt > 0) u.taunt -= 1;
       if (!alive('enemy').length) { result = 'win'; break; }
@@ -635,7 +809,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
 // ===== 전투 보상 =====
 function rollGrade(rng, grades) { return weighted(rng, grades); }
 export function battleRewards(enemies, type, rng, mods = {}) {
-  const exp = enemies.reduce((s, e) => s + Math.round((6 + e.lv * 3) * (e.rewardMult || 1) * (e.tier === 'boss' ? 10 : e.tier === 'elite' ? 3 : 1)), 0);
+  const exp = enemies.reduce((s, e) => s + Math.round((6 + e.lv * 3) * (e.rewardMult || 1) * (T.expMult || 1) * (e.tier === 'boss' ? 10 : e.tier === 'elite' ? 3 : 1)), 0);
   const gold = enemies.reduce((s, e) => s + Math.round((3 + e.lv * 2) * (e.tier === 'boss' ? 8 : e.tier === 'elite' ? 3 : 1) * (0.85 + rng() * 0.3)), 0);
   const tableKey = type === 'normal' ? 'normal' : type;
   const base = DROP_TABLE[tableKey] || DROP_TABLE.normal;
@@ -644,7 +818,13 @@ export function battleRewards(enemies, type, rng, mods = {}) {
   const ilv = Math.max(...enemies.map(e => e.lv));
   const items = [];
   const count = tbl.items || 1;
-  for (let i = 0; i < count; i++) if (rng() < tbl.itemChance) items.push(rollItem(rng, rollGrade(rng, tbl.grades), ilv, null, mods.set || 'frost'));
+  const heroCls = mods.heroCls || 'wanderer';
+  const uChance = type === 'boss' ? UNIQUE_CHANCE.boss : type === 'dungeonBoss' ? (mods.uniqueChance || 0) : 0;
+  for (let i = 0; i < count; i++) {
+    if (rng() >= tbl.itemChance) continue;
+    const uq = uChance && rng() < uChance ? rollUniqueItem(rng, ilv, heroCls) : null;
+    items.push(uq || rollGear(rng, rollGrade(rng, tbl.grades), ilv, heroCls, mods.set || 'field'));
+  }
   const essence = ri(rng, tbl.essence[0], tbl.essence[1]);
   const shard = tbl.shard ? Math.round(ri(rng, tbl.shard[0], tbl.shard[1]) * (mods.shardMult || 1)) : 0;
   return { exp, gold, items, essence, shard };
@@ -678,40 +858,36 @@ export function applyBattle(save0, ctx, battle, rng = Math.random) {
   save.progress.killsByKey = save.progress.killsByKey || {};
   for (const e of ctx.enemies) save.progress.killsByKey[e.key] = (save.progress.killsByKey[e.key] || 0) + 1;
   save.stats.elites = (save.stats.elites || 0) + ctx.enemies.filter(e => e.tier === 'elite').length;
-  let mods = {};
+  let mods = { heroCls: save.hero };
   if (ctx.kind === 'dungeon' && save.dungeon) {
-    const tier = DUNGEON_TIERS[save.dungeon.tier || 0];
-    mods = { epicMult: tier.epicMult, shardMult: tier.shardMult, set: dungeonDef(save.dungeon.id).set };
+    const ti = save.dungeon.tier || 0;
+    const tier = DUNGEON_TIERS[ti];
+    mods = { ...mods, epicMult: tier.epicMult, shardMult: tier.shardMult, set: dungeonDef(save.dungeon.id).set, uniqueChance: UNIQUE_CHANCE.dungeonBoss[ti] || 0 };
   }
   const r = battleRewards(ctx.enemies, ctx.type, rng, mods);
+  // 장비 옵션 — 경험치·골드 % (주인공 기준)
+  const hd = deriveUnit(save, save.hero);
+  r.exp = Math.round(r.exp * (1 + (hd.expPct || 0)));
+  r.gold = Math.round(r.gold * (1 + (hd.goldPct || 0)));
   summary.exp = r.exp; summary.gold = r.gold; summary.essence = r.essence; summary.shard = r.shard;
   save.gold += r.gold; save.mats.essence += r.essence; save.mats.shard += r.shard;
   for (const cid of save.party) {
     const ups = gainExp(save.units[cid], r.exp);
     if (ups) summary.levelUps[cid] = save.units[cid].lv;
   }
-  // 동료는 자동 성장 (주인공은 직접 배분)
-  for (const cid of save.party) if (cid !== save.hero && summary.levelUps[cid]) save.units[cid] = autoGrowUnit(save.units[cid]);
   for (const it of r.items) {
     if (save.inventory.length >= T.inventoryMax) { const g = GRADES[gradeIdx(it.grade)]; save.mats.essence += g.dismantle; summary.autoDismantled = (summary.autoDismantled || 0) + 1; continue; }
     const item = { ...it, uid: save.nextUid++ };
     save.inventory.push(item);
     summary.items.push(item);
     if (item.grade === 'epic') save.stats.epics += 1;
+    if (item.grade === 'unique') save.stats.uniques = (save.stats.uniques || 0) + 1;
   }
   if (ctx.kind === 'field') {
     const fid = ctx.fieldId;
     save.progress.fieldKills[fid] = (save.progress.fieldKills[fid] || 0) + ctx.enemies.length;
     if (ctx.type === 'boss' && !save.progress.bossCleared[fid]) {
       save.progress.bossCleared[fid] = true;
-      const order = companionOrder(save.hero);
-      const cid = order[fid - 1];
-      if (cid && !save.units[cid]) {
-        const hero = save.units[save.hero];
-        save.units[cid] = autoGrowUnit(makeUnit(cid, Math.max(1, hero.lv - 1)));
-        if (save.party.length < 4) save.party.push(cid);
-        summary.recruit = cid;
-      }
       if (fid < CHRONICLE_FIELDS.length) summary.unlocks.push(`사냥터 「${CHRONICLE_FIELDS[fid].name}」`);
       for (const D of CHRONICLE_DUNGEONS) if (fid === D.unlockField) summary.unlocks.push(`던전 「${D.name}」`);
     }
