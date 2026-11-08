@@ -11,7 +11,7 @@ import { PALETTE } from '../utils/helpers.js';
 import { GlassPanel, UIButton, BottomSheet } from '../components/ui/CommonUI.jsx';
 import {
   CHRONICLE_TITLE, CHRONICLE_SUB, CHRONICLE_SAVE_KEY, CHRONICLE_TUNING, CHRONICLE_CLASSES, CHRONICLE_FIELDS,
-  CHRONICLE_DUNGEON, CHRONICLE_DUNGEONS, DUNGEON_TIERS, dungeonDef, STAT_META, STAT_KEYS, SKILL_MAX_LV, MASTERY_PCT, BOSS_DAILY_LIMIT, GRADES, gradeIdx, SLOTS, FORGE,
+  CHRONICLE_DUNGEON, CHRONICLE_DUNGEONS, DUNGEON_TIERS, dungeonDef, STAT_META, STAT_KEYS, SKILL_MAX_LV, MASTERY_PCT, BOSS_DAILY_LIMIT, DUNGEON_KEYS, GRADES, gradeIdx, SLOTS, FORGE,
   chronicleClass, classSkills, describeSkill, chronicleEnemyArt,
 } from './data.js';
 import * as E from './engine.js';
@@ -231,6 +231,7 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain }) {
                 {summary.recruit && <div className="text-center font-semibold" style={{ color: '#9fd18a' }}>✚ {iga(chronicleClass(summary.recruit).name)} 동료가 되었다!</div>}
                 {summary.unlocks.map(u => <div key={u} className="text-center" style={{ color: '#9cc4e4' }}>🔓 {u} 개방</div>)}
                 {summary.dungeonClear && <div className="text-center font-semibold" style={{ color: '#c08ae8' }}>던전 정복!</div>}
+                {summary.keys ? <div className="text-center font-semibold" style={{ color: PALETTE.legendary }}>🗝 던전 열쇠 +{summary.keys}</div> : null}
                 {(summary.questsDone || []).map(t => <div key={t} className="text-center font-semibold" style={{ color: PALETTE.dawn }}>📜 의뢰 완료: {t} — 게시판에서 보상</div>)}
               </div>
             ) : (
@@ -267,7 +268,7 @@ function TownView({ save, go, onExit }) {
   const tiles = [
     { id: 'quests', icon: '📜', label: '의뢰 게시판', sub: qBadge ? `새 소식 ${qBadge}건` : '메인 · 의뢰 · 이야기', badge: qBadge > 0 },
     { id: 'field', icon: '⚔', label: '사냥터', sub: '몹 사냥 · 보스' },
-    { id: 'dungeon', icon: '🕳', label: '던전', sub: save.dungeon ? `${dungeonDef(save.dungeon.id).name} 진행 중` : E.dungeonUnlocked(save) ? `${CHRONICLE_DUNGEONS.filter(d => E.dungeonUnlocked(save, d.id)).length}곳 · 난이도 3단계` : '죽은 자의 숲 보스 후 개방', locked: !E.dungeonUnlocked(save) },
+    { id: 'dungeon', icon: '🕳', label: '던전', sub: save.dungeon ? `${dungeonDef(save.dungeon.id).name} 진행 중` : E.dungeonUnlocked(save) ? `🗝 열쇠 ${E.keyCount(save)}개 · ${CHRONICLE_DUNGEONS.filter(d => E.dungeonUnlocked(save, d.id)).length}곳` : '죽은 자의 숲 보스 후 개방', locked: !E.dungeonUnlocked(save) },
     { id: 'party', icon: '👥', label: '파티 · 성장', sub: '능력치 · 스킬 · 장비', badge: alertParty },
     { id: 'bag', icon: '🎒', label: '가방', sub: `${save.inventory.length}/${CHRONICLE_TUNING.inventoryMax}` },
     { id: 'forge', icon: '⚒', label: '대장간', sub: '강화 · 등급 승급' },
@@ -377,7 +378,7 @@ function FieldView({ save, onBack, onFight, playScene, sceneOpen }) {
 }
 
 // ===== 던전 =====
-function DungeonView({ save, onBack, onEnter, onFight, onLeave }) {
+function DungeonView({ save, onBack, onEnter, onFight, onLeave, onBuyKey }) {
   const d = save.dungeon;
   const opened = CHRONICLE_DUNGEONS.filter(x => E.dungeonUnlocked(save, x.id));
   const [selId, setSelId] = useState(d?.id || opened[opened.length - 1]?.id || 'frostTomb');
@@ -388,7 +389,7 @@ function DungeonView({ save, onBack, onEnter, onFight, onLeave }) {
   const best = save.progress.dungeonTier?.[D.id];
   return (
     <div className="absolute inset-0 flex flex-col">
-      <Header title={d ? `${D.name} · ${T.label}` : '던전'} onBack={d ? null : onBack} right={<Wallet save={save} />} />
+      <Header title={d ? `${D.name} · ${T.label}` : '던전'} onBack={d ? null : onBack} right={<div className="flex items-center gap-2"><span style={{ fontSize: 12, color: PALETTE.legendary }}>🗝{E.keyCount(save)}</span><Wallet save={save} /></div>} />
       {!d && (
         <div className="flex gap-1.5 px-3 pt-2 flex-none">
           {CHRONICLE_DUNGEONS.map(x => {
@@ -447,7 +448,22 @@ function DungeonView({ save, onBack, onEnter, onFight, onLeave }) {
           ))}
         </GlassPanel>
         {!d ? (
-          <UIButton onClick={() => onEnter(D.id, tier)}>{D.name} · {T.label} 입장</UIButton>
+          <>
+            <UIButton disabled={E.keyCount(save) < T.keyCost} onClick={() => onEnter(D.id, tier)}>
+              {E.keyCount(save) < T.keyCost ? `열쇠 부족 (🗝 ${T.keyCost}개 필요)` : `${D.name} · ${T.label} 입장 — 🗝 ${T.keyCost}개`}
+            </UIButton>
+            <GlassPanel className="p-3">
+              <div className="flex items-center justify-between" style={{ fontSize: 12.5, color: PALETTE.text }}>
+                <span>🗝 던전 열쇠 <b style={{ color: PALETTE.legendary }}>{E.keyCount(save)}</b> / {DUNGEON_KEYS.max}</span>
+                <button disabled={!E.canBuyKey(save)} onClick={onBuyKey} className="ui-press" style={{ fontSize: 12, padding: '6px 10px', borderRadius: 9, border: `1px solid ${E.canBuyKey(save) ? PALETTE.legendary : 'var(--ui-line)'}`, color: E.canBuyKey(save) ? PALETTE.legendary : PALETTE.textDim, background: 'transparent', opacity: E.canBuyKey(save) ? 1 : 0.5 }}>
+                  구매 🪙{DUNGEON_KEYS.shopPrice} (오늘 {E.keysBoughtToday(save)}/{DUNGEON_KEYS.shopDailyLimit})
+                </button>
+              </div>
+              <div className="mt-1.5" style={{ fontSize: 11, color: PALETTE.textDim, lineHeight: 1.55 }}>
+                매일 0시 3개까지 충전 · 사냥터 강적 처치 시 {Math.round(DUNGEON_KEYS.eliteDrop * 100)}% · 일부 의뢰 보상 · 입장 시 소모(후퇴·전멸해도 돌려받지 못함) — 일반 1 · 영웅 2 · 전설 3
+              </div>
+            </GlassPanel>
+          </>
         ) : (
           <>
             <UIButton onClick={onFight}>{D.floors[d.floor].boss ? '보스와 싸운다' : `${d.floor + 1}층 전투`}</UIButton>
@@ -880,7 +896,7 @@ function QuestView({ save, setSave, onBack, flash, onReplay }) {
             onClaim={() => {
               const r = Q.claimQuest(save, item.q.id, Math.random);
               setSave(r.save);
-              flash(r.gained?.item ? `보상 수령 — ${E.itemName(r.gained.item)} 획득` : '보상 수령!');
+              flash(r.gained?.item ? `보상 수령 — ${E.itemName(r.gained.item)} 획득` : r.gained?.keysGot ? `보상 수령 — 🗝 열쇠 +${r.gained.keysGot}` : '보상 수령!');
             }} />
         ))}
         {tab === 'board' && !shown.length && <div className="text-center py-10" style={{ fontSize: 12.5, color: PALETTE.textDim }}>지금 받을 수 있는 의뢰가 없습니다 — 새 지역을 열면 의뢰가 붙습니다</div>}
@@ -909,6 +925,12 @@ export default function ChronicleGame({ onExit }) {
   const rng = Math.random;
 
   useEffect(() => { writeSave(save); }, [save]);
+  // 🗝 날짜가 바뀌면 열쇠 충전 (화면 이동 때마다 확인)
+  useEffect(() => {
+    if (!save) return;
+    const next = E.refreshDungeonKeys(save);
+    if (next !== save) setSaveState(next);
+  }, [view]); // eslint-disable-line react-hooks/exhaustive-deps
   const setSave = (next) => setSaveState(next);
   const flash = (msg) => { setToast(msg); setTimeout(() => setToast(t => (t === msg ? null : t)), 1600); };
 
@@ -990,6 +1012,7 @@ export default function ChronicleGame({ onExit }) {
     content = (
       <DungeonView save={save} onBack={() => setView('town')}
         onEnter={(id, tier) => setSave(E.startDungeon(save, id, tier))}
+        onBuyKey={() => { setSave(E.buyDungeonKey(save)); flash('🗝 던전 열쇠 +1'); }}
         onFight={fightDungeon}
         onLeave={() => { setSave(E.leaveDungeon(save)); setView('town'); }} />
     );

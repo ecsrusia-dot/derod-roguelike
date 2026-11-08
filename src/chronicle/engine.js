@@ -6,7 +6,7 @@
 // ============================================
 import {
   CHRONICLE_TUNING as T, CHRONICLE_CLASSES, CHRONICLE_SKILLS, CHRONICLE_FIELDS, CHRONICLE_DUNGEON, CHRONICLE_DUNGEONS, DUNGEON_TIERS, dungeonDef, EPIC_SETS, UNIQUE_OPTIONS, uniqueIdsFor,
-  STAT_KEYS, SKILL_MAX_LV, MASTERY_PCT, BOSS_DAILY_LIMIT, GRADES, gradeIdx, SLOTS, SLOT_NAMES, EPIC_NAMES, FORGE, DROP_TABLE,
+  STAT_KEYS, SKILL_MAX_LV, MASTERY_PCT, BOSS_DAILY_LIMIT, DUNGEON_KEYS, GRADES, gradeIdx, SLOTS, SLOT_NAMES, EPIC_NAMES, FORGE, DROP_TABLE,
   chronicleClass, classSkills, buildChronicleEnemy,
 } from './data.js';
 
@@ -65,6 +65,7 @@ export function newChronicleSave(heroClassId) {
     progress: { fieldKills: {}, bossCleared: {}, dungeonClears: 0, killsByKey: {} },
     dungeon: null, stats: { battles: 0, kills: 0, elites: 0, epics: 0 }, createdAt: Date.now(),
     quests: {}, story: { seen: {}, recruitSeen: {} },
+    keys: { count: DUNGEON_KEYS.dailyRefill, refillDate: kstDateKey(), boughtDate: null, bought: 0 },
   };
 }
 
@@ -233,6 +234,42 @@ function useBossAttempt(save, fieldId, now = Date.now()) {
   if (!save.bossDaily || save.bossDaily.date !== key) save.bossDaily = { date: key, counts: {} };
   save.bossDaily.counts[fieldId] = (save.bossDaily.counts[fieldId] || 0) + 1;
 }
+
+// ===== 🗝 던전 열쇠 (1.209.0) =====
+// 날짜가 바뀌었으면 3개까지 채운다 (변경 없으면 같은 객체 반환)
+export function refreshDungeonKeys(save0, now = Date.now()) {
+  const today = kstDateKey(now);
+  const k = save0.keys || { count: 0, refillDate: null, boughtDate: null, bought: 0 };
+  if (save0.keys && k.refillDate === today) return save0;
+  const save = clone(save0);
+  save.keys = { ...k, count: Math.max(k.count || 0, DUNGEON_KEYS.dailyRefill), refillDate: today };
+  return save;
+}
+export function keyCount(save) { return save.keys?.count || 0; }
+export function keysBoughtToday(save, now = Date.now()) {
+  return save.keys?.boughtDate === kstDateKey(now) ? (save.keys.bought || 0) : 0;
+}
+export function canBuyKey(save, now = Date.now()) {
+  return save.gold >= DUNGEON_KEYS.shopPrice && keysBoughtToday(save, now) < DUNGEON_KEYS.shopDailyLimit && keyCount(save) < DUNGEON_KEYS.max;
+}
+export function buyDungeonKey(save0, now = Date.now()) {
+  let save = refreshDungeonKeys(save0, now);
+  if (!canBuyKey(save, now)) return save0;
+  save = clone(save);
+  const today = kstDateKey(now);
+  save.gold -= DUNGEON_KEYS.shopPrice;
+  save.keys.bought = (save.keys.boughtDate === today ? save.keys.bought || 0 : 0) + 1;
+  save.keys.boughtDate = today;
+  save.keys.count += 1;
+  return save;
+}
+function addKeys(save, n) {
+  if (!save.keys) save.keys = { count: 0, refillDate: null, boughtDate: null, bought: 0 };
+  const before = save.keys.count;
+  save.keys.count = Math.min(DUNGEON_KEYS.max, before + n);
+  return save.keys.count - before;
+}
+export { addKeys as _addKeys };
 
 // 경험치 — 레벨업 횟수 반환
 function gainExp(u, n) {
@@ -630,6 +667,13 @@ export function applyBattle(save0, ctx, battle, rng = Math.random) {
     return { save, summary };
   }
   save.stats.kills += ctx.enemies.length;
+  // 🗝 강적 처치 시 열쇠 드랍 (사냥터)
+  if (ctx.kind === 'field') {
+    const elites = ctx.enemies.filter(e => e.tier === 'elite').length;
+    let got = 0;
+    for (let i = 0; i < elites; i++) if (rng() < DUNGEON_KEYS.eliteDrop) got += addKeys(save, 1);
+    if (got) summary.keys = got;
+  }
   // 의뢰용 카운터 (1.206.0)
   save.progress.killsByKey = save.progress.killsByKey || {};
   for (const e of ctx.enemies) save.progress.killsByKey[e.key] = (save.progress.killsByKey[e.key] || 0) + 1;
@@ -687,9 +731,14 @@ export function applyBattle(save0, ctx, battle, rng = Math.random) {
 }
 
 // ===== 던전 =====
-export function startDungeon(save0, id = 'frostTomb', tier = 0) {
+export function dungeonKeyCost(tier = 0) { return DUNGEON_TIERS[tier]?.keyCost || 1; }
+export function startDungeon(save0, id = 'frostTomb', tier = 0, now = Date.now()) {
   if (!dungeonUnlocked(save0, id) || !dungeonTierUnlocked(save0, id, tier)) return save0;
-  const save = clone(save0);
+  const fresh = refreshDungeonKeys(save0, now);
+  const cost = dungeonKeyCost(tier);
+  if (keyCount(fresh) < cost) return save0;
+  const save = clone(fresh);
+  save.keys.count -= cost;
   save.dungeon = { id, tier, floor: 0, hp: null };
   return save;
 }
