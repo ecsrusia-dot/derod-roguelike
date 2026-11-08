@@ -15,11 +15,14 @@ import {
   chronicleClass, classSkills, describeSkill, chronicleEnemyArt,
 } from './data.js';
 import * as E from './engine.js';
+import * as Q from './quest.js';
+import { NPCS } from './story.js';
+import { ENEMIES } from '../data/enemies.js';
 
 const FONT_TITLE = '"Cinzel", "Noto Serif KR", serif';
 
 function loadSave() {
-  try { const raw = localStorage.getItem(CHRONICLE_SAVE_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; }
+  try { const raw = localStorage.getItem(CHRONICLE_SAVE_KEY); return raw ? Q.ensureQuestFields(JSON.parse(raw)) : null; } catch { return null; }
 }
 function writeSave(s) {
   try { if (s) localStorage.setItem(CHRONICLE_SAVE_KEY, JSON.stringify(s)); else localStorage.removeItem(CHRONICLE_SAVE_KEY); } catch { /* 저장 불가 */ }
@@ -27,6 +30,8 @@ function writeSave(s) {
 
 // ===== 작은 부품 =====
 const gradeOf = (id) => GRADES[gradeIdx(id)] || GRADES[0];
+// 받침 여부로 이/가 고르기
+const iga = (w) => { const c = w.charCodeAt(w.length - 1) - 0xac00; return c >= 0 && c <= 11171 && c % 28 ? `${w}이` : `${w}가`; };
 function statLine(st) {
   const p = [];
   if (st.atk) p.push(`공격 ${st.atk}`);
@@ -222,9 +227,10 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain }) {
                   <div key={it.uid} className="text-center" style={{ color: gradeOf(it.grade).color }}>획득: {E.itemName(it)} ({gradeOf(it.grade).label})</div>
                 ))}
                 {summary.autoDismantled ? <div className="text-center" style={{ color: PALETTE.textDim }}>가방이 가득 차 {summary.autoDismantled}개 자동 분해</div> : null}
-                {summary.recruit && <div className="text-center font-semibold" style={{ color: '#9fd18a' }}>✚ {chronicleClass(summary.recruit).name}이(가) 동료가 되었다!</div>}
+                {summary.recruit && <div className="text-center font-semibold" style={{ color: '#9fd18a' }}>✚ {iga(chronicleClass(summary.recruit).name)} 동료가 되었다!</div>}
                 {summary.unlocks.map(u => <div key={u} className="text-center" style={{ color: '#9cc4e4' }}>🔓 {u} 개방</div>)}
                 {summary.dungeonClear && <div className="text-center font-semibold" style={{ color: '#c08ae8' }}>던전 정복!</div>}
+                {(summary.questsDone || []).map(t => <div key={t} className="text-center font-semibold" style={{ color: PALETTE.dawn }}>📜 의뢰 완료: {t} — 게시판에서 보상</div>)}
               </div>
             ) : (
               <div className="mt-1 text-center" style={{ fontSize: 12.5, color: PALETTE.textDim }}>
@@ -252,10 +258,13 @@ function TownView({ save, go, onExit }) {
   const hero = save.units[save.hero];
   const alertParty = Object.values(save.units).some(u => u.points > 0 || u.sp > 0);
   const nextField = CHRONICLE_FIELDS.find(f => !save.progress.bossCleared[f.id]);
+  const main = Q.currentMainQuest(save);
   const goal = nextField
-    ? `${nextField.name} — 처치 ${Math.min(save.progress.fieldKills[nextField.id] || 0, nextField.bossKills)}/${nextField.bossKills} 후 보스`
-    : '모든 지역 정복! 던전에서 에픽 장비를 노리자';
+    ? `${main ? `[${main.title}] ` : ''}${nextField.name} — 처치 ${Math.min(save.progress.fieldKills[nextField.id] || 0, nextField.bossKills)}/${nextField.bossKills} 후 보스`
+    : main ? `[${main.title}] 보상을 받으러 게시판으로` : '1부 완결! 던전에서 에픽 장비를 노리자';
+  const qBadge = Q.questBadgeCount(save);
   const tiles = [
+    { id: 'quests', icon: '📜', label: '의뢰 게시판', sub: qBadge ? `새 소식 ${qBadge}건` : '메인 · 의뢰 · 이야기', badge: qBadge > 0 },
     { id: 'field', icon: '⚔', label: '사냥터', sub: '몹 사냥 · 보스' },
     { id: 'dungeon', icon: '🕳', label: '던전', sub: E.dungeonUnlocked(save) ? CHRONICLE_DUNGEON.name : '죽은 자의 숲 보스 후 개방', locked: !E.dungeonUnlocked(save) },
     { id: 'party', icon: '👥', label: '파티 · 성장', sub: '능력치 · 스킬 · 장비', badge: alertParty },
@@ -309,8 +318,9 @@ function TownView({ save, go, onExit }) {
 }
 
 // ===== 사냥터 =====
-function FieldView({ save, onBack, onFight }) {
+function FieldView({ save, onBack, onFight, playScene, sceneOpen }) {
   const [sel, setSel] = useState(() => [...CHRONICLE_FIELDS].reverse().find(f => E.fieldUnlocked(save, f.id))?.id || 1);
+  useEffect(() => { if (!sceneOpen) playScene({ at: 'field', fieldId: sel }); }, [sel, sceneOpen]); // eslint-disable-line react-hooks/exhaustive-deps
   const f = CHRONICLE_FIELDS[sel - 1];
   const kills = save.progress.fieldKills[f.id] || 0;
   const bossReady = kills >= f.bossKills;
@@ -345,7 +355,7 @@ function FieldView({ save, onBack, onFight }) {
           <div className="mt-1"><Bar v={Math.min(kills, f.bossKills)} max={f.bossKills} color={f.color} h={6} /></div>
           <div className="mt-2" style={{ fontSize: 11.5, color: PALETTE.textDim, lineHeight: 1.5 }}>
             출몰: 일반 {f.normals.length}종 · 강적 {Math.round(CHRONICLE_TUNING.eliteChance * 100)}% 확률<br />
-            {cleared ? '보스 처치 완료 — 재도전 가능 (희귀 장비 확정)' : nextComp && !save.units[nextComp] ? `보스를 쓰러뜨리면 ${chronicleClass(nextComp).name}이(가) 동료가 된다` : '보스를 쓰러뜨리면 다음 지역이 열린다'}
+            {cleared ? '보스 처치 완료 — 재도전 가능 (희귀 장비 확정)' : nextComp && !save.units[nextComp] ? `보스를 쓰러뜨리면 ${iga(chronicleClass(nextComp).name)} 동료가 된다` : '보스를 쓰러뜨리면 다음 지역이 열린다'}
           </div>
         </GlassPanel>
         <UIButton onClick={() => onFight(f, false)}>사냥 시작</UIButton>
@@ -725,6 +735,114 @@ function TitleView({ save, onStart, onContinue, onExit }) {
   );
 }
 
+// ===== 이야기 장면 =====
+function speakerOf(save, sp) {
+  if (sp === 'narr') return { name: '', img: null, color: PALETTE.textDim };
+  if (sp === 'hero') { const c = chronicleClass(save.hero); return { name: c.name, img: c.image, color: c.color }; }
+  if (NPCS[sp]) return { name: NPCS[sp].name, icon: NPCS[sp].icon, color: NPCS[sp].color };
+  if (CHRONICLE_CLASSES.some(c => c.id === sp)) { const c = chronicleClass(sp); return { name: c.name, img: c.image, color: c.color }; }
+  if (ENEMIES[sp]) return { name: ENEMIES[sp].name, img: chronicleEnemyArt(sp), color: '#e06a5f' };
+  return { name: sp, color: PALETTE.text };
+}
+function SceneView({ save, scene, onEnd }) {
+  const [i, setI] = useState(0);
+  const line = scene.lines[i];
+  const who = speakerOf(save, line.sp);
+  const bg = scene.id === 'ending' && save.hero !== 'priest' ? `./classes/${save.hero}win.jpg` : scene.bg;
+  const next = () => (i + 1 < scene.lines.length ? setI(i + 1) : onEnd());
+  return (
+    <div className="absolute inset-0 z-40 flex flex-col" style={{ background: '#050304' }} onClick={next}>
+      {bg && <img src={bg} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ opacity: 0.55 }} draggable={false} />}
+      <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, #050304aa 0%, transparent 30%, #050304ee 72%)' }} />
+      <div className="relative flex items-center px-4 pt-4">
+        <div className="flex-1" style={{ fontSize: 11, letterSpacing: '0.3em', color: PALETTE.dawn }}>{scene.title}</div>
+        <button onClick={(e) => { e.stopPropagation(); onEnd(); }} className="ui-press" style={{ fontSize: 12, padding: '6px 12px', borderRadius: 999, border: '1px solid var(--ui-line-strong)', color: PALETTE.textDim, background: '#0008' }}>건너뛰기 ⏭</button>
+      </div>
+      <div className="flex-1" />
+      <div className="relative px-4 pb-6">
+        <div key={i} className="ui-screen-enter" style={{ padding: '14px 16px', borderRadius: 18, background: 'rgba(12,7,9,0.88)', border: `1px solid ${line.sp === 'narr' ? 'var(--ui-line)' : who.color + '88'}`, minHeight: 130 }}>
+          {line.sp !== 'narr' && (
+            <div className="flex items-center gap-2 mb-2">
+              {who.img ? <img src={who.img} alt="" className="object-cover" style={{ width: 40, height: 40, borderRadius: 12, border: `1px solid ${who.color}` }} /> : <span style={{ fontSize: 26 }}>{who.icon}</span>}
+              <span className="font-semibold" style={{ fontSize: 14, color: who.color }}>{who.name}</span>
+            </div>
+          )}
+          <div style={{ fontSize: 14.5, lineHeight: 1.7, color: line.sp === 'narr' ? '#cbbba6' : PALETTE.text, fontStyle: line.sp === 'narr' ? 'italic' : 'normal' }}>{line.t}</div>
+          <div className="text-right mt-2" style={{ fontSize: 11, color: PALETTE.textDim }}>{i + 1}/{scene.lines.length} · 눌러서 계속 ▸</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ===== 의뢰 게시판 =====
+const Q_KIND = { main: { label: '메인', color: '#e8b04a' }, side: { label: '의뢰', color: '#9cc4e4' }, companion: { label: '동료', color: '#9fd18a' } };
+function QuestCard({ save, item, onAccept, onClaim, onAbandon }) {
+  const { q, status, prog } = item;
+  const k = Q_KIND[q.kind];
+  return (
+    <div style={{ padding: 12, borderRadius: 14, background: status === 'done' ? 'rgba(232,176,74,0.08)' : 'rgba(255,255,255,0.03)', border: `1px solid ${status === 'done' ? PALETTE.legendary : 'var(--ui-line)'}` }}>
+      <div className="flex items-center gap-2">
+        <span style={{ fontSize: 10.5, padding: '1px 7px', borderRadius: 999, color: k.color, border: `1px solid ${k.color}66` }}>{k.label}</span>
+        <span className="flex-1 font-semibold truncate" style={{ fontSize: 13.5, color: status === 'claimed' ? PALETTE.textDim : PALETTE.text }}>{q.title}</span>
+        {q.kind === 'companion' && <Portrait cid={q.req.companion} size={26} />}
+      </div>
+      <div className="mt-1" style={{ fontSize: 12, color: PALETTE.textDim, lineHeight: 1.5 }}>{q.desc}</div>
+      {(status === 'active' || status === 'done') && (
+        <div className="mt-2 flex items-center gap-2">
+          <div className="flex-1"><Bar v={prog.cur} max={prog.max} color={status === 'done' ? PALETTE.legendary : '#9cc4e4'} h={6} /></div>
+          <span style={{ fontSize: 11.5, color: PALETTE.text }}>{Math.max(0, prog.cur)}/{prog.max}</span>
+        </div>
+      )}
+      <div className="mt-1.5" style={{ fontSize: 11.5, color: PALETTE.legendary }}>보상: {Q.rewardText(q.reward)}</div>
+      {status === 'available' && <UIButton variant="ghost" style={{ height: 38, marginTop: 8 }} onClick={onAccept}>수락</UIButton>}
+      {status === 'done' && <UIButton style={{ height: 38, marginTop: 8 }} onClick={onClaim}>보상 받기</UIButton>}
+      {status === 'active' && q.kind !== 'main' && (
+        <button onClick={onAbandon} className="ui-press mt-1" style={{ fontSize: 11, color: PALETTE.textDim, background: 'transparent', border: 'none', padding: '4px 0' }}>포기하기</button>
+      )}
+    </div>
+  );
+}
+function QuestView({ save, setSave, onBack, flash, onReplay }) {
+  const [tab, setTab] = useState('board');
+  const list = Q.questList(save);
+  const order = { done: 0, active: 1, available: 2 };
+  const shown = list.filter(x => order[x.status] != null).sort((a, b) => order[a.status] - order[b.status] || (a.q.kind === 'main' ? -1 : 0));
+  const claimed = list.filter(x => x.status === 'claimed');
+  const seen = Q.seenScenes(save);
+  return (
+    <div className="absolute inset-0 flex flex-col">
+      <Header title="의뢰 게시판" onBack={onBack} right={<Wallet save={save} />} />
+      <div className="flex gap-1.5 px-3 pt-2 flex-none">
+        {[['board', `게시판 ${shown.length}`], ['done', `완료 ${claimed.length}`], ['story', '지난 이야기']].map(([id, label]) => (
+          <button key={id} onClick={() => setTab(id)} className="ui-press flex-1" style={{ height: 36, borderRadius: 10, fontSize: 12, border: `1px solid ${tab === id ? PALETTE.legendary : 'var(--ui-line)'}`, color: tab === id ? PALETTE.legendary : PALETTE.text, background: 'transparent' }}>{label}</button>
+        ))}
+      </div>
+      <div className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-2">
+        {tab === 'board' && shown.map(item => (
+          <QuestCard key={item.q.id} save={save} item={item}
+            onAccept={() => { setSave(Q.acceptQuest(save, item.q.id)); flash(`「${item.q.title}」 수락`); }}
+            onAbandon={() => setSave(Q.abandonQuest(save, item.q.id))}
+            onClaim={() => {
+              const r = Q.claimQuest(save, item.q.id, Math.random);
+              setSave(r.save);
+              flash(r.gained?.item ? `보상 수령 — ${E.itemName(r.gained.item)} 획득` : '보상 수령!');
+            }} />
+        ))}
+        {tab === 'board' && !shown.length && <div className="text-center py-10" style={{ fontSize: 12.5, color: PALETTE.textDim }}>지금 받을 수 있는 의뢰가 없습니다 — 새 지역을 열면 의뢰가 붙습니다</div>}
+        {tab === 'done' && claimed.map(item => <QuestCard key={item.q.id} save={save} item={item} />)}
+        {tab === 'story' && seen.map(sc => (
+          <button key={sc.id} onClick={() => onReplay(sc)} className="ui-press text-left" style={{ padding: 12, borderRadius: 14, border: '1px solid var(--ui-line)', background: 'rgba(255,255,255,0.03)' }}>
+            <div className="font-semibold" style={{ fontSize: 13.5, color: PALETTE.text }}>{sc.title}</div>
+            <div className="truncate" style={{ fontSize: 11.5, color: PALETTE.textDim }}>{sc.lines[0].t}</div>
+          </button>
+        ))}
+        {tab === 'story' && !seen.length && <div className="text-center py-10" style={{ fontSize: 12.5, color: PALETTE.textDim }}>아직 본 이야기가 없습니다</div>}
+      </div>
+    </div>
+  );
+}
+
 // ===== 메인 =====
 export default function ChronicleGame({ onExit }) {
   const [save, setSaveState] = useState(loadSave);
@@ -732,6 +850,7 @@ export default function ChronicleGame({ onExit }) {
   const [battle, setBattle] = useState(null);
   const [repeat, setRepeat] = useState(false);
   const [toast, setToast] = useState(null);
+  const [scene, setScene] = useState(null); // { scene, replay, after }
   const lastFieldRef = useRef(null);
   const rng = Math.random;
 
@@ -739,16 +858,38 @@ export default function ChronicleGame({ onExit }) {
   const setSave = (next) => setSaveState(next);
   const flash = (msg) => { setToast(msg); setTimeout(() => setToast(t => (t === msg ? null : t)), 1600); };
 
+  // 이야기 — 조건에 맞는 장면이 있으면 띄우고 true
+  const playScene = (ctx, after = null) => {
+    if (!save || scene) return false;
+    const sc = Q.nextScene(save, ctx);
+    if (!sc) return false;
+    setScene({ scene: sc, after });
+    return true;
+  };
+  const endScene = () => {
+    const cur = scene;
+    setScene(null);
+    if (!cur) return;
+    if (!cur.replay) setSave(Q.markSceneSeen(save, cur.scene));
+    if (cur.after) cur.after();
+  };
+  // 마을에 있을 때 밀린 장면 (서장 · 보스 처치 후 · 동료 합류 · 던전 개방 · 종장)
+  useEffect(() => {
+    if (view === 'town' && save && !scene && !battle) playScene({ at: 'town' });
+  }, [view, save, scene, battle]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // 전투 시작: 끝까지 계산 → 저장 반영 → 재생
   const fightField = (field, boss) => {
+    if (boss && playScene({ at: 'bossPre', fieldId: field.id }, () => flash('준비되면 「보스 도전」을 누르세요'))) return; // 보스 앞 장면 먼저 (저장 반영 후 다시 도전)
     lastFieldRef.current = field;
     const enc = E.rollFieldEncounter(field, rng, boss, E.partyLevel(save));
     const party = E.partyCombatants(save);
     const sim = E.simulateChronicleBattle(party, enc.enemies, rng);
     const ctx = { kind: 'field', fieldId: field.id, type: enc.type, enemies: enc.enemies, label: boss ? `${field.name} 보스` : field.name };
     const r = E.applyBattle(save, ctx, sim, rng);
+    r.summary.questsDone = Q.newlyDoneQuests(save, r.save);
     setSave(r.save);
-    if (boss || sim.result !== 'win') setRepeat(false);
+    if (boss || sim.result !== 'win' || r.summary.questsDone.length) setRepeat(false);
     setBattle({ sim, enemies: enc.enemies, party, summary: r.summary, ctx, key: Date.now() });
     setView('battle');
   };
@@ -760,6 +901,7 @@ export default function ChronicleGame({ onExit }) {
     const sim = E.simulateChronicleBattle(party, enc.enemies, rng);
     const ctx = { kind: 'dungeon', type: enc.type, enemies: enc.enemies, label: `${CHRONICLE_DUNGEON.name} ${CHRONICLE_DUNGEON.floors[d.floor].boss ? '보스' : `${d.floor + 1}층`}` };
     const r = E.applyBattle(save, ctx, sim, rng);
+    r.summary.questsDone = Q.newlyDoneQuests(save, r.save);
     setSave(r.save);
     setBattle({ sim, enemies: enc.enemies, party, summary: r.summary, ctx, key: Date.now() });
     setView('battle');
@@ -777,7 +919,7 @@ export default function ChronicleGame({ onExit }) {
     content = (
       <TitleView save={save} onExit={onExit}
         onContinue={() => setView('town')}
-        onStart={(cid) => { setSave(E.newChronicleSave(cid)); setView('town'); }} />
+        onStart={(cid) => { setSave(Q.ensureQuestFields(E.newChronicleSave(cid))); setView('town'); }} />
     );
   } else if (view === 'battle' && battle) {
     content = (
@@ -786,7 +928,9 @@ export default function ChronicleGame({ onExit }) {
         onAgain={() => lastFieldRef.current && fightField(lastFieldRef.current, false)} />
     );
   } else if (view === 'field') {
-    content = <FieldView save={save} onBack={() => { setRepeat(false); setView('town'); }} onFight={fightField} />;
+    content = <FieldView save={save} onBack={() => { setRepeat(false); setView('town'); }} onFight={fightField} playScene={playScene} sceneOpen={!!scene} />;
+  } else if (view === 'quests') {
+    content = <QuestView save={save} setSave={setSave} onBack={() => setView('town')} flash={flash} onReplay={(sc) => setScene({ scene: sc, replay: true })} />;
   } else if (view === 'dungeon') {
     content = (
       <DungeonView save={save} onBack={() => setView('town')}
@@ -807,6 +951,7 @@ export default function ChronicleGame({ onExit }) {
   return (
     <div className="absolute inset-0" style={{ background: PALETTE.bg, fontFamily: '"Noto Serif KR", serif', color: PALETTE.text }}>
       <div key={view} className="ui-screen-enter absolute inset-0">{content}</div>
+      {scene && <SceneView key={scene.scene.id} save={save} scene={scene.scene} onEnd={endScene} />}
       {toast && (
         <div className="absolute left-1/2 z-50 pointer-events-none" style={{ bottom: 90, transform: 'translateX(-50%)', padding: '8px 14px', borderRadius: 999, background: '#000d', border: '1px solid var(--ui-line-strong)', color: PALETTE.legendary, fontSize: 12.5, whiteSpace: 'nowrap' }}>{toast}</div>
       )}

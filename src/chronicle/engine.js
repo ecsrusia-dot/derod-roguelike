@@ -62,8 +62,9 @@ export function newChronicleSave(heroClassId) {
   return {
     v: 1, hero: heroClassId, units: { [heroClassId]: hero }, party: [heroClassId],
     gold: 50, mats: { essence: 0, shard: 0 }, inventory: [], nextUid: 1,
-    progress: { fieldKills: {}, bossCleared: {}, dungeonClears: 0 },
-    dungeon: null, stats: { battles: 0, kills: 0, epics: 0 }, createdAt: Date.now(),
+    progress: { fieldKills: {}, bossCleared: {}, dungeonClears: 0, killsByKey: {} },
+    dungeon: null, stats: { battles: 0, kills: 0, elites: 0, epics: 0 }, createdAt: Date.now(),
+    quests: {}, story: { seen: {}, recruitSeen: {} },
   };
 }
 
@@ -553,6 +554,10 @@ export function applyBattle(save0, ctx, battle, rng = Math.random) {
     return { save, summary };
   }
   save.stats.kills += ctx.enemies.length;
+  // 의뢰용 카운터 (1.206.0)
+  save.progress.killsByKey = save.progress.killsByKey || {};
+  for (const e of ctx.enemies) save.progress.killsByKey[e.key] = (save.progress.killsByKey[e.key] || 0) + 1;
+  save.stats.elites = (save.stats.elites || 0) + ctx.enemies.filter(e => e.tier === 'elite').length;
   const r = battleRewards(ctx.enemies, ctx.type, rng);
   summary.exp = r.exp; summary.gold = r.gold; summary.essence = r.essence; summary.shard = r.shard;
   save.gold += r.gold; save.mats.essence += r.essence; save.mats.shard += r.shard;
