@@ -18,7 +18,7 @@ export const CHRONICLE_SAVE_KEY = 'dnt_chronicle_v2';    // 2.0 계정 저장
 export const CHRONICLE_TUNING = {
   pointsPerLevel: 4,          // 레벨업당 능력치 포인트
   spPerLevel: 1,              // 레벨업당 스킬 포인트
-  maxLevel: 60,
+  maxLevel: 100,              // 1.211.0 2부 — 지역 9곳, 마지막 보스 Lv.100
   expNeed: (lv) => Math.round(30 * Math.pow(lv, 1.6)),
   enemyHpBase: 30, enemyHpPerLv: 14,     // 일반 적 HP = (30 + 14×Lv) × 개성 × 등급 × 지역
   enemyAtkBase: 9, enemyAtkPerLv: 3.6,   // 일반 적 공격 = (9 + 3.6×Lv) × …
@@ -27,7 +27,7 @@ export const CHRONICLE_TUNING = {
   soloHp: 0.9, soloAtk: 1.3, soloGrowth: 0.055, expMult: 3,
   defK: 60,                   // 받는 피해 = raw × K/(K+방어)
   critMult: 1.6,
-  maxRounds: 40,
+  maxRounds: 50,
   eliteChance: 0.12,
   fieldDefeatGoldLoss: 0.1,
   inventoryMax: 40,           // 캐릭터 개인 가방
@@ -85,7 +85,7 @@ export const CHRONICLE_SKILLS = {
   p_heal: S('p_heal', 'priest', '치유의 빛', 'heal', 1, 2, 1.5, 0.15),
   p_bless: S('p_bless', 'priest', '축복', 'buffAtk', 3, 5, 0.15, 0.04, { turns: 3 }),
   p_shield: S('p_shield', 'priest', '가호', 'shield', 5, 5, 1.2, 0.2),
-  p_light: S('p_light', 'priest', '신성 광선', 'strike', 8, 3, 1.6, 0.15),
+  p_light: S('p_light', 'priest', '신성 광선', 'strike', 8, 3, 1.9, 0.18),
   // ── 1.207.0 후반 스킬 (Lv.15 · Lv.25) — 남는 스킬 포인트 해소
   w_flash: S('w_flash', 'wanderer', '일섬', 'strike', 15, 3, 2.6, 0.25),
   w_unyield: S('w_unyield', 'wanderer', '불굴', 'passive', 25, 0, 0, 0, { fx: (lv) => ({ hpPct: 0.05 * lv, defPct: 0.04 * lv }) }),
@@ -147,11 +147,27 @@ export function describeSkill(s, lv = 1) {
 
 // ===== 사냥터 · 던전 =====
 const mob = (chapter, tier) => Object.entries(ENEMIES).filter(([, e]) => e.chapter === chapter && e.tier === tier).map(([k]) => k);
+// 2부 지역은 챔피언십 컨셉 적 16종(일반 8 · 강적 4)을 그대로 쓴다
+const champMob = (concept, tier) => Object.entries(ENEMIES).filter(([, e]) => typeof e.chapter === 'string' && e.chapter.startsWith(`${concept}_`) && e.tier === tier).map(([k]) => k);
+const champField = (id, name, concept, lv, bossLv, bossKills, color, boss) => ({
+  id, part: 2, concept, name, lv, bossLv, bossKills, area: { hpMult: 1, atkMult: 1 }, color,
+  normals: champMob(concept, 'normal'), elites: champMob(concept, 'elite'), boss,
+});
+export const CHRONICLE_PARTS = [
+  { id: 1, name: '1부 · 끝나지 않는 황혼', fields: [1, 2, 3, 4] },
+  { id: 2, name: '2부 · 여명의 배신', fields: [5, 6, 7, 8, 9] },
+];
 export const CHRONICLE_FIELDS = [
   { id: 1, name: '북부 극지대', lv: [1, 12], bossLv: 14, bossKills: 30, area: { hpMult: 1, atkMult: 1 }, color: '#7ba3c4', normals: mob(1, 'normal'), elites: mob(1, 'elite'), boss: 'iceMage' },
   { id: 2, name: '죽은 자의 숲', lv: [12, 24], bossLv: 26, bossKills: 50, area: { hpMult: 1, atkMult: 1 }, color: '#7a9a5e', normals: mob(2, 'normal'), elites: mob(2, 'elite'), boss: 'twilightChild' },
   { id: 3, name: '봉인된 신전', lv: [24, 36], bossLv: 38, bossKills: 70, area: { hpMult: 1, atkMult: 1 }, color: '#d4a574', normals: mob(3, 'normal'), elites: mob(3, 'elite'), boss: 'oblivionSealer' },
   { id: 4, name: '마계의 균열', lv: [36, 48], bossLv: 50, bossKills: 90, area: { hpMult: 1, atkMult: 1 }, color: '#c4453d', normals: mob(4, 'normal'), elites: mob(4, 'elite'), boss: 'nakzelionShadow' },
+  // ── 2부 「여명의 배신」 (1.211.0) — 4지역 보스 처치 후 순서대로 개방
+  champField(5, '되살아난 동토', 'frost', [48, 58], 60, 100, '#9cc4e4', 'champ_frost_boss3'),
+  champField(6, '광란의 숲', 'forest', [58, 68], 70, 110, '#9fd18a', 'champ_forest_witch'),
+  champField(7, '봉인 성역', 'sanctum', [68, 78], 80, 120, '#e3c27a', 'champ_sanctum_boss4'),
+  champField(8, '핏빛 균열', 'rift', [78, 88], 90, 130, '#e0574c', 'champ_rift_boss4'),
+  champField(9, '여명의 첨탑', 'dawn', [88, 98], 100, 150, '#fff1c4', 'champ_dawn_boss4'),
 ];
 // 던전 (1.208.0 — 2곳 × 난이도 3단계). set = 에픽 장비 이름 세트
 export const CHRONICLE_DUNGEONS = [

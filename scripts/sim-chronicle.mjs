@@ -5,6 +5,7 @@ import * as E from '../src/chronicle/engine.js';
 import { CHRONICLE_FIELDS, CHRONICLE_CLASSES, CHRONICLE_SKILLS } from '../src/chronicle/data.js';
 function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const N = +process.argv[2] || 10;
+const LAST = CHRONICLE_FIELDS[CHRONICLE_FIELDS.length - 1].id;
 
 function upkeep(save) {
   const cid = save.hero;
@@ -30,9 +31,9 @@ function run(classId, seed) {
   let save = E.newChronicleSave(classId);
   const log = {}; const wr = { normal: [0, 0], elite: [0, 0], boss: [0, 0] }; let hpLoss = [];
   let battles = 0; const failLv = {}; // 보스 패배 시 1레벨 더 올리고 재도전 (사람처럼)
-  while (battles < 3000) {
-    if (save.progress.bossCleared[4]) break;
-    const fid = [4, 3, 2, 1].find(f => E.fieldUnlocked(save, f));
+  while (battles < 6000) {
+    if (save.progress.bossCleared[LAST]) break;
+    const fid = CHRONICLE_FIELDS.map(f => f.id).reverse().find(f => E.fieldUnlocked(save, f));
     const field = CHRONICLE_FIELDS[fid - 1];
     save = upkeep(save);
     const lv = save.units[classId].lv;
@@ -56,5 +57,5 @@ for (const c of CHRONICLE_CLASSES) {
   const rs = []; for (let i = 0; i < N; i++) rs.push(run(c.id, i * 97 + 3));
   const med = (f) => { const v = rs.map(f).filter(x => x != null).sort((a, b) => a - b); return v.length ? v[Math.floor(v.length / 2)] : '-'; };
   const rate = (t) => { const w = rs.reduce((s, r) => s + r.wr[t][0], 0); const n = rs.reduce((s, r) => s + r.wr[t][1], 0); return n ? Math.round(w / n * 100) + '%' : '-'; };
-  console.log(`${c.name.padEnd(7)} | ` + [1, 2, 3, 4].map(f => `보스${f} ${med(r => r.log[f]?.battles)}전 Lv${med(r => r.log[f]?.lv)}`).join(' | ') + ` | 완주 ${rs.filter(r => r.log[4]).length}/${N} | 승률 일반 ${rate('normal')}(HP-${med(r => r.hpLoss)}%) 강적 ${rate('elite')} 보스 ${rate('boss')}`);
+  console.log(`${c.name.padEnd(7)} | ` + CHRONICLE_FIELDS.map(f => f.id).map(f => `보스${f} ${med(r => r.log[f]?.battles)}전 Lv${med(r => r.log[f]?.lv)}`).join(' | ') + ` | 완주 ${rs.filter(r => r.log[LAST]).length}/${N} | 승률 일반 ${rate('normal')}(HP-${med(r => r.hpLoss)}%) 강적 ${rate('elite')} 보스 ${rate('boss')}`);
 }

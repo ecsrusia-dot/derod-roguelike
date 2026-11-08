@@ -12,6 +12,7 @@
 export const NPCS = {
   elder: { name: '촌장 하르덴', icon: '🕯', color: '#d4a574' },
   narr: { name: '', icon: '', color: '#9b8975' },
+  herald: { name: '여명의 전령 세라엘', icon: '✦', color: '#f3e3a8' },
 };
 
 const bossDone = (s, f) => !!s.progress.bossCleared[f];
@@ -147,6 +148,151 @@ export const SCENES = [
       { sp: 'narr', t: '해를 삼킨 자의 본체는 아직 어딘가에 잠들어 있다. 이야기는 계속된다. — 1부 끝' },
     ],
   },
+  // ───────── 2부 「여명의 배신」 (1.211.0) ─────────
+  {
+    id: 'p2_prologue', title: '2부 서장 — 너무 밝은 아침', bg: './enemies/championship/dawn/champ_dawn_boss1_intro.jpg',
+    when: (s, c) => bossDone(s, 4) && !!s.story.seen.ending && c.at === 'town',
+    lines: [
+      { sp: 'narr', t: '여명이 돌아온 지 이레. 해는 지지 않았다. 밤이 오지 않는 하늘 아래, 사람들은 잠드는 법을 잊어 갔다.' },
+      { sp: 'narr', t: '여드레째 아침, 마을 광장에 빛으로 된 날개가 내려앉았다.' },
+      { sp: 'herald', t: '황혼의 땅에 사는 자들이여. 여명의 신께서 너희의 수고를 치하하신다.' },
+      { sp: 'herald', t: '그림자를 걷어 낸 대가로, 이 땅을 「정화」하겠노라. 흠 있는 것, 어두운 것, 늙고 병든 것은 모두 빛 속에 녹아 사라지리라.' },
+      { sp: 'elder', t: '…정화라니. 그건 우리 모두를 말하는 게 아닌가.' },
+      { sp: 'hero', t: '우리가 되찾은 건 여명이 아니었던 건가.' },
+      { sp: 'elder', t: '북쪽이 다시 얼어붙고 있다는 소식이 왔네. 이번엔 빛 때문에. 자네가 쓰러뜨린 서리가… 되살아났어.' },
+    ],
+  },
+  {
+    id: 'f5_enter', title: '되살아난 동토', bg: './enemies/championship/frost/champ_frost_boss3_intro.jpg',
+    when: (s, c) => c.at === 'field' && c.fieldId === 5,
+    lines: [
+      { sp: 'narr', t: '하얀 태양 아래서 얼음이 자란다. 녹아야 할 눈이 빛을 받을수록 더 단단해진다.' },
+      { sp: 'hero', t: '이 냉기는 마녀의 것과 달라. 따뜻한 빛이 얼음을 만들고 있어.' },
+    ],
+  },
+  {
+    id: 'f5_boss', title: '협곡의 한기룡', bg: './enemies/championship/frost/champ_frost_boss3_intro.jpg',
+    when: (s, c) => c.at === 'bossPre' && c.fieldId === 5,
+    lines: [
+      { sp: 'champ_frost_boss3', t: '나는 천 년을 잠들어 있었다. 빛이 나를 깨워 이렇게 속삭이더군 — 「흠 있는 것들을 얼려라」.' },
+      { sp: 'champ_frost_boss3', t: '너는 따뜻하구나, 작은 것아. 그러니 가장 먼저 얼어야겠지.' },
+    ],
+  },
+  {
+    id: 'f5_clear', title: '얼음 속의 편지', bg: './enemies/championship/frost/champ_frost_boss3_intro.jpg',
+    when: (s) => bossDone(s, 5),
+    lines: [
+      { sp: 'narr', t: '용이 쓰러진 자리, 녹지 않는 얼음 속에 낡은 편지 한 장이 갇혀 있었다.' },
+      { sp: 'narr', t: '「여명은 세상을 고치지 않는다. 다시 쓴다. — 첫 번째 봉인자」' },
+      { sp: 'hero', t: '첫 번째 봉인자… 신전의 그 봉인자들은, 여명을 막고 있었던 건가.' },
+    ],
+  },
+  {
+    id: 'f6_enter', title: '광란의 숲', bg: './enemies/championship/forest/chapter3/champ_forest_witch_intro.jpg',
+    when: (s, c) => c.at === 'field' && c.fieldId === 6,
+    lines: [
+      { sp: 'narr', t: '빛을 너무 많이 받은 숲은 미쳐 버렸다. 꽃은 피자마자 시들고, 나무는 서로의 뿌리를 졸라 죽인다.' },
+      { sp: 'hero', t: '어둠이 사라지자 쉴 곳도 사라졌어. 이 숲은 잠들지 못해서 미친 거야.' },
+    ],
+  },
+  {
+    id: 'f6_boss', title: '광기의 마녀', bg: './enemies/championship/forest/chapter3/champ_forest_witch_intro.jpg',
+    when: (s, c) => c.at === 'bossPre' && c.fieldId === 6,
+    lines: [
+      { sp: 'champ_forest_witch', t: '밤이 오지 않아. 밤이 오지 않아. 노래를 멈출 수가 없어.' },
+      { sp: 'champ_forest_witch', t: '네가 그림자를 죽였지? 그 그림자가 우리를 재워 주던 유일한 이불이었는데!' },
+    ],
+  },
+  {
+    id: 'f6_clear', title: '첫 번째 밤', bg: './enemies/championship/forest/chapter3/champ_forest_witch_intro.jpg',
+    when: (s) => bossDone(s, 6),
+    lines: [
+      { sp: 'narr', t: '마녀가 쓰러지며 손바닥만 한 어둠을 풀어 놓았다. 그 그늘 아래서, 숲은 백 일 만에 처음으로 잠들었다.' },
+      { sp: 'elder', t: '성역에서 온 순례자가 말하더군. 신전 깊은 곳에 「여명이 봉인한 자들」이 있다고.' },
+      { sp: 'hero', t: '여명이 봉인했다…? 신전은 마왕을 가둔 곳이 아니었어요?' },
+    ],
+  },
+  {
+    id: 'f7_enter', title: '봉인 성역', bg: './enemies/championship/sanctum/champ_sanctum_boss4_intro.jpg',
+    when: (s, c) => c.at === 'field' && c.fieldId === 7,
+    lines: [
+      { sp: 'narr', t: '금빛 돌로 지은 성역. 벽마다 사람의 얼굴이 새겨져 있고, 그 얼굴들은 모두 눈을 감고 있다.' },
+      { sp: 'hero', t: '이건 조각이 아니야… 봉인된 사람들이야.' },
+    ],
+  },
+  {
+    id: 'f7_boss', title: '절대봉인의 군주', bg: './enemies/championship/sanctum/champ_sanctum_boss4_intro.jpg',
+    when: (s, c) => c.at === 'bossPre' && c.fieldId === 7,
+    lines: [
+      { sp: 'champ_sanctum_boss4', t: '여기 잠든 자들은 모두 여명에 맞선 영웅이었다. 나는 그들을 지키는 것이 아니라 가두는 자다.' },
+      { sp: 'champ_sanctum_boss4', t: '신께서 명하셨다. 황혼을 사랑한 자는 영원히 눈뜨지 못하게 하라고.' },
+      { sp: 'hero', t: '그럼 나도 여기 새겨질 차례겠네. — 해 보시지.' },
+    ],
+  },
+  {
+    id: 'f7_clear', title: '눈을 뜬 영웅들', bg: './enemies/championship/sanctum/champ_sanctum_boss4_intro.jpg',
+    when: (s) => bossDone(s, 7),
+    lines: [
+      { sp: 'narr', t: '군주가 무너지자 벽의 얼굴들이 하나씩 눈을 떴다. 그들은 말없이 한 방향을 가리켰다 — 붉은 균열을.' },
+      { sp: 'narr', t: '「해를 삼킨 자는 해를 훔친 것이 아니다. 해가 세상을 태우지 못하게 가려 준 것이다.」' },
+      { sp: 'hero', t: '…그럼 내가 쓰러뜨린 그림자는, 우리를 지키던 쪽이었던 거야?' },
+    ],
+  },
+  {
+    id: 'f8_enter', title: '핏빛 균열', bg: './enemies/championship/rift/champ_rift_boss4_intro.jpg',
+    when: (s, c) => c.at === 'field' && c.fieldId === 8,
+    lines: [
+      { sp: 'narr', t: '닫혔던 균열이 빛에 찢겨 다시 열렸다. 마계는 불타고 있었다 — 하늘에서 쏟아지는 흰 불길에.' },
+      { sp: 'hero', t: '마족들이… 여명의 빛에 쫓기고 있어.' },
+    ],
+  },
+  {
+    id: 'f8_boss', title: '마왕의 화신', bg: './enemies/championship/rift/champ_rift_boss4_intro.jpg',
+    when: (s, c) => c.at === 'bossPre' && c.fieldId === 8,
+    lines: [
+      { sp: 'champ_rift_boss4', t: '내 그림자를 벤 것이 너로구나. 원망은 않는다. 너는 몰랐으니까.' },
+      { sp: 'champ_rift_boss4', t: '나는 천 년 동안 해를 가려 왔다. 이제 힘이 다했다. 마지막으로 묻겠다 — 네 검이 그 빛을 벨 수 있는지.' },
+      { sp: 'hero', t: '증명해 보이죠. 당신을 넘어서.' },
+    ],
+  },
+  {
+    id: 'f8_clear', title: '건네받은 밤', bg: './enemies/championship/rift/champ_rift_boss4_intro.jpg',
+    when: (s) => bossDone(s, 8),
+    lines: [
+      { sp: 'champ_rift_boss4', t: '…좋다. 그 검이라면 닿겠지. 내 밤을 가져가라. 첨탑 꼭대기에서, 해를 다시 가려라.' },
+      { sp: 'narr', t: '마왕의 몸이 검은 재가 되어 흩어졌다. 손에 남은 한 줌의 어둠이 차갑고, 이상하게 다정했다.' },
+      { sp: 'elder', t: '여명의 첨탑… 하늘과 땅을 잇는 그 탑에 신이 있다네. 돌아오게. 꼭 돌아와서, 밤 인사를 해 주게.' },
+    ],
+  },
+  {
+    id: 'f9_enter', title: '여명의 첨탑', bg: './enemies/championship/dawn/champ_dawn_boss4_intro.jpg',
+    when: (s, c) => c.at === 'field' && c.fieldId === 9,
+    lines: [
+      { sp: 'narr', t: '끝없는 계단. 한 층 오를 때마다 그림자가 짧아지고, 마침내 발밑의 그림자마저 사라진다.' },
+      { sp: 'herald', t: '돌아가라, 황혼의 아이야. 신께서는 너를 미워하지 않으신다. 다만 고쳐 쓰실 뿐이다.' },
+      { sp: 'hero', t: '고쳐 쓴 세상에 나는 없겠지. 그러니 사양할게.' },
+    ],
+  },
+  {
+    id: 'f9_boss', title: '여명의 신', bg: './enemies/championship/dawn/champ_dawn_boss4_intro.jpg',
+    when: (s, c) => c.at === 'bossPre' && c.fieldId === 9,
+    lines: [
+      { sp: 'champ_dawn_boss4', t: '황혼은 오류다. 저무는 것, 늙는 것, 끝나는 것 — 나는 그것을 지우려 했을 뿐이다.' },
+      { sp: 'champ_dawn_boss4', t: '너도 보았지. 밤이 없는 세상을. 그것이 완전함이다.' },
+      { sp: 'hero', t: '봤어. 아무도 잠들지 못하는 세상이었지. 끝나지 않는 건 완전한 게 아니야. 그냥 멈춘 거야.' },
+    ],
+  },
+  {
+    id: 'ending2', title: '종장 — 황혼과 여명 사이', bg: './enemies/championship/dawn/champ_dawn_boss4_intro.jpg',
+    when: (s) => bossDone(s, 9),
+    lines: [
+      { sp: 'narr', t: '신의 빛이 부서지는 순간, 손에 쥔 마왕의 밤이 하늘로 번져 나갔다. 해는 사라지지 않았다. 다만, 처음으로 기울었다.' },
+      { sp: 'narr', t: '그날 저녁, 대륙의 모든 하늘이 붉게 물들었다. 사람들은 그것을 더 이상 두려워하지 않았다.' },
+      { sp: 'elder', t: '해가 진다. …이렇게 아름다운 걸, 우린 왜 잊고 살았을까.' },
+      { sp: 'hero', t: '내일 또 뜰 테니까요. 지는 걸 알아야 뜨는 것도 반가운 거죠.' },
+      { sp: 'narr', t: '여명과 황혼이 번갈아 오는 세상. 그것이 이 연대기가 되찾은 전부였다. — 2부 끝' },
+    ],
+  },
   {
     id: 'dungeon_clear', title: '서리 왕의 무구', bg: './enemies/championship/frost/champ_frost_boss4_intro.jpg',
     when: (s) => (s.progress.dungeonClears || 0) >= 1,
@@ -233,6 +379,29 @@ export const QUESTS = [
   { id: 'd1', kind: 'side', req: { main: 'm2' }, title: '왕의 무덤', desc: '촌장: "서리 왕의 무덤 끝까지 내려가 보게."', goal: { type: 'dungeon', n: 1 }, reward: { gold: 600, shard: 3, keys: 2 } },
   { id: 'd2', kind: 'side', req: { main: 'm2' }, title: '전설의 무구', desc: '대장장이: "에픽 장비를 하나 손에 넣어 와. 내 눈으로 봐야겠어."', goal: { type: 'grade', grade: 'epic' }, reward: { gold: 1000, essence: 30 } },
 
+  // ── 2부 메인 (1.211.0)
+  { id: 'm5', kind: 'main', req: { main: 'm4' }, title: '되살아난 서리', desc: '빛에 깨어난 협곡의 한기룡을 쓰러뜨려라.', goal: { type: 'boss', field: 5 }, reward: { gold: 2500, essence: 30, shard: 4, keys: 2 } },
+  { id: 'm6', kind: 'main', req: { main: 'm5' }, title: '잠들지 못하는 숲', desc: '광란의 숲에서 노래를 멈추지 못하는 마녀를 쉬게 하라.', goal: { type: 'boss', field: 6 }, reward: { gold: 3500, essence: 40, shard: 5, item: { grade: 'epic' } } },
+  { id: 'm7', kind: 'main', req: { main: 'm6' }, title: '눈 감은 영웅들', desc: '봉인 성역의 군주를 쓰러뜨리고 갇힌 자들을 깨워라.', goal: { type: 'boss', field: 7 }, reward: { gold: 5000, essence: 50, shard: 6, keys: 3 } },
+  { id: 'm8', kind: 'main', req: { main: 'm7' }, title: '해를 가린 자', desc: '핏빛 균열 깊은 곳의 마왕을 만나 그 검을 증명하라.', goal: { type: 'boss', field: 8 }, reward: { gold: 7000, essence: 60, shard: 8, item: { grade: 'epic' } } },
+  { id: 'm9', kind: 'main', req: { main: 'm8' }, title: '황혼과 여명 사이', desc: '여명의 첨탑 꼭대기에서 신을 쓰러뜨리고 밤을 되돌려라.', goal: { type: 'boss', field: 9 }, reward: { gold: 12000, essence: 100, shard: 15, item: { grade: 'epic' } } },
+  // ── 2부 의뢰
+  { id: 's5a', kind: 'side', req: { field: 5 }, title: '빛의 서리', desc: '양치기 노인: "다시 늑대가 내려왔어. 이번엔 눈이 하얗게 빛나."', goal: { type: 'killKey', key: 'champ_frost_wolf', n: 15 }, reward: { gold: 1500, exp: 20000, essence: 15 } },
+  { id: 's5b', kind: 'side', req: { field: 5 }, title: '얼어붙은 망자', desc: '사냥꾼: "얼음 속에서 걸어 나오는 시체들… 내 형도 그 안에 있었어."', goal: { type: 'killKey', key: 'champ_frost_revenant', n: 15 }, reward: { gold: 1600, item: { grade: 'rare' }, keys: 1 } },
+  { id: 's5c', kind: 'side', req: { field: 5 }, title: '서리의 사도들', desc: '파수대장: "빙룡과 대마법사가 정찰대를 몰살시켰다."', goal: { type: 'elites', n: 6 }, reward: { gold: 2000, shard: 3, essence: 15 } },
+  { id: 's6a', kind: 'side', req: { field: 6 }, title: '잠들지 못한 짐승', desc: '나무꾼: "표범들이 밤낮없이 울부짖어. 차라리 편히 보내 줘."', goal: { type: 'killKey', key: 'champ_forest_leopard', n: 18 }, reward: { gold: 2000, exp: 30000, essence: 20 } },
+  { id: 's6b', kind: 'side', req: { field: 6 }, title: '가시 덩굴 살수', desc: '약초꾼: "덩굴이 사람을 사냥해요. 약초밭이 무덤이 됐어요."', goal: { type: 'killKey', key: 'champ_forest_thornling', n: 15 }, reward: { gold: 2200, item: { grade: 'rare' }, keys: 1 } },
+  { id: 's6c', kind: 'side', req: { field: 6 }, title: '광기의 우두머리', desc: '숲의 파수꾼: "광기에 물든 것 중에서도 가장 큰 놈들을 쓰러뜨려 주게."', goal: { type: 'elites', n: 7 }, reward: { gold: 2600, shard: 4, essence: 20 } },
+  { id: 's7a', kind: 'side', req: { field: 7 }, title: '봉인사의 열쇠', desc: '순례자: "봉인사들이 지닌 금 열쇠로 벽의 얼굴들을 풀 수 있을지도 몰라요."', goal: { type: 'killKey', key: 'champ_sanctum_acolyte', n: 20 }, reward: { gold: 2800, exp: 40000, essence: 25 } },
+  { id: 's7b', kind: 'side', req: { field: 7 }, title: '회랑의 감시자', desc: '학자: "감시자의 눈을 가져오게. 봉인 문자의 비밀이 거기 있을 걸세."', goal: { type: 'killKey', key: 'champ_sanctum_warden', n: 18 }, reward: { gold: 3000, item: { grade: 'rare' }, keys: 2 } },
+  { id: 's7c', kind: 'side', req: { field: 7 }, title: '봉인의 폭군들', desc: '깨어난 영웅: "우리를 가둔 자들의 장수들이 아직 성역을 돌고 있다."', goal: { type: 'elites', n: 8 }, reward: { gold: 3500, shard: 5, essence: 25 } },
+  { id: 's8a', kind: 'side', req: { field: 8 }, title: '도망치는 마족', desc: '깨어난 영웅: "빛에 쫓기는 마족들이 미쳐 날뛴다. 괴롭게 두지 마라."', goal: { type: 'killKey', key: 'champ_rift_devourer', n: 20 }, reward: { gold: 3800, exp: 60000, essence: 30 } },
+  { id: 's8b', kind: 'side', req: { field: 8 }, title: '균열의 암살자', desc: '파수대장: "암살자들이 우리 진영 안까지 들어왔다."', goal: { type: 'killKey', key: 'champ_rift_assassin', n: 20 }, reward: { gold: 4000, item: { grade: 'rare' }, keys: 2 } },
+  { id: 's8c', kind: 'side', req: { field: 8 }, title: '절대 사도', desc: '촌장: "마왕을 만나려면 그 앞을 지키는 사도들부터 넘어야 하네."', goal: { type: 'elites', n: 9 }, reward: { gold: 4500, shard: 6, essence: 30 } },
+  { id: 's9a', kind: 'side', req: { field: 9 }, title: '빛의 성전사', desc: '깨어난 영웅: "첨탑의 성전사들은 한때 우리 동료였다. 끝을 내 주게."', goal: { type: 'killKey', key: 'champ_dawn_paladin', n: 25 }, reward: { gold: 5000, exp: 80000, essence: 40 } },
+  { id: 's9b', kind: 'side', req: { field: 9 }, title: '여명의 신탁', desc: '학자: "신탁자들이 무엇을 예언하는지 알아야 하네."', goal: { type: 'killKey', key: 'champ_dawn_oracle', n: 22 }, reward: { gold: 5500, item: { grade: 'epic' }, keys: 2 } },
+  { id: 's9c', kind: 'side', req: { field: 9 }, title: '첨탑의 수호자들', desc: '촌장: "신에게 닿기 전에, 그 날개들을 하나씩 꺾게."', goal: { type: 'elites', n: 10 }, reward: { gold: 6000, shard: 8, essence: 40 } },
+  { id: 'g4', kind: 'side', req: { field: 6 }, title: '이름이 전설이 되다', desc: '촌장: "이제 자네 이름을 모르는 사람이 없네." — 주인공 Lv.75 달성', goal: { type: 'level', n: 75 }, reward: { gold: 5000, essence: 40, keys: 2 } },
   // ── 1.208.0 던전 확장
   { id: 'd3', kind: 'side', req: { main: 'm3' }, title: '광기의 심장', desc: '숲의 파수꾼: "숲 가장 깊은 곳에서 음악이 들린다네. 멈춰 주게."', goal: { type: 'dungeonTier', id: 'forestHeart', tier: 0 }, reward: { gold: 1500, shard: 4, essence: 20, keys: 2 } },
   { id: 'd4', kind: 'side', req: { main: 'm2' }, title: '영웅의 증명', desc: '대장장이: "무덤을 영웅 난이도로 끝까지 내려가면, 진짜 대장장이 일을 보여 주지."', goal: { type: 'dungeonTier', id: 'frostTomb', tier: 1 }, reward: { gold: 1200, shard: 5 } },
