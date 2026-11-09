@@ -1732,7 +1732,7 @@ function QuestView({ save, setSave, onBack, flash, onReplay }) {
 function huntRecord(sim, party, enc, summary) {
   const dmg = E.battleDamageStats(sim, party);
   const units = {};
-  for (const p of party) units[p.id] = { id: p.id, name: p.name, fam: !!p.fam, famKey: p.famKey, classId: p.classId, dmg: dmg.byUnit[p.id] || 0 };
+  for (const p of party) units[p.id] = { id: p.id, name: p.name, fam: !!p.fam, famKey: p.famKey, classId: p.classId, dmg: dmg.byUnit[p.id] || 0, heal: dmg.healBy[p.id] || 0, shield: dmg.shieldBy[p.id] || 0, taken: dmg.takenBy[p.id] || 0 };
   return {
     win: sim.result === 'win', type: enc.type, rounds: dmg.rounds,
     kills: sim.result === 'win' ? enc.enemies.reduce((m, e) => ({ ...m, [e.tier]: (m[e.tier] || 0) + 1 }), {}) : {},
@@ -1751,8 +1751,8 @@ function addHuntRecord(st, r) {
   for (const [k, v] of Object.entries(r.kills)) st.kills[k] = (st.kills[k] || 0) + v;
   for (const u of Object.values(r.units)) {
     const key = u.fam ? `fam:${u.famKey}` : u.id;
-    const cur = st.units[key] || { ...u, dmg: 0, rounds: 0 };
-    cur.dmg += u.dmg; cur.rounds += r.rounds;
+    const cur = st.units[key] || { ...u, dmg: 0, heal: 0, shield: 0, taken: 0, rounds: 0 };
+    cur.dmg += u.dmg; cur.heal = (cur.heal || 0) + (u.heal || 0); cur.shield = (cur.shield || 0) + (u.shield || 0); cur.taken = (cur.taken || 0) + (u.taken || 0); cur.rounds += r.rounds;
     st.units[key] = cur;
   }
   for (const [k, v] of Object.entries(r.skills)) {
@@ -1782,7 +1782,7 @@ function HuntReport({ report: r, onClose, title = '📊 사냥 보고서' }) {
           {r.types.gate ? <div style={row}><span>관문 전투</span><b>{r.types.gate}회</b></div> : null}
         </GlassPanel>
         <GlassPanel className="p-3">
-          <div className="font-semibold mb-2" style={{ fontSize: 13, color: PALETTE.text }}>기여도 · 라운드당 피해(DPS) 순위</div>
+          <div className="font-semibold mb-2" style={{ fontSize: 13, color: PALETTE.text }}>기여도 · 피해(DPS) 순위 + 회복 · 보호막 · 받아낸 피해</div>
           {units.map((u, i) => {
             const pct = Math.round(u.dmg / total * 100);
             const dps = Math.round(u.dmg / Math.max(1, u.rounds));
@@ -1794,6 +1794,11 @@ function HuntReport({ report: r, onClose, title = '📊 사냥 보고서' }) {
                   <div className="flex justify-between" style={{ fontSize: 12, color: PALETTE.text }}><span className="truncate">{u.fam ? `🐾 ${u.name}` : u.name}</span><span>{pct}%</span></div>
                   <Bar v={u.dmg} max={total} color={u.fam ? '#d07ae8' : PALETTE.legendary} h={6} />
                   <div style={{ fontSize: 11, color: PALETTE.textDim }}>총 {u.dmg.toLocaleString()} · 라운드당 {dps.toLocaleString()}</div>
+                  {(u.heal > 0 || u.shield > 0 || u.taken > 0) && <div style={{ fontSize: 11, color: PALETTE.textDim }}>
+                    {u.heal > 0 && <span style={{ color: '#8fe08a' }}>✚ 회복 {Math.round(u.heal).toLocaleString()} </span>}
+                    {u.shield > 0 && <span style={{ color: '#9cc4e4' }}>◈ 보호막 {Math.round(u.shield).toLocaleString()} </span>}
+                    {u.taken > 0 && <span style={{ color: '#e8b04a' }}>🛡 받아낸 피해 {Math.round(u.taken).toLocaleString()}</span>}
+                  </div>}
                 </div>
               </div>
             );

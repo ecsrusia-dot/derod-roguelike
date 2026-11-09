@@ -1000,8 +1000,9 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
         spiritHit(u, hits);
         if (s.kind === 'lifesteal' && r.d > 0) {
           const h = Math.round(r.d * s.steal);
+          const before = u.hp;
           u.hp = Math.min(u.maxHp, u.hp + h);
-          hits.push({ t: u.id, h });
+          hits.push({ t: u.id, h, eh: u.hp - before });
         }
         break;
       }
@@ -1029,16 +1030,16 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
       case 'heal': {
         const t = allies.slice().sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];
         const h = Math.round(u.healPower * v);
-        healUnit(t, h);
-        hits.push({ t: t.id, h });
+        const eh = healUnit(t, h);
+        hits.push({ t: t.id, h, eh });
         holyHit(u, h, hits);
         break;
       }
       case 'healAll':
-        for (const a of allies) { const h = Math.round(u.healPower * v); healUnit(a, h); hits.push({ t: a.id, h }); holyHit(u, h, hits); }
+        for (const a of allies) { const h = Math.round(u.healPower * v); const eh = healUnit(a, h); hits.push({ t: a.id, h, eh }); holyHit(u, h, hits); }
         break;
       case 'shield':
-        for (const a of allies) { const sh = Math.round(u.healPower * v); a.shield = Math.max(a.shield, sh); hits.push({ t: a.id, s: sh }); }
+        for (const a of allies) { const sh = Math.round(u.healPower * v); const es = Math.max(0, sh - a.shield); a.shield = Math.max(a.shield, sh); hits.push({ t: a.id, s: sh, es }); }
         break;
       case 'buffAtk':
         for (const a of allies) { a.buffs.bless = { v: v * (u.blessMult || 1), t: s.turns + (u.blessTurns || 0) }; hits.push({ t: a.id, buff: true }); }
@@ -1074,8 +1075,8 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
       case 'bigHeal': case 'healShield': case 'healBuff': {
         const t = allies.slice().sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];
         const h = Math.round(u.healPower * v);
-        healUnit(t, h); hits.push({ t: t.id, h });
-        if (s.kind === 'healShield') { const sh = Math.round(u.healPower * s.shieldV); t.shield = Math.max(t.shield, sh); hits.push({ t: t.id, s: sh }); }
+        const eh = healUnit(t, h); hits.push({ t: t.id, h, eh });
+        if (s.kind === 'healShield') { const sh = Math.round(u.healPower * s.shieldV); const es = Math.max(0, sh - t.shield); t.shield = Math.max(t.shield, sh); hits.push({ t: t.id, s: sh, es }); }
         if (s.kind === 'healBuff') for (const a of allies) { a.buffs.song = { v: s.buff, t: s.turns }; hits.push({ t: a.id, buff: true }); }
         break;
       }
@@ -1326,6 +1327,9 @@ export function leaveDungeon(save0) {
 export function battleDamageStats(sim, party) {
   const ids = new Set(party.map(p => p.id));
   const byUnit = {}; const bySkill = {};
+  // 지원 기여 (1.226.1) — 회복(실제 찬 HP) · 보호막(실제 증가량) · 받아낸 피해(적 공격·대신 맞기)
+  const healBy = {}; const shieldBy = {}; const takenBy = {};
+  const addTo = (m, id, v) => { if (ids.has(id) && v > 0) m[id] = (m[id] || 0) + v; };
   const add = (id, skill, d) => {
     if (!ids.has(id) || !(d > 0)) return;
     byUnit[id] = (byUnit[id] || 0) + d;
@@ -1335,12 +1339,14 @@ export function battleDamageStats(sim, party) {
     if (e.k === 'dotTick') { for (const [k, d] of Object.entries(e.dotSrc || {})) { const [id, sn] = k.split('|'); add(id, sn, d); } continue; }
     if (!e.a || !e.hits) continue;
     for (const h of e.hits) {
+      if (ids.has(e.a)) { addTo(healBy, e.a, h.eh ?? (e.k === 'hot' ? h.h : 0)); addTo(shieldBy, e.a, h.es || 0); }
+      else if (ids.has(h.t) && h.d > 0) addTo(takenBy, h.t, h.d);
       if (!(h.d > 0) || ids.has(h.t)) continue;
       if (h.counter) add(h.by, '반격', h.d);
       else add(e.a, h.chain ? `${e.n}(추가타)` : e.n, h.d);
     }
   }
-  return { byUnit, bySkill, rounds: sim.rounds || 1 };
+  return { byUnit, bySkill, healBy, shieldBy, takenBy, rounds: sim.rounds || 1 };
 }
 
 
