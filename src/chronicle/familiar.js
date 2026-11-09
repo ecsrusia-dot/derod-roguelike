@@ -102,6 +102,16 @@ export const FAM_SKILLS = {
 
 // 동행 스킬 상세 (1.217.0) — 효과 · 재사용 · 발동 조건 (engine chooseSkill 순서와 같은 말로)
 const FAM_SKILL_WHEN = {
+  duel: '도발당하지 않은 적이 있을 때 (최우선)',
+  warcry: '적이 2명 이상이거나 도발된 적이 없을 때 (최우선)',
+  cover: '주인공 HP가 85% 미만이고 보호 중이 아닐 때 (최우선)',
+  fortify: '주인공에게 방어 강화가 없을 때 (최우선)',
+  bigHeal: 'HP가 55% 미만인 아군이 있을 때 (최우선)',
+  hot: 'HP 80% 미만이면서 지속 회복이 없는 아군이 있을 때 (최우선)',
+  healShield: 'HP 65% 미만인 아군이 있을 때 (최우선)',
+  healBuff: 'HP 75% 미만인 아군이 있거나 공격 강화가 꺼져 있을 때 (최우선)',
+  breakStrike: '준비되면 바로 (최우선)', weakStrike: '준비되면 바로 (최우선)', markStrike: '준비되면 바로 (최우선)', executeStrike: '준비되면 바로 (최우선)',
+  sigDot: '준비되면 바로 (최우선)',
   taunt: '준비되면 바로 사용 (최우선 · 전투 시작부터 2턴 도발 상태)',
   heal: 'HP가 55% 미만인 아군(주인공·자신)이 있을 때 — 비율이 가장 낮은 쪽을 회복',
   shield: '보호막을 가진 아군이 아무도 없을 때',
@@ -114,10 +124,27 @@ export function famSkillInfo(key, f) {
   const role = FAM_ROLES[roleId];
   const lv = famGradeIdx(f.grade) + 1;
   const pct = (x) => `${Math.round(x * 100)}%`;
-  return FAM_SKILLS[roleId].map(s => {
-    const v = s.base + s.perLv * (lv - 1);
+  const sig = famSignature(key, f.grade);
+  const sigLocked = lv - 1 < FAM_SIG_MIN_GRADE;
+  return [sig, ...FAM_SKILLS[roleId]].map(s => {
+    const sv = Math.max(lv, FAM_SIG_MIN_GRADE + 1);
+    const v = s.base + s.perLv * ((s.sig ? sv : lv) - 1);
     let effect = '';
     switch (s.kind) {
+      case 'duel': effect = `가장 강한 적 1명을 ${s.turns}턴 동안 도발 — 그 적은 사역마만 공격. 그동안 사역마 방어 +${pct(v)}`; break;
+      case 'warcry': effect = `적 전원을 ${s.turns}턴 동안 도발 — 모든 적이 사역마만 공격. 방어 +${pct(v)}`; break;
+      case 'cover': effect = `${s.turns}턴 동안 주인공이 받는 피해의 ${pct(v)}를 사역마가 대신 받음`; break;
+      case 'fortify': effect = `${s.turns}턴 동안 주인공 방어 +${pct(v)} · 받는 피해 -${pct(s.red)}`; break;
+      case 'bigHeal': effect = `HP 비율이 가장 낮은 아군을 회복력 ${pct(v)}만큼 즉시 회복`; break;
+      case 'hot': effect = `아군 1명에게 ${s.turns}턴 동안 매 턴 회복력 ${pct(v)} 회복`; break;
+      case 'healShield': effect = `아군 1명 회복력 ${pct(v)} 회복 + 회복력 ${pct(s.shieldV)} 보호막`; break;
+      case 'healBuff': effect = `아군 1명 회복력 ${pct(v)} 회복 + 아군 전원 공격력 +${pct(s.buff)} (${s.turns}턴)`; break;
+      case 'breakStrike': effect = `적 1명에게 공격력 ${pct(v)} 피해 + 방어 -${pct(s.dv)} (${s.turns}턴)`; break;
+      case 'weakStrike': effect = `적 1명에게 공격력 ${pct(v)} 피해 + 그 적의 공격력 -${pct(s.dv)} (${s.turns}턴)`; break;
+      case 'markStrike': effect = `적 1명에게 공격력 ${pct(v)} 피해 + 받는 피해 +${pct(s.dv)} (${s.turns}턴, 주인공 공격 포함)`; break;
+      case 'executeStrike': effect = `적 1명에게 공격력 ${pct(v)} 피해 — 대상 HP 35% 미만이면 2배`; break;
+      case 'dot': if (s.sig) { effect = `적 전체에 ${s.turns}턴 동안 매 턴 공격력 ${pct(v)} 지속 피해`; break; }
+      // falls through
       case 'strike': effect = `적 1명(HP가 가장 낮은 적)에게 사역마 공격력 ${pct(v)} 피해`; break;
       case 'multi': effect = `적에게 ${s.hits}회 연속 공격, 1회당 공격력 ${pct(v)}`; break;
       case 'aoe': effect = `적 전체에게 공격력 ${pct(v)} 피해`; break;
@@ -126,7 +153,7 @@ export function famSkillInfo(key, f) {
       case 'shield': effect = `아군 전원에게 보호막 — 사역마 회복력 ${pct(v)}`; break;
       default: effect = s.kind;
     }
-    return { id: s.id, name: s.name, kind: s.kind, cd: s.cd, effect, when: FAM_SKILL_WHEN[s.kind] || '' };
+    return { id: s.id, name: s.name, kind: s.kind, cd: s.cd, effect, when: FAM_SKILL_WHEN[s.sig && s.kind === 'dot' ? 'sigDot' : s.kind] || '', sig: !!s.sig, sigType: s.sig ? FAM_SIGS[s.sigId].type : null, locked: !!s.sig && sigLocked };
   });
 }
 // 동행 능력치 (주인공 대비 비율 — 등급·강화 반영)
@@ -138,6 +165,49 @@ export function famStatRatios(key, f) {
     hp: role.hp * m, atk: role.atk * m, def: role.def * Math.sqrt(m), heal: (role.heal || 0.15) * m,
     guard: role.guard ? role.guard[lv - 1] : 0,
   };
+}
+
+// ===== 고유 스킬 (1.218.0 — 남령부터) =====
+// 같은 역할이라도 사역마마다 다른 고유 스킬. 자령은 지속 턴 +1
+// kind는 engine.js act()에서 처리 (duel/warcry/cover/fortify/bigHeal/hot/healShield/healBuff/breakStrike/weakStrike/markStrike/executeStrike/dot)
+export const FAM_SIGS = {
+  T1: { type: '단일 도발', kind: 'duel', name: '결투 신청', cd: 4, base: 0.2, perLv: 0.05, turns: 4 },
+  T2: { type: '광역 도발', kind: 'warcry', name: '전장의 함성', cd: 4, base: 0.2, perLv: 0.05, turns: 2 },
+  T3: { type: '보호', kind: 'cover', name: '수호 맹세', cd: 4, base: 0.45, perLv: 0.05, turns: 3 },
+  T4: { type: '방어 강화', kind: 'fortify', name: '철벽 진형', cd: 4, base: 0.3, perLv: 0.06, red: 0.1, turns: 3 },
+  H1: { type: '즉시 회복', kind: 'bigHeal', name: '생명의 분수', cd: 5, base: 1.0, perLv: 0.15 },
+  H2: { type: '지속 회복', kind: 'hot', name: '재생의 씨앗', cd: 5, base: 0.18, perLv: 0.03, turns: 4 },
+  H3: { type: '회복 + 보호막', kind: 'healShield', name: '축복의 장막', cd: 5, base: 0.4, perLv: 0.07, shieldV: 0.4 },
+  H4: { type: '회복 + 공격 강화', kind: 'healBuff', name: '고양의 노래', cd: 5, base: 0.35, perLv: 0.06, buff: 0.12, turns: 3 },
+  D1: { type: '방어 파괴', kind: 'breakStrike', name: '갑옷 부수기', cd: 3, base: 1.5, perLv: 0.15, dv: 0.35, turns: 3 },
+  D2: { type: '공격 약화', kind: 'weakStrike', name: '기력 흡수', cd: 3, base: 1.2, perLv: 0.12, dv: 0.3, turns: 3 },
+  D3: { type: '취약 표식', kind: 'markStrike', name: '사냥꾼의 표식', cd: 3, base: 1.0, perLv: 0.1, dv: 0.3, turns: 3 },
+  D4: { type: '처형', kind: 'executeStrike', name: '처형', cd: 3, base: 1.8, perLv: 0.2 },
+  D5: { type: '광역 지속 피해', kind: 'dot', all: true, name: '역병', cd: 4, base: 0.6, perLv: 0.08, turns: 4 },
+};
+const SIG_BY_ROLE = { tank: ['T1', 'T2', 'T3', 'T4'], healer: ['H1', 'H2', 'H3', 'H4'], dps: ['D1', 'D2', 'D3', 'D4', 'D5'] };
+// 보스 출신 — 전용 이름
+const BOSS_SIGS = {
+  '망각의 봉인자': ['T1', '망각의 사슬'], '동굴의 빙왕': ['T2', '빙왕의 포효'], '절대봉인의 군주': ['T3', '봉인의 맹세'], '절대영도의 군주': ['T4', '절대영도 결계'],
+  '정원의 대천사': ['H1', '대천사의 손길'], '광기의 마녀': ['H2', '광기의 영약'], '심처의 봉인자': ['H3', '봉인 장막'], '한기의 마녀': ['H4', '서리꽃 찬가'], '여명의 신': ['H4', '여명의 축복'],
+  '협곡의 한기룡': ['D1', '한기룡의 브레스'], '마왕의 화신': ['D2', '화신의 공포'], '타락한 황혼의 자녀': ['D3', '황혼의 낙인'], '심장의 마왕': ['D4', '마왕의 처형'],
+  '광기의 종말 마에스트로': ['D5', '종말의 교향곡'], '마왕의 그림자': ['D2', '그림자 잠식'],
+};
+export const FAM_SIG_MIN_GRADE = 3; // 남령
+export function famSignatureId(key) {
+  const b = BOSS_SIGS[ENEMIES[key]?.name];
+  if (b) return b[0];
+  const list = SIG_BY_ROLE[famRole(key)];
+  let h = 7; for (const ch of key) h = (h * 131 + ch.charCodeAt(0)) >>> 0;
+  return list[h % list.length];
+}
+// 실제 전투용 고유 스킬 객체 (자령은 지속 턴 +1)
+export function famSignature(key, grade) {
+  const id = famSignatureId(key);
+  const d = FAM_SIGS[id];
+  const b = BOSS_SIGS[ENEMIES[key]?.name];
+  const violet = famGradeIdx(grade) >= 4;
+  return { ...d, id: `sig_${id}`, sigId: id, sig: true, cls: 'fam', reqLv: 1, name: b ? b[1] : d.name, turns: d.turns ? d.turns + (violet ? 1 : 0) : undefined };
 }
 
 export const famName = (key) => ENEMIES[key]?.name || '사역마';
@@ -160,7 +230,7 @@ export function famCombatant(key, f, hero, famPct = 0) {
     def: Math.round(hero.def * role.def * Math.sqrt(m)), spd: Math.max(5, hero.spd - 2), crit: 0.08, critMult: 1.5, dodge: 0.05,
     tauntReduce: role.tauntReduce ? Math.min(0.5, role.tauntReduce + 0.05 * (lv - 1)) : 0,
     guardian: role.guard ? role.guard[lv - 1] : 0, startTaunt: role.guard ? 2 : 0,
-    skills: FAM_SKILLS[roleId].map(s => ({ s, lv })),
+    skills: [...(famGradeIdx(f.grade) >= FAM_SIG_MIN_GRADE ? [{ s: famSignature(key, f.grade), lv }] : []), ...FAM_SKILLS[roleId].map(s => ({ s, lv }))],
   };
 }
 // 보조 사역마 → 주인공 패시브 합산 (등급별 값 × 강화)

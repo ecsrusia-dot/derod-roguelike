@@ -201,8 +201,8 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
   const bg = isBoss ? chronicleEnemyArt(enemies[0].key, 'intro') : null;
 
   const Float = ({ id }) => hitFor(id).map((h, i) => {
-    const txt = h.m ? '빗나감' : h.h ? `+${h.h}` : h.s ? `🛡${h.s}` : h.buff ? '강화' : h.dot && h.d == null ? '중독' : h.d != null ? `${h.counter ? '반격 ' : ''}-${h.d}${h.c ? '!' : ''}` : '';
-    const color = h.m ? '#bbb' : h.h ? '#8fe08a' : h.s ? '#9cc4e4' : h.buff ? '#e8c48a' : h.c ? '#ffd27a' : '#ff8a80';
+    const txt = h.m ? '빗나감' : h.h ? `+${h.h}` : h.s ? `🛡${h.s}` : h.buff ? '강화' : h.debuff ? '약화' : h.dot && h.d == null ? '중독' : h.d != null ? `${h.counter ? '반격 ' : h.cover ? '대신 ' : ''}-${h.d}${h.c ? '!' : ''}` : '';
+    const color = h.m ? '#bbb' : h.h ? '#8fe08a' : h.s ? '#9cc4e4' : h.buff ? '#e8c48a' : h.debuff ? '#c08ae8' : h.cover ? '#9cc4e4' : h.c ? '#ffd27a' : '#ff8a80';
     if (!txt) return null;
     return <div key={`${idx}-${i}`} className="arc-float absolute font-bold pointer-events-none" style={{ left: '50%', top: '30%', fontSize: h.c ? 18 : 15, color, textShadow: '0 2px 5px #000', animationDelay: `${i * 80}ms` }}>{txt}</div>;
   });
@@ -884,13 +884,14 @@ function FamSkillPanel({ k, f }) {
       <div style={{ color: PALETTE.textDim }}>최대 HP {p(r.hp)} · 공격력 {p(r.atk)} · 방어 {p(r.def)} · 회복력 {p(r.heal)}{r.guard ? ` · 수호 태세 ${p(r.guard)}` : ''}</div>
       <div className="font-semibold mt-2" style={{ color: PALETTE.text }}>동행 스킬</div>
       {skills.map(sk => (
-        <div key={sk.id} className="mt-1.5" style={{ paddingLeft: 8, borderLeft: '2px solid var(--ui-line-strong)' }}>
+        <div key={sk.id} className="mt-1.5" style={{ paddingLeft: 8, borderLeft: `2px solid ${sk.sig ? '#d07ae8' : 'var(--ui-line-strong)'}`, opacity: sk.locked ? 0.55 : 1 }}>
+          {sk.sig && <div style={{ fontSize: 11, color: '#d07ae8', fontWeight: 700 }}>★ 고유 스킬 · {sk.sigType}{sk.locked ? ' — 🔒 남령부터 사용 (수치는 남령 기준)' : ''}</div>}
           <div style={{ color: PALETTE.legendary, fontWeight: 600 }}>{sk.name} <span style={{ color: PALETTE.textDim, fontWeight: 400 }}>· 재사용 {sk.cd}턴</span></div>
           <div style={{ color: PALETTE.text }}>{sk.effect}</div>
           <div style={{ color: PALETTE.textDim }}>발동: {sk.when}</div>
         </div>
       ))}
-      <div className="mt-1.5" style={{ color: PALETTE.textDim, fontSize: 11.5 }}>스킬이 모두 대기 중이면 일반 공격. 스킬 위력은 등급이 오를수록 커진다.</div>
+      <div className="mt-1.5" style={{ color: PALETTE.textDim, fontSize: 11.5 }}>스킬이 모두 대기 중이면 일반 공격. 스킬 위력은 등급이 오를수록 커지고, 자령은 고유 스킬 지속 턴 +1.</div>
     </GlassPanel>
   );
 }
@@ -1044,7 +1045,7 @@ function FamiliarView({ save, setSave, onBack, flash }) {
             <div className="text-center mt-2" style={{ fontSize: 13, color: g.color, fontWeight: 600 }}>{g.label} · {F.FAM_ROLES[F.famRole(sel)].icon} {F.FAM_ROLES[F.famRole(sel)].label}</div>
             <div className="text-center mt-0.5" style={{ fontSize: 12, color: PALETTE.textDim }}>{F.FAM_ROLES[F.famRole(sel)].desc}</div>
             <GlassPanel className="p-2.5 mt-2" style={{ fontSize: 12, color: PALETTE.text, lineHeight: 1.6 }}>
-              <div><b>동행</b> <span style={{ color: PALETTE.textDim }}>— {F.FAM_SKILLS[F.famRole(sel)].map(x => x.name).join(' · ')}{F.FAM_ROLES[F.famRole(sel)].guard ? ` · 수호 태세: 적 공격의 ${Math.round(F.FAM_ROLES[F.famRole(sel)].guard[gi] * 100)}%를 대신 받음` : ''}</span></div>
+              <div><b>동행</b> <span style={{ color: PALETTE.textDim }}>— {gi >= F.FAM_SIG_MIN_GRADE ? `★${F.famSignature(sel, selF.grade).name} · ` : ''}{F.FAM_SKILLS[F.famRole(sel)].map(x => x.name).join(' · ')}{F.FAM_ROLES[F.famRole(sel)].guard ? ` · 수호 태세: 적 공격의 ${Math.round(F.FAM_ROLES[F.famRole(sel)].guard[gi] * 100)}%를 대신 받음` : ''}</span></div>
               <div><b>보조</b> <span style={{ color: PALETTE.textDim }}>— {F.famSubText(sel, selF)}</span></div>
             </GlassPanel>
             <FamSubTable k={sel} gi={gi} />

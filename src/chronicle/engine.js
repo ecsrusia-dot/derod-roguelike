@@ -677,8 +677,8 @@ export function dungeonEncounter(d, rng) {
 // ===== 전투 시뮬 (풀오토) =====
 export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
   const units = [
-    ...party0.map(p => ({ ...p, buffs: {}, shield: Math.round((p.startShieldPct || 0) * p.maxHp), taunt: p.startTaunt || 0, tauntDef: 0, dots: [], cds: {}, turn: 0, critNext: false, firstDone: false, reviveUsed: false, emergencyUsed: false })),
-    ...enemies0.map(e => ({ ...e, buffs: {}, shield: 0, taunt: 0, tauntDef: 0, dots: [], cds: {}, turn: 0, skills: [] })),
+    ...party0.map(p => ({ ...p, buffs: {}, shield: Math.round((p.startShieldPct || 0) * p.maxHp), taunt: p.startTaunt || 0, tauntDef: 0, dots: [], cds: {}, fx: {}, hots: [], forced: null, cover: null, turn: 0, critNext: false, firstDone: false, reviveUsed: false, emergencyUsed: false })),
+    ...enemies0.map(e => ({ ...e, buffs: {}, shield: 0, taunt: 0, tauntDef: 0, dots: [], cds: {}, fx: {}, hots: [], forced: null, cover: null, turn: 0, skills: [] })),
   ];
   const events = [];
   const alive = (side) => units.filter(u => u.side === side && u.hp > 0);
@@ -692,6 +692,8 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
     if (u.missingHpAtk) m += Math.floor((1 - u.hp / u.maxHp) * 10) * u.missingHpAtk;
     return m;
   };
+  // 일시 효과 (1.218.0 사역마 고유 스킬): armorBreak·weak·vuln(적) / guardDef·guardRed(아군)
+  const fxv = (u, k) => (u.fx && u.fx[k] && u.fx[k].t > 0 ? u.fx[k].v : 0);
   const healUnit = (t, h) => {
     const before = t.hp;
     t.hp = Math.min(t.maxHp, t.hp + h);
@@ -710,25 +712,32 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
       if (def.critAfterCounter) def.critNext = true;
       return { miss: true, d: 0 };
     }
-    let raw = att.atk * mult * atkMod(att) * (1 + (skill ? att.skillDmg || 0 : 0)) * (0.9 + rng() * 0.2);
+    let raw = att.atk * mult * atkMod(att) * (1 + (skill ? att.skillDmg || 0 : 0)) * (0.9 + rng() * 0.2) * (1 - fxv(att, 'weak'));
     if (att.execute && def.hp < def.maxHp * 0.3) raw *= 1 + att.execute;
     let crit = rng() < (att.crit || 0);
     if (att.side === 'party' && (att.critNext || (att.firstCrit && !att.firstDone))) crit = true;
     att.critNext = false; att.firstDone = true;
     if (crit) raw *= att.critMult || T.critMult;
-    const defV = (def.def || 0) * (1 + (def.taunt > 0 ? def.tauntDef : 0)) * (1 - (att.armorPen || 0));
+    const defV = (def.def || 0) * (1 + (def.taunt > 0 ? def.tauntDef : 0) + fxv(def, 'guardDef')) * (1 - (att.armorPen || 0)) * (1 - fxv(def, 'armorBreak'));
     let d = raw * T.defK / (T.defK + defV);
     d *= 1 - (def.dmgReduce || 0);
+    d *= (1 + fxv(def, 'vuln')) * (1 - fxv(def, 'guardRed'));
     if (def.taunt > 0 && def.tauntReduce) d *= 1 - def.tauntReduce;
     if (def.shield > 0 && def.shieldReduce) d *= 1 - def.shieldReduce;
     d = Math.max(1, Math.round(d));
     let absorbed = 0;
     if (def.shield > 0) { absorbed = Math.min(def.shield, d); def.shield -= absorbed; d -= absorbed; }
+    // 보호 (수호 맹세) — 피해 일부를 보호자가 대신 받는다
+    let cover = null;
+    if (def.cover && def.cover.t > 0 && d > 0) {
+      const pr = units.find(x => x.id === def.cover.by && x.hp > 0);
+      if (pr) { const part = Math.round(d * def.cover.v); pr.hp = Math.max(0, pr.hp - part); onHurt(pr); d -= part; cover = { t: pr.id, d: part }; }
+    }
     def.hp = Math.max(0, def.hp - d);
     onHurt(def);
     if (att.lifesteal && d > 0 && att.hp > 0) healUnit(att, Math.round(d * att.lifesteal));
     if (def.thornsPct && d > 0 && att.hp > 0) att.hp = Math.max(0, att.hp - Math.max(1, Math.round(d * def.thornsPct)));
-    return { d, crit, absorbed };
+    return { d, crit, absorbed, cover };
   };
   // 정령 화살 — 공격 뒤 확률 추가 타격 (유니크)
   const spiritHit = (u, hits) => {
@@ -748,6 +757,8 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
     const foes = alive(u.side === 'party' ? 'enemy' : 'party');
     if (!foes.length) return null;
     if (u.side === 'enemy') {
+      // 결투·함성 도발 (고유 스킬) — 강제 대상
+      if (u.forced && u.forced.t > 0) { const ft = foes.find(f => f.id === u.forced.by); if (ft) return ft; }
       const t = foes.find(f => f.taunt > 0);
       if (t && rng() < 0.85) return t;
       // 수호 사역마 — 살아 있으면 등급별 확률로 공격을 대신 받는다 (1.216.0)
@@ -779,6 +790,22 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
     const has = (k) => ready.find(x => x.s.kind === k);
     const lowAlly = allies.find(a => a.hp < a.maxHp * 0.55);
     const hurt = allies.filter(a => a.hp < a.maxHp * 0.7).length;
+    // 사역마 고유 스킬 (1.218.0) — 조건이 맞으면 최우선
+    const sig = ready.find(x => x.s.sig);
+    if (sig) {
+      const leader = allies.find(a => a.leader) || allies[0];
+      const k = sig.s.kind;
+      const ok = k === 'duel' ? foes.some(f => !(f.forced?.t > 0))
+        : k === 'warcry' ? (foes.length >= 2 || !foes.some(f => f.forced?.t > 0))
+          : k === 'cover' ? leader && leader.hp < leader.maxHp * 0.85 && !(leader.cover?.t > 0)
+            : k === 'fortify' ? leader && !(fxv(leader, 'guardDef') > 0)
+              : k === 'bigHeal' ? !!lowAlly
+                : k === 'hot' ? allies.some(a => a.hp < a.maxHp * 0.8 && !a.hots.length)
+                  : k === 'healShield' ? allies.some(a => a.hp < a.maxHp * 0.65)
+                    : k === 'healBuff' ? (allies.some(a => a.hp < a.maxHp * 0.75) || !allies.some(a => a.buffs.song?.t > 0))
+                      : true;
+      if (ok) return sig;
+    }
     if (hurt >= 2 && has('healAll')) return has('healAll');
     if (lowAlly && has('heal')) return has('heal');
     if (lowAlly && has('healAll')) return has('healAll');
@@ -803,13 +830,15 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
       const bossAoe = u.tier === 'boss' && u.turn % 4 === 0;
       const heavy = (u.tier !== 'normal') && u.turn % 3 === 0;
       if (bossAoe) {
-        const hits = foes.map(f => { const r = damage(u, f, 0.7); return { t: f.id, d: r.d, c: r.crit, m: r.miss }; });
+        const hits = [];
+        for (const f of foes) { const r = damage(u, f, 0.7); hits.push({ t: f.id, d: r.d, c: r.crit, m: r.miss }); if (r.cover) hits.push({ t: r.cover.t, d: r.cover.d, cover: true }); }
         push({ a: u.id, n: '광역 강타', k: 'aoe', hits });
         return;
       }
       const t = pickEnemyTarget(u);
       const r = damage(u, t, heavy ? 1.6 : 1);
       const hits = [{ t: t.id, d: r.d, c: r.crit, m: r.miss }];
+      if (r.cover) hits.push({ t: r.cover.t, d: r.cover.d, cover: true });
       if (!r.miss) counterCheck(t, u, hits);
       push({ a: u.id, n: heavy ? '강공격' : '공격', k: heavy ? 'heavy' : 'attack', hits });
       return;
@@ -898,6 +927,50 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
       case 'taunt':
         u.taunt = s.turns; u.tauntDef = v; hits.push({ t: u.id, buff: true });
         break;
+      // ===== 사역마 고유 스킬 (1.218.0) =====
+      case 'duel': {
+        const t = foes.filter(f => !(f.forced?.t > 0)).sort((a, b) => b.atk - a.atk)[0] || foes[0];
+        t.forced = { by: u.id, t: s.turns };
+        u.fx.guardDef = { v, t: s.turns };
+        hits.push({ t: t.id, debuff: true }, { t: u.id, buff: true });
+        break;
+      }
+      case 'warcry':
+        for (const f of foes) { f.forced = { by: u.id, t: s.turns }; hits.push({ t: f.id, debuff: true }); }
+        u.fx.guardDef = { v, t: s.turns }; hits.push({ t: u.id, buff: true });
+        break;
+      case 'cover': {
+        const ld = allies.find(a => a.leader) || allies[0];
+        ld.cover = { by: u.id, v: Math.min(0.8, v), t: s.turns }; hits.push({ t: ld.id, buff: true });
+        break;
+      }
+      case 'fortify': {
+        const ld = allies.find(a => a.leader) || allies[0];
+        ld.fx.guardDef = { v, t: s.turns }; ld.fx.guardRed = { v: s.red, t: s.turns }; hits.push({ t: ld.id, buff: true });
+        break;
+      }
+      case 'bigHeal': case 'healShield': case 'healBuff': {
+        const t = allies.slice().sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];
+        const h = Math.round(u.healPower * v);
+        healUnit(t, h); hits.push({ t: t.id, h });
+        if (s.kind === 'healShield') { const sh = Math.round(u.healPower * s.shieldV); t.shield = Math.max(t.shield, sh); hits.push({ t: t.id, s: sh }); }
+        if (s.kind === 'healBuff') for (const a of allies) { a.buffs.song = { v: s.buff, t: s.turns }; hits.push({ t: a.id, buff: true }); }
+        break;
+      }
+      case 'hot': {
+        const t = allies.filter(a => !a.hots.length).sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0] || allies[0];
+        t.hots.push({ v: Math.round(u.healPower * v), t: s.turns, src: u.id, sn: s.name }); hits.push({ t: t.id, buff: true });
+        break;
+      }
+      case 'breakStrike': case 'weakStrike': case 'markStrike': case 'executeStrike': {
+        const t = pickEnemyTarget(u);
+        const mult = s.kind === 'executeStrike' && t.hp < t.maxHp * 0.35 ? v * 2 : v;
+        const r = damage(u, t, mult, { skill: true });
+        hits.push({ t: t.id, d: r.d, c: r.crit, m: r.miss });
+        const key = { breakStrike: 'armorBreak', weakStrike: 'weak', markStrike: 'vuln' }[s.kind];
+        if (key && !r.miss && t.hp > 0) { t.fx[key] = { v: s.dv, t: s.turns }; hits.push({ t: t.id, debuff: true }); }
+        break;
+      }
       default: break;
     }
     if (u.skillShield) u.shield += Math.round(u.atk * u.skillShield);
@@ -927,6 +1000,12 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
       if (u.hp <= 0) continue;
       // 지속 피해 → 행동
       if (u.regenPct && u.hp < u.maxHp) u.hp = Math.min(u.maxHp, u.hp + Math.round(u.maxHp * u.regenPct));
+      if (u.hots.length) {
+        const h = healUnit(u, u.hots.reduce((t, x) => t + x.v, 0));
+        const src = u.hots[0].src;
+        u.hots = u.hots.map(x => ({ ...x, t: x.t - 1 })).filter(x => x.t > 0);
+        push({ a: src, n: '지속 회복', k: 'hot', hits: [{ t: u.id, h }] });
+      }
       if (u.dots.length) {
         const total = u.dots.reduce((s, d) => s + d.v, 0);
         const dotSrc = {};
@@ -943,6 +1022,9 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
       if (u.resetEvery && u.turn % u.resetEvery === 0) { const ks = Object.keys(u.cds).filter(k => u.cds[k] > 0); if (ks.length) u.cds[pick(rng, ks)] = 0; }
       for (const b of Object.values(u.buffs)) if (b.t > 0) b.t -= 1;
       if (u.taunt > 0) u.taunt -= 1;
+      for (const k of Object.keys(u.fx)) if (u.fx[k].t > 0) u.fx[k].t -= 1;
+      if (u.forced && u.forced.t > 0) u.forced.t -= 1;
+      if (u.cover && u.cover.t > 0) u.cover.t -= 1;
       if (!alive('enemy').length) { result = 'win'; break; }
       if (!alive('party').length || units.some(x => x.leader && x.hp <= 0)) { result = 'lose'; break; }
     }
