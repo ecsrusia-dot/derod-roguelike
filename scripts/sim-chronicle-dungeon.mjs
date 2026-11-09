@@ -49,8 +49,8 @@ if (mode === 'snap') {
   const configs = (process.env.CFG || 'none,tank,dps,healer').split(',');
   function withFam(s, role) {
     s = structuredClone(s); s.fams = {}; s.famTeam = {};
-    if (role !== 'none') { s.fams[FAMS[role]] = { grade: GRADE, plus: PLUS }; s.famTeam.main = FAMS[role]; }
-    if (SUBS) { SUBK[SUBS].forEach((k, i) => { s.fams[k] = { grade: GRADE, plus: PLUS }; s.famTeam['sub' + (i + 1)] = k; }); }
+    if (role !== 'none') { s.fams[FAMS[role]] = { grade: GRADE, plus: PLUS, lv: s.units[s.hero].lv }; s.famTeam.main = FAMS[role]; }
+    if (SUBS) { SUBK[SUBS].forEach((k, i) => { s.fams[k] = { grade: GRADE, plus: PLUS, lv: s.units[s.hero].lv }; s.famTeam['sub' + (i + 1)] = k; }); }
     return s;
   }
   function run(save, id, tier, rng) {
