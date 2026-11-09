@@ -744,6 +744,22 @@ body {
 @keyframes chr-fx-shield { 0% { filter: none; } 35% { filter: drop-shadow(0 0 12px #9cc4e4) brightness(1.1); } 100% { filter: none; } }
 .chr-fx-shield { animation: chr-fx-shield .6s ease-out; }
 @media (prefers-reduced-motion: reduce) { .chr-log-in, .chr-skill-call, .chr-fx-crit, .chr-fx-heal, .chr-fx-shield { animation: none; } }
+/* 황혼 연대기 연출 (1.232.2) — 승리 · 레벨 업 · 드랍 · 소환 · 대장간 */
+@keyframes chr-win { 0% { opacity: 0; transform: scale(.6); letter-spacing: .4em; } 60% { opacity: 1; transform: scale(1.12); } 100% { transform: scale(1); letter-spacing: .08em; } }
+.chr-win { animation: chr-win .55s cubic-bezier(.2,.9,.3,1.2) both; text-shadow: 0 0 18px rgba(232,176,74,.55); }
+@keyframes chr-band { 0% { background-position: -150% 0; } 100% { background-position: 250% 0; } }
+.chr-levelup { background: linear-gradient(100deg, transparent 20%, rgba(255,214,122,.45) 45%, transparent 70%) no-repeat, rgba(232,176,74,.12); background-size: 60% 100%, 100% 100%; animation: chr-band 1.4s ease-out .2s both; border-radius: 8px; padding: 2px 0; }
+@keyframes chr-drop { 0%,100% { box-shadow: 0 0 0 0 transparent; } 40% { box-shadow: 0 0 14px 1px var(--g); } }
+.chr-drop { border-radius: 8px; padding: 1px 4px; animation: chr-drop 1.2s ease-out 2; border: 1px solid var(--g); }
+@keyframes chr-flip { 0% { opacity: 0; transform: perspective(500px) rotateY(90deg) scale(.9); } 60% { opacity: 1; transform: perspective(500px) rotateY(-8deg) scale(1.03); } 100% { transform: none; } }
+.chr-flip { animation: chr-flip .5s ease-out both; }
+@keyframes chr-flip-hi { 0%,100% { box-shadow: 0 0 0 0 transparent; } 50% { box-shadow: 0 0 22px 3px var(--g); } }
+.chr-flip-hi { animation: chr-flip .5s ease-out both, chr-flip-hi 1.4s ease-in-out .5s 2; }
+@keyframes chr-pop { 0% { opacity: 0; transform: translate(-50%,-50%) scale(.5); } 25% { opacity: 1; transform: translate(-50%,-50%) scale(1.12); } 40% { transform: translate(-50%,-50%) scale(1); } 85% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%,-56%) scale(1); } }
+.chr-pop { animation: chr-pop 1.6s ease-out both; }
+@keyframes chr-shatter { 0%,100% { transform: translate(-50%,-50%); } 15% { transform: translate(calc(-50% - 7px),-50%) rotate(-2deg); } 30% { transform: translate(calc(-50% + 6px),-50%) rotate(2deg); } 45% { transform: translate(calc(-50% - 4px),-50%); } 60% { transform: translate(-50%,-50%); } }
+.chr-pop-destroy { animation: chr-pop 1.9s ease-out both, chr-shatter .5s ease .15s; }
+@media (prefers-reduced-motion: reduce) { .chr-win, .chr-levelup, .chr-drop, .chr-flip, .chr-flip-hi, .chr-pop, .chr-pop-destroy { animation: none; } }
 @keyframes arc-pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(232,176,74,0); } 50% { box-shadow: 0 0 14px 0 rgba(232,176,74,.28); } }
 .arc-pulse { animation: arc-pulse 2.2s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) {
