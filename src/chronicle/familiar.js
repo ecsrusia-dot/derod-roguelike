@@ -10,7 +10,7 @@
 // 데이터 + 순수 함수만 — engine.js가 이 파일을 쓴다 (반대 방향 import 금지).
 // 밸런스는 이 파일 한 곳 (FAM_GRADES · FAM_TUNING · FAM_ROLES).
 // ============================================
-import { ENEMIES } from '../data/enemies.js';
+import { CENEMIES as ENEMIES } from './enemies.js';
 import { CHRONICLE_FIELDS, CHRONICLE_DUNGEONS } from './data.js';
 
 export const FAM_GRADES = [
@@ -267,12 +267,12 @@ export function famPool(progress) {
   const open = CHRONICLE_FIELDS.filter(f => f.id === 1 || cleared[f.id - 1]);
   const uniq = (a) => [...new Set(a)].filter(k => ENEMIES[k]);
   const dungeonBosses = CHRONICLE_DUNGEONS.filter(d => progress?.dungeonTier?.[d.id] != null).map(d => d.floors[d.floors.length - 1].enemies[0]);
-  const p2Bosses = CHRONICLE_FIELDS.filter(f => f.part === 2 && cleared[f.id]).map(f => f.boss);
+  const p2Bosses = CHRONICLE_FIELDS.filter(f => f.part >= 2 && cleared[f.id]).map(f => f.boss);
   return {
     red: uniq(open.flatMap(f => f.normals)),
     green: uniq(open.flatMap(f => f.normals)),
     blue: uniq(open.flatMap(f => f.elites)),
-    indigo: uniq(CHRONICLE_FIELDS.filter(f => f.part !== 2 && cleared[f.id]).map(f => f.boss)),
+    indigo: uniq(CHRONICLE_FIELDS.filter(f => !f.part && cleared[f.id]).map(f => f.boss)),
     violet: uniq([...dungeonBosses, ...p2Bosses]),
   };
 }

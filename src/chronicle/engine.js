@@ -78,6 +78,8 @@ export function companionOrder(heroId) {
   return CHRONICLE_CLASSES.map(c => c.id).filter(id => id !== heroId);
 }
 export function fieldUnlocked(save, fieldId) {
+  const f = CHRONICLE_FIELDS[fieldId - 1];
+  if (f?.reqRebirth && (save.units[save.hero]?.rebirth?.count || 0) < f.reqRebirth) return false; // 3부는 전승자만
   return fieldId === 1 || !!save.progress.bossCleared[fieldId - 1];
 }
 export function dungeonUnlocked(save, id = null) {

@@ -45,6 +45,7 @@ export function questReqMet(save, q) {
   const r = q.req || {};
   if (r.field && !(r.field === 1 || save.progress.bossCleared[r.field - 1])) return false;
   if (r.main && save.quests[r.main]?.state !== 'claimed') return false;
+  if (r.rebirth && (save.units[save.hero]?.rebirth?.count || 0) < r.rebirth) return false; // 3부 (1.222.0)
   if (r.companion && (!save.units[r.companion] || r.companion === save.hero)) return false;
   return true;
 }
