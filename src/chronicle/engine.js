@@ -875,13 +875,13 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
     const t = pickEnemyTarget(u);
     if (!t) return;
     const r = damage(u, t, 0.8, { noDodge: true });
-    hits.push({ t: t.id, d: r.d, c: r.crit, chain: true });
+    hits.push({ t: t.id, d: r.d, c: r.crit, chain: true, ab: r.absorbed });
   };
   // 연격 — 단일 공격 뒤 추가 타격
   const chainHit = (u, t, hits) => {
     if (!u.chain || !t || t.hp <= 0 || rng() >= u.chain) return;
     const r = damage(u, t, 0.5, { noDodge: true });
-    hits.push({ t: t.id, d: r.d, c: r.crit, chain: true });
+    hits.push({ t: t.id, d: r.d, c: r.crit, chain: true, ab: r.absorbed });
   };
   const pickEnemyTarget = (u) => {
     const foes = alive(u.side === 'party' ? 'enemy' : 'party');
@@ -960,13 +960,13 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
       const heavy = (u.tier !== 'normal') && u.turn % 3 === 0;
       if (bossAoe) {
         const hits = [];
-        for (const f of foes) { const r = damage(u, f, 0.7); hits.push({ t: f.id, d: r.d, c: r.crit, m: r.miss }); if (r.cover) hits.push({ t: r.cover.t, d: r.cover.d, cover: true }); }
+        for (const f of foes) { const r = damage(u, f, 0.7); hits.push({ t: f.id, d: r.d, c: r.crit, m: r.miss, ab: r.absorbed }); if (r.cover) hits.push({ t: r.cover.t, d: r.cover.d, cover: true }); }
         push({ a: u.id, n: '광역 강타', k: 'aoe', hits });
         return;
       }
       const t = pickEnemyTarget(u);
       const r = damage(u, t, heavy ? 1.6 : 1);
-      const hits = [{ t: t.id, d: r.d, c: r.crit, m: r.miss }];
+      const hits = [{ t: t.id, d: r.d, c: r.crit, m: r.miss, ab: r.absorbed }];
       if (r.cover) hits.push({ t: r.cover.t, d: r.cover.d, cover: true });
       if (!r.miss) counterCheck(t, u, hits);
       push({ a: u.id, n: heavy ? '강공격' : '공격', k: heavy ? 'heavy' : 'attack', hits });
@@ -981,7 +981,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
       const hits = [];
       for (let i = 0; i < times && t.hp > 0; i++) {
         const r = damage(u, t, 1);
-        hits.push({ t: t.id, d: r.d, c: r.crit, m: r.miss });
+        hits.push({ t: t.id, d: r.d, c: r.crit, m: r.miss, ab: r.absorbed });
         if (!r.miss) chainHit(u, t, hits);
       }
       spiritHit(u, hits);
@@ -1001,7 +1001,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
         let r = { d: 0 };
         for (let i = 0; i < times && t.hp > 0; i++) {
           r = damage(u, t, v, { skill: true });
-          hits.push({ t: t.id, d: r.d, c: r.crit, m: r.miss });
+          hits.push({ t: t.id, d: r.d, c: r.crit, m: r.miss, ab: r.absorbed });
           if (!r.miss) chainHit(u, t, hits);
         }
         spiritHit(u, hits);
@@ -1019,12 +1019,12 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
           const t = pickEnemyTarget(u);
           if (!t) break;
           const r = damage(u, t, v, { skill: true });
-          hits.push({ t: t.id, d: r.d, c: r.crit, m: r.miss });
+          hits.push({ t: t.id, d: r.d, c: r.crit, m: r.miss, ab: r.absorbed });
         }
         break;
       }
       case 'aoe':
-        for (const t of foes) { const r = damage(u, t, v, { skill: true }); hits.push({ t: t.id, d: r.d, c: r.crit, m: r.miss }); }
+        for (const t of foes) { const r = damage(u, t, v, { skill: true }); hits.push({ t: t.id, d: r.d, c: r.crit, m: r.miss, ab: r.absorbed }); }
         break;
       case 'dot': {
         const targets = s.all ? foes : [pickEnemyTarget(u)];
@@ -1096,7 +1096,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
         const t = pickEnemyTarget(u);
         const mult = s.kind === 'executeStrike' && t.hp < t.maxHp * 0.35 ? v * 2 : v;
         const r = damage(u, t, mult, { skill: true });
-        hits.push({ t: t.id, d: r.d, c: r.crit, m: r.miss });
+        hits.push({ t: t.id, d: r.d, c: r.crit, m: r.miss, ab: r.absorbed });
         const key = { breakStrike: 'armorBreak', weakStrike: 'weak', markStrike: 'vuln' }[s.kind];
         if (key && !r.miss && t.hp > 0) { t.fx[key] = { v: s.dv, t: s.turns }; hits.push({ t: t.id, debuff: true }); }
         break;

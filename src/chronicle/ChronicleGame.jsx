@@ -157,6 +157,64 @@ function Portrait({ cid, size = 44, dim = false }) {
   return <img src={c.image} alt={c.name} className="object-cover flex-none" style={{ width: size, height: size, borderRadius: 12, border: `1.5px solid ${c.color}`, filter: dim ? 'grayscale(1) brightness(.5)' : 'none' }} draggable={false} />;
 }
 
+// ===== 전투 카드 · 로그 (1.227.0) =====
+function BattleCard({ u, art, hp, sh, acting, fx, h, enemy = false, border, children }) {
+  const dead = hp <= 0;
+  const accent = enemy ? '#ff8a80' : u.fam ? '#d07ae8' : chronicleClass(u.classId).color;
+  return (
+    <div className={`relative flex-1 min-w-0 ${fx}`} style={{ opacity: dead ? 0.35 : 1, transition: 'opacity .3s' }}>
+      <div className="relative overflow-hidden" style={{ height: h, borderRadius: 12, border: `1.5px solid ${acting ? accent : border}`, boxShadow: acting ? `0 0 12px ${accent}66` : 'none', transition: 'box-shadow .2s, border-color .2s' }}>
+        <img src={art} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ objectPosition: enemy ? '50% 40%' : '50% 22%', filter: dead ? 'grayscale(1)' : 'none' }} draggable={false} />
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, transparent 45%, #000d)' }} />
+        <div className="absolute bottom-1 left-1.5 right-1.5">
+          <div className="flex items-baseline justify-between gap-1">
+            <span className="truncate" style={{ fontSize: 11.5, color: '#fff', textShadow: '0 1px 2px #000' }}>{u.fam ? '🐾 ' : ''}Lv.{u.lv} {u.name}</span>
+            <span className="flex-none" style={{ fontSize: 10.5, color: '#ddd', textShadow: '0 1px 2px #000' }}>{Math.max(0, hp).toLocaleString()}{sh > 0 ? <span style={{ color: '#9cc4e4' }}> ◈{sh.toLocaleString()}</span> : null}</span>
+          </div>
+          <Bar v={hp} max={u.maxHp} shield={sh} color={enemy ? 'linear-gradient(90deg,#8b1f1f,#e0574c)' : 'linear-gradient(90deg,#3d7a3a,#7fcf6a)'} h={7} />
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+}
+const LOG_C = { dmg: '#ff8a80', crit: '#ffb347', heal: '#8fe08a', shield: '#9cc4e4', buff: '#e8c48a', debuff: '#c08ae8', miss: '#9a9a9a', holy: '#ffe9a8', skill: '#e8b04a' };
+function BattleLogLine({ e, latest, unitOf }) {
+  if (e.round) {
+    return <div className="flex items-center gap-2 my-0.5" style={{ fontSize: 10.5, color: PALETTE.textDim }}><span className="flex-1" style={{ height: 1, background: 'var(--ui-line)' }} />{e.round}라운드<span className="flex-1" style={{ height: 1, background: 'var(--ui-line)' }} /></div>;
+  }
+  const actor = unitOf(e.a);
+  const nameColor = (u) => (!u ? PALETTE.text : u.side === 'enemy' ? '#ff7a5c' : u.fam ? '#c79bff' : chronicleClass(u.classId).color);
+  const N = ({ id }) => { const u = unitOf(id); return <b style={{ color: nameColor(u), fontWeight: 600 }}>{u?.fam ? '🐾' : ''}{u?.name || ''}</b>; };
+  const icon = e.k === 'dotTick' ? '☠' : e.k === 'hot' ? '✚' : e.skill ? '✦' : e.k === 'heavy' ? '💢' : e.k === 'aoe' ? '💥' : '⚔';
+  const actColor = e.k === 'dotTick' ? LOG_C.debuff : e.k === 'hot' ? LOG_C.heal : e.skill ? LOG_C.skill : e.k === 'heavy' ? LOG_C.crit : PALETTE.text;
+  const chip = (h, i) => {
+    const sp = { marginLeft: 6, whiteSpace: 'nowrap' };
+    if (h.m) return <span key={i} style={{ ...sp, color: LOG_C.miss }}><N id={h.t} /> 빗나감</span>;
+    if (e.k === 'dotTick' && h.d > 0) return <span key={i} style={{ ...sp, color: LOG_C.debuff, fontWeight: 600 }}>-{h.d.toLocaleString()}</span>;
+    if (h.d > 0) {
+      const c = h.c ? LOG_C.crit : h.holy ? LOG_C.holy : h.cover ? LOG_C.shield : LOG_C.dmg;
+      const pre = h.counter ? '↺ 반격 ' : h.cover ? '🛡 대신 ' : h.chain ? '⚡ 추가타 ' : h.holy ? '☀ ' : h.c ? '💥 ' : '';
+      return <span key={i} style={{ ...sp, color: c, fontWeight: h.c ? 800 : 600, fontSize: h.c ? 13 : undefined }}>{pre}<N id={h.t} /> -{h.d.toLocaleString()}{h.c ? ' 치명!' : ''}{h.ab > 0 ? <span style={{ color: LOG_C.shield, fontWeight: 400 }}> (◈흡수 {h.ab.toLocaleString()})</span> : null}</span>;
+    }
+    if (h.d === 0 && h.ab > 0) return <span key={i} style={{ ...sp, color: LOG_C.shield, fontWeight: 600 }}>◈ <N id={h.t} /> 보호막 흡수 {h.ab.toLocaleString()}{h.c ? ' (치명)' : ''}</span>;
+    if (h.d === 0 && !h.m && h.h == null && h.s == null) return <span key={i} style={{ ...sp, color: LOG_C.miss }}><N id={h.t} /> 피해 없음</span>;
+    if (h.h) return <span key={i} style={{ ...sp, color: LOG_C.heal, fontWeight: 600 }}>✚ <N id={h.t} /> +{(h.eh ?? h.h).toLocaleString()}</span>;
+    if (h.s) return <span key={i} style={{ ...sp, color: LOG_C.shield, fontWeight: 600 }}>◈ <N id={h.t} /> +{(h.es ?? h.s).toLocaleString()}</span>;
+    if (h.buff) return <span key={i} style={{ ...sp, color: LOG_C.buff }}>▲ <N id={h.t} /> 강화</span>;
+    if (h.debuff) return <span key={i} style={{ ...sp, color: LOG_C.debuff }}>▼ <N id={h.t} /> 약화</span>;
+    if (h.dot) return <span key={i} style={{ ...sp, color: LOG_C.debuff }}>☠ <N id={h.t} /> 중독</span>;
+    return null;
+  };
+  return (
+    <div className={latest ? 'chr-log-in' : ''} style={{ fontSize: 12, lineHeight: 1.5, padding: latest ? '3px 6px' : '0 6px', borderRadius: 8, background: latest ? 'rgba(232,176,74,0.10)' : 'transparent', borderLeft: `2px solid ${latest ? actColor : 'transparent'}`, color: PALETTE.textDim, opacity: latest ? 1 : 0.85 }}>
+      <span style={{ color: actColor }}>{icon} </span>
+      {e.k === 'dotTick' ? <><N id={e.a} /> <span style={{ color: LOG_C.debuff }}>지속 피해</span></> : <><N id={e.a} /> <span style={{ color: actColor, fontWeight: e.skill ? 700 : 400 }}>{e.n}</span></>}
+      {(e.hits || []).map(chip)}
+    </div>
+  );
+}
+
 // ===== 전투 재생 =====
 const SPEEDS = [1, 2, 4];
 function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boostLeft = 0, onAskBoost, dungeonAuto = false, onToggleDungeonAuto }) {
@@ -196,20 +254,33 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
   for (let i = Math.min(idx, sim.events.length - 1); i >= 0; i--) { if (sim.events[i].st) { st = sim.events[i].st; break; } }
   const hpOf = (u) => (st && st[u.id] ? st[u.id][0] : u.hp);
   const shOf = (u) => (st && st[u.id] ? st[u.id][1] : 0);
-  const nameOf = (id) => [...party, ...enemies].find(u => u.id === id)?.name || '';
-  const recent = sim.events.slice(0, idx + 1).filter(e => e.a).slice(-4).reverse();
+  const unitOf = (id) => [...party, ...enemies].find(u => u.id === id);
   const curHits = cur && cur.a ? cur.hits || [] : [];
   const hitFor = (id) => curHits.filter(h => h.t === id);
   const round = (() => { for (let i = Math.min(idx, sim.events.length - 1); i >= 0; i--) if (sim.events[i].round) return sim.events[i].round; return 1; })();
   const isBoss = ctx.type === 'boss' || ctx.type === 'dungeonBoss';
   const bg = isBoss ? chronicleEnemyArt(enemies[0].key, 'intro') : null;
+  // 로그 (1.227.0) — 지금까지의 사건 전부, 최신이 아래. 자동 스크롤
+  const logEvents = sim.events.slice(Math.max(0, idx + 1 - 80), idx + 1).filter(e => e.a || e.round);
+  const logRef = useRef(null);
+  useEffect(() => { const el = logRef.current; if (el) el.scrollTop = el.scrollHeight; }, [idx]);
 
   const Float = ({ id }) => hitFor(id).map((h, i) => {
-    const txt = h.m ? '빗나감' : h.h ? `+${h.h}` : h.s ? `🛡${h.s}` : h.buff ? '강화' : h.debuff ? '약화' : h.dot && h.d == null ? '중독' : h.d != null ? `${h.counter ? '반격 ' : h.cover ? '대신 ' : ''}-${h.d}${h.c ? '!' : ''}` : '';
-    const color = h.m ? '#bbb' : h.h ? '#8fe08a' : h.s ? '#9cc4e4' : h.buff ? '#e8c48a' : h.debuff ? '#c08ae8' : h.cover ? '#9cc4e4' : h.c ? '#ffd27a' : '#ff8a80';
+    const txt = h.m ? '빗나감' : h.d === 0 && h.ab > 0 ? `◈흡수 ${h.ab}` : h.h ? `+${h.eh ?? h.h}` : h.s ? `◈${h.es ?? h.s}` : h.buff ? '▲강화' : h.debuff ? '▼약화' : h.dot && h.d == null ? '☠중독' : h.d != null ? `${h.counter ? '반격 ' : h.cover ? '대신 ' : ''}-${h.d}${h.c ? '!' : ''}` : '';
+    const color = h.m ? '#bbb' : h.d === 0 && h.ab > 0 ? '#9cc4e4' : h.h ? '#8fe08a' : h.s ? '#9cc4e4' : h.buff ? '#e8c48a' : h.debuff || h.dot ? '#c08ae8' : h.cover ? '#9cc4e4' : h.c ? '#ffd27a' : '#ff8a80';
     if (!txt) return null;
-    return <div key={`${idx}-${i}`} className="arc-float absolute font-bold pointer-events-none" style={{ left: '50%', top: '30%', fontSize: h.c ? 18 : 15, color, textShadow: '0 2px 5px #000', animationDelay: `${i * 80}ms` }}>{txt}</div>;
+    return <div key={`${idx}-${i}`} className="arc-float absolute font-bold pointer-events-none" style={{ left: '50%', top: '35%', fontSize: h.c ? 22 : 17, color, textShadow: '0 2px 6px #000', animationDelay: `${i * 80}ms`, zIndex: 3 }}>{txt}</div>;
   });
+  // 카드 이펙트 — 치명타 섬광 · 회복 초록빛 · 보호막 하늘빛 · 피격 흔들림
+  const fxClass = (id) => {
+    const hs = hitFor(id);
+    if (hs.some(h => h.c && h.d > 0)) return 'chr-fx-crit';
+    if (hs.some(h => h.d > 0)) return 'arc-shake';
+    if (hs.some(h => h.h)) return 'chr-fx-heal';
+    if (hs.some(h => h.s)) return 'chr-fx-shield';
+    return '';
+  };
+  const cardH = 150;
 
   return (
     <div className="absolute inset-0 flex flex-col" style={{ background: PALETTE.bg }}>
@@ -230,59 +301,35 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
 
       {/* 적 */}
       <div className="relative flex gap-2 px-3 pt-1 flex-none">
-        {enemies.map(e => {
-          const hp = hpOf(e);
-          const dead = hp <= 0;
-          const acting = cur?.a === e.id;
-          return (
-            <div key={e.id} className={`relative flex-1 min-w-0 ${hitFor(e.id).some(h => h.d > 0) ? 'arc-shake' : ''}`} style={{ opacity: dead ? 0.3 : 1, transition: 'opacity .3s' }}>
-              <div className="relative overflow-hidden" style={{ borderRadius: 12, aspectRatio: enemies.length === 1 ? '16 / 10' : '3 / 4', border: `1.5px solid ${acting ? '#ff8a80' : e.tier === 'boss' ? '#c4453d88' : e.tier === 'elite' ? '#e8b04a88' : 'var(--ui-line)'}` }}>
-                <img src={chronicleEnemyArt(e.key)} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ filter: dead ? 'grayscale(1)' : 'none' }} draggable={false} />
-                <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, transparent 50%, #000c)' }} />
-                <div className="absolute bottom-1 left-1.5 right-1.5">
-                  <div className="truncate" style={{ fontSize: 11, color: '#fff', textShadow: '0 1px 2px #000' }}>Lv.{e.lv} {e.name}</div>
-                  <Bar v={hp} max={e.maxHp} color="linear-gradient(90deg,#8b1f1f,#e0574c)" h={6} />
-                </div>
-              </div>
-              <Float id={e.id} />
-            </div>
-          );
-        })}
+        {enemies.map(e => (
+          <BattleCard key={e.id} u={e} art={chronicleEnemyArt(e.key)} hp={hpOf(e)} sh={shOf(e)} acting={cur?.a === e.id} fx={fxClass(e.id)} h={cardH} enemy
+            border={e.tier === 'boss' ? '#c4453d88' : e.tier === 'elite' ? '#e8b04a88' : 'var(--ui-line)'}>
+            <Float id={e.id} />
+          </BattleCard>
+        ))}
       </div>
 
-      {/* 행동 */}
-      <div className="relative flex-1 min-h-0 px-4 pt-3 flex flex-col justify-center">
-        {cur?.a && (
-          <div className="text-center" style={{ fontSize: 15, color: cur.skill ? PALETTE.legendary : PALETTE.text, fontWeight: 600 }}>
-            {nameOf(cur.a)} — {cur.n}
+      {/* 전투 로그 — 적과 아군 사이 전체 */}
+      <div className="relative flex-1 min-h-0 mx-3 my-2 flex flex-col" style={{ borderRadius: 12, background: 'rgba(0,0,0,0.38)', border: '1px solid var(--ui-line)' }}>
+        {cur?.skill && !done && (
+          <div key={`call-${idx}`} className="chr-skill-call absolute font-bold pointer-events-none text-center" style={{ left: '50%', top: '50%', zIndex: 4, fontSize: 22, color: PALETTE.legendary, fontFamily: FONT_TITLE, textShadow: '0 0 14px #e8b04acc, 0 2px 6px #000', whiteSpace: 'nowrap' }}>
+            ✦ {cur.n}
+            <div style={{ fontSize: 12, color: PALETTE.text, fontWeight: 400, textShadow: '0 1px 4px #000' }}>{unitOf(cur.a)?.name}</div>
           </div>
         )}
-        <div className="mt-2 flex flex-col gap-0.5 overflow-hidden">
-          {recent.map((e, i) => (
-            <div key={i} className="truncate" style={{ fontSize: 11.5, color: i === 0 ? PALETTE.text : PALETTE.textDim, opacity: 1 - i * 0.2 }}>
-              {nameOf(e.a)} · {e.n}{(e.hits || []).filter(h => h.d > 0).length ? ` → ${(e.hits || []).filter(h => h.d > 0).map(h => `${nameOf(h.t)} ${h.d}`).join(', ')}` : ''}
-            </div>
-          ))}
+        <div ref={logRef} className="flex-1 min-h-0 overflow-y-auto px-2.5 py-2 flex flex-col gap-1">
+          {logEvents.map((e, i) => <BattleLogLine key={`${idx - (logEvents.length - 1 - i)}-${i}`} e={e} latest={i === logEvents.length - 1 && !done} unitOf={unitOf} />)}
         </div>
       </div>
 
-      {/* 파티 */}
-      <div className={`relative grid ${party.length > 1 ? 'grid-cols-2' : 'grid-cols-1'} gap-2 px-3 pb-2 flex-none`}>
-        {party.map(p => {
-          const hp = hpOf(p);
-          const acting = cur?.a === p.id;
-          return (
-            <div key={p.id} className={`relative flex items-center gap-2 ${hitFor(p.id).some(h => h.d > 0) ? 'arc-shake' : ''}`} style={{ padding: 7, borderRadius: 12, background: acting ? `${chronicleClass(p.classId).color}26` : 'rgba(255,255,255,0.03)', border: `1px solid ${acting ? chronicleClass(p.classId).color : 'var(--ui-line)'}` }}>
-              <UnitIcon u={p} size={38} dim={hp <= 0} />
-              <div className="flex-1 min-w-0">
-                <div className="truncate" style={{ fontSize: 11.5, color: PALETTE.text }}>Lv.{p.lv} {p.name}</div>
-                <Bar v={hp} max={p.maxHp} shield={shOf(p)} color="linear-gradient(90deg,#3d7a3a,#7fcf6a)" h={7} />
-                <div style={{ fontSize: 10.5, color: PALETTE.textDim }}>{hp}/{p.maxHp}</div>
-              </div>
-              <Float id={p.id} />
-            </div>
-          );
-        })}
+      {/* 아군 — 적과 같은 카드 형식 */}
+      <div className="relative flex gap-2 px-3 pb-2 flex-none">
+        {party.map(p => (
+          <BattleCard key={p.id} u={p} art={p.fam ? chronicleEnemyArt(p.famKey) : chronicleClass(p.classId).combatImage} hp={hpOf(p)} sh={shOf(p)} acting={cur?.a === p.id} fx={fxClass(p.id)} h={cardH}
+            border={p.fam ? '#d07ae888' : `${chronicleClass(p.classId).color}88`}>
+            <Float id={p.id} />
+          </BattleCard>
+        ))}
       </div>
 
       {/* 결과 */}
