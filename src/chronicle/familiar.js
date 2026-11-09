@@ -48,7 +48,7 @@ export const FAM_ROLES = {
     label: '수호', icon: '🛡', color: '#9cc4e4', atk: 0.1, hp: 0.85, def: 1.3, tauntReduce: 0.2,
     // 수호 태세 — 살아 있는 동안 적의 단일 공격이 이 확률로 사역마에게 향한다 (등급별)
     guard: [0.35, 0.45, 0.55, 0.65, 0.75],
-    desc: '도발로 적의 공격을 대신 받는다 — 딜이 부족해 전투가 길어지는 직업에게',
+    desc: '도발로 적의 공격을 대신 받는다 — 딜은 강하지만 몸이 약한 직업에게',
     // 보조 패시브 — 등급별 값 (적·녹·청·남·자)
     sub: { dmgReduce: [0.02, 0.03, 0.045, 0.06, 0.08], shieldPct: [0, 0, 0.05, 0.08, 0.12] },
   },
@@ -59,7 +59,7 @@ export const FAM_ROLES = {
   },
   healer: {
     label: '치유', icon: '✚', color: '#8fe08a', atk: 0.1, hp: 0.35, def: 0.6, heal: 0.2,
-    desc: '주인공을 회복하고 보호막을 씌운다 — 딜이 충분해 버티기만 하면 되는 직업에게',
+    desc: '주인공을 회복하고 보호막을 씌운다 — 단단하지만 전투가 길어지는 직업에게',
     sub: { regenPct: [0.002, 0.0025, 0.003, 0.004, 0.005], healPct: [0.04, 0.06, 0.09, 0.12, 0.16], emergencyHeal: [0, 0, 0.08, 0.12, 0.18] },
   },
 };
@@ -99,6 +99,46 @@ export const FAM_SKILLS = {
   dps: [FS('f_bite', '물어뜯기', 'strike', 2, 1.6, 0.18), FS('f_frenzy', '난도질', 'multi', 3, 0.6, 0.08, { hits: 3 }), FS('f_blast', '마력 폭발', 'aoe', 4, 0.9, 0.12)],
   healer: [FS('f_mend', '치유의 숨결', 'heal', 3, 1.0, 0.12), FS('f_ward', '보호의 빛', 'shield', 4, 0.8, 0.12)],
 };
+
+// 동행 스킬 상세 (1.217.0) — 효과 · 재사용 · 발동 조건 (engine chooseSkill 순서와 같은 말로)
+const FAM_SKILL_WHEN = {
+  taunt: '준비되면 바로 사용 (최우선 · 전투 시작부터 2턴 도발 상태)',
+  heal: 'HP가 55% 미만인 아군(주인공·자신)이 있을 때 — 비율이 가장 낮은 쪽을 회복',
+  shield: '보호막을 가진 아군이 아무도 없을 때',
+  aoe: '살아 있는 적이 2명 이상일 때',
+  strike: '다른 조건이 맞지 않을 때 — 준비된 단일 공격 중 위력이 가장 높은 것',
+  multi: '다른 조건이 맞지 않을 때 — 준비된 단일 공격 중 위력이 가장 높은 것',
+};
+export function famSkillInfo(key, f) {
+  const roleId = famRole(key);
+  const role = FAM_ROLES[roleId];
+  const lv = famGradeIdx(f.grade) + 1;
+  const pct = (x) => `${Math.round(x * 100)}%`;
+  return FAM_SKILLS[roleId].map(s => {
+    const v = s.base + s.perLv * (lv - 1);
+    let effect = '';
+    switch (s.kind) {
+      case 'strike': effect = `적 1명(HP가 가장 낮은 적)에게 사역마 공격력 ${pct(v)} 피해`; break;
+      case 'multi': effect = `적에게 ${s.hits}회 연속 공격, 1회당 공격력 ${pct(v)}`; break;
+      case 'aoe': effect = `적 전체에게 공격력 ${pct(v)} 피해`; break;
+      case 'taunt': effect = `${s.turns}턴 도발 — 적의 공격이 85% 확률로 사역마에게. 그동안 방어 +${pct(v)} · 받는 피해 -${pct(Math.min(0.5, (role.tauntReduce || 0) + 0.05 * (lv - 1)))}`; break;
+      case 'heal': effect = `아군 1명 회복 — 사역마 회복력 ${pct(v)}`; break;
+      case 'shield': effect = `아군 전원에게 보호막 — 사역마 회복력 ${pct(v)}`; break;
+      default: effect = s.kind;
+    }
+    return { id: s.id, name: s.name, kind: s.kind, cd: s.cd, effect, when: FAM_SKILL_WHEN[s.kind] || '' };
+  });
+}
+// 동행 능력치 (주인공 대비 비율 — 등급·강화 반영)
+export function famStatRatios(key, f) {
+  const role = FAM_ROLES[famRole(key)];
+  const m = powerMult(f);
+  const lv = famGradeIdx(f.grade) + 1;
+  return {
+    hp: role.hp * m, atk: role.atk * m, def: role.def * Math.sqrt(m), heal: (role.heal || 0.15) * m,
+    guard: role.guard ? role.guard[lv - 1] : 0,
+  };
+}
 
 export const famName = (key) => ENEMIES[key]?.name || '사역마';
 const plusMult = (f) => 1 + FAM_TUNING.plusStatPct * (f.plus || 0);

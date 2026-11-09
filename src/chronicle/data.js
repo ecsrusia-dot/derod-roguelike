@@ -170,7 +170,20 @@ export function fieldStages(field) {
 }
 
 // ===== ×4 배속 이용권 (1.213.0 — PM 결정: 골드로 시간 구매) =====
-export const BOOST = { minutes: 30, cost: (lv) => 300 + 15 * lv, maxStackMin: 180 };
+// 1.217.0 PM 결정 — 가격 ×15 (사냥 약 80전 분량)
+export const BOOST = { minutes: 30, cost: (lv) => (300 + 15 * lv) * 15, maxStackMin: 180 };
+// 가방 확장 (1.217.0 PM 결정) — 골드로 10칸씩, 최대 100칸. 비용은 회차마다 2배. 캐릭터별
+export const BAG_EXPAND = { step: 10, max: 100, cost: (n) => 5000 * 2 ** n };
+// 분해 재화 (1.217.0 PM 결정 — 등급마다 재화 종류가 다르다). 강화 단계는 별도로 ✦ 환급
+//   gold: 아이템 레벨 비례 [기본, 레벨당]
+export const SALVAGE = {
+  common: { gold: [10, 2] },
+  uncommon: { essence: 3 },
+  rare: { essence: 8, famShard: 1 },
+  epic: { essence: 20, shard: 2 },
+  unique: { shard: 5, famSoul: 10 },
+};
+export const SALVAGE_ICON = { gold: '🪙', essence: '✦', shard: '◆', famShard: '📜', famSoul: '🔮' };
 
 export const CHRONICLE_PARTS = [
   { id: 1, name: '1부 · 끝나지 않는 황혼', fields: [1, 2, 3, 4] },

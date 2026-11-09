@@ -11,7 +11,7 @@ import { PALETTE } from '../utils/helpers.js';
 import { GlassPanel, UIButton, BottomSheet } from '../components/ui/CommonUI.jsx';
 import {
   CHRONICLE_TITLE, CHRONICLE_SUB, CHRONICLE_PARTS, CHRONICLE_SAVE_KEY, CHRONICLE_SAVE_KEY_V1, CHRONICLE_TUNING, CHRONICLE_CLASSES, CHRONICLE_FIELDS,
-  CHRONICLE_DUNGEON, CHRONICLE_DUNGEONS, DUNGEON_TIERS, dungeonDef, STAT_META, STAT_KEYS, SKILL_MAX_LV, MASTERY_PCT, BOSS_DAILY_LIMIT, DUNGEON_KEYS, GRADES, gradeIdx, SLOTS, FORGE, UNIQUE_CHANCE, UNIQUE_ITEMS, fieldStages, FIELD_STAGES, BOOST,
+  CHRONICLE_DUNGEON, CHRONICLE_DUNGEONS, DUNGEON_TIERS, dungeonDef, STAT_META, STAT_KEYS, SKILL_MAX_LV, MASTERY_PCT, BOSS_DAILY_LIMIT, DUNGEON_KEYS, GRADES, gradeIdx, SLOTS, FORGE, UNIQUE_CHANCE, UNIQUE_ITEMS, fieldStages, FIELD_STAGES, BOOST, BAG_EXPAND,
   chronicleClass, classSkills, describeSkill, chronicleEnemyArt,
 } from './data.js';
 import * as E from './engine.js';
@@ -354,7 +354,7 @@ function TownView({ save, go, onExit, onSwitchChar }) {
     { id: 'tower', icon: '🗼', label: '황혼의 첨탑', sub: E.towerUnlocked(save.progress) ? (save.tower?.run ? `${save.tower.run.floor}층 도전 중` : `최고 ${save.tower?.best || 0}층 · ✪${save.mats.towerCoin || 0}`) : '마계의 균열 보스 후 개방', locked: !E.towerUnlocked(save.progress) },
     { id: 'dungeon', icon: '🕳', label: '던전', sub: save.dungeon ? `${dungeonDef(save.dungeon.id).name} 진행 중` : E.dungeonUnlocked(save) ? `🗝 열쇠 ${E.keyCount(save)}개 · ${CHRONICLE_DUNGEONS.filter(d => E.dungeonUnlocked(save, d.id)).length}곳` : '죽은 자의 숲 보스 후 개방', locked: !E.dungeonUnlocked(save) },
     { id: 'party', icon: '🧭', label: '성장', sub: '능력치 · 스킬 · 장비', badge: alertParty },
-    { id: 'bag', icon: '🎒', label: '가방', sub: `${save.inventory.length}/${CHRONICLE_TUNING.inventoryMax}${save.inventory.some(i => !E.itemUsable(i, save.hero)) ? ' · 다른 직업 장비 있음' : ''}` },
+    { id: 'bag', icon: '🎒', label: '가방', sub: `${save.inventory.length}/${E.bagMax(save)}${save.inventory.some(i => !E.itemUsable(i, save.hero)) ? ' · 다른 직업 장비 있음' : ''}` },
     { id: 'fam', icon: '🐾', label: '사역마', sub: E.famSlotOpen(save, 'main') ? `📜 ${save.mats.famShard || 0} · 보유 ${Object.keys(save.fams || {}).length}` : `Lv.${F.FAM_TUNING.slotLv.main}부터 동행`, badge: (save.mats.famShard || 0) >= F.FAM_TUNING.shardsPerSummon || (save.mats.sealPlus || 0) > 0 },
     { id: 'stash', icon: '🏛', label: '공용 창고', sub: `${(save.stash || []).length}/${A.STASH_MAX} · 모든 캐릭터 공유` },
     { id: 'forge', icon: '⚒', label: '대장간', sub: '강화 · 등급 승급' },
@@ -764,7 +764,7 @@ function BagView({ save, setSave, onBack, flash }) {
     if (!uids.length) return;
     const r = E.dismantleItems(save, uids);
     setSave(r.save);
-    flash(`${uids.length}개 분해 → ✦ +${r.essence}`);
+    flash(`${uids.length}개 분해 → ${E.salvageText(r.salvage)}`);
   };
   const toStash = (uids) => {
     const r = E.moveToStash(save, uids);
@@ -774,7 +774,21 @@ function BagView({ save, setSave, onBack, flash }) {
   const btn = { height: 34, borderRadius: 10, fontSize: 11.5, background: 'transparent' };
   return (
     <div className="absolute inset-0 flex flex-col">
-      <Header title={`가방 ${save.inventory.length}/${CHRONICLE_TUNING.inventoryMax}`} onBack={onBack} right={<Wallet save={save} />} />
+      <Header title={`가방 ${save.inventory.length}/${E.bagMax(save)}`} onBack={onBack} right={<Wallet save={save} />} />
+      {(() => {
+        const c = E.bagExpandCost(save);
+        return (
+          <div className="flex items-center gap-2 px-3 pt-2 flex-none" style={{ fontSize: 12 }}>
+            <span style={{ color: PALETTE.textDim }}>가방 확장 (최대 {BAG_EXPAND.max}칸)</span>
+            <div className="flex-1" />
+            {c == null ? <span style={{ color: PALETTE.textDim }}>최대 확장</span> : (
+              <button disabled={save.gold < c} onClick={() => { setSave(E.expandBag(save)); flash(`가방 +${BAG_EXPAND.step}칸 → ${E.bagMax(save) + BAG_EXPAND.step}칸`); }} className="ui-press" style={{ fontSize: 12, padding: '5px 10px', borderRadius: 9, border: `1px solid ${PALETTE.legendary}88`, color: PALETTE.legendary, background: 'transparent', opacity: save.gold < c ? 0.45 : 1 }}>
+                +{BAG_EXPAND.step}칸 · 🪙 {c.toLocaleString()}
+              </button>
+            )}
+          </div>
+        );
+      })()}
       <ItemFilterBar filter={filter} setFilter={setFilter} />
       <div className="flex gap-1.5 px-3 pt-2 flex-none">
         <button onClick={() => { setSave(E.autoEquip(save)); flash('더 강한 장비로 교체'); }} className="ui-press flex-1" style={{ ...btn, border: `1px solid ${PALETTE.legendary}88`, color: PALETTE.legendary }}>자동 장착</button>
@@ -784,6 +798,7 @@ function BagView({ save, setSave, onBack, flash }) {
         <button onClick={() => bulk(0)} className="ui-press flex-1" style={{ ...btn, border: '1px dashed var(--ui-line-strong)', color: PALETTE.textDim }}>일반 분해</button>
         <button onClick={() => bulk(1)} className="ui-press flex-1" style={{ ...btn, border: '1px dashed var(--ui-line-strong)', color: PALETTE.textDim }}>고급 이하 분해</button>
       </div>
+      <div className="px-3 pt-1 flex-none" style={{ fontSize: 11, color: PALETTE.textDim }}>분해 재화 — 일반 🪙 · 고급 ✦ · 희귀 ✦📜 · 에픽 ✦◆ · 유니크 ◆🔮</div>
       <div className="flex items-center gap-2 px-3 pt-1.5 flex-none" style={{ fontSize: 12 }}>
         <button onClick={toggleOther} className="ui-press flex items-center gap-1.5" style={{ background: 'transparent', border: 'none', color: incOther ? PALETTE.legendary : PALETTE.textDim, padding: '4px 0' }}>
           <span className="flex items-center justify-center" style={{ width: 18, height: 18, borderRadius: 5, border: `1.5px solid ${incOther ? PALETTE.legendary : 'var(--ui-line-strong)'}`, background: incOther ? `${PALETTE.legendary}33` : 'transparent', fontSize: 12 }}>{incOther ? '✓' : ''}</span>
@@ -828,8 +843,8 @@ function BagView({ save, setSave, onBack, flash }) {
               )}
               <div className="flex gap-2">
                 <UIButton variant="ghost" style={{ height: 42 }} disabled={!!by} onClick={() => { toStash([item.uid]); setSel(null); }}>{by ? '착용 중' : '창고로'}</UIButton>
-                <UIButton variant="ghost" style={{ height: 42 }} disabled={!!by} onClick={() => { const r = E.dismantleItems(save, [item.uid]); setSave(r.save); setSel(null); flash(`분해 → ✦ +${r.essence}${r.shard ? ` ◆ +${r.shard}` : ''}`); }}>
-                  {by ? '착용 중' : `분해 ✦${gradeOf(item.grade).dismantle + (item.plus || 0)}`}
+                <UIButton variant="ghost" style={{ height: 42 }} disabled={!!by} onClick={() => { const r = E.dismantleItems(save, [item.uid]); setSave(r.save); setSel(null); flash(`분해 → ${E.salvageText(r.salvage)}`); }}>
+                  {by ? '착용 중' : `분해 ${E.salvageText(E.salvageOf(item))}`}
                 </UIButton>
               </div>
               <UIButton variant="ghost" style={{ height: 40 }} onClick={() => setSel(null)}>닫기</UIButton>
@@ -855,6 +870,27 @@ function FamRoleGuide({ heroCls }) {
         </div>
       ))}
       {tip && <div className="mt-1.5" style={{ color: PALETTE.text }}>{chronicleClass(heroCls).name} 추천 동행: <b style={{ color: F.FAM_ROLES[tip.best].color }}>{F.FAM_ROLES[tip.best].icon} {F.FAM_ROLES[tip.best].label}</b> <span style={{ color: PALETTE.textDim }}>— {tip.why}</span></div>}
+    </GlassPanel>
+  );
+}
+// 동행 스킬 · 능력치 상세 (1.217.0)
+function FamSkillPanel({ k, f }) {
+  const skills = F.famSkillInfo(k, f);
+  const r = F.famStatRatios(k, f);
+  const p = (x) => `${Math.round(x * 100)}%`;
+  return (
+    <GlassPanel className="p-2.5 mt-2" style={{ fontSize: 12, lineHeight: 1.55 }}>
+      <div className="font-semibold" style={{ color: PALETTE.text }}>동행 시 능력치 <span style={{ color: PALETTE.textDim, fontWeight: 400 }}>(주인공 대비)</span></div>
+      <div style={{ color: PALETTE.textDim }}>최대 HP {p(r.hp)} · 공격력 {p(r.atk)} · 방어 {p(r.def)} · 회복력 {p(r.heal)}{r.guard ? ` · 수호 태세 ${p(r.guard)}` : ''}</div>
+      <div className="font-semibold mt-2" style={{ color: PALETTE.text }}>동행 스킬</div>
+      {skills.map(sk => (
+        <div key={sk.id} className="mt-1.5" style={{ paddingLeft: 8, borderLeft: '2px solid var(--ui-line-strong)' }}>
+          <div style={{ color: PALETTE.legendary, fontWeight: 600 }}>{sk.name} <span style={{ color: PALETTE.textDim, fontWeight: 400 }}>· 재사용 {sk.cd}턴</span></div>
+          <div style={{ color: PALETTE.text }}>{sk.effect}</div>
+          <div style={{ color: PALETTE.textDim }}>발동: {sk.when}</div>
+        </div>
+      ))}
+      <div className="mt-1.5" style={{ color: PALETTE.textDim, fontSize: 11.5 }}>스킬이 모두 대기 중이면 일반 공격. 스킬 위력은 등급이 오를수록 커진다.</div>
     </GlassPanel>
   );
 }
@@ -1012,6 +1048,7 @@ function FamiliarView({ save, setSave, onBack, flash }) {
               <div><b>보조</b> <span style={{ color: PALETTE.textDim }}>— {F.famSubText(sel, selF)}</span></div>
             </GlassPanel>
             <FamSubTable k={sel} gi={gi} />
+            <FamSkillPanel k={sel} f={selF} />
             <div className="flex gap-1 mt-3 justify-center">{Array.from({ length: F.FAM_TUNING.maxPlus }, (_, i) => <span key={i} style={{ width: 18, height: 6, borderRadius: 3, background: i < selF.plus ? g.color : '#ffffff1a' }} />)}</div>
             <div className="mt-3 flex flex-col gap-2">
               {!maxed && <UIButton disabled={souls < ec} onClick={() => setSave(E.enhanceFam(save, sel))}>강화 +{selF.plus} → +{selF.plus + 1} (🔮{ec} / 보유 {souls})</UIButton>}
@@ -1149,13 +1186,13 @@ function StashView({ save, setSave, onBack, flash }) {
   const list = stash.filter(i => filter === 'all' || (filter === 'mine' ? E.itemUsable(i, hero) : filter === 'unique' ? i.grade === 'unique' : i.cls === filter))
     .sort((a, b) => gradeIdx(b.grade) - gradeIdx(a.grade) || E.itemPower(b) - E.itemPower(a));
   const item = sel != null ? stash.find(i => i.uid === sel) : null;
-  const bagFull = save.inventory.length >= CHRONICLE_TUNING.inventoryMax;
+  const bagFull = save.inventory.length >= E.bagMax(save);
   const tabs = [{ id: 'mine', label: '착용 가능' }, { id: 'unique', label: '유니크' }, { id: 'all', label: '전체' }];
   return (
     <div className="absolute inset-0 flex flex-col">
       <Header title={`공용 창고 ${stash.length}/${A.STASH_MAX}`} onBack={onBack} right={<Wallet save={save} />} />
       <div className="px-4 pt-2 flex-none" style={{ fontSize: 11.5, color: PALETTE.textDim, lineHeight: 1.5 }}>
-        모든 캐릭터가 함께 쓰는 창고 — 다른 직업 장비를 넣어 두면 그 직업 캐릭터가 꺼내 쓸 수 있습니다. (가방 {save.inventory.length}/{CHRONICLE_TUNING.inventoryMax})
+        모든 캐릭터가 함께 쓰는 창고 — 다른 직업 장비를 넣어 두면 그 직업 캐릭터가 꺼내 쓸 수 있습니다. (가방 {save.inventory.length}/{E.bagMax(save)})
       </div>
       <div className="flex gap-1.5 px-3 pt-2 flex-none">
         {tabs.map(s => (
@@ -1182,8 +1219,8 @@ function StashView({ save, setSave, onBack, flash }) {
             <UIButton style={{ height: 42 }} disabled={bagFull} onClick={() => { setSave(E.takeFromStash(save, item.uid)); setSel(null); flash('가방으로 꺼냄'); }}>
               {bagFull ? '가방이 가득 찼습니다' : `가방으로 꺼내기${E.itemUsable(item, hero) ? '' : ' (지금 캐릭터는 착용 불가)'}`}
             </UIButton>
-            <UIButton variant="ghost" style={{ height: 42 }} onClick={() => { const r = E.dismantleStash(save, [item.uid]); setSave(r.save); setSel(null); flash(`분해 → ✦ +${r.essence}${r.shard ? ` ◆ +${r.shard}` : ''}`); }}>
-              분해 ✦{gradeOf(item.grade).dismantle + (item.plus || 0)}
+            <UIButton variant="ghost" style={{ height: 42 }} onClick={() => { const r = E.dismantleStash(save, [item.uid]); setSave(r.save); setSel(null); flash(`분해 → ${E.salvageText(r.salvage)}`); }}>
+              분해 {E.salvageText(E.salvageOf(item))}
             </UIButton>
             <UIButton variant="ghost" style={{ height: 40 }} onClick={() => setSel(null)}>닫기</UIButton>
           </div>
