@@ -65,6 +65,7 @@ export function toView(acc) {
     dungeon: c.dungeon, stats: c.stats, createdAt: c.createdAt,
     roster: buildRoster(acc.chars), // 원정대 (1.229.0) — 레벨 상한·전역 버프 계산용, 읽기 전용
     rosterQuests: acc.rosterQuests || { claimed: {} }, // 원정대 의뢰 (1.230.0) — 계정 공유
+    raid: acc.raid || null, // 원정대 레이드 기록 (1.231.0) — 읽기 전용 (갱신은 raid.applyRaidResult가 계정에 직접)
   });
 }
 
@@ -81,6 +82,15 @@ export function fromView(acc, v) {
       [v.hero]: { ...c, peakLv: Math.max(peakOf(c), v.units[v.hero]?.lv || 0), unit: v.units[v.hero], bag: v.inventory, progress: v.progress, quests: v.quests, story: v.story, dungeon: v.dungeon, stats: v.stats, famTeam: v.famTeam || {}, tower: v.tower || { best: 0, checkpoint: 0, run: null }, bagExpand: v.bagExpand || 0 },
     },
   };
+}
+
+// 원정대 레이드 파티 (1.231.0) — 5캐릭 각자의 장비·특성·전역 버프·사역마 패시브로 계산 (동행 사역마는 불참)
+export function raidParty(acc) {
+  return Object.keys(acc.chars).map(cid => {
+    const v = toView({ ...acc, active: cid });
+    const d = E.deriveUnit(v, cid);
+    return { ...d, hp: d.maxHp };
+  });
 }
 
 export function charSummary(acc, classId) {
