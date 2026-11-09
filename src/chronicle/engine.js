@@ -5,6 +5,7 @@
 // 전투는 simulateChronicleBattle이 끝까지 계산해 사건 목록을 돌려주고, UI는 재생만 한다 (풀오토 관전).
 // ============================================
 import { fieldStages, FIELD_STAGES, STAGE_TUNING, BOOST } from './data.js';
+import { TOWER, TOWER_SHOP, towerUnlocked, isTowerBoss, towerEnemyLv, towerArea, towerFloorPicks, kstWeekKey } from './tower.js';
 import { famCombatant, famSubFx, rollFamShards, FAM_TUNING, summonFamiliars, enhanceFamiliar, evolveFamiliar } from './familiar.js';
 import {
   CHRONICLE_TUNING as T, CHRONICLE_CLASSES, CHRONICLE_SKILLS, CHRONICLE_FIELDS, CHRONICLE_DUNGEON, CHRONICLE_DUNGEONS, DUNGEON_TIERS, dungeonDef,
@@ -940,7 +941,7 @@ export function battleRewards(enemies, type, rng, mods = {}) {
   const items = [];
   const count = tbl.items || 1;
   const heroCls = mods.heroCls || 'wanderer';
-  const uChance = type === 'boss' ? UNIQUE_CHANCE.boss : type === 'dungeonBoss' ? (mods.uniqueChance || 0) : 0;
+  const uChance = type === 'boss' ? UNIQUE_CHANCE.boss : (type === 'dungeonBoss' || type === 'towerBoss') ? (mods.uniqueChance || 0) : 0;
   for (let i = 0; i < count; i++) {
     if (rng() >= tbl.itemChance) continue;
     const uq = uChance && rng() < uChance ? rollUniqueItem(rng, ilv, heroCls) : null;
@@ -964,6 +965,9 @@ export function applyBattle(save0, ctx, battle, rng = Math.random) {
       save.gold -= loss; summary.goldLost = loss;
     } else if (ctx.kind === 'dungeon') {
       save.dungeon = null;
+    } else if (ctx.kind === 'tower' && save.tower) {
+      summary.towerFell = save.tower.run?.floor;
+      save.tower.run = null; // 쓰러지면 이번 도전 종료 — 체크포인트는 남는다
     }
     return { save, summary };
   }
@@ -985,6 +989,7 @@ export function applyBattle(save0, ctx, battle, rng = Math.random) {
     const tier = DUNGEON_TIERS[ti];
     mods = { ...mods, epicMult: tier.epicMult, shardMult: tier.shardMult, set: dungeonDef(save.dungeon.id).set, uniqueChance: UNIQUE_CHANCE.dungeonBoss[ti] || 0 };
   }
+  if (ctx.kind === 'tower' && save.tower?.run) mods = { ...mods, uniqueChance: TOWER.uniqueChance(save.tower.run.floor) };
   // 📜 계약서 조각 (1.212.0 — 사역마 소환 재료, 계정 공유)
   const fs = rollFamShards(ctx.enemies, ctx.type, rng, save.dungeon?.tier || 0);
   if (fs) { save.mats.famShard = (save.mats.famShard || 0) + fs; summary.famShards = fs; }
@@ -1027,6 +1032,7 @@ export function applyBattle(save0, ctx, battle, rng = Math.random) {
       for (const D of CHRONICLE_DUNGEONS) if (fid === D.unlockField) summary.unlocks.push(`던전 「${D.name}」`);
     }
   }
+  if (ctx.kind === 'tower' && save.tower?.run) towerAdvance(save, battle, summary);
   if (ctx.kind === 'dungeon' && save.dungeon) {
     save.dungeon.hp = battle.finalHp;
     if (ctx.type === 'dungeonBoss') {
@@ -1079,4 +1085,78 @@ export function battleDamageStats(sim, party) {
     }
   }
   return { byUnit, bySkill, rounds: sim.rounds || 1 };
+}
+
+
+// ===== 무한 탑 「황혼의 첨탑」 (1.215.0) =====
+// 캐릭터: save.tower = { best, checkpoint, run: {floor, hp} | null }
+// 계정: mats.towerCoin · save.towerWeek = { key(월요일), best, claimed: [10,20,…] }
+export { TOWER, TOWER_SHOP, towerUnlocked, isTowerBoss, towerEnemyLv, towerArea };
+export const towerWeekKeyNow = () => kstWeekKey();
+export function refreshTowerWeek(save0, now = Date.now()) {
+  const key = kstWeekKey(now);
+  if (save0.towerWeek?.key === key) return save0;
+  return { ...save0, towerWeek: { key, best: 0, claimed: [] } };
+}
+export function startTower(save0) {
+  if (!towerUnlocked(save0.progress) || save0.tower?.run) return save0;
+  const save = refreshTowerWeek(clone(save0));
+  save.tower = save.tower || { best: 0, checkpoint: 0, run: null };
+  save.tower.run = { floor: (save.tower.checkpoint || 0) + 1, hp: null };
+  return save;
+}
+export function leaveTower(save0) {
+  if (!save0.tower?.run) return save0;
+  const save = clone(save0);
+  save.tower.run = null;
+  return save;
+}
+export function towerEncounter(save, rng) {
+  const floor = save.tower.run.floor;
+  const { type, picks } = towerFloorPicks(floor, rng);
+  const area = towerArea(floor);
+  const lv = towerEnemyLv(floor);
+  return { type, floor, enemies: picks.map((k, i) => buildChronicleEnemy(k, lv + (i === 0 && type !== 'towerFloor' ? 1 : 0), `e${i}`, area)) };
+}
+function towerAdvance(save, battle, summary) {
+  const t = save.tower;
+  const floor = t.run.floor;
+  const boss = isTowerBoss(floor);
+  let coins = TOWER.coins(floor) * (boss ? TOWER.bossCoinMult : 1);
+  t.best = Math.max(t.best || 0, floor);
+  if (boss) { t.checkpoint = Math.max(t.checkpoint || 0, floor); summary.towerCheckpoint = floor; }
+  // 주간 기록 · 10층 단위 첫 도달 보너스
+  const w = save.towerWeek && save.towerWeek.key === kstWeekKey() ? save.towerWeek : { key: kstWeekKey(), best: 0, claimed: [] };
+  w.best = Math.max(w.best, floor);
+  if (boss && !w.claimed.includes(floor)) { w.claimed = [...w.claimed, floor]; const b = TOWER.weeklyBonus(floor); coins += b; summary.towerWeekly = b; }
+  save.towerWeek = w;
+  save.mats.towerCoin = (save.mats.towerCoin || 0) + coins;
+  summary.towerCoins = coins;
+  summary.towerFloor = floor;
+  t.run = { floor: floor + 1, hp: battle.finalHp };
+}
+// 첨탑 상점 — uniqueId: 유니크 선택 상자에서 고른 유니크
+export function towerShopCanBuy(save, id) {
+  const it = TOWER_SHOP.find(x => x.id === id);
+  if (!it || (save.mats.towerCoin || 0) < it.cost) return false;
+  if (id === 'key' && keyCount(save) >= DUNGEON_KEYS.max) return false;
+  if (id === 'unique' && save.inventory.length >= T.inventoryMax) return false;
+  return true;
+}
+export function buyTowerItem(save0, id, uniqueId = null) {
+  if (!towerShopCanBuy(save0, id)) return save0;
+  const it = TOWER_SHOP.find(x => x.id === id);
+  const save = clone(save0);
+  if (id === 'unique') {
+    const u = UNIQUE_ITEMS[uniqueId];
+    if (!u || u.disabled || !(u.cls === save.hero || u.cls === 'common')) return save0;
+    save.inventory.push({ ...makeItem(Math.random, { named: uniqueId, ilv: save.units[save.hero].lv }), uid: save.nextUid++ });
+    save.stats.uniques = (save.stats.uniques || 0) + 1;
+  } else if (id === 'ticket') save.mats.sealPlus = (save.mats.sealPlus || 0) + 1;
+  else if (id === 'shards') save.mats.famShard = (save.mats.famShard || 0) + 10;
+  else if (id === 'key') addKeys(save, 1);
+  else if (id === 'ancient') save.mats.shard += 5;
+  else if (id === 'essence') save.mats.essence += 40;
+  save.mats.towerCoin -= it.cost;
+  return save;
 }
