@@ -4,7 +4,7 @@
 // 저장 객체(save)를 받아 새 save를 돌려주는 순수 함수 + 전투 시뮬.
 // 전투는 simulateChronicleBattle이 끝까지 계산해 사건 목록을 돌려주고, UI는 재생만 한다 (풀오토 관전).
 // ============================================
-import { fieldStages, FIELD_STAGES, STAGE_TUNING, BOOST, BAG_EXPAND, SALVAGE, SALVAGE_ICON } from './data.js';
+import { fieldStages, FIELD_STAGES, STAGE_TUNING, BOOST, BAG_EXPAND, SALVAGE, SALVAGE_ICON, REBIRTH, REBIRTH_BRANCHES, expNeedFor } from './data.js';
 import { TOWER, TOWER_SHOP, towerUnlocked, isTowerBoss, towerEnemyLv, towerArea, towerFloorPicks, kstWeekKey } from './tower.js';
 import { famCombatant, famSubFx, rollFamShards, FAM_TUNING, summonFamiliars, enhanceFamiliar, evolveFamiliar } from './familiar.js';
 import {
@@ -52,7 +52,7 @@ export function autoGrowUnit(u0) {
   }
   let guard = 0;
   while (u.sp > 0 && guard++ < 50) {
-    const learnable = classSkills(u.classId).filter(s => s.reqLv <= u.lv && (u.skills[s.id] || 0) < SKILL_MAX_LV);
+    const learnable = classSkills(u.classId, u.rebirth?.branch).filter(s => s.reqLv <= u.lv && (u.skills[s.id] || 0) < SKILL_MAX_LV);
     if (!learnable.length) { u.mastery = (u.mastery || 0) + u.sp; u.sp = 0; break; }
     learnable.sort((a, b) => (u.skills[a.id] || 0) - (u.skills[b.id] || 0) || a.reqLv - b.reqLv);
     const s = learnable[0];
@@ -190,13 +190,17 @@ export function statLabel(k, v) {
   return `${d.label} ${k === 'cdr' ? '-' : '+'}${v}${d.unit || ''}`;
 }
 
+// 전승 캐릭터 착용 제한 (1.220.0) — 장비 레벨 ≤ 내 레벨 + 5 (전승 전에는 제한 없음)
+export function canWear(it, u) {
+  return !(u?.rebirth?.count > 0) || (it.ilv || 1) <= u.lv + REBIRTH.wearMargin;
+}
 function gearTotals(save, u) {
   const t = {};
   const add = (k, v) => { t[k] = (t[k] || 0) + v; };
   for (const slot of Object.keys(u.equip)) {
     const uid = u.equip[slot];
     const it = uid != null ? save.inventory.find(i => i.uid === uid) : null;
-    if (!it || !itemUsable(it, u.classId)) continue;
+    if (!it || !itemUsable(it, u.classId) || !canWear(it, u)) continue;
     for (const [k, v] of Object.entries(itemStats(it))) add(k, v);
     const ud = uniqueDef(it);
     if (ud) for (const [k, v] of Object.entries(ud.fx)) add(k, v);
@@ -225,17 +229,21 @@ export function deriveUnit(save, classId) {
   const g = gearTotals(save, u);
   // 보조 사역마 패시브 (1.212.0) — 장비 합산과 같은 키로 더한다
   for (const [k, v] of Object.entries(famSubFx(save.fams, activeSubs(save)))) g[k] = (g[k] || 0) + v;
+  // 전승 갈래 기본 효과 (1.220.0)
+  const br = u.rebirth?.branch && REBIRTH_BRANCHES[u.rebirth.branch];
+  if (br) for (const [k, v] of Object.entries(br.fx)) g[k] = (g[k] || 0) + v;
+  const rb = 1 + REBIRTH.bonusPct * (u.rebirth?.count || 0);
   const G = (k) => g[k] || 0;
   const fx = passiveFx(u);
   const st = u.stats;
   const main = cls.main === 'int' ? st.int : cls.main === 'agi' ? st.agi : st.str;
   const mast = (u.mastery || 0) * MASTERY_PCT;
-  const atk = (main * 2.2 + u.lv * 1.5 + G('atk')) * (1 + (fx.atkPct || 0) + G('atkPct') + mast);
+  const atk = (main * 2.2 + u.lv * 1.5 + G('atk')) * (1 + (fx.atkPct || 0) + G('atkPct') + mast) * rb;
   const out = {
     id: classId, classId, name: cls.name, side: 'party', lv: u.lv, magic: cls.magic,
-    maxHp: Math.round((50 + st.vit * 10 + u.lv * 6 + G('hp')) * (1 + (fx.hpPct || 0) + G('hpPct') + mast)),
+    maxHp: Math.round((50 + st.vit * 10 + u.lv * 6 + G('hp')) * (1 + (fx.hpPct || 0) + G('hpPct') + mast) * rb),
     atk: Math.round(atk),
-    healPower: Math.round((st.int * 2.2 + u.lv * 1.5 + G('atk') * 0.5) * (1 + G('healPct'))),
+    healPower: Math.round(Math.max(st.int * 2.2 + u.lv * 1.5 + G('atk') * 0.5, atk * G('healFromAtk')) * (1 + G('healPct'))),
     def: Math.round((st.vit * 0.8 + G('def')) * (1 + (fx.defPct || 0) + G('defPct'))),
     spd: +((8 + st.agi * 0.6 + G('spd')) * (1 + G('spdPct'))).toFixed(1),
     crit: Math.min(0.6, 0.05 + st.agi * 0.004 + (fx.critAdd || 0) + G('crit')),
@@ -276,7 +284,7 @@ export function autoAllocate(save0, classId) {
   return save;
 }
 export function canLearn(u, s) {
-  return u.sp > 0 && s.reqLv <= u.lv && (u.skills[s.id] || 0) < SKILL_MAX_LV;
+  return u.sp > 0 && s.reqLv <= u.lv && (u.skills[s.id] || 0) < SKILL_MAX_LV && (!s.branch || s.branch === u.rebirth?.branch);
 }
 export function learnSkill(save0, classId, skillId) {
   const u0 = save0.units[classId];
@@ -354,8 +362,8 @@ function gainExp(u, n) {
   let ups = 0;
   if (u.lv >= T.maxLevel) return 0;
   u.exp += n;
-  while (u.lv < T.maxLevel && u.exp >= T.expNeed(u.lv)) {
-    u.exp -= T.expNeed(u.lv);
+  while (u.lv < T.maxLevel && u.exp >= expNeedFor(u)) {
+    u.exp -= expNeedFor(u);
     u.lv += 1; u.points += T.pointsPerLevel; u.sp += T.spPerLevel; ups++;
   }
   return ups;
@@ -372,7 +380,7 @@ export function equipItem(save0, classId, uid) {
   const save = clone(save0);
   const it = save.inventory.find(i => i.uid === uid);
   const u = save.units[classId];
-  if (!it || !u || !itemUsable(it, classId)) return save0;
+  if (!it || !u || !itemUsable(it, classId) || !canWear(it, u)) return save0;
   // 다른 유닛이 끼고 있으면 해제
   for (const other of Object.values(save.units)) {
     for (const sl of Object.keys(other.equip)) if (other.equip[sl] === uid) other.equip[sl] = null;
@@ -435,8 +443,9 @@ export function autoEquip(save0) {
   let save = clone(save0);
   for (const cid of save.party) {
     for (const sl of SLOTS.map(s => s.id)) {
-      const cur = save.inventory.find(i => i.uid === save.units[cid].equip[sl] && itemUsable(i, cid));
-      const free = save.inventory.filter(i => i.slot === sl && itemUsable(i, cid) && !equippedBy(save, i.uid));
+      const u = save.units[cid];
+      const cur = save.inventory.find(i => i.uid === u.equip[sl] && itemUsable(i, cid) && canWear(i, u));
+      const free = save.inventory.filter(i => i.slot === sl && itemUsable(i, cid) && canWear(i, u) && !equippedBy(save, i.uid));
       free.sort((a, b) => itemPower(b) - itemPower(a));
       if (free[0] && (!cur || itemPower(free[0]) > itemPower(cur))) save = equipItem(save, cid, free[0].uid);
     }
@@ -556,6 +565,7 @@ export function forgePromote(save0, uid, rng = Math.random) {
 
 // ===== 사역마 편성 (1.212.0) — 칸은 주인공 레벨로 개방 =====
 export function famSlotOpen(save, slot) {
+  if (save.units[save.hero]?.rebirth?.count > 0) return true; // 전승자는 이미 개방한 칸 유지
   const lv = save.units[save.hero]?.lv || 1;
   return lv >= FAM_TUNING.slotLv[slot];
 }
@@ -703,6 +713,28 @@ export function dungeonEncounter(d, rng) {
   return { type: 'dungeonFloor', enemies };
 }
 
+// 고유 스킬과 같은 규칙으로 고르는 스킬 종류 (사역마 고유 스킬 · 전승 스킬 공용)
+const SPECIAL_KINDS = new Set(['duel', 'warcry', 'cover', 'fortify', 'bigHeal', 'hot', 'healShield', 'healBuff', 'breakStrike', 'weakStrike', 'markStrike', 'executeStrike']);
+
+// ===== 전승 (1.220.0) =====
+export function canRebirth(save, classId = save.hero) {
+  const u = save.units[classId];
+  return !!u && u.lv >= REBIRTH.reqLevel && (u.rebirth?.count || 0) < REBIRTH.max;
+}
+export function rebirth(save0, branchId, classId = save0.hero) {
+  const br = REBIRTH_BRANCHES[branchId];
+  const u0 = save0.units[classId];
+  if (!br || br.cls !== classId || !canRebirth(save0, classId)) return save0;
+  if (u0.rebirth?.branch && u0.rebirth.branch !== branchId) return save0; // 갈래는 첫 전승 때 고정
+  const save = clone(save0);
+  const u = save.units[classId];
+  const cls = chronicleClass(classId);
+  u.rebirth = { branch: branchId, count: (u0.rebirth?.count || 0) + 1 };
+  u.lv = 1; u.exp = 0; u.points = 0; u.sp = 1; u.stats = { ...cls.base }; u.skills = {}; u.mastery = 0;
+  save.stats.rebirths = (save.stats.rebirths || 0) + 1;
+  return save;
+}
+
 // ===== 전투 시뮬 (풀오토) =====
 export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
   const units = [
@@ -820,8 +852,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
     const lowAlly = allies.find(a => a.hp < a.maxHp * 0.55);
     const hurt = allies.filter(a => a.hp < a.maxHp * 0.7).length;
     // 사역마 고유 스킬 (1.218.0) — 조건이 맞으면 최우선
-    const sig = ready.find(x => x.s.sig);
-    if (sig) {
+    for (const sig of ready.filter(x => x.s.sig || SPECIAL_KINDS.has(x.s.kind))) {
       const leader = allies.find(a => a.leader) || allies[0];
       const k = sig.s.kind;
       const ok = k === 'duel' ? foes.some(f => !(f.forced?.t > 0))
@@ -833,7 +864,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
                   : k === 'healShield' ? allies.some(a => a.hp < a.maxHp * 0.65)
                     : k === 'healBuff' ? (allies.some(a => a.hp < a.maxHp * 0.75) || !allies.some(a => a.buffs.song?.t > 0))
                       : true;
-      if (ok) return sig;
+      if (ok && !(k === 'cover' && u.leader)) return sig;
     }
     if (hurt >= 2 && has('healAll')) return has('healAll');
     if (lowAlly && has('heal')) return has('heal');

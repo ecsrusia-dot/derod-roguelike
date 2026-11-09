@@ -116,7 +116,71 @@ export const DUNGEON_KEYS = {
   shopPrice: 400,        // 상점 구매 가격 (골드)
   shopDailyLimit: 2,     // 하루 구매 한도
 };
-export const classSkills = (classId) => Object.values(CHRONICLE_SKILLS).filter(s => s.cls === classId);
+// ===== 전승 (1.220.0 PM 결정) =====
+// 만렙(Lv.100) 달성 시 직업별 2갈래 중 하나로 전승 → 레벨 1로 초기화(능력치·스킬·마스터리 포함),
+// 필요 경험치 ×2(전승 횟수마다 누적), 장비·사역마·재화 유지, 착용은 「장비 레벨 ≤ 내 레벨 + 5」만.
+// 갈래는 첫 전승 때 고정. 전승 1회마다 영구 공격력·최대 HP +5%
+export const REBIRTH = { reqLevel: 100, max: 5, expMult: 2, wearMargin: 5, bonusPct: 0.05 };
+export const REBIRTH_BRANCHES = {
+  w_warlord: { cls: 'wanderer', name: '검귀', type: '탱딜', color: '#e8826a', desc: '반격과 베기로 버티며 적을 쓸어버린다 — 회복이 없으니 치유 사역마와 궁합', fx: { atkPct: 0.12, counterPct: 0.08, counterDmg: 0.3 } },
+  w_paladin: { cls: 'wanderer', name: '성기사', type: '탱힐', color: '#f0d27a', desc: '스스로 회복하고 보호막을 두른다 — 딜이 부족하니 맹공 사역마와 궁합', fx: { defPct: 0.12, hpPct: 0.08, healFromAtk: 0.6 } },
+  s_arch: { cls: 'sage', name: '대마도사', type: '광역 특화', color: '#9cc4e4', desc: '스킬 피해를 극대화해 적 무리를 한 번에 지운다', fx: { skillDmg: 0.15 } },
+  s_hex: { cls: 'sage', name: '저주술사', type: '도트·취약', color: '#c08ae8', desc: '저주와 표식으로 적을 녹인다 — 긴 전투에 강하다', fx: { dotDmg: 0.3, hpPct: 0.06 } },
+  d_reaper: { cls: 'demonblood', name: '혈귀', type: '단일 특화', color: '#e0574c', desc: '치명적인 일격과 방어 파괴로 강적을 처형한다', fx: { critDmg: 0.3, armorPen: 0.1 } },
+  d_plague: { cls: 'demonblood', name: '역병기사', type: '도트·약화', color: '#9fd18a', desc: '역병으로 적을 약하게 만들고 단단하게 버틴다', fx: { hpPct: 0.12, dotDmg: 0.2 } },
+  e_sniper: { cls: 'elf', name: '저격수', type: '단일 특화', color: '#d8e89a', desc: '치명타와 처형 사격으로 보스를 노린다', fx: { crit: 0.08, critDmg: 0.25 } },
+  e_storm: { cls: 'elf', name: '폭풍궁수', type: '광역 특화', color: '#7fd1c8', desc: '쉬지 않는 화살비로 무리를 휩쓴다', fx: { spdPct: 0.1, chain: 0.08 } },
+  p_arch: { cls: 'priest', name: '대주교', type: '버프·힐', color: '#ffe9a8', desc: '회복과 함께 아군의 공격을 끌어올린다 — 맹공 사역마와 궁합', fx: { healPct: 0.15 } },
+  p_inq: { cls: 'priest', name: '심판관', type: '디버프·힐', color: '#c9a0ff', desc: '적을 약화·표식하며 스스로도 싸운다 — 수호 사역마와 궁합', fx: { atkPct: 0.15, holyDmg: 0.1 } },
+};
+const B = (branch, id, name, kind, reqLv, cd, base, perLv, extra = {}) => S(id, REBIRTH_BRANCHES[branch].cls, name, kind, reqLv, cd, base, perLv, { branch, ...extra });
+Object.assign(CHRONICLE_SKILLS, {
+  // 검귀
+  wb_cleave: B('w_warlord', 'wb_cleave', '참마검', 'aoe', 1, 3, 1.3, 0.12),
+  wb_spirit: B('w_warlord', 'wb_spirit', '검귀의 기백', 'passive', 15, 0, 0, 0, { fx: (lv) => ({ atkPct: 0.03 * lv, counterPct: 0.02 * lv }) }),
+  wb_execute: B('w_warlord', 'wb_execute', '일도양단', 'executeStrike', 30, 4, 2.2, 0.2),
+  // 성기사
+  wp_lay: B('w_paladin', 'wp_lay', '신성한 손길', 'heal', 1, 3, 0.9, 0.1),
+  wp_faith: B('w_paladin', 'wp_faith', '신념', 'passive', 15, 0, 0, 0, { fx: (lv) => ({ defPct: 0.04 * lv, hpPct: 0.02 * lv }) }),
+  wp_aegis: B('w_paladin', 'wp_aegis', '성역의 방패', 'healShield', 30, 5, 0.7, 0.08, { shieldV: 0.9 }),
+  // 대마도사
+  sa_storm: B('s_arch', 'sa_storm', '천벌의 폭풍', 'aoe', 1, 3, 1.4, 0.14),
+  sa_mind: B('s_arch', 'sa_mind', '마력 공명', 'passive', 15, 0, 0, 0, { fx: (lv) => ({ atkPct: 0.04 * lv }) }),
+  sa_rain: B('s_arch', 'sa_rain', '유성우', 'multi', 30, 4, 0.7, 0.07, { hits: 5 }),
+  // 저주술사
+  sh_plague: B('s_hex', 'sh_plague', '역병의 저주', 'dot', 1, 4, 0.6, 0.07, { turns: 4, all: true }),
+  sh_rot: B('s_hex', 'sh_rot', '부패의 손길', 'passive', 15, 0, 0, 0, { fx: (lv) => ({ hpPct: 0.03 * lv, atkPct: 0.02 * lv }) }),
+  sh_mark: B('s_hex', 'sh_mark', '파멸의 표식', 'markStrike', 30, 3, 1.2, 0.12, { dv: 0.3, turns: 3 }),
+  // 혈귀
+  dr_rend: B('d_reaper', 'dr_rend', '심장 찢기', 'executeStrike', 1, 3, 1.8, 0.16),
+  dr_thirst: B('d_reaper', 'dr_thirst', '피의 갈증', 'passive', 15, 0, 0, 0, { fx: (lv) => ({ atkPct: 0.03 * lv, critAdd: 0.02 * lv }) }),
+  dr_break: B('d_reaper', 'dr_break', '뼈 부수기', 'breakStrike', 30, 3, 1.5, 0.14, { dv: 0.35, turns: 3 }),
+  // 역병기사
+  dp_miasma: B('d_plague', 'dp_miasma', '독기', 'dot', 1, 4, 0.55, 0.06, { turns: 4, all: true }),
+  dp_flesh: B('d_plague', 'dp_flesh', '썩은 살갗', 'passive', 15, 0, 0, 0, { fx: (lv) => ({ hpPct: 0.04 * lv, defPct: 0.03 * lv }) }),
+  dp_weaken: B('d_plague', 'dp_weaken', '쇠약의 일격', 'weakStrike', 30, 3, 1.3, 0.12, { dv: 0.3, turns: 3 }),
+  // 저격수
+  es_snipe: B('e_sniper', 'es_snipe', '저격', 'executeStrike', 1, 3, 2.0, 0.18),
+  es_focus: B('e_sniper', 'es_focus', '집중', 'passive', 15, 0, 0, 0, { fx: (lv) => ({ critAdd: 0.03 * lv, atkPct: 0.02 * lv }) }),
+  es_pierce: B('e_sniper', 'es_pierce', '관통 사격', 'breakStrike', 30, 3, 1.5, 0.14, { dv: 0.3, turns: 3 }),
+  // 폭풍궁수
+  et_gale: B('e_storm', 'et_gale', '돌풍 화살', 'aoe', 1, 3, 1.2, 0.12),
+  et_wind: B('e_storm', 'et_wind', '바람의 눈', 'passive', 15, 0, 0, 0, { fx: (lv) => ({ dodgeAdd: 0.02 * lv, atkPct: 0.03 * lv }) }),
+  et_barrage: B('e_storm', 'et_barrage', '폭풍 연사', 'multi', 30, 4, 0.5, 0.05, { hits: 7 }),
+  // 대주교
+  pa_hymn: B('p_arch', 'pa_hymn', '고양의 찬가', 'healBuff', 1, 4, 0.8, 0.08, { buff: 0.15, turns: 3 }),
+  pa_grace: B('p_arch', 'pa_grace', '은총', 'passive', 15, 0, 0, 0, { fx: (lv) => ({ hpPct: 0.03 * lv, defPct: 0.02 * lv }) }),
+  pa_regen: B('p_arch', 'pa_regen', '재생의 기도', 'hot', 30, 4, 0.3, 0.04, { turns: 4 }),
+  // 심판관
+  pi_verdict: B('p_inq', 'pi_verdict', '판결', 'weakStrike', 1, 3, 1.5, 0.14, { dv: 0.25, turns: 3 }),
+  pi_zeal: B('p_inq', 'pi_zeal', '열의', 'passive', 15, 0, 0, 0, { fx: (lv) => ({ atkPct: 0.04 * lv }) }),
+  pi_brand: B('p_inq', 'pi_brand', '단죄의 낙인', 'markStrike', 30, 3, 1.4, 0.12, { dv: 0.3, turns: 3 }),
+});
+export const rebirthBranches = (classId) => Object.entries(REBIRTH_BRANCHES).filter(([, b]) => b.cls === classId).map(([id, b]) => ({ id, ...b }));
+// 레벨업 필요 경험치 — 전승 횟수마다 ×2
+export const expNeedFor = (u) => Math.round(CHRONICLE_TUNING.expNeed(u.lv) * Math.pow(REBIRTH.expMult, u.rebirth?.count || 0));
+// branch를 주면 그 갈래 스킬까지 포함 (갈래 없는 유닛은 기본 스킬만)
+export const classSkills = (classId, branch = null) => Object.values(CHRONICLE_SKILLS).filter(s => s.cls === classId && (!s.branch || s.branch === branch));
 
 const pct = (x) => `${Math.round(x * 100)}%`;
 export function describeSkill(s, lv = 1) {
@@ -134,6 +198,13 @@ export function describeSkill(s, lv = 1) {
     case 'buffAtk': return `${s.turns}턴간 아군 전체 공격력 +${pct(v)}`;
     case 'rage': return `${s.turns}턴간 자신의 공격력 +${pct(v)}`;
     case 'taunt': return `${s.turns}턴간 적의 공격을 끌어당기고 방어 +${pct(v)}`;
+    case 'executeStrike': return `적 1명에게 공격력 ${pct(v)} 피해 — 대상 HP 35% 미만이면 2배`;
+    case 'breakStrike': return `적 1명에게 공격력 ${pct(v)} 피해 + ${s.turns}턴간 방어 -${pct(s.dv)}`;
+    case 'weakStrike': return `적 1명에게 공격력 ${pct(v)} 피해 + ${s.turns}턴간 그 적의 공격력 -${pct(s.dv)}`;
+    case 'markStrike': return `적 1명에게 공격력 ${pct(v)} 피해 + ${s.turns}턴간 받는 피해 +${pct(s.dv)}`;
+    case 'healShield': return `HP가 가장 낮은 아군 회복 ${pct(v)} + 보호막 ${pct(s.shieldV)}`;
+    case 'healBuff': return `HP가 가장 낮은 아군 회복 ${pct(v)} + ${s.turns}턴간 아군 전체 공격력 +${pct(s.buff)}`;
+    case 'hot': return `아군 1명에게 ${s.turns}턴간 매 턴 ${pct(v)} 회복`;
     case 'passive': {
       const fx = s.fx(L);
       const parts = [];

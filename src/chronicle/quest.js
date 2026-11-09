@@ -6,7 +6,7 @@
 // 완료 여부는 저장하지 않고 매번 goal로 계산한다 (저장 꼬임 방지).
 // ============================================
 import { QUESTS, SCENES, RECRUIT_SCENES } from './story.js';
-import { GRADES, gradeIdx, CHRONICLE_TUNING as T, DUNGEON_TIERS } from './data.js';
+import { GRADES, gradeIdx, CHRONICLE_TUNING as T, DUNGEON_TIERS, expNeedFor } from './data.js';
 import { rollItem, autoGrowUnit, refreshDungeonKeys, _addKeys } from './engine.js';
 
 const clone = (o) => (typeof structuredClone === 'function' ? structuredClone(o) : JSON.parse(JSON.stringify(o)));
@@ -123,7 +123,7 @@ export function claimQuest(save0, id, rng = Math.random) {
       if (u.lv >= T.maxLevel) continue;
       u.exp += r.exp;
       let up = false;
-      while (u.lv < T.maxLevel && u.exp >= T.expNeed(u.lv)) { u.exp -= T.expNeed(u.lv); u.lv += 1; u.points += T.pointsPerLevel; u.sp += T.spPerLevel; up = true; }
+      while (u.lv < T.maxLevel && u.exp >= expNeedFor(u)) { u.exp -= expNeedFor(u); u.lv += 1; u.points += T.pointsPerLevel; u.sp += T.spPerLevel; up = true; }
       if (up && cid !== save.hero) save.units[cid] = autoGrowUnit(u);
     }
   }
