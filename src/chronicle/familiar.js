@@ -418,3 +418,73 @@ export function rollFamShards(enemies, type, rng, dungeonTier = 0) {
   }
   return n;
 }
+
+// ============================================
+// 보유 효과 · 인연 (1.228.0 — PM: 남령부터 보유 효과 · 특정 사역마를 모으면 인연 보너스)
+// 둘 다 「가지고만 있으면」 적용 (편성 무관) → engine deriveUnit이 장비 합산 키와 같은 곳에 더한다
+// ============================================
+export const FAM_OWN_MIN_GRADE = 3; // 남령부터
+// 역할별 보유 효과 — [남령, 자령] × 강화(+5%/단계)
+export const FAM_OWN = {
+  tank: { hpPct: [0.015, 0.025], defPct: [0.015, 0.025] },
+  dps: { atkPct: [0.015, 0.025], critDmg: [0.03, 0.05] },
+  healer: { regenPct: [0.0008, 0.0013], dmgReduce: [0.006, 0.01] },
+};
+export function famOwnValues(key, f) {
+  const gi = famGradeIdx(f?.grade);
+  if (!f || gi < FAM_OWN_MIN_GRADE) return {};
+  const out = {};
+  for (const [k, arr] of Object.entries(FAM_OWN[famRole(key)])) out[k] = arr[gi - FAM_OWN_MIN_GRADE] * plusMult(f);
+  return out;
+}
+// 보유 효과 합계 상한 — 극한 수집(전부 자령+10)이면 공격 +200%가 되므로 막는다. 후반 예상치(보스 자령+5)는 +25% 안팎
+export const FAM_OWN_CAP = { atkPct: 0.3, hpPct: 0.3, defPct: 0.3, critDmg: 0.6, dmgReduce: 0.08, regenPct: 0.01 };
+export function famOwnFx(fams) {
+  const fx = {};
+  for (const [key, f] of Object.entries(fams || {})) for (const [k, v] of Object.entries(famOwnValues(key, f))) fx[k] = (fx[k] || 0) + v;
+  for (const k of Object.keys(fx)) if (FAM_OWN_CAP[k] != null) fx[k] = Math.min(FAM_OWN_CAP[k], fx[k]);
+  return fx;
+}
+
+// 인연 — members 전원 보유 = 1단계 / 전원 tier2Grade 이상 + 강화 +5 이상 = 2단계 (효과 ×2)
+const keyByName = (name) => Object.keys(ENEMIES).find(k => ENEMIES[k].name === name);
+export const BOND_TIER2_PLUS = 5;
+const REGION_BOND_FX = {
+  1: { hpPct: 0.02 }, 2: { critDmg: 0.04 }, 3: { defPct: 0.03 }, 4: { atkPct: 0.02 }, 5: { dmgReduce: 0.01 }, 6: { crit: 0.01 },
+  7: { regenPct: 0.001 }, 8: { atkPct: 0.02 }, 9: { hpPct: 0.02 }, 10: { expPct: 0.05 }, 11: { dodge: 0.01 }, 12: { famPct: 0.03 },
+};
+const PACK_BOND_FX = { 1: { goldPct: 0.03 }, 2: { expPct: 0.03 }, 3: { dropPct: 0.02 }, 4: { goldPct: 0.03 } };
+const SPECIAL_BONDS = [
+  { id: 'b_witches', name: '세 마녀', desc: '서리·광기·기억 — 세 시대의 마녀', names: ['한기의 마녀', '광기의 마녀', '회상의 마녀'], fx: { skillDmg: 0.03 } },
+  { id: 'b_icethrone', name: '얼음 왕좌', desc: '동토를 다스린 세 군주', names: ['절대영도의 군주', '동굴의 빙왕', '협곡의 한기룡'], fx: { hpPct: 0.03 } },
+  { id: 'b_demonline', name: '마왕의 계보', desc: '그림자에서 심장까지, 마왕의 핏줄', names: ['마왕의 그림자', '마왕의 화신', '심장의 마왕'], fx: { atkPct: 0.03 } },
+  { id: 'b_heaven', name: '천상의 빛', desc: '여명을 지키던 천상의 존재들', names: ['여명의 신', '정원의 대천사', '천사의 화신'], fx: { dmgReduce: 0.015 } },
+  { id: 'b_seal', name: '봉인의 맥', desc: '봉인을 지키고, 봉인에 갇힌 자들', names: ['망각의 봉인자', '절대봉인의 군주', '심처의 봉인자'], fx: { defPct: 0.04 } },
+];
+const uniqKeys = (a) => [...new Set(a)].filter(k => k && ENEMIES[k]);
+export const FAM_BONDS = [
+  ...CHRONICLE_FIELDS.map(f => ({ id: `b_field${f.id}`, kind: 'region', name: `${f.name}의 주인들`, desc: `${f.name}의 보스와 강적`, members: uniqKeys([f.boss, ...f.elites]), fx: REGION_BOND_FX[f.id] || { hpPct: 0.02 }, tier2Grade: 'indigo' })),
+  ...CHRONICLE_FIELDS.filter(f => PACK_BOND_FX[f.id]).map(f => ({ id: `b_pack${f.id}`, kind: 'pack', name: `${f.name} 사냥 무리`, desc: `${f.name}의 일반 몹`, members: uniqKeys(f.normals), fx: PACK_BOND_FX[f.id], tier2Grade: 'blue' })),
+  ...SPECIAL_BONDS.map(b => ({ ...b, kind: 'special', members: uniqKeys(b.names.map(keyByName)), tier2Grade: 'violet' })),
+].filter(b => b.members.length >= 2);
+export const FAM_BOND_KIND = { region: '지역 인연', pack: '사냥 무리', special: '특별 인연' };
+export function bondTier(fams, bond) {
+  const fs = bond.members.map(k => fams?.[k]);
+  if (fs.some(f => !f)) return 0;
+  const g2 = famGradeIdx(bond.tier2Grade);
+  return fs.every(f => famGradeIdx(f.grade) >= g2 && (f.plus || 0) >= BOND_TIER2_PLUS) ? 2 : 1;
+}
+export function famBondFx(fams) {
+  const fx = {};
+  for (const b of FAM_BONDS) { const t = bondTier(fams, b); if (!t) continue; for (const [k, v] of Object.entries(b.fx)) fx[k] = (fx[k] || 0) + v * t; }
+  return fx;
+}
+// 효과 문구 (보유 효과·인연 공용)
+const FX_LABEL = {
+  hpPct: ['최대 HP', '%'], defPct: ['방어', '%'], atkPct: ['공격력', '%'], critDmg: ['치명타 피해', '%'], crit: ['치명타 확률', '%'], dodge: ['회피', '%'],
+  regenPct: ['매 턴 HP 재생', '%'], dmgReduce: ['받는 피해 감소', '%'], skillDmg: ['스킬 피해', '%'], expPct: ['경험치', '%'], goldPct: ['골드', '%'],
+  dropPct: ['아이템 획득', '%'], famPct: ['사역마 능력치', '%'],
+};
+export function famFxText(fx) {
+  return Object.entries(fx).filter(([, v]) => v).map(([k, v]) => `${(FX_LABEL[k] || [k])[0]} +${Math.round(v * 1000) / 10}%`).join(' · ');
+}

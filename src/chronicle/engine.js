@@ -7,7 +7,7 @@
 import { talentFx, canLearnTalent, talentNode, talentResetCost, talentTrees, tierUnlocked } from './talents.js';
 import { fieldStages, FIELD_STAGES, STAGE_TUNING, BOOST, BAG_EXPAND, SALVAGE, SALVAGE_ICON, REBIRTH, REBIRTH_BRANCHES, expNeedFor } from './data.js';
 import { TOWER, TOWER_SHOP, towerUnlocked, isTowerBoss, towerEnemyLv, towerArea, towerFloorPicks, kstWeekKey } from './tower.js';
-import { famCombatant, famSubFx, rollFamShards, gainFamExp, FAM_AI, FAM_TUNING, summonFamiliars, enhanceFamiliar, evolveFamiliar } from './familiar.js';
+import { famCombatant, famSubFx, famOwnFx, famBondFx, rollFamShards, gainFamExp, FAM_AI, FAM_TUNING, summonFamiliars, enhanceFamiliar, evolveFamiliar } from './familiar.js';
 import {
   CHRONICLE_TUNING as T, CHRONICLE_CLASSES, CHRONICLE_SKILLS, CHRONICLE_FIELDS, CHRONICLE_DUNGEON, CHRONICLE_DUNGEONS, DUNGEON_TIERS, dungeonDef,
   STAT_KEYS, SKILL_MAX_LV, MASTERY_PCT, BOSS_DAILY_LIMIT, DUNGEON_KEYS, GRADES, gradeIdx, SLOTS, CLASS_SLOTS, FORGE, DROP_TABLE,
@@ -245,6 +245,8 @@ export function deriveUnit(save, classId) {
   const g = gearTotals(save, u);
   // 보조 사역마 패시브 (1.212.0) — 장비 합산과 같은 키로 더한다
   for (const [k, v] of Object.entries(famSubFx(save.fams, activeSubs(save), u.lv))) g[k] = (g[k] || 0) + v;
+  // 사역마 보유 효과(남령+) · 인연 (1.228.0) — 가지고만 있으면 적용
+  for (const fx of [famOwnFx(save.fams), famBondFx(save.fams)]) for (const [k, v] of Object.entries(fx)) g[k] = (g[k] || 0) + v;
   // 전승 갈래 기본 효과 (1.220.0)
   const br = u.rebirth?.branch && REBIRTH_BRANCHES[u.rebirth.branch];
   if (br) for (const [k, v] of Object.entries(br.fx)) g[k] = (g[k] || 0) + v;
