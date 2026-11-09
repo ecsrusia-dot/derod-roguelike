@@ -7,7 +7,7 @@
 import { talentFx, canLearnTalent, talentNode, talentResetCost, talentTrees, tierUnlocked } from './talents.js';
 import { fieldStages, FIELD_STAGES, STAGE_TUNING, BOOST, BAG_EXPAND, SALVAGE, SALVAGE_ICON, REBIRTH, REBIRTH_BRANCHES, expNeedFor } from './data.js';
 import { TOWER, TOWER_SHOP, towerUnlocked, isTowerBoss, towerEnemyLv, towerArea, towerFloorPicks, kstWeekKey } from './tower.js';
-import { famCombatant, famSubFx, rollFamShards, gainFamExp, FAM_TUNING, summonFamiliars, enhanceFamiliar, evolveFamiliar } from './familiar.js';
+import { famCombatant, famSubFx, rollFamShards, gainFamExp, FAM_AI, FAM_TUNING, summonFamiliars, enhanceFamiliar, evolveFamiliar } from './familiar.js';
 import {
   CHRONICLE_TUNING as T, CHRONICLE_CLASSES, CHRONICLE_SKILLS, CHRONICLE_FIELDS, CHRONICLE_DUNGEON, CHRONICLE_DUNGEONS, DUNGEON_TIERS, dungeonDef,
   STAT_KEYS, SKILL_MAX_LV, MASTERY_PCT, BOSS_DAILY_LIMIT, DUNGEON_KEYS, GRADES, gradeIdx, SLOTS, CLASS_SLOTS, FORGE, DROP_TABLE,
@@ -918,7 +918,8 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
     const allies = alive('party');
     const foes = alive('enemy');
     const has = (k) => ready.find(x => x.s.kind === k);
-    const lowAlly = allies.find(a => a.hp < a.maxHp * 0.55);
+    // 1.227.1 PM: 사역마는 덜 놀게 — 치유 HP 75% 미만(주인공은 55% 그대로) · 보호막은 주인공 보호막이 최대 HP 10% 미만이면 다시
+    const lowAlly = allies.find(a => a.hp < a.maxHp * (u.fam ? FAM_AI.healBelow : 0.55));
     const hurt = allies.filter(a => a.hp < a.maxHp * 0.7).length;
     // 사역마 고유 스킬 (1.218.0) — 조건이 맞으면 최우선
     for (const sig of ready.filter(x => x.s.sig || SPECIAL_KINDS.has(x.s.kind))) {
@@ -938,7 +939,8 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
     if (hurt >= 2 && has('healAll')) return has('healAll');
     if (lowAlly && has('heal')) return has('heal');
     if (lowAlly && has('healAll')) return has('healAll');
-    if (has('shield') && !allies.some(a => a.shield > 0)) return has('shield');
+    const shieldNeed = u.fam ? (() => { const ld = allies.find(a => a.leader) || allies[0]; return ld && ld.shield < ld.maxHp * FAM_AI.shieldBelow; })() : !allies.some(a => a.shield > 0);
+    if (has('shield') && shieldNeed) return has('shield');
     if (has('buffAtk') && !allies.some(a => a.buffs.bless?.t > 0)) return has('buffAtk');
     if (has('rage') && !(u.buffs.rage?.t > 0)) return has('rage');
     if (has('taunt') && !(u.taunt > 0) && (u.fam || u.hp < u.maxHp * 0.6)) return has('taunt'); // 솔로: 도발 = 방어 태세 (위급하거나 강적·보스전에서만)
