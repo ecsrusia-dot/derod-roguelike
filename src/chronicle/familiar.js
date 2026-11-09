@@ -28,7 +28,6 @@ export const FAM_TUNING = {
   tenPullGuarantee: 'blue',     // 10연마다 이 등급 이상 1마리 확정
   violetPity: 150,              // 누적 소환 수 — 자령이 안 나오면 확정 (자령 소환 가능해진 뒤부터)
   maxPlus: 10,
-  hpPerLv: 70,                  // 사역마 HP 기준 = min(주인공 최대 HP, 레벨 × 70)
   plusStatPct: 0.05,            // 강화 1단계당 능력치 +5%
   enhanceCost: (plus, g) => (plus + 1) * famGrade(g).cost,   // +n → +n+1 사역혼
   evolveCost: (g) => 10 * famGrade(g).cost,
@@ -39,17 +38,33 @@ export const FAM_TUNING = {
 };
 
 // ===== 사역마 레벨 (1.225.0 — PM: 처음 얻으면 Lv.1, 동행할 때만 경험치) =====
-// 실효 레벨 = min(사역마 레벨, 주인공 레벨) · 능력치는 (10+실효)/(10+주인공) 비율로 깎인다
+// 실효 레벨 = min(사역마 레벨, 주인공 레벨) · 능력치는 실효 레벨의 기준 곡선(FAM_STAT_CURVE, 1.226.0)
 // 보조 패시브도 레벨 비례 — subMin + (1-subMin) × (실효/주인공)
 export const FAM_LEVEL = {
   expNeed: (lv) => Math.round(60 * Math.pow(lv, 1.6)), // 주인공 1회차와 같은 곡선
   catchUp: 1,       // 1.225.1 PM: 따라잡기 보정 폐지 — 주인공과 같은 경험치 (동행해서 직접 키워야 함)
   subMin: 0.3,      // Lv.1 보조 사역마도 패시브의 30%는 준다
-  lvOffset: 10,
 };
+// ===== 사역마 독립 능력치 (1.226.0 — PM: 주인공 직업·장비와 무관) =====
+// 기준 곡선 = 5직업 봇이 그 레벨에서 가진 평균 능력치 (장비 포함, 사역마 없이 측정 — scratch curve.mjs)
+// [레벨, 최대 HP, 공격력, 방어, 속도] — 사이 레벨은 선형 보간
+export const FAM_STAT_CURVE = [
+  [1, 151, 33, 8, 11.6], [5, 255, 61, 16, 12.9], [10, 441, 112, 33, 15.4], [15, 654, 171, 53, 17.5], [20, 862, 231, 71, 19.3],
+  [25, 1126, 297, 92, 21], [30, 1400, 350, 115, 23.1], [40, 1984, 473, 156, 27.3], [50, 2353, 590, 196, 31.8], [60, 2833, 706, 237, 35.2],
+  [70, 3380, 800, 287, 39.1], [80, 3890, 960, 335, 42.8], [90, 4676, 1071, 397, 46.6], [100, 4950, 1120, 420, 49],
+];
+export function famBaseStats(lv) {
+  const c = FAM_STAT_CURVE;
+  const L = Math.max(1, Math.min(c[c.length - 1][0], lv));
+  let i = 0;
+  while (i < c.length - 2 && c[i + 1][0] < L) i++;
+  const [l0, ...a] = c[i]; const [l1, ...b] = c[i + 1];
+  const t = Math.max(0, Math.min(1, (L - l0) / (l1 - l0)));
+  const v = a.map((x, k) => x + (b[k] - x) * t);
+  return { hp: v[0], atk: v[1], def: v[2], spd: v[3] };
+}
 export const famLv = (f) => Math.max(1, f?.lv || 1);
 export const famEffLv = (f, heroLv) => Math.min(famLv(f), Math.max(1, heroLv || 1));
-export const famLvRatio = (f, heroLv) => (FAM_LEVEL.lvOffset + famEffLv(f, heroLv)) / (FAM_LEVEL.lvOffset + Math.max(1, heroLv || 1));
 const subLvMult = (f, heroLv) => (heroLv ? FAM_LEVEL.subMin + (1 - FAM_LEVEL.subMin) * (famEffLv(f, heroLv) / heroLv) : 1);
 // 승리 경험치 → 사역마 (주인공 레벨이 상한) → { f, ups }
 export function gainFamExp(f0, n, heroLv) {
@@ -196,15 +211,7 @@ export function famSkillInfo(key, f) {
   });
 }
 // 동행 능력치 (주인공 대비 비율 — 등급·강화 반영)
-export function famStatRatios(key, f) {
-  const role = FAM_ROLES[famRole(key)];
-  const m = powerMult(f);
-  const lv = famGradeIdx(f.grade) + 1;
-  return {
-    hp: role.hp * m, atk: role.atk * m, def: role.def * Math.sqrt(m), heal: (role.heal || 0.15) * m,
-    guard: role.guard ? role.guard[lv - 1] : 0,
-  };
-}
+export const famGuard = (key, f) => { const role = FAM_ROLES[famRole(key)]; return role.guard ? role.guard[famGradeIdx(f.grade)] : 0; };
 
 // ===== 고유 스킬 (1.218.0 — 남령부터) =====
 // 같은 역할이라도 사역마마다 다른 고유 스킬. 자령은 지속 턴 +1
@@ -253,21 +260,31 @@ export const famName = (key) => ENEMIES[key]?.name || '사역마';
 const plusMult = (f) => 1 + FAM_TUNING.plusStatPct * (f.plus || 0);
 const powerMult = (f) => famGrade(f.grade).mult * plusMult(f);
 
-// 동행 사역마 → 전투 유닛 (주인공 능력치 비례 × 사역마 레벨 비율 — 1.225.0)
+// 동행 사역마의 실제 능력치 (1.226.0) — 사역마 실효 레벨의 기준 곡선 × 역할 × 등급·강화 × 사역마 장비 옵션(famPct)
+// 주인공 직업·장비·특성은 반영하지 않는다 (같은 사역마는 누가 데려가도 같은 성능). 회복량은 고정 수치(PM 결정)
+export function famStats(key, f, heroLv, famPct = 0) {
+  const role = FAM_ROLES[famRole(key)];
+  const eff = famEffLv(f, heroLv);
+  const b = famBaseStats(eff);
+  const m = powerMult(f) * (1 + famPct);
+  return {
+    lv: eff,
+    maxHp: Math.round(b.hp * role.hp * m),
+    atk: Math.round(b.atk * role.atk * m),
+    healPower: Math.round(b.atk * (role.heal || 0.15) * m),
+    def: Math.round(b.def * role.def * Math.sqrt(m)),
+    spd: +Math.max(5, b.spd - 2).toFixed(1),
+  };
+}
 export function famCombatant(key, f, hero, famPct = 0) {
   const roleId = famRole(key);
   const role = FAM_ROLES[roleId];
-  const eff = famEffLv(f, hero.lv);
-  const m = powerMult(f) * (1 + famPct) * famLvRatio(f, hero.lv);
-  // HP 기준은 직업과 무관한 레벨 기준값 (1.216.0) — HP가 높은 직업일수록 사역마도 단단해지던 문제 보정
-  const maxHp = Math.round(Math.min(hero.maxHp, FAM_TUNING.hpPerLv * eff) * role.hp * m);
+  const st = famStats(key, f, hero.lv, famPct);
   const lv = famGradeIdx(f.grade) + 1;
-  // 회복력은 주인공 공격력 기준 — 어느 직업이 데려가도 같은 비율로 회복한다
-  const healBase = hero.atk;
   return {
-    id: 'fam', fam: true, famKey: key, famRole: roleId, classId: hero.classId, name: famName(key), side: 'party', lv: eff, magic: true,
-    maxHp, hp: maxHp, atk: Math.round(hero.atk * role.atk * m), healPower: Math.round(healBase * (role.heal || 0.15) * m),
-    def: Math.round(hero.def * role.def * Math.sqrt(m)), spd: Math.max(5, hero.spd - 2), crit: 0.08, critMult: 1.5, dodge: 0.05,
+    id: 'fam', fam: true, famKey: key, famRole: roleId, classId: hero.classId, name: famName(key), side: 'party', lv: st.lv, magic: true,
+    maxHp: st.maxHp, hp: st.maxHp, atk: st.atk, healPower: st.healPower,
+    def: st.def, spd: st.spd, crit: 0.08, critMult: 1.5, dodge: 0.05,
     tauntReduce: role.tauntReduce ? Math.min(0.5, role.tauntReduce + 0.05 * (lv - 1)) : 0,
     guardian: role.guard ? role.guard[lv - 1] : 0, startTaunt: role.guard ? 2 : 0,
     skills: [...(famGradeIdx(f.grade) >= FAM_SIG_MIN_GRADE ? [{ s: famSignature(key, f.grade), lv }] : []), ...FAM_SKILLS[roleId].map(s => ({ s, lv }))],

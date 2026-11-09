@@ -1011,14 +1011,17 @@ function FamRoleGuide({ heroCls }) {
   );
 }
 // 동행 스킬 · 능력치 상세 (1.217.0)
-function FamSkillPanel({ k, f }) {
+function FamSkillPanel({ k, f, save }) {
   const skills = F.famSkillInfo(k, f);
-  const r = F.famStatRatios(k, f);
-  const p = (x) => `${Math.round(x * 100)}%`;
+  const heroLv = save.units[save.hero]?.lv || 1;
+  const famPct = E.deriveUnit(save, save.hero).famPct || 0;
+  const r = F.famStats(k, f, heroLv, famPct);
+  const guard = F.famGuard(k, f);
   return (
     <GlassPanel className="p-2.5 mt-2" style={{ fontSize: 12, lineHeight: 1.55 }}>
-      <div className="font-semibold" style={{ color: PALETTE.text }}>동행 시 능력치 <span style={{ color: PALETTE.textDim, fontWeight: 400 }}>(주인공 대비)</span></div>
-      <div style={{ color: PALETTE.textDim }}>최대 HP {p(r.hp)} · 공격력 {p(r.atk)} · 방어 {p(r.def)} · 회복력 {p(r.heal)}{r.guard ? ` · 수호 태세 ${p(r.guard)}` : ''}</div>
+      <div className="font-semibold" style={{ color: PALETTE.text }}>동행 시 능력치 <span style={{ color: PALETTE.textDim, fontWeight: 400 }}>(Lv.{r.lv} 기준 · 주인공 직업과 무관)</span></div>
+      <div style={{ color: PALETTE.textDim }}>최대 HP <b style={{ color: PALETTE.text }}>{r.maxHp.toLocaleString()}</b> · 공격력 <b style={{ color: PALETTE.text }}>{r.atk}</b> · 방어 <b style={{ color: PALETTE.text }}>{r.def}</b> · 회복력 <b style={{ color: PALETTE.text }}>{r.healPower}</b> · 속도 {r.spd}{guard ? ` · 수호 태세 ${Math.round(guard * 100)}%` : ''}</div>
+      {famPct > 0 && <div style={{ fontSize: 11, color: PALETTE.textDim }}>주인공 장비 「사역마 능력치」 옵션 +{Math.round(famPct * 100)}% 포함</div>}
       <div className="font-semibold mt-2" style={{ color: PALETTE.text }}>동행 스킬</div>
       {F.famGradeIdx(f.grade) < F.FAM_SIG_MIN_GRADE && <div style={{ fontSize: 11, color: PALETTE.textDim }}>★ 고유 스킬은 <b style={{ color: '#7a6ae8' }}>남령</b>으로 진화하면 열린다</div>}
       {skills.map(sk => (
@@ -1192,7 +1195,7 @@ function FamiliarView({ save, setSave, onBack, flash }) {
             <GlassPanel className="p-2.5 mt-2" style={{ fontSize: 12, color: PALETTE.text }}>
               <div className="flex items-center justify-between">
                 <b style={{ color: PALETTE.legendary }}>Lv.{F.famLv(selF)} <span style={{ fontWeight: 400, color: PALETTE.textDim }}>/ 주인공 Lv.{heroLv}</span></b>
-                <span style={{ fontSize: 11, color: PALETTE.textDim }}>능력치 {Math.round(F.famLvRatio(selF, heroLv) * 100)}% · 보조 효과 {Math.round((F.FAM_LEVEL.subMin + (1 - F.FAM_LEVEL.subMin) * (F.famEffLv(selF, heroLv) / heroLv)) * 100)}%</span>
+                <span style={{ fontSize: 11, color: PALETTE.textDim }}>보조 효과 {Math.round((F.FAM_LEVEL.subMin + (1 - F.FAM_LEVEL.subMin) * (F.famEffLv(selF, heroLv) / heroLv)) * 100)}%</span>
               </div>
               {F.famLv(selF) < heroLv ? <>
                 <div className="mt-1"><Bar v={selF.exp || 0} max={F.FAM_LEVEL.expNeed(F.famLv(selF))} color="#e8b04a" h={5} /></div>
@@ -1200,7 +1203,7 @@ function FamiliarView({ save, setSave, onBack, flash }) {
               </> : <div style={{ fontSize: 11, color: PALETTE.textDim }}>주인공 레벨 도달 — 주인공이 레벨업하면 다시 경험치를 받는다</div>}
             </GlassPanel>
             <FamSubTable k={sel} gi={gi} />
-            <FamSkillPanel k={sel} f={selF} />
+            <FamSkillPanel k={sel} f={selF} save={save} />
             <div className="flex gap-1 mt-3 justify-center">{Array.from({ length: F.FAM_TUNING.maxPlus }, (_, i) => <span key={i} style={{ width: 18, height: 6, borderRadius: 3, background: i < selF.plus ? g.color : '#ffffff1a' }} />)}</div>
             <div className="mt-3 flex flex-col gap-2">
               {!maxed && <UIButton disabled={souls < ec} onClick={() => setSave(E.enhanceFam(save, sel))}>강화 +{selF.plus} → +{selF.plus + 1} (🔮{ec} / 보유 {souls})</UIButton>}
