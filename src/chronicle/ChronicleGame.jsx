@@ -203,7 +203,7 @@ function BattleLogLine({ e, latest, unitOf }) {
   const icon = e.k === 'dotTick' ? '☠' : e.k === 'hot' ? '✚' : e.skill ? '✦' : e.k === 'heavy' ? '💢' : e.k === 'aoe' ? '💥' : '⚔';
   const actColor = e.k === 'dotTick' ? LOG_C.debuff : e.k === 'hot' ? LOG_C.heal : e.skill ? LOG_C.skill : e.k === 'heavy' ? LOG_C.crit : PALETTE.text;
   const chip = (h, i) => {
-    const sp = { marginLeft: 6, whiteSpace: 'nowrap' };
+    const sp = { marginLeft: 6, whiteSpace: 'nowrap', display: 'inline-block', maxWidth: '100%' }; // inline-block = 칩 사이에서 줄바꿈 (1.232.1)
     if (h.m) return <span key={i} style={{ ...sp, color: LOG_C.miss }}><N id={h.t} /> 빗나감</span>;
     if (e.k === 'dotTick' && h.d > 0) return <span key={i} style={{ ...sp, color: LOG_C.debuff, fontWeight: 600 }}>-{h.d.toLocaleString()}</span>;
     if (h.d > 0) {
@@ -385,7 +385,7 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
             )}
             <div className="flex gap-2 mt-2.5">
               <button onClick={openStats} className="ui-press flex-1" style={{ height: 34, borderRadius: 10, fontSize: 12, border: '1px solid var(--ui-line-strong)', color: PALETTE.text, background: 'transparent' }}>📊 전투 집계</button>
-              {battle.runReport && <button onClick={() => setStats(battle.runReport)} className="ui-press flex-1" style={{ height: 34, borderRadius: 10, fontSize: 12, border: '1px solid #c08ae888', color: '#c08ae8', background: 'transparent' }}>🏰 던전 전체 집계</button>}
+              {battle.runReport && <button onClick={() => setStats(battle.runReport)} className="ui-press flex-1" style={{ height: 34, borderRadius: 10, fontSize: 12, border: '1px solid #c08ae888', color: '#c08ae8', background: 'transparent' }}>{battle.runReport.kind === 'tower' ? '🗼 첨탑 도전 집계' : '🏰 던전 전체 집계'}</button>}
             </div>
             <div className="flex gap-2 mt-2">
               {dungeonNext && (
@@ -402,7 +402,7 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
           </GlassPanel>
         </div>
       )}
-      {stats && <HuntReport report={stats} title={stats === battle.runReport ? '🏰 던전 전체 집계' : '📊 전투 집계'} onClose={() => setStats(null)} />}
+      {stats && <HuntReport report={stats} title={stats === battle.runReport ? (battle.runReport.kind === 'tower' ? '🗼 첨탑 도전 집계' : '🏰 던전 전체 집계') : '📊 전투 집계'} onClose={() => setStats(null)} />}
     </div>
   );
 }
@@ -1126,12 +1126,27 @@ function BagView({ save, setSave, onBack, flash }) {
   const list = sortItems(save, filterItems(save.inventory, filter, hero), sortBy);
   const item = sel != null ? save.inventory.find(i => i.uid === sel) : null;
   const others = save.inventory.filter(i => !E.itemUsable(i, hero));
+  const [confirm, setConfirm] = useState(null); // 분해 확인 창 (1.232.1)
+  const salvageOfUids = (uids) => { const tot = {}; for (const it of save.inventory) if (uids.includes(it.uid)) for (const [k, v] of Object.entries(E.salvageOf(it))) tot[k] = (tot[k] || 0) + v; return tot; };
+  const gradeCount = (uids) => GRADES.map(g => ({ g, n: save.inventory.filter(i => uids.includes(i.uid) && i.grade === g.id).length })).filter(x => x.n);
+  const askDismantle = (uids, after) => {
+    if (!uids.length) { flash('분해할 장비가 없습니다'); return; }
+    const plused = save.inventory.filter(i => uids.includes(i.uid) && i.plus > 0).length;
+    setConfirm({
+      title: `장비 ${uids.length}개 분해`,
+      lines: [
+        { t: gradeCount(uids).map(x => `${x.g.label} ${x.n}`).join(' · ') },
+        { t: `얻는 재화: ${E.salvageText(salvageOfUids(uids))}` },
+        ...(plused ? [{ t: `⚠ 강화된 장비 ${plused}개 포함`, color: '#e8b04a' }] : []),
+        { t: '분해한 장비는 되돌릴 수 없습니다', color: PALETTE.textDim },
+      ],
+      confirmLabel: `${uids.length}개 분해`,
+      onConfirm: () => { const r = E.dismantleItems(save, uids); setSave(r.save); flash(`${uids.length}개 분해 → ${E.salvageText(r.salvage)}`); setConfirm(null); if (after) after(); },
+    });
+  };
   const bulk = (maxGrade) => {
     const uids = save.inventory.filter(i => gradeIdx(i.grade) <= maxGrade && !E.equippedBy(save, i.uid) && (incOther || E.itemUsable(i, hero))).map(i => i.uid);
-    if (!uids.length) return;
-    const r = E.dismantleItems(save, uids);
-    setSave(r.save);
-    flash(`${uids.length}개 분해 → ${E.salvageText(r.salvage)}`);
+    askDismantle(uids);
   };
   const toStash = (uids) => {
     const r = E.moveToStash(save, uids);
@@ -1217,7 +1232,7 @@ function BagView({ save, setSave, onBack, flash }) {
           </div>
           <div className="flex gap-2">
             <UIButton variant="ghost" style={{ height: 40 }} disabled={!picked.size} onClick={() => { toStash([...picked]); endPick(); }}>{picked.size ? `${picked.size}개 창고로` : '창고로'}</UIButton>
-            <UIButton style={{ height: 40, background: picked.size ? '#b8443a' : undefined }} disabled={!picked.size} onClick={() => { const n = picked.size; const r = E.dismantleItems(save, [...picked]); setSave(r.save); flash(`${n}개 분해 → ${E.salvageText(r.salvage)}`); endPick(); }}>{picked.size ? `${picked.size}개 분해` : '분해할 장비를 고르세요'}</UIButton>
+            <UIButton style={{ height: 40, background: picked.size ? '#b8443a' : undefined }} disabled={!picked.size} onClick={() => askDismantle([...picked], endPick)}>{picked.size ? `${picked.size}개 분해` : '분해할 장비를 고르세요'}</UIButton>
           </div>
         </div>
       )}
@@ -1253,6 +1268,7 @@ function BagView({ save, setSave, onBack, flash }) {
           </BottomSheet>
         );
       })()}
+      {confirm && <ConfirmSheet {...confirm} danger onCancel={() => setConfirm(null)} />}
       {preview && <PreviewSheet save={save} after={preview.after} title={preview.title} onClose={() => setPreview(null)} />}
     </div>
   );
@@ -1772,6 +1788,12 @@ function ForgeView({ save, setSave, onBack, flash }) {
   const ng = item && E.nextGrade(item);
   const er = item && E.enhanceRisk(item);
   const pr = item && ng && E.promoteRisk(item);
+  const [confirm, setConfirm] = useState(null); // 하락·파괴 위험 확인 (1.232.1)
+  const [skipAsk, setSkipAsk] = useState(forgeConfirmSkip);
+  const guard = (risky, info, run) => {
+    if (!risky || forgeConfirmSkip) { run(); return; }
+    setConfirm({ ...info, onConfirm: () => { forgeConfirmSkip = skipAsk; setConfirm(null); run(); } });
+  };
   return (
     <div className="absolute inset-0 flex flex-col">
       <Header title="대장간" onBack={onBack} right={<Wallet save={save} />} />
@@ -1801,11 +1823,19 @@ function ForgeView({ save, setSave, onBack, flash }) {
                   <div style={{ fontSize: 12, color: PALETTE.textDim }}>결과: {statLine(E.itemStats({ ...item, plus: (item.plus || 0) + 1 }))}</div>
                   <div style={{ fontSize: 12, color: PALETTE.textDim }}>비용: 🪙 {ec.gold} · ✦ {ec.essence}</div>
                   <RiskLine rate={er.rate} fail={er.breakChance ? `실패 시 1단계 하락 · 그중 ${Math.round(er.breakChance * 100)}%는 장비 파괴` : er.drop ? '실패 시 1단계 하락' : er.rate < 1 ? '실패 시 재료만 잃음' : ''} danger={!!er.breakChance} />
-                  <UIButton style={{ height: 40, marginTop: 8 }} disabled={!E.canEnhance(save, item)} onClick={() => {
+                  <UIButton style={{ height: 40, marginTop: 8 }} disabled={!E.canEnhance(save, item)} onClick={() => guard(er.drop || er.breakChance > 0, {
+                    title: `강화 +${item.plus || 0} → +${(item.plus || 0) + 1}`,
+                    lines: [
+                      { t: `성공 확률 ${Math.round(er.rate * 100)}%` },
+                      { t: er.breakChance ? `실패하면 1단계 하락, 그중 ${Math.round(er.breakChance * 100)}%는 장비가 파괴됩니다` : '실패하면 1단계 하락합니다', color: er.breakChance ? '#e06a5f' : '#e8b04a' },
+                      ...(E.equippedBy(save, item.uid) ? [{ t: '⚠ 착용 중인 장비입니다', color: '#e8b04a' }] : []),
+                    ],
+                    confirmLabel: '강화한다', danger: er.breakChance > 0,
+                  }, () => {
                     const r = E.forgeEnhance(save, item.uid); if (!r.result) return; setSave(r.save);
                     if (r.result === 'destroy') { setSel(null); flash('💥 강화 실패 — 장비가 파괴되었습니다'); }
                     else flash({ success: `강화 성공! +${(item.plus || 0) + 1}`, fail: '강화 실패 — 재료만 잃었습니다', down: `강화 실패 — +${Math.max(0, (item.plus || 0) - 1)}로 하락` }[r.result]);
-                  }}>강화</UIButton>
+                  })}>강화</UIButton>
                 </>
               ) : <div style={{ fontSize: 12, color: PALETTE.textDim }}>최대 강화</div>}
             </GlassPanel>
@@ -1816,12 +1846,20 @@ function ForgeView({ save, setSave, onBack, flash }) {
                   <div style={{ fontSize: 12, color: PALETTE.textDim }}>결과: {statLine(E.itemStats({ ...item, grade: ng }))}{` + 무작위 옵션 1개`}{ng === 'epic' && item.slot === 'accessory' ? ' + 에픽 장신구 효과' : ''}</div>
                   <div style={{ fontSize: 12, color: PALETTE.textDim }}>비용: 🪙 {pc.gold} · ✦ {pc.essence}{pc.shard ? ` · ◆ ${pc.shard}` : ''}</div>
                   <RiskLine rate={pr.rate} fail={pr.breaks ? '실패 시 장비 파괴' : '실패 시 재료만 잃음'} danger={pr.breaks} />
-                  <UIButton variant="gold" style={{ height: 40, marginTop: 8 }} disabled={!E.canPromote(save, item)} onClick={() => {
+                  <UIButton variant="gold" style={{ height: 40, marginTop: 8 }} disabled={!E.canPromote(save, item)} onClick={() => guard(pr.breaks, {
+                    title: `${gradeOf(ng).label} 승급`,
+                    lines: [
+                      { t: `성공 확률 ${Math.round(pr.rate * 100)}%` },
+                      { t: '실패하면 장비가 파괴됩니다', color: '#e06a5f' },
+                      ...(E.equippedBy(save, item.uid) ? [{ t: '⚠ 착용 중인 장비입니다', color: '#e8b04a' }] : []),
+                    ],
+                    confirmLabel: '승급한다', danger: true,
+                  }, () => {
                     const r = E.forgePromote(save, item.uid); if (!r.result) return; setSave(r.save);
                     if (r.result === 'destroy') { setSel(null); flash('💥 승급 실패 — 장비가 파괴되었습니다'); return; }
                     if (r.result === 'fail') { flash('승급 실패 — 재료만 잃었습니다'); return; }
                     const it2 = r.save.inventory.find(i => i.uid === item.uid); flash(E.epicOptOf(it2) ? `에픽 승급! 「${E.epicOptOf(it2).name}」` : `${gradeOf(ng).label} 등급으로 승급!`);
-                  }}>승급</UIButton>
+                  })}>승급</UIButton>
                 </>
               ) : <div style={{ fontSize: 12, color: PALETTE.textDim }}>최고 등급</div>}
             </GlassPanel>
@@ -1829,6 +1867,7 @@ function ForgeView({ save, setSave, onBack, flash }) {
           </div>
         </BottomSheet>
       )}
+      {confirm && <ConfirmSheet {...confirm} onCancel={() => setConfirm(null)} skipLabel="이번 접속 동안 다시 묻지 않기" skip={skipAsk} onSkipChange={setSkipAsk} />}
     </div>
   );
 }
@@ -2094,6 +2133,28 @@ function DetailStats({ d, cid }) {
   );
 }
 
+// ===== 확인 창 (1.232.1) — 되돌릴 수 없는 동작 앞에 =====
+function ConfirmSheet({ title, lines = [], confirmLabel = '진행', danger = false, onConfirm, onCancel, skipLabel, onSkipChange, skip }) {
+  return (
+    <BottomSheet title={title} onClose={onCancel} maxHeight="60%">
+      <div className="flex flex-col gap-1.5" style={{ fontSize: 12.5, color: PALETTE.text, lineHeight: 1.55 }}>
+        {lines.map((l, i) => <div key={i} style={{ color: l.color || PALETTE.text }}>{l.t ?? l}</div>)}
+      </div>
+      {skipLabel && (
+        <label className="flex items-center gap-2 mt-3" style={{ fontSize: 12, color: PALETTE.textDim }}>
+          <input type="checkbox" checked={!!skip} onChange={(e) => onSkipChange(e.target.checked)} /> {skipLabel}
+        </label>
+      )}
+      <div className="flex gap-2 mt-4">
+        <UIButton variant="ghost" style={{ height: 42 }} onClick={onCancel}>취소</UIButton>
+        <UIButton style={{ height: 42, background: danger ? '#b8443a' : undefined }} onClick={onConfirm}>{confirmLabel}</UIButton>
+      </div>
+    </BottomSheet>
+  );
+}
+// 대장간 위험 경고 「이번 접속 동안 묻지 않기」 — 새로고침하면 다시 묻는다
+let forgeConfirmSkip = false;
+
 // ===== 효율 미리보기 (1.232.0) — 바꾸기 전에 같은 적 200전씩 계산해 비교 (저장은 안 바뀜) =====
 const LAST_HUNT_KEY = 'chronicleLastHunt';
 function readLastHunt() { try { return JSON.parse(localStorage.getItem(LAST_HUNT_KEY) || 'null'); } catch { return null; } }
@@ -2335,7 +2396,7 @@ function SetupLine({ r }) {
     <div style={{ fontSize: 11.5, color: PALETTE.textDim, marginTop: 4, lineHeight: 1.5 }}>
       {su.classId ? <span style={{ color: chronicleClass(su.classId).color }}>{chronicleClass(su.classId).name} Lv.{su.lv}</span> : null}
       {' · '}{su.famName ? `🐾 ${su.famName}` : '사역마 없음'}
-      {place ? <> · 📍 {r.kind === 'dungeon' ? placeBase(place) : place}</> : null}
+      {place ? <> · 📍 {r.kind === 'dungeon' ? placeBase(place) : r.kind === 'tower' ? '황혼의 첨탑' : place}</> : null}
     </div>
   );
 }
@@ -2351,7 +2412,7 @@ function logEfficiency(r) {
   const g = Object.fromEntries(gainRows(r).map(x => [x.k, x.v]));
   const place = Object.entries(r.places || {}).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
   const entry = {
-    at: Date.now(), kind: r.kind, place: r.kind === 'dungeon' ? placeBase(place) : place,
+    at: Date.now(), kind: r.kind, place: r.kind === 'dungeon' ? placeBase(place) : r.kind === 'tower' ? '황혼의 첨탑' : place,
     classId: r.setup?.classId, lv: r.setup?.lv, fam: r.setup?.famName || null,
     battles: r.battles, wins: r.wins, ms: r.ms, speed: speedText(r),
     exp: g.exp || 0, gold: g.gold || 0, essence: g.essence || 0, shard: g.shard || 0, famShards: g.famShards || 0, drops: g.drops || 0,
@@ -2372,7 +2433,7 @@ function EfficiencyLog({ onClose }) {
   return (
     <BottomSheet title="📈 효율 기록 비교" onClose={onClose} maxHeight="88%">
       <div style={{ fontSize: 11.5, color: PALETTE.textDim, lineHeight: 1.5, marginBottom: 8 }}>
-        반복 사냥·던전 한 판(2전투 이상)이 끝날 때마다 자동 기록 · 최근 {EFF_MAX}건 · 이 기기에만 저장<br />
+        반복 사냥·던전 한 판·첨탑 도전(2전투 이상)이 끝날 때마다 자동 기록 · 최근 {EFF_MAX}건 · 이 기기에만 저장<br />
         같은 배속끼리 비교하세요 (배속이 2배면 분당 값도 2배)
       </div>
       <div className="flex flex-wrap gap-1.5 mb-2">
@@ -2385,7 +2446,7 @@ function EfficiencyLog({ onClose }) {
         {list.map((e, i) => (
           <div key={e.at} style={{ padding: 10, borderRadius: 12, border: `1px solid ${e === best ? PALETTE.legendary + '99' : 'var(--ui-line)'}`, background: 'rgba(255,255,255,0.03)' }}>
             <div className="flex justify-between items-baseline" style={{ fontSize: 12.5, color: PALETTE.text }}>
-              <span className="font-semibold truncate">{sort !== 'at' ? `${i + 1}. ` : ''}{e.kind === 'dungeon' ? '🏰 ' : '🌾 '}{e.place || '—'}</span>
+              <span className="font-semibold truncate">{sort !== 'at' ? `${i + 1}. ` : ''}{e.kind === 'dungeon' ? '🏰 ' : e.kind === 'tower' ? '🗼 ' : '🌾 '}{e.place || '—'}</span>
               <span style={{ fontSize: 11, color: PALETTE.textDim, whiteSpace: 'nowrap', marginLeft: 6 }}>{e.speed} · {fmtDur(e.ms)}</span>
             </div>
             <div style={{ fontSize: 11.5, color: PALETTE.textDim }}>
@@ -2450,6 +2511,7 @@ export default function ChronicleGame({ onExit }) {
   const [dungeonAuto, setDungeonAuto] = useState(() => { try { return localStorage.getItem('chronicleDungeonAuto') === '1'; } catch { return false; } });
   const toggleDungeonAuto = () => { const v = !dungeonAuto; setDungeonAuto(v); try { localStorage.setItem('chronicleDungeonAuto', v ? '1' : '0'); } catch { /* */ } };
   const dungRunRef = useRef(null);
+  const towerRunRef = useRef(null); // 첨탑 한 번 도전 집계 (1.232.1)
   const toggleRepeat = () => {
     if (!repeat) { repStatsRef.current = newHuntStats(); if (lastRecRef.current) addHuntRecord(repStatsRef.current, lastRecRef.current); }
     setRepeat(r => !r);
@@ -2546,7 +2608,16 @@ export default function ChronicleGame({ onExit }) {
     const r = E.applyBattle(save, ctx, sim, rng);
     r.summary.questsDone = Q.newlyDoneQuests(save, r.save);
     setSave(r.save);
-    setBattle({ sim, enemies: enc.enemies, party, summary: r.summary, ctx, key: Date.now() });
+    // 첨탑 한 번 도전 집계 (1.232.1) — 층이 이어지지 않으면 새 도전
+    if (!towerRunRef.current || towerRunRef.current.lastFloor + 1 !== enc.floor) towerRunRef.current = { st: newHuntStats(), lastFloor: enc.floor - 1 };
+    addHuntRecord(towerRunRef.current.st, huntRecord(sim, party, enc, r.summary, readSpeedPref(E.boostLeftMs(save)), ctx.label));
+    towerRunRef.current.lastFloor = enc.floor;
+    let runReport = null;
+    if (sim.result !== 'win') {
+      if (towerRunRef.current.st.battles > 1) { runReport = { ...towerRunRef.current.st, endedAt: Date.now(), kind: 'tower' }; logEfficiency(runReport); }
+      towerRunRef.current = null;
+    }
+    setBattle({ sim, enemies: enc.enemies, party, summary: r.summary, ctx, runReport, key: Date.now() });
     setView('battle');
   };
   // 원정대 레이드 (1.231.0) — 계정 단위: 5캐릭 파티 · 결과·보상은 계정에 직접
