@@ -23,6 +23,7 @@ import * as RD from './raid.js';
 import * as Q from './quest.js';
 import * as A from './account.js';
 import * as F from './familiar.js';
+import * as P from './preview.js';
 import { NPCS } from './story.js';
 import { CENEMIES as ENEMIES } from './enemies.js';
 
@@ -1106,6 +1107,7 @@ function PartyView({ save, setSave, onBack }) {
 // ===== 가방 (캐릭터 전용) =====
 function BagView({ save, setSave, onBack, flash }) {
   const [filter, setFilter] = useState('all');
+  const [preview, setPreview] = useState(null); // 효율 미리보기 (1.232.0)
   const [sel, setSel] = useState(null);
   // 정렬 (1.213.1): 착용 장비가 맨 위 → 그 아래 전투력(주 능력치) 높은 순
   const [sortBy, pickSort] = useItemSort();
@@ -1230,6 +1232,9 @@ function BagView({ save, setSave, onBack, flash }) {
             <div className="text-center mt-1" style={{ fontSize: 12.5, color: PALETTE.text, lineHeight: 1.6 }}>{statLine(E.itemStats(item))}</div>
             <ItemSpecial item={item} center />
             {usable && !by && <DiffLine item={item} cur={cur} />}
+            {usable && !by && E.canWear(item, save.units[hero]) && (
+              <button onClick={() => setPreview({ after: E.equipItem(save, hero, item.uid), title: `⚔ ${E.itemName(item)}${item.plus ? ` +${item.plus}` : ''} 장착 시` })} className="ui-press w-full mt-2" style={{ height: 38, borderRadius: 10, border: `1px dashed ${PALETTE.legendary}88`, color: PALETTE.legendary, background: 'transparent', fontSize: 12.5 }}>📊 이걸 끼면? — 사냥 효율 미리보기</button>
+            )}
             {!usable && <div className="text-center mt-2" style={{ fontSize: 12, color: '#e06a5f' }}>{chronicleClass(save.hero).name}{'는 착용할 수 없습니다 — 공용 창고에 넣으면 '}{chronicleClass(item.cls).name} 캐릭터가 쓸 수 있습니다</div>}
             <div className="mt-3 flex flex-col gap-2">
               {usable && !by && (
@@ -1248,6 +1253,7 @@ function BagView({ save, setSave, onBack, flash }) {
           </BottomSheet>
         );
       })()}
+      {preview && <PreviewSheet save={save} after={preview.after} title={preview.title} onClose={() => setPreview(null)} />}
     </div>
   );
 }
@@ -1391,6 +1397,7 @@ function FamiliarView({ save, setSave, onBack, flash }) {
   const [results, setResults] = useState(null);
   const [sel, setSel] = useState(null);
   const [pickSlot, setPickSlot] = useState(null);
+  const [preview, setPreview] = useState(null); // 효율 미리보기 (1.232.0)
   const fams = save.fams || {};
   const shards = save.mats.famShard || 0;
   const tickets = save.mats.sealPlus || 0;
@@ -1545,12 +1552,19 @@ function FamiliarView({ save, setSave, onBack, flash }) {
         <BottomSheet title={`${slots.find(x => x.id === pickSlot).label} 편성`} onClose={() => setPickSlot(null)} maxHeight="75%">
           <div className="flex flex-col gap-1.5">
             {team[pickSlot] && <UIButton variant="ghost" style={{ height: 40 }} onClick={() => { setSave(E.setFamTeam(save, pickSlot, null)); setPickSlot(null); }}>편성 해제</UIButton>}
-            {list.filter(([k]) => k !== team[pickSlot]).map(([k, f]) => <FamCard key={k} k={k} f={f} heroLv={heroLv} onClick={() => { setSave(E.setFamTeam(save, pickSlot, k)); setPickSlot(null); }} />)}
+            <div style={{ fontSize: 11.5, color: PALETTE.textDim }}>📊 = 이 사역마로 바꾸면 사냥 효율이 어떻게 되는지 미리보기</div>
+            {list.filter(([k]) => k !== team[pickSlot]).map(([k, f]) => (
+              <div key={k} className="flex items-stretch gap-1.5">
+                <div className="flex-1 min-w-0"><FamCard k={k} f={f} heroLv={heroLv} onClick={() => { setSave(E.setFamTeam(save, pickSlot, k)); setPickSlot(null); }} /></div>
+                <button onClick={() => setPreview({ after: E.setFamTeam(save, pickSlot, k), title: `🐾 ${slots.find(x => x.id === pickSlot).label}: ${F.famName(k)}(으)로 바꾸면` })} className="ui-press flex-none" aria-label="효율 미리보기" style={{ width: 44, borderRadius: 12, border: `1px dashed ${PALETTE.legendary}88`, color: PALETTE.legendary, background: 'transparent', fontSize: 16 }}>📊</button>
+              </div>
+            ))}
             {!list.length && <div className="text-center py-6" style={{ fontSize: 12.5, color: PALETTE.textDim }}>보유한 사역마가 없습니다</div>}
             <UIButton variant="ghost" style={{ height: 40 }} onClick={() => setPickSlot(null)}>닫기</UIButton>
           </div>
         </BottomSheet>
       )}
+      {preview && <PreviewSheet save={save} after={preview.after} title={preview.title} onClose={() => setPreview(null)} />}
     </div>
   );
 }
@@ -2080,14 +2094,80 @@ function DetailStats({ d, cid }) {
   );
 }
 
-// ===== 반복 사냥 보고서 (1.213.0) =====
-// 전투 1회 재생 시간 (BattleView 재생 속도와 같은 공식) + 다음 전투까지 대기 1.8초 — 분당 효율 계산용 (1.231.3)
-const BATTLE_GAP_MS = 1800;
-function battlePlayMs(sim, speed = 1) {
-  let ms = 0;
-  for (const ev of sim.events) ms += ev.round ? 160 : ev.k === 'dotTick' ? 380 : 620;
-  return Math.round(ms / speed) + BATTLE_GAP_MS;
+// ===== 효율 미리보기 (1.232.0) — 바꾸기 전에 같은 적 200전씩 계산해 비교 (저장은 안 바뀜) =====
+const LAST_HUNT_KEY = 'chronicleLastHunt';
+function readLastHunt() { try { return JSON.parse(localStorage.getItem(LAST_HUNT_KEY) || 'null'); } catch { return null; } }
+const PREVIEW_ROWS = [
+  { k: 'winRate', label: '승률', fmt: (v) => `${Math.round(v * 100)}%`, better: 1 },
+  { k: 'hpLeft', label: '남는 HP (승리 시)', fmt: (v) => `${Math.round(v * 100)}%`, better: 1 },
+  { k: 'secPerBattle', label: '전투 1회 시간', fmt: (v) => `${v.toFixed(1)}초`, better: -1 },
+  { k: 'expPerMin', label: '⭐ 경험치/분', fmt: (v) => Math.round(v).toLocaleString(), better: 1, pct: true },
+  { k: 'goldPerMin', label: '🪙 골드/분', fmt: (v) => Math.round(v).toLocaleString(), better: 1, pct: true },
+];
+function PreviewSheet({ save, after, title, onClose }) {
+  const target = useMemo(() => P.previewTarget(save, readLastHunt()), [save]);
+  const speed = readSpeedPref(E.boostLeftMs(save));
+  const [res, setRes] = useState(null);
+  useEffect(() => {
+    if (!target) return undefined;
+    setRes(null);
+    const t = setTimeout(() => setRes(P.previewCompare(save, after, target, { speed })), 30);
+    return () => clearTimeout(t);
+  }, [save, after, target, speed]);
+  const same = after === save;
+  const delta = (row) => {
+    const a = res.before[row.k], b = res.after[row.k];
+    const d = b - a;
+    const noise = row.pct ? Math.abs(a) * 0.03 : row.k === 'secPerBattle' ? 0.05 : 0.01;
+    if (Math.abs(d) <= noise) return { mark: '=', color: PALETTE.textDim, txt: '' };
+    const good = d * row.better > 0;
+    return { mark: good ? '▲' : '▼', color: good ? '#8fe08a' : '#e06a5f', txt: row.pct && a ? ` ${d > 0 ? '+' : ''}${Math.round(d / a * 100)}%` : '' };
+  };
+  const verdict = res && (() => {
+    const e = res.after.expPerMin - res.before.expPerMin;
+    const w = res.after.winRate - res.before.winRate;
+    if (res.after.winRate < 0.9 && w < -0.005) return { t: '⚠ 패배가 늘어납니다 — 반복 사냥이 끊길 수 있어요', c: '#e06a5f' };
+    if (Math.abs(e) <= Math.abs(res.before.expPerMin) * 0.03 && Math.abs(w) <= 0.005) return { t: '효율 차이가 거의 없습니다', c: PALETTE.textDim };
+    return e > 0 ? { t: `✔ 바꾸면 사냥 효율이 오릅니다 (경험치/분 +${Math.round(e / Math.max(1, res.before.expPerMin) * 100)}%)`, c: '#8fe08a' } : { t: `✖ 지금이 더 효율적입니다 (경험치/분 ${Math.round(e / Math.max(1, res.before.expPerMin) * 100)}%)`, c: '#e06a5f' };
+  })();
+  return (
+    <BottomSheet title="📊 효율 미리보기" onClose={onClose} maxHeight="80%">
+      <div className="text-center font-semibold" style={{ fontSize: 13, color: PALETTE.text }}>{title}</div>
+      {target && <div className="text-center" style={{ fontSize: 11.5, color: PALETTE.textDim, marginTop: 2 }}>📍 {target.field.name} {target.stage + 1} {target.fromLast ? '(마지막 사냥)' : '(열린 최고 스테이지)'} · 같은 적 {P.PREVIEW.battles}전씩 · ×{speed} 재생 기준</div>}
+      {!target && <div className="text-center py-6" style={{ fontSize: 12.5, color: PALETTE.textDim }}>비교할 사냥터가 없습니다</div>}
+      {target && same && <div className="text-center py-6" style={{ fontSize: 12.5, color: PALETTE.textDim }}>지금과 같은 상태라 비교할 것이 없습니다</div>}
+      {target && !same && !res && <div className="text-center py-8" style={{ fontSize: 12.5, color: PALETTE.textDim }}>계산 중…</div>}
+      {target && !same && res && (
+        <>
+          <div className="mt-3" style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto', columnGap: 10, rowGap: 5, fontSize: 12.5, color: PALETTE.text, alignItems: 'baseline' }}>
+            <span style={{ fontSize: 11, color: PALETTE.textDim }}>항목</span>
+            <span style={{ fontSize: 11, color: PALETTE.textDim, textAlign: 'right' }}>지금</span>
+            <span style={{ fontSize: 11, color: PALETTE.legendary, textAlign: 'right' }}>바꾸면</span>
+            <span />
+            {PREVIEW_ROWS.map(row => {
+              const d = delta(row);
+              return (
+                <React.Fragment key={row.k}>
+                  <span>{row.label}</span>
+                  <span style={{ textAlign: 'right', color: PALETTE.textDim }}>{row.fmt(res.before[row.k])}</span>
+                  <b style={{ textAlign: 'right' }}>{row.fmt(res.after[row.k])}</b>
+                  <span style={{ color: d.color, fontSize: 12, whiteSpace: 'nowrap' }}>{d.mark}{d.txt}</span>
+                </React.Fragment>
+              );
+            })}
+          </div>
+          {verdict && <div className="text-center mt-3 font-semibold" style={{ fontSize: 13, color: verdict.c }}>{verdict.t}</div>}
+          <div className="mt-2" style={{ fontSize: 11, color: PALETTE.textDim, lineHeight: 1.5 }}>※ 저장은 바뀌지 않습니다 · 보상은 운이라 ±3% 정도 흔들림(이 범위는 「=」로 표시) · 사냥터 일반 전투 기준 (던전·탑·보스 제외)</div>
+        </>
+      )}
+      <UIButton variant="ghost" style={{ height: 40, marginTop: 12 }} onClick={onClose}>닫기</UIButton>
+    </BottomSheet>
+  );
 }
+
+// ===== 반복 사냥 보고서 (1.213.0) =====
+// 전투 1회 재생 시간은 preview.js battlePlayMs (효율 미리보기와 같은 공식)
+const battlePlayMs = P.battlePlayMs;
 function readSpeedPref(boostLeft) {
   let s = 2;
   try { s = +localStorage.getItem('chronicleSpeed') || 2; } catch { /* */ }
@@ -2417,7 +2497,7 @@ export default function ChronicleGame({ onExit }) {
     const boss = mode === 'boss';
     if (boss && E.bossAttemptsLeft(save, field.id) <= 0) { flash('오늘 보스 재도전 횟수를 모두 썼습니다'); return; }
     if (boss && playScene({ at: 'bossPre', fieldId: field.id }, () => flash('준비되면 「보스 도전」을 누르세요'))) return; // 보스 앞 장면 먼저 (저장 반영 후 다시 도전)
-    if (mode === 'hunt') lastFieldRef.current = { field, stage };
+    if (mode === 'hunt') { lastFieldRef.current = { field, stage }; try { localStorage.setItem(LAST_HUNT_KEY, JSON.stringify({ hero: save.hero, fieldId: field.id, stage })); } catch { /* */ } }
     const enc = mode === 'gate' ? E.rollGateEncounter(field, stage, rng) : E.rollFieldEncounter(field, rng, boss, null, boss ? null : stage);
     enc.enemies = E.scaleEnemiesForRebirth(save, enc.enemies);
     const party = E.partyCombatants(save);
