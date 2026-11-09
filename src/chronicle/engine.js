@@ -438,6 +438,16 @@ function gainExp(u, n, cap = T.maxLevel) {
   return ups;
 }
 
+// 오프라인 보상 지급 (1.233.0) — 경험치(원정대 상한 적용)·골드·정수 → { save, ups }
+export function grantOffline(save0, rw) {
+  const save = clone(save0);
+  const u = save.units[save.hero];
+  const ups = u ? gainExp(u, rw.exp || 0, levelCapOf(save)) : 0;
+  save.gold += rw.gold || 0;
+  save.mats = { ...save.mats, essence: (save.mats.essence || 0) + (rw.essence || 0) };
+  return { save, ups };
+}
+
 // ===== 파티 · 장비 조작 =====
 export function setParty(save0, ids) {
   const save = clone(save0);

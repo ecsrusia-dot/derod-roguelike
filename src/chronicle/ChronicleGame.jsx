@@ -24,6 +24,8 @@ import * as Q from './quest.js';
 import * as A from './account.js';
 import * as F from './familiar.js';
 import * as P from './preview.js';
+import * as O from './offline.js';
+import * as D from './daily.js';
 import { NPCS } from './story.js';
 import { CENEMIES as ENEMIES } from './enemies.js';
 
@@ -596,7 +598,7 @@ function RosterView({ save, setSave, flash, onBack, onSwitchChar, onRaid }) {
 }
 
 // ===== 마을 =====
-function TownView({ save, go, onExit, onSwitchChar }) {
+function TownView({ save, acc, go, onExit, onSwitchChar }) {
   const hero = save.units[save.hero];
   const alertParty = hero.points > 0 || hero.sp > 0;
   const cls = chronicleClass(save.hero);
@@ -611,6 +613,7 @@ function TownView({ save, go, onExit, onSwitchChar }) {
     const L = [];
     if (hero.points > 0 || hero.sp > 0) L.push({ id: 'party', icon: '🧭', t: `성장 포인트 사용${hero.points ? ` · 능력치 ${hero.points}` : ''}${hero.sp ? ` · 스킬 ${hero.sp}` : ''}` });
     if (qBadge > 0) L.push({ id: 'quests', icon: '📜', t: `의뢰 게시판 새 소식 ${qBadge}건` });
+    const dB = D.dailyBadge(acc); if (dB) L.push({ id: 'daily', icon: '📅', t: `일일 임무 보상 ${dB}건` });
     if (nextField && E.fieldUnlocked(save, nextField.id)) {
       const st = E.stageState(save, nextField.id);
       if (E.bossReady(save, nextField.id)) L.push({ id: 'field', icon: '👑', t: `${nextField.name} 보스 도전 가능` });
@@ -636,14 +639,15 @@ function TownView({ save, go, onExit, onSwitchChar }) {
     { id: 'fam', icon: '🐾', label: '사역마', sub: E.famSlotOpen(save, 'main') ? `📜 ${save.mats.famShard || 0} · 보유 ${Object.keys(save.fams || {}).length}` : `Lv.${F.FAM_TUNING.slotLv.main}부터 동행`, badge: (save.mats.famShard || 0) >= F.FAM_TUNING.shardsPerSummon || (save.mats.sealPlus || 0) > 0 },
     { id: 'stash', icon: '🏛', label: '공용 창고', sub: `${(save.stash || []).length}/${A.STASH_MAX} · 모든 캐릭터 공유` },
     { id: 'forge', icon: '⚒', label: '대장간', sub: '강화 · 등급 승급' },
+    { id: 'daily', icon: '📅', label: '일일 임무', sub: (() => { const n = D.DAILY_MISSIONS.filter(m => D.missionState(acc, m).status !== 'progress').length; return `오늘 ${n}/${D.DAILY_MISSIONS.length} 달성`; })(), badge: D.dailyBadge(acc) > 0 },
     { id: 'exit', icon: '⇄', label: '게임 선택', sub: '진행은 자동 저장' },
   ];
   const byId = Object.fromEntries(tiles.map(t => [t.id, t]));
   const GROUPS = [
     { label: '⚔ 전투', ids: ['field', 'dungeon', 'tower'] },
     { label: '🧭 성장', ids: ['party', 'fam', 'forge'] },
-    { label: '🏳 원정대 · 의뢰', ids: ['raid', 'roster', 'quests'] },
-    { label: '📦 보관', ids: ['bag', 'stash', 'exit'] },
+    { label: '📜 의뢰 · 원정대', ids: ['quests', 'daily', 'roster'] },
+    { label: '📦 레이드 · 보관', ids: ['raid', 'bag', 'stash'] },
   ];
   return (
     <div className="absolute inset-0 flex flex-col">
@@ -694,6 +698,7 @@ function TownView({ save, go, onExit, onSwitchChar }) {
             </div>
           </div>
         ))}
+        <button onClick={onExit} className="ui-press w-full" style={{ height: 42, borderRadius: 12, background: 'transparent', border: '1px dashed var(--ui-line-strong)', fontSize: 12.5, color: PALETTE.dawn }}>⇄ 게임 선택으로 <span style={{ color: PALETTE.textDim, fontSize: 11 }}>(진행은 자동 저장)</span></button>
       </div>
     </div>
   );
@@ -1480,7 +1485,7 @@ function FamBondView({ fams, onPick }) {
   );
 }
 
-function FamiliarView({ save, setSave, onBack, flash }) {
+function FamiliarView({ save, setSave, onBack, flash, onTrack = () => {} }) {
   const [tab, setTab] = useState('summon');
   const [results, setResults] = useState(null);
   const [sel, setSel] = useState(null);
@@ -1499,7 +1504,7 @@ function FamiliarView({ save, setSave, onBack, flash }) {
   const doSummon = (n, ticket) => {
     const r = E.summonFam(save, n, ticket);
     if (!r.results) { flash(ticket ? '소환권이 부족합니다' : '계약서 조각이 부족합니다'); return; }
-    setSave(r.save); setResults(r.results);
+    setSave(r.save); setResults(r.results); onTrack({ summon: r.results.length });
   };
   const slots = [
     { id: 'main', label: '동행', desc: '전투에 함께 싸운다' },
@@ -1849,7 +1854,7 @@ function RiskLine({ rate, fail, danger }) {
     </div>
   );
 }
-function ForgeView({ save, setSave, onBack, flash }) {
+function ForgeView({ save, setSave, onBack, flash, onTrack = () => {} }) {
   const [sel, setSel] = useState(null);
   const [filter, setFilter] = useState('all');
   const [sortBy, pickSort] = useItemSort();
@@ -1906,7 +1911,7 @@ function ForgeView({ save, setSave, onBack, flash }) {
                     ],
                     confirmLabel: '강화한다', danger: er.breakChance > 0,
                   }, () => {
-                    const r = E.forgeEnhance(save, item.uid); if (!r.result) return; setSave(r.save);
+                    const r = E.forgeEnhance(save, item.uid); if (!r.result) return; setSave(r.save); onTrack({ forge: 1 });
                     if (r.result === 'destroy') { setSel(null); showPop('destroy', '장비 파괴', `${E.itemName(item)} +${item.plus || 0}`); }
                     else if (r.result === 'success') showPop('success', `강화 성공! +${(item.plus || 0) + 1}`, E.itemName(item));
                     else if (r.result === 'down') showPop('down', `강화 실패 — +${Math.max(0, (item.plus || 0) - 1)}로 하락`, E.itemName(item));
@@ -1931,7 +1936,7 @@ function ForgeView({ save, setSave, onBack, flash }) {
                     ],
                     confirmLabel: '승급한다', danger: true,
                   }, () => {
-                    const r = E.forgePromote(save, item.uid); if (!r.result) return; setSave(r.save);
+                    const r = E.forgePromote(save, item.uid); if (!r.result) return; setSave(r.save); onTrack({ forge: 1 });
                     if (r.result === 'destroy') { setSel(null); showPop('destroy', '장비 파괴', `${gradeOf(ng).label} 승급 실패`); return; }
                     if (r.result === 'fail') { showPop('fail', '승급 실패', '재료만 잃었습니다'); return; }
                     const it2 = r.save.inventory.find(i => i.uid === item.uid); showPop('success', `${gradeOf(ng).label} 등급으로 승급!`, E.epicOptOf(it2) ? `에픽 효과 「${E.epicOptOf(it2).name}」` : E.itemName(it2));
@@ -2205,6 +2210,65 @@ function DetailStats({ d, cid }) {
             <span className="text-right">{fmtDetail(d[k] || 0, f)}</span>
           </React.Fragment>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// ===== 오프라인 보상 (1.233.0) =====
+function OfflineSheet({ pd, onClaim }) {
+  return (
+    <BottomSheet title="🌙 자리를 비운 사이" onClose={onClaim} maxHeight="60%">
+      <div className="text-center" style={{ fontSize: 12.5, color: PALETTE.textDim, lineHeight: 1.6 }}>
+        <b style={{ color: PALETTE.text }}>{iga(chronicleClass(pd.hero).name)}</b> <b style={{ color: PALETTE.text }}>{pd.place}</b>에서 {O.fmtAway(pd.ms)} 동안 사냥했다
+        <div style={{ fontSize: 11 }}>최대 {O.OFFLINE.maxMs / 3600000}시간 · 접속 중 ×1 효율의 {Math.round(O.OFFLINE.eff * 100)}% · 승률 {Math.round(pd.winRate * 100)}% 반영</div>
+      </div>
+      <div className="mt-3 flex flex-col gap-1 text-center" style={{ fontSize: 14, color: PALETTE.text }}>
+        <div>경험치 <b style={{ color: PALETTE.legendary }}>+<CountUp v={pd.exp} /></b></div>
+        <div>🪙 <b style={{ color: PALETTE.legendary }}>+<CountUp v={pd.gold} /></b> · ✦ <b>+{pd.essence}</b></div>
+      </div>
+      <UIButton style={{ height: 44, marginTop: 14 }} onClick={onClaim}>받기</UIButton>
+    </BottomSheet>
+  );
+}
+
+// ===== 일일 임무 (1.233.0) =====
+function DailyView({ acc, onBack, onClaim, onBonus }) {
+  const st = D.dailyState(acc);
+  const allClaimed = D.bonusReady(acc);
+  return (
+    <div className="absolute inset-0 flex flex-col">
+      <Header title="📅 일일 임무" onBack={onBack} />
+      <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2">
+        <div style={{ fontSize: 12, color: PALETTE.textDim }}>매일 KST 0시 초기화 · 어느 캐릭터로 해도 진행된다</div>
+        {D.DAILY_MISSIONS.map(m => {
+          const ms = D.missionState(acc, m);
+          return (
+            <GlassPanel key={m.id} className="p-3">
+              <div className="flex items-center gap-2">
+                <span style={{ fontSize: 20, width: 26, textAlign: 'center' }}>{m.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold" style={{ fontSize: 13, color: ms.status === 'claimed' ? PALETTE.textDim : PALETTE.text }}>{m.title}</div>
+                  <div style={{ fontSize: 11.5, color: PALETTE.textDim }}>{D.dailyRewardText(m.reward)}</div>
+                  <div className="mt-1"><Bar v={ms.cur} max={m.need} color={ms.status === 'progress' ? '#9cc4e4' : PALETTE.legendary} h={4} /></div>
+                </div>
+                {ms.status === 'done' ? <button onClick={() => onClaim(m.id)} className="ui-press flex-none font-semibold" style={{ height: 36, padding: '0 14px', borderRadius: 9, border: `1px solid ${PALETTE.legendary}`, color: '#1a1206', background: PALETTE.legendary, fontSize: 12.5 }}>받기</button>
+                  : <span className="flex-none" style={{ fontSize: 12, color: ms.status === 'claimed' ? '#8fe08a' : PALETTE.textDim }}>{ms.status === 'claimed' ? '✔ 완료' : `${ms.cur}/${m.need}`}</span>}
+              </div>
+            </GlassPanel>
+          );
+        })}
+        <GlassPanel className="p-3" style={{ border: `1px solid ${allClaimed && !st.bonus ? PALETTE.legendary : 'var(--ui-line)'}` }}>
+          <div className="flex items-center gap-2">
+            <span style={{ fontSize: 20, width: 26, textAlign: 'center' }}>🎁</span>
+            <div className="flex-1">
+              <div className="font-semibold" style={{ fontSize: 13, color: PALETTE.text }}>오늘의 임무 모두 완료</div>
+              <div style={{ fontSize: 11.5, color: PALETTE.textDim }}>{D.dailyRewardText(D.DAILY_BONUS.reward)}</div>
+            </div>
+            {st.bonus ? <span style={{ fontSize: 12, color: '#8fe08a' }}>✔ 완료</span>
+              : <button disabled={!allClaimed} onClick={onBonus} className="ui-press flex-none font-semibold" style={{ height: 36, padding: '0 14px', borderRadius: 9, border: `1px solid ${PALETTE.legendary}`, color: allClaimed ? '#1a1206' : PALETTE.textDim, background: allClaimed ? PALETTE.legendary : 'transparent', fontSize: 12.5, opacity: allClaimed ? 1 : 0.5 }}>받기</button>}
+          </div>
+        </GlassPanel>
       </div>
     </div>
   );
@@ -2608,6 +2672,35 @@ export default function ChronicleGame({ onExit }) {
     if (next !== save) setAcc(a => A.fromView(a, next));
   }, [view]); // eslint-disable-line react-hooks/exhaustive-deps
   const setSave = (next) => setAcc(a => A.fromView(a, next));
+  // 일일 임무 진행 (1.233.0) — 계정 단위
+  const trackDaily = (d) => setAcc(a => D.trackDaily(a, d));
+  const winDeltas = (sim, enemies, extra = {}) => (sim.result === 'win' ? { win: 1, elite: enemies.filter(e => e.tier === 'elite' || e.tier === 'boss').length, ...extra } : null);
+  // 오프라인 보상 (1.233.0) — 접속 시각은 별도 키에, 계산된 보상은 계정 offline.pending에
+  const LAST_SEEN_KEY = 'chronicleLastSeen';
+  const saveRef = useRef(save); saveRef.current = save;
+  useEffect(() => {
+    const stamp = () => { try { localStorage.setItem(LAST_SEEN_KEY, String(Date.now())); } catch { /* */ } };
+    const check = () => {
+      let last = 0;
+      try { last = +localStorage.getItem(LAST_SEEN_KEY) || 0; } catch { /* */ }
+      stamp();
+      const sv = saveRef.current;
+      if (!last || !sv) return;
+      const rw = O.offlineReward(sv, P.previewTarget(sv, readLastHunt()), Date.now() - last);
+      if (rw && (rw.exp || rw.gold)) setAcc(a => ({ ...a, offline: { pending: O.mergeOffline(a.offline?.pending, rw) } }));
+    };
+    check();
+    const iv = setInterval(() => { if (document.visibilityState === 'visible') stamp(); }, 30000);
+    const onVis = () => { if (document.visibilityState === 'visible') check(); else stamp(); };
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('pagehide', stamp);
+    return () => { clearInterval(iv); document.removeEventListener('visibilitychange', onVis); window.removeEventListener('pagehide', stamp); stamp(); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const claimOffline = () => {
+    const pd = acc.offline?.pending;
+    setAcc(a => O.claimOffline(a).acc);
+    if (pd) flash(`오프라인 보상 — 경험치 +${pd.exp.toLocaleString()} · 🪙 +${pd.gold.toLocaleString()}`);
+  };
   const flash = (msg) => { setToast(msg); setTimeout(() => setToast(t => (t === msg ? null : t)), 1600); };
 
   // 이야기 — 조건에 맞는 장면이 있으면 띄우고 true
@@ -2646,6 +2739,7 @@ export default function ChronicleGame({ onExit }) {
     r.summary.questsDone = Q.newlyDoneQuests(save, r.save);
     if (mode === 'hunt' && !E.gateReady(save, field.id, stage) && E.gateReady(r.save, field.id, stage)) r.summary.gateOpen = true;
     setSave(r.save);
+    trackDaily(winDeltas(sim, enc.enemies));
     const rec = huntRecord(sim, party, enc, r.summary, readSpeedPref(E.boostLeftMs(save)), ctx.label);
     lastRecRef.current = rec;
     if (repStatsRef.current) addHuntRecord(repStatsRef.current, rec);
@@ -2664,6 +2758,7 @@ export default function ChronicleGame({ onExit }) {
     const r = E.applyBattle(save, ctx, sim, rng);
     r.summary.questsDone = Q.newlyDoneQuests(save, r.save);
     setSave(r.save);
+    trackDaily(winDeltas(sim, enc.enemies, { dungeonWin: 1 }));
     if (!dungRunRef.current) dungRunRef.current = newHuntStats();
     addHuntRecord(dungRunRef.current, huntRecord(sim, party, enc, r.summary, readSpeedPref(E.boostLeftMs(save)), ctx.label));
     let runReport = null;
@@ -2685,6 +2780,7 @@ export default function ChronicleGame({ onExit }) {
     const r = E.applyBattle(save, ctx, sim, rng);
     r.summary.questsDone = Q.newlyDoneQuests(save, r.save);
     setSave(r.save);
+    trackDaily(winDeltas(sim, enc.enemies));
     // 첨탑 한 번 도전 집계 (1.232.1) — 층이 이어지지 않으면 새 도전
     if (!towerRunRef.current || towerRunRef.current.lastFloor + 1 !== enc.floor) towerRunRef.current = { st: newHuntStats(), lastFloor: enc.floor - 1 };
     addHuntRecord(towerRunRef.current.st, huntRecord(sim, party, enc, r.summary, readSpeedPref(E.boostLeftMs(save)), ctx.label));
@@ -2758,13 +2854,15 @@ export default function ChronicleGame({ onExit }) {
   } else if (view === 'tower') {
     content = <TowerView save={save} setSave={setSave} onBack={() => setView('town')} onFight={fightTower} flash={flash} />;
   } else if (view === 'fam') {
-    content = <FamiliarView save={save} setSave={setSave} onBack={() => setView('town')} flash={flash} />;
+    content = <FamiliarView save={save} setSave={setSave} onBack={() => setView('town')} flash={flash} onTrack={trackDaily} />;
   } else if (view === 'stash') {
     content = <StashView save={save} setSave={setSave} onBack={() => setView('town')} flash={flash} />;
+  } else if (view === 'daily') {
+    content = <DailyView acc={acc} onBack={() => setView('town')} onClaim={(id) => { setAcc(a => D.claimDaily(a, id)); flash('일일 임무 보상 수령'); }} onBonus={() => { setAcc(a => D.claimDailyBonus(a)); flash(`오늘의 임무 완주 — ${D.dailyRewardText(D.DAILY_BONUS.reward)}`); }} />;
   } else if (view === 'forge') {
-    content = <ForgeView save={save} setSave={setSave} onBack={() => setView('town')} flash={flash} />;
+    content = <ForgeView save={save} setSave={setSave} onBack={() => setView('town')} flash={flash} onTrack={trackDaily} />;
   } else {
-    content = <TownView save={save} go={(v) => setView(v === 'dungeon' && save.dungeon ? 'dungeon' : v)} onExit={onExit} onSwitchChar={() => setView('title')} />;
+    content = <TownView save={save} acc={acc} go={(v) => setView(v === 'dungeon' && save.dungeon ? 'dungeon' : v)} onExit={onExit} onSwitchChar={() => setView('title')} />;
   }
 
   return (
@@ -2773,6 +2871,7 @@ export default function ChronicleGame({ onExit }) {
       {report && <HuntReport report={report} save={save} onClose={() => setReport(null)} />}
       {boostSheet && save && <BoostSheet save={save} onClose={() => setBoostSheet(false)} onBuy={() => { const n = E.buyBoost(save); if (n === save) { flash(save.gold < E.boostCost(save) ? '골드가 부족합니다' : `최대 ${BOOST.maxStackMin / 60}시간까지 쌓을 수 있습니다`); return; } setSave(n); flash(`⏩ ×4 배속 +${BOOST.minutes}분`); }} />}
       {acc.giftNotice && view === 'title' && <GiftNotice acc={acc} onClose={() => setAcc(a => ({ ...a, giftNotice: false }))} />}
+      {view === 'town' && !scene && acc.offline?.pending && acc.chars?.[acc.offline.pending.hero] && <OfflineSheet pd={acc.offline.pending} onClaim={claimOffline} />}
       {scene && <SceneView key={scene.scene.id} save={save} scene={scene.scene} onEnd={endScene} />}
       {toast && (
         <div className="absolute left-1/2 z-50 pointer-events-none" style={{ bottom: 90, transform: 'translateX(-50%)', padding: '8px 14px', borderRadius: 999, background: '#000d', border: '1px solid var(--ui-line-strong)', color: PALETTE.legendary, fontSize: 12.5, whiteSpace: 'nowrap' }}>{toast}</div>
