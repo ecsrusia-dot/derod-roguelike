@@ -799,11 +799,14 @@ export function dungeonEncounter(d, rng) {
   const ds = T.dungeonSolo || { hp: 1, atk: 1 };
   const area = { hpMult: D.area.hpMult * tier.hp * ds.hp, atkMult: D.area.atkMult * tier.atk * ds.atk };
   const lv = f.lv + tier.lv;
-  if (f.boss) return { type: 'dungeonBoss', enemies: [buildChronicleEnemy(f.enemies[0], lv, 'e0', area)] };
+  // 경험치 배율 (1.234.1) — 난이도 HP 배율 대신 고정 보너스 (일반 기준 = 지역 × 솔로 보정)
+  const rm = D.area.hpMult * ds.hp * (tier.expMult || 1);
+  const mk = (key, i) => ({ ...buildChronicleEnemy(key, lv, `e${i}`, area), rewardMult: rm });
+  if (f.boss) return { type: 'dungeonBoss', enemies: [mk(f.enemies[0], 0)] };
   const [n0, n1] = T.dungeonFloorEnemies || [2, 3];
   const n = n0 + Math.floor(rng() * (n1 - n0 + 1));
   const enemies = [];
-  for (let i = 0; i < n; i++) enemies.push(buildChronicleEnemy(pick(rng, f.enemies), lv, `e${i}`, area));
+  for (let i = 0; i < n; i++) enemies.push(mk(pick(rng, f.enemies), i));
   return { type: 'dungeonFloor', enemies };
 }
 
@@ -1221,8 +1224,14 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
 
 // ===== 전투 보상 =====
 function rollGrade(rng, grades) { return weighted(rng, grades); }
+// 레벨 차이 경험치 배율 (1.234.1) — heroLv 없으면 1
+export function expGapMult(heroLv, enemyLv) {
+  const g = T.expGap; if (!g || heroLv == null) return 1;
+  const over = heroLv - enemyLv - g.free;
+  return over > 0 ? Math.max(g.min, 1 - g.perLv * over) : 1;
+}
 export function battleRewards(enemies, type, rng, mods = {}) {
-  const exp = enemies.reduce((s, e) => s + Math.round((6 + e.lv * 3) * (e.rewardMult || 1) * (T.expMult || 1) * (e.tier === 'boss' ? 10 : e.tier === 'elite' ? 3 : 1)), 0);
+  const exp = enemies.reduce((s, e) => s + Math.round((6 + e.lv * 3) * (e.rewardMult || 1) * (T.expMult || 1) * (e.tier === 'boss' ? 10 : e.tier === 'elite' ? 3 : 1) * expGapMult(mods.heroLv, e.lv)), 0);
   const gold = enemies.reduce((s, e) => s + Math.round((3 + e.lv * 2) * (e.tier === 'boss' ? 8 : e.tier === 'elite' ? 3 : 1) * (0.85 + rng() * 0.3)), 0);
   const tableKey = type === 'normal' ? 'normal' : type;
   const base = DROP_TABLE[tableKey] || DROP_TABLE.normal;
@@ -1291,6 +1300,7 @@ export function applyBattle(save0, ctx, battle, rng = Math.random) {
   // 📜 계약서 조각 (1.212.0 — 사역마 소환 재료, 계정 공유)
   const fs = rollFamShards(ctx.enemies, ctx.type, rng, save.dungeon?.tier || 0);
   if (fs) { save.mats.famShard = (save.mats.famShard || 0) + fs; summary.famShards = fs; }
+  mods = { ...mods, heroLv: save.units[save.hero]?.lv };
   const r = battleRewards(ctx.enemies, ctx.type, rng, mods);
   // 장비 옵션 — 경험치·골드 % (주인공 기준)
   const hd = deriveUnit(save, save.hero);
