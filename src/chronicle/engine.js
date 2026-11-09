@@ -1296,7 +1296,16 @@ export function applyBattle(save0, ctx, battle, rng = Math.random) {
     const bu = Object.values(UNIQUE_ITEMS).filter(x => x.branch === hu.rebirth.branch);
     if (bu.length && rng() < pickC(REBIRTH.branchUnique[ty])) r.items.push(makeItem(rng, { named: pick(rng, bu).id, ilv }));
   }
+  // 자동 분해 (1.231.2) — 설정 등급 이하 · 에픽 이상은 항상 보존 · 타직업은 other 설정일 때만
+  const as = save.autoSalvage || { grade: -1 };
+  const autoTot = {};
   for (const it of r.items) {
+    const g = gradeIdx(it.grade);
+    if (as.grade >= 0 && g <= Math.min(as.grade, gradeIdx('rare')) && (as.other || itemUsable(it, save.hero))) {
+      for (const [k, v] of Object.entries(salvageOf(it))) autoTot[k] = (autoTot[k] || 0) + v;
+      summary.autoSalvaged = (summary.autoSalvaged || 0) + 1;
+      continue;
+    }
     if (save.inventory.length >= bagMax(save)) { addSalvage(save, salvageOf(it)); summary.autoDismantled = (summary.autoDismantled || 0) + 1; continue; }
     const item = { ...it, uid: save.nextUid++ };
     save.inventory.push(item);
@@ -1305,6 +1314,7 @@ export function applyBattle(save0, ctx, battle, rng = Math.random) {
     if (item.grade === 'unique') save.stats.uniques = (save.stats.uniques || 0) + 1;
     if (item.grade === 'mythic') save.stats.mythics = (save.stats.mythics || 0) + 1;
   }
+  if (summary.autoSalvaged) { addSalvage(save, autoTot); summary.autoSalvage = autoTot; }
   if (ctx.kind === 'field') {
     const fid = ctx.fieldId;
     save.progress.fieldKills[fid] = (save.progress.fieldKills[fid] || 0) + ctx.enemies.length;
