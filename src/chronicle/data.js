@@ -120,7 +120,13 @@ export const DUNGEON_KEYS = {
 // 만렙(Lv.100) 달성 시 직업별 2갈래 중 하나로 전승 → 레벨 1로 초기화(능력치·스킬·마스터리 포함),
 // 필요 경험치 ×2(전승 횟수마다 누적), 장비·사역마·재화 유지, 착용은 「장비 레벨 ≤ 내 레벨 + 5」만.
 // 갈래는 첫 전승 때 고정. 전승 1회마다 영구 공격력·최대 HP +5%
-export const REBIRTH = { reqLevel: 100, max: 5, expMult: 2, wearMargin: 5, bonusPct: 0.05 };
+export const REBIRTH = { reqLevel: 100, max: 5, expMult: 2, expMultStep: 0.5, wearMargin: 5, bonusPct: 0.05,
+  // 1.221.0 전승 단계 — 전승 횟수마다 모든 적(사냥터·던전·탑) HP·공격 증가
+  enemyHp: 0.25, enemyAtk: 0.15,
+  // 전승 등급 장비 드랍 확률 (전승 캐릭터만) · 갈래 유니크 확률
+  mythicDrop: { elite: 0.01, gate: 0.05, boss: 0.15, dungeonBoss: [0.15, 0.25, 0.4], towerElite: 0.04, towerBoss: 0.2 },
+  branchUnique: { boss: 0.02, dungeonBoss: [0.03, 0.05, 0.08], towerBoss: 0.05 },
+};
 export const REBIRTH_BRANCHES = {
   w_warlord: { cls: 'wanderer', name: '검귀', type: '탱딜', color: '#e8826a', desc: '반격과 베기로 버티며 적을 쓸어버린다 — 회복이 없으니 치유 사역마와 궁합', fx: { atkPct: 0.12, counterPct: 0.08, counterDmg: 0.3 } },
   w_paladin: { cls: 'wanderer', name: '성기사', type: '탱힐', color: '#f0d27a', desc: '스스로 회복하고 보호막을 두른다 — 딜이 부족하니 맹공 사역마와 궁합', fx: { defPct: 0.12, hpPct: 0.08, healFromAtk: 0.6 } },
@@ -177,8 +183,9 @@ Object.assign(CHRONICLE_SKILLS, {
   pi_brand: B('p_inq', 'pi_brand', '단죄의 낙인', 'markStrike', 30, 3, 1.4, 0.12, { dv: 0.3, turns: 3 }),
 });
 export const rebirthBranches = (classId) => Object.entries(REBIRTH_BRANCHES).filter(([, b]) => b.cls === classId).map(([id, b]) => ({ id, ...b }));
-// 레벨업 필요 경험치 — 전승 횟수마다 ×2
-export const expNeedFor = (u) => Math.round(CHRONICLE_TUNING.expNeed(u.lv) * Math.pow(REBIRTH.expMult, u.rebirth?.count || 0));
+// 레벨업 필요 경험치 — 첫 전승 ×2, 이후 전승마다 +0.5 (1.221.0: 누적 ×2는 2회차부터 과도해 완화)
+export const rebirthExpMult = (count) => (count > 0 ? REBIRTH.expMult + REBIRTH.expMultStep * (count - 1) : 1);
+export const expNeedFor = (u) => Math.round(CHRONICLE_TUNING.expNeed(u.lv) * rebirthExpMult(u.rebirth?.count || 0));
 // branch를 주면 그 갈래 스킬까지 포함 (갈래 없는 유닛은 기본 스킬만)
 export const classSkills = (classId, branch = null) => Object.values(CHRONICLE_SKILLS).filter(s => s.cls === classId && (!s.branch || s.branch === branch));
 
@@ -253,6 +260,7 @@ export const SALVAGE = {
   rare: { essence: 8, famShard: 1 },
   epic: { essence: 20, shard: 2 },
   unique: { shard: 5, famSoul: 10 },
+  mythic: { shard: 10, famSoul: 20 },
 };
 export const SALVAGE_ICON = { gold: '🪙', essence: '✦', shard: '◆', famShard: '📜', famSoul: '🔮' };
 
@@ -402,6 +410,8 @@ export const GRADES = [
   { id: 'rare', label: '희귀', color: '#6aa6e0', mult: 1.45, opts: 2, optMult: 1.15, dismantle: 8 },
   { id: 'epic', label: '에픽', color: '#c08ae8', mult: 1.8, opts: 3, optMult: 1.3, dismantle: 20, shard: 2 },
   { id: 'unique', label: '유니크', color: '#f0883e', mult: 2.0, opts: 2, optMult: 1.45, dismantle: 40, shard: 5 },
+  // 1.221.0 — 전승한 캐릭터만 얻는 최상위 등급 (승급 불가 · 옵션 4개)
+  { id: 'mythic', label: '전승', color: '#ff6ad5', mult: 2.3, opts: 4, optMult: 1.6, dismantle: 60, shard: 10 },
 ];
 export const gradeIdx = (id) => GRADES.findIndex(g => g.id === id);
 export const SLOTS = [
@@ -512,6 +522,19 @@ export const UNIQUE_ITEMS = {
   u_c_coin: U('u_c_coin', 'common', 'accessory', '탐욕의 금화', { atkPct: 0.06, crit: 0.03 }, { goldPct: 0.4, dmgTakenUp: 0.1 }, '골드 +40%, 받는 피해 +10%'),
 };
 // 유니크 확률 — 장비 1개당 (설계서 5절)
+// 갈래 전용 유니크 (1.221.0) — 그 갈래로 전승한 캐릭터만 착용 · 전승 캐릭터 보스 드랍
+Object.assign(UNIQUE_ITEMS, {
+  ub_warlord: U('ub_warlord', 'wanderer', 'weapon', '검귀의 대태도', { atkPct: 0.12, counterDmg: 0.3 }, { execute: 0.3 }, 'HP 30% 미만의 적에게 피해 +30%', { branch: 'w_warlord' }),
+  ub_paladin: U('ub_paladin', 'wanderer', 'offhand', '성기사의 성물', { defPct: 0.15, healPct: 0.2 }, { overhealShield: 1 }, '최대 HP를 넘는 회복은 보호막으로', { branch: 'w_paladin' }),
+  ub_arch: U('ub_arch', 'sage', 'accessory', '대마도사의 왕관', { skillDmg: 0.15, atkPct: 0.08 }, { skillDmg: 0.15 }, '스킬 피해 +15% 추가', { branch: 's_arch' }),
+  ub_hex: U('ub_hex', 'sage', 'offhand', '저주술사의 해골', { dotDmg: 0.25, hpPct: 0.08 }, { dotTurnsMult: 2 }, '지속 피해가 2배 길게 지속', { branch: 's_hex' }),
+  ub_reaper: U('ub_reaper', 'demonblood', 'weapon', '혈귀의 낫', { critDmg: 0.3, atkPct: 0.1 }, { execute: 0.4 }, 'HP 30% 미만의 적에게 피해 +40%', { branch: 'd_reaper' }),
+  ub_plague: U('ub_plague', 'demonblood', 'armor', '역병의 갑주', { hpPct: 0.15, dmgReduce: 0.06 }, { thornsPct: 0.2 }, '받은 피해 20% 반사', { branch: 'd_plague' }),
+  ub_sniper: U('ub_sniper', 'elf', 'weapon', '저격수의 장궁', { crit: 0.08, critDmg: 0.3 }, { firstCrit: 1 }, '전투 첫 공격 치명타 확정', { branch: 'e_sniper' }),
+  ub_storm: U('ub_storm', 'elf', 'offhand', '폭풍의 화살통', { chain: 0.1, atkPct: 0.08 }, { chain: 0.2 }, '단일 공격 뒤 추가 타격 확률 +20%', { branch: 'e_storm' }),
+  ub_arch2: U('ub_arch2', 'priest', 'offhand', '대주교의 성배', { healPct: 0.2, hpPct: 0.08 }, { revive: 0.3 }, '전투당 1회, 쓰러지면 HP 30%로 부활', { branch: 'p_arch' }),
+  ub_inq: U('ub_inq', 'priest', 'weapon', '심판관의 망치', { atkPct: 0.15, holyDmg: 0.1 }, { execute: 0.3 }, 'HP 30% 미만의 적에게 피해 +30%', { branch: 'p_inq' }),
+});
 export const UNIQUE_CHANCE = { boss: 0.005, dungeonBoss: [0.02, 0.05, 0.10] };
 
 export const FORGE = {
