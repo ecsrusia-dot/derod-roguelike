@@ -28,6 +28,7 @@ export const CHRONICLE_TUNING = {
   // 던전 솔로 보정 (1.214.0) — 층 사이 회복이 없으므로 던전 적만 따로 낮춘다 · 층당 적 수
   holyCap: 0.2, // 치유→신성 피해 합계 상한 (1.216.0 — 사제 + 사역마 조합 독주 보정)
   shieldCap: 0.15, // 시작 보호막 합계 상한 (1.216.0)
+  shieldMaxPct: 0.5,     // 1.226.2 PM: 보호막 총량 상한 = 최대 HP의 50% (모든 경로 합산 — 누적형 보호막 무한 증가 방지)
   lifestealCap: 0.07, // 장비·유니크 흡혈 합계 상한 (1.216.0 — 혼혈 마족 던전 독주 보정)
   dungeonSolo: { hp: 0.6, atk: 0.75 }, dungeonFloorEnemies: [1, 2], dungeonFloorHeal: 0.25, // 던전 층 사이 최대 HP의 25% 회복 (자체 회복 없는 직업 보정)
   defK: 60,                   // 받는 피해 = raw × K/(K+방어)

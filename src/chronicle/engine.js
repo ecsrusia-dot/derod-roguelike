@@ -817,10 +817,17 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
   };
   // 일시 효과 (1.218.0 사역마 고유 스킬): armorBreak·weak·vuln(적) / guardDef·guardRed(아군)
   const fxv = (u, k) => (u.fx && u.fx[k] && u.fx[k].t > 0 ? u.fx[k].v : 0);
+  // 보호막 (1.226.2) — 모든 경로가 이 함수를 쓴다. mode 'add' = 누적 / 'max' = 큰 값으로 갱신. 총량 상한 최대 HP × shieldMaxPct
+  const addShield = (t, v, mode = 'add') => {
+    const cap = Math.round(t.maxHp * (T.shieldMaxPct || 9));
+    const before = t.shield;
+    t.shield = Math.min(cap, Math.max(before, mode === 'max' ? v : before + v));
+    return t.shield - before;
+  };
   const healUnit = (t, h) => {
     const before = t.hp;
     t.hp = Math.min(t.maxHp, t.hp + h);
-    if (t.overhealShield) t.shield += Math.max(0, h - (t.hp - before));
+    if (t.overhealShield) addShield(t, Math.max(0, h - (t.hp - before)));
     return t.hp - before;
   };
   // 쓰러짐 직전 처리 — 불굴(guts) · 부활(revive) · 응급(emergencyHeal)
@@ -1039,7 +1046,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
         for (const a of allies) { const h = Math.round(u.healPower * v); const eh = healUnit(a, h); hits.push({ t: a.id, h, eh }); holyHit(u, h, hits); }
         break;
       case 'shield':
-        for (const a of allies) { const sh = Math.round(u.healPower * v); const es = Math.max(0, sh - a.shield); a.shield = Math.max(a.shield, sh); hits.push({ t: a.id, s: sh, es }); }
+        for (const a of allies) { const sh = Math.round(u.healPower * v); const es = addShield(a, sh, 'max'); hits.push({ t: a.id, s: sh, es }); }
         break;
       case 'buffAtk':
         for (const a of allies) { a.buffs.bless = { v: v * (u.blessMult || 1), t: s.turns + (u.blessTurns || 0) }; hits.push({ t: a.id, buff: true }); }
@@ -1076,7 +1083,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
         const t = allies.slice().sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];
         const h = Math.round(u.healPower * v);
         const eh = healUnit(t, h); hits.push({ t: t.id, h, eh });
-        if (s.kind === 'healShield') { const sh = Math.round(u.healPower * s.shieldV); const es = Math.max(0, sh - t.shield); t.shield = Math.max(t.shield, sh); hits.push({ t: t.id, s: sh, es }); }
+        if (s.kind === 'healShield') { const sh = Math.round(u.healPower * s.shieldV); const es = addShield(t, sh, 'max'); hits.push({ t: t.id, s: sh, es }); }
         if (s.kind === 'healBuff') for (const a of allies) { a.buffs.song = { v: s.buff, t: s.turns }; hits.push({ t: a.id, buff: true }); }
         break;
       }
@@ -1096,7 +1103,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
       }
       default: break;
     }
-    if (u.skillShield) u.shield += Math.round(u.atk * u.skillShield);
+    if (u.skillShield) addShield(u, Math.round(u.atk * u.skillShield));
     push({ a: u.id, n: s.name, k: s.kind, skill: true, hits });
   };
   // 치유 → 신성 피해 (사제 옵션·유니크)
