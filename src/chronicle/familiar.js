@@ -43,7 +43,7 @@ export const FAM_TUNING = {
 // 보조 패시브도 레벨 비례 — subMin + (1-subMin) × (실효/주인공)
 export const FAM_LEVEL = {
   expNeed: (lv) => Math.round(60 * Math.pow(lv, 1.6)), // 주인공 1회차와 같은 곡선
-  catchUp: 10,      // 주인공보다 낮을 때 경험치 배율 (Lv.36 약 36전 · Lv.68 약 100전 · Lv.98 약 180전이면 따라잡음)
+  catchUp: 1,       // 1.225.1 PM: 따라잡기 보정 폐지 — 주인공과 같은 경험치 (동행해서 직접 키워야 함)
   subMin: 0.3,      // Lv.1 보조 사역마도 패시브의 30%는 준다
   lvOffset: 10,
 };
@@ -164,7 +164,8 @@ export function famSkillInfo(key, f) {
   const pct = (x) => `${Math.round(x * 100)}%`;
   const sig = famSignature(key, f.grade);
   const sigLocked = lv - 1 < FAM_SIG_MIN_GRADE;
-  return [sig, ...FAM_SKILLS[roleId]].map(s => {
+  // 1.225.1 — 남령 미만은 고유 스킬을 목록에서 뺀다 (전투에서도 쓰지 않음 · 화면엔 안내 한 줄만)
+  return [...(sigLocked ? [] : [sig]), ...FAM_SKILLS[roleId]].map(s => {
     const sv = Math.max(lv, FAM_SIG_MIN_GRADE + 1);
     const v = s.base + s.perLv * ((s.sig ? sv : lv) - 1);
     let effect = '';

@@ -1020,6 +1020,7 @@ function FamSkillPanel({ k, f }) {
       <div className="font-semibold" style={{ color: PALETTE.text }}>동행 시 능력치 <span style={{ color: PALETTE.textDim, fontWeight: 400 }}>(주인공 대비)</span></div>
       <div style={{ color: PALETTE.textDim }}>최대 HP {p(r.hp)} · 공격력 {p(r.atk)} · 방어 {p(r.def)} · 회복력 {p(r.heal)}{r.guard ? ` · 수호 태세 ${p(r.guard)}` : ''}</div>
       <div className="font-semibold mt-2" style={{ color: PALETTE.text }}>동행 스킬</div>
+      {F.famGradeIdx(f.grade) < F.FAM_SIG_MIN_GRADE && <div style={{ fontSize: 11, color: PALETTE.textDim }}>★ 고유 스킬은 <b style={{ color: '#7a6ae8' }}>남령</b>으로 진화하면 열린다</div>}
       {skills.map(sk => (
         <div key={sk.id} className="mt-1.5" style={{ paddingLeft: 8, borderLeft: `2px solid ${sk.sig ? '#d07ae8' : 'var(--ui-line-strong)'}`, opacity: sk.locked ? 0.55 : 1 }}>
           {sk.sig && <div style={{ fontSize: 11, color: '#d07ae8', fontWeight: 700 }}>★ 고유 스킬 · {sk.sigType}{sk.locked ? ' — 🔒 남령부터 사용 (수치는 남령 기준)' : ''}</div>}
@@ -1195,7 +1196,7 @@ function FamiliarView({ save, setSave, onBack, flash }) {
               </div>
               {F.famLv(selF) < heroLv ? <>
                 <div className="mt-1"><Bar v={selF.exp || 0} max={F.FAM_LEVEL.expNeed(F.famLv(selF))} color="#e8b04a" h={5} /></div>
-                <div style={{ fontSize: 11, color: PALETTE.textDim }}>경험치 {selF.exp || 0}/{F.FAM_LEVEL.expNeed(F.famLv(selF))} · <b style={{ color: '#e8b04a' }}>동행 칸</b>에서 이길 때만 오른다 (주인공보다 낮으면 ×{F.FAM_LEVEL.catchUp})</div>
+                <div style={{ fontSize: 11, color: PALETTE.textDim }}>경험치 {selF.exp || 0}/{F.FAM_LEVEL.expNeed(F.famLv(selF))} · <b style={{ color: '#e8b04a' }}>동행 칸</b>에서 이길 때만 오른다</div>
               </> : <div style={{ fontSize: 11, color: PALETTE.textDim }}>주인공 레벨 도달 — 주인공이 레벨업하면 다시 경험치를 받는다</div>}
             </GlassPanel>
             <FamSubTable k={sel} gi={gi} />
