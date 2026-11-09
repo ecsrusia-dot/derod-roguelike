@@ -8,6 +8,7 @@
 import { QUESTS, SCENES, RECRUIT_SCENES } from './story.js';
 import { GRADES, gradeIdx, CHRONICLE_TUNING as T, DUNGEON_TIERS, expNeedFor } from './data.js';
 import { rollItem, autoGrowUnit, refreshDungeonKeys, _addKeys } from './engine.js';
+import { levelCap } from './roster.js';
 
 const clone = (o) => (typeof structuredClone === 'function' ? structuredClone(o) : JSON.parse(JSON.stringify(o)));
 
@@ -128,12 +129,13 @@ export function claimQuest(save0, id, rng = Math.random) {
   save.mats.shard += r.shard || 0;
   if (r.keys) gained.keysGot = _addKeys(save, r.keys);
   if (r.exp) {
+    const cap = levelCap(save.roster); // 원정대 레벨 상한 (1.229.0)
     for (const cid of save.party) {
       const u = save.units[cid];
-      if (u.lv >= T.maxLevel) continue;
+      if (u.lv >= cap) continue;
       u.exp += r.exp;
       let up = false;
-      while (u.lv < T.maxLevel && u.exp >= expNeedFor(u)) { u.exp -= expNeedFor(u); u.lv += 1; u.points += T.pointsPerLevel; u.sp += T.spPerLevel; up = true; }
+      while (u.lv < cap && u.exp >= expNeedFor(u)) { u.exp -= expNeedFor(u); u.lv += 1; u.points += T.pointsPerLevel; u.sp += T.spPerLevel; up = true; }
       if (up && cid !== save.hero) save.units[cid] = autoGrowUnit(u);
     }
   }
