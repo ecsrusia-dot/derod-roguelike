@@ -361,6 +361,7 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
                 {summary.items.map(it => (
                   <div key={it.uid} className="text-center" style={{ color: gradeOf(it.grade).color, fontWeight: it.grade === 'unique' || it.grade === 'mythic' ? 700 : 400 }}>{it.grade === 'mythic' ? '✦ 전승 장비 획득: ' : it.grade === 'unique' ? '★ 유니크 획득: ' : '획득: '}{E.itemName(it)} ({gradeOf(it.grade).label}{E.itemUsable(it, save.hero) ? '' : ` · ${clsTag(it)}`})</div>
                 ))}
+                {summary.autoSalvaged ? <div className="text-center" style={{ color: PALETTE.textDim }}>♻ 자동 분해 {summary.autoSalvaged}개 → {E.salvageText(summary.autoSalvage || {})}</div> : null}
                 {summary.autoDismantled ? <div className="text-center" style={{ color: PALETTE.textDim }}>가방이 가득 차 {summary.autoDismantled}개 자동 분해</div> : null}
                 {summary.unlocks.map(u => <div key={u} className="text-center" style={{ color: '#9cc4e4' }}>🔓 {u} 개방</div>)}
                 {summary.dungeonClear && <div className="text-center font-semibold" style={{ color: '#c08ae8' }}>던전 정복!</div>}
@@ -1108,7 +1109,16 @@ function BagView({ save, setSave, onBack, flash }) {
   // 정렬 (1.213.1): 착용 장비가 맨 위 → 그 아래 전투력(주 능력치) 높은 순
   const [sortBy, pickSort] = useItemSort();
   const [incOther, setIncOther] = useState(() => { try { return localStorage.getItem('chronicleBulkOther') === '1'; } catch { return false; } });
-  const toggleOther = () => { const v = !incOther; setIncOther(v); try { localStorage.setItem('chronicleBulkOther', v ? '1' : '0'); } catch { /* */ } };
+  // 타직업 포함 — 일괄 분해·자동 분해 공용 (1.231.2: 자동 분해 설정은 계정에 저장)
+  const toggleOther = () => { const v = !incOther; setIncOther(v); try { localStorage.setItem('chronicleBulkOther', v ? '1' : '0'); } catch { /* */ } setSave({ ...save, autoSalvage: { ...(save.autoSalvage || { grade: -1 }), other: v } }); };
+  const autoG = save.autoSalvage?.grade ?? -1;
+  const setAutoG = (g) => setSave({ ...save, autoSalvage: { grade: g, other: incOther } });
+  // 선택 분해 모드 (1.231.2)
+  const [picking, setPicking] = useState(false);
+  const [picked, setPicked] = useState(() => new Set());
+  const togglePick = (uid) => setPicked(p => { const n = new Set(p); if (n.has(uid)) n.delete(uid); else n.add(uid); return n; });
+  const endPick = () => { setPicking(false); setPicked(new Set()); };
+  const pickedSalvage = (() => { const tot = {}; for (const it of save.inventory) if (picked.has(it.uid)) for (const [k, v] of Object.entries(E.salvageOf(it))) tot[k] = (tot[k] || 0) + v; return tot; })();
   const hero = save.hero;
   const list = sortItems(save, filterItems(save.inventory, filter, hero), sortBy);
   const item = sel != null ? save.inventory.find(i => i.uid === sel) : null;
@@ -1151,12 +1161,20 @@ function BagView({ save, setSave, onBack, flash }) {
       <div className="flex gap-1.5 px-3 pt-1.5 flex-none">
         <button onClick={() => bulk(0)} className="ui-press flex-1" style={{ ...btn, border: '1px dashed var(--ui-line-strong)', color: PALETTE.textDim }}>일반 분해</button>
         <button onClick={() => bulk(1)} className="ui-press flex-1" style={{ ...btn, border: '1px dashed var(--ui-line-strong)', color: PALETTE.textDim }}>고급 이하 분해</button>
+        <button onClick={() => bulk(2)} className="ui-press flex-1" style={{ ...btn, border: '1px dashed #6aa6e088', color: '#6aa6e0' }}>희귀 이하 분해</button>
+        <button onClick={() => (picking ? endPick() : setPicking(true))} className="ui-press flex-1" style={{ ...btn, border: `1px solid ${picking ? PALETTE.legendary : 'var(--ui-line-strong)'}`, color: picking ? PALETTE.legendary : PALETTE.text, background: picking ? `${PALETTE.legendary}1f` : 'transparent' }}>{picking ? '선택 끝내기' : '☑ 선택 분해'}</button>
+      </div>
+      <div className="flex items-center gap-1 px-3 pt-1.5 flex-none" style={{ fontSize: 11.5 }}>
+        <span className="flex-none" style={{ color: PALETTE.textDim }}>획득 즉시 자동 분해</span>
+        {[[-1, '끔'], [0, '일반'], [1, '고급↓'], [2, '희귀↓']].map(([g, l]) => (
+          <button key={g} onClick={() => setAutoG(g)} className="ui-press flex-1" style={{ height: 28, borderRadius: 8, fontSize: 11.5, border: `1px solid ${autoG === g ? (g === 2 ? '#6aa6e0' : PALETTE.legendary) : 'var(--ui-line)'}`, color: autoG === g ? (g === 2 ? '#6aa6e0' : PALETTE.legendary) : PALETTE.textDim, background: autoG === g ? '#ffffff10' : 'transparent' }}>{l}</button>
+        ))}
       </div>
       <div className="px-3 pt-1 flex-none" style={{ fontSize: 11, color: PALETTE.textDim }}>분해 재화 — 일반 🪙 · 고급 ✦ · 희귀 ✦📜 · 에픽 ✦◆ · 유니크 ◆🔮</div>
       <div className="flex items-center gap-2 px-3 pt-1.5 flex-none" style={{ fontSize: 12 }}>
         <button onClick={toggleOther} className="ui-press flex items-center gap-1.5" style={{ background: 'transparent', border: 'none', color: incOther ? PALETTE.legendary : PALETTE.textDim, padding: '4px 0' }}>
           <span className="flex items-center justify-center" style={{ width: 18, height: 18, borderRadius: 5, border: `1.5px solid ${incOther ? PALETTE.legendary : 'var(--ui-line-strong)'}`, background: incOther ? `${PALETTE.legendary}33` : 'transparent', fontSize: 12 }}>{incOther ? '✓' : ''}</span>
-          일괄 분해에 타직업 장비 포함
+          분해·자동 분해에 타직업 장비 포함
         </button>
         <div className="flex-1" />
         <SortButtons sortBy={sortBy} pickSort={pickSort} />
@@ -1170,13 +1188,36 @@ function BagView({ save, setSave, onBack, flash }) {
             <React.Fragment key={it.uid}>
               {i === 0 && by && <div style={{ fontSize: 11.5, color: PALETTE.dawn, padding: '2px 2px 0' }}>착용 중</div>}
               {firstUnequipped && <div style={{ fontSize: 11.5, color: PALETTE.textDim, padding: '6px 2px 0' }}>보관 중 · {sortBy === 'grade' ? '등급' : '전투력'} 높은 순</div>}
-              <ItemRow save={save} item={it} onClick={() => setSel(it.uid)} right={<span className="flex-none text-right" style={{ fontSize: 11, color: by ? PALETTE.dawn : PALETTE.textDim }}>{by ? '착용' : ''}<br />⚔{E.itemPower(it)}</span>} />
+              {picking ? (
+                <div className="flex items-center gap-2">
+                  <span className="flex-none flex items-center justify-center" style={{ width: 22, height: 22, borderRadius: 6, border: `1.5px solid ${picked.has(it.uid) ? '#e06a5f' : 'var(--ui-line-strong)'}`, background: picked.has(it.uid) ? '#e06a5f33' : 'transparent', color: '#e06a5f', fontSize: 13, opacity: by ? 0.3 : 1 }}>{picked.has(it.uid) ? '✓' : ''}</span>
+                  <div className="flex-1 min-w-0" style={{ opacity: by ? 0.45 : 1 }}>
+                    <ItemRow save={save} item={it} onClick={() => !by && togglePick(it.uid)} right={<span className="flex-none text-right" style={{ fontSize: 11, color: by ? PALETTE.dawn : PALETTE.textDim }}>{by ? '착용' : ''}<br />⚔{E.itemPower(it)}</span>} />
+                  </div>
+                </div>
+              ) : (
+                <ItemRow save={save} item={it} onClick={() => setSel(it.uid)} right={<span className="flex-none text-right" style={{ fontSize: 11, color: by ? PALETTE.dawn : PALETTE.textDim }}>{by ? '착용' : ''}<br />⚔{E.itemPower(it)}</span>} />
+              )}
               {!by && E.itemUsable(it, hero) && <div className="px-2"><DiffLine item={it} cur={cur} compact /></div>}
             </React.Fragment>
           );
         })}
         {!list.length && <div className="text-center py-10" style={{ fontSize: 12.5, color: PALETTE.textDim }}>비어 있습니다 — 사냥터에서 장비를 모아 보세요</div>}
       </div>
+      {picking && (
+        <div className="flex-none px-3 py-2 flex flex-col gap-1.5" style={{ borderTop: '1px solid var(--ui-line)', background: 'rgba(0,0,0,0.45)' }}>
+          <div className="flex items-center gap-2" style={{ fontSize: 12 }}>
+            <span style={{ color: PALETTE.text }}>선택 <b style={{ color: '#e06a5f' }}>{picked.size}</b>개{picked.size ? ` → ${E.salvageText(pickedSalvage)}` : ''}</span>
+            <div className="flex-1" />
+            <button onClick={() => setPicked(new Set(list.filter(i => !E.equippedBy(save, i.uid)).map(i => i.uid)))} className="ui-press" style={{ fontSize: 11.5, padding: '4px 8px', borderRadius: 8, border: '1px solid var(--ui-line-strong)', color: PALETTE.dawn, background: 'transparent' }}>보이는 것 전체</button>
+            <button onClick={() => setPicked(new Set())} className="ui-press" style={{ fontSize: 11.5, padding: '4px 8px', borderRadius: 8, border: '1px solid var(--ui-line-strong)', color: PALETTE.textDim, background: 'transparent' }}>해제</button>
+          </div>
+          <div className="flex gap-2">
+            <UIButton variant="ghost" style={{ height: 40 }} disabled={!picked.size} onClick={() => { toStash([...picked]); endPick(); }}>{picked.size ? `${picked.size}개 창고로` : '창고로'}</UIButton>
+            <UIButton style={{ height: 40, background: picked.size ? '#b8443a' : undefined }} disabled={!picked.size} onClick={() => { const n = picked.size; const r = E.dismantleItems(save, [...picked]); setSave(r.save); flash(`${n}개 분해 → ${E.salvageText(r.salvage)}`); endPick(); }}>{picked.size ? `${picked.size}개 분해` : '분해할 장비를 고르세요'}</UIButton>
+          </div>
+        </div>
+      )}
       {item && (() => {
         const usable = E.itemUsable(item, hero);
         const by = E.equippedBy(save, item.uid);
