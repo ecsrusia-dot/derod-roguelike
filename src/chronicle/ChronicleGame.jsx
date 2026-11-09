@@ -87,6 +87,42 @@ function Bar({ v, max, color, h = 8, shield = 0 }) {
     </div>
   );
 }
+// 장비 비교 (1.213.1) — 새 장비 vs 지금 착용 중인 같은 부위 장비
+const STAT_ORDER = ['atk', 'def', 'hp', 'spd'];
+function itemDiff(item, cur) {
+  const a = E.itemStats(item); const b = cur ? E.itemStats(cur) : {};
+  const keys = [...new Set([...Object.keys(a), ...Object.keys(b)])]
+    .sort((x, y) => (STAT_ORDER.indexOf(x) + 1 || 99) - (STAT_ORDER.indexOf(y) + 1 || 99));
+  return keys.map(k => ({ k, d: +((a[k] || 0) - (b[k] || 0)).toFixed(3) })).filter(x => x.d !== 0);
+}
+const powerDiff = (item, cur) => E.itemPower(item) - (cur ? E.itemPower(cur) : 0);
+function DiffLine({ item, cur, compact = false }) {
+  const pd = powerDiff(item, cur);
+  const lines = itemDiff(item, cur);
+  const col = (d) => (d > 0 ? '#8fe08a' : '#e06a5f');
+  const fmt = (k, d) => { const t = E.statLabel(k, Math.abs(d)); return `${d > 0 ? '▲' : '▼'} ${t.replace(/[+-](?=\d)/, '')}`; };
+  if (compact) {
+    return (
+      <div className="truncate" style={{ fontSize: 11 }}>
+        <b style={{ color: pd > 0 ? '#8fe08a' : pd < 0 ? '#e06a5f' : PALETTE.textDim }}>{pd > 0 ? `▲${pd}` : pd < 0 ? `▼${-pd}` : '='}</b>
+        {lines.slice(0, 3).map(x => <span key={x.k} style={{ color: col(x.d), marginLeft: 6 }}>{fmt(x.k, x.d)}</span>)}
+      </div>
+    );
+  }
+  return (
+    <div className="mt-2" style={{ padding: '8px 10px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--ui-line)' }}>
+      <div className="flex justify-between" style={{ fontSize: 12, color: PALETTE.textDim }}>
+        <span>{cur ? `착용 중: ${E.itemName(cur)}${cur.plus ? ` +${cur.plus}` : ''}` : '이 부위 비어 있음'}</span>
+        <b style={{ color: pd > 0 ? '#8fe08a' : pd < 0 ? '#e06a5f' : PALETTE.textDim }}>전투력 {pd > 0 ? `▲ ${pd}` : pd < 0 ? `▼ ${-pd}` : '변화 없음'}</b>
+      </div>
+      <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1" style={{ fontSize: 12 }}>
+        {lines.map(x => <span key={x.k} style={{ color: col(x.d) }}>{fmt(x.k, x.d)}</span>)}
+        {!lines.length && <span style={{ color: PALETTE.textDim }}>능력치 차이 없음</span>}
+      </div>
+      {(E.uniqueDef(cur) || E.epicOptOf(cur)) && <div className="mt-1" style={{ fontSize: 11, color: PALETTE.textDim }}>※ 교체하면 착용 중 장비의 특수 효과를 잃습니다</div>}
+    </div>
+  );
+}
 function ItemRow({ save, item, onClick, right }) {
   const g = gradeOf(item.grade);
   const by = save.inventory.some(i => i.uid === item.uid) ? E.equippedBy(save, item.uid) : null;
@@ -658,7 +694,15 @@ function PartyView({ save, setSave, onBack }) {
             )}
             {save.inventory.filter(i => i.slot === slotPick && i.uid !== u.equip[slotPick] && E.itemUsable(i, cid))
               .sort((a, b) => E.itemPower(b) - E.itemPower(a))
-              .map(it => <ItemRow key={it.uid} save={save} item={it} onClick={() => { setSave(E.equipItem(save, cid, it.uid)); setSlotPick(null); }} />)}
+              .map(it => {
+                const cur = save.inventory.find(i => i.uid === u.equip[slotPick]);
+                return (
+                  <div key={it.uid}>
+                    <ItemRow save={save} item={it} onClick={() => { setSave(E.equipItem(save, cid, it.uid)); setSlotPick(null); }} />
+                    <div className="px-2 pt-0.5"><DiffLine item={it} cur={cur} compact /></div>
+                  </div>
+                );
+              })}
             {!save.inventory.some(i => i.slot === slotPick && i.uid !== u.equip[slotPick] && E.itemUsable(i, cid)) && <div className="text-center py-4" style={{ fontSize: 12.5, color: PALETTE.textDim }}>가방에 착용할 수 있는 장비가 없습니다{slotPick === 'accessory' ? '' : ` (${cls.name} 전용)`}</div>}
             <UIButton variant="ghost" style={{ height: 40 }} onClick={() => setSlotPick(null)}>닫기</UIButton>
           </div>
@@ -683,13 +727,21 @@ function PartyView({ save, setSave, onBack }) {
 function BagView({ save, setSave, onBack, flash }) {
   const [filter, setFilter] = useState('all');
   const [sel, setSel] = useState(null);
+  // 정렬 (1.213.1): 착용 장비가 맨 위 → 그 아래 전투력(주 능력치) 높은 순
+  const [sortBy, setSortBy] = useState(() => { try { return localStorage.getItem('chronicleBagSort') || 'power'; } catch { return 'power'; } });
+  const [incOther, setIncOther] = useState(() => { try { return localStorage.getItem('chronicleBulkOther') === '1'; } catch { return false; } });
+  const pickSort = (v) => { setSortBy(v); try { localStorage.setItem('chronicleBagSort', v); } catch { /* */ } };
+  const toggleOther = () => { const v = !incOther; setIncOther(v); try { localStorage.setItem('chronicleBulkOther', v ? '1' : '0'); } catch { /* */ } };
   const hero = save.hero;
+  const slotIdx = (i) => SLOTS.findIndex(x => x.id === i.slot);
+  const eqd = (i) => (E.equippedBy(save, i.uid) ? 1 : 0);
   const list = save.inventory.filter(i => filter === 'all' || (filter === 'other' ? !E.itemUsable(i, hero) : i.slot === filter))
-    .sort((a, b) => (E.itemUsable(b, hero) ? 1 : 0) - (E.itemUsable(a, hero) ? 1 : 0) || gradeIdx(b.grade) - gradeIdx(a.grade) || E.itemPower(b) - E.itemPower(a));
+    .sort((a, b) => eqd(b) - eqd(a) || (eqd(a) && eqd(b) ? slotIdx(a) - slotIdx(b) : 0)
+      || (sortBy === 'grade' ? gradeIdx(b.grade) - gradeIdx(a.grade) || E.itemPower(b) - E.itemPower(a) : E.itemPower(b) - E.itemPower(a) || gradeIdx(b.grade) - gradeIdx(a.grade)));
   const item = sel != null ? save.inventory.find(i => i.uid === sel) : null;
   const others = save.inventory.filter(i => !E.itemUsable(i, hero));
   const bulk = (maxGrade) => {
-    const uids = save.inventory.filter(i => gradeIdx(i.grade) <= maxGrade && !E.equippedBy(save, i.uid) && E.itemUsable(i, hero)).map(i => i.uid);
+    const uids = save.inventory.filter(i => gradeIdx(i.grade) <= maxGrade && !E.equippedBy(save, i.uid) && (incOther || E.itemUsable(i, hero))).map(i => i.uid);
     if (!uids.length) return;
     const r = E.dismantleItems(save, uids);
     setSave(r.save);
@@ -717,8 +769,31 @@ function BagView({ save, setSave, onBack, flash }) {
         <button onClick={() => bulk(0)} className="ui-press flex-1" style={{ ...btn, border: '1px dashed var(--ui-line-strong)', color: PALETTE.textDim }}>일반 분해</button>
         <button onClick={() => bulk(1)} className="ui-press flex-1" style={{ ...btn, border: '1px dashed var(--ui-line-strong)', color: PALETTE.textDim }}>고급 이하 분해</button>
       </div>
+      <div className="flex items-center gap-2 px-3 pt-1.5 flex-none" style={{ fontSize: 12 }}>
+        <button onClick={toggleOther} className="ui-press flex items-center gap-1.5" style={{ background: 'transparent', border: 'none', color: incOther ? PALETTE.legendary : PALETTE.textDim, padding: '4px 0' }}>
+          <span className="flex items-center justify-center" style={{ width: 18, height: 18, borderRadius: 5, border: `1.5px solid ${incOther ? PALETTE.legendary : 'var(--ui-line-strong)'}`, background: incOther ? `${PALETTE.legendary}33` : 'transparent', fontSize: 12 }}>{incOther ? '✓' : ''}</span>
+          일괄 분해에 타직업 장비 포함
+        </button>
+        <div className="flex-1" />
+        <span style={{ color: PALETTE.textDim }}>정렬</span>
+        {[['power', '전투력'], ['grade', '등급']].map(([v, l]) => (
+          <button key={v} onClick={() => pickSort(v)} className="ui-press" style={{ fontSize: 11.5, padding: '4px 8px', borderRadius: 8, border: `1px solid ${sortBy === v ? PALETTE.legendary : 'var(--ui-line)'}`, color: sortBy === v ? PALETTE.legendary : PALETTE.textDim, background: 'transparent' }}>{l}</button>
+        ))}
+      </div>
       <div className="flex-1 overflow-y-auto px-3 py-2 flex flex-col gap-1.5">
-        {list.map(it => <ItemRow key={it.uid} save={save} item={it} onClick={() => setSel(it.uid)} />)}
+        {list.map((it, i) => {
+          const by = E.equippedBy(save, it.uid);
+          const cur = !by && E.itemUsable(it, hero) ? save.inventory.find(x => x.uid === save.units[hero].equip[it.slot]) : null;
+          const firstUnequipped = !by && (i === 0 || E.equippedBy(save, list[i - 1].uid));
+          return (
+            <React.Fragment key={it.uid}>
+              {i === 0 && by && <div style={{ fontSize: 11.5, color: PALETTE.dawn, padding: '2px 2px 0' }}>착용 중</div>}
+              {firstUnequipped && <div style={{ fontSize: 11.5, color: PALETTE.textDim, padding: '6px 2px 0' }}>보관 중 · {sortBy === 'grade' ? '등급' : '전투력'} 높은 순</div>}
+              <ItemRow save={save} item={it} onClick={() => setSel(it.uid)} right={<span className="flex-none text-right" style={{ fontSize: 11, color: by ? PALETTE.dawn : PALETTE.textDim }}>{by ? '착용' : ''}<br />⚔{E.itemPower(it)}</span>} />
+              {!by && E.itemUsable(it, hero) && <div className="px-2"><DiffLine item={it} cur={cur} compact /></div>}
+            </React.Fragment>
+          );
+        })}
         {!list.length && <div className="text-center py-10" style={{ fontSize: 12.5, color: PALETTE.textDim }}>비어 있습니다 — 사냥터에서 장비를 모아 보세요</div>}
       </div>
       {item && (() => {
@@ -731,6 +806,7 @@ function BagView({ save, setSave, onBack, flash }) {
             <div style={{ fontSize: 12.5, color: gradeOf(item.grade).color }} className="text-center">{gradeOf(item.grade).label} · Lv.{item.ilv} · {SLOTS.find(s => s.id === item.slot).label} · {clsTag(item)}</div>
             <div className="text-center mt-1" style={{ fontSize: 12.5, color: PALETTE.text, lineHeight: 1.6 }}>{statLine(E.itemStats(item))}</div>
             <ItemSpecial item={item} center />
+            {usable && !by && <DiffLine item={item} cur={cur} />}
             {!usable && <div className="text-center mt-2" style={{ fontSize: 12, color: '#e06a5f' }}>{chronicleClass(save.hero).name}{'는 착용할 수 없습니다 — 공용 창고에 넣으면 '}{chronicleClass(item.cls).name} 캐릭터가 쓸 수 있습니다</div>}
             <div className="mt-3 flex flex-col gap-2">
               {usable && !by && (
