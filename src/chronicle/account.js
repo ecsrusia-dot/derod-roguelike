@@ -64,6 +64,7 @@ export function toView(acc) {
     boostUntil: acc.boostUntil || 0, towerWeek: acc.towerWeek || null, tower: c.tower || { best: 0, checkpoint: 0, run: null }, bagExpand: c.bagExpand || 0, fams: acc.fams || {}, famPity: acc.famPity || { total: 0, sinceViolet: 0 }, famTeam: c.famTeam || {},
     dungeon: c.dungeon, stats: c.stats, createdAt: c.createdAt,
     roster: buildRoster(acc.chars), // 원정대 (1.229.0) — 레벨 상한·전역 버프 계산용, 읽기 전용
+    rosterQuests: acc.rosterQuests || { claimed: {} }, // 원정대 의뢰 (1.230.0) — 계정 공유
   });
 }
 
@@ -74,7 +75,7 @@ export function fromView(acc, v) {
   return {
     ...acc,
     gold: v.gold, mats: v.mats, keys: v.keys, bossDaily: v.bossDaily, nextUid: v.nextUid, stash: v.stash || [],
-    fams: v.fams || {}, famPity: v.famPity, boostUntil: v.boostUntil || 0, towerWeek: v.towerWeek || acc.towerWeek || null,
+    fams: v.fams || {}, famPity: v.famPity, rosterQuests: v.rosterQuests || acc.rosterQuests || { claimed: {} }, boostUntil: v.boostUntil || 0, towerWeek: v.towerWeek || acc.towerWeek || null,
     chars: {
       ...acc.chars,
       [v.hero]: { ...c, peakLv: Math.max(peakOf(c), v.units[v.hero]?.lv || 0), unit: v.units[v.hero], bag: v.inventory, progress: v.progress, quests: v.quests, story: v.story, dungeon: v.dungeon, stats: v.stats, famTeam: v.famTeam || {}, tower: v.tower || { best: 0, checkpoint: 0, run: null }, bagExpand: v.bagExpand || 0 },
