@@ -73,16 +73,16 @@ const made = (roster) => Object.keys(roster || {}).length;
 const reborn = (roster) => Object.values(roster || {}).filter(r => r.rebirth > 0).length;
 export const ROSTER_QUESTS = [
   { id: 'rq_make2', title: '동료를 찾아서', desc: '캐릭터 2명 만들기', need: 2, cur: made, reward: { gold: 1000 } },
-  { id: 'rq_make5', title: '다섯 갈래의 길', desc: '캐릭터 5명 모두 만들기', need: 5, cur: made, reward: { sealPlus: 3 } },
+  { id: 'rq_make5', title: '다섯 갈래의 길', desc: '캐릭터 5명 모두 만들기', need: 5, cur: made, reward: { famShard: 30 } },
   { id: 'rq_all20', title: '첫걸음', desc: '캐릭터 5명 모두 Lv.20', need: 5, cur: (r) => cnt(r, 20), reward: { gold: 3000, famShard: 50 } },
-  { id: 'rq_two60', title: '두 번째 기둥', desc: '캐릭터 2명 Lv.60 (상한 Lv.70 해제)', need: 2, cur: (r) => cnt(r, 60), reward: { sealPlus: 2, talentScroll: 1 } },
-  { id: 'rq_all40', title: '단단해진 원정대', desc: '캐릭터 5명 모두 Lv.40', need: 5, cur: (r) => cnt(r, 40), reward: { sealPlus: 3, gold: 5000 } },
+  { id: 'rq_two60', title: '두 번째 기둥', desc: '캐릭터 2명 Lv.60 (상한 Lv.70 해제)', need: 2, cur: (r) => cnt(r, 60), reward: { famShard: 20, talentScroll: 1 } },
+  { id: 'rq_all40', title: '단단해진 원정대', desc: '캐릭터 5명 모두 Lv.40', need: 5, cur: (r) => cnt(r, 40), reward: { famShard: 30, gold: 5000 } },
   { id: 'rq_three60', title: '세 번째 기둥', desc: '캐릭터 3명 Lv.60 (상한 Lv.80 해제)', need: 3, cur: (r) => cnt(r, 60), reward: { talentScroll: 1, famShard: 100 } },
-  { id: 'rq_all60', title: '황혼을 넘는 자들', desc: '캐릭터 5명 모두 Lv.60 (상한 Lv.100 해제)', need: 5, cur: (r) => cnt(r, 60), reward: { sealPlus: 5, talentScroll: 2 } },
-  { id: 'rq_all80', title: '여명의 수호자들', desc: '캐릭터 5명 모두 Lv.80', need: 5, cur: (r) => cnt(r, 80), reward: { sealPlus: 5, gold: 20000 } },
-  { id: 'rq_all100', title: '전설의 원정대', desc: '캐릭터 5명 모두 Lv.100', need: 5, cur: (r) => cnt(r, 100), reward: { sealPlus: 10, talentScroll: 3 } },
-  { id: 'rq_reb1', title: '다시 태어난 자', desc: '캐릭터 1명 전승', need: 1, cur: reborn, reward: { sealPlus: 3, famSoul: 100 } },
-  { id: 'rq_reb5', title: '윤회의 원정대', desc: '캐릭터 5명 모두 전승', need: 5, cur: reborn, reward: { sealPlus: 10, famSoul: 500 } },
+  { id: 'rq_all60', title: '황혼을 넘는 자들', desc: '캐릭터 5명 모두 Lv.60 (상한 Lv.100 해제)', need: 5, cur: (r) => cnt(r, 60), reward: { famShard: 50, talentScroll: 2 } },
+  { id: 'rq_all80', title: '여명의 수호자들', desc: '캐릭터 5명 모두 Lv.80', need: 5, cur: (r) => cnt(r, 80), reward: { famShard: 50, gold: 20000 } },
+  { id: 'rq_all100', title: '전설의 원정대', desc: '캐릭터 5명 모두 Lv.100', need: 5, cur: (r) => cnt(r, 100), reward: { famShard: 100, talentScroll: 3 } },
+  { id: 'rq_reb1', title: '다시 태어난 자', desc: '캐릭터 1명 전승', need: 1, cur: reborn, reward: { famShard: 30, famSoul: 100 } },
+  { id: 'rq_reb5', title: '윤회의 원정대', desc: '캐릭터 5명 모두 전승', need: 5, cur: reborn, reward: { famShard: 100, famSoul: 500 } },
 ];
 export function rosterQuestState(save, q) {
   const cur = Math.min(q.need, q.cur(save.roster));
@@ -100,5 +100,5 @@ export function claimRosterQuest(save0, id) {
   }
   return save;
 }
-const REWARD_LBL = { gold: ['🪙', '골드'], sealPlus: ['🎫', '소환권'], talentScroll: ['📖', '특성 주문서'], famShard: ['📜', '계약서 조각'], famSoul: ['🔮', '사역혼'] };
+const REWARD_LBL = { gold: ['🪙', '골드'], talentScroll: ['📖', '특성 주문서'], famShard: ['📜', '계약서 조각'], famSoul: ['🔮', '사역혼'] };
 export const rosterRewardText = (r) => Object.entries(r).map(([k, v]) => `${(REWARD_LBL[k] || ['', k])[0]} ${(REWARD_LBL[k] || ['', k])[1]} ${v.toLocaleString()}`).join(' · ');

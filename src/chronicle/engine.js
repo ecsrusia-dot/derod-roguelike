@@ -657,12 +657,11 @@ export function activeMain(save) {
   return k && save.fams?.[k] && famSlotOpen(save, 'main') ? k : null;
 }
 
-// 소환 — n회. useTicket이면 소환권(mats.sealPlus) 1장 = 1회. → { save, results, souls } (재료 부족이면 results null)
-export function summonFam(save0, n, useTicket = false, rng = Math.random) {
-  const m = save0.mats;
-  if (useTicket ? (m.sealPlus || 0) < n : (m.famShard || 0) < n * FAM_TUNING.shardsPerSummon) return { save: save0, results: null };
+// 소환 — n회 (계약서 조각 10개 = 1회, 1.233.1 소환권 폐지). → { save, results, souls } (재료 부족이면 results null)
+export function summonFam(save0, n, rng = Math.random) {
+  if ((save0.mats.famShard || 0) < n * FAM_TUNING.shardsPerSummon) return { save: save0, results: null };
   const save = clone(save0);
-  if (useTicket) save.mats.sealPlus -= n; else save.mats.famShard -= n * FAM_TUNING.shardsPerSummon;
+  save.mats.famShard -= n * FAM_TUNING.shardsPerSummon;
   const r = summonFamiliars(save.fams || {}, save.famPity, save.progress, n, rng);
   save.fams = r.fams; save.famPity = r.pity;
   save.mats.famSoul = (save.mats.famSoul || 0) + r.souls;
@@ -1470,8 +1469,7 @@ export function buyTowerItem(save0, id, uniqueId = null) {
     if (!u || u.disabled || !(u.cls === save.hero || u.cls === 'common')) return save0;
     save.inventory.push({ ...makeItem(Math.random, { named: uniqueId, ilv: save.units[save.hero].lv }), uid: save.nextUid++ });
     save.stats.uniques = (save.stats.uniques || 0) + 1;
-  } else if (id === 'ticket') save.mats.sealPlus = (save.mats.sealPlus || 0) + 1;
-  else if (id === 'shards') save.mats.famShard = (save.mats.famShard || 0) + 10;
+  } else if (id === 'shards') save.mats.famShard = (save.mats.famShard || 0) + 10;
   else if (id === 'key') addKeys(save, 1);
   else if (id === 'ancient') save.mats.shard += 5;
   else if (id === 'essence') save.mats.essence += 40;
