@@ -7,7 +7,7 @@
 import { talentFx, canLearnTalent, talentNode, talentResetCost, talentTrees, tierUnlocked } from './talents.js';
 import { fieldStages, FIELD_STAGES, STAGE_TUNING, BOOST, BAG_EXPAND, SALVAGE, SALVAGE_ICON, REBIRTH, REBIRTH_BRANCHES, expNeedFor } from './data.js';
 import { TOWER, TOWER_SHOP, towerUnlocked, isTowerBoss, towerEnemyLv, towerArea, towerFloorPicks, kstWeekKey } from './tower.js';
-import { famCombatant, famSubFx, rollFamShards, FAM_TUNING, summonFamiliars, enhanceFamiliar, evolveFamiliar } from './familiar.js';
+import { famCombatant, famSubFx, rollFamShards, gainFamExp, FAM_TUNING, summonFamiliars, enhanceFamiliar, evolveFamiliar } from './familiar.js';
 import {
   CHRONICLE_TUNING as T, CHRONICLE_CLASSES, CHRONICLE_SKILLS, CHRONICLE_FIELDS, CHRONICLE_DUNGEON, CHRONICLE_DUNGEONS, DUNGEON_TIERS, dungeonDef,
   STAT_KEYS, SKILL_MAX_LV, MASTERY_PCT, BOSS_DAILY_LIMIT, DUNGEON_KEYS, GRADES, gradeIdx, SLOTS, CLASS_SLOTS, FORGE, DROP_TABLE,
@@ -198,7 +198,8 @@ export function statLabel(k, v) {
 export function canWear(it, u) {
   const ub = it.named && UNIQUE_ITEMS[it.named]?.branch;
   if (ub && u?.rebirth?.branch !== ub) return false; // 갈래 유니크는 그 갈래만
-  return !(u?.rebirth?.count > 0) || (it.ilv || 1) <= u.lv + REBIRTH.wearMargin;
+  // 1.225.0 PM: 장비 레벨이 내 레벨 이하일 때만 착용 (전승 여부 무관)
+  return (it.ilv || 1) <= (u?.lv || 1);
 }
 // 전승 단계 (1.221.0) — 전승 횟수만큼 적 강화. UI·시뮬이 조우 직후 호출
 export function rebirthCount(save) { return save.units[save.hero]?.rebirth?.count || 0; }
@@ -236,14 +237,14 @@ function passiveFx(u) {
 // 전투 능력치 (2.0 — 장비 옵션·유니크 효과 합산)
 const PASS_KEYS = ['counterDouble', 'tauntReduce', 'critAfterCounter', 'emergencyHeal', 'dotTurnsMult', 'openInferno', 'skillShield', 'resetEvery',
   'overhealShield', 'missingHpAtk', 'rageDouble', 'multiHitsAdd', 'spiritArrow', 'dodgeHeal', 'firstCrit', 'revive', 'shieldReduce', 'blessMult', 'blessTurns',
-  'execute', 'chain', 'holyDmg', 'regenPct', 'counterDmg', 'skillDmg', 'dotDmg', 'expPct', 'goldPct', 'famPct'];
+  'execute', 'chain', 'holyDmg', 'regenPct', 'counterDmg', 'skillDmg', 'dotDmg', 'expPct', 'goldPct', 'dropPct', 'famPct'];
 const MULT_KEYS = ['dotTurnsMult', 'blessMult'];
 export function deriveUnit(save, classId) {
   const u = save.units[classId];
   const cls = chronicleClass(classId);
   const g = gearTotals(save, u);
   // 보조 사역마 패시브 (1.212.0) — 장비 합산과 같은 키로 더한다
-  for (const [k, v] of Object.entries(famSubFx(save.fams, activeSubs(save)))) g[k] = (g[k] || 0) + v;
+  for (const [k, v] of Object.entries(famSubFx(save.fams, activeSubs(save), u.lv))) g[k] = (g[k] || 0) + v;
   // 전승 갈래 기본 효과 (1.220.0)
   const br = u.rebirth?.branch && REBIRTH_BRANCHES[u.rebirth.branch];
   if (br) for (const [k, v] of Object.entries(br.fx)) g[k] = (g[k] || 0) + v;
@@ -1170,8 +1171,13 @@ export function battleRewards(enemies, type, rng, mods = {}) {
   const count = tbl.items || 1;
   const heroCls = mods.heroCls || 'wanderer';
   const uChance = type === 'boss' ? UNIQUE_CHANCE.boss : (type === 'dungeonBoss' || type === 'towerBoss') ? (mods.uniqueChance || 0) : 0;
-  for (let i = 0; i < count; i++) {
-    if (rng() >= tbl.itemChance) continue;
+  // 🎁 아이템 획득 % (1.225.0 — 보조 사역마) — 확률을 올리고, 100%를 넘는 몫은 추가 장비 확률
+  const p = tbl.itemChance * (1 + (mods.dropPct || 0));
+  const extra = Math.max(0, p - 1);
+  let total = count;
+  for (let i = 0; i < count; i++) if (extra && rng() < extra) total++;
+  for (let i = 0; i < total; i++) {
+    if (i < count && rng() >= Math.min(1, p)) continue;
     const uq = uChance && rng() < uChance ? rollUniqueItem(rng, ilv, heroCls) : null;
     items.push(uq || rollGear(rng, rollGrade(rng, tbl.grades), ilv, heroCls, mods.set || 'field'));
   }
@@ -1213,7 +1219,7 @@ export function applyBattle(save0, ctx, battle, rng = Math.random) {
   save.progress.killsByKey = save.progress.killsByKey || {};
   for (const e of ctx.enemies) save.progress.killsByKey[e.key] = (save.progress.killsByKey[e.key] || 0) + 1;
   save.stats.elites = (save.stats.elites || 0) + ctx.enemies.filter(e => e.tier === 'elite').length;
-  let mods = { heroCls: save.hero };
+  let mods = { heroCls: save.hero, dropPct: deriveUnit(save, save.hero).dropPct || 0 };
   if (ctx.kind === 'dungeon' && save.dungeon) {
     const ti = save.dungeon.tier || 0;
     const tier = DUNGEON_TIERS[ti];
@@ -1234,6 +1240,13 @@ export function applyBattle(save0, ctx, battle, rng = Math.random) {
   for (const cid of save.party) {
     const ups = gainExp(save.units[cid], r.exp);
     if (ups) summary.levelUps[cid] = save.units[cid].lv;
+  }
+  // 🐾 동행 사역마 경험치 (1.225.0 — 동행 칸만, 주인공 레벨이 상한)
+  const mk = activeMain(save);
+  if (mk) {
+    const g = gainFamExp(save.fams[mk], r.exp, save.units[save.hero].lv);
+    save.fams = { ...save.fams, [mk]: g.f };
+    summary.famExp = { key: mk, gained: g.gained, ups: g.ups, lv: g.f.lv };
   }
   // 전승 장비 · 갈래 유니크 (1.221.0 — 전승 캐릭터만)
   const hu = save.units[save.hero];

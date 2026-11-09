@@ -32,6 +32,10 @@ export function ensureQuestFields(save) {
     if (u.mastery) { u.sp = (u.sp || 0) + u.mastery; u.mastery = 0; }
     u.talents = u.talents || {};
   }
+  // 사역마 레벨 (1.225.0) — 레벨이 없던 기존 사역마는 지금 주인공 레벨로 (전승 캐릭터면 만렙) — 손해 없이 이전
+  const hu = s.units?.[s.hero];
+  const legacyLv = hu ? (hu.rebirth?.count > 0 ? T.maxLevel : hu.lv) : 1;
+  for (const [k, f] of Object.entries(s.fams)) if (f && f.lv == null) s.fams[k] = { ...f, lv: legacyLv, exp: 0 };
   return refreshDungeonKeys(s);
 }
 
