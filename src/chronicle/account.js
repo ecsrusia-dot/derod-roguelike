@@ -9,6 +9,7 @@
 import { DUNGEON_KEYS, CLASS_SLOTS, CHRONICLE_TUNING as T } from './data.js';
 import * as E from './engine.js';
 import { ensureQuestFields } from './quest.js';
+import { buildRoster, peakOf } from './roster.js';
 
 const clone = (o) => (typeof structuredClone === 'function' ? structuredClone(o) : JSON.parse(JSON.stringify(o)));
 
@@ -62,6 +63,7 @@ export function toView(acc) {
     stash: acc.stash, inventory: c.bag, progress: c.progress, quests: c.quests, story: c.story,
     boostUntil: acc.boostUntil || 0, towerWeek: acc.towerWeek || null, tower: c.tower || { best: 0, checkpoint: 0, run: null }, bagExpand: c.bagExpand || 0, fams: acc.fams || {}, famPity: acc.famPity || { total: 0, sinceViolet: 0 }, famTeam: c.famTeam || {},
     dungeon: c.dungeon, stats: c.stats, createdAt: c.createdAt,
+    roster: buildRoster(acc.chars), // 원정대 (1.229.0) — 레벨 상한·전역 버프 계산용, 읽기 전용
   });
 }
 
@@ -75,7 +77,7 @@ export function fromView(acc, v) {
     fams: v.fams || {}, famPity: v.famPity, boostUntil: v.boostUntil || 0, towerWeek: v.towerWeek || acc.towerWeek || null,
     chars: {
       ...acc.chars,
-      [v.hero]: { ...c, unit: v.units[v.hero], bag: v.inventory, progress: v.progress, quests: v.quests, story: v.story, dungeon: v.dungeon, stats: v.stats, famTeam: v.famTeam || {}, tower: v.tower || { best: 0, checkpoint: 0, run: null }, bagExpand: v.bagExpand || 0 },
+      [v.hero]: { ...c, peakLv: Math.max(peakOf(c), v.units[v.hero]?.lv || 0), unit: v.units[v.hero], bag: v.inventory, progress: v.progress, quests: v.quests, story: v.story, dungeon: v.dungeon, stats: v.stats, famTeam: v.famTeam || {}, tower: v.tower || { best: 0, checkpoint: 0, run: null }, bagExpand: v.bagExpand || 0 },
     },
   };
 }

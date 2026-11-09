@@ -18,6 +18,7 @@ import {
 } from './data.js';
 import * as E from './engine.js';
 import * as TL from './talents.js';
+import * as R from './roster.js';
 import * as Q from './quest.js';
 import * as A from './account.js';
 import * as F from './familiar.js';
@@ -390,6 +391,69 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
   );
 }
 
+// ===== 원정대 (1.229.0) — 레벨 상한 · 전역 버프 =====
+function RosterView({ save, onBack, onSwitchChar }) {
+  const roster = save.roster || {};
+  const cap = E.levelCapOf(save);
+  const hint = R.nextCapHint(roster);
+  const got = R.globalBuffFx(roster, save.hero);
+  const n60 = R.reachedCount(roster, R.ROSTER.unlockLv);
+  return (
+    <div className="absolute inset-0 flex flex-col">
+      <Header title="원정대" onBack={onBack} />
+      <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
+        <GlassPanel className="p-3" style={{ fontSize: 12, lineHeight: 1.6 }}>
+          <div className="flex items-center justify-between">
+            <span className="font-semibold" style={{ fontSize: 14, color: PALETTE.text }}>레벨 상한</span>
+            <span className="font-bold" style={{ fontSize: 18, color: cap >= CHRONICLE_TUNING.maxLevel ? PALETTE.legendary : '#e8b04a' }}>Lv.{cap}</span>
+          </div>
+          <div className="flex gap-1 mt-1">{[60, 70, 80, 90, 100].map(c => <span key={c} className="flex-1 text-center" style={{ fontSize: 10.5, padding: '3px 0', borderRadius: 6, background: cap >= c ? '#e8b04a33' : '#ffffff0d', color: cap >= c ? '#e8b04a' : PALETTE.textDim }}>{c}</span>)}</div>
+          <div className="mt-1.5" style={{ color: PALETTE.textDim }}>
+            기본 Lv.{R.ROSTER.baseCap} · 두 번째 캐릭터부터 Lv.{R.ROSTER.unlockLv}을 달성할 때마다 <b style={{ color: PALETTE.text }}>+{R.ROSTER.perChar}</b> (지금 Lv.{R.ROSTER.unlockLv} 달성 {n60}명)
+            {hint ? <><br />다음: 캐릭터 <b style={{ color: '#e8b04a' }}>{hint.need}명</b>이 Lv.{R.ROSTER.unlockLv}에 도달하면 상한 Lv.{hint.next}</> : <><br /><b style={{ color: PALETTE.legendary }}>모든 상한 해제 완료</b></>}
+          </div>
+        </GlassPanel>
+
+        <GlassPanel className="p-3" style={{ fontSize: 12, lineHeight: 1.6 }}>
+          <div className="font-semibold" style={{ fontSize: 13.5, color: PALETTE.text }}>{chronicleClass(save.hero).name}가 받는 전역 버프</div>
+          <div style={{ color: Object.keys(got).length ? PALETTE.text : PALETTE.textDim }}>{R.rosterFxText(got) || '아직 없음 — 다른 캐릭터를 Lv.20 이상 키우면 생긴다'}</div>
+          <div style={{ fontSize: 11, color: PALETTE.textDim }}>각 캐릭터가 Lv.20 · 40 · 60 · 80 · 100에 도달할 때마다 「다른」 캐릭터 전원에게 영구 버프. 전승해도 최고 레벨 기준으로 유지.</div>
+        </GlassPanel>
+
+        {CHRONICLE_CLASSES.map(c => {
+          const r = roster[c.id];
+          const buff = R.GLOBAL_BUFFS[c.id];
+          const me = c.id === save.hero;
+          return (
+            <GlassPanel key={c.id} className="p-3" style={{ border: `1px solid ${me ? c.color : 'var(--ui-line)'}` }}>
+              <div className="flex items-center gap-2.5">
+                <Portrait cid={c.id} size={44} dim={!r} />
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold truncate" style={{ fontSize: 13.5, color: r ? c.color : PALETTE.textDim }}>{c.name}{me ? ' (지금)' : ''}</div>
+                  <div style={{ fontSize: 11.5, color: PALETTE.textDim }}>{r ? <>Lv.{r.lv}{r.peak > r.lv ? ` · 최고 Lv.${r.peak}` : ''}{r.rebirth ? ` · ✦전승 ${r.rebirth}회` : ''}</> : '아직 만들지 않음 — 첫 화면에서 생성'}</div>
+                </div>
+                {!me && <button onClick={onSwitchChar} className="ui-press flex-none" style={{ height: 32, padding: '0 10px', borderRadius: 9, border: '1px solid var(--ui-line-strong)', color: PALETTE.dawn, background: 'transparent', fontSize: 11.5 }}>{r ? '전환' : '생성'}</button>}
+              </div>
+              <div className="mt-2" style={{ fontSize: 11.5, color: PALETTE.textDim }}>「{buff.title}」 — 다른 캐릭터에게 주는 버프</div>
+              <div className="flex flex-col gap-0.5 mt-1">
+                {R.ROSTER_MILESTONES.map((lv, i) => {
+                  const on = r && r.peak >= lv;
+                  return (
+                    <div key={lv} className="flex items-center gap-2" style={{ fontSize: 11.5 }}>
+                      <span className="flex-none text-center font-semibold" style={{ width: 52, padding: '1px 0', borderRadius: 6, border: `1px solid ${on ? c.color : 'var(--ui-line)'}`, background: on ? `${c.color}1f` : 'transparent', color: on ? c.color : PALETTE.textDim }}>{on ? '✓ ' : ''}Lv.{lv}</span>
+                      <span style={{ color: on ? PALETTE.text : PALETTE.textDim }}>{R.rosterFxText(buff.fx[i])}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </GlassPanel>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ===== 마을 =====
 function TownView({ save, go, onExit, onSwitchChar }) {
   const hero = save.units[save.hero];
@@ -407,6 +471,7 @@ function TownView({ save, go, onExit, onSwitchChar }) {
     { id: 'tower', icon: '🗼', label: '황혼의 첨탑', sub: E.towerUnlocked(save.progress) ? (save.tower?.run ? `${save.tower.run.floor}층 도전 중` : `최고 ${save.tower?.best || 0}층 · ✪${save.mats.towerCoin || 0}`) : '마계의 균열 보스 후 개방', locked: !E.towerUnlocked(save.progress) },
     { id: 'dungeon', icon: '🕳', label: '던전', sub: save.dungeon ? `${dungeonDef(save.dungeon.id).name} 진행 중` : E.dungeonUnlocked(save) ? `🗝 열쇠 ${E.keyCount(save)}개 · ${CHRONICLE_DUNGEONS.filter(d => E.dungeonUnlocked(save, d.id)).length}곳` : '죽은 자의 숲 보스 후 개방', locked: !E.dungeonUnlocked(save) },
     { id: 'party', icon: '🧭', label: '성장', sub: '능력치 · 스킬 · 장비', badge: alertParty },
+    { id: 'roster', icon: '🏳', label: '원정대', sub: `레벨 상한 ${E.levelCapOf(save)} · 전역 버프` },
     { id: 'bag', icon: '🎒', label: '가방', sub: `${save.inventory.length}/${E.bagMax(save)}${save.inventory.some(i => !E.itemUsable(i, save.hero)) ? ' · 다른 직업 장비 있음' : ''}` },
     { id: 'fam', icon: '🐾', label: '사역마', sub: E.famSlotOpen(save, 'main') ? `📜 ${save.mats.famShard || 0} · 보유 ${Object.keys(save.fams || {}).length}` : `Lv.${F.FAM_TUNING.slotLv.main}부터 동행`, badge: (save.mats.famShard || 0) >= F.FAM_TUNING.shardsPerSummon || (save.mats.sealPlus || 0) > 0 },
     { id: 'stash', icon: '🏛', label: '공용 창고', sub: `${(save.stash || []).length}/${A.STASH_MAX} · 모든 캐릭터 공유` },
@@ -428,7 +493,7 @@ function TownView({ save, go, onExit, onSwitchChar }) {
             <Portrait cid={save.hero} size={54} />
             <div className="flex-1 min-w-0">
               <div className="font-semibold" style={{ fontSize: 15, color: PALETTE.text }}>{cls.name} <span style={{ fontSize: 11.5, color: cls.color }}>{cls.role}</span></div>
-              <div style={{ fontSize: 12, color: PALETTE.legendary }}>Lv.{hero.lv} / {CHRONICLE_TUNING.maxLevel} · 전투력 {E.unitPower(save, save.hero)}</div>
+              <div style={{ fontSize: 12, color: PALETTE.legendary }}>Lv.{hero.lv} / {E.levelCapOf(save)} · 전투력 {E.unitPower(save, save.hero)}</div>
             </div>
             <button onClick={onSwitchChar} className="ui-press flex-none" style={{ fontSize: 11.5, padding: '6px 10px', borderRadius: 9, border: '1px solid var(--ui-line-strong)', color: PALETTE.dawn, background: 'transparent' }}>캐릭터 변경</button>
           </div>
@@ -812,7 +877,8 @@ function PartyView({ save, setSave, onBack }) {
           <div className="flex-1 min-w-0">
             <div className="font-bold" style={{ fontSize: 17, color: PALETTE.text }}>{cls.name} <span style={{ fontSize: 12, color: cls.color }}>{cls.role}</span></div>
             {u.rebirth?.count > 0 && <div style={{ fontSize: 12, color: REBIRTH_BRANCHES[u.rebirth.branch].color, fontWeight: 700 }}>✦ 전승 {u.rebirth.count}회 · {REBIRTH_BRANCHES[u.rebirth.branch].name} <span style={{ fontWeight: 400, color: PALETTE.textDim }}>({REBIRTH_BRANCHES[u.rebirth.branch].type} · 경험치 ×{rebirthExpMult(u.rebirth.count)})</span></div>}
-            <div style={{ fontSize: 12.5, color: PALETTE.legendary }}>Lv.{u.lv} / {CHRONICLE_TUNING.maxLevel} · 전투력 {E.unitPower(save, cid)}</div>
+            <div style={{ fontSize: 12.5, color: PALETTE.legendary }}>Lv.{u.lv} / {E.levelCapOf(save)} · 전투력 {E.unitPower(save, cid)}</div>
+            {u.lv >= E.levelCapOf(save) && u.lv < CHRONICLE_TUNING.maxLevel && <div style={{ fontSize: 11, color: '#e8b04a' }}>🔒 원정대 레벨 상한 — 다른 캐릭터를 Lv.{R.ROSTER.unlockLv}까지 키우면 +{R.ROSTER.perChar} (경험치 정지 중)</div>}
             <div className="mt-1"><Bar v={u.exp} max={expNeedFor(u)} color={PALETTE.legendary} h={5} /></div>
             <div style={{ fontSize: 10.5, color: PALETTE.textDim }}>경험치 {u.exp}/{expNeedFor(u)}</div>
           </div>
@@ -2108,6 +2174,8 @@ export default function ChronicleGame({ onExit }) {
     );
   } else if (view === 'party') {
     content = <PartyView save={save} setSave={setSave} onBack={() => setView('town')} />;
+  } else if (view === 'roster') {
+    content = <RosterView save={save} onBack={() => setView('town')} onSwitchChar={() => setView('title')} />;
   } else if (view === 'bag') {
     content = <BagView save={save} setSave={setSave} onBack={() => setView('town')} flash={flash} />;
   } else if (view === 'tower') {

@@ -4,6 +4,7 @@
 // 저장 객체(save)를 받아 새 save를 돌려주는 순수 함수 + 전투 시뮬.
 // 전투는 simulateChronicleBattle이 끝까지 계산해 사건 목록을 돌려주고, UI는 재생만 한다 (풀오토 관전).
 // ============================================
+import { levelCap, globalBuffFx } from './roster.js';
 import { talentFx, canLearnTalent, talentNode, talentResetCost, talentTrees, tierUnlocked } from './talents.js';
 import { fieldStages, FIELD_STAGES, STAGE_TUNING, BOOST, BAG_EXPAND, SALVAGE, SALVAGE_ICON, REBIRTH, REBIRTH_BRANCHES, expNeedFor } from './data.js';
 import { TOWER, TOWER_SHOP, towerUnlocked, isTowerBoss, towerEnemyLv, towerArea, towerFloorPicks, kstWeekKey } from './tower.js';
@@ -247,6 +248,8 @@ export function deriveUnit(save, classId) {
   for (const [k, v] of Object.entries(famSubFx(save.fams, activeSubs(save), u.lv))) g[k] = (g[k] || 0) + v;
   // 사역마 보유 효과(남령+) · 인연 (1.228.0) — 가지고만 있으면 적용
   for (const fx of [famOwnFx(save.fams), famBondFx(save.fams)]) for (const [k, v] of Object.entries(fx)) g[k] = (g[k] || 0) + v;
+  // 원정대 전역 버프 (1.229.0) — 다른 캐릭터들의 Lv.20/40/60/80/100 달성 보상
+  for (const [k, v] of Object.entries(globalBuffFx(save.roster, classId))) g[k] = (g[k] || 0) + v;
   // 전승 갈래 기본 효과 (1.220.0)
   const br = u.rebirth?.branch && REBIRTH_BRANCHES[u.rebirth.branch];
   if (br) for (const [k, v] of Object.entries(br.fx)) g[k] = (g[k] || 0) + v;
@@ -422,11 +425,13 @@ function addKeys(save, n) {
 export { addKeys as _addKeys };
 
 // 경험치 — 레벨업 횟수 반환
-function gainExp(u, n) {
+// cap = 원정대 레벨 상한 (1.229.0) — 상한에 닿으면 경험치를 받지 않는다 (기존 고레벨 저장은 레벨 유지)
+export const levelCapOf = (save) => levelCap(save?.roster);
+function gainExp(u, n, cap = T.maxLevel) {
   let ups = 0;
-  if (u.lv >= T.maxLevel) return 0;
+  if (u.lv >= cap) return 0;
   u.exp += n;
-  while (u.lv < T.maxLevel && u.exp >= expNeedFor(u)) {
+  while (u.lv < cap && u.exp >= expNeedFor(u)) {
     u.exp -= expNeedFor(u);
     u.lv += 1; u.points += T.pointsPerLevel; u.sp += T.spPerLevel; ups++;
   }
@@ -1250,7 +1255,7 @@ export function applyBattle(save0, ctx, battle, rng = Math.random) {
   summary.exp = r.exp; summary.gold = r.gold; summary.essence = r.essence; summary.shard = r.shard;
   save.gold += r.gold; save.mats.essence += r.essence; save.mats.shard += r.shard;
   for (const cid of save.party) {
-    const ups = gainExp(save.units[cid], r.exp);
+    const ups = gainExp(save.units[cid], r.exp, levelCapOf(save));
     if (ups) summary.levelUps[cid] = save.units[cid].lv;
   }
   // 🐾 동행 사역마 경험치 (1.225.0 — 동행 칸만, 주인공 레벨이 상한)
