@@ -732,6 +732,18 @@ body {
 .arc-float { animation: arc-float 1s ease-out both; }
 @keyframes arc-shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 50% { transform: translateX(4px); } 75% { transform: translateX(-2px); } }
 .arc-shake { animation: arc-shake .28s ease; }
+/* 황혼 연대기 전투 (1.227.0) — 로그 등장 · 스킬 호명 · 카드 이펙트 */
+@keyframes chr-log-in { 0% { opacity: 0; transform: translateY(6px); } 100% { opacity: 1; transform: none; } }
+.chr-log-in { animation: chr-log-in .25s ease-out both; }
+@keyframes chr-skill-call { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.7); } 18% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); } 75% { opacity: 1; transform: translate(-50%, -50%) scale(1); } 100% { opacity: 0; transform: translate(-50%, -60%) scale(1); } }
+.chr-skill-call { animation: chr-skill-call .9s ease-out both; }
+@keyframes chr-fx-crit { 0% { filter: none; } 25% { filter: brightness(1.7) drop-shadow(0 0 10px #ffb347); } 100% { filter: none; } }
+.chr-fx-crit { animation: chr-fx-crit .45s ease-out, arc-shake .28s ease; }
+@keyframes chr-fx-heal { 0% { filter: none; } 35% { filter: drop-shadow(0 0 12px #8fe08a) brightness(1.15); } 100% { filter: none; } }
+.chr-fx-heal { animation: chr-fx-heal .6s ease-out; }
+@keyframes chr-fx-shield { 0% { filter: none; } 35% { filter: drop-shadow(0 0 12px #9cc4e4) brightness(1.1); } 100% { filter: none; } }
+.chr-fx-shield { animation: chr-fx-shield .6s ease-out; }
+@media (prefers-reduced-motion: reduce) { .chr-log-in, .chr-skill-call, .chr-fx-crit, .chr-fx-heal, .chr-fx-shield { animation: none; } }
 @keyframes arc-pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(232,176,74,0); } 50% { box-shadow: 0 0 14px 0 rgba(232,176,74,.28); } }
 .arc-pulse { animation: arc-pulse 2.2s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) {
