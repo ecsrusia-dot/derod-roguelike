@@ -25,8 +25,13 @@ export function ensureQuestFields(save) {
   s.fams = s.fams || {};
   s.famTeam = s.famTeam || {};
   s.famPity = s.famPity || { total: 0, sinceViolet: 0 };
-  s.mats = { famShard: 0, famSoul: 0, sealPlus: 0, towerCoin: 0, ...s.mats };
+  s.mats = { famShard: 0, famSoul: 0, sealPlus: 0, towerCoin: 0, talentScroll: 0, ...s.mats };
   s.tower = s.tower || { best: 0, checkpoint: 0, run: null };
+  // 마스터리 폐지 (1.224.0) — 찍은 마스터리는 전부 스킬 포인트로 환급 (반복 실행해도 안전)
+  for (const u of Object.values(s.units || {})) {
+    if (u.mastery) { u.sp = (u.sp || 0) + u.mastery; u.mastery = 0; }
+    u.talents = u.talents || {};
+  }
   return refreshDungeonKeys(s);
 }
 

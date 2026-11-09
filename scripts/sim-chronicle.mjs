@@ -34,7 +34,7 @@ function upkeep(save, rng) {
   while (save.units[cid].sp > 0 && g++ < 30) {
     const u = save.units[cid];
     const s = Object.values(CHRONICLE_SKILLS).find(x => x.cls === cid && E.canLearn(u, x));
-    save = s ? E.learnSkill(save, cid, s.id) : E.addMastery(save, cid, u.sp);
+    save = s ? E.learnSkill(save, cid, s.id) : E.autoAllocateTalents(save, cid);
   }
   save = E.autoEquip(save);
   const junk = save.inventory.filter(i => !E.equippedBy(save, i.uid)).map(i => i.uid);

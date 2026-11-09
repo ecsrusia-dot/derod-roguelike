@@ -13,10 +13,11 @@ import UpdateButton from '../components/ui/UpdateButton.jsx';
 import { GAME_VERSION } from '../data/version.js';
 import {
   CHRONICLE_TITLE, CHRONICLE_SUB, CHRONICLE_PARTS, CHRONICLE_SAVE_KEY, CHRONICLE_SAVE_KEY_V1, CHRONICLE_TUNING, CHRONICLE_CLASSES, CHRONICLE_FIELDS,
-  CHRONICLE_DUNGEON, CHRONICLE_DUNGEONS, DUNGEON_TIERS, dungeonDef, STAT_META, STAT_KEYS, SKILL_MAX_LV, MASTERY_PCT, BOSS_DAILY_LIMIT, DUNGEON_KEYS, GRADES, gradeIdx, SLOTS, FORGE, UNIQUE_CHANCE, UNIQUE_ITEMS, fieldStages, FIELD_STAGES, BOOST, BAG_EXPAND,
+  CHRONICLE_SKILLS, CHRONICLE_DUNGEON, CHRONICLE_DUNGEONS, DUNGEON_TIERS, dungeonDef, STAT_META, STAT_KEYS, SKILL_MAX_LV, MASTERY_PCT, BOSS_DAILY_LIMIT, DUNGEON_KEYS, GRADES, gradeIdx, SLOTS, FORGE, UNIQUE_CHANCE, UNIQUE_ITEMS, fieldStages, FIELD_STAGES, BOOST, BAG_EXPAND,
   chronicleClass, classSkills, describeSkill, chronicleEnemyArt, expNeedFor, rebirthExpMult, REBIRTH, REBIRTH_BRANCHES, rebirthBranches,
 } from './data.js';
 import * as E from './engine.js';
+import * as TL from './talents.js';
 import * as Q from './quest.js';
 import * as A from './account.js';
 import * as F from './familiar.js';
@@ -309,6 +310,7 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
                 {summary.stageClear ? <div className="text-center font-semibold" style={{ color: '#9cc4e4' }}>🔓 스테이지 {summary.stageClear} 관문 통과!</div> : null}
                 {summary.famShards ? <div className="text-center" style={{ color: '#d07ae8' }}>📜 계약서 조각 +{summary.famShards}</div> : null}
                 {summary.keys ? <div className="text-center font-semibold" style={{ color: PALETTE.legendary }}>🗝 던전 열쇠 +{summary.keys}</div> : null}
+                {summary.talentScroll ? <div className="text-center font-semibold" style={{ color: '#7fd1c8' }}>📖 특성 초기화 주문서 +{summary.talentScroll}</div> : null}
                 {(summary.questsDone || []).map(t => <div key={t} className="text-center font-semibold" style={{ color: PALETTE.dawn }}>📜 의뢰 완료: {t} — 게시판에서 보상</div>)}
               </div>
             ) : (
@@ -631,7 +633,7 @@ function RebirthSheet({ save, cid, onClose, onRebirth }) {
   return (
     <BottomSheet title={`✦ ${next}차 전승`} onClose={onClose} maxHeight="88%">
       <div style={{ fontSize: 12, color: PALETTE.textDim, lineHeight: 1.6 }}>
-        레벨·능력치·스킬·마스터리가 <b style={{ color: '#e06a5f' }}>Lv.1로 초기화</b>되고, 필요 경험치가 <b style={{ color: PALETTE.text }}>×{rebirthExpMult(next)}</b>가 되고, 모든 적이 <b style={{ color: '#ff6ad5' }}>전승 {next}단계</b>(HP +{Math.round(REBIRTH.enemyHp * next * 100)}% · 공격 +{Math.round(REBIRTH.enemyAtk * next * 100)}%)로 강해진다. 대신 전승 장비·갈래 유니크가 떨어진다.
+        레벨·능력치·스킬·특성이 <b style={{ color: '#e06a5f' }}>Lv.1로 초기화</b>되고, 필요 경험치가 <b style={{ color: PALETTE.text }}>×{rebirthExpMult(next)}</b>가 되고, 모든 적이 <b style={{ color: '#ff6ad5' }}>전승 {next}단계</b>(HP +{Math.round(REBIRTH.enemyHp * next * 100)}% · 공격 +{Math.round(REBIRTH.enemyAtk * next * 100)}%)로 강해진다. 대신 전승 장비·갈래 유니크가 떨어진다.
         장비·사역마·재화는 그대로지만 <b style={{ color: PALETTE.text }}>장비 레벨 ≤ 내 레벨 + {REBIRTH.wearMargin}</b>만 착용 효과가 있다.
         전승마다 공격력·최대 HP <b style={{ color: PALETTE.legendary }}>+{Math.round(REBIRTH.bonusPct * 100)}%</b> 영구. {fixed ? '갈래는 첫 전승 때 고정되어 바꿀 수 없다.' : '갈래는 한 번 고르면 바꿀 수 없다.'}
       </div>
@@ -657,6 +659,90 @@ function RebirthSheet({ save, cid, onClose, onRebirth }) {
         <UIButton variant="ghost" style={{ height: 40 }} onClick={onClose}>닫기</UIButton>
       </div>
     </BottomSheet>
+  );
+}
+
+// ===== 특성 트리 (1.224.0 — 갈래 3개 × 5단) =====
+function TalentPanel({ save, setSave, cid }) {
+  const u = save.units[cid];
+  const trees = TL.talentTrees(cid);
+  const [tab, setTab] = useState(() => {
+    let best = 0; trees.forEach((t, i) => { if (TL.treePoints(u, t.id) > TL.treePoints(u, trees[best].id)) best = i; });
+    return best;
+  });
+  const [confirmReset, setConfirmReset] = useState(false);
+  if (!trees.length) return null;
+  const tree = trees[tab];
+  const pts = TL.treePoints(u, tree.id);
+  const step = TL.TALENT_TUNING.tierStep;
+  const cost = TL.talentResetCost(u);
+  const scrolls = save.mats.talentScroll || 0;
+  const spent = TL.talentSpent(u);
+  const canReset = E.canResetTalents(save, cid);
+  const skillName = (id) => CHRONICLE_SKILLS[id]?.name || id;
+  return (
+    <GlassPanel className="p-3">
+      <div className="flex items-center justify-between">
+        <span className="font-semibold" style={{ fontSize: 13.5, color: PALETTE.text }}>특성 <span style={{ fontSize: 11, color: PALETTE.textDim, fontWeight: 400 }}>— 투자 {spent}</span></span>
+        <span style={{ fontSize: 12, color: u.sp ? PALETTE.legendary : PALETTE.textDim }}>스킬 포인트 {u.sp}</span>
+      </div>
+      <div className="grid grid-cols-3 gap-1.5 mt-2">
+        {trees.map((t, i) => {
+          const on = i === tab;
+          return (
+            <button key={t.id} onClick={() => setTab(i)} className="ui-press" style={{ padding: '7px 4px', borderRadius: 10, border: `1.5px solid ${on ? t.color : 'var(--ui-line)'}`, background: on ? `${t.color}22` : 'transparent', color: on ? t.color : PALETTE.textDim }}>
+              <div className="font-semibold" style={{ fontSize: 13 }}>{t.name}</div>
+              <div style={{ fontSize: 11 }}>{TL.treePoints(u, t.id)}점</div>
+            </button>
+          );
+        })}
+      </div>
+      <div className="mt-2" style={{ fontSize: 11.5, color: PALETTE.textDim }}>{tree.desc}</div>
+      {tree.tiers.map((row, ti) => {
+        const open = TL.tierUnlocked(u, tree.id, ti);
+        return (
+          <div key={ti} className="mt-2" style={{ opacity: open ? 1 : 0.5 }}>
+            <div style={{ fontSize: 11, color: open ? tree.color : PALETTE.textDim }}>{ti + 1}단{ti === tree.tiers.length - 1 ? ' · 궁극' : ''}{open ? '' : ` — ${tree.name}에 ${ti * step}점 필요 (현재 ${pts})`}</div>
+            <div className={`grid gap-1.5 mt-1 ${row.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+              {row.map(n => {
+                const r = u.talents?.[n.id] || 0;
+                const can = TL.canLearnTalent(u, n.id);
+                const full = r >= n.max;
+                return (
+                  <button key={n.id} disabled={!can} onClick={() => setSave(E.learnTalent(save, cid, n.id))} className="ui-press text-left" style={{ padding: '8px 9px', borderRadius: 11, border: `1px solid ${r ? tree.color : 'var(--ui-line)'}`, background: r ? `${tree.color}14` : 'transparent', minHeight: 58 }}>
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="font-semibold truncate" style={{ fontSize: 12.5, color: r ? PALETTE.text : PALETTE.textDim }}>{n.name}</span>
+                      <span className="flex-none" style={{ fontSize: 11, color: full ? PALETTE.legendary : can ? tree.color : PALETTE.textDim }}>{r}/{n.max}</span>
+                    </div>
+                    <div style={{ fontSize: 11, color: PALETTE.textDim, lineHeight: 1.35 }}>
+                      {n.max > 1 ? '1점당 ' : ''}{TL.talentFxText(n.fx, skillName)}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+      {u.sp > 0 && <button onClick={() => setSave(E.autoAllocateTalents(save, cid))} className="ui-press w-full mt-3" style={{ height: 36, borderRadius: 10, border: '1px dashed var(--ui-line-strong)', color: PALETTE.dawn, background: 'transparent', fontSize: 12.5 }}>남은 포인트 자동 배분</button>}
+      {spent > 0 && (
+        <div className="mt-3 pt-2" style={{ borderTop: '1px solid var(--ui-line)' }}>
+          <div style={{ fontSize: 11.5, color: PALETTE.textDim }}>
+            초기화 비용: <b style={{ color: PALETTE.legendary }}>🪙 {cost.gold.toLocaleString()}</b>
+            {cost.scrolls > 0 ? <> + <b style={{ color: scrolls >= cost.scrolls ? '#7fd1c8' : '#e06a5f' }}>📖 주문서 {cost.scrolls}장</b> (보유 {scrolls})</> : <span> · Lv.{TL.TALENT_TUNING.scrollFreeUntil}까지는 주문서 불필요</span>}
+          </div>
+          {cost.scrolls > 0 && <div style={{ fontSize: 10.5, color: PALETTE.textDim }}>주문서는 보스·던전 보스·탑 보스에서 유니크와 같은 확률로 떨어진다. Lv.61부터 10레벨마다 1장씩 더 필요.</div>}
+          {!confirmReset ? (
+            <button disabled={!canReset} onClick={() => setConfirmReset(true)} className="ui-press w-full mt-2" style={{ height: 36, borderRadius: 10, border: `1px solid ${canReset ? '#e06a5f' : 'var(--ui-line)'}`, color: canReset ? '#e06a5f' : PALETTE.textDim, background: 'transparent', fontSize: 12.5, opacity: canReset ? 1 : 0.5 }}>특성 초기화 (포인트 {spent} 환급)</button>
+          ) : (
+            <div className="flex gap-2 mt-2">
+              <button onClick={() => setConfirmReset(false)} className="ui-press flex-1" style={{ height: 36, borderRadius: 10, border: '1px solid var(--ui-line-strong)', color: PALETTE.textDim, background: 'transparent', fontSize: 12.5 }}>취소</button>
+              <button onClick={() => { setSave(E.resetTalents(save, cid)); setConfirmReset(false); }} className="ui-press flex-1 font-semibold" style={{ height: 36, borderRadius: 10, border: '1px solid #e06a5f', color: '#fff', background: '#e06a5f', fontSize: 12.5 }}>정말 초기화</button>
+            </div>
+          )}
+        </div>
+      )}
+    </GlassPanel>
   );
 }
 
@@ -738,15 +824,11 @@ function PartyView({ save, setSave, onBack }) {
               </div>
             );
           })}
-          <div className="flex items-center gap-2 mt-3 pt-2" style={{ borderTop: '1px solid var(--ui-line)' }}>
-            <div className="flex-1 min-w-0">
-              <div style={{ fontSize: 13, color: u.mastery ? PALETTE.text : PALETTE.textDim }}>마스터리 <span style={{ fontSize: 11, color: PALETTE.legendary }}>Lv.{u.mastery || 0}</span></div>
-              <div style={{ fontSize: 11, color: PALETTE.textDim }}>포인트 1개당 공격력·최대 HP +{Math.round(MASTERY_PCT * 100)}% · 상한 없음 (현재 +{Math.round((u.mastery || 0) * MASTERY_PCT * 100)}%)</div>
-            </div>
-            <button disabled={!u.sp} onClick={() => setSave(E.addMastery(save, cid, 1))} className="ui-press flex-none" style={{ height: 34, padding: '0 10px', borderRadius: 9, border: `1px solid ${u.sp ? PALETTE.legendary : 'var(--ui-line)'}`, color: u.sp ? PALETTE.legendary : PALETTE.textDim, background: 'transparent', fontSize: 12, opacity: u.sp ? 1 : 0.4 }}>+1</button>
-            {u.sp > 1 && <button onClick={() => setSave(E.addMastery(save, cid, u.sp))} className="ui-press flex-none" style={{ height: 34, padding: '0 10px', borderRadius: 9, border: `1px solid ${PALETTE.legendary}`, color: PALETTE.legendary, background: 'transparent', fontSize: 12 }}>전부</button>}
-          </div>
+          <div className="mt-2" style={{ fontSize: 11, color: PALETTE.textDim }}>스킬을 다 올리고 남은 포인트는 아래 <b style={{ color: PALETTE.legendary }}>특성</b>에 찍는다.</div>
         </GlassPanel>
+
+        {/* 특성 트리 (1.224.0) */}
+        <TalentPanel save={save} setSave={setSave} cid={cid} />
 
         {/* 장비 */}
         <GlassPanel className="p-3 flex flex-col gap-2">
@@ -1637,12 +1719,12 @@ function huntRecord(sim, party, enc, summary) {
     win: sim.result === 'win', type: enc.type, rounds: dmg.rounds,
     kills: sim.result === 'win' ? enc.enemies.reduce((m, e) => ({ ...m, [e.tier]: (m[e.tier] || 0) + 1 }), {}) : {},
     units, skills: dmg.bySkill,
-    exp: summary.exp || 0, gold: summary.gold || 0, essence: summary.essence || 0, famShards: summary.famShards || 0,
+    exp: summary.exp || 0, gold: summary.gold || 0, essence: summary.essence || 0, famShards: summary.famShards || 0, talentScroll: summary.talentScroll || 0,
     items: (summary.items || []).map(i => i.grade), levelUps: Object.keys(summary.levelUps || {}).length,
   };
 }
 function newHuntStats() {
-  return { battles: 0, wins: 0, losses: 0, rounds: 0, types: {}, kills: {}, units: {}, skills: {}, exp: 0, gold: 0, essence: 0, famShards: 0, items: {}, levelUps: 0, startedAt: Date.now() };
+  return { battles: 0, wins: 0, losses: 0, rounds: 0, types: {}, kills: {}, units: {}, skills: {}, exp: 0, gold: 0, essence: 0, famShards: 0, talentScroll: 0, items: {}, levelUps: 0, startedAt: Date.now() };
 }
 function addHuntRecord(st, r) {
   st.battles += 1; if (r.win) st.wins += 1; else st.losses += 1;
@@ -1661,7 +1743,7 @@ function addHuntRecord(st, r) {
     const key = `${u?.fam ? `fam:${u.famKey}` : id}|${sn}`;
     st.skills[key] = (st.skills[key] || 0) + v;
   }
-  st.exp += r.exp; st.gold += r.gold; st.essence += r.essence; st.famShards += r.famShards; st.levelUps += r.levelUps;
+  st.exp += r.exp; st.gold += r.gold; st.essence += r.essence; st.famShards += r.famShards; st.talentScroll = (st.talentScroll || 0) + (r.talentScroll || 0); st.levelUps += r.levelUps;
   for (const g of r.items) st.items[g] = (st.items[g] || 0) + 1;
 }
 const TIER_LABEL = { normal: '일반 몹', elite: '강적', boss: '보스' };
@@ -1709,6 +1791,7 @@ function HuntReport({ report: r, onClose, title = '📊 사냥 보고서' }) {
           <div style={row}><span>골드</span><b>🪙 {r.gold.toLocaleString()}</b></div>
           <div style={row}><span>정수</span><b>✦ {r.essence}</b></div>
           {r.famShards ? <div style={row}><span>계약서 조각</span><b>📜 {r.famShards}</b></div> : null}
+          {r.talentScroll ? <div style={row}><span>특성 초기화 주문서</span><b>📖 {r.talentScroll}</b></div> : null}
           {r.levelUps ? <div style={row}><span>레벨 업</span><b>▲ {r.levelUps}</b></div> : null}
           <div style={row}><span>장비</span><b>{GRADES.filter(g => r.items[g.id]).map(g => <span key={g.id} style={{ color: g.color, marginLeft: 6 }}>{g.label} {r.items[g.id]}</span>)}{!Object.keys(r.items).length && '없음'}</b></div>
         </GlassPanel>}

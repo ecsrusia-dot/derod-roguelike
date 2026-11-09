@@ -104,7 +104,7 @@ export const CHRONICLE_SKILLS = {
   p_judge: S('p_judge', 'priest', '심판', 'aoe', 25, 4, 1.6, 0.15),
 };
 export const SKILL_MAX_LV = 5;
-// 마스터리 (1.207.0) — 남는 스킬 포인트 1개당 공격·최대 HP +1%, 상한 없음
+// 마스터리 (1.207.0) — 1.224.0 폐지 (특성 트리 talents.js로 대체, 상수는 구 호환용으로만 남김)
 export const MASTERY_PCT = 0.01;
 // 보스 재도전 (1.207.0) — 첫 처치 후 보스마다 하루 3회 (한국 시간 0시 초기화)
 export const BOSS_DAILY_LIMIT = 3;
