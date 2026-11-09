@@ -74,6 +74,42 @@ function Header({ title, onBack, right }) {
     </div>
   );
 }
+// 숫자가 차오르는 연출 (1.232.2) — 0 → v, 약 0.7초
+function CountUp({ v, ms = 700 }) {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    let reduce = false;
+    try { reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { /* */ }
+    if (reduce || !v) { setN(v || 0); return undefined; }
+    let raf; const t0 = performance.now();
+    const step = (t) => { const k = Math.min(1, (t - t0) / ms); setN(Math.round(v * (1 - (1 - k) ** 3))); if (k < 1) raf = requestAnimationFrame(step); };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [v, ms]);
+  return <>{n.toLocaleString()}</>;
+}
+// 대장간 결과 팝업 (1.232.2) — 성공 금색 · 실패 회색 · 하락 주황 · 파괴 붉은 흔들림
+const FORGE_POP = {
+  success: { icon: '✨', color: '#ffd27a', glow: 'rgba(232,176,74,.55)' },
+  fail: { icon: '…', color: '#c9c2b8', glow: 'rgba(255,255,255,.15)' },
+  down: { icon: '▼', color: '#e8b04a', glow: 'rgba(232,140,74,.4)' },
+  destroy: { icon: '💥', color: '#ff6b5e', glow: 'rgba(224,80,70,.6)' },
+};
+function ForgePop({ pop, onDone }) {
+  const doneRef = useRef(onDone); doneRef.current = onDone;
+  useEffect(() => { const t = setTimeout(() => doneRef.current(), pop.kind === 'destroy' ? 1900 : 1600); return () => clearTimeout(t); }, [pop]);
+  const st = FORGE_POP[pop.kind] || FORGE_POP.fail;
+  return (
+    <div className="absolute inset-0 pointer-events-auto" style={{ zIndex: 60, background: 'rgba(0,0,0,.35)' }} onClick={onDone}>
+      <div key={pop.key} className={`${pop.kind === 'destroy' ? 'chr-pop-destroy' : 'chr-pop'} absolute text-center`} style={{ left: '50%', top: '45%', minWidth: 220, padding: '18px 22px', borderRadius: 18, background: 'rgba(20,14,12,.92)', border: `1.5px solid ${st.color}`, boxShadow: `0 0 34px 4px ${st.glow}` }}>
+        <div style={{ fontSize: 34 }}>{st.icon}</div>
+        <div className="font-bold mt-1" style={{ fontSize: 18, color: st.color, fontFamily: FONT_TITLE }}>{pop.title}</div>
+        {pop.sub && <div className="mt-1" style={{ fontSize: 12.5, color: PALETTE.textDim }}>{pop.sub}</div>}
+      </div>
+    </div>
+  );
+}
+
 function Wallet({ save }) {
   return (
     <div className="flex items-center gap-2 flex-none" style={{ fontSize: 12 }}>
@@ -350,17 +386,17 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
       {done && (
         <div className="relative flex-none px-3 pb-3">
           <GlassPanel strong className="p-3">
-            <div className="font-bold text-center" style={{ fontSize: 17, color: sim.result === 'win' ? PALETTE.legendary : '#e06a5f', fontFamily: FONT_TITLE }}>
+            <div className={`font-bold text-center ${sim.result === 'win' ? 'chr-win' : ''}`} style={{ fontSize: 17, color: sim.result === 'win' ? PALETTE.legendary : '#e06a5f', fontFamily: FONT_TITLE }}>
               {sim.result === 'win' ? '승리' : '전멸'}
             </div>
             {sim.result === 'win' ? (
               <div className="mt-1.5 flex flex-col gap-1" style={{ fontSize: 12.5, color: PALETTE.text }}>
-                {ctx.kind !== 'raid' && <div className="text-center">경험치 +{summary.exp} · 🪙 +{summary.gold} · ✦ +{summary.essence}{summary.shard ? ` · ◆ +${summary.shard}` : ''}</div>}
+                {ctx.kind !== 'raid' && <div className="text-center">경험치 +<CountUp v={summary.exp} /> · 🪙 +<CountUp v={summary.gold} /> · ✦ +{summary.essence}{summary.shard ? ` · ◆ +${summary.shard}` : ''}</div>}
                 {Object.entries(summary.levelUps).map(([cid, lv]) => (
-                  <div key={cid} className="text-center" style={{ color: PALETTE.legendary }}>▲ {chronicleClass(cid).name} Lv.{lv} 달성!</div>
+                  <div key={cid} className="text-center font-semibold chr-levelup" style={{ color: PALETTE.legendary }}>▲ 레벨 업! {chronicleClass(cid).name} Lv.{lv}</div>
                 ))}
                 {summary.items.map(it => (
-                  <div key={it.uid} className="text-center" style={{ color: gradeOf(it.grade).color, fontWeight: it.grade === 'unique' || it.grade === 'mythic' ? 700 : 400 }}>{it.grade === 'mythic' ? '✦ 전승 장비 획득: ' : it.grade === 'unique' ? '★ 유니크 획득: ' : '획득: '}{E.itemName(it)} ({gradeOf(it.grade).label}{E.itemUsable(it, save.hero) ? '' : ` · ${clsTag(it)}`})</div>
+                  <div key={it.uid} className="text-center" style={{ color: gradeOf(it.grade).color, fontWeight: it.grade === 'unique' || it.grade === 'mythic' ? 700 : 400 }}><span className={gradeIdx(it.grade) >= gradeIdx('rare') ? 'chr-drop' : ''} style={{ '--g': gradeOf(it.grade).color }}>{it.grade === 'mythic' ? '✦ 전승 장비 획득: ' : it.grade === 'unique' ? '★ 유니크 획득: ' : '획득: '}{E.itemName(it)} ({gradeOf(it.grade).label}{E.itemUsable(it, save.hero) ? '' : ` · ${clsTag(it)}`})</span></div>
                 ))}
                 {summary.autoSalvaged ? <div className="text-center" style={{ color: PALETTE.textDim }}>♻ 자동 분해 {summary.autoSalvaged}개 → {E.salvageText(summary.autoSalvage || {})}</div> : null}
                 {summary.autoDismantled ? <div className="text-center" style={{ color: PALETTE.textDim }}>가방이 가득 차 {summary.autoDismantled}개 자동 분해</div> : null}
@@ -570,6 +606,24 @@ function TownView({ save, go, onExit, onSwitchChar }) {
     ? `${main ? `[${main.title}] ` : ''}${nextField.name} — ${E.bossReady(save, nextField.id) ? '보스 도전 가능' : `스테이지 ${E.stageState(save, nextField.id).cleared + 1}/${FIELD_STAGES}`}`
     : main ? `[${main.title}] 보상을 받으러 게시판으로` : '2부 완결! 던전·보스 재도전으로 유니크를 노리자';
   const qBadge = Q.questBadgeCount(save);
+  // 「지금 할 일」 (1.232.2) — 우선순위 순 최대 3개
+  const todos = (() => {
+    const L = [];
+    if (hero.points > 0 || hero.sp > 0) L.push({ id: 'party', icon: '🧭', t: `성장 포인트 사용${hero.points ? ` · 능력치 ${hero.points}` : ''}${hero.sp ? ` · 스킬 ${hero.sp}` : ''}` });
+    if (qBadge > 0) L.push({ id: 'quests', icon: '📜', t: `의뢰 게시판 새 소식 ${qBadge}건` });
+    if (nextField && E.fieldUnlocked(save, nextField.id)) {
+      const st = E.stageState(save, nextField.id);
+      if (E.bossReady(save, nextField.id)) L.push({ id: 'field', icon: '👑', t: `${nextField.name} 보스 도전 가능` });
+      else if (st.cleared < FIELD_STAGES && E.gateReady(save, nextField.id, st.cleared)) L.push({ id: 'field', icon: '⚔', t: `${nextField.name} ${st.cleared + 1} 관문 도전 가능` });
+    }
+    const rq = R.rosterQuestBadge(save); if (rq) L.push({ id: 'roster', icon: '🏳', t: `원정대 의뢰 보상 ${rq}건` });
+    const rd = RD.RAID_TIERS.filter((t, i) => RD.raidUnlocked(save.roster, save.raid, i) && !(save.raid?.daily?.date === E.kstDateKey() && save.raid.daily.done?.[t.id])).length;
+    if (rd) L.push({ id: 'raid', icon: '⚔', t: `원정대 레이드 오늘 보상 ${rd}단계 남음` });
+    if (E.famSlotOpen(save, 'main') && ((save.mats.famShard || 0) >= F.FAM_TUNING.shardsPerSummon || (save.mats.sealPlus || 0) > 0)) L.push({ id: 'fam', icon: '🐾', t: '사역마 소환 가능' });
+    if (E.dungeonUnlocked(save) && !save.dungeon && E.keyCount(save) >= DUNGEON_KEYS.max) L.push({ id: 'dungeon', icon: '🗝', t: `열쇠가 가득 참 (${E.keyCount(save)}개) — 던전으로` });
+    if (save.inventory.length >= E.bagMax(save) * 0.9) L.push({ id: 'bag', icon: '🎒', t: `가방이 거의 가득 참 (${save.inventory.length}/${E.bagMax(save)})` });
+    return L.slice(0, 3);
+  })();
   const tiles = [
     { id: 'quests', icon: '📜', label: '의뢰 게시판', sub: qBadge ? `새 소식 ${qBadge}건` : '메인 · 의뢰 · 이야기', badge: qBadge > 0 },
     { id: 'field', icon: '⚔', label: '사냥터', sub: '몹 사냥 · 보스' },
@@ -582,6 +636,14 @@ function TownView({ save, go, onExit, onSwitchChar }) {
     { id: 'fam', icon: '🐾', label: '사역마', sub: E.famSlotOpen(save, 'main') ? `📜 ${save.mats.famShard || 0} · 보유 ${Object.keys(save.fams || {}).length}` : `Lv.${F.FAM_TUNING.slotLv.main}부터 동행`, badge: (save.mats.famShard || 0) >= F.FAM_TUNING.shardsPerSummon || (save.mats.sealPlus || 0) > 0 },
     { id: 'stash', icon: '🏛', label: '공용 창고', sub: `${(save.stash || []).length}/${A.STASH_MAX} · 모든 캐릭터 공유` },
     { id: 'forge', icon: '⚒', label: '대장간', sub: '강화 · 등급 승급' },
+    { id: 'exit', icon: '⇄', label: '게임 선택', sub: '진행은 자동 저장' },
+  ];
+  const byId = Object.fromEntries(tiles.map(t => [t.id, t]));
+  const GROUPS = [
+    { label: '⚔ 전투', ids: ['field', 'dungeon', 'tower'] },
+    { label: '🧭 성장', ids: ['party', 'fam', 'forge'] },
+    { label: '🏳 원정대 · 의뢰', ids: ['raid', 'roster', 'quests'] },
+    { label: '📦 보관', ids: ['bag', 'stash', 'exit'] },
   ];
   return (
     <div className="absolute inset-0 flex flex-col">
@@ -607,21 +669,31 @@ function TownView({ save, go, onExit, onSwitchChar }) {
           <div className="mt-1.5" style={{ fontSize: 11, color: PALETTE.textDim }}>경험치 {hero.exp}/{expNeedFor(hero)}</div>
           <Bar v={hero.exp} max={expNeedFor(hero)} color={PALETTE.legendary} h={5} />
         </GlassPanel>
-        <div className="grid grid-cols-2 gap-2.5 ui-stagger">
-          {tiles.map(t => (
-            <button key={t.id} disabled={t.locked} onClick={() => go(t.id)} className="ui-press relative text-left" style={{ padding: 14, borderRadius: 16, background: 'rgba(255,255,255,0.035)', border: '1px solid var(--ui-line-strong)', opacity: t.locked ? 0.45 : 1, minHeight: 92 }}>
-              <div style={{ fontSize: 24 }}>{t.icon}</div>
-              <div className="font-semibold mt-1" style={{ fontSize: 14, color: PALETTE.text }}>{t.label}</div>
-              <div className="truncate" style={{ fontSize: 11, color: PALETTE.textDim }}>{t.sub}</div>
-              {t.badge && <span className="absolute" style={{ top: 10, right: 10, width: 9, height: 9, borderRadius: 999, background: '#e06a5f' }} />}
+        <GlassPanel className="p-3">
+          <div className="font-semibold mb-1.5" style={{ fontSize: 13, color: PALETTE.legendary }}>✦ 지금 할 일</div>
+          {todos.length ? todos.map((d, i) => (
+            <button key={i} onClick={() => go(d.id)} className="ui-press w-full flex items-center gap-2 text-left" style={{ minHeight: 40, padding: '6px 8px', borderRadius: 10, marginTop: i ? 4 : 0, background: 'rgba(232,176,74,0.07)', border: '1px solid rgba(232,176,74,0.22)' }}>
+              <span style={{ fontSize: 16, width: 22, textAlign: 'center' }}>{d.icon}</span>
+              <span className="flex-1" style={{ fontSize: 12.5, color: PALETTE.text }}>{d.t}</span>
+              <span style={{ fontSize: 13, color: PALETTE.legendary }}>›</span>
             </button>
-          ))}
-          <button onClick={onExit} className="ui-press text-left" style={{ padding: 14, borderRadius: 16, background: 'transparent', border: '1px dashed var(--ui-line-strong)', minHeight: 92 }}>
-            <div style={{ fontSize: 24 }}>⇄</div>
-            <div className="font-semibold mt-1" style={{ fontSize: 14, color: PALETTE.dawn }}>게임 선택</div>
-            <div style={{ fontSize: 11, color: PALETTE.textDim }}>진행은 자동 저장</div>
-          </button>
-        </div>
+          )) : <div style={{ fontSize: 12, color: PALETTE.textDim }}>당장 할 일은 모두 마쳤다 — 사냥으로 성장하자</div>}
+        </GlassPanel>
+        {GROUPS.map(gp => (
+          <div key={gp.label}>
+            <div className="mb-1.5" style={{ fontSize: 12, color: PALETTE.textDim, fontWeight: 600 }}>{gp.label}</div>
+            <div className="grid grid-cols-3 gap-2 ui-stagger">
+              {gp.ids.map(id => byId[id]).map(t => (
+                <button key={t.id} disabled={t.locked} onClick={() => (t.id === 'exit' ? onExit() : go(t.id))} aria-label={t.label} className="ui-press relative text-left" style={{ padding: '10px 10px 9px', borderRadius: 14, background: 'rgba(255,255,255,0.035)', border: '1px solid var(--ui-line-strong)', opacity: t.locked ? 0.45 : 1, minHeight: 82 }}>
+                  <div style={{ fontSize: 20 }}>{t.icon}</div>
+                  <div className="font-semibold mt-0.5" style={{ fontSize: 13, color: PALETTE.text }}>{t.label}</div>
+                  <div style={{ fontSize: 11, color: PALETTE.textDim, lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{t.sub}</div>
+                  {t.badge && <span className="absolute" style={{ top: 8, right: 8, width: 9, height: 9, borderRadius: 999, background: '#e06a5f' }} />}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -1501,7 +1573,7 @@ function FamiliarView({ save, setSave, onBack, flash }) {
             {results.map((r, i) => {
               const g = F.famGrade(r.grade);
               return (
-                <div key={i} className={`flex items-center gap-2 ${F.famGradeIdx(r.grade) >= 3 ? 'ui-sheen' : ''}`} style={{ padding: 6, borderRadius: 10, border: `1px solid ${g.color}`, background: `${g.color}1a`, animationDelay: `${i * 60}ms` }}>
+                <div key={i} className={`flex items-center gap-2 ${F.famGradeIdx(r.grade) >= 2 ? 'chr-flip-hi' : 'chr-flip'}`} style={{ padding: 6, borderRadius: 10, border: `1px solid ${g.color}`, background: `${g.color}1a`, animationDelay: `${i * 90}ms`, '--g': g.color }}>
                   <img src={chronicleEnemyArt(r.key)} alt="" className="object-cover flex-none" style={{ width: 36, height: 36, borderRadius: 8 }} />
                   <div className="min-w-0">
                     <div className="truncate" style={{ fontSize: 12, color: g.color, fontWeight: 600 }}>{g.label} {F.famName(r.key)}</div>
@@ -1789,6 +1861,8 @@ function ForgeView({ save, setSave, onBack, flash }) {
   const er = item && E.enhanceRisk(item);
   const pr = item && ng && E.promoteRisk(item);
   const [confirm, setConfirm] = useState(null); // 하락·파괴 위험 확인 (1.232.1)
+  const [pop, setPop] = useState(null); // 결과 팝업 (1.232.2)
+  const showPop = (kind, title, sub) => setPop({ kind, title, sub, key: Date.now() });
   const [skipAsk, setSkipAsk] = useState(forgeConfirmSkip);
   const guard = (risky, info, run) => {
     if (!risky || forgeConfirmSkip) { run(); return; }
@@ -1833,8 +1907,10 @@ function ForgeView({ save, setSave, onBack, flash }) {
                     confirmLabel: '강화한다', danger: er.breakChance > 0,
                   }, () => {
                     const r = E.forgeEnhance(save, item.uid); if (!r.result) return; setSave(r.save);
-                    if (r.result === 'destroy') { setSel(null); flash('💥 강화 실패 — 장비가 파괴되었습니다'); }
-                    else flash({ success: `강화 성공! +${(item.plus || 0) + 1}`, fail: '강화 실패 — 재료만 잃었습니다', down: `강화 실패 — +${Math.max(0, (item.plus || 0) - 1)}로 하락` }[r.result]);
+                    if (r.result === 'destroy') { setSel(null); showPop('destroy', '장비 파괴', `${E.itemName(item)} +${item.plus || 0}`); }
+                    else if (r.result === 'success') showPop('success', `강화 성공! +${(item.plus || 0) + 1}`, E.itemName(item));
+                    else if (r.result === 'down') showPop('down', `강화 실패 — +${Math.max(0, (item.plus || 0) - 1)}로 하락`, E.itemName(item));
+                    else showPop('fail', '강화 실패', '재료만 잃었습니다');
                   })}>강화</UIButton>
                 </>
               ) : <div style={{ fontSize: 12, color: PALETTE.textDim }}>최대 강화</div>}
@@ -1856,9 +1932,9 @@ function ForgeView({ save, setSave, onBack, flash }) {
                     confirmLabel: '승급한다', danger: true,
                   }, () => {
                     const r = E.forgePromote(save, item.uid); if (!r.result) return; setSave(r.save);
-                    if (r.result === 'destroy') { setSel(null); flash('💥 승급 실패 — 장비가 파괴되었습니다'); return; }
-                    if (r.result === 'fail') { flash('승급 실패 — 재료만 잃었습니다'); return; }
-                    const it2 = r.save.inventory.find(i => i.uid === item.uid); flash(E.epicOptOf(it2) ? `에픽 승급! 「${E.epicOptOf(it2).name}」` : `${gradeOf(ng).label} 등급으로 승급!`);
+                    if (r.result === 'destroy') { setSel(null); showPop('destroy', '장비 파괴', `${gradeOf(ng).label} 승급 실패`); return; }
+                    if (r.result === 'fail') { showPop('fail', '승급 실패', '재료만 잃었습니다'); return; }
+                    const it2 = r.save.inventory.find(i => i.uid === item.uid); showPop('success', `${gradeOf(ng).label} 등급으로 승급!`, E.epicOptOf(it2) ? `에픽 효과 「${E.epicOptOf(it2).name}」` : E.itemName(it2));
                   })}>승급</UIButton>
                 </>
               ) : <div style={{ fontSize: 12, color: PALETTE.textDim }}>최고 등급</div>}
@@ -1868,6 +1944,7 @@ function ForgeView({ save, setSave, onBack, flash }) {
         </BottomSheet>
       )}
       {confirm && <ConfirmSheet {...confirm} onCancel={() => setConfirm(null)} skipLabel="이번 접속 동안 다시 묻지 않기" skip={skipAsk} onSkipChange={setSkipAsk} />}
+      {pop && <ForgePop pop={pop} onDone={() => setPop(null)} />}
     </div>
   );
 }
