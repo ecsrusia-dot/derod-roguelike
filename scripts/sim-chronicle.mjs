@@ -3,17 +3,19 @@
 // 장비는 봇이 실제로 얻은 것만 사용 (1.208 교훈 — 이상적 장비 가정 금지)
 import * as E from '../src/chronicle/engine.js';
 import { CHRONICLE_FIELDS, CHRONICLE_CLASSES, CHRONICLE_SKILLS } from '../src/chronicle/data.js';
-import { FAM_GRADES, FAM_ROLES, famRole, famGradeIdx } from '../src/chronicle/familiar.js';
+import { FAM_GRADES, FAM_ROLES, famRole, famGradeIdx, famLvRatio } from '../src/chronicle/familiar.js';
 const USE_FAM = process.env.FAM !== '0'; // FAM=0 이면 사역마 없이 (1.211.0 기준선 비교용)
 function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const N = +process.argv[2] || 10;
 const LAST = CHRONICLE_FIELDS[CHRONICLE_FIELDS.length - 1].id;
 
 // 사역마 봇: 조각 생기면 소환 · 가장 강한 맹공/주술을 동행, 나머지 상위 2마리 보조 · 사역혼은 동행에 몰아서 강화·진화
-const famScore = (k, f) => FAM_GRADES[famGradeIdx(f.grade)].mult * (1 + 0.08 * f.plus) * (FAM_ROLES[famRole(k)].atk + FAM_ROLES[famRole(k)].hp * 0.5);
+// 1.225.0 — 레벨 비율 반영 (단, 0.6 하한: 등급이 크게 높은 신규 사역마는 데려가서 키운다)
+const famScore = (k, f, hlv = 1) => FAM_GRADES[famGradeIdx(f.grade)].mult * (1 + 0.08 * f.plus) * (FAM_ROLES[famRole(k)].atk + FAM_ROLES[famRole(k)].hp * 0.5) * Math.max(0.6, famLvRatio(f, hlv));
 function famUpkeep(save, rng) {
   while ((save.mats.famShard || 0) >= 10) { const r = E.summonFam(save, save.mats.famShard >= 100 ? 10 : 1, false, rng); save = r.save; }
-  const ranked = Object.entries(save.fams).sort((a, b) => famScore(b[0], b[1]) - famScore(a[0], a[1])).map(x => x[0]);
+  const hlv = save.units[save.hero].lv;
+  const ranked = Object.entries(save.fams).sort((a, b) => famScore(b[0], b[1], hlv) - famScore(a[0], a[1], hlv)).map(x => x[0]);
   if (!ranked.length) return save;
   save = E.setFamTeam(save, 'main', ranked[0]);
   if (ranked[1]) save = E.setFamTeam(save, 'sub1', ranked[1]);
@@ -79,6 +81,7 @@ function run(classId, seed) {
   const avg = (a) => a.length ? Math.round(a.reduce((x, y) => x + y, 0) / a.length * 100) : 0;
   const fams = Object.values(save.fams || {});
   const best = fams.length ? Math.max(...fams.map(f => famGradeIdx(f.grade))) : -1;
+  if (process.env.FAMLOG) console.error(classId, "hero", save.units[classId].lv, "main fam lv", save.fams[save.famTeam?.main]?.lv);
   return { log, battles, lv: save.units[classId].lv, wr, hpLoss: avg(hpLoss), summons: save.famPity?.total || 0, famCount: fams.length, best, mainFam: save.famTeam?.main && save.fams[save.famTeam.main] };
 }
 

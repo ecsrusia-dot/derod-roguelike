@@ -139,7 +139,7 @@ function ItemRow({ save, item, onClick, right }) {
           {E.itemName(item)}{item.plus ? ` +${item.plus}` : ''} <span style={{ fontSize: 11, color: PALETTE.textDim, fontWeight: 400 }}>{g.label} · Lv.{item.ilv}</span>
         </div>
         <div className="truncate" style={{ fontSize: 11, color: usable ? PALETTE.textDim : '#e06a5f' }}>{usable ? clsTag(item) : `🔒 ${clsTag(item)} — 창고에 보관해 두세요`}</div>
-        {usable && !E.canWear(item, save.units[save.hero]) && <div className="truncate" style={{ fontSize: 11, color: '#e06a5f' }}>🔒 전승 착용 제한 — 내 레벨 {Math.max(1, item.ilv - REBIRTH.wearMargin)} 이상 필요{by ? ' (착용 중이지만 효과 없음)' : ''}</div>}
+        {usable && !E.canWear(item, save.units[save.hero]) && <div className="truncate" style={{ fontSize: 11, color: '#e06a5f' }}>🔒 착용 레벨 부족 — 내 레벨 {item.ilv} 이상 필요{by ? ' (착용 중이지만 효과 없음)' : ''}</div>}
         <div className="truncate" style={{ fontSize: 11.5, color: PALETTE.textDim }}>{statLine(E.itemStats(item))}</div>
         <ItemSpecial item={item} />
       </div>
@@ -309,6 +309,7 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
                 {summary.gateOpen ? <div className="text-center font-semibold" style={{ color: PALETTE.legendary }}>⚔ 처치 목표 달성 — 관문 도전 가능!</div> : null}
                 {summary.stageClear ? <div className="text-center font-semibold" style={{ color: '#9cc4e4' }}>🔓 스테이지 {summary.stageClear} 관문 통과!</div> : null}
                 {summary.famShards ? <div className="text-center" style={{ color: '#d07ae8' }}>📜 계약서 조각 +{summary.famShards}</div> : null}
+                {summary.famExp?.ups ? <div className="text-center font-semibold" style={{ color: '#e8b04a' }}>🐾 {F.famName(summary.famExp.key)} Lv.{summary.famExp.lv} 달성!</div> : null}
                 {summary.keys ? <div className="text-center font-semibold" style={{ color: PALETTE.legendary }}>🗝 던전 열쇠 +{summary.keys}</div> : null}
                 {summary.talentScroll ? <div className="text-center font-semibold" style={{ color: '#7fd1c8' }}>📖 특성 초기화 주문서 +{summary.talentScroll}</div> : null}
                 {(summary.questsDone || []).map(t => <div key={t} className="text-center font-semibold" style={{ color: PALETTE.dawn }}>📜 의뢰 완료: {t} — 게시판에서 보상</div>)}
@@ -634,7 +635,7 @@ function RebirthSheet({ save, cid, onClose, onRebirth }) {
     <BottomSheet title={`✦ ${next}차 전승`} onClose={onClose} maxHeight="88%">
       <div style={{ fontSize: 12, color: PALETTE.textDim, lineHeight: 1.6 }}>
         레벨·능력치·스킬·특성이 <b style={{ color: '#e06a5f' }}>Lv.1로 초기화</b>되고, 필요 경험치가 <b style={{ color: PALETTE.text }}>×{rebirthExpMult(next)}</b>가 되고, 모든 적이 <b style={{ color: '#ff6ad5' }}>전승 {next}단계</b>(HP +{Math.round(REBIRTH.enemyHp * next * 100)}% · 공격 +{Math.round(REBIRTH.enemyAtk * next * 100)}%)로 강해진다. 대신 전승 장비·갈래 유니크가 떨어진다.
-        장비·사역마·재화는 그대로지만 <b style={{ color: PALETTE.text }}>장비 레벨 ≤ 내 레벨 + {REBIRTH.wearMargin}</b>만 착용 효과가 있다.
+        장비·사역마·재화는 그대로지만 <b style={{ color: PALETTE.text }}>장비 레벨 ≤ 내 레벨</b>만 착용 효과가 있다.
         전승마다 공격력·최대 HP <b style={{ color: PALETTE.legendary }}>+{Math.round(REBIRTH.bonusPct * 100)}%</b> 영구. {fixed ? '갈래는 첫 전승 때 고정되어 바꿀 수 없다.' : '갈래는 한 번 고르면 바꿀 수 없다.'}
       </div>
       <div className="flex flex-col gap-2 mt-3">
@@ -1034,10 +1035,10 @@ function FamSkillPanel({ k, f }) {
 // 보조 효과 등급표 — 청령부터 효과가 하나 더 붙는다
 function FamSubTable({ k, gi }) {
   const rows = F.famSubPreview(k);
-  const keys = Object.keys(F.FAM_ROLES[F.famRole(k)].sub);
+  const keys = F.famSubKeys(k);
   return (
     <div className="mt-2" style={{ fontSize: 11.5 }}>
-      <div style={{ color: PALETTE.textDim, marginBottom: 3 }}>등급별 보조 효과 (강화 전 · 청령부터 효과 추가)</div>
+      <div style={{ color: PALETTE.textDim, marginBottom: 3 }}>등급별 보조 효과 (강화 전 · 사역마 레벨이 주인공과 같을 때 · 청령부터 효과 추가)</div>
       <div className="grid gap-x-2" style={{ gridTemplateColumns: `auto repeat(${keys.length}, 1fr)` }}>
         <span />
         {keys.map(kk => <span key={kk} className="text-right" style={{ color: PALETTE.textDim }}>{F.famSubLabel(kk)}</span>)}
@@ -1051,15 +1052,16 @@ function FamSubTable({ k, gi }) {
     </div>
   );
 }
-function FamCard({ k, f, onClick, right, size = 46 }) {
+function FamCard({ k, f, onClick, right, size = 46, heroLv = 0 }) {
   const g = F.famGrade(f.grade);
   const role = F.FAM_ROLES[F.famRole(k)];
   return (
     <button onClick={onClick} className="ui-press w-full flex items-center gap-2.5 text-left" style={{ padding: '7px 10px', borderRadius: 12, background: `${g.color}12`, border: `1px solid ${g.color}66` }}>
       <img src={chronicleEnemyArt(k)} alt="" className="object-cover flex-none" style={{ width: size, height: size, borderRadius: 10, border: `1.5px solid ${g.color}` }} />
       <div className="flex-1 min-w-0">
-        <div className="truncate font-semibold" style={{ fontSize: 13, color: g.color }}>{F.famName(k)}{f.plus ? ` +${f.plus}` : ''} <span style={{ fontSize: 11, color: PALETTE.textDim, fontWeight: 400 }}>{g.label} · <span style={{ color: role.color }}>{role.icon} {role.label}</span></span></div>
-        <div className="truncate" style={{ fontSize: 11, color: PALETTE.textDim }}>보조 효과: {F.famSubText(k, f)}</div>
+        <div className="truncate font-semibold" style={{ fontSize: 13, color: g.color }}><span style={{ color: heroLv && F.famLv(f) < heroLv ? '#e8b04a' : PALETTE.legendary }}>Lv.{F.famLv(f)}</span> {F.famName(k)}{f.plus ? ` +${f.plus}` : ''} <span style={{ fontSize: 11, color: PALETTE.textDim, fontWeight: 400 }}>{g.label} · <span style={{ color: role.color }}>{role.icon} {role.label}</span></span></div>
+        <div className="truncate" style={{ fontSize: 11, color: PALETTE.textDim }}>보조 효과: {F.famSubText(k, f, heroLv)}</div>
+        {heroLv > 0 && F.famLv(f) < heroLv && <div className="mt-0.5"><Bar v={f.exp || 0} max={F.FAM_LEVEL.expNeed(F.famLv(f))} color="#e8b04a" h={3} /></div>}
       </div>
       {right}
     </button>
@@ -1074,6 +1076,7 @@ function FamiliarView({ save, setSave, onBack, flash }) {
   const shards = save.mats.famShard || 0;
   const tickets = save.mats.sealPlus || 0;
   const souls = save.mats.famSoul || 0;
+  const heroLv = save.units[save.hero]?.lv || 1;
   const per = F.FAM_TUNING.shardsPerSummon;
   const pool = F.famPool(save.progress);
   const pity = save.famPity || { total: 0, sinceViolet: 0 };
@@ -1128,7 +1131,7 @@ function FamiliarView({ save, setSave, onBack, flash }) {
         )}
         {tab === 'list' && (
           <>
-            {list.map(([k, f]) => <FamCard key={k} k={k} f={f} onClick={() => setSel(k)} right={['main', 'sub1', 'sub2'].find(sl => team[sl] === k) && <span style={{ fontSize: 11, color: PALETTE.dawn }}>{slots.find(x => x.id === ['main', 'sub1', 'sub2'].find(sl => team[sl] === k)).label}</span>} />)}
+            {list.map(([k, f]) => <FamCard key={k} k={k} f={f} heroLv={heroLv} onClick={() => setSel(k)} right={['main', 'sub1', 'sub2'].find(sl => team[sl] === k) && <span style={{ fontSize: 11, color: PALETTE.dawn }}>{slots.find(x => x.id === ['main', 'sub1', 'sub2'].find(sl => team[sl] === k)).label}</span>} />)}
             {!list.length && <div className="text-center py-10" style={{ fontSize: 12.5, color: PALETTE.textDim }}>아직 사역마가 없습니다 — 계약서 조각을 모아 소환하세요</div>}
           </>
         )}
@@ -1140,13 +1143,13 @@ function FamiliarView({ save, setSave, onBack, flash }) {
             <div key={sl.id}>
               <div style={{ fontSize: 12, color: PALETTE.text, marginBottom: 4 }}><b>{sl.label}</b> <span style={{ color: PALETTE.textDim }}>— {sl.desc}</span></div>
               {!open ? <div style={{ padding: 12, borderRadius: 12, border: '1px dashed var(--ui-line)', color: PALETTE.textDim, fontSize: 12.5 }}>🔒 주인공 Lv.{F.FAM_TUNING.slotLv[sl.id]}에 개방</div>
-                : f ? <FamCard k={k} f={f} onClick={() => setPickSlot(sl.id)} right={<span style={{ fontSize: 11, color: PALETTE.dawn }}>교체</span>} />
+                : f ? <FamCard k={k} f={f} heroLv={heroLv} onClick={() => setPickSlot(sl.id)} right={<span style={{ fontSize: 11, color: PALETTE.dawn }}>교체</span>} />
                   : <button onClick={() => setPickSlot(sl.id)} className="ui-press w-full text-left" style={{ padding: 12, borderRadius: 12, border: '1px dashed var(--ui-line-strong)', background: 'transparent', color: PALETTE.textDim, fontSize: 12.5 }}>＋ 비어 있음 (눌러서 편성)</button>}
             </div>
           );
         })}
         {tab === 'team' && <FamRoleGuide heroCls={save.hero} />}
-        {tab === 'team' && <div style={{ fontSize: 11.5, color: PALETTE.textDim, lineHeight: 1.6 }}>동행 사역마는 주인공 능력치에 비례해 강해진다 (역할·등급·강화 반영). 주인공이 쓰러지면 패배. 사역마는 모든 캐릭터가 함께 쓴다.</div>}
+        {tab === 'team' && <div style={{ fontSize: 11.5, color: PALETTE.textDim, lineHeight: 1.6 }}>동행 사역마는 주인공 능력치 × 사역마 레벨 비율로 강해진다 (역할·등급·강화 반영). 새 사역마는 Lv.1 — 동행 칸에서 이길 때만 경험치를 받고, 주인공 레벨이 상한. 보조 칸은 사역마마다 경험치·골드·아이템 획득 중 하나를 더 준다. 주인공이 쓰러지면 패배. 사역마는 모든 캐릭터가 함께 쓴다.</div>}
       </div>
 
       {results && (
@@ -1182,7 +1185,18 @@ function FamiliarView({ save, setSave, onBack, flash }) {
             <div className="text-center mt-0.5" style={{ fontSize: 12, color: PALETTE.textDim }}>{F.FAM_ROLES[F.famRole(sel)].desc}</div>
             <GlassPanel className="p-2.5 mt-2" style={{ fontSize: 12, color: PALETTE.text, lineHeight: 1.6 }}>
               <div><b>동행</b> <span style={{ color: PALETTE.textDim }}>— {gi >= F.FAM_SIG_MIN_GRADE ? `★${F.famSignature(sel, selF.grade).name} · ` : ''}{F.FAM_SKILLS[F.famRole(sel)].map(x => x.name).join(' · ')}{F.FAM_ROLES[F.famRole(sel)].guard ? ` · 수호 태세: 적 공격의 ${Math.round(F.FAM_ROLES[F.famRole(sel)].guard[gi] * 100)}%를 대신 받음` : ''}</span></div>
-              <div><b>보조</b> <span style={{ color: PALETTE.textDim }}>— {F.famSubText(sel, selF)}</span></div>
+              <div><b>보조</b> <span style={{ color: PALETTE.textDim }}>— {F.famSubText(sel, selF, heroLv)}</span></div>
+              <div><b>재화 특성</b> <span style={{ color: PALETTE.textDim }}>— {F.FAM_ECON[F.famEconId(sel)].icon} {F.FAM_ECON[F.famEconId(sel)].label} (보조 칸에서만)</span></div>
+            </GlassPanel>
+            <GlassPanel className="p-2.5 mt-2" style={{ fontSize: 12, color: PALETTE.text }}>
+              <div className="flex items-center justify-between">
+                <b style={{ color: PALETTE.legendary }}>Lv.{F.famLv(selF)} <span style={{ fontWeight: 400, color: PALETTE.textDim }}>/ 주인공 Lv.{heroLv}</span></b>
+                <span style={{ fontSize: 11, color: PALETTE.textDim }}>능력치 {Math.round(F.famLvRatio(selF, heroLv) * 100)}% · 보조 효과 {Math.round((F.FAM_LEVEL.subMin + (1 - F.FAM_LEVEL.subMin) * (F.famEffLv(selF, heroLv) / heroLv)) * 100)}%</span>
+              </div>
+              {F.famLv(selF) < heroLv ? <>
+                <div className="mt-1"><Bar v={selF.exp || 0} max={F.FAM_LEVEL.expNeed(F.famLv(selF))} color="#e8b04a" h={5} /></div>
+                <div style={{ fontSize: 11, color: PALETTE.textDim }}>경험치 {selF.exp || 0}/{F.FAM_LEVEL.expNeed(F.famLv(selF))} · <b style={{ color: '#e8b04a' }}>동행 칸</b>에서 이길 때만 오른다 (주인공보다 낮으면 ×{F.FAM_LEVEL.catchUp})</div>
+              </> : <div style={{ fontSize: 11, color: PALETTE.textDim }}>주인공 레벨 도달 — 주인공이 레벨업하면 다시 경험치를 받는다</div>}
             </GlassPanel>
             <FamSubTable k={sel} gi={gi} />
             <FamSkillPanel k={sel} f={selF} />
@@ -1209,7 +1223,7 @@ function FamiliarView({ save, setSave, onBack, flash }) {
         <BottomSheet title={`${slots.find(x => x.id === pickSlot).label} 편성`} onClose={() => setPickSlot(null)} maxHeight="75%">
           <div className="flex flex-col gap-1.5">
             {team[pickSlot] && <UIButton variant="ghost" style={{ height: 40 }} onClick={() => { setSave(E.setFamTeam(save, pickSlot, null)); setPickSlot(null); }}>편성 해제</UIButton>}
-            {list.filter(([k]) => k !== team[pickSlot]).map(([k, f]) => <FamCard key={k} k={k} f={f} onClick={() => { setSave(E.setFamTeam(save, pickSlot, k)); setPickSlot(null); }} />)}
+            {list.filter(([k]) => k !== team[pickSlot]).map(([k, f]) => <FamCard key={k} k={k} f={f} heroLv={heroLv} onClick={() => { setSave(E.setFamTeam(save, pickSlot, k)); setPickSlot(null); }} />)}
             {!list.length && <div className="text-center py-6" style={{ fontSize: 12.5, color: PALETTE.textDim }}>보유한 사역마가 없습니다</div>}
             <UIButton variant="ghost" style={{ height: 40 }} onClick={() => setPickSlot(null)}>닫기</UIButton>
           </div>

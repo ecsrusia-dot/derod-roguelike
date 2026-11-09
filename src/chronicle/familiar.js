@@ -38,6 +38,44 @@ export const FAM_TUNING = {
   slotLv: { main: 5, sub1: 20, sub2: 40 }, // 주인공 레벨 개방
 };
 
+// ===== 사역마 레벨 (1.225.0 — PM: 처음 얻으면 Lv.1, 동행할 때만 경험치) =====
+// 실효 레벨 = min(사역마 레벨, 주인공 레벨) · 능력치는 (10+실효)/(10+주인공) 비율로 깎인다
+// 보조 패시브도 레벨 비례 — subMin + (1-subMin) × (실효/주인공)
+export const FAM_LEVEL = {
+  expNeed: (lv) => Math.round(60 * Math.pow(lv, 1.6)), // 주인공 1회차와 같은 곡선
+  catchUp: 10,      // 주인공보다 낮을 때 경험치 배율 (Lv.36 약 36전 · Lv.68 약 100전 · Lv.98 약 180전이면 따라잡음)
+  subMin: 0.3,      // Lv.1 보조 사역마도 패시브의 30%는 준다
+  lvOffset: 10,
+};
+export const famLv = (f) => Math.max(1, f?.lv || 1);
+export const famEffLv = (f, heroLv) => Math.min(famLv(f), Math.max(1, heroLv || 1));
+export const famLvRatio = (f, heroLv) => (FAM_LEVEL.lvOffset + famEffLv(f, heroLv)) / (FAM_LEVEL.lvOffset + Math.max(1, heroLv || 1));
+const subLvMult = (f, heroLv) => (heroLv ? FAM_LEVEL.subMin + (1 - FAM_LEVEL.subMin) * (famEffLv(f, heroLv) / heroLv) : 1);
+// 승리 경험치 → 사역마 (주인공 레벨이 상한) → { f, ups }
+export function gainFamExp(f0, n, heroLv) {
+  const f = { ...f0, lv: famLv(f0), exp: f0.exp || 0 };
+  if (f.lv >= heroLv) return { f: { ...f, exp: 0 }, ups: 0, gained: 0 };
+  const gained = Math.round(n * FAM_LEVEL.catchUp);
+  f.exp += gained;
+  let ups = 0;
+  while (f.lv < heroLv && f.exp >= FAM_LEVEL.expNeed(f.lv)) { f.exp -= FAM_LEVEL.expNeed(f.lv); f.lv += 1; ups++; }
+  if (f.lv >= heroLv) f.exp = 0;
+  return { f, ups, gained };
+}
+
+// ===== 보조 재화 특성 (1.225.0) — 보조 칸에서만. 사역마마다 하나 (키로 고정 — 저장 안 함) =====
+export const FAM_ECON = {
+  expPct: { label: '경험치', icon: '📘', v: [0.04, 0.06, 0.09, 0.13, 0.18] },
+  goldPct: { label: '골드', icon: '🪙', v: [0.05, 0.08, 0.12, 0.17, 0.25] },
+  dropPct: { label: '아이템 획득', icon: '🎁', v: [0.03, 0.05, 0.08, 0.12, 0.16] },
+};
+export function famEconId(key) {
+  let h = 7;
+  for (const ch of String(key)) h = (h * 33 + ch.charCodeAt(0)) >>> 0;
+  const ids = Object.keys(FAM_ECON);
+  return ids[h % ids.length];
+}
+
 // 역할 3종 (1.216.0 재정립) — 원본 적 이름으로 자동 결정
 //   tank   수호: 동행 = 도발로 공격을 대신 받는 방패 · 보조 = 받는 피해 감소 (+청령↑ 시작 보호막)
 //   dps    맹공: 동행 = 함께 때리는 두 번째 딜러   · 보조 = 공격력 (+청령↑ 치명타 피해)
@@ -214,18 +252,19 @@ export const famName = (key) => ENEMIES[key]?.name || '사역마';
 const plusMult = (f) => 1 + FAM_TUNING.plusStatPct * (f.plus || 0);
 const powerMult = (f) => famGrade(f.grade).mult * plusMult(f);
 
-// 동행 사역마 → 전투 유닛 (주인공 능력치에 비례 — 사역마 레벨 없음)
+// 동행 사역마 → 전투 유닛 (주인공 능력치 비례 × 사역마 레벨 비율 — 1.225.0)
 export function famCombatant(key, f, hero, famPct = 0) {
   const roleId = famRole(key);
   const role = FAM_ROLES[roleId];
-  const m = powerMult(f) * (1 + famPct);
+  const eff = famEffLv(f, hero.lv);
+  const m = powerMult(f) * (1 + famPct) * famLvRatio(f, hero.lv);
   // HP 기준은 직업과 무관한 레벨 기준값 (1.216.0) — HP가 높은 직업일수록 사역마도 단단해지던 문제 보정
-  const maxHp = Math.round(Math.min(hero.maxHp, FAM_TUNING.hpPerLv * hero.lv) * role.hp * m);
+  const maxHp = Math.round(Math.min(hero.maxHp, FAM_TUNING.hpPerLv * eff) * role.hp * m);
   const lv = famGradeIdx(f.grade) + 1;
   // 회복력은 주인공 공격력 기준 — 어느 직업이 데려가도 같은 비율로 회복한다
   const healBase = hero.atk;
   return {
-    id: 'fam', fam: true, famKey: key, famRole: roleId, classId: hero.classId, name: famName(key), side: 'party', lv: hero.lv, magic: true,
+    id: 'fam', fam: true, famKey: key, famRole: roleId, classId: hero.classId, name: famName(key), side: 'party', lv: eff, magic: true,
     maxHp, hp: maxHp, atk: Math.round(hero.atk * role.atk * m), healPower: Math.round(healBase * (role.heal || 0.15) * m),
     def: Math.round(hero.def * role.def * Math.sqrt(m)), spd: Math.max(5, hero.spd - 2), crit: 0.08, critMult: 1.5, dodge: 0.05,
     tauntReduce: role.tauntReduce ? Math.min(0.5, role.tauntReduce + 0.05 * (lv - 1)) : 0,
@@ -233,32 +272,38 @@ export function famCombatant(key, f, hero, famPct = 0) {
     skills: [...(famGradeIdx(f.grade) >= FAM_SIG_MIN_GRADE ? [{ s: famSignature(key, f.grade), lv }] : []), ...FAM_SKILLS[roleId].map(s => ({ s, lv }))],
   };
 }
-// 보조 사역마 → 주인공 패시브 합산 (등급별 값 × 강화)
-export function famSubValues(key, f) {
+// 보조 사역마 → 주인공 패시브 합산 (등급별 값 × 강화 × 레벨 비례) + 재화 특성 1개 (1.225.0)
+export function famSubValues(key, f, heroLv = 0) {
   const role = FAM_ROLES[famRole(key)];
   const gi = famGradeIdx(f.grade);
+  const lm = subLvMult(f, heroLv);
   const out = {};
-  for (const [k, arr] of Object.entries(role.sub)) { const v = arr[gi] * plusMult(f); if (v > 0) out[k] = v; }
+  for (const [k, arr] of Object.entries(role.sub)) { const v = arr[gi] * plusMult(f) * lm; if (v > 0) out[k] = v; }
+  const ek = famEconId(key);
+  out[ek] = (out[ek] || 0) + FAM_ECON[ek].v[gi] * plusMult(f) * lm;
   return out;
 }
-export function famSubFx(fams, keys) {
+export function famSubFx(fams, keys, heroLv = 0) {
   const fx = {};
   for (const key of keys || []) {
     const f = key && fams?.[key];
     if (!f) continue;
-    for (const [k, v] of Object.entries(famSubValues(key, f))) fx[k] = (fx[k] || 0) + v;
+    for (const [k, v] of Object.entries(famSubValues(key, f, heroLv))) fx[k] = (fx[k] || 0) + v;
   }
   return fx;
 }
-const SUB_LABEL = { dmgReduce: '받는 피해 -', shieldPct: '전투 시작 보호막 (최대 HP) ', atkPct: '공격력 +', critDmg: '치명타 피해 +', healPct: '회복량 +', regenPct: '매 턴 HP 재생 ', emergencyHeal: 'HP 30% 미만 시 1회 회복 ' };
-export function famSubText(key, f) {
-  return Object.entries(famSubValues(key, f)).map(([k, v]) => `${SUB_LABEL[k] || k}${Math.round(v * 1000) / 10}%`).join(' · ');
+const SUB_LABEL = { expPct: '경험치 +', goldPct: '골드 +', dropPct: '아이템 획득 +', dmgReduce: '받는 피해 -', shieldPct: '전투 시작 보호막 (최대 HP) ', atkPct: '공격력 +', critDmg: '치명타 피해 +', healPct: '회복량 +', regenPct: '매 턴 HP 재생 ', emergencyHeal: 'HP 30% 미만 시 1회 회복 ' };
+export function famSubText(key, f, heroLv = 0) {
+  return Object.entries(famSubValues(key, f, heroLv)).map(([k, v]) => `${SUB_LABEL[k] || k}${Math.round(v * 1000) / 10}%`).join(' · ');
 }
 // 다음 등급에서 새로 생기는 보조 효과 (청령부터) — UI 안내용
 export function famSubPreview(key) {
   const role = FAM_ROLES[famRole(key)];
-  return FAM_GRADES.map((g, gi) => ({ grade: g, vals: Object.fromEntries(Object.entries(role.sub).map(([k, arr]) => [k, arr[gi]]).filter(([, v]) => v > 0)) }));
+  const ek = famEconId(key);
+  const subs = { ...role.sub, [ek]: FAM_ECON[ek].v };
+  return FAM_GRADES.map((g, gi) => ({ grade: g, vals: Object.fromEntries(Object.entries(subs).map(([k, arr]) => [k, arr[gi]]).filter(([, v]) => v > 0)) }));
 }
+export const famSubKeys = (key) => [...Object.keys(FAM_ROLES[famRole(key)].sub), famEconId(key)];
 export const famSubLabel = (k) => (SUB_LABEL[k] || k).replace(/[ +-]+$/, '');
 
 // ===== 소환 풀 — 진행한 지역 적만 =====
@@ -313,7 +358,7 @@ export function summonFamiliars(fams0, pity0, progress, n, rng = Math.random) {
     const key = pickR(rng, pool[gid]);
     const have = fams[key];
     const r = { key, grade: gid, isNew: !have, upgraded: false, soul: 0 };
-    if (!have) fams[key] = { grade: gid, plus: 0 };
+    if (!have) fams[key] = { grade: gid, plus: 0, lv: 1, exp: 0 };
     else if (famGradeIdx(gid) > famGradeIdx(have.grade)) { fams[key] = { ...have, grade: gid }; r.upgraded = true; }
     else { r.soul = famGrade(gid).dupSoul; souls += r.soul; }
     results.push(r);
@@ -336,7 +381,7 @@ export function evolveFamiliar(fams, souls, key, rng = Math.random) {
   if (!f || f.plus < FAM_TUNING.maxPlus || gi >= FAM_GRADES.length - 1) return { fams, souls, result: null };
   const c = FAM_TUNING.evolveCost(f.grade);
   if (souls < c) return { fams, souls, result: null };
-  if (rng() < FAM_GRADES[gi].evolve) return { fams: { ...fams, [key]: { grade: FAM_GRADES[gi + 1].id, plus: 0 } }, souls: souls - c, result: 'success' };
+  if (rng() < FAM_GRADES[gi].evolve) return { fams: { ...fams, [key]: { ...f, grade: FAM_GRADES[gi + 1].id, plus: 0 } }, souls: souls - c, result: 'success' };
   return { fams: { ...fams, [key]: { ...f, plus: Math.max(0, f.plus - FAM_TUNING.evolveFailDrop) } }, souls: souls - c, result: 'fail' };
 }
 
