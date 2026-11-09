@@ -334,6 +334,93 @@ export const SCENES = [
       { sp: 'narr', t: '여명과 황혼이 번갈아 오는 세상. 그것이 이 연대기가 되찾은 전부였다. — 2부 끝' },
     ],
   },
+  // ── 3부 「황혼 너머」 (1.222.0) — 전승한 캐릭터만
+  {
+    id: 'p3_prologue', title: '3부 서장 — 두 번째 아침', bg: './enemies/championship/memory/p3_m_boss_intro.jpg',
+    when: (s, c) => c.at === 'town' && bossDone(s, 9) && (s.units[s.hero]?.rebirth?.count || 0) >= 1,
+    lines: [
+      { sp: 'narr', t: '눈을 떴을 때, 손은 처음 검을 쥐던 그날처럼 가벼웠다. 그러나 손바닥에는 백 번의 싸움이 남긴 굳은살이 그대로였다.' },
+      { sp: 'elder', t: '자네… 젊어졌군. 아니, 처음부터 다시 걷기로 한 건가.' },
+      { sp: 'hero', t: '해가 기울기 시작한 뒤로, 하늘 저편에 틈이 보여요. 황혼 너머에 뭔가 있어요.' },
+      { sp: 'herald', t: '…나도 보았다. 신이 무너진 날, 여명의 뒤편이 갈라졌다. 그 너머는 아무도 기억하지 못하는 곳이다.' },
+      { sp: 'narr', t: '잊힌 자들의 폐허, 형체 없는 회랑, 그리고 모든 황혼이 태어난 근원. 연대기는 아직 끝나지 않았다.' },
+    ],
+  },
+  {
+    id: 'f10_enter', title: '기억의 폐허', bg: './enemies/championship/memory/p3_m_boss_intro.jpg',
+    when: (s, c) => c.at === 'field' && c.fieldId === 10,
+    lines: [
+      { sp: 'narr', t: '부서진 성벽마다 낯익은 얼굴이 새겨져 있다. 쓰러뜨린 적들, 지키지 못한 사람들 — 모두 잊혀 가는 중이었다.' },
+      { sp: 'hero', t: '여기 있는 건… 내가 지나온 길이야.' },
+    ],
+  },
+  {
+    id: 'f10_boss', title: '기억의 군주', bg: './enemies/championship/memory/p3_m_boss_intro.jpg',
+    when: (s, c) => c.at === 'bossPre' && c.fieldId === 10,
+    lines: [
+      { sp: 'p3_m_boss', t: '다시 태어난 자여. 너는 이미 모든 것을 잊었어야 했다. 왜 기억을 붙들고 돌아왔느냐.' },
+      { sp: 'hero', t: '잊으면 같은 실수를 하니까. 이번엔 끝까지 기억할 거야.' },
+    ],
+  },
+  {
+    id: 'f10_clear', title: '되찾은 이름', bg: './enemies/championship/memory/p3_m_boss_intro.jpg',
+    when: (s) => bossDone(s, 10),
+    lines: [
+      { sp: 'narr', t: '므네메가 흩어지자 폐허의 얼굴들이 하나씩 눈을 감았다. 편안한 얼굴이었다.' },
+      { sp: 'herald', t: '회랑이 열렸다. 저 너머는 형체조차 없다. 조심해라.' },
+    ],
+  },
+  {
+    id: 'f11_enter', title: '공허의 회랑', bg: './enemies/championship/void/p3_v_boss_intro.jpg',
+    when: (s, c) => c.at === 'field' && c.fieldId === 11,
+    lines: [
+      { sp: 'narr', t: '발밑이 없다. 그런데도 걸을 수 있다. 회랑은 걷는 자가 믿는 만큼만 존재했다.' },
+      { sp: 'hero', t: '믿어야 길이 생긴다면… 지금까지랑 다를 것도 없네.' },
+    ],
+  },
+  {
+    id: 'f11_boss', title: '공허의 문지기', bg: './enemies/championship/void/p3_v_boss_intro.jpg',
+    when: (s, c) => c.at === 'bossPre' && c.fieldId === 11,
+    lines: [
+      { sp: 'p3_v_boss', t: '이 문 너머는 처음이자 끝이다. 황혼이 태어난 곳. 들어간 자는 아무도 같은 모습으로 나오지 못했다.' },
+      { sp: 'hero', t: '그럼 다른 모습으로라도 나올게.' },
+    ],
+  },
+  {
+    id: 'f11_clear', title: '열린 문', bg: './enemies/championship/void/p3_v_boss_intro.jpg',
+    when: (s) => bossDone(s, 11),
+    lines: [
+      { sp: 'narr', t: '문지기의 검이 부러지는 소리와 함께, 회랑 끝에서 노을빛이 쏟아져 들어왔다.' },
+      { sp: 'elder', t: '(멀리서 들리는 목소리) …돌아오게. 노을이 질 때까지는 꼭 돌아오게.' },
+    ],
+  },
+  {
+    id: 'f12_enter', title: '황혼의 근원', bg: './enemies/championship/origin/p3_o_boss_intro.jpg',
+    when: (s, c) => c.at === 'field' && c.fieldId === 12,
+    lines: [
+      { sp: 'narr', t: '세상의 모든 해가 여기서 저물고, 여기서 다시 떠올랐다. 하늘과 땅의 구분이 없는 금빛 바다.' },
+      { sp: 'herald', t: '이곳이 신조차 손대지 못한 곳이다. 너는… 무엇을 하러 왔지?' },
+      { sp: 'hero', t: '확인하러. 황혼이 정말 끝나지 않는 건지.' },
+    ],
+  },
+  {
+    id: 'f12_boss', title: '황혼의 근원 아이온', bg: './enemies/championship/origin/p3_o_boss_intro.jpg',
+    when: (s, c) => c.at === 'bossPre' && c.fieldId === 12,
+    lines: [
+      { sp: 'p3_o_boss', t: '나는 끝이자 시작. 너희가 황혼이라 부르는 것. 나를 쓰러뜨리면 다시는 해가 지지 않을 것이다.' },
+      { sp: 'hero', t: '거짓말. 너는 그냥 지는 게 무서운 거야. …나도 그랬어. 그래서 몇 번이고 다시 태어났지.' },
+    ],
+  },
+  {
+    id: 'ending3', title: '종장 — 황혼 너머', bg: './enemies/championship/origin/p3_o_boss_intro.jpg',
+    when: (s) => bossDone(s, 12),
+    lines: [
+      { sp: 'narr', t: '근원이 부서진 자리에서, 해는 여전히 기울었다. 아이온의 말은 거짓이었다. 끝은 사라지지 않았다. 다만 두렵지 않게 되었을 뿐.' },
+      { sp: 'herald', t: '여명의 전령으로서 마지막 말을 하마. …수고했다, 황혼의 아이야.' },
+      { sp: 'elder', t: '돌아왔구먼. 저녁 먹고 가게. 오늘 노을이 유난히 곱다네.' },
+      { sp: 'narr', t: '몇 번을 다시 태어나도, 저녁은 온다. 그것이 이 연대기가 마지막으로 배운 것이었다. — 3부 끝' },
+    ],
+  },
   {
     id: 'dungeon_clear', title: '서리 왕의 무구', bg: './enemies/championship/frost/champ_frost_boss4_intro.jpg',
     when: (s) => (s.progress.dungeonClears || 0) >= 1,
@@ -426,6 +513,13 @@ export const QUESTS = [
   { id: 'm7', kind: 'main', req: { main: 'm6' }, title: '눈 감은 영웅들', desc: '봉인 성역의 군주를 쓰러뜨리고 갇힌 자들을 깨워라.', goal: { type: 'boss', field: 7 }, reward: { gold: 5000, essence: 50, shard: 6, keys: 3 } },
   { id: 'm8', kind: 'main', req: { main: 'm7' }, title: '해를 가린 자', desc: '핏빛 균열 깊은 곳의 마왕을 만나 그 검을 증명하라.', goal: { type: 'boss', field: 8 }, reward: { gold: 7000, essence: 60, shard: 8, item: { grade: 'epic' } } },
   { id: 'm9', kind: 'main', req: { main: 'm8' }, title: '황혼과 여명 사이', desc: '여명의 첨탑 꼭대기에서 신을 쓰러뜨리고 밤을 되돌려라.', goal: { type: 'boss', field: 9 }, reward: { gold: 12000, essence: 100, shard: 15, item: { grade: 'epic' } } },
+  // ── 3부 의뢰 (1.222.0 — 전승 1회 이상)
+  { id: 'm10', kind: 'main', req: { main: 'm9', rebirth: 1 }, title: '잊힌 자들의 왕', desc: '기억의 폐허 끝에서 기억의 군주 므네메를 쓰러뜨려라.', goal: { type: 'boss', field: 10 }, reward: { gold: 20000, essence: 150, shard: 20, item: { grade: 'epic' } } },
+  { id: 'm11', kind: 'main', req: { main: 'm10', rebirth: 1 }, title: '문 너머', desc: '공허의 회랑을 지키는 문지기 네하르를 넘어서라.', goal: { type: 'boss', field: 11 }, reward: { gold: 30000, essence: 200, shard: 25, item: { grade: 'epic' } } },
+  { id: 'm12', kind: 'main', req: { main: 'm11', rebirth: 1 }, title: '황혼 너머', desc: '모든 황혼의 근원, 아이온과 마주하라.', goal: { type: 'boss', field: 12 }, reward: { gold: 50000, essence: 300, shard: 40, item: { grade: 'epic' } } },
+  { id: 's10a', kind: 'side', req: { field: 10, rebirth: 1 }, title: '메아리를 잠재우다', desc: '여명의 전령: "폐허의 늑대들은 울음을 멈추지 않는다. 그건 누군가의 기억이다."', goal: { type: 'killKey', key: 'p3_m_wolf', n: 30 }, reward: { gold: 8000, exp: 400000, essence: 60 } },
+  { id: 's11a', kind: 'side', req: { field: 11, rebirth: 1 }, title: '형체 없는 것들', desc: '여명의 전령: "회랑의 그림자는 베어도 돌아온다. 끝까지 베어라."', goal: { type: 'killKey', key: 'p3_v_shade', n: 30 }, reward: { gold: 10000, exp: 600000, shard: 10, keys: 2 } },
+  { id: 's12a', kind: 'side', req: { field: 12, rebirth: 1 }, title: '근원의 파편', desc: '대장장이: "그 파편 하나면 전설을 벼를 수 있어. 아니, 전설보다 뜨거운 걸."', goal: { type: 'killKey', key: 'p3_o_shard', n: 30 }, reward: { gold: 15000, exp: 800000, shard: 20, essence: 100 } },
   // ── 2부 의뢰
   { id: 's5a', kind: 'side', req: { field: 5 }, title: '빛의 서리', desc: '양치기 노인: "다시 늑대가 내려왔어. 이번엔 눈이 하얗게 빛나."', goal: { type: 'killKey', key: 'champ_frost_wolf', n: 15 }, reward: { gold: 1500, exp: 20000, essence: 15 } },
   { id: 's5b', kind: 'side', req: { field: 5 }, title: '얼어붙은 망자', desc: '사냥꾼: "얼음 속에서 걸어 나오는 시체들… 내 형도 그 안에 있었어."', goal: { type: 'killKey', key: 'champ_frost_revenant', n: 15 }, reward: { gold: 1600, item: { grade: 'rare' }, keys: 1 } },

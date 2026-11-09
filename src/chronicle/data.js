@@ -7,7 +7,7 @@
 // 밸런스는 이 파일 한 곳 (CHRONICLE_TUNING · 스킬 수치 · 지역 레벨).
 // ============================================
 import { CLASSES } from '../data/classes.js';
-import { ENEMIES } from '../data/enemies.js';
+import { CENEMIES as ENEMIES } from './enemies.js';
 import { getEnemyImageSrc } from '../utils/helpers.js';
 
 export const CHRONICLE_TITLE = '황혼 연대기';
@@ -124,12 +124,12 @@ export const REBIRTH = { reqLevel: 100, max: 5, expMult: 2, expMultStep: 0.5, we
   // 1.221.0 전승 단계 — 전승 횟수마다 모든 적(사냥터·던전·탑) HP·공격 증가
   enemyHp: 0.25, enemyAtk: 0.15,
   // 전승 등급 장비 드랍 확률 (전승 캐릭터만) · 갈래 유니크 확률
-  mythicDrop: { elite: 0.01, gate: 0.05, boss: 0.15, dungeonBoss: [0.15, 0.25, 0.4], towerElite: 0.04, towerBoss: 0.2 },
+  mythicDrop: { elite: 0.003, gate: 0.02, boss: 0.08, dungeonBoss: [0.1, 0.18, 0.3], towerElite: 0.02, towerBoss: 0.12 },
   branchUnique: { boss: 0.02, dungeonBoss: [0.03, 0.05, 0.08], towerBoss: 0.05 },
 };
 export const REBIRTH_BRANCHES = {
   w_warlord: { cls: 'wanderer', name: '검귀', type: '탱딜', color: '#e8826a', desc: '반격과 베기로 버티며 적을 쓸어버린다 — 회복이 없으니 치유 사역마와 궁합', fx: { atkPct: 0.12, counterPct: 0.08, counterDmg: 0.3 } },
-  w_paladin: { cls: 'wanderer', name: '성기사', type: '탱힐', color: '#f0d27a', desc: '스스로 회복하고 보호막을 두른다 — 딜이 부족하니 맹공 사역마와 궁합', fx: { defPct: 0.12, hpPct: 0.08, healFromAtk: 0.6 } },
+  w_paladin: { cls: 'wanderer', name: '성기사', type: '탱힐', color: '#f0d27a', desc: '스스로 회복하고 보호막을 두른다 — 딜이 부족하니 맹공 사역마와 궁합', fx: { defPct: 0.1, hpPct: 0.06, healFromAtk: 0.4 } },
   s_arch: { cls: 'sage', name: '대마도사', type: '광역 특화', color: '#9cc4e4', desc: '스킬 피해를 극대화해 적 무리를 한 번에 지운다', fx: { skillDmg: 0.15 } },
   s_hex: { cls: 'sage', name: '저주술사', type: '도트·취약', color: '#c08ae8', desc: '저주와 표식으로 적을 녹인다 — 긴 전투에 강하다', fx: { dotDmg: 0.3, hpPct: 0.06 } },
   d_reaper: { cls: 'demonblood', name: '혈귀', type: '단일 특화', color: '#e0574c', desc: '치명적인 일격과 방어 파괴로 강적을 처형한다', fx: { critDmg: 0.3, armorPen: 0.1 } },
@@ -267,6 +267,7 @@ export const SALVAGE_ICON = { gold: '🪙', essence: '✦', shard: '◆', famSha
 export const CHRONICLE_PARTS = [
   { id: 1, name: '1부 · 끝나지 않는 황혼', fields: [1, 2, 3, 4] },
   { id: 2, name: '2부 · 여명의 배신', fields: [5, 6, 7, 8, 9] },
+  { id: 3, name: '3부 · 황혼 너머', fields: [10, 11, 12], reqRebirth: 1 },
 ];
 export const CHRONICLE_FIELDS = [
   { id: 1, name: '북부 극지대', lv: [1, 12], bossLv: 14, bossKills: 30, area: { hpMult: 1, atkMult: 1 }, color: '#7ba3c4', normals: mob(1, 'normal'), elites: mob(1, 'elite'), boss: 'iceMage' },
@@ -279,6 +280,10 @@ export const CHRONICLE_FIELDS = [
   champField(7, '봉인 성역', 'sanctum', [68, 78], 80, 120, '#e3c27a', 'champ_sanctum_boss4'),
   champField(8, '핏빛 균열', 'rift', [78, 88], 90, 130, '#e0574c', 'champ_rift_boss4'),
   champField(9, '여명의 첨탑', 'dawn', [88, 98], 100, 150, '#fff1c4', 'champ_dawn_boss4'),
+  // ── 3부 「황혼 너머」 (1.222.0) — 전승 1회 이상 + 2부 종장 후. 적 레벨이 만렙(100)을 넘는다
+  { ...champField(10, '기억의 폐허', 'memory', [100, 105], 107, 160, '#a8d8d0', 'p3_m_boss'), part: 3, reqRebirth: 1, area: { hpMult: 1.2, atkMult: 1.1 } },
+  { ...champField(11, '공허의 회랑', 'void', [105, 110], 112, 170, '#b48cff', 'p3_v_boss'), part: 3, reqRebirth: 1, area: { hpMult: 1.35, atkMult: 1.2 } },
+  { ...champField(12, '황혼의 근원', 'origin', [110, 115], 118, 180, '#ffb070', 'p3_o_boss'), part: 3, reqRebirth: 1, area: { hpMult: 1.5, atkMult: 1.3 } },
 ];
 // 던전 (1.208.0 — 2곳 × 난이도 3단계). set = 에픽 장비 이름 세트
 export const CHRONICLE_DUNGEONS = [

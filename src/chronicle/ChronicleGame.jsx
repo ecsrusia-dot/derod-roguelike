@@ -19,7 +19,7 @@ import * as Q from './quest.js';
 import * as A from './account.js';
 import * as F from './familiar.js';
 import { NPCS } from './story.js';
-import { ENEMIES } from '../data/enemies.js';
+import { CENEMIES as ENEMIES } from './enemies.js';
 
 const FONT_TITLE = '"Cinzel", "Noto Serif KR", serif';
 
@@ -433,7 +433,7 @@ function FieldView({ save, onBack, onFight, playScene, sceneOpen }) {
           const last = [...p.fields].reverse().find(id => E.fieldUnlocked(save, id)) || p.fields[0];
           return (
             <button key={p.id} disabled={!open} onClick={() => setSel(last)} className="ui-press flex-1" style={{ height: 34, borderRadius: 10, fontSize: 12, fontWeight: 600, border: `1px solid ${on ? PALETTE.legendary : 'var(--ui-line)'}`, color: open ? (on ? PALETTE.legendary : PALETTE.text) : PALETTE.textDim, background: on ? 'rgba(232,176,74,0.10)' : 'transparent', opacity: open ? 1 : 0.4 }}>
-              {open ? p.name : `🔒 ${p.name.split(' · ')[0]} — ${CHRONICLE_FIELDS[p.fields[0] - 2].name} 보스 후`}
+              {open ? p.name : p.reqRebirth ? `🔒 ${p.name.split(' · ')[0]} — 전승 후` : `🔒 ${p.name.split(' · ')[0]} — ${CHRONICLE_FIELDS[p.fields[0] - 2].name} 보스 후`}
             </button>
           );
         })}
@@ -534,7 +534,7 @@ function DungeonView({ save, onBack, onEnter, onFight, onLeave, onBuyKey, dungeo
             const open = E.dungeonUnlocked(save, x.id);
             return (
               <button key={x.id} disabled={!open} onClick={() => { setSelId(x.id); setTier(0); }} className="ui-press" style={{ minHeight: 44, padding: '4px 6px', borderRadius: 10, fontSize: 11.5, lineHeight: 1.3, border: `1px solid ${selId === x.id ? x.color : 'var(--ui-line)'}`, color: open ? (selId === x.id ? x.color : PALETTE.text) : PALETTE.textDim, background: selId === x.id ? `${x.color}1c` : 'transparent', opacity: open ? 1 : 0.4 }}>
-                {open ? <>{x.name}<br /><span style={{ fontSize: 10.5, color: PALETTE.textDim }}>{x.part === 2 ? '2부' : '1부'} · Lv.{x.recLv}</span></> : <>🔒 {CHRONICLE_FIELDS[x.unlockField - 1].name}<br /><span style={{ fontSize: 10.5 }}>보스 후</span></>}
+                {open ? <>{x.name}<br /><span style={{ fontSize: 10.5, color: PALETTE.textDim }}>{x.part ? `${x.part}부` : '1부'} · Lv.{x.recLv}</span></> : <>🔒 {CHRONICLE_FIELDS[x.unlockField - 1].name}<br /><span style={{ fontSize: 10.5 }}>보스 후</span></>}
               </button>
             );
           })}
