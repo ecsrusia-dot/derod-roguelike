@@ -1019,6 +1019,7 @@ function PartyView({ save, setSave, onBack }) {
               {cid === 'priest' && <tr><td style={{ color: PALETTE.textDim }}>치유력</td><td className="text-right">{d.healPower}</td><td /><td /></tr>}
             </tbody>
           </table>
+          <DetailStats d={d} cid={cid} />
         </GlassPanel>
 
         {/* 스킬 */}
@@ -2040,6 +2041,40 @@ function QuestView({ save, setSave, onBack, flash, onReplay }) {
           </button>
         ))}
         {tab === 'story' && !seen.length && <div className="text-center py-10" style={{ fontSize: 12.5, color: PALETTE.textDim }}>아직 본 이야기가 없습니다</div>}
+      </div>
+    </div>
+  );
+}
+
+// ===== 세부 능력치 (1.231.4) — deriveUnit이 계산하는 전투 수치를 전부 보여 준다 =====
+// [키, 라벨, 형식] — 형식: pct(%) · pctMult(배율 → %) · turn(턴) · x(배) · flag(보유) · num
+const DETAIL_STATS = [
+  ['critMult', '치명 피해', 'pctMult'], ['counterPct', '반격 확률', 'pct'], ['counterDmg', '반격 피해', 'pct'], ['counterDouble', '반격 2회 확률', 'pct'],
+  ['critAfterCounter', '반격·회피 후 확정 치명', 'flag'], ['firstCrit', '첫 공격 확정 치명', 'flag'],
+  ['dmgReduce', '받는 피해 감소', 'pct'], ['tauntReduce', '도발 중 피해 감소', 'pct'], ['shieldReduce', '보호막 중 피해 감소', 'pct'],
+  ['lifesteal', '흡혈', 'pct'], ['thornsPct', '피해 반사', 'pct'], ['armorPen', '방어 관통', 'pct'], ['lowHpDmg', 'HP 50% 이하일 때 피해', 'pct'],
+  ['missingHpAtk', '잃은 HP 10%당 피해', 'pct'], ['execute', '빈사(HP 30%↓) 적 피해', 'pct'], ['chain', '추가 타격 확률', 'pct'],
+  ['skillDmg', '스킬 피해', 'pct'], ['dotDmg', '지속 피해', 'pct'], ['dotTurnsMult', '지속 피해 시간', 'x'], ['holyDmg', '치유→신성 피해', 'pct'],
+  ['startShieldPct', '시작 보호막', 'pct'], ['skillShield', '스킬 사용 시 보호막(공격력 대비)', 'pct'], ['overhealShield', '넘친 회복 → 보호막', 'flag'],
+  ['regenPct', '매 턴 HP 재생', 'pct'], ['dodgeHeal', '회피 시 회복', 'pct'], ['emergencyHeal', '위기 회복(HP 30%↓, 1회)', 'pct'],
+  ['revive', '부활(1회) HP', 'pct'], ['guts', '불굴(1회 HP 1로 버팀)', 'flag'], ['cdr', '재사용 단축', 'turn'], ['resetEvery', '재사용 초기화 주기', 'turn'],
+  ['openInferno', '시작 시 적 전체 겁화', 'flag'], ['rageDouble', '분노 중 2회 행동', 'flag'], ['multiHitsAdd', '연속 화살 타수', 'num'], ['spiritArrow', '정령 화살 확률', 'pct'],
+  ['blessMult', '축복 효과', 'x'], ['blessTurns', '축복 지속', 'turn'],
+  ['famPct', '사역마 능력치', 'pct'], ['expPct', '경험치 획득', 'pct'], ['goldPct', '골드 획득', 'pct'], ['dropPct', '장비 획득률', 'pct'],
+];
+const fmtDetail = (v, f) => (f === 'pct' ? `${Math.round(v * 1000) / 10}%` : f === 'pctMult' ? `${Math.round(v * 100)}%` : f === 'turn' ? `${v}턴` : f === 'x' ? `×${v}` : f === 'flag' ? '보유' : `+${v}`);
+function DetailStats({ d, cid }) {
+  const rows = DETAIL_STATS.filter(([k]) => d[k] || (k === 'counterPct' && cid === 'wanderer') || k === 'critMult');
+  return (
+    <div className="mt-2 pt-2" style={{ borderTop: '1px solid var(--ui-line)' }}>
+      <div style={{ fontSize: 11.5, color: PALETTE.textDim, marginBottom: 2 }}>세부 능력치 <span style={{ fontSize: 11 }}>— 장비·특성·사역마·원정대 버프·전승 합산</span></div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', columnGap: 10, rowGap: 2, fontSize: 12, color: PALETTE.text }}>
+        {rows.map(([k, label, f]) => (
+          <React.Fragment key={k}>
+            <span style={{ color: PALETTE.textDim }}>{label}</span>
+            <span className="text-right">{fmtDetail(d[k] || 0, f)}</span>
+          </React.Fragment>
+        ))}
       </div>
     </div>
   );
