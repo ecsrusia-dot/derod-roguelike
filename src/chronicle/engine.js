@@ -486,16 +486,39 @@ export function canEnhance(save, item) {
   const c = enhanceCost(item);
   return save.gold >= c.gold && save.mats.essence >= c.essence;
 }
-export function enhanceItem(save0, uid) {
+// 강화 성공률·실패 결과 (1.219.0)
+export function enhanceRisk(item) {
+  const n = item.plus || 0;
+  const rate = FORGE.enhanceRate[n] ?? 0;
+  const drop = n >= FORGE.enhanceDropFrom;
+  const brk = n >= FORGE.enhanceBreakFrom ? FORGE.enhanceBreakChance : 0;
+  return { rate, drop, breakChance: brk };
+}
+export function promoteRisk(item) {
+  const g = nextGrade(item);
+  return g ? { rate: FORGE.promoteRate[g] ?? 1, breaks: !!FORGE.promoteBreak[g] } : null;
+}
+// 장비 파괴 — 착용 중이면 칸도 비운다
+function destroyItem(save, uid) {
+  for (const u of Object.values(save.units)) for (const sl of Object.keys(u.equip || {})) if (u.equip[sl] === uid) u.equip[sl] = null;
+  save.inventory = save.inventory.filter(i => i.uid !== uid);
+  save.stats.destroyed = (save.stats.destroyed || 0) + 1;
+}
+// result: 'success' | 'fail'(재료만) | 'down'(단계 하락) | 'destroy'
+export function forgeEnhance(save0, uid, rng = Math.random) {
   const it0 = save0.inventory.find(i => i.uid === uid);
-  if (!canEnhance(save0, it0)) return save0;
+  if (!canEnhance(save0, it0)) return { save: save0, result: null };
   const save = clone(save0);
   const it = save.inventory.find(i => i.uid === uid);
   const c = enhanceCost(it);
   save.gold -= c.gold; save.mats.essence -= c.essence;
-  it.plus = (it.plus || 0) + 1;
-  return save;
+  const r = enhanceRisk(it);
+  if (rng() < r.rate) { it.plus = (it.plus || 0) + 1; return { save, result: 'success' }; }
+  if (r.breakChance && rng() < r.breakChance) { destroyItem(save, uid); return { save, result: 'destroy' }; }
+  if (r.drop) { it.plus = Math.max(0, (it.plus || 0) - 1); return { save, result: 'down' }; }
+  return { save, result: 'fail' };
 }
+export function enhanceItem(save0, uid, rng = Math.random) { return forgeEnhance(save0, uid, rng).save; }
 export function nextGrade(item) {
   if (item.grade === 'unique') return null; // 유니크는 승급 불가
   const i = gradeIdx(item.grade);
@@ -506,13 +529,19 @@ export function canPromote(save, item) {
   const c = item && promoteCost(item);
   return !!c && save.gold >= c.gold && save.mats.essence >= c.essence && save.mats.shard >= c.shard;
 }
-export function promoteItem(save0, uid, rng = Math.random) {
+export function promoteItem(save0, uid, rng = Math.random) { return forgePromote(save0, uid, rng).save; }
+export function forgePromote(save0, uid, rng = Math.random) {
   const it0 = save0.inventory.find(i => i.uid === uid);
-  if (!canPromote(save0, it0)) return save0;
+  if (!canPromote(save0, it0)) return { save: save0, result: null };
   const save = clone(save0);
   const it = save.inventory.find(i => i.uid === uid);
   const c = promoteCost(it);
   save.gold -= c.gold; save.mats.essence -= c.essence; save.mats.shard -= c.shard;
+  const r = promoteRisk(it);
+  if (rng() >= r.rate) {
+    if (r.breaks) { destroyItem(save, uid); return { save, result: 'destroy' }; }
+    return { save, result: 'fail' };
+  }
   it.grade = nextGrade(it);
   it.opts = it.opts || [];
   const o = rollOption(rng, it.cls, it.grade, it.opts); // 승급마다 옵션 +1
@@ -522,7 +551,7 @@ export function promoteItem(save0, uid, rng = Math.random) {
     it.set = it.set || 'field';
     if (it.slot === 'accessory' && !it.eopt) it.eopt = pick(rng, Object.keys(EPIC_OPTIONS));
   }
-  return save;
+  return { save, result: 'success' };
 }
 
 // ===== 사역마 편성 (1.212.0) — 칸은 주인공 레벨로 개방 =====
