@@ -10,7 +10,7 @@ function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Ma
 const DIR = (await import('os')).tmpdir() + '/';
 function upkeep(save) {
   const cid = save.hero; save = E.autoAllocate(save, cid);
-  let g = 0; while (save.units[cid].sp > 0 && g++ < 30) { const u = save.units[cid]; const s = Object.values(CHRONICLE_SKILLS).find(x => x.cls === cid && E.canLearn(u, x)); save = s ? E.learnSkill(save, cid, s.id) : E.addMastery(save, cid, u.sp); }
+  let g = 0; while (save.units[cid].sp > 0 && g++ < 30) { const u = save.units[cid]; const s = Object.values(CHRONICLE_SKILLS).find(x => x.cls === cid && E.canLearn(u, x)); save = s ? E.learnSkill(save, cid, s.id) : E.autoAllocateTalents(save, cid); }
   save = E.autoEquip(save);
   save = E.dismantleItems(save, save.inventory.filter(i => !E.equippedBy(save, i.uid)).map(i => i.uid)).save;
   for (const uid of Object.values(save.units[cid].equip)) { if (uid == null) continue; let k = 0; while (k++ < 3) { const it = save.inventory.find(i => i.uid === uid); if (E.canPromote(save, it)) save = E.promoteItem(save, uid); else if (E.canEnhance(save, it)) save = E.enhanceItem(save, uid); else break; } }

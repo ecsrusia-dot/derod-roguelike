@@ -4,6 +4,7 @@
 // 저장 객체(save)를 받아 새 save를 돌려주는 순수 함수 + 전투 시뮬.
 // 전투는 simulateChronicleBattle이 끝까지 계산해 사건 목록을 돌려주고, UI는 재생만 한다 (풀오토 관전).
 // ============================================
+import { talentFx, canLearnTalent, talentNode, talentResetCost, talentTrees, tierUnlocked } from './talents.js';
 import { fieldStages, FIELD_STAGES, STAGE_TUNING, BOOST, BAG_EXPAND, SALVAGE, SALVAGE_ICON, REBIRTH, REBIRTH_BRANCHES, expNeedFor } from './data.js';
 import { TOWER, TOWER_SHOP, towerUnlocked, isTowerBoss, towerEnemyLv, towerArea, towerFloorPicks, kstWeekKey } from './tower.js';
 import { famCombatant, famSubFx, rollFamShards, FAM_TUNING, summonFamiliars, enhanceFamiliar, evolveFamiliar } from './familiar.js';
@@ -53,7 +54,7 @@ export function autoGrowUnit(u0) {
   let guard = 0;
   while (u.sp > 0 && guard++ < 50) {
     const learnable = classSkills(u.classId, u.rebirth?.branch).filter(s => s.reqLv <= u.lv && (u.skills[s.id] || 0) < SKILL_MAX_LV);
-    if (!learnable.length) { u.mastery = (u.mastery || 0) + u.sp; u.sp = 0; break; }
+    if (!learnable.length) { autoSpendTalents(u); break; }
     learnable.sort((a, b) => (u.skills[a.id] || 0) - (u.skills[b.id] || 0) || a.reqLv - b.reqLv);
     const s = learnable[0];
     u.skills[s.id] = (u.skills[s.id] || 0) + 1; u.sp -= 1;
@@ -236,6 +237,7 @@ function passiveFx(u) {
 const PASS_KEYS = ['counterDouble', 'tauntReduce', 'critAfterCounter', 'emergencyHeal', 'dotTurnsMult', 'openInferno', 'skillShield', 'resetEvery',
   'overhealShield', 'missingHpAtk', 'rageDouble', 'multiHitsAdd', 'spiritArrow', 'dodgeHeal', 'firstCrit', 'revive', 'shieldReduce', 'blessMult', 'blessTurns',
   'execute', 'chain', 'holyDmg', 'regenPct', 'counterDmg', 'skillDmg', 'dotDmg', 'expPct', 'goldPct', 'famPct'];
+const MULT_KEYS = ['dotTurnsMult', 'blessMult'];
 export function deriveUnit(save, classId) {
   const u = save.units[classId];
   const cls = chronicleClass(classId);
@@ -245,12 +247,19 @@ export function deriveUnit(save, classId) {
   // 전승 갈래 기본 효과 (1.220.0)
   const br = u.rebirth?.branch && REBIRTH_BRANCHES[u.rebirth.branch];
   if (br) for (const [k, v] of Object.entries(br.fx)) g[k] = (g[k] || 0) + v;
+  // 특성 트리 (1.224.0) — sb_<스킬> = 스킬 위력, 배율 키는 큰 값만 (장비 ×2와 곱해지지 않게)
+  const skillBoost = {};
+  for (const [k, v] of Object.entries(talentFx(u))) {
+    if (k.startsWith('sb_')) skillBoost[k.slice(3)] = (skillBoost[k.slice(3)] || 0) + v;
+    else if (MULT_KEYS.includes(k)) g[k] = Math.max(g[k] || 0, v);
+    else g[k] = (g[k] || 0) + v;
+  }
   const rb = 1 + REBIRTH.bonusPct * (u.rebirth?.count || 0);
   const G = (k) => g[k] || 0;
   const fx = passiveFx(u);
   const st = u.stats;
   const main = cls.main === 'int' ? st.int : cls.main === 'agi' ? st.agi : st.str;
-  const mast = (u.mastery || 0) * MASTERY_PCT;
+  const mast = 0; // 마스터리 폐지 (1.224.0 — 특성 트리로 환급)
   const atk = (main * 2.2 + u.lv * 1.5 + G('atk')) * (1 + (fx.atkPct || 0) + G('atkPct') + mast) * rb;
   const out = {
     id: classId, classId, name: cls.name, side: 'party', lv: u.lv, magic: cls.magic,
@@ -272,6 +281,7 @@ export function deriveUnit(save, classId) {
       .filter(x => x.s && x.lv > 0 && x.s.kind !== 'passive'),
   };
   for (const k of PASS_KEYS) if (G(k)) out[k] = G(k);
+  if (Object.keys(skillBoost).length) out.skillBoost = skillBoost;
   if (out.holyDmg) out.holyDmg = Math.min(T.holyCap || 9, out.holyDmg); // 치유→신성 피해 상한 (1.216.0)
   return out;
 }
@@ -308,12 +318,50 @@ export function learnSkill(save0, classId, skillId) {
   u.skills[skillId] = (u.skills[skillId] || 0) + 1; u.sp -= 1;
   return save;
 }
-export function addMastery(save0, classId, n = 1) {
+// ===== 특성 트리 (1.224.0) =====
+export function learnTalent(save0, classId, nodeId) {
   const u0 = save0.units[classId];
-  if (!u0 || u0.sp < n) return save0;
+  if (!u0 || !canLearnTalent(u0, nodeId)) return save0;
   const save = clone(save0);
   const u = save.units[classId];
-  u.sp -= n; u.mastery = (u.mastery || 0) + n;
+  u.talents = { ...(u.talents || {}), [nodeId]: (u.talents?.[nodeId] || 0) + 1 };
+  u.sp -= 1;
+  return save;
+}
+// 자동 배분 (봇·동료용) — 가장 많이 찍은 갈래를 먼저 채우고, 단이 막히면 다른 갈래
+export function autoSpendTalents(u) {
+  u.talents = u.talents || {};
+  const trees = talentTrees(u.classId);
+  let guard = 0;
+  while (u.sp > 0 && guard++ < 200) {
+    let picked = null;
+    for (const tree of trees) {
+      for (let ti = tree.tiers.length - 1; ti >= 0 && !picked; ti--) {
+        if (!tierUnlocked(u, tree.id, ti)) continue;
+        picked = tree.tiers[ti].find(n => (u.talents[n.id] || 0) < n.max);
+      }
+      if (picked) break;
+    }
+    if (!picked) break;
+    u.talents[picked.id] = (u.talents[picked.id] || 0) + 1; u.sp -= 1;
+  }
+  return u;
+}
+export function canResetTalents(save, classId) {
+  const u = save.units[classId];
+  if (!u || !Object.keys(u.talents || {}).length) return false;
+  const c = talentResetCost(u);
+  return save.gold >= c.gold && (save.mats.talentScroll || 0) >= c.scrolls;
+}
+export function resetTalents(save0, classId) {
+  if (!canResetTalents(save0, classId)) return save0;
+  const save = clone(save0);
+  const u = save.units[classId];
+  const c = talentResetCost(u);
+  const spent = Object.values(u.talents).reduce((a, b) => a + b, 0);
+  save.gold -= c.gold;
+  save.mats.talentScroll = (save.mats.talentScroll || 0) - c.scrolls;
+  u.talents = {}; u.sp += spent;
   return save;
 }
 
@@ -743,7 +791,7 @@ export function rebirth(save0, branchId, classId = save0.hero) {
   const u = save.units[classId];
   const cls = chronicleClass(classId);
   u.rebirth = { branch: branchId, count: (u0.rebirth?.count || 0) + 1 };
-  u.lv = 1; u.exp = 0; u.points = 0; u.sp = 1; u.stats = { ...cls.base }; u.skills = {}; u.mastery = 0;
+  u.lv = 1; u.exp = 0; u.points = 0; u.sp = 1; u.stats = { ...cls.base }; u.skills = {}; u.mastery = 0; u.talents = {};
   save.stats.rebirths = (save.stats.rebirths || 0) + 1;
   return save;
 }
@@ -933,7 +981,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
       return;
     }
     const { s, lv } = choice;
-    const v = s.base + s.perLv * (lv - 1);
+    const v = (s.base + s.perLv * (lv - 1)) * (1 + (u.skillBoost?.[s.id] || 0));
     u.cds[s.id] = Math.max(1, s.cd + 1 - (u.cdr || 0));
     const hits = [];
     const foes = alive('enemy');
@@ -1129,7 +1177,9 @@ export function battleRewards(enemies, type, rng, mods = {}) {
   }
   const essence = ri(rng, tbl.essence[0], tbl.essence[1]);
   const shard = tbl.shard ? Math.round(ri(rng, tbl.shard[0], tbl.shard[1]) * (mods.shardMult || 1)) : 0;
-  return { exp, gold, items, essence, shard };
+  // 📖 특성 초기화 주문서 (1.224.0 — PM: 보스 확률 드랍, 유니크와 같은 확률)
+  const talentScroll = uChance && rng() < uChance ? 1 : 0;
+  return { exp, gold, items, essence, shard, talentScroll };
 }
 
 // 전투 결과를 저장에 반영 — ctx: { kind:'field'|'dungeon', fieldId, type }
@@ -1178,6 +1228,7 @@ export function applyBattle(save0, ctx, battle, rng = Math.random) {
   const hd = deriveUnit(save, save.hero);
   r.exp = Math.round(r.exp * (1 + (hd.expPct || 0)));
   r.gold = Math.round(r.gold * (1 + (hd.goldPct || 0)));
+  if (r.talentScroll) { save.mats.talentScroll = (save.mats.talentScroll || 0) + r.talentScroll; summary.talentScroll = r.talentScroll; }
   summary.exp = r.exp; summary.gold = r.gold; summary.essence = r.essence; summary.shard = r.shard;
   save.gold += r.gold; save.mats.essence += r.essence; save.mats.shard += r.shard;
   for (const cid of save.party) {
@@ -1351,4 +1402,14 @@ export function buyTowerItem(save0, id, uniqueId = null) {
   else if (id === 'essence') save.mats.essence += 40;
   save.mats.towerCoin -= it.cost;
   return save;
+}
+
+// 남은 스킬 포인트를 특성에 자동 배분 (1.224.0 — 「자동 배분」 버튼·시뮬용)
+export function autoAllocateTalents(save0, classId) {
+  const u0 = save0.units[classId];
+  if (!u0 || u0.sp <= 0) return save0;
+  const save = clone(save0);
+  const u = save.units[classId];
+  autoSpendTalents(u);
+  return u.sp === u0.sp ? save0 : save;
 }
