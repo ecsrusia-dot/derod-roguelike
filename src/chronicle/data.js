@@ -19,7 +19,7 @@ export const CHRONICLE_TUNING = {
   pointsPerLevel: 4,          // 레벨업당 능력치 포인트
   spPerLevel: 1,              // 레벨업당 스킬 포인트
   maxLevel: 100,              // 1.211.0 2부 — 지역 9곳, 마지막 보스 Lv.100
-  expNeed: (lv) => Math.round(30 * Math.pow(lv, 1.6)),
+  expNeed: (lv) => Math.round(60 * Math.pow(lv, 1.6)), // 1.219.0 ×2 (PM 결정)
   enemyHpBase: 30, enemyHpPerLv: 14,     // 일반 적 HP = (30 + 14×Lv) × 개성 × 등급 × 지역
   enemyAtkBase: 9, enemyAtkPerLv: 3.6,   // 일반 적 공격 = (9 + 3.6×Lv) × …
   enemyTier: { normal: { hp: 1, atk: 1 }, elite: { hp: 3.2, atk: 1.4 }, boss: { hp: 3.8, atk: 1.35 } },
@@ -451,8 +451,16 @@ export const FORGE = {
   promoteCost: {
     uncommon: { gold: 120, essence: 6, shard: 0 },
     rare: { gold: 400, essence: 15, shard: 0 },
-    epic: { gold: 1200, essence: 30, shard: 5 },
+    epic: { gold: 4800, essence: 120, shard: 20 },   // 1.219.0 ×4
   },
+  // 1.219.0 PM 결정 — 강한 패널티 + 파괴
+  // 강화 성공률: 인덱스 = 현재 강화 단계 (+0→+1 … +9→+10)
+  enhanceRate: [1, 1, 1, 0.85, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2],
+  // 실패 시: 현재 +3~+5 = 재료만 잃음 / +6~+7 = 1단계 하락 / +8~+9 = 1단계 하락 + 이 확률로 장비 파괴
+  enhanceDropFrom: 6, enhanceBreakFrom: 8, enhanceBreakChance: 0.3,
+  // 승급 성공률 · 실패 시 에픽 승급은 장비 파괴 (그 외는 재료만 잃음)
+  promoteRate: { uncommon: 0.8, rare: 0.5, epic: 0.2 },
+  promoteBreak: { epic: true },
   // 유니크는 승급 불가 (드랍 전용) — 강화는 가능
 };
 

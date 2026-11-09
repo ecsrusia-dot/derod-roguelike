@@ -1267,6 +1267,14 @@ function SortButtons({ sortBy, pickSort }) {
   );
 }
 
+function RiskLine({ rate, fail, danger }) {
+  return (
+    <div style={{ fontSize: 12, marginTop: 2 }}>
+      <span style={{ color: rate >= 1 ? '#8fe08a' : rate >= 0.5 ? PALETTE.legendary : '#e06a5f', fontWeight: 700 }}>성공률 {Math.round(rate * 100)}%</span>
+      {fail ? <span style={{ color: danger ? '#e06a5f' : PALETTE.textDim, fontWeight: danger ? 700 : 400 }}> · {danger ? '⚠ ' : ''}{fail}</span> : null}
+    </div>
+  );
+}
 function ForgeView({ save, setSave, onBack, flash }) {
   const [sel, setSel] = useState(null);
   const [filter, setFilter] = useState('all');
@@ -1276,11 +1284,13 @@ function ForgeView({ save, setSave, onBack, flash }) {
   const ec = item && E.enhanceCost(item);
   const pc = item && E.promoteCost(item);
   const ng = item && E.nextGrade(item);
+  const er = item && E.enhanceRisk(item);
+  const pr = item && ng && E.promoteRisk(item);
   return (
     <div className="absolute inset-0 flex flex-col">
       <Header title="대장간" onBack={onBack} right={<Wallet save={save} />} />
       <div className="px-4 pt-3 flex-none" style={{ fontSize: 12, color: PALETTE.textDim, lineHeight: 1.55 }}>
-        <b style={{ color: PALETTE.text }}>강화</b> +1당 능력치 +{Math.round(FORGE.enhancePct * 100)}% (최대 +{FORGE.maxEnhance}) · <b style={{ color: PALETTE.text }}>승급</b> 다음 등급으로 + 옵션 1개 추가 — 에픽 승급은 던전의 ◆ 고대 파편 필요 · 유니크는 승급 불가(강화만)
+        <b style={{ color: PALETTE.text }}>강화</b> +1당 능력치 +{Math.round(FORGE.enhancePct * 100)}% (최대 +{FORGE.maxEnhance}, +3부터 실패 · +6부터 하락 · +8부터 파괴 위험) · <b style={{ color: PALETTE.text }}>승급</b> 다음 등급으로 + 옵션 1개 추가 — 에픽 승급은 던전의 ◆ 고대 파편 필요 · 유니크는 승급 불가(강화만)
       </div>
       <ItemFilterBar filter={filter} setFilter={setFilter} />
       <div className="flex items-center gap-2 px-3 pt-1.5 flex-none" style={{ fontSize: 12 }}>
@@ -1304,7 +1314,12 @@ function ForgeView({ save, setSave, onBack, flash }) {
                 <>
                   <div style={{ fontSize: 12, color: PALETTE.textDim }}>결과: {statLine(E.itemStats({ ...item, plus: (item.plus || 0) + 1 }))}</div>
                   <div style={{ fontSize: 12, color: PALETTE.textDim }}>비용: 🪙 {ec.gold} · ✦ {ec.essence}</div>
-                  <UIButton style={{ height: 40, marginTop: 8 }} disabled={!E.canEnhance(save, item)} onClick={() => { setSave(E.enhanceItem(save, item.uid)); flash('강화 성공!'); }}>강화</UIButton>
+                  <RiskLine rate={er.rate} fail={er.breakChance ? `실패 시 1단계 하락 · 그중 ${Math.round(er.breakChance * 100)}%는 장비 파괴` : er.drop ? '실패 시 1단계 하락' : er.rate < 1 ? '실패 시 재료만 잃음' : ''} danger={!!er.breakChance} />
+                  <UIButton style={{ height: 40, marginTop: 8 }} disabled={!E.canEnhance(save, item)} onClick={() => {
+                    const r = E.forgeEnhance(save, item.uid); if (!r.result) return; setSave(r.save);
+                    if (r.result === 'destroy') { setSel(null); flash('💥 강화 실패 — 장비가 파괴되었습니다'); }
+                    else flash({ success: `강화 성공! +${(item.plus || 0) + 1}`, fail: '강화 실패 — 재료만 잃었습니다', down: `강화 실패 — +${Math.max(0, (item.plus || 0) - 1)}로 하락` }[r.result]);
+                  }}>강화</UIButton>
                 </>
               ) : <div style={{ fontSize: 12, color: PALETTE.textDim }}>최대 강화</div>}
             </GlassPanel>
@@ -1314,7 +1329,13 @@ function ForgeView({ save, setSave, onBack, flash }) {
                 <>
                   <div style={{ fontSize: 12, color: PALETTE.textDim }}>결과: {statLine(E.itemStats({ ...item, grade: ng }))}{` + 무작위 옵션 1개`}{ng === 'epic' && item.slot === 'accessory' ? ' + 에픽 장신구 효과' : ''}</div>
                   <div style={{ fontSize: 12, color: PALETTE.textDim }}>비용: 🪙 {pc.gold} · ✦ {pc.essence}{pc.shard ? ` · ◆ ${pc.shard}` : ''}</div>
-                  <UIButton variant="gold" style={{ height: 40, marginTop: 8 }} disabled={!E.canPromote(save, item)} onClick={() => { const next = E.promoteItem(save, item.uid); setSave(next); const it2 = next.inventory.find(i => i.uid === item.uid); flash(E.epicOptOf(it2) ? `에픽 승급! 「${E.epicOptOf(it2).name}」` : `${gradeOf(ng).label} 등급으로 승급!`); }}>승급</UIButton>
+                  <RiskLine rate={pr.rate} fail={pr.breaks ? '실패 시 장비 파괴' : '실패 시 재료만 잃음'} danger={pr.breaks} />
+                  <UIButton variant="gold" style={{ height: 40, marginTop: 8 }} disabled={!E.canPromote(save, item)} onClick={() => {
+                    const r = E.forgePromote(save, item.uid); if (!r.result) return; setSave(r.save);
+                    if (r.result === 'destroy') { setSel(null); flash('💥 승급 실패 — 장비가 파괴되었습니다'); return; }
+                    if (r.result === 'fail') { flash('승급 실패 — 재료만 잃었습니다'); return; }
+                    const it2 = r.save.inventory.find(i => i.uid === item.uid); flash(E.epicOptOf(it2) ? `에픽 승급! 「${E.epicOptOf(it2).name}」` : `${gradeOf(ng).label} 등급으로 승급!`);
+                  }}>승급</UIButton>
                 </>
               ) : <div style={{ fontSize: 12, color: PALETTE.textDim }}>최고 등급</div>}
             </GlassPanel>
