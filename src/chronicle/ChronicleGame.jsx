@@ -12,7 +12,7 @@ import { GlassPanel, UIButton, BottomSheet } from '../components/ui/CommonUI.jsx
 import {
   CHRONICLE_TITLE, CHRONICLE_SUB, CHRONICLE_PARTS, CHRONICLE_SAVE_KEY, CHRONICLE_SAVE_KEY_V1, CHRONICLE_TUNING, CHRONICLE_CLASSES, CHRONICLE_FIELDS,
   CHRONICLE_DUNGEON, CHRONICLE_DUNGEONS, DUNGEON_TIERS, dungeonDef, STAT_META, STAT_KEYS, SKILL_MAX_LV, MASTERY_PCT, BOSS_DAILY_LIMIT, DUNGEON_KEYS, GRADES, gradeIdx, SLOTS, FORGE, UNIQUE_CHANCE, UNIQUE_ITEMS, fieldStages, FIELD_STAGES, BOOST, BAG_EXPAND,
-  chronicleClass, classSkills, describeSkill, chronicleEnemyArt, expNeedFor, REBIRTH, REBIRTH_BRANCHES, rebirthBranches,
+  chronicleClass, classSkills, describeSkill, chronicleEnemyArt, expNeedFor, rebirthExpMult, REBIRTH, REBIRTH_BRANCHES, rebirthBranches,
 } from './data.js';
 import * as E from './engine.js';
 import * as Q from './quest.js';
@@ -212,7 +212,7 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
     <div className="absolute inset-0 flex flex-col" style={{ background: PALETTE.bg }}>
       {bg && <img src={bg} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ opacity: 0.18 }} onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
       <div className="relative flex items-center gap-2 px-3 pt-2 flex-none" style={{ minHeight: 44 }}>
-        <span style={{ fontSize: 12, color: PALETTE.textDim }}>{ctx.label} · {round}라운드</span>
+        <span style={{ fontSize: 12, color: PALETTE.textDim }}>{ctx.label} · {round}라운드{enemies[0]?.rebirthTier ? <span style={{ color: '#ff6ad5' }}> · ✦전승 {enemies[0].rebirthTier}단계</span> : null}</span>
         <div className="flex-1" />
         {SPEEDS.map(s => {
           const locked = s === 4 && boostLeft <= 0;
@@ -296,7 +296,7 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
                   <div key={cid} className="text-center" style={{ color: PALETTE.legendary }}>▲ {chronicleClass(cid).name} Lv.{lv} 달성!</div>
                 ))}
                 {summary.items.map(it => (
-                  <div key={it.uid} className="text-center" style={{ color: gradeOf(it.grade).color, fontWeight: it.grade === 'unique' ? 700 : 400 }}>{it.grade === 'unique' ? '★ 유니크 획득: ' : '획득: '}{E.itemName(it)} ({gradeOf(it.grade).label}{E.itemUsable(it, save.hero) ? '' : ` · ${clsTag(it)}`})</div>
+                  <div key={it.uid} className="text-center" style={{ color: gradeOf(it.grade).color, fontWeight: it.grade === 'unique' || it.grade === 'mythic' ? 700 : 400 }}>{it.grade === 'mythic' ? '✦ 전승 장비 획득: ' : it.grade === 'unique' ? '★ 유니크 획득: ' : '획득: '}{E.itemName(it)} ({gradeOf(it.grade).label}{E.itemUsable(it, save.hero) ? '' : ` · ${clsTag(it)}`})</div>
                 ))}
                 {summary.autoDismantled ? <div className="text-center" style={{ color: PALETTE.textDim }}>가방이 가득 차 {summary.autoDismantled}개 자동 분해</div> : null}
                 {summary.unlocks.map(u => <div key={u} className="text-center" style={{ color: '#9cc4e4' }}>🔓 {u} 개방</div>)}
@@ -629,7 +629,7 @@ function RebirthSheet({ save, cid, onClose, onRebirth }) {
   return (
     <BottomSheet title={`✦ ${next}차 전승`} onClose={onClose} maxHeight="88%">
       <div style={{ fontSize: 12, color: PALETTE.textDim, lineHeight: 1.6 }}>
-        레벨·능력치·스킬·마스터리가 <b style={{ color: '#e06a5f' }}>Lv.1로 초기화</b>되고, 필요 경험치가 <b style={{ color: PALETTE.text }}>×{2 ** next}</b>가 된다.
+        레벨·능력치·스킬·마스터리가 <b style={{ color: '#e06a5f' }}>Lv.1로 초기화</b>되고, 필요 경험치가 <b style={{ color: PALETTE.text }}>×{rebirthExpMult(next)}</b>가 되고, 모든 적이 <b style={{ color: '#ff6ad5' }}>전승 {next}단계</b>(HP +{Math.round(REBIRTH.enemyHp * next * 100)}% · 공격 +{Math.round(REBIRTH.enemyAtk * next * 100)}%)로 강해진다. 대신 전승 장비·갈래 유니크가 떨어진다.
         장비·사역마·재화는 그대로지만 <b style={{ color: PALETTE.text }}>장비 레벨 ≤ 내 레벨 + {REBIRTH.wearMargin}</b>만 착용 효과가 있다.
         전승마다 공격력·최대 HP <b style={{ color: PALETTE.legendary }}>+{Math.round(REBIRTH.bonusPct * 100)}%</b> 영구. {fixed ? '갈래는 첫 전승 때 고정되어 바꿀 수 없다.' : '갈래는 한 번 고르면 바꿀 수 없다.'}
       </div>
@@ -675,7 +675,7 @@ function PartyView({ save, setSave, onBack }) {
           <img src={cls.combatImage} alt="" className="object-cover flex-none" style={{ width: 92, height: 92, borderRadius: 16, border: `1px solid ${cls.color}`, objectPosition: '50% 25%' }} />
           <div className="flex-1 min-w-0">
             <div className="font-bold" style={{ fontSize: 17, color: PALETTE.text }}>{cls.name} <span style={{ fontSize: 12, color: cls.color }}>{cls.role}</span></div>
-            {u.rebirth?.count > 0 && <div style={{ fontSize: 12, color: REBIRTH_BRANCHES[u.rebirth.branch].color, fontWeight: 700 }}>✦ 전승 {u.rebirth.count}회 · {REBIRTH_BRANCHES[u.rebirth.branch].name} <span style={{ fontWeight: 400, color: PALETTE.textDim }}>({REBIRTH_BRANCHES[u.rebirth.branch].type} · 경험치 ×{2 ** u.rebirth.count})</span></div>}
+            {u.rebirth?.count > 0 && <div style={{ fontSize: 12, color: REBIRTH_BRANCHES[u.rebirth.branch].color, fontWeight: 700 }}>✦ 전승 {u.rebirth.count}회 · {REBIRTH_BRANCHES[u.rebirth.branch].name} <span style={{ fontWeight: 400, color: PALETTE.textDim }}>({REBIRTH_BRANCHES[u.rebirth.branch].type} · 경험치 ×{rebirthExpMult(u.rebirth.count)})</span></div>}
             <div style={{ fontSize: 12.5, color: PALETTE.legendary }}>Lv.{u.lv} / {CHRONICLE_TUNING.maxLevel} · 전투력 {E.unitPower(save, cid)}</div>
             <div className="mt-1"><Bar v={u.exp} max={expNeedFor(u)} color={PALETTE.legendary} h={5} /></div>
             <div style={{ fontSize: 10.5, color: PALETTE.textDim }}>경험치 {u.exp}/{expNeedFor(u)}</div>
@@ -1147,7 +1147,7 @@ function TowerView({ save, setSave, onBack, onFight, flash }) {
   const boss = E.isTowerBoss(nextFloor);
   const party = E.partyCombatants(save, run?.hp);
   const nextCp = Math.ceil(nextFloor / E.TOWER.bossEvery) * E.TOWER.bossEvery;
-  const myUniques = Object.values(UNIQUE_ITEMS).filter(u => !u.disabled && (u.cls === save.hero || u.cls === 'common'));
+  const myUniques = Object.values(UNIQUE_ITEMS).filter(u => !u.disabled && !u.branch && (u.cls === save.hero || u.cls === 'common'));
   const buy = (id, uid) => { const n = E.buyTowerItem(save, id, uid); if (n === save) { flash('구매할 수 없습니다'); return false; } setSave(n); flash('구매 완료'); return true; };
   return (
     <div className="absolute inset-0 flex flex-col">
@@ -1433,7 +1433,7 @@ function TitleView({ acc, onSelect, onCreate, onExit }) {
           </GlassPanel>
           <GlassPanel className="p-3" style={{ fontSize: 12, color: PALETTE.textDim, lineHeight: 1.6 }}>
             <div className="font-semibold mb-1" style={{ color: PALETTE.text }}>전용 장비</div>
-            무기 · 보조({SLOTS[1].label}) · 갑옷은 {cls.name} 전용, 장신구는 공용. 유니크 {Object.values(UNIQUE_ITEMS).filter(u => u.cls === picking && !u.disabled).length}종.
+            무기 · 보조({SLOTS[1].label}) · 갑옷은 {cls.name} 전용, 장신구는 공용. 유니크 {Object.values(UNIQUE_ITEMS).filter(u => u.cls === picking && !u.disabled && !u.branch).length}종 (+ 전승 갈래 유니크).
           </GlassPanel>
         </div>
         <div className="p-4 flex-none"><UIButton onClick={() => onCreate(picking)}>{cls.name}{'(으)로 시작'}</UIButton></div>
@@ -1782,6 +1782,7 @@ export default function ChronicleGame({ onExit }) {
     if (boss && playScene({ at: 'bossPre', fieldId: field.id }, () => flash('준비되면 「보스 도전」을 누르세요'))) return; // 보스 앞 장면 먼저 (저장 반영 후 다시 도전)
     if (mode === 'hunt') lastFieldRef.current = { field, stage };
     const enc = mode === 'gate' ? E.rollGateEncounter(field, stage, rng) : E.rollFieldEncounter(field, rng, boss, null, boss ? null : stage);
+    enc.enemies = E.scaleEnemiesForRebirth(save, enc.enemies);
     const party = E.partyCombatants(save);
     const sim = E.simulateChronicleBattle(party, enc.enemies, rng);
     const ctx = { kind: 'field', fieldId: field.id, type: enc.type, enemies: enc.enemies, stage: boss ? null : stage, label: boss ? `${field.name} 보스` : mode === 'gate' ? `${field.name} ${stage + 1} 관문` : `${field.name} ${stage + 1}` };
@@ -1800,6 +1801,7 @@ export default function ChronicleGame({ onExit }) {
     const d = save.dungeon;
     if (!d) return;
     const enc = E.dungeonEncounter(d, rng);
+    enc.enemies = E.scaleEnemiesForRebirth(save, enc.enemies);
     const party = E.partyCombatants(save, d.hp);
     const sim = E.simulateChronicleBattle(party, enc.enemies, rng);
     const ctx = { kind: 'dungeon', type: enc.type, enemies: enc.enemies, label: `${dungeonDef(d.id).name}(${DUNGEON_TIERS[d.tier || 0].label}) ${dungeonDef(d.id).floors[d.floor].boss ? '보스' : `${d.floor + 1}층`}` };
@@ -1820,6 +1822,7 @@ export default function ChronicleGame({ onExit }) {
   const fightTower = () => {
     if (!save.tower?.run) return;
     const enc = E.towerEncounter(save, rng);
+    enc.enemies = E.scaleEnemiesForRebirth(save, enc.enemies);
     const party = E.partyCombatants(save, save.tower.run.hp);
     const sim = E.simulateChronicleBattle(party, enc.enemies, rng);
     const ctx = { kind: 'tower', type: enc.type, enemies: enc.enemies, label: `황혼의 첨탑 ${enc.floor}층${E.isTowerBoss(enc.floor) ? ' 보스' : ''}` };

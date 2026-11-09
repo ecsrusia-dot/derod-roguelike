@@ -103,7 +103,7 @@ export function itemName(item) {
   const names = (CLASS_GEAR_NAMES[item.cls] || CLASS_GEAR_NAMES.common)[item.slot] || [];
   const t = tierOf(item.ilv);
   const base = (t <= 3 ? names[t] : names[3] && `${LATE_PREFIX[t - 4]} ${names[3].replace(/^(균열의|심연의) /, '')}`) || '장비';
-  return item.grade === 'epic' ? `${EPIC_PREFIX[item.set] || EPIC_PREFIX.field} ${base}` : base;
+  return item.grade === 'epic' ? `${EPIC_PREFIX[item.set] || EPIC_PREFIX.field} ${base}` : item.grade === 'mythic' ? `전승의 ${base}` : base;
 }
 function rollOption(rng, cls, gradeId, have) {
   const pool = { ...(OPTION_POOLS[cls] || OPTION_POOLS.common) };
@@ -128,6 +128,7 @@ export function makeItem(rng, { cls, slot, grade, ilv, set = 'field', named = nu
   const n = GRADES[gradeIdx(grade)]?.opts || 0;
   for (let i = 0; i < n; i++) { const o = rollOption(rng, cls, grade, it.opts); if (o) it.opts.push(o); }
   if (grade === 'epic') { it.set = set; if (slot === 'accessory') it.eopt = pick(rng, Object.keys(EPIC_OPTIONS)); }
+  if (grade === 'mythic' && slot === 'accessory') it.eopt = pick(rng, Object.keys(EPIC_OPTIONS));
   return it;
 }
 // 드랍 직업 분배 (현재 직업 70 / 다른 직업 25 / 공용 장신구 5)
@@ -144,7 +145,7 @@ export function rollGear(rng, grade, ilv, heroCls, set = 'field') {
 }
 export function rollUniqueItem(rng, ilv, heroCls) {
   const cls = rollDropClass(rng, heroCls);
-  const pool = Object.values(UNIQUE_ITEMS).filter(u => u.cls === cls && !u.disabled);
+  const pool = Object.values(UNIQUE_ITEMS).filter(u => u.cls === cls && !u.disabled && !u.branch);
   if (!pool.length) return null;
   return makeItem(rng, { named: pick(rng, pool).id, ilv });
 }
@@ -192,7 +193,17 @@ export function statLabel(k, v) {
 
 // 전승 캐릭터 착용 제한 (1.220.0) — 장비 레벨 ≤ 내 레벨 + 5 (전승 전에는 제한 없음)
 export function canWear(it, u) {
+  const ub = it.named && UNIQUE_ITEMS[it.named]?.branch;
+  if (ub && u?.rebirth?.branch !== ub) return false; // 갈래 유니크는 그 갈래만
   return !(u?.rebirth?.count > 0) || (it.ilv || 1) <= u.lv + REBIRTH.wearMargin;
+}
+// 전승 단계 (1.221.0) — 전승 횟수만큼 적 강화. UI·시뮬이 조우 직후 호출
+export function rebirthCount(save) { return save.units[save.hero]?.rebirth?.count || 0; }
+export function scaleEnemiesForRebirth(save, enemies) {
+  const c = rebirthCount(save);
+  if (!c) return enemies;
+  const hm = 1 + REBIRTH.enemyHp * c; const am = 1 + REBIRTH.enemyAtk * c;
+  return enemies.map(e => ({ ...e, hp: Math.round(e.hp * hm), maxHp: Math.round(e.maxHp * hm), atk: Math.round(e.atk * am), rebirthTier: c }));
 }
 function gearTotals(save, u) {
   const t = {};
@@ -1171,6 +1182,17 @@ export function applyBattle(save0, ctx, battle, rng = Math.random) {
     const ups = gainExp(save.units[cid], r.exp);
     if (ups) summary.levelUps[cid] = save.units[cid].lv;
   }
+  // 전승 장비 · 갈래 유니크 (1.221.0 — 전승 캐릭터만)
+  const hu = save.units[save.hero];
+  if (hu?.rebirth?.count > 0 && battle.result === 'win') {
+    const tierI = save.dungeon?.tier || 0;
+    const pickC = (t) => (Array.isArray(t) ? t[Math.min(tierI, t.length - 1)] : t) || 0;
+    const ty = ctx.type === 'normal' && ctx.enemies.some(e => e.tier === 'elite') ? 'elite' : ctx.type;
+    const ilv = Math.max(...ctx.enemies.map(e => e.lv));
+    if (rng() < pickC(REBIRTH.mythicDrop[ty])) r.items.push(rollGear(rng, 'mythic', ilv, save.hero));
+    const bu = Object.values(UNIQUE_ITEMS).filter(x => x.branch === hu.rebirth.branch);
+    if (bu.length && rng() < pickC(REBIRTH.branchUnique[ty])) r.items.push(makeItem(rng, { named: pick(rng, bu).id, ilv }));
+  }
   for (const it of r.items) {
     if (save.inventory.length >= bagMax(save)) { addSalvage(save, salvageOf(it)); summary.autoDismantled = (summary.autoDismantled || 0) + 1; continue; }
     const item = { ...it, uid: save.nextUid++ };
@@ -1178,6 +1200,7 @@ export function applyBattle(save0, ctx, battle, rng = Math.random) {
     summary.items.push(item);
     if (item.grade === 'epic') save.stats.epics += 1;
     if (item.grade === 'unique') save.stats.uniques = (save.stats.uniques || 0) + 1;
+    if (item.grade === 'mythic') save.stats.mythics = (save.stats.mythics || 0) + 1;
   }
   if (ctx.kind === 'field') {
     const fid = ctx.fieldId;
