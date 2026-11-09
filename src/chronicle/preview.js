@@ -47,7 +47,7 @@ export function previewTarget(save, last) {
 
 // 한 상태로 N전 — encounters는 미리 굴린 조우 목록
 function runSide(save, target, encounters, seed, speed) {
-  let wins = 0, hpLeft = 0, ms = 0, exp = 0, gold = 0;
+  let wins = 0, hpLeft = 0, ms = 0, exp = 0, gold = 0, essence = 0;
   encounters.forEach((enc0, i) => {
     const enemies = E.scaleEnemiesForRebirth(save, enc0.enemies);
     const party = E.partyCombatants(save);
@@ -64,13 +64,14 @@ function runSide(save, target, encounters, seed, speed) {
       const r = E.applyBattle(save, ctx, sim, seededRng(seed + i * 104729 + 1));
       exp += r.summary.exp || 0;
       gold += r.summary.gold || 0;
+      essence += r.summary.essence || 0;
     }
   });
   const n = encounters.length;
   const perMin = (v) => (ms ? v * 60000 / ms : 0);
   return {
     battles: n, winRate: wins / n, hpLeft: wins ? hpLeft / wins : 0, secPerBattle: ms / n / 1000,
-    expPerMin: perMin(exp), goldPerMin: perMin(gold),
+    expPerMin: perMin(exp), goldPerMin: perMin(gold), essencePerMin: perMin(essence),
   };
 }
 
@@ -83,4 +84,11 @@ export function previewCompare(before, after, target, { battles = PREVIEW.battle
     after: runSide(after, target, encounters, seed + 1, speed),
     target, battles, speed,
   };
+}
+
+// 한 상태의 효율만 (오프라인 보상 1.233.0)
+export function estimateRate(save, target, { battles = 40, speed = 1, seed = 777 } = {}) {
+  const encRng = seededRng(seed);
+  const encounters = Array.from({ length: battles }, () => E.rollFieldEncounter(target.field, encRng, false, null, target.stage));
+  return runSide(save, target, encounters, seed + 1, speed);
 }
