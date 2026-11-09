@@ -234,7 +234,7 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
   const { sim, enemies, party, summary, ctx } = battle;
   const [idx, setIdx] = useState(0);
   const [stats, setStats] = useState(null); // 전투 집계 (1.215.1)
-  const openStats = () => { const r = newHuntStats(); addHuntRecord(r, huntRecord(sim, party, { type: ctx.type, enemies }, summary)); setStats({ ...r, endedAt: r.startedAt }); };
+  const openStats = () => { const r = newHuntStats(); addHuntRecord(r, huntRecord(sim, party, { type: ctx.type, enemies }, summary, speed, ctx.label)); setStats(r); };
   const dungeonNext = ctx.kind === 'dungeon' && sim.result === 'win' && !summary.dungeonClear;
   const [speedPref, setSpeed] = useState(() => { try { return +localStorage.getItem('chronicleSpeed') || 2; } catch { return 2; } });
   // ×4는 이용권이 있을 때만 (1.213.0) — 만료되면 ×2로
@@ -2046,8 +2046,24 @@ function QuestView({ save, setSave, onBack, flash, onReplay }) {
 }
 
 // ===== 반복 사냥 보고서 (1.213.0) =====
-function huntRecord(sim, party, enc, summary) {
+// 전투 1회 재생 시간 (BattleView 재생 속도와 같은 공식) + 다음 전투까지 대기 1.8초 — 분당 효율 계산용 (1.231.3)
+const BATTLE_GAP_MS = 1800;
+function battlePlayMs(sim, speed = 1) {
+  let ms = 0;
+  for (const ev of sim.events) ms += ev.round ? 160 : ev.k === 'dotTick' ? 380 : 620;
+  return Math.round(ms / speed) + BATTLE_GAP_MS;
+}
+function readSpeedPref(boostLeft) {
+  let s = 2;
+  try { s = +localStorage.getItem('chronicleSpeed') || 2; } catch { /* */ }
+  return s === 4 && boostLeft <= 0 ? 2 : s;
+}
+function huntRecord(sim, party, enc, summary, speed = 2, label = '') {
   const dmg = E.battleDamageStats(sim, party);
+  const salv = {};
+  for (const src of [summary.autoSalvage, summary.dismantleLoot]) for (const [k, v] of Object.entries(src || {})) salv[k] = (salv[k] || 0) + v;
+  const hero = party.find(p => !p.fam);
+  const fam = party.find(p => p.fam);
   const units = {};
   for (const p of party) units[p.id] = { id: p.id, name: p.name, fam: !!p.fam, famKey: p.famKey, classId: p.classId, dmg: dmg.byUnit[p.id] || 0, heal: dmg.healBy[p.id] || 0, shield: dmg.shieldBy[p.id] || 0, taken: dmg.takenBy[p.id] || 0 };
   return {
@@ -2055,11 +2071,15 @@ function huntRecord(sim, party, enc, summary) {
     kills: sim.result === 'win' ? enc.enemies.reduce((m, e) => ({ ...m, [e.tier]: (m[e.tier] || 0) + 1 }), {}) : {},
     units, skills: dmg.bySkill,
     exp: summary.exp || 0, gold: summary.gold || 0, essence: summary.essence || 0, famShards: summary.famShards || 0, talentScroll: summary.talentScroll || 0,
+    shard: summary.shard || 0, keys: summary.keys || 0, famExp: summary.famExp?.gained || 0, salv,
+    salvaged: (summary.autoSalvaged || 0) + (summary.autoDismantled || 0),
     items: (summary.items || []).map(i => i.grade), levelUps: Object.keys(summary.levelUps || {}).length,
+    ms: battlePlayMs(sim, speed), speed, label,
+    setup: { classId: hero?.classId, lv: hero?.lv, famKey: fam?.famKey || null, famName: fam?.name || null },
   };
 }
 function newHuntStats() {
-  return { battles: 0, wins: 0, losses: 0, rounds: 0, types: {}, kills: {}, units: {}, skills: {}, exp: 0, gold: 0, essence: 0, famShards: 0, talentScroll: 0, items: {}, levelUps: 0, startedAt: Date.now() };
+  return { battles: 0, wins: 0, losses: 0, rounds: 0, types: {}, kills: {}, units: {}, skills: {}, exp: 0, gold: 0, essence: 0, famShards: 0, talentScroll: 0, shard: 0, keys: 0, famExp: 0, salv: {}, salvaged: 0, items: {}, levelUps: 0, ms: 0, speeds: {}, places: {}, setup: null, startedAt: Date.now() };
 }
 function addHuntRecord(st, r) {
   st.battles += 1; if (r.win) st.wins += 1; else st.losses += 1;
@@ -2079,6 +2099,12 @@ function addHuntRecord(st, r) {
     st.skills[key] = (st.skills[key] || 0) + v;
   }
   st.exp += r.exp; st.gold += r.gold; st.essence += r.essence; st.famShards += r.famShards; st.talentScroll = (st.talentScroll || 0) + (r.talentScroll || 0); st.levelUps += r.levelUps;
+  st.shard = (st.shard || 0) + (r.shard || 0); st.keys = (st.keys || 0) + (r.keys || 0); st.famExp = (st.famExp || 0) + (r.famExp || 0); st.salvaged = (st.salvaged || 0) + (r.salvaged || 0);
+  st.salv = st.salv || {}; for (const [k, v] of Object.entries(r.salv || {})) st.salv[k] = (st.salv[k] || 0) + v;
+  st.ms = (st.ms || 0) + (r.ms || 0);
+  st.speeds = st.speeds || {}; if (r.speed) st.speeds[r.speed] = (st.speeds[r.speed] || 0) + 1;
+  st.places = st.places || {}; if (r.label) st.places[r.label] = (st.places[r.label] || 0) + 1;
+  if (r.setup) st.setup = r.setup;
   for (const g of r.items) st.items[g] = (st.items[g] || 0) + 1;
 }
 const TIER_LABEL = { normal: '일반 몹', elite: '강적', boss: '보스' };
@@ -2086,17 +2112,19 @@ function HuntReport({ report: r, onClose, title = '📊 사냥 보고서' }) {
   const units = Object.entries(r.units).map(([key, u]) => ({ key, ...u })).sort((a, b) => b.dmg - a.dmg);
   const total = units.reduce((t, u) => t + u.dmg, 0) || 1;
   const skills = Object.entries(r.skills).map(([k, v]) => { const [uk, sn] = k.split('|'); return { uk, sn, v }; }).sort((a, b) => b.v - a.v).slice(0, 6);
-  const mins = Math.max(1, Math.round((r.endedAt - r.startedAt) / 60000));
+  const ms = r.ms || Math.max(60000, (r.endedAt || Date.now()) - r.startedAt);
+  const [effOpen, setEffOpen] = useState(false);
   const row = { display: 'flex', justifyContent: 'space-between', fontSize: 12.5, color: PALETTE.text, padding: '3px 0' };
   return (
     <BottomSheet title={title} onClose={onClose} maxHeight="85%">
       <div className="flex flex-col gap-3">
         <GlassPanel className="p-3">
           <div className="font-semibold mb-1" style={{ fontSize: 13, color: PALETTE.legendary }}>
-            {r.battles === 1 ? <>{r.wins ? '승리' : '패배'} <span style={{ color: PALETTE.textDim, fontWeight: 400 }}>· {r.rounds}라운드</span></> : <>전투 {r.battles}회 · 승리 {r.wins} · 패배 {r.losses} <span style={{ color: PALETTE.textDim, fontWeight: 400 }}>· {r.rounds}라운드 · 약 {mins}분</span></>}
+            {r.battles === 1 ? <>{r.wins ? '승리' : '패배'} <span style={{ color: PALETTE.textDim, fontWeight: 400 }}>· {r.rounds}라운드 · {fmtDur(ms)}</span></> : <>전투 {r.battles}회 · 승리 {r.wins} · 패배 {r.losses} <span style={{ color: PALETTE.textDim, fontWeight: 400 }}>· {r.rounds}라운드 · {fmtDur(ms)}</span></>}
           </div>
           {['normal', 'elite', 'boss'].filter(t => r.kills[t]).map(t => <div key={t} style={row}><span>{TIER_LABEL[t]} 처치</span><b>{r.kills[t]}마리</b></div>)}
           {r.types.gate ? <div style={row}><span>관문 전투</span><b>{r.types.gate}회</b></div> : null}
+          <SetupLine r={r} />
         </GlassPanel>
         <GlassPanel className="p-3">
           <div className="font-semibold mb-2" style={{ fontSize: 13, color: PALETTE.text }}>기여도 · 피해(DPS) 순위 + 회복 · 보호막 · 받아낸 피해</div>
@@ -2126,16 +2154,142 @@ function HuntReport({ report: r, onClose, title = '📊 사냥 보고서' }) {
           ))}
         </GlassPanel>
         {(r.wins > 0 || r.battles > 1) && <GlassPanel className="p-3">
-          <div className="font-semibold mb-1" style={{ fontSize: 13, color: PALETTE.text }}>획득</div>
-          <div style={row}><span>경험치</span><b>{r.exp.toLocaleString()}</b></div>
-          <div style={row}><span>골드</span><b>🪙 {r.gold.toLocaleString()}</b></div>
-          <div style={row}><span>정수</span><b>✦ {r.essence}</b></div>
-          {r.famShards ? <div style={row}><span>계약서 조각</span><b>📜 {r.famShards}</b></div> : null}
-          {r.talentScroll ? <div style={row}><span>특성 초기화 주문서</span><b>📖 {r.talentScroll}</b></div> : null}
-          {r.levelUps ? <div style={row}><span>레벨 업</span><b>▲ {r.levelUps}</b></div> : null}
-          <div style={row}><span>장비</span><b>{GRADES.filter(g => r.items[g.id]).map(g => <span key={g.id} style={{ color: g.color, marginLeft: 6 }}>{g.label} {r.items[g.id]}</span>)}{!Object.keys(r.items).length && '없음'}</b></div>
+          <div className="flex justify-between items-baseline mb-1">
+            <span className="font-semibold" style={{ fontSize: 13, color: PALETTE.text }}>획득 · 분당 효율</span>
+            <span style={{ fontSize: 11, color: PALETTE.textDim }}>{speedText(r)} 재생 기준</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto', columnGap: 10, rowGap: 3, fontSize: 12.5, color: PALETTE.text, alignItems: 'baseline' }}>
+            <span style={{ fontSize: 11, color: PALETTE.textDim }}>항목</span>
+            <span style={{ fontSize: 11, color: PALETTE.textDim, textAlign: 'right' }}>총량</span>
+            <span style={{ fontSize: 11, color: PALETTE.legendary, textAlign: 'right' }}>분당</span>
+            <span style={{ fontSize: 11, color: PALETTE.textDim, textAlign: 'right' }}>전투당</span>
+            {gainRows(r).map(g => (
+              <React.Fragment key={g.k}>
+                <span>{g.icon} {g.label}{g.sub ? <span style={{ fontSize: 10.5, color: PALETTE.textDim }}> {g.sub}</span> : null}</span>
+                <b style={{ textAlign: 'right' }}>{fmtNum(g.v)}</b>
+                <b style={{ textAlign: 'right', color: PALETTE.legendary }}>{fmtNum(g.v * 60000 / ms)}</b>
+                <span style={{ textAlign: 'right', color: PALETTE.textDim }}>{fmtNum(g.v / Math.max(1, r.battles))}</span>
+              </React.Fragment>
+            ))}
+          </div>
+          {r.levelUps ? <div style={{ ...row, marginTop: 4 }}><span>레벨 업</span><b>▲ {r.levelUps}</b></div> : null}
+          <div style={row}><span>장비 (보관)</span><b>{GRADES.filter(g => r.items[g.id]).map(g => <span key={g.id} style={{ color: g.color, marginLeft: 6 }}>{g.label} {r.items[g.id]}</span>)}{!Object.keys(r.items).length && '없음'}</b></div>
+          {r.salvaged ? <div style={{ fontSize: 11, color: PALETTE.textDim }}>자동 분해 {r.salvaged}개 — 분해로 얻은 재화는 위 골드·정수·파편에 포함</div> : null}
+          <div style={{ fontSize: 11, color: PALETTE.textDim, marginTop: 4, lineHeight: 1.5 }}>분당 = 전투 재생 시간(다음 전투 대기 1.8초 포함) 기준 · 배속이 다르면 분당 값도 달라지므로 비교는 같은 배속끼리 · 전투당 값은 배속과 무관</div>
         </GlassPanel>}
+        <UIButton variant="ghost" style={{ height: 40 }} onClick={() => setEffOpen(true)}>📈 효율 기록 비교</UIButton>
         <UIButton onClick={onClose}>확인</UIButton>
+      </div>
+      {effOpen && <EfficiencyLog onClose={() => setEffOpen(false)} />}
+    </BottomSheet>
+  );
+}
+
+// ===== 분당 효율 (1.231.3) =====
+const fmtNum = (v) => (v >= 100 ? Math.round(v).toLocaleString() : v >= 10 ? (Math.round(v * 10) / 10).toLocaleString() : (Math.round(v * 100) / 100).toLocaleString());
+function fmtDur(ms) {
+  const sec = Math.max(1, Math.round(ms / 1000));
+  return sec < 60 ? `${sec}초` : `${Math.floor(sec / 60)}분 ${sec % 60}초`;
+}
+function speedText(r) {
+  const sp = Object.entries(r.speeds || {}).sort((a, b) => b[1] - a[1]).map(([k]) => `×${k}`);
+  return sp.length ? sp.join('·') : '×2';
+}
+// 획득 항목 — 골드·정수·파편·조각·사역혼은 자동 분해 재화 포함
+function gainRows(r) {
+  const sv = r.salv || {};
+  const rows = [
+    { k: 'exp', icon: '⭐', label: '경험치', v: r.exp || 0 },
+    { k: 'gold', icon: '🪙', label: '골드', v: (r.gold || 0) + (sv.gold || 0), sub: sv.gold ? `(분해 ${fmtNum(sv.gold)})` : '' },
+    { k: 'essence', icon: '✦', label: '정수', v: (r.essence || 0) + (sv.essence || 0) },
+    { k: 'shard', icon: '◆', label: '파편', v: (r.shard || 0) + (sv.shard || 0) },
+    { k: 'famShards', icon: '📜', label: '계약서 조각', v: (r.famShards || 0) + (sv.famShard || 0) },
+    { k: 'famSoul', icon: '🔮', label: '사역혼', v: sv.famSoul || 0 },
+    { k: 'famExp', icon: '🐾', label: '사역마 경험치', v: r.famExp || 0 },
+    { k: 'talentScroll', icon: '📖', label: '특성 주문서', v: r.talentScroll || 0 },
+    { k: 'keys', icon: '🗝', label: '던전 열쇠', v: r.keys || 0 },
+    { k: 'drops', icon: '⚔', label: '장비 드랍', v: Object.values(r.items || {}).reduce((t, n) => t + n, 0) + (r.salvaged || 0) },
+  ];
+  return rows.filter(g => g.v > 0 || g.k === 'exp' || g.k === 'gold');
+}
+function SetupLine({ r }) {
+  const su = r.setup;
+  if (!su) return null;
+  const place = Object.entries(r.places || {}).sort((a, b) => b[1] - a[1])[0]?.[0];
+  return (
+    <div style={{ fontSize: 11.5, color: PALETTE.textDim, marginTop: 4, lineHeight: 1.5 }}>
+      {su.classId ? <span style={{ color: chronicleClass(su.classId).color }}>{chronicleClass(su.classId).name} Lv.{su.lv}</span> : null}
+      {' · '}{su.famName ? `🐾 ${su.famName}` : '사역마 없음'}
+      {place ? <> · 📍 {r.kind === 'dungeon' ? placeBase(place) : place}</> : null}
+    </div>
+  );
+}
+// 던전 라벨 「금고(전설) 3층」 → 「금고(전설)」
+const placeBase = (label) => (label || '').replace(/ (보스|\d+층)$/, '');
+
+// 효율 기록 — 반복 사냥·던전 한 판이 끝날 때마다 기기에 최근 40건 저장 (기기 전용, 계정 저장과 무관)
+const EFF_KEY = 'chronicleEffLog';
+const EFF_MAX = 40;
+function readEffLog() { try { return JSON.parse(localStorage.getItem(EFF_KEY) || '[]'); } catch { return []; } }
+function logEfficiency(r) {
+  if (!r || r.battles < 2 || !r.ms) return;
+  const g = Object.fromEntries(gainRows(r).map(x => [x.k, x.v]));
+  const place = Object.entries(r.places || {}).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
+  const entry = {
+    at: Date.now(), kind: r.kind, place: r.kind === 'dungeon' ? placeBase(place) : place,
+    classId: r.setup?.classId, lv: r.setup?.lv, fam: r.setup?.famName || null,
+    battles: r.battles, wins: r.wins, ms: r.ms, speed: speedText(r),
+    exp: g.exp || 0, gold: g.gold || 0, essence: g.essence || 0, shard: g.shard || 0, famShards: g.famShards || 0, drops: g.drops || 0,
+  };
+  try { localStorage.setItem(EFF_KEY, JSON.stringify([entry, ...readEffLog()].slice(0, EFF_MAX))); } catch { /* */ }
+}
+const EFF_SORTS = [
+  { id: 'exp', label: '경험치/분' }, { id: 'gold', label: '골드/분' }, { id: 'essence', label: '정수/분' }, { id: 'drops', label: '장비/분' }, { id: 'at', label: '최근 순' },
+];
+function EfficiencyLog({ onClose }) {
+  const [log, setLog] = useState(readEffLog);
+  const [sort, setSort] = useState(() => { try { return localStorage.getItem('chronicleEffSort') || 'exp'; } catch { return 'exp'; } });
+  const pickSort = (id) => { setSort(id); try { localStorage.setItem('chronicleEffSort', id); } catch { /* */ } };
+  const pm = (e, k) => (e[k] || 0) * 60000 / Math.max(1, e.ms);
+  const list = [...log].sort((a, b) => (sort === 'at' ? b.at - a.at : pm(b, sort) - pm(a, sort)));
+  const best = sort === 'at' ? null : list[0];
+  const clear = () => { try { localStorage.removeItem(EFF_KEY); } catch { /* */ } setLog([]); };
+  return (
+    <BottomSheet title="📈 효율 기록 비교" onClose={onClose} maxHeight="88%">
+      <div style={{ fontSize: 11.5, color: PALETTE.textDim, lineHeight: 1.5, marginBottom: 8 }}>
+        반복 사냥·던전 한 판(2전투 이상)이 끝날 때마다 자동 기록 · 최근 {EFF_MAX}건 · 이 기기에만 저장<br />
+        같은 배속끼리 비교하세요 (배속이 2배면 분당 값도 2배)
+      </div>
+      <div className="flex flex-wrap gap-1.5 mb-2">
+        {EFF_SORTS.map(o => (
+          <button key={o.id} onClick={() => pickSort(o.id)} className="ui-press" style={{ height: 30, padding: '0 10px', borderRadius: 8, fontSize: 12, border: `1px solid ${sort === o.id ? PALETTE.legendary : 'var(--ui-line)'}`, color: sort === o.id ? PALETTE.legendary : PALETTE.textDim, background: 'transparent' }}>{o.label}</button>
+        ))}
+      </div>
+      {!list.length && <div className="text-center py-8" style={{ fontSize: 12.5, color: PALETTE.textDim }}>아직 기록이 없습니다 — 반복 사냥이나 던전을 한 판 돌려 보세요</div>}
+      <div className="flex flex-col gap-2">
+        {list.map((e, i) => (
+          <div key={e.at} style={{ padding: 10, borderRadius: 12, border: `1px solid ${e === best ? PALETTE.legendary + '99' : 'var(--ui-line)'}`, background: 'rgba(255,255,255,0.03)' }}>
+            <div className="flex justify-between items-baseline" style={{ fontSize: 12.5, color: PALETTE.text }}>
+              <span className="font-semibold truncate">{sort !== 'at' ? `${i + 1}. ` : ''}{e.kind === 'dungeon' ? '🏰 ' : '🌾 '}{e.place || '—'}</span>
+              <span style={{ fontSize: 11, color: PALETTE.textDim, whiteSpace: 'nowrap', marginLeft: 6 }}>{e.speed} · {fmtDur(e.ms)}</span>
+            </div>
+            <div style={{ fontSize: 11.5, color: PALETTE.textDim }}>
+              {e.classId ? <span style={{ color: chronicleClass(e.classId).color }}>{chronicleClass(e.classId).name} Lv.{e.lv}</span> : null}
+              {' · '}{e.fam ? `🐾 ${e.fam}` : '사역마 없음'} · 전투 {e.battles}회 (승 {e.wins})
+            </div>
+            <div className="grid grid-cols-4 gap-1 mt-1" style={{ fontSize: 11.5 }}>
+              {[['exp', '⭐'], ['gold', '🪙'], ['essence', '✦'], ['drops', '⚔']].map(([k, ic]) => (
+                <div key={k} style={{ textAlign: 'center', padding: '3px 0', borderRadius: 6, background: sort === k ? 'rgba(232,176,74,0.12)' : 'transparent', color: sort === k ? PALETTE.legendary : PALETTE.text }}>
+                  {ic} {fmtNum(pm(e, k))}<div style={{ fontSize: 10, color: PALETTE.textDim }}>/분</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-2 mt-3">
+        {log.length > 0 && <UIButton variant="ghost" style={{ height: 40 }} onClick={clear}>기록 지우기</UIButton>}
+        <UIButton style={{ height: 40 }} onClick={onClose}>닫기</UIButton>
       </div>
     </BottomSheet>
   );
@@ -2189,7 +2343,7 @@ export default function ChronicleGame({ onExit }) {
     if (repeat || !repStatsRef.current) return;
     const st = repStatsRef.current;
     repStatsRef.current = null;
-    if (st.battles > 1) setReport({ ...st, endedAt: Date.now() });
+    if (st.battles > 1) { const rep = { ...st, endedAt: Date.now(), kind: 'hunt' }; logEfficiency(rep); setReport(rep); }
   }, [repeat]);
 
   useEffect(() => { writeAccount(acc); }, [acc]);
@@ -2238,7 +2392,7 @@ export default function ChronicleGame({ onExit }) {
     r.summary.questsDone = Q.newlyDoneQuests(save, r.save);
     if (mode === 'hunt' && !E.gateReady(save, field.id, stage) && E.gateReady(r.save, field.id, stage)) r.summary.gateOpen = true;
     setSave(r.save);
-    const rec = huntRecord(sim, party, enc, r.summary);
+    const rec = huntRecord(sim, party, enc, r.summary, readSpeedPref(E.boostLeftMs(save)), ctx.label);
     lastRecRef.current = rec;
     if (repStatsRef.current) addHuntRecord(repStatsRef.current, rec);
     if (mode !== 'hunt' || sim.result !== 'win' || r.summary.questsDone.length) setRepeat(false);
@@ -2257,10 +2411,10 @@ export default function ChronicleGame({ onExit }) {
     r.summary.questsDone = Q.newlyDoneQuests(save, r.save);
     setSave(r.save);
     if (!dungRunRef.current) dungRunRef.current = newHuntStats();
-    addHuntRecord(dungRunRef.current, huntRecord(sim, party, enc, r.summary));
+    addHuntRecord(dungRunRef.current, huntRecord(sim, party, enc, r.summary, readSpeedPref(E.boostLeftMs(save)), ctx.label));
     let runReport = null;
     if (sim.result !== 'win' || r.summary.dungeonClear) {
-      if (dungRunRef.current.battles > 1) runReport = { ...dungRunRef.current, endedAt: Date.now() };
+      if (dungRunRef.current.battles > 1) { runReport = { ...dungRunRef.current, endedAt: Date.now(), kind: 'dungeon' }; logEfficiency(runReport); }
       dungRunRef.current = null;
     }
     setBattle({ sim, enemies: enc.enemies, party, summary: r.summary, ctx, runReport, key: Date.now() });
