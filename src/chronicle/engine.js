@@ -843,7 +843,10 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
     if (def.hp <= 0 && def.revive && !def.reviveUsed) { def.reviveUsed = true; def.hp = Math.round(def.maxHp * def.revive); }
     if (def.hp > 0 && def.emergencyHeal && !def.emergencyUsed && def.hp < def.maxHp * 0.3) { def.emergencyUsed = true; def.hp = Math.min(def.maxHp, def.hp + Math.round(def.maxHp * def.emergencyHeal)); }
   };
+  // 원정대 레이드 「다섯 봉인」 (1.231.0) — 봉인은 그 직업만, 봉인이 남아 있으면 보스 무적. 일반 전투엔 봉인이 없어 영향 0
+  const immuneTo = (att, def) => !!def && ((def.sealOf && att?.classId !== def.sealOf) || (def.sealedBoss && units.some(x => x.sealOf && x.hp > 0)));
   const damage = (att, def, mult, { noDodge = false, skill = false } = {}) => {
+    if (immuneTo(att, def)) return { d: 0, immune: true };
     if (!noDodge && rng() < (def.dodge || 0)) {
       if (def.dodgeHeal) healUnit(def, Math.round(def.maxHp * def.dodgeHeal));
       if (def.critAfterCounter) def.critNext = true;
@@ -873,7 +876,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
     def.hp = Math.max(0, def.hp - d);
     onHurt(def);
     if (att.lifesteal && d > 0 && att.hp > 0) healUnit(att, Math.round(d * att.lifesteal));
-    if (def.thornsPct && d > 0 && att.hp > 0) att.hp = Math.max(0, att.hp - Math.max(1, Math.round(d * def.thornsPct)));
+    if (def.thornsPct && d > 0 && att.hp > 0 && !immuneTo(def, att)) att.hp = Math.max(0, att.hp - Math.max(1, Math.round(d * def.thornsPct)));
     return { d, crit, absorbed, cover };
   };
   // 정령 화살 — 공격 뒤 확률 추가 타격 (유니크)
@@ -906,7 +909,10 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
       if (leader && foes.length > 1 && rng() < 0.7) return leader;
       return pick(rng, foes);
     }
-    return foes.slice().sort((a, b) => a.hp - b.hp)[0];
+    const own = foes.find(f => f.sealOf === u.classId);
+    if (own) return own;
+    const ok = foes.filter(f => !immuneTo(u, f));
+    return (ok.length ? ok : foes).slice().sort((a, b) => a.hp - b.hp)[0];
   };
   const counterCheck = (def, att, hits) => {
     if (def.side !== 'party' || def.hp <= 0 || att.hp <= 0 || !def.counterPct) return;
@@ -923,7 +929,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
   const chooseSkill = (u) => {
     const ready = u.skills.filter(x => !(u.cds[x.s.id] > 0));
     const allies = alive('party');
-    const foes = alive('enemy');
+    const foes = alive('enemy').filter(f => !immuneTo(u, f));
     const has = (k) => ready.find(x => x.s.kind === k);
     // 1.227.1 PM: 사역마는 덜 놀게 — 치유 HP 75% 미만(주인공은 55% 그대로) · 보호막은 주인공 보호막이 최대 HP 10% 미만이면 다시
     const lowAlly = allies.find(a => a.hp < a.maxHp * (u.fam ? FAM_AI.healBelow : 0.55));
@@ -963,6 +969,17 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
   const act = (u) => {
     u.turn += 1;
     if (u.side === 'enemy') {
+      if (u.passive) return; // 행동하지 않는 적
+      // 봉인의 반향 (1.231.0) — 봉인은 자기 주인만 공격한다 (약한 캐릭터는 자기 봉인을 버티지 못한다)
+      if (u.sealOf) {
+        const o = alive('party').find(p => p.classId === u.sealOf);
+        if (!o || !u.atk) return;
+        const r = damage(u, o, 1);
+        const hits = [{ t: o.id, d: r.d, c: r.crit, m: r.miss, ab: r.absorbed }];
+        if (r.cover) hits.push({ t: r.cover.t, d: r.cover.d, cover: true });
+        push({ a: u.id, n: '봉인의 반향', k: 'attack', hits });
+        return;
+      }
       const foes = alive('party');
       if (!foes.length) return;
       const bossAoe = u.tier === 'boss' && u.turn % 4 === 0;
@@ -1001,7 +1018,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
     const v = (s.base + s.perLv * (lv - 1)) * (1 + (u.skillBoost?.[s.id] || 0));
     u.cds[s.id] = Math.max(1, s.cd + 1 - (u.cdr || 0));
     const hits = [];
-    const foes = alive('enemy');
+    const foes = alive('enemy').filter(f => !immuneTo(u, f)); // 봉인 레이드: 깰 수 없는 대상 제외 (1.231.0)
     const allies = alive('party');
     switch (s.kind) {
       case 'strike': case 'lifesteal': {
@@ -1119,7 +1136,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
   function holyHit(u, h, hits) {
     if (!u.holyDmg || h <= 0) return;
     const t = pickEnemyTarget(u);
-    if (!t) return;
+    if (!t || immuneTo(u, t)) return;
     const d = Math.max(1, Math.round(h * u.holyDmg));
     t.hp = Math.max(0, t.hp - d);
     hits.push({ t: t.id, d, holy: true });
@@ -1145,6 +1162,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
         u.hots = u.hots.map(x => ({ ...x, t: x.t - 1 })).filter(x => x.t > 0);
         push({ a: src, n: '지속 회복', k: 'hot', hits: [{ t: u.id, h }] });
       }
+      if (u.dots.length && (u.sealOf || u.sealedBoss)) u.dots = u.dots.filter(d => !immuneTo(units.find(x => x.id === d.src), u));
       if (u.dots.length) {
         const total = u.dots.reduce((s, d) => s + d.v, 0);
         const dotSrc = {};
@@ -1166,6 +1184,8 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
       if (u.cover && u.cover.t > 0) u.cover.t -= 1;
       if (!alive('enemy').length) { result = 'win'; break; }
       if (!alive('party').length || units.some(x => x.leader && x.hp <= 0)) { result = 'lose'; break; }
+      // 봉인 주인이 쓰러지면 그 봉인은 영원히 깰 수 없다 → 실패
+      if (units.some(x => x.sealOf && x.hp > 0 && !units.some(p => p.side === 'party' && p.classId === x.sealOf && p.hp > 0))) { result = 'lose'; break; }
     }
     if (result) break;
   }

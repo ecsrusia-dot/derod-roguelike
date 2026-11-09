@@ -19,6 +19,7 @@ import {
 import * as E from './engine.js';
 import * as TL from './talents.js';
 import * as R from './roster.js';
+import * as RD from './raid.js';
 import * as Q from './quest.js';
 import * as A from './account.js';
 import * as F from './familiar.js';
@@ -168,11 +169,22 @@ function BattleCard({ u, art, hp, sh, acting, fx, h, enemy = false, border, chil
         <img src={art} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ objectPosition: enemy ? '50% 40%' : '50% 22%', filter: dead ? 'grayscale(1)' : 'none' }} draggable={false} />
         <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, transparent 45%, #000d)' }} />
         <div className="absolute bottom-1 left-1.5 right-1.5">
-          <div className="flex items-baseline justify-between gap-1">
-            <span className="truncate" style={{ fontSize: 11.5, color: '#fff', textShadow: '0 1px 2px #000' }}>{u.fam ? '🐾 ' : ''}Lv.{u.lv} {u.name}</span>
-            <span className="flex-none" style={{ fontSize: 10.5, color: '#ddd', textShadow: '0 1px 2px #000' }}>{Math.max(0, hp).toLocaleString()}{sh > 0 ? <span style={{ color: '#9cc4e4' }}> ◈{sh.toLocaleString()}</span> : null}</span>
-          </div>
-          <Bar v={hp} max={u.maxHp} shield={sh} color={enemy ? 'linear-gradient(90deg,#8b1f1f,#e0574c)' : 'linear-gradient(90deg,#3d7a3a,#7fcf6a)'} h={7} />
+          {h < 150 ? (
+            // 좁은 카드 (레이드 등 인원이 많을 때) — 짧은 이름 + 바 아래 HP
+            <>
+              <div className="truncate" style={{ fontSize: 11, color: '#fff', textShadow: '0 1px 2px #000' }}>{u.short || u.name}</div>
+              <Bar v={hp} max={u.maxHp} shield={sh} color={enemy ? 'linear-gradient(90deg,#8b1f1f,#e0574c)' : 'linear-gradient(90deg,#3d7a3a,#7fcf6a)'} h={6} />
+              <div className="truncate" style={{ fontSize: 10.5, color: '#ddd', textShadow: '0 1px 2px #000' }}>{Math.max(0, hp).toLocaleString()}{sh > 0 ? <span style={{ color: '#9cc4e4' }}> ◈{sh.toLocaleString()}</span> : null}</div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-baseline justify-between gap-1">
+                <span className="truncate" style={{ fontSize: 11.5, color: '#fff', textShadow: '0 1px 2px #000' }}>{u.fam ? '🐾 ' : ''}Lv.{u.lv} {u.name}</span>
+                <span className="flex-none" style={{ fontSize: 10.5, color: '#ddd', textShadow: '0 1px 2px #000' }}>{Math.max(0, hp).toLocaleString()}{sh > 0 ? <span style={{ color: '#9cc4e4' }}> ◈{sh.toLocaleString()}</span> : null}</span>
+              </div>
+              <Bar v={hp} max={u.maxHp} shield={sh} color={enemy ? 'linear-gradient(90deg,#8b1f1f,#e0574c)' : 'linear-gradient(90deg,#3d7a3a,#7fcf6a)'} h={7} />
+            </>
+          )}
         </div>
       </div>
       {children}
@@ -281,7 +293,7 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
     if (hs.some(h => h.s)) return 'chr-fx-shield';
     return '';
   };
-  const cardH = 150;
+  const cardH = enemies.length > 3 || party.length > 3 ? 118 : 150;
 
   return (
     <div className="absolute inset-0 flex flex-col" style={{ background: PALETTE.bg }}>
@@ -342,7 +354,7 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
             </div>
             {sim.result === 'win' ? (
               <div className="mt-1.5 flex flex-col gap-1" style={{ fontSize: 12.5, color: PALETTE.text }}>
-                <div className="text-center">경험치 +{summary.exp} · 🪙 +{summary.gold} · ✦ +{summary.essence}{summary.shard ? ` · ◆ +${summary.shard}` : ''}</div>
+                {ctx.kind !== 'raid' && <div className="text-center">경험치 +{summary.exp} · 🪙 +{summary.gold} · ✦ +{summary.essence}{summary.shard ? ` · ◆ +${summary.shard}` : ''}</div>}
                 {Object.entries(summary.levelUps).map(([cid, lv]) => (
                   <div key={cid} className="text-center" style={{ color: PALETTE.legendary }}>▲ {chronicleClass(cid).name} Lv.{lv} 달성!</div>
                 ))}
@@ -360,11 +372,13 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
                 {summary.famExp?.ups ? <div className="text-center font-semibold" style={{ color: '#e8b04a' }}>🐾 {F.famName(summary.famExp.key)} Lv.{summary.famExp.lv} 달성!</div> : null}
                 {summary.keys ? <div className="text-center font-semibold" style={{ color: PALETTE.legendary }}>🗝 던전 열쇠 +{summary.keys}</div> : null}
                 {summary.talentScroll ? <div className="text-center font-semibold" style={{ color: '#7fd1c8' }}>📖 특성 초기화 주문서 +{summary.talentScroll}</div> : null}
+                {summary.raid?.reward ? <div className="text-center font-semibold" style={{ color: '#ff8a80' }}>⚔ 원정대 레이드 보상{summary.raid.first ? ' (첫 클리어!)' : ''} — {R.rosterRewardText(summary.raid.reward)}</div> : null}
+                {summary.raid?.noReward ? <div className="text-center" style={{ color: PALETTE.textDim }}>오늘 이 단계 보상은 이미 받았다 (KST 0시 초기화)</div> : null}
                 {(summary.questsDone || []).map(t => <div key={t} className="text-center font-semibold" style={{ color: PALETTE.dawn }}>📜 의뢰 완료: {t} — 게시판에서 보상</div>)}
               </div>
             ) : (
               <div className="mt-1 text-center" style={{ fontSize: 12.5, color: PALETTE.textDim }}>
-                {ctx.kind === 'tower' ? `첨탑 ${summary.towerFell}층에서 쓰러졌다. 다음 도전은 체크포인트부터.` : ctx.kind === 'dungeon' ? '던전에서 쫓겨났다.' : `마을로 돌아간다.${summary.goldLost ? ` (골드 -${summary.goldLost})` : ''}`}
+                {ctx.kind === 'raid' ? '원정대가 무너졌다 — 봉인의 주인이 쓰러지면 그 봉인은 깰 수 없다. 약한 캐릭터를 더 키워 다시 도전하자.' : ctx.kind === 'tower' ? `첨탑 ${summary.towerFell}층에서 쓰러졌다. 다음 도전은 체크포인트부터.` : ctx.kind === 'dungeon' ? '던전에서 쫓겨났다.' : `마을로 돌아간다.${summary.goldLost ? ` (골드 -${summary.goldLost})` : ''}`}
               </div>
             )}
             <div className="flex gap-2 mt-2.5">
@@ -391,8 +405,71 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
   );
 }
 
+// ===== 원정대 레이드 「다섯 봉인」 (1.231.0) =====
+function RaidView({ save, onBack, onFight }) {
+  const roster = save.roster || {};
+  const raid = save.raid || {};
+  const today = E.kstDateKey();
+  const doneToday = raid.daily?.date === today ? raid.daily.done || {} : {};
+  return (
+    <div className="absolute inset-0 flex flex-col">
+      <Header title="원정대 레이드" onBack={onBack} />
+      <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
+        <GlassPanel className="p-3" style={{ fontSize: 12, lineHeight: 1.65 }}>
+          <div className="font-semibold" style={{ fontSize: 14, color: '#ff8a80' }}>⚔ 다섯 봉인</div>
+          <div style={{ color: PALETTE.text }}>다섯 캐릭터가 함께 싸운다. 보스는 <b>직업별 봉인 5개</b>가 지키고 있다.</div>
+          <div style={{ color: PALETTE.textDim }}>
+            · 봉인은 <b style={{ color: PALETTE.text }}>그 직업만</b> 깰 수 있다 — 봉인이 하나라도 남으면 보스는 무적<br />
+            · 각 봉인은 <b style={{ color: PALETTE.text }}>자기 주인만</b> 계속 공격한다 (봉인의 반향)<br />
+            · 봉인의 주인이 쓰러지면 그 봉인은 영원히 못 깬다 → <b style={{ color: '#e06a5f' }}>즉시 실패</b><br />
+            · 입장 = 다섯 캐릭터 <b style={{ color: PALETTE.text }}>전원</b>이 조건 충족 · 앞 단계를 깨야 다음 단계<br />
+            · 보상은 단계마다 하루 1회 + 첫 클리어 보너스 (모든 캐릭터 공유) · 동행 사역마는 참가하지 않고 패시브만 적용
+          </div>
+        </GlassPanel>
+        {RD.RAID_TIERS.map((t, i) => {
+          const eligible = RD.raidEligible(roster, t);
+          const unlocked = RD.raidUnlocked(roster, raid, i);
+          const clears = raid.clears?.[t.id] || 0;
+          const first = clears === 0;
+          const rw = RD.raidReward(i, first);
+          const prevOk = i === 0 || (raid.clears?.[RD.RAID_TIERS[i - 1].id] || 0) > 0;
+          return (
+            <GlassPanel key={t.id} className="p-3" style={{ border: `1px solid ${unlocked ? '#e0574c88' : 'var(--ui-line)'}`, opacity: prevOk ? 1 : 0.55 }}>
+              <div className="flex gap-2.5">
+                <img src={chronicleEnemyArt(Object.keys(ENEMIES).find(k => ENEMIES[k].name === t.boss))} alt="" className="object-cover flex-none" style={{ width: 64, height: 64, borderRadius: 12, border: '1px solid #e0574c66', filter: unlocked ? 'none' : 'grayscale(.8) brightness(.6)' }} draggable={false} />
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold truncate" style={{ fontSize: 13.5, color: unlocked ? PALETTE.text : PALETTE.textDim }}>{i + 1}. {t.name}</div>
+                  <div className="truncate" style={{ fontSize: 11, color: PALETTE.textDim }}>{t.desc} — 보스 {t.boss}</div>
+                  <div style={{ fontSize: 11.5, color: '#e8b04a' }}>입장: 다섯 캐릭터 전원 {t.req.rebirth ? `전승 ${t.req.rebirth}회 이상 · ` : ''}Lv.{t.req.lv} 이상</div>
+                  <div style={{ fontSize: 11, color: PALETTE.textDim }}>{clears ? `클리어 ${clears}회${doneToday[t.id] ? ' · 오늘 보상 받음' : ''}` : '미클리어'}</div>
+                </div>
+              </div>
+              <div className="flex gap-1.5 mt-2">
+                {CHRONICLE_CLASSES.map(c => {
+                  const r = roster[c.id];
+                  const ok = RD.raidMemberOk(r, t);
+                  return (
+                    <div key={c.id} className="flex-1 flex flex-col items-center" style={{ minWidth: 0 }}>
+                      <Portrait cid={c.id} size={36} dim={!ok} />
+                      <span className="truncate w-full text-center" style={{ fontSize: 10.5, color: ok ? '#8fe08a' : '#e06a5f' }}>{r ? `${r.rebirth ? '✦' : ''}Lv.${r.lv}` : '없음'}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-1.5" style={{ fontSize: 11.5, color: PALETTE.textDim }}>보상{first ? ' (첫 클리어)' : doneToday[t.id] ? ' — 오늘은 받음' : ''}: {R.rosterRewardText(rw)}</div>
+              <button disabled={!unlocked} onClick={() => onFight(t.id)} className="ui-press w-full mt-2 font-semibold" style={{ height: 40, borderRadius: 11, border: `1px solid ${unlocked ? '#e0574c' : 'var(--ui-line)'}`, background: unlocked ? '#e0574c' : 'transparent', color: unlocked ? '#fff' : PALETTE.textDim, fontSize: 13 }}>
+                {unlocked ? '⚔ 원정대 출격' : !prevOk ? '앞 단계를 먼저 클리어' : !eligible ? '조건 미달 — 붉은 캐릭터를 키우자' : '잠김'}
+              </button>
+            </GlassPanel>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ===== 원정대 (1.229.0) — 레벨 상한 · 전역 버프 =====
-function RosterView({ save, setSave, flash, onBack, onSwitchChar }) {
+function RosterView({ save, setSave, flash, onBack, onSwitchChar, onRaid }) {
   const roster = save.roster || {};
   const cap = E.levelCapOf(save);
   const hint = R.nextCapHint(roster);
@@ -413,6 +490,11 @@ function RosterView({ save, setSave, flash, onBack, onSwitchChar }) {
             {hint ? <><br />다음: 캐릭터 <b style={{ color: '#e8b04a' }}>{hint.need}명</b>이 Lv.{R.ROSTER.unlockLv}에 도달하면 상한 Lv.{hint.next}</> : <><br /><b style={{ color: PALETTE.legendary }}>모든 상한 해제 완료</b></>}
           </div>
         </GlassPanel>
+
+        <button onClick={onRaid} className="ui-press w-full text-left" style={{ padding: 12, borderRadius: 14, border: `1.5px solid ${RD.raidEligible(roster, RD.RAID_TIERS[0]) ? '#e0574c' : 'var(--ui-line)'}`, background: RD.raidEligible(roster, RD.RAID_TIERS[0]) ? '#e0574c1a' : 'transparent' }}>
+          <div className="font-bold" style={{ fontSize: 14, color: RD.raidEligible(roster, RD.RAID_TIERS[0]) ? '#ff8a80' : PALETTE.textDim }}>⚔ 원정대 레이드 「다섯 봉인」</div>
+          <div style={{ fontSize: 11.5, color: PALETTE.textDim }}>{RD.raidEligible(roster, RD.RAID_TIERS[0]) ? '다섯 캐릭터가 함께 싸운다 — 각자 자기 봉인을 깨야 보스에 닿는다' : '다섯 캐릭터 모두 Lv.60이 되면 입장 — 눌러서 규칙 보기'}</div>
+        </button>
 
         <GlassPanel className="p-3" style={{ fontSize: 12 }}>
           <div className="font-semibold" style={{ fontSize: 13.5, color: PALETTE.text }}>원정대 의뢰 <span style={{ fontSize: 11, color: PALETTE.textDim, fontWeight: 400 }}>— 계정 목표 · 보상은 모든 캐릭터 공유</span></div>
@@ -2156,10 +2238,23 @@ export default function ChronicleGame({ onExit }) {
     setBattle({ sim, enemies: enc.enemies, party, summary: r.summary, ctx, key: Date.now() });
     setView('battle');
   };
+  // 원정대 레이드 (1.231.0) — 계정 단위: 5캐릭 파티 · 결과·보상은 계정에 직접
+  const fightRaid = (tierId) => {
+    const tier = RD.raidTier(tierId);
+    if (!tier) return;
+    const enemies = RD.buildRaidEnemies(tier);
+    const party = A.raidParty(acc);
+    const sim = E.simulateChronicleBattle(party, enemies, rng);
+    const r = RD.applyRaidResult(acc, tierId, sim.result === 'win', E.kstDateKey());
+    setAcc(r.acc);
+    setBattle({ sim, enemies, party, summary: r.summary, ctx: { kind: 'raid', type: 'raid', enemies, label: `원정대 레이드 · ${tier.name}`, tierId }, key: Date.now() });
+    setView('battle');
+  };
   const afterBattle = () => {
     const ctx = battle?.ctx;
     setBattle(null);
-    if (ctx?.kind === 'dungeon') setView(save.dungeon ? 'dungeon' : 'town');
+    if (ctx?.kind === 'raid') setView('raid');
+    else if (ctx?.kind === 'dungeon') setView(save.dungeon ? 'dungeon' : 'town');
     else if (ctx?.kind === 'tower') setView('tower');
     else setView(battle?.sim.result === 'win' ? 'field' : 'town');
   };
@@ -2195,8 +2290,10 @@ export default function ChronicleGame({ onExit }) {
     );
   } else if (view === 'party') {
     content = <PartyView save={save} setSave={setSave} onBack={() => setView('town')} />;
+  } else if (view === 'raid') {
+    content = <RaidView save={save} onBack={() => setView('roster')} onFight={fightRaid} />;
   } else if (view === 'roster') {
-    content = <RosterView save={save} setSave={setSave} flash={flash} onBack={() => setView('town')} onSwitchChar={() => setView('title')} />;
+    content = <RosterView save={save} setSave={setSave} flash={flash} onBack={() => setView('town')} onSwitchChar={() => setView('title')} onRaid={() => setView('raid')} />;
   } else if (view === 'bag') {
     content = <BagView save={save} setSave={setSave} onBack={() => setView('town')} flash={flash} />;
   } else if (view === 'tower') {
