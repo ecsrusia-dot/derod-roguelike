@@ -25,6 +25,8 @@ export const CHRONICLE_TUNING = {
   enemyTier: { normal: { hp: 1, atk: 1 }, elite: { hp: 3.2, atk: 1.4 }, boss: { hp: 3.8, atk: 1.35 } },
   // 2.0 솔로 보정 — 적 전체 배율 · 경험치 배율 (난이도 체감 조정은 여기)
   soloHp: 0.9, soloAtk: 1.3, soloGrowth: 0.055, expMult: 3,
+  // 레벨 차이 경험치 감쇠 (1.234.1 PM 결정) — 몹이 나보다 free레벨 넘게 낮으면 1레벨당 perLv씩 감소, 최저 min
+  expGap: { free: 5, perLv: 0.15, min: 0.1 },
   // 던전 솔로 보정 (1.214.0) — 층 사이 회복이 없으므로 던전 적만 따로 낮춘다 · 층당 적 수
   holyCap: 0.2, // 치유→신성 피해 합계 상한 (1.216.0 — 사제 + 사역마 조합 독주 보정)
   shieldCap: 0.15, // 시작 보호막 합계 상한 (1.216.0)
@@ -367,9 +369,10 @@ export const dungeonDef = (id) => CHRONICLE_DUNGEONS.find(d => d.id === id) || C
 
 // 난이도 — 이전 단계 보스를 쓰러뜨리면 다음 단계 개방
 export const DUNGEON_TIERS = [
-  { id: 'normal', label: '일반', color: '#a89a88', lv: 0, hp: 1, atk: 1, epicMult: 1, shardMult: 1, keyCost: 1 },
-  { id: 'heroic', label: '영웅', color: '#6aa6e0', lv: 3, hp: 1.5, atk: 1.25, epicMult: 1.6, shardMult: 2, keyCost: 2 },
-  { id: 'legend', label: '전설', color: '#e8b04a', lv: 6, hp: 2.6, atk: 1.8, epicMult: 2.4, shardMult: 3, keyCost: 3 },
+// expMult (1.234.1) — 경험치는 HP 배율이 아니라 이 고정 보너스로 (전설 HP ×2.6이 경험치 ×2.6이 되던 문제)
+  { id: 'normal', label: '일반', color: '#a89a88', lv: 0, hp: 1, atk: 1, epicMult: 1, shardMult: 1, keyCost: 1, expMult: 1 },
+  { id: 'heroic', label: '영웅', color: '#6aa6e0', lv: 3, hp: 1.5, atk: 1.25, epicMult: 1.6, shardMult: 2, keyCost: 2, expMult: 1.2 },
+  { id: 'legend', label: '전설', color: '#e8b04a', lv: 6, hp: 2.6, atk: 1.8, epicMult: 2.4, shardMult: 3, keyCost: 3, expMult: 1.4 },
 ];
 
 // 적 일러 경로 (본편 헬퍼와 같은 규칙, ./ 상대 경로)
