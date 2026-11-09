@@ -24,7 +24,6 @@ export const TOWER = {
 
 // 첨탑 상점 — 주화로 구매 (모든 캐릭터 공유)
 export const TOWER_SHOP = [
-  { id: 'ticket', name: '🎫 사역마 소환권', desc: '사역마 1회 소환', cost: 60 },
   { id: 'shards', name: '📜 계약서 조각 ×10', desc: '사역마 소환 1회분', cost: 50 },
   { id: 'key', name: '🗝 던전 열쇠', desc: '던전 입장권 1개 (최대 보유량까지)', cost: 40 },
   { id: 'ancient', name: '◆ 고대 파편 ×5', desc: '에픽 승급 재료', cost: 50 },

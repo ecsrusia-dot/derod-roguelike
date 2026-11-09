@@ -2,7 +2,7 @@
 // chronicle/daily.js — 일일 임무 (1.233.0)
 // ============================================
 // PM 결정 (점검 보고 4번): 하루 단위 목표 — KST 0시 초기화 · 계정 공유(어느 캐릭터로 해도 진행)
-//   보상은 사냥으로 쉽게 못 모으는 재화 위주 (계약서 조각·열쇠·사역혼·소환권)
+//   보상은 사냥으로 쉽게 못 모으는 재화 위주 (계약서 조각·열쇠·사역혼)
 //   계정 필드 daily = { date, prog: {metric: n}, claimed: {id: true}, bonus: bool }
 // 순수 함수 (engine·data만 import)
 // ============================================
@@ -17,9 +17,9 @@ export const DAILY_MISSIONS = [
   { id: 'd_forge', icon: '⚒', title: '대장간 강화·승급 3회 시도', metric: 'forge', need: 3, reward: { gold: 5000 } },
   { id: 'd_summon', icon: '🐾', title: '사역마 1회 소환', metric: 'summon', need: 1, reward: { famSoul: 10 } },
 ];
-export const DAILY_BONUS = { reward: { sealPlus: 1 } }; // 5개 모두 받으면
+export const DAILY_BONUS = { reward: { famShard: 10 } }; // 5개 모두 받으면 (1.233.1 소환권 1장 → 조각 10개)
 
-const REWARD_LBL = { gold: ['🪙', '골드'], famShard: ['📜', '계약서 조각'], keys: ['🗝', '던전 열쇠'], essence: ['✦', '정수'], famSoul: ['🔮', '사역혼'], sealPlus: ['🎫', '소환권'] };
+const REWARD_LBL = { gold: ['🪙', '골드'], famShard: ['📜', '계약서 조각'], keys: ['🗝', '던전 열쇠'], essence: ['✦', '정수'], famSoul: ['🔮', '사역혼'] };
 export const dailyRewardText = (r) => Object.entries(r).map(([k, v]) => `${(REWARD_LBL[k] || ['', k])[0]} ${(REWARD_LBL[k] || ['', k])[1]} ${v.toLocaleString()}`).join(' · ');
 
 // 오늘 상태 (날짜가 바뀌었으면 비운 상태)

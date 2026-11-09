@@ -26,7 +26,9 @@ export function ensureQuestFields(save) {
   s.fams = s.fams || {};
   s.famTeam = s.famTeam || {};
   s.famPity = s.famPity || { total: 0, sinceViolet: 0 };
-  s.mats = { famShard: 0, famSoul: 0, sealPlus: 0, towerCoin: 0, talentScroll: 0, ...s.mats };
+  s.mats = { famShard: 0, famSoul: 0, towerCoin: 0, talentScroll: 0, ...s.mats };
+  // 소환권 폐지 (1.233.1) — 보유 소환권 1장 = 계약서 조각 10개로 환산 (환산 후 0이라 반복 실행해도 안전)
+  if (s.mats.sealPlus > 0) s.mats = { ...s.mats, famShard: (s.mats.famShard || 0) + s.mats.sealPlus * 10, sealPlus: 0 };
   s.tower = s.tower || { best: 0, checkpoint: 0, run: null };
   // 마스터리 폐지 (1.224.0) — 찍은 마스터리는 전부 스킬 포인트로 환급 (반복 실행해도 안전)
   for (const u of Object.values(s.units || {})) {

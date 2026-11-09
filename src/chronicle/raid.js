@@ -59,8 +59,9 @@ export function buildRaidEnemies(tier) {
 
 // 보상 — 단계별 하루 1회 (KST) + 첫 클리어 보너스. 재화는 계정 공유
 export function raidReward(i, first) {
-  const r = { gold: 4000 * (i + 1), sealPlus: 1 + Math.floor(i / 2), famSoul: 20 * (i + 1) };
-  if (first) { r.sealPlus += 3; r.talentScroll = 1 + Math.floor(i / 3); }
+  // 1.233.1 소환권 폐지 → 계약서 조각 (소환권 1장 = 조각 10개)
+  const r = { gold: 4000 * (i + 1), famShard: 10 * (1 + Math.floor(i / 2)), famSoul: 20 * (i + 1) };
+  if (first) { r.famShard += 30; r.talentScroll = 1 + Math.floor(i / 3); }
   return r;
 }
 // 결과 반영 (계정 단위) → { acc, summary }

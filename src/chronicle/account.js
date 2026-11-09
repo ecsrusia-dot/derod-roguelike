@@ -13,12 +13,12 @@ import { buildRoster, peakOf } from './roster.js';
 
 const clone = (o) => (typeof structuredClone === 'function' ? structuredClone(o) : JSON.parse(JSON.stringify(o)));
 
-// 1.x 저장이 있던 플레이어 시작 보상 (설계서 8절) — sealPlus는 1.212.0부터 「사역마 소환권」
-export const V1_GIFT = { gold: 3000, keys: 5, sealPlus: 3, rareBoxes: 2 };
+// 1.x 저장이 있던 플레이어 시작 보상 (설계서 8절) — 1.233.1 소환권 폐지로 계약서 조각 30개(= 소환 3회)
+export const V1_GIFT = { gold: 3000, keys: 5, famShard: 30, rareBoxes: 2 };
 
 export function newAccount(hadV1 = false) {
   return {
-    v: 2, gold: 50, mats: { essence: 0, shard: 0, seal: 0, sealPlus: 0 },
+    v: 2, gold: 50, mats: { essence: 0, shard: 0, seal: 0, famShard: 0 },
     keys: { count: DUNGEON_KEYS.dailyRefill, refillDate: E.kstDateKey(), boughtDate: null, bought: 0 },
     stash: [], nextUid: 1, bossDaily: null, chars: {}, active: null, fams: {}, famPity: { total: 0, sinceViolet: 0 },
     gift: hadV1 ? { ...V1_GIFT } : null, giftNotice: hadV1, createdAt: Date.now(),
@@ -39,7 +39,7 @@ export function createCharacter(acc0, classId, rng = Math.random) {
     const g = acc.gift;
     acc.gold += g.gold;
     acc.keys.count = Math.min(DUNGEON_KEYS.max, acc.keys.count + g.keys);
-    acc.mats.sealPlus = (acc.mats.sealPlus || 0) + g.sealPlus;
+    acc.mats.famShard = (acc.mats.famShard || 0) + (g.famShard || 0) + (g.sealPlus || 0) * 10; // 구 gift(sealPlus) 호환
     for (let i = 0; i < g.rareBoxes; i++) {
       const it = E.makeItem(rng, { cls: classId, slot: CLASS_SLOTS[i % CLASS_SLOTS.length], grade: 'rare', ilv: 8 });
       acc.chars[classId].bag.push({ ...it, uid: acc.nextUid++ });

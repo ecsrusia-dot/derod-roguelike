@@ -14,7 +14,7 @@ const LAST = CHRONICLE_FIELDS[CHRONICLE_FIELDS.length - 1].id;
 // 1.226.0 — 사역마 실제 능력치 기준 (단, 실효 레벨이 주인공의 60% 미만이어도 등급이 높으면 데려가서 키운다)
 const famScore = (k, f, hlv = 1) => { const st = famStats(k, { ...f, lv: Math.max(f.lv || 1, Math.round(hlv * 0.6)) }, hlv); return st.atk + st.maxHp * 0.25 + st.healPower; };
 function famUpkeep(save, rng) {
-  while ((save.mats.famShard || 0) >= 10) { const r = E.summonFam(save, save.mats.famShard >= 100 ? 10 : 1, false, rng); save = r.save; }
+  while ((save.mats.famShard || 0) >= 10) { const r = E.summonFam(save, save.mats.famShard >= 100 ? 10 : 1, rng); save = r.save; }
   const hlv = save.units[save.hero].lv;
   const ranked = Object.entries(save.fams).sort((a, b) => famScore(b[0], b[1], hlv) - famScore(a[0], a[1], hlv)).map(x => x[0]);
   if (!ranked.length) return save;

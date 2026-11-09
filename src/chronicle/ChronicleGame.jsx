@@ -622,7 +622,7 @@ function TownView({ save, acc, go, onExit, onSwitchChar }) {
     const rq = R.rosterQuestBadge(save); if (rq) L.push({ id: 'roster', icon: '🏳', t: `원정대 의뢰 보상 ${rq}건` });
     const rd = RD.RAID_TIERS.filter((t, i) => RD.raidUnlocked(save.roster, save.raid, i) && !(save.raid?.daily?.date === E.kstDateKey() && save.raid.daily.done?.[t.id])).length;
     if (rd) L.push({ id: 'raid', icon: '⚔', t: `원정대 레이드 오늘 보상 ${rd}단계 남음` });
-    if (E.famSlotOpen(save, 'main') && ((save.mats.famShard || 0) >= F.FAM_TUNING.shardsPerSummon || (save.mats.sealPlus || 0) > 0)) L.push({ id: 'fam', icon: '🐾', t: '사역마 소환 가능' });
+    if (E.famSlotOpen(save, 'main') && (save.mats.famShard || 0) >= F.FAM_TUNING.shardsPerSummon) L.push({ id: 'fam', icon: '🐾', t: '사역마 소환 가능' });
     if (E.dungeonUnlocked(save) && !save.dungeon && E.keyCount(save) >= DUNGEON_KEYS.max) L.push({ id: 'dungeon', icon: '🗝', t: `열쇠가 가득 참 (${E.keyCount(save)}개) — 던전으로` });
     if (save.inventory.length >= E.bagMax(save) * 0.9) L.push({ id: 'bag', icon: '🎒', t: `가방이 거의 가득 참 (${save.inventory.length}/${E.bagMax(save)})` });
     return L.slice(0, 3);
@@ -636,7 +636,7 @@ function TownView({ save, acc, go, onExit, onSwitchChar }) {
     { id: 'raid', icon: '⚔', label: '원정대 레이드', sub: (() => { const n = RD.RAID_TIERS.filter((t, i) => RD.raidUnlocked(save.roster, save.raid, i)).length; return n ? `「다섯 봉인」 ${n}단계 도전 가능` : '다섯 캐릭터 모두 Lv.60이면 입장'; })(), badge: RD.RAID_TIERS.some((t, i) => RD.raidUnlocked(save.roster, save.raid, i) && !(save.raid?.daily?.date === E.kstDateKey() && save.raid.daily.done?.[t.id])) },
     { id: 'roster', icon: '🏳', label: '원정대', sub: R.rosterQuestBadge(save) ? `의뢰 보상 ${R.rosterQuestBadge(save)}건` : `레벨 상한 ${E.levelCapOf(save)} · 전역 버프 · 의뢰`, badge: R.rosterQuestBadge(save) > 0 },
     { id: 'bag', icon: '🎒', label: '가방', sub: `${save.inventory.length}/${E.bagMax(save)}${save.inventory.some(i => !E.itemUsable(i, save.hero)) ? ' · 다른 직업 장비 있음' : ''}` },
-    { id: 'fam', icon: '🐾', label: '사역마', sub: E.famSlotOpen(save, 'main') ? `📜 ${save.mats.famShard || 0} · 보유 ${Object.keys(save.fams || {}).length}` : `Lv.${F.FAM_TUNING.slotLv.main}부터 동행`, badge: (save.mats.famShard || 0) >= F.FAM_TUNING.shardsPerSummon || (save.mats.sealPlus || 0) > 0 },
+    { id: 'fam', icon: '🐾', label: '사역마', sub: E.famSlotOpen(save, 'main') ? `📜 ${save.mats.famShard || 0} · 보유 ${Object.keys(save.fams || {}).length}` : `Lv.${F.FAM_TUNING.slotLv.main}부터 동행`, badge: (save.mats.famShard || 0) >= F.FAM_TUNING.shardsPerSummon },
     { id: 'stash', icon: '🏛', label: '공용 창고', sub: `${(save.stash || []).length}/${A.STASH_MAX} · 모든 캐릭터 공유` },
     { id: 'forge', icon: '⚒', label: '대장간', sub: '강화 · 등급 승급' },
     { id: 'daily', icon: '📅', label: '일일 임무', sub: (() => { const n = D.DAILY_MISSIONS.filter(m => D.missionState(acc, m).status !== 'progress').length; return `오늘 ${n}/${D.DAILY_MISSIONS.length} 달성`; })(), badge: D.dailyBadge(acc) > 0 },
@@ -1493,7 +1493,6 @@ function FamiliarView({ save, setSave, onBack, flash, onTrack = () => {} }) {
   const [preview, setPreview] = useState(null); // 효율 미리보기 (1.232.0)
   const fams = save.fams || {};
   const shards = save.mats.famShard || 0;
-  const tickets = save.mats.sealPlus || 0;
   const souls = save.mats.famSoul || 0;
   const heroLv = save.units[save.hero]?.lv || 1;
   const per = F.FAM_TUNING.shardsPerSummon;
@@ -1501,9 +1500,9 @@ function FamiliarView({ save, setSave, onBack, flash, onTrack = () => {} }) {
   const pity = save.famPity || { total: 0, sinceViolet: 0 };
   const team = save.famTeam || {};
   const list = Object.entries(fams).sort((a, b) => F.famGradeIdx(b[1].grade) - F.famGradeIdx(a[1].grade) || b[1].plus - a[1].plus);
-  const doSummon = (n, ticket) => {
-    const r = E.summonFam(save, n, ticket);
-    if (!r.results) { flash(ticket ? '소환권이 부족합니다' : '계약서 조각이 부족합니다'); return; }
+  const doSummon = (n) => {
+    const r = E.summonFam(save, n);
+    if (!r.results) { flash('계약서 조각이 부족합니다'); return; }
     setSave(r.save); setResults(r.results); onTrack({ summon: r.results.length });
   };
   const slots = [
@@ -1515,7 +1514,7 @@ function FamiliarView({ save, setSave, onBack, flash, onTrack = () => {} }) {
   const tabBtn = (id, label) => <button key={id} onClick={() => setTab(id)} className="ui-press flex-1" style={{ height: 36, borderRadius: 10, fontSize: 12, border: `1px solid ${tab === id ? PALETTE.legendary : 'var(--ui-line)'}`, color: tab === id ? PALETTE.legendary : PALETTE.text, background: 'transparent' }}>{label}</button>;
   return (
     <div className="absolute inset-0 flex flex-col">
-      <Header title="사역마" onBack={onBack} right={<div className="flex items-center gap-2" style={{ fontSize: 12 }}><span style={{ color: '#d07ae8' }}>📜{shards}</span><span style={{ color: PALETTE.legendary }}>🎫{tickets}</span><span style={{ color: '#9cc4e4' }}>🔮{souls}</span></div>} />
+      <Header title="사역마" onBack={onBack} right={<div className="flex items-center gap-2" style={{ fontSize: 12 }}><span style={{ color: '#d07ae8' }}>📜{shards}</span><span style={{ color: '#9cc4e4' }}>🔮{souls}</span></div>} />
       <div className="flex gap-1.5 px-3 pt-2 flex-none">{tabBtn('summon', '소환')}{tabBtn('list', `보관함 ${list.length}`)}{tabBtn('team', '편성')}{tabBtn('bond', `인연 ${F.FAM_BONDS.filter(b => F.bondTier(fams, b) > 0).length}`)}</div>
       <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
         {tab === 'summon' && (
@@ -1541,7 +1540,6 @@ function FamiliarView({ save, setSave, onBack, flash, onTrack = () => {} }) {
               <UIButton variant="ghost" disabled={shards < per} onClick={() => doSummon(1, false)}>1회 소환 📜{per}</UIButton>
               <UIButton disabled={shards < per * 10} onClick={() => doSummon(10, false)}>10연 소환 📜{per * 10}</UIButton>
             </div>
-            {tickets > 0 && <UIButton variant="gold" onClick={() => doSummon(1, true)}>🎫 소환권으로 1회 소환 (남은 {tickets}장)</UIButton>}
             <GlassPanel className="p-3" style={{ fontSize: 11.5, color: PALETTE.textDim, lineHeight: 1.6 }}>
               <b style={{ color: PALETTE.text }}>중복</b> → 🔮 사역혼 (적 1 · 녹 3 · 청 10 · 남 30 · 자 100). 더 높은 등급으로 중복이 나오면 그 등급으로 올라간다.<br />
               <b style={{ color: PALETTE.text }}>강화</b> +1~+{F.FAM_TUNING.maxPlus} (단계당 능력치 +{Math.round(F.FAM_TUNING.plusStatPct * 100)}%) → <b style={{ color: PALETTE.text }}>+{F.FAM_TUNING.maxPlus}에서 진화</b> 도전 — 실패하면 강화 -{F.FAM_TUNING.evolveFailDrop}단계.
@@ -2063,7 +2061,7 @@ function GiftNotice({ acc, onClose }) {
         <GlassPanel className="p-3 mt-3">
           <div>🪙 골드 {g.gold.toLocaleString()}</div>
           <div>🗝 던전 열쇠 +{g.keys}</div>
-          <div>🎫 사역마 소환권 {g.sealPlus}장</div>
+          <div>📜 계약서 조각 {g.famShard ?? (g.sealPlus || 0) * 10}개 (사역마 소환 {Math.floor((g.famShard ?? (g.sealPlus || 0) * 10) / F.FAM_TUNING.shardsPerSummon)}회분)</div>
           <div>🎁 첫 캐릭터 직업 희귀 장비 {g.rareBoxes}개</div>
         </GlassPanel>
         <div className="mt-2" style={{ fontSize: 11.5, color: PALETTE.textDim }}>{Object.keys(acc.chars || {}).length ? '보상은 지급되었습니다.' : '첫 캐릭터를 만들면 지급됩니다.'}</div>
@@ -2224,7 +2222,6 @@ function OfflineSheet({ pd, onClaim }) {
         <div style={{ fontSize: 11 }}>최대 {O.OFFLINE.maxMs / 3600000}시간 · 접속 중 ×1 효율의 {Math.round(O.OFFLINE.eff * 100)}% · 승률 {Math.round(pd.winRate * 100)}% 반영</div>
       </div>
       <div className="mt-3 flex flex-col gap-1 text-center" style={{ fontSize: 14, color: PALETTE.text }}>
-        <div>경험치 <b style={{ color: PALETTE.legendary }}>+<CountUp v={pd.exp} /></b></div>
         <div>🪙 <b style={{ color: PALETTE.legendary }}>+<CountUp v={pd.gold} /></b> · ✦ <b>+{pd.essence}</b></div>
       </div>
       <UIButton style={{ height: 44, marginTop: 14 }} onClick={onClaim}>받기</UIButton>
@@ -2687,7 +2684,7 @@ export default function ChronicleGame({ onExit }) {
       const sv = saveRef.current;
       if (!last || !sv) return;
       const rw = O.offlineReward(sv, P.previewTarget(sv, readLastHunt()), Date.now() - last);
-      if (rw && (rw.exp || rw.gold)) setAcc(a => ({ ...a, offline: { pending: O.mergeOffline(a.offline?.pending, rw) } }));
+      if (rw && (rw.gold || rw.essence)) setAcc(a => ({ ...a, offline: { pending: O.mergeOffline(a.offline?.pending, rw) } }));
     };
     check();
     const iv = setInterval(() => { if (document.visibilityState === 'visible') stamp(); }, 30000);
@@ -2699,7 +2696,7 @@ export default function ChronicleGame({ onExit }) {
   const claimOffline = () => {
     const pd = acc.offline?.pending;
     setAcc(a => O.claimOffline(a).acc);
-    if (pd) flash(`오프라인 보상 — 경험치 +${pd.exp.toLocaleString()} · 🪙 +${pd.gold.toLocaleString()}`);
+    if (pd) flash(`오프라인 보상 — 🪙 +${pd.gold.toLocaleString()} · ✦ +${pd.essence}`);
   };
   const flash = (msg) => { setToast(msg); setTimeout(() => setToast(t => (t === msg ? null : t)), 1600); };
 
