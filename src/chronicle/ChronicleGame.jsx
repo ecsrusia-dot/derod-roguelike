@@ -1118,6 +1118,62 @@ function FamCard({ k, f, onClick, right, size = 46, heroLv = 0 }) {
     </button>
   );
 }
+// ===== 사역마 인연 (1.228.0) =====
+function FamBondView({ fams, onPick }) {
+  const own = F.famOwnFx(fams);
+  const ownN = Object.values(fams).filter(f => F.famGradeIdx(f.grade) >= F.FAM_OWN_MIN_GRADE).length;
+  const bondFx = F.famBondFx(fams);
+  const groups = ['region', 'pack', 'special'];
+  return (
+    <>
+      <GlassPanel className="p-3" style={{ fontSize: 12, lineHeight: 1.6 }}>
+        <div className="font-semibold" style={{ fontSize: 13.5, color: PALETTE.text }}>컬렉션 효과 <span style={{ fontSize: 11, color: PALETTE.textDim, fontWeight: 400 }}>— 가지고만 있으면 적용 (편성 무관)</span></div>
+        <div><b style={{ color: '#c79bff' }}>보유 효과</b> <span style={{ color: PALETTE.textDim }}>(남령 이상 {ownN}마리)</span> — <span style={{ color: PALETTE.text }}>{F.famFxText(own) || '없음'}</span></div>
+        <div><b style={{ color: PALETTE.legendary }}>인연</b> <span style={{ color: PALETTE.textDim }}>({F.FAM_BONDS.filter(b => F.bondTier(fams, b) > 0).length}/{F.FAM_BONDS.length})</span> — <span style={{ color: PALETTE.text }}>{F.famFxText(bondFx) || '없음'}</span></div>
+        <div style={{ fontSize: 11, color: PALETTE.textDim }}>보유 효과 합계 상한: 공격·HP·방어 +30% · 치명타 피해 +60% · 받는 피해 감소 8% · 재생 1%</div>
+        <div style={{ fontSize: 11, color: PALETTE.textDim }}>인연 1단계 = 구성원 모두 보유 · 2단계 = 모두 지정 등급 이상 + 강화 +{F.BOND_TIER2_PLUS} 이상 (효과 2배)</div>
+      </GlassPanel>
+      {groups.map(kind => (
+        <div key={kind} className="flex flex-col gap-2">
+          <div className="font-semibold" style={{ fontSize: 13, color: PALETTE.text }}>{F.FAM_BOND_KIND[kind]}</div>
+          {F.FAM_BONDS.filter(b => b.kind === kind).map(b => {
+            const t = F.bondTier(fams, b);
+            const have = b.members.filter(k => fams[k]).length;
+            const g2 = F.famGrade(b.tier2Grade);
+            return (
+              <GlassPanel key={b.id} className="p-2.5" style={{ border: `1px solid ${t === 2 ? PALETTE.legendary : t === 1 ? '#c79bff88' : 'var(--ui-line)'}` }}>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold truncate" style={{ fontSize: 13, color: t ? PALETTE.text : PALETTE.textDim }}>{b.name}</span>
+                  <span className="flex-none" style={{ fontSize: 11.5, fontWeight: 700, color: t === 2 ? PALETTE.legendary : t === 1 ? '#c79bff' : PALETTE.textDim }}>{t ? `${t}단계 발동` : `${have}/${b.members.length}`}</span>
+                </div>
+                <div style={{ fontSize: 11, color: PALETTE.textDim }}>{b.desc}</div>
+                <div className="flex gap-1.5 mt-1.5 flex-wrap">
+                  {b.members.map(k => {
+                    const f = fams[k];
+                    const g = f ? F.famGrade(f.grade) : null;
+                    return (
+                      <button key={k} onClick={() => onPick(k)} className="ui-press flex flex-col items-center" style={{ width: 52, background: 'transparent', border: 'none', padding: 0 }}>
+                        <img src={chronicleEnemyArt(k)} alt="" className="object-cover" style={{ width: 44, height: 44, borderRadius: 10, border: `1.5px solid ${g ? g.color : 'var(--ui-line)'}`, filter: f ? 'none' : 'grayscale(1) brightness(.45)' }} draggable={false} />
+                        <span className="truncate w-full text-center" style={{ fontSize: 10, color: g ? g.color : PALETTE.textDim }}>{g ? `${g.label}${f.plus ? `+${f.plus}` : ''}` : '미보유'}</span>
+                        <span className="truncate w-full text-center" style={{ fontSize: 10, color: PALETTE.textDim }}>{F.famName(k)}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="mt-1" style={{ fontSize: 11.5 }}>
+                  <span style={{ color: t >= 1 ? '#c79bff' : PALETTE.textDim }}>1단계 {F.famFxText(b.fx)}</span>
+                  <span style={{ color: PALETTE.textDim }}> · </span>
+                  <span style={{ color: t === 2 ? PALETTE.legendary : PALETTE.textDim }}>2단계 {F.famFxText(Object.fromEntries(Object.entries(b.fx).map(([k, v]) => [k, v * 2])))} <span style={{ fontSize: 10.5 }}>({g2.label} 이상·+{F.BOND_TIER2_PLUS})</span></span>
+                </div>
+              </GlassPanel>
+            );
+          })}
+        </div>
+      ))}
+    </>
+  );
+}
+
 function FamiliarView({ save, setSave, onBack, flash }) {
   const [tab, setTab] = useState('summon');
   const [results, setResults] = useState(null);
@@ -1148,7 +1204,7 @@ function FamiliarView({ save, setSave, onBack, flash }) {
   return (
     <div className="absolute inset-0 flex flex-col">
       <Header title="사역마" onBack={onBack} right={<div className="flex items-center gap-2" style={{ fontSize: 12 }}><span style={{ color: '#d07ae8' }}>📜{shards}</span><span style={{ color: PALETTE.legendary }}>🎫{tickets}</span><span style={{ color: '#9cc4e4' }}>🔮{souls}</span></div>} />
-      <div className="flex gap-1.5 px-3 pt-2 flex-none">{tabBtn('summon', '소환')}{tabBtn('list', `보관함 ${list.length}`)}{tabBtn('team', '편성')}</div>
+      <div className="flex gap-1.5 px-3 pt-2 flex-none">{tabBtn('summon', '소환')}{tabBtn('list', `보관함 ${list.length}`)}{tabBtn('team', '편성')}{tabBtn('bond', `인연 ${F.FAM_BONDS.filter(b => F.bondTier(fams, b) > 0).length}`)}</div>
       <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
         {tab === 'summon' && (
           <>
@@ -1186,6 +1242,7 @@ function FamiliarView({ save, setSave, onBack, flash }) {
             {!list.length && <div className="text-center py-10" style={{ fontSize: 12.5, color: PALETTE.textDim }}>아직 사역마가 없습니다 — 계약서 조각을 모아 소환하세요</div>}
           </>
         )}
+        {tab === 'bond' && <FamBondView fams={fams} onPick={(k) => fams[k] && setSel(k)} />}
         {tab === 'team' && slots.map(sl => {
           const open = E.famSlotOpen(save, sl.id);
           const k = team[sl.id];
@@ -1200,7 +1257,7 @@ function FamiliarView({ save, setSave, onBack, flash }) {
           );
         })}
         {tab === 'team' && <FamRoleGuide heroCls={save.hero} />}
-        {tab === 'team' && <div style={{ fontSize: 11.5, color: PALETTE.textDim, lineHeight: 1.6 }}>동행 사역마는 주인공 능력치 × 사역마 레벨 비율로 강해진다 (역할·등급·강화 반영). 새 사역마는 Lv.1 — 동행 칸에서 이길 때만 경험치를 받고, 주인공 레벨이 상한. 보조 칸은 사역마마다 경험치·골드·아이템 획득 중 하나를 더 준다. 주인공이 쓰러지면 패배. 사역마는 모든 캐릭터가 함께 쓴다.</div>}
+        {tab === 'team' && <div style={{ fontSize: 11.5, color: PALETTE.textDim, lineHeight: 1.6 }}>동행 사역마의 능력치는 사역마 자신의 레벨·등급·강화·역할로 정해진다 (주인공 직업과 무관). 새 사역마는 Lv.1 — 동행 칸에서 이길 때만 경험치를 받고, 주인공 레벨이 상한. 보조 칸은 사역마마다 경험치·골드·아이템 획득 중 하나를 더 준다. 주인공이 쓰러지면 패배. 사역마는 모든 캐릭터가 함께 쓴다.</div>}
       </div>
 
       {results && (
@@ -1238,6 +1295,8 @@ function FamiliarView({ save, setSave, onBack, flash }) {
               <div><b>동행</b> <span style={{ color: PALETTE.textDim }}>— {gi >= F.FAM_SIG_MIN_GRADE ? `★${F.famSignature(sel, selF.grade).name} · ` : ''}{F.FAM_SKILLS[F.famRole(sel)].map(x => x.name).join(' · ')}{F.FAM_ROLES[F.famRole(sel)].guard ? ` · 수호 태세: 적 공격의 ${Math.round(F.FAM_ROLES[F.famRole(sel)].guard[gi] * 100)}%를 대신 받음` : ''}</span></div>
               <div><b>보조</b> <span style={{ color: PALETTE.textDim }}>— {F.famSubText(sel, selF, heroLv)}</span></div>
               <div><b>재화 특성</b> <span style={{ color: PALETTE.textDim }}>— {F.FAM_ECON[F.famEconId(sel)].icon} {F.FAM_ECON[F.famEconId(sel)].label} (보조 칸에서만)</span></div>
+              <div><b style={{ color: gi >= F.FAM_OWN_MIN_GRADE ? '#c79bff' : PALETTE.text }}>보유 효과</b> <span style={{ color: PALETTE.textDim }}>— {gi >= F.FAM_OWN_MIN_GRADE ? `${F.famFxText(F.famOwnValues(sel, selF))} (편성 안 해도 적용)` : '남령으로 진화하면 열린다 — 가지고만 있어도 적용되는 패시브'}</span></div>
+              {(() => { const bs = F.FAM_BONDS.filter(b => b.members.includes(sel)); return bs.length ? <div><b>인연</b> <span style={{ color: PALETTE.textDim }}>— {bs.map(b => `${b.name}${F.bondTier(fams, b) ? ` (${F.bondTier(fams, b)}단계)` : ''}`).join(' · ')}</span></div> : null; })()}
             </GlassPanel>
             <GlassPanel className="p-2.5 mt-2" style={{ fontSize: 12, color: PALETTE.text }}>
               <div className="flex items-center justify-between">
