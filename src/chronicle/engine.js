@@ -555,7 +555,7 @@ export function setFamTeam(save0, slot, key) {
 export function partyCombatants(save, hpMap = null) {
   const list = save.party.map(cid => {
     const d = deriveUnit(save, cid);
-    const hp = hpMap && hpMap[cid] != null ? Math.min(d.maxHp, hpMap[cid]) : d.maxHp;
+    const hp = hpMap && hpMap[cid] != null ? Math.min(d.maxHp, hpMap[cid] + Math.round(d.maxHp * (T.dungeonFloorHeal || 0))) : d.maxHp;
     return { ...d, hp, leader: cid === save.hero };
   });
   const mk = activeMain(save);
@@ -640,10 +640,12 @@ export function dungeonEncounter(d, rng) {
   const D = dungeonDef(d.id);
   const tier = DUNGEON_TIERS[d.tier || 0];
   const f = D.floors[d.floor];
-  const area = { hpMult: D.area.hpMult * tier.hp, atkMult: D.area.atkMult * tier.atk };
+  const ds = T.dungeonSolo || { hp: 1, atk: 1 };
+  const area = { hpMult: D.area.hpMult * tier.hp * ds.hp, atkMult: D.area.atkMult * tier.atk * ds.atk };
   const lv = f.lv + tier.lv;
   if (f.boss) return { type: 'dungeonBoss', enemies: [buildChronicleEnemy(f.enemies[0], lv, 'e0', area)] };
-  const n = Math.min(3, 2 + (rng() < 0.5 ? 1 : 0));
+  const [n0, n1] = T.dungeonFloorEnemies || [2, 3];
+  const n = n0 + Math.floor(rng() * (n1 - n0 + 1));
   const enemies = [];
   for (let i = 0; i < n; i++) enemies.push(buildChronicleEnemy(pick(rng, f.enemies), lv, `e${i}`, area));
   return { type: 'dungeonFloor', enemies };

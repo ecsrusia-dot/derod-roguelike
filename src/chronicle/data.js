@@ -25,6 +25,8 @@ export const CHRONICLE_TUNING = {
   enemyTier: { normal: { hp: 1, atk: 1 }, elite: { hp: 3.2, atk: 1.4 }, boss: { hp: 3.8, atk: 1.35 } },
   // 2.0 솔로 보정 — 적 전체 배율 · 경험치 배율 (난이도 체감 조정은 여기)
   soloHp: 0.9, soloAtk: 1.3, soloGrowth: 0.055, expMult: 3,
+  // 던전 솔로 보정 (1.214.0) — 층 사이 회복이 없으므로 던전 적만 따로 낮춘다 · 층당 적 수
+  dungeonSolo: { hp: 0.6, atk: 0.75 }, dungeonFloorEnemies: [1, 2], dungeonFloorHeal: 0.25, // 던전 층 사이 최대 HP의 25% 회복 (자체 회복 없는 직업 보정)
   defK: 60,                   // 받는 피해 = raw × K/(K+방어)
   critMult: 1.6,
   maxRounds: 50,
@@ -209,6 +211,55 @@ export const CHRONICLE_DUNGEONS = [
       { lv: 48, enemies: ['champ_forest_boss4'], boss: true },
     ],
   },
+  // ── 2부 던전 (1.214.0) — 2부 지역 보스를 쓰러뜨리면 개방. 보스는 지역 보스와 다른 챔피언십 보스
+  {
+    id: 'frostAbyss', name: '빙왕의 심연', part: 2, unlockField: 6, recLv: 68, color: '#7fb2e6', area: { hpMult: 1, atkMult: 1 }, set: 'abyss',
+    desc: '되살아난 동토 아래, 빛이 닿지 않는 얼음 동굴. 동굴의 빙왕이 다시 왕좌에 앉았다.',
+    art: 'champ_frost_boss2',
+    floors: [
+      { lv: 64, enemies: ['champ_frost_lurker', 'champ_frost_revenant', 'champ_frost_wolf'] },
+      { lv: 65, enemies: ['champ_frost_juggernaut', 'champ_frost_shaman', 'champ_frost_brute'] },
+      { lv: 66, enemies: ['champ_frost_seer', 'champ_frost_elite2', 'champ_frost_avatar'] },
+      { lv: 67, enemies: ['champ_frost_elite3', 'champ_frost_elite4'] },
+      { lv: 70, enemies: ['champ_frost_boss2'], boss: true },
+    ],
+  },
+  {
+    id: 'sanctumVault', name: '봉인 성역의 금고', part: 2, unlockField: 7, recLv: 78, color: '#e3c27a', area: { hpMult: 1, atkMult: 1 }, set: 'sanctum',
+    desc: '여명이 봉인한 것들을 모아 둔 금고. 가장 깊은 곳의 봉인자가 열쇠를 쥐고 있다.',
+    art: 'champ_sanctum_boss3',
+    floors: [
+      { lv: 74, enemies: ['champ_sanctum_acolyte', 'champ_sanctum_guardian', 'champ_sanctum_seer'] },
+      { lv: 75, enemies: ['champ_sanctum_priest', 'champ_sanctum_warden', 'champ_sanctum_brute1'] },
+      { lv: 76, enemies: ['champ_sanctum_archpriest', 'champ_sanctum_oracle', 'champ_sanctum_elite2'] },
+      { lv: 77, enemies: ['champ_sanctum_avatar', 'champ_sanctum_elite3', 'champ_sanctum_elite4'] },
+      { lv: 80, enemies: ['champ_sanctum_boss3'], boss: true },
+    ],
+  },
+  {
+    id: 'riftHeart', name: '마왕의 심장', part: 2, unlockField: 8, recLv: 88, color: '#e0574c', area: { hpMult: 1, atkMult: 1 }, set: 'rift',
+    desc: '핏빛 균열 가장 깊은 곳, 아직 뛰고 있는 마왕의 심장. 그 심장을 지키는 또 하나의 마왕.',
+    art: 'champ_rift_boss3',
+    floors: [
+      { lv: 84, enemies: ['champ_rift_imp', 'champ_rift_warrior', 'champ_rift_caster'] },
+      { lv: 85, enemies: ['champ_rift_assassin', 'champ_rift_devourer', 'champ_rift_brute1'] },
+      { lv: 86, enemies: ['champ_rift_demonlord', 'champ_rift_archmage', 'champ_rift_elite2'] },
+      { lv: 87, enemies: ['champ_rift_avatar', 'champ_rift_elite3', 'champ_rift_elite4'] },
+      { lv: 90, enemies: ['champ_rift_boss3'], boss: true },
+    ],
+  },
+  {
+    id: 'dawnGarden', name: '여명의 정원', part: 2, unlockField: 9, recLv: 98, color: '#fff1c4', area: { hpMult: 1, atkMult: 1 }, set: 'dawn',
+    desc: '신이 쓰러진 뒤에도 꺼지지 않는 정원. 정원의 대천사가 마지막 빛을 지킨다.',
+    art: 'champ_dawn_boss3',
+    floors: [
+      { lv: 94, enemies: ['champ_dawn_acolyte', 'champ_dawn_warrior', 'champ_dawn_seraph'] },
+      { lv: 95, enemies: ['champ_dawn_priest', 'champ_dawn_paladin', 'champ_dawn_brute1'] },
+      { lv: 96, enemies: ['champ_dawn_high_seraph', 'champ_dawn_oracle', 'champ_dawn_elite2'] },
+      { lv: 97, enemies: ['champ_dawn_avatar', 'champ_dawn_elite3', 'champ_dawn_elite4'] },
+      { lv: 100, enemies: ['champ_dawn_boss3'], boss: true },
+    ],
+  },
 ];
 export const CHRONICLE_DUNGEON = CHRONICLE_DUNGEONS[0]; // 1.205~1.207 호환 (이야기·의뢰가 참조)
 export const dungeonDef = (id) => CHRONICLE_DUNGEONS.find(d => d.id === id) || CHRONICLE_DUNGEONS[0];
@@ -216,8 +267,8 @@ export const dungeonDef = (id) => CHRONICLE_DUNGEONS.find(d => d.id === id) || C
 // 난이도 — 이전 단계 보스를 쓰러뜨리면 다음 단계 개방
 export const DUNGEON_TIERS = [
   { id: 'normal', label: '일반', color: '#a89a88', lv: 0, hp: 1, atk: 1, epicMult: 1, shardMult: 1, keyCost: 1 },
-  { id: 'heroic', label: '영웅', color: '#6aa6e0', lv: 6, hp: 2.2, atk: 1.7, epicMult: 1.6, shardMult: 2, keyCost: 2 },
-  { id: 'legend', label: '전설', color: '#e8b04a', lv: 12, hp: 3.6, atk: 2.4, epicMult: 2.4, shardMult: 3, keyCost: 3 },
+  { id: 'heroic', label: '영웅', color: '#6aa6e0', lv: 3, hp: 1.5, atk: 1.25, epicMult: 1.6, shardMult: 2, keyCost: 2 },
+  { id: 'legend', label: '전설', color: '#e8b04a', lv: 6, hp: 2.0, atk: 1.5, epicMult: 2.4, shardMult: 3, keyCost: 3 },
 ];
 
 // 적 일러 경로 (본편 헬퍼와 같은 규칙, ./ 상대 경로)
@@ -282,7 +333,7 @@ export const CLASS_GEAR_NAMES = {
   priest: { weapon: ['나무 홀', '은 홀', '여명의 홀', '균열의 홀'], offhand: ['순례 성물', '은 성물', '빛의 성물', '균열의 성물'], armor: ['수련 법의', '은사 법의', '빛의 법의', '균열의 법의'] },
   common: { accessory: ['낡은 반지', '은 목걸이', '룬 부적', '심연의 인장'] },
 };
-export const EPIC_PREFIX = { frost: '서리 왕의', forest: '광란의', field: '빛나는' };
+export const EPIC_PREFIX = { frost: '서리 왕의', forest: '광란의', field: '빛나는', abyss: '심연 빙왕의', sanctum: '봉인된', rift: '마왕의', dawn: '여명 정원의' };
 
 // 옵션 정의 — pct: % 표시 / v: 고급 기준 값 범위 [최소, 최대] (등급 optMult 곱)
 export const OPTION_DEFS = {

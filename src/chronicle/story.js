@@ -96,6 +96,38 @@ export const SCENES = [
       { sp: 'elder', t: '광기에 물든 자들이 그 음악에 맞춰 춤추고 있다지. 숲의 심장부, 거기에 또 하나의 무구가 잠들어 있을 게다.' },
     ],
   },
+  // ── 2부 던전 개방 (1.214.0)
+  {
+    id: 'dungeon3_open', title: '빙왕의 심연', bg: './enemies/championship/frost/champ_frost_boss2_intro.jpg',
+    when: (s, c) => !!s.progress.bossCleared[6] && c.at === 'town',
+    lines: [
+      { sp: 'elder', t: '되살아난 동토 아래에 동굴이 열렸다는군. 서리 왕보다 오래된 얼음, 동굴의 빙왕이 거기 있다네.' },
+      { sp: 'hero', t: '빛이 깨운 건 용 하나가 아니었군요.' },
+    ],
+  },
+  {
+    id: 'dungeon4_open', title: '봉인 성역의 금고', bg: './enemies/championship/sanctum/champ_sanctum_boss3_intro.jpg',
+    when: (s, c) => !!s.progress.bossCleared[7] && c.at === 'town',
+    lines: [
+      { sp: 'herald', t: '…성역의 금고에는 손대지 마라. 그곳에 잠든 것은 너희 같은 자들이 감당할 수 없는 기록이다.' },
+      { sp: 'hero', t: '그렇게까지 숨기고 싶은 거라면, 꼭 봐야겠네.' },
+    ],
+  },
+  {
+    id: 'dungeon5_open', title: '마왕의 심장', bg: './enemies/championship/rift/champ_rift_boss3_intro.jpg',
+    when: (s, c) => !!s.progress.bossCleared[8] && c.at === 'town',
+    lines: [
+      { sp: 'narr', t: '마왕은 재가 되었지만, 균열 깊은 곳의 심장은 아직 뛰고 있었다. 그리고 그 심장을 노리는 또 다른 마왕이 있었다.' },
+    ],
+  },
+  {
+    id: 'dungeon6_open', title: '여명의 정원', bg: './enemies/championship/dawn/champ_dawn_boss3_intro.jpg',
+    when: (s, c) => !!s.progress.bossCleared[9] && c.at === 'town',
+    lines: [
+      { sp: 'elder', t: '첨탑 아래 정원은 신이 쓰러진 뒤에도 빛나고 있다는군. 정원의 대천사가 아직 명령을 기다리고 있대.' },
+      { sp: 'hero', t: '그럼 이제 그만 쉬게 해 줘야겠네요.' },
+    ],
+  },
   {
     id: 'f3_enter', title: '봉인된 신전', bg: './enemies/classic/chapter_3/timeKeeper_combat.jpg',
     when: (s, c) => c.at === 'field' && c.fieldId === 3,
@@ -402,6 +434,12 @@ export const QUESTS = [
   { id: 's9b', kind: 'side', req: { field: 9 }, title: '여명의 신탁', desc: '학자: "신탁자들이 무엇을 예언하는지 알아야 하네."', goal: { type: 'killKey', key: 'champ_dawn_oracle', n: 22 }, reward: { gold: 5500, item: { grade: 'epic' }, keys: 2 } },
   { id: 's9c', kind: 'side', req: { field: 9 }, title: '첨탑의 수호자들', desc: '촌장: "신에게 닿기 전에, 그 날개들을 하나씩 꺾게."', goal: { type: 'elites', n: 10 }, reward: { gold: 6000, shard: 8, essence: 40 } },
   { id: 'g4', kind: 'side', req: { field: 6 }, title: '이름이 전설이 되다', desc: '촌장: "이제 자네 이름을 모르는 사람이 없네." — 주인공 Lv.75 달성', goal: { type: 'level', n: 75 }, reward: { gold: 5000, essence: 40, keys: 2 } },
+  // ── 2부 던전 (1.214.0)
+  { id: 'd6', kind: 'side', req: { field: 7 }, title: '심연의 왕좌', desc: '사냥꾼: "동굴의 빙왕을 쓰러뜨리면 동토가 다시 녹을지도 몰라."', goal: { type: 'dungeonTier', id: 'frostAbyss', tier: 0 }, reward: { gold: 4000, shard: 6, essence: 30, keys: 2 } },
+  { id: 'd7', kind: 'side', req: { field: 8 }, title: '금고의 기록', desc: '학자: "성역의 금고에 무엇이 적혀 있는지 알아야 하네."', goal: { type: 'dungeonTier', id: 'sanctumVault', tier: 0 }, reward: { gold: 5500, shard: 8, essence: 40, keys: 2 } },
+  { id: 'd8', kind: 'side', req: { field: 9 }, title: '두 번째 마왕', desc: '깨어난 영웅: "심장을 노리는 자를 막아야 한다. 그것이 마왕의 유언이었다."', goal: { type: 'dungeonTier', id: 'riftHeart', tier: 0 }, reward: { gold: 7000, shard: 10, item: { grade: 'epic' } } },
+  { id: 'd9', kind: 'side', req: { main: 'm9' }, title: '정원을 닫다', desc: '촌장: "정원의 대천사를 쉬게 해 주게. 그게 진짜 마지막 일일 걸세."', goal: { type: 'dungeonTier', id: 'dawnGarden', tier: 0 }, reward: { gold: 10000, shard: 15, item: { grade: 'epic' }, keys: 3 } },
+  { id: 'd10', kind: 'side', req: { main: 'm9' }, title: '여명보다 밝게', desc: '대장장이: "정원을 전설 난이도로 넘으면, 그건 대장장이도 못 만드는 전설이지."', goal: { type: 'dungeonTier', id: 'dawnGarden', tier: 2 }, reward: { gold: 20000, shard: 25, item: { grade: 'epic' } } },
   // ── 1.208.0 던전 확장
   { id: 'd3', kind: 'side', req: { main: 'm3' }, title: '광기의 심장', desc: '숲의 파수꾼: "숲 가장 깊은 곳에서 음악이 들린다네. 멈춰 주게."', goal: { type: 'dungeonTier', id: 'forestHeart', tier: 0 }, reward: { gold: 1500, shard: 4, essence: 20, keys: 2 } },
   { id: 'd4', kind: 'side', req: { main: 'm2' }, title: '영웅의 증명', desc: '대장장이: "무덤을 영웅 난이도로 끝까지 내려가면, 진짜 대장장이 일을 보여 주지."', goal: { type: 'dungeonTier', id: 'frostTomb', tier: 1 }, reward: { gold: 1200, shard: 5 } },
