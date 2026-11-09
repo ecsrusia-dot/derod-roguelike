@@ -392,7 +392,7 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
 }
 
 // ===== 원정대 (1.229.0) — 레벨 상한 · 전역 버프 =====
-function RosterView({ save, onBack, onSwitchChar }) {
+function RosterView({ save, setSave, flash, onBack, onSwitchChar }) {
   const roster = save.roster || {};
   const cap = E.levelCapOf(save);
   const hint = R.nextCapHint(roster);
@@ -412,6 +412,27 @@ function RosterView({ save, onBack, onSwitchChar }) {
             기본 Lv.{R.ROSTER.baseCap} · 두 번째 캐릭터부터 Lv.{R.ROSTER.unlockLv}을 달성할 때마다 <b style={{ color: PALETTE.text }}>+{R.ROSTER.perChar}</b> (지금 Lv.{R.ROSTER.unlockLv} 달성 {n60}명)
             {hint ? <><br />다음: 캐릭터 <b style={{ color: '#e8b04a' }}>{hint.need}명</b>이 Lv.{R.ROSTER.unlockLv}에 도달하면 상한 Lv.{hint.next}</> : <><br /><b style={{ color: PALETTE.legendary }}>모든 상한 해제 완료</b></>}
           </div>
+        </GlassPanel>
+
+        <GlassPanel className="p-3" style={{ fontSize: 12 }}>
+          <div className="font-semibold" style={{ fontSize: 13.5, color: PALETTE.text }}>원정대 의뢰 <span style={{ fontSize: 11, color: PALETTE.textDim, fontWeight: 400 }}>— 계정 목표 · 보상은 모든 캐릭터 공유</span></div>
+          {R.ROSTER_QUESTS.map(q => {
+            const st = R.rosterQuestState(save, q);
+            return (
+              <div key={q.id} className="flex items-center gap-2 mt-2" style={{ opacity: st.status === 'claimed' ? 0.5 : 1 }}>
+                <div className="flex-1 min-w-0">
+                  <div className="truncate" style={{ fontSize: 12.5, color: st.status === 'done' ? PALETTE.legendary : PALETTE.text, fontWeight: 600 }}>{q.title} <span style={{ fontSize: 11, color: PALETTE.textDim, fontWeight: 400 }}>{q.desc}</span></div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1"><Bar v={st.cur} max={q.need} color={st.status === 'progress' ? PALETTE.dawn : PALETTE.legendary} h={4} /></div>
+                    <span style={{ fontSize: 11, color: PALETTE.textDim }}>{st.cur}/{q.need}</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: PALETTE.textDim }}>{R.rosterRewardText(q.reward)}</div>
+                </div>
+                {st.status === 'done' && <button onClick={() => { setSave(R.claimRosterQuest(save, q.id)); flash(`원정대 의뢰 「${q.title}」 보상 — ${R.rosterRewardText(q.reward)}`); }} className="ui-press flex-none font-semibold" style={{ height: 34, padding: '0 12px', borderRadius: 9, border: `1px solid ${PALETTE.legendary}`, color: '#1a1206', background: PALETTE.legendary, fontSize: 12 }}>받기</button>}
+                {st.status === 'claimed' && <span className="flex-none" style={{ fontSize: 11, color: PALETTE.textDim }}>완료</span>}
+              </div>
+            );
+          })}
         </GlassPanel>
 
         <GlassPanel className="p-3" style={{ fontSize: 12, lineHeight: 1.6 }}>
@@ -471,7 +492,7 @@ function TownView({ save, go, onExit, onSwitchChar }) {
     { id: 'tower', icon: '🗼', label: '황혼의 첨탑', sub: E.towerUnlocked(save.progress) ? (save.tower?.run ? `${save.tower.run.floor}층 도전 중` : `최고 ${save.tower?.best || 0}층 · ✪${save.mats.towerCoin || 0}`) : '마계의 균열 보스 후 개방', locked: !E.towerUnlocked(save.progress) },
     { id: 'dungeon', icon: '🕳', label: '던전', sub: save.dungeon ? `${dungeonDef(save.dungeon.id).name} 진행 중` : E.dungeonUnlocked(save) ? `🗝 열쇠 ${E.keyCount(save)}개 · ${CHRONICLE_DUNGEONS.filter(d => E.dungeonUnlocked(save, d.id)).length}곳` : '죽은 자의 숲 보스 후 개방', locked: !E.dungeonUnlocked(save) },
     { id: 'party', icon: '🧭', label: '성장', sub: '능력치 · 스킬 · 장비', badge: alertParty },
-    { id: 'roster', icon: '🏳', label: '원정대', sub: `레벨 상한 ${E.levelCapOf(save)} · 전역 버프` },
+    { id: 'roster', icon: '🏳', label: '원정대', sub: R.rosterQuestBadge(save) ? `의뢰 보상 ${R.rosterQuestBadge(save)}건` : `레벨 상한 ${E.levelCapOf(save)} · 전역 버프 · 의뢰`, badge: R.rosterQuestBadge(save) > 0 },
     { id: 'bag', icon: '🎒', label: '가방', sub: `${save.inventory.length}/${E.bagMax(save)}${save.inventory.some(i => !E.itemUsable(i, save.hero)) ? ' · 다른 직업 장비 있음' : ''}` },
     { id: 'fam', icon: '🐾', label: '사역마', sub: E.famSlotOpen(save, 'main') ? `📜 ${save.mats.famShard || 0} · 보유 ${Object.keys(save.fams || {}).length}` : `Lv.${F.FAM_TUNING.slotLv.main}부터 동행`, badge: (save.mats.famShard || 0) >= F.FAM_TUNING.shardsPerSummon || (save.mats.sealPlus || 0) > 0 },
     { id: 'stash', icon: '🏛', label: '공용 창고', sub: `${(save.stash || []).length}/${A.STASH_MAX} · 모든 캐릭터 공유` },
@@ -2175,7 +2196,7 @@ export default function ChronicleGame({ onExit }) {
   } else if (view === 'party') {
     content = <PartyView save={save} setSave={setSave} onBack={() => setView('town')} />;
   } else if (view === 'roster') {
-    content = <RosterView save={save} onBack={() => setView('town')} onSwitchChar={() => setView('title')} />;
+    content = <RosterView save={save} setSave={setSave} flash={flash} onBack={() => setView('town')} onSwitchChar={() => setView('title')} />;
   } else if (view === 'bag') {
     content = <BagView save={save} setSave={setSave} onBack={() => setView('town')} flash={flash} />;
   } else if (view === 'tower') {
