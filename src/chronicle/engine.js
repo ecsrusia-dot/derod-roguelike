@@ -1306,7 +1306,7 @@ export function applyBattle(save0, ctx, battle, rng = Math.random) {
       summary.autoSalvaged = (summary.autoSalvaged || 0) + 1;
       continue;
     }
-    if (save.inventory.length >= bagMax(save)) { addSalvage(save, salvageOf(it)); summary.autoDismantled = (summary.autoDismantled || 0) + 1; continue; }
+    if (save.inventory.length >= bagMax(save)) { const sv = salvageOf(it); addSalvage(save, sv); summary.autoDismantled = (summary.autoDismantled || 0) + 1; summary.dismantleLoot = summary.dismantleLoot || {}; for (const [k, v] of Object.entries(sv)) summary.dismantleLoot[k] = (summary.dismantleLoot[k] || 0) + v; continue; }
     const item = { ...it, uid: save.nextUid++ };
     save.inventory.push(item);
     summary.items.push(item);
