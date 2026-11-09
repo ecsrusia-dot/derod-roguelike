@@ -26,6 +26,9 @@ export const CHRONICLE_TUNING = {
   // 2.0 솔로 보정 — 적 전체 배율 · 경험치 배율 (난이도 체감 조정은 여기)
   soloHp: 0.9, soloAtk: 1.3, soloGrowth: 0.055, expMult: 3,
   // 던전 솔로 보정 (1.214.0) — 층 사이 회복이 없으므로 던전 적만 따로 낮춘다 · 층당 적 수
+  holyCap: 0.2, // 치유→신성 피해 합계 상한 (1.216.0 — 사제 + 사역마 조합 독주 보정)
+  shieldCap: 0.15, // 시작 보호막 합계 상한 (1.216.0)
+  lifestealCap: 0.07, // 장비·유니크 흡혈 합계 상한 (1.216.0 — 혼혈 마족 던전 독주 보정)
   dungeonSolo: { hp: 0.6, atk: 0.75 }, dungeonFloorEnemies: [1, 2], dungeonFloorHeal: 0.25, // 던전 층 사이 최대 HP의 25% 회복 (자체 회복 없는 직업 보정)
   defK: 60,                   // 받는 피해 = raw × K/(K+방어)
   critMult: 1.6,
@@ -74,9 +77,9 @@ export const CHRONICLE_SKILLS = {
   s_amplify: S('s_amplify', 'sage', '마력 증폭', 'passive', 5, 0, 0, 0, { fx: (lv) => ({ atkPct: 0.06 * lv }) }),
   s_meteor: S('s_meteor', 'sage', '화염 폭풍', 'aoe', 8, 5, 1.5, 0.15),
   // 혼혈 마족
-  d_blood: S('d_blood', 'demonblood', '피의 일격', 'lifesteal', 1, 2, 1.7, 0.15, { steal: 0.2 }),
+  d_blood: S('d_blood', 'demonblood', '피의 일격', 'lifesteal', 1, 2, 1.7, 0.15, { steal: 0.1 }),
   d_rage: S('d_rage', 'demonblood', '광폭화', 'rage', 3, 5, 0.3, 0.06, { turns: 3 }),
-  d_bloodlust: S('d_bloodlust', 'demonblood', '혈광', 'passive', 5, 0, 0, 0, { fx: (lv) => ({ lowHpDmg: 0.15 * lv, hpPct: 0.04 * lv }) }),
+  d_bloodlust: S('d_bloodlust', 'demonblood', '혈광', 'passive', 5, 0, 0, 0, { fx: (lv) => ({ lowHpDmg: 0.06 * lv, hpPct: 0.02 * lv }) }),
   d_slaughter: S('d_slaughter', 'demonblood', '학살', 'aoe', 8, 4, 1.1, 0.12),
   // 숲의 정령사
   e_volley: S('e_volley', 'elf', '연속 화살', 'multi', 1, 2, 0.6, 0.06, { hits: 3 }),
@@ -84,20 +87,20 @@ export const CHRONICLE_SKILLS = {
   e_wind: S('e_wind', 'elf', '바람의 가호', 'passive', 5, 0, 0, 0, { fx: (lv) => ({ critAdd: 0.03 * lv, dodgeAdd: 0.02 * lv }) }),
   e_rain: S('e_rain', 'elf', '화살비', 'aoe', 8, 4, 1.0, 0.12),
   // 여명의 사제
-  p_heal: S('p_heal', 'priest', '치유의 빛', 'heal', 1, 2, 1.5, 0.15),
-  p_bless: S('p_bless', 'priest', '축복', 'buffAtk', 3, 5, 0.15, 0.04, { turns: 3 }),
-  p_shield: S('p_shield', 'priest', '가호', 'shield', 5, 5, 1.2, 0.2),
+  p_heal: S('p_heal', 'priest', '치유의 빛', 'heal', 1, 3, 0.9, 0.08),
+  p_bless: S('p_bless', 'priest', '축복', 'buffAtk', 3, 5, 0.08, 0.02, { turns: 3 }),
+  p_shield: S('p_shield', 'priest', '가호', 'shield', 5, 5, 0.7, 0.1),
   p_light: S('p_light', 'priest', '신성 광선', 'strike', 8, 3, 1.9, 0.18),
   // ── 1.207.0 후반 스킬 (Lv.15 · Lv.25) — 남는 스킬 포인트 해소
   w_flash: S('w_flash', 'wanderer', '일섬', 'strike', 15, 3, 2.6, 0.25),
   w_unyield: S('w_unyield', 'wanderer', '불굴', 'passive', 25, 0, 0, 0, { fx: (lv) => ({ hpPct: 0.05 * lv, defPct: 0.04 * lv }) }),
   s_surge: S('s_surge', 'sage', '마력 폭주', 'rage', 15, 5, 0.35, 0.07, { turns: 3 }),
   s_starfall: S('s_starfall', 'sage', '운석 낙하', 'aoe', 25, 6, 2.4, 0.25),
-  d_moon: S('d_moon', 'demonblood', '혈월참', 'lifesteal', 15, 4, 2.4, 0.22, { steal: 0.3 }),
-  d_undying: S('d_undying', 'demonblood', '불멸의 피', 'passive', 25, 0, 0, 0, { fx: (lv) => ({ hpPct: 0.06 * lv, lowHpDmg: 0.1 * lv }) }),
+  d_moon: S('d_moon', 'demonblood', '혈월참', 'lifesteal', 15, 4, 2.4, 0.22, { steal: 0.15 }),
+  d_undying: S('d_undying', 'demonblood', '불멸의 피', 'passive', 25, 0, 0, 0, { fx: (lv) => ({ hpPct: 0.02 * lv, lowHpDmg: 0.04 * lv }) }),
   e_spirits: S('e_spirits', 'elf', '정령 소환', 'dot', 15, 4, 0.6, 0.07, { turns: 3, all: true }),
   e_divine: S('e_divine', 'elf', '신궁', 'multi', 25, 4, 0.45, 0.05, { hits: 7 }),
-  p_dawn: S('p_dawn', 'priest', '여명의 기도', 'healAll', 15, 4, 0.9, 0.12),
+  p_dawn: S('p_dawn', 'priest', '여명의 기도', 'healAll', 15, 4, 0.5, 0.07),
   p_judge: S('p_judge', 'priest', '심판', 'aoe', 25, 4, 1.6, 0.15),
 };
 export const SKILL_MAX_LV = 5;
@@ -268,7 +271,7 @@ export const dungeonDef = (id) => CHRONICLE_DUNGEONS.find(d => d.id === id) || C
 export const DUNGEON_TIERS = [
   { id: 'normal', label: '일반', color: '#a89a88', lv: 0, hp: 1, atk: 1, epicMult: 1, shardMult: 1, keyCost: 1 },
   { id: 'heroic', label: '영웅', color: '#6aa6e0', lv: 3, hp: 1.5, atk: 1.25, epicMult: 1.6, shardMult: 2, keyCost: 2 },
-  { id: 'legend', label: '전설', color: '#e8b04a', lv: 6, hp: 2.0, atk: 1.5, epicMult: 2.4, shardMult: 3, keyCost: 3 },
+  { id: 'legend', label: '전설', color: '#e8b04a', lv: 6, hp: 2.6, atk: 1.8, epicMult: 2.4, shardMult: 3, keyCost: 3 },
 ];
 
 // 적 일러 경로 (본편 헬퍼와 같은 규칙, ./ 상대 경로)
@@ -351,7 +354,7 @@ export const OPTION_DEFS = {
   cdr: { label: '재사용 단축', pct: false, v: [1, 1], unit: '턴', rare: true },
   dotDmg: { label: '지속 피해', pct: true, v: [0.10, 0.20] },
   shieldPct: { label: '시작 보호막', pct: true, v: [0.04, 0.08] },
-  lifesteal: { label: '흡혈', pct: true, v: [0.02, 0.05] },
+  lifesteal: { label: '흡혈', pct: true, v: [0.01, 0.03] },
   lowHpDmg: { label: '저체력 피해', pct: true, v: [0.05, 0.12] },
   thornsPct: { label: '피해 반사', pct: true, v: [0.05, 0.10] },
   chain: { label: '추가 타격 확률', pct: true, v: [0.05, 0.10] },
@@ -373,7 +376,7 @@ export const OPTION_POOLS = {
 export const OFFHAND_BASE = {
   wanderer: { flat: { def: [1, 0.6] }, pct: { counterPct: 0.04 } },
   sage: { flat: { atk: [1, 0.5] }, pct: { skillDmg: 0.06 } },
-  demonblood: { flat: { hp: [5, 3] }, pct: { lifesteal: 0.03 } },
+  demonblood: { flat: { hp: [5, 3] }, pct: { lifesteal: 0.02 } },
   elf: { flat: { spd: [0.5, 0.05] }, pct: { crit: 0.04 } },
   priest: { flat: {}, pct: { healPct: 0.08, shieldPct: 0.05 } },
 };

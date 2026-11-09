@@ -28,6 +28,7 @@ export const FAM_TUNING = {
   tenPullGuarantee: 'blue',     // 10연마다 이 등급 이상 1마리 확정
   violetPity: 150,              // 누적 소환 수 — 자령이 안 나오면 확정 (자령 소환 가능해진 뒤부터)
   maxPlus: 10,
+  hpPerLv: 70,                  // 사역마 HP 기준 = min(주인공 최대 HP, 레벨 × 70)
   plusStatPct: 0.05,            // 강화 1단계당 능력치 +5%
   enhanceCost: (plus, g) => (plus + 1) * famGrade(g).cost,   // +n → +n+1 사역혼
   evolveCost: (g) => 10 * famGrade(g).cost,
@@ -37,74 +38,118 @@ export const FAM_TUNING = {
   slotLv: { main: 5, sub1: 20, sub2: 40 }, // 주인공 레벨 개방
 };
 
-// 역할 — 원본 적 이름으로 자동 결정
+// 역할 3종 (1.216.0 재정립) — 원본 적 이름으로 자동 결정
+//   tank   수호: 동행 = 도발로 공격을 대신 받는 방패 · 보조 = 받는 피해 감소 (+청령↑ 시작 보호막)
+//   dps    맹공: 동행 = 함께 때리는 두 번째 딜러   · 보조 = 공격력 (+청령↑ 치명타 피해)
+//   healer 치유: 동행 = 주인공을 회복·보호막       · 보조 = 매 턴 재생 · 회복량 (+청령↑ 위기 회복)
+// atk/hp/def = 주인공 능력치 대비 비율 (× 등급 배율 × 강화)
 export const FAM_ROLES = {
-  guard: { label: '수호', icon: '🛡', atk: 0.12, hp: 0.4, def: 0.8, sub: { dmgReduce: 0.02 }, subLabel: '받는 피해 감소' },
-  fang: { label: '맹공', icon: '🗡', atk: 0.24, hp: 0.22, def: 0.4, sub: { atkPct: 0.025 }, subLabel: '공격력' },
-  hex: { label: '주술', icon: '🔮', atk: 0.2, hp: 0.2, def: 0.3, sub: { skillDmg: 0.035 }, subLabel: '스킬 피해' },
-  mend: { label: '치유', icon: '✚', atk: 0.1, hp: 0.25, def: 0.5, sub: { healPct: 0.04, regenPct: 0.003 }, subLabel: '회복량 · 매 턴 재생' },
-  shade: { label: '교란', icon: '🌫', atk: 0.18, hp: 0.2, def: 0.4, sub: { dodge: 0.015 }, subLabel: '회피' },
+  tank: {
+    label: '수호', icon: '🛡', color: '#9cc4e4', atk: 0.1, hp: 0.85, def: 1.3, tauntReduce: 0.2,
+    // 수호 태세 — 살아 있는 동안 적의 단일 공격이 이 확률로 사역마에게 향한다 (등급별)
+    guard: [0.35, 0.45, 0.55, 0.65, 0.75],
+    desc: '도발로 적의 공격을 대신 받는다 — 딜이 부족해 전투가 길어지는 직업에게',
+    // 보조 패시브 — 등급별 값 (적·녹·청·남·자)
+    sub: { dmgReduce: [0.02, 0.03, 0.045, 0.06, 0.08], shieldPct: [0, 0, 0.05, 0.08, 0.12] },
+  },
+  dps: {
+    label: '맹공', icon: '🗡', color: '#e8826a', atk: 0.5, hp: 0.36, def: 0.5,
+    desc: '함께 공격해 빠르게 정리한다 — 극딜 조합',
+    sub: { atkPct: [0.03, 0.045, 0.07, 0.1, 0.13], critDmg: [0, 0, 0.15, 0.25, 0.4] },
+  },
+  healer: {
+    label: '치유', icon: '✚', color: '#8fe08a', atk: 0.1, hp: 0.35, def: 0.6, heal: 0.2,
+    desc: '주인공을 회복하고 보호막을 씌운다 — 딜이 충분해 버티기만 하면 되는 직업에게',
+    sub: { regenPct: [0.002, 0.0025, 0.003, 0.004, 0.005], healPct: [0.04, 0.06, 0.09, 0.12, 0.16], emergencyHeal: [0, 0, 0.08, 0.12, 0.18] },
+  },
 };
 const ROLE_WORDS = [
-  ['guard', /거인|골렘|수호|갑주|감시자|기사|성전사|저거너트|광전사|트리언트/],
-  ['mend', /정령|드라이어드|사제|천사|어머니|선견자|예언자|신탁/],
-  ['hex', /마녀|마법사|무당|술사|봉인사|봉인자|마에스트로|군주|왕/],
-  ['shade', /망령|망자|영혼|암살자|잠복자|그림자|화신|임프/],
-  ['fang', /늑대|표범|호랑이|전사|약탈자|고블린|용|룡|키메라|포식자|살수|악마|마수|거미/],
+  ['tank', /거인|골렘|수호|갑주|감시자|기사|성전사|저거너트|광전사|트리언트|파수|문지기|폭군|약탈자|얼어붙은 망자|균열의 전사/],
+  ['healer', /정령|드라이어드|사제|천사|어머니|선견자|예언자|신탁|요정|성녀|사도|무당|술사|영혼/],
 ];
+// 보스 출신(남령·자령)은 이름 대신 직접 지정 — 상위 등급에도 세 역할이 고르게 있도록
+const ROLE_OVERRIDE = {
+  '한기의 마녀': 'healer', '망각의 봉인자': 'tank', '타락한 황혼의 자녀': 'dps', '마왕의 그림자': 'dps',
+  '절대영도의 군주': 'tank', '동굴의 빙왕': 'tank', '절대봉인의 군주': 'tank',
+  '심처의 봉인자': 'healer', '광기의 마녀': 'healer', '여명의 신': 'healer', '정원의 대천사': 'healer',
+  '광기의 종말 마에스트로': 'dps', '심장의 마왕': 'dps', '협곡의 한기룡': 'dps', '마왕의 화신': 'dps',
+};
 export function famRole(key) {
   const name = ENEMIES[key]?.name || '';
-  for (const [r, re] of ROLE_WORDS) if (re.test(name)) return r;
-  const roles = Object.keys(FAM_ROLES);
+  if (ROLE_OVERRIDE[name]) return ROLE_OVERRIDE[name];
+  for (const [r, re] of ROLE_WORDS) if (name && re.test(name)) return r;
+  if (name) return 'dps';
   let h = 0; for (const ch of key) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return roles[h % roles.length];
+  return ['tank', 'dps', 'healer'][h % 3];
 }
+
+// 직업별 추천 동행 (1.216.0 시뮬 — 2부 던전 영웅/전설, 청령+5 기준)
+export const FAM_CLASS_TIP = {
+  wanderer: { best: 'healer', why: '단단하지만 딜이 느려 전투가 길다 — 길게 버티게 해 주는 치유' },
+  sage: { best: 'tank', why: '딜은 최고지만 몸이 약하다 — 공격을 대신 맞아 주는 수호 (영웅 0% → 100%)' },
+  demonblood: { best: 'tank', why: '흡혈이 상한(7%)에 묶여 혼자 버티기 어렵다 — 수호로 안정, 치유도 무난' },
+  elf: { best: 'tank', why: '회피가 높아도 연속 피격에 약하다 — 수호가 가장 안정적' },
+  priest: { best: 'dps', why: '스스로 회복하지만 딜이 부족해 시간 초과 — 맹공으로 극딜' },
+};
 
 // 역할별 동행 스킬 (Lv = 등급 순서 1~5)
 const FS = (id, name, kind, cd, base, perLv, extra = {}) => ({ id, cls: 'fam', name, kind, reqLv: 1, cd, base, perLv, ...extra });
 export const FAM_SKILLS = {
-  guard: [FS('f_guard', '수호의 포효', 'taunt', 4, 0.3, 0.08, { turns: 2 }), FS('f_bash', '몸통 박치기', 'strike', 2, 1.2, 0.15)],
-  fang: [FS('f_bite', '물어뜯기', 'strike', 2, 1.6, 0.18), FS('f_frenzy', '난도질', 'multi', 3, 0.6, 0.08, { hits: 3 })],
-  hex: [FS('f_curse', '저주', 'dot', 4, 0.45, 0.07, { turns: 3, all: true }), FS('f_blast', '마력 폭발', 'aoe', 4, 0.9, 0.12)],
-  mend: [FS('f_mend', '치유의 숨결', 'heal', 3, 1.0, 0.15), FS('f_ward', '보호의 빛', 'shield', 5, 0.8, 0.12)],
-  shade: [FS('f_venom', '그림자 독', 'dot', 3, 0.7, 0.1, { turns: 3 }), FS('f_rend', '찢어발기기', 'multi', 3, 0.5, 0.07, { hits: 2 })],
+  tank: [FS('f_guard', '수호의 포효', 'taunt', 3, 0.3, 0.1, { turns: 3 }), FS('f_bash', '몸통 박치기', 'strike', 2, 1.0, 0.12)],
+  dps: [FS('f_bite', '물어뜯기', 'strike', 2, 1.6, 0.18), FS('f_frenzy', '난도질', 'multi', 3, 0.6, 0.08, { hits: 3 }), FS('f_blast', '마력 폭발', 'aoe', 4, 0.9, 0.12)],
+  healer: [FS('f_mend', '치유의 숨결', 'heal', 3, 1.0, 0.12), FS('f_ward', '보호의 빛', 'shield', 4, 0.8, 0.12)],
 };
 
 export const famName = (key) => ENEMIES[key]?.name || '사역마';
-const powerMult = (f) => famGrade(f.grade).mult * (1 + FAM_TUNING.plusStatPct * (f.plus || 0));
+const plusMult = (f) => 1 + FAM_TUNING.plusStatPct * (f.plus || 0);
+const powerMult = (f) => famGrade(f.grade).mult * plusMult(f);
 
 // 동행 사역마 → 전투 유닛 (주인공 능력치에 비례 — 사역마 레벨 없음)
 export function famCombatant(key, f, hero, famPct = 0) {
-  const role = FAM_ROLES[famRole(key)];
+  const roleId = famRole(key);
+  const role = FAM_ROLES[roleId];
   const m = powerMult(f) * (1 + famPct);
-  const maxHp = Math.round(hero.maxHp * role.hp * m);
+  // HP 기준은 직업과 무관한 레벨 기준값 (1.216.0) — HP가 높은 직업일수록 사역마도 단단해지던 문제 보정
+  const maxHp = Math.round(Math.min(hero.maxHp, FAM_TUNING.hpPerLv * hero.lv) * role.hp * m);
   const lv = famGradeIdx(f.grade) + 1;
+  // 회복력은 주인공 공격력 기준 — 어느 직업이 데려가도 같은 비율로 회복한다
+  const healBase = hero.atk;
   return {
-    id: 'fam', fam: true, famKey: key, classId: hero.classId, name: famName(key), side: 'party', lv: hero.lv, magic: true,
-    maxHp, hp: maxHp, atk: Math.round(hero.atk * role.atk * m), healPower: Math.round(hero.atk * 0.25 * m),
+    id: 'fam', fam: true, famKey: key, famRole: roleId, classId: hero.classId, name: famName(key), side: 'party', lv: hero.lv, magic: true,
+    maxHp, hp: maxHp, atk: Math.round(hero.atk * role.atk * m), healPower: Math.round(healBase * (role.heal || 0.15) * m),
     def: Math.round(hero.def * role.def * Math.sqrt(m)), spd: Math.max(5, hero.spd - 2), crit: 0.08, critMult: 1.5, dodge: 0.05,
-    skills: FAM_SKILLS[famRole(key)].map(s => ({ s, lv })),
+    tauntReduce: role.tauntReduce ? Math.min(0.5, role.tauntReduce + 0.05 * (lv - 1)) : 0,
+    guardian: role.guard ? role.guard[lv - 1] : 0, startTaunt: role.guard ? 2 : 0,
+    skills: FAM_SKILLS[roleId].map(s => ({ s, lv })),
   };
 }
-// 보조 사역마 → 주인공 패시브 합산
+// 보조 사역마 → 주인공 패시브 합산 (등급별 값 × 강화)
+export function famSubValues(key, f) {
+  const role = FAM_ROLES[famRole(key)];
+  const gi = famGradeIdx(f.grade);
+  const out = {};
+  for (const [k, arr] of Object.entries(role.sub)) { const v = arr[gi] * plusMult(f); if (v > 0) out[k] = v; }
+  return out;
+}
 export function famSubFx(fams, keys) {
   const fx = {};
   for (const key of keys || []) {
     const f = key && fams?.[key];
     if (!f) continue;
-    const role = FAM_ROLES[famRole(key)];
-    for (const [k, v] of Object.entries(role.sub)) fx[k] = (fx[k] || 0) + v * powerMult(f);
+    for (const [k, v] of Object.entries(famSubValues(key, f))) fx[k] = (fx[k] || 0) + v;
   }
   return fx;
 }
+const SUB_LABEL = { dmgReduce: '받는 피해 -', shieldPct: '전투 시작 보호막 (최대 HP) ', atkPct: '공격력 +', critDmg: '치명타 피해 +', healPct: '회복량 +', regenPct: '매 턴 HP 재생 ', emergencyHeal: 'HP 30% 미만 시 1회 회복 ' };
 export function famSubText(key, f) {
-  const role = FAM_ROLES[famRole(key)];
-  return Object.entries(role.sub).map(([k, v]) => {
-    const val = v * powerMult(f);
-    const lbl = { dmgReduce: '받는 피해 -', atkPct: '공격력 +', skillDmg: '스킬 피해 +', healPct: '회복량 +', regenPct: '매 턴 HP 재생 ', dodge: '회피 +' }[k] || k;
-    return `${lbl}${Math.round(val * 1000) / 10}%`;
-  }).join(' · ');
+  return Object.entries(famSubValues(key, f)).map(([k, v]) => `${SUB_LABEL[k] || k}${Math.round(v * 1000) / 10}%`).join(' · ');
 }
+// 다음 등급에서 새로 생기는 보조 효과 (청령부터) — UI 안내용
+export function famSubPreview(key) {
+  const role = FAM_ROLES[famRole(key)];
+  return FAM_GRADES.map((g, gi) => ({ grade: g, vals: Object.fromEntries(Object.entries(role.sub).map(([k, arr]) => [k, arr[gi]]).filter(([, v]) => v > 0)) }));
+}
+export const famSubLabel = (k) => (SUB_LABEL[k] || k).replace(/[ +-]+$/, '');
 
 // ===== 소환 풀 — 진행한 지역 적만 =====
 export function famPool(progress) {
