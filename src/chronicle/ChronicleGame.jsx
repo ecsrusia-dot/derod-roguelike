@@ -508,12 +508,12 @@ function DungeonView({ save, onBack, onEnter, onFight, onLeave, onBuyKey }) {
     <div className="absolute inset-0 flex flex-col">
       <Header title={d ? `${D.name} · ${T.label}` : '던전'} onBack={d ? null : onBack} right={<div className="flex items-center gap-2"><span style={{ fontSize: 12, color: PALETTE.legendary }}>🗝{E.keyCount(save)}</span><Wallet save={save} /></div>} />
       {!d && (
-        <div className="flex gap-1.5 px-3 pt-2 flex-none">
+        <div className="grid grid-cols-3 gap-1.5 px-3 pt-2 flex-none">
           {CHRONICLE_DUNGEONS.map(x => {
             const open = E.dungeonUnlocked(save, x.id);
             return (
-              <button key={x.id} disabled={!open} onClick={() => { setSelId(x.id); setTier(0); }} className="ui-press flex-1" style={{ height: 40, borderRadius: 10, fontSize: 12, border: `1px solid ${selId === x.id ? x.color : 'var(--ui-line)'}`, color: open ? (selId === x.id ? x.color : PALETTE.text) : PALETTE.textDim, background: selId === x.id ? `${x.color}1c` : 'transparent', opacity: open ? 1 : 0.4 }}>
-                {open ? x.name : `🔒 ${CHRONICLE_FIELDS[x.unlockField - 1].name} 보스 후`}
+              <button key={x.id} disabled={!open} onClick={() => { setSelId(x.id); setTier(0); }} className="ui-press" style={{ minHeight: 44, padding: '4px 6px', borderRadius: 10, fontSize: 11.5, lineHeight: 1.3, border: `1px solid ${selId === x.id ? x.color : 'var(--ui-line)'}`, color: open ? (selId === x.id ? x.color : PALETTE.text) : PALETTE.textDim, background: selId === x.id ? `${x.color}1c` : 'transparent', opacity: open ? 1 : 0.4 }}>
+                {open ? <>{x.name}<br /><span style={{ fontSize: 10.5, color: PALETTE.textDim }}>{x.part === 2 ? '2부' : '1부'} · Lv.{x.recLv}</span></> : <>🔒 {CHRONICLE_FIELDS[x.unlockField - 1].name}<br /><span style={{ fontSize: 10.5 }}>보스 후</span></>}
               </button>
             );
           })}
@@ -554,7 +554,7 @@ function DungeonView({ save, onBack, onEnter, onFight, onLeave, onBuyKey }) {
         </div>
         <GlassPanel className="p-3 flex flex-col gap-2">
           <div style={{ fontSize: 11.5, color: PALETTE.textDim }}>
-            {d ? '내 상태 — 층 사이 회복 없음' : `권장 Lv.${D.recLv + T.lv} · 적 HP ×${T.hp} · 공격 ×${T.atk} · 에픽 확률 ×${T.epicMult} · ◆ ×${T.shardMult} · 보스 유니크 ${Math.round(UNIQUE_CHANCE.dungeonBoss[d ? d.tier || 0 : tier] * 100)}%`}
+            {d ? '내 상태 — 층 사이 최대 HP의 25%만 회복' : `권장 Lv.${D.recLv + T.lv} · 적 HP ×${T.hp} · 공격 ×${T.atk} · 에픽 확률 ×${T.epicMult} · ◆ ×${T.shardMult} · 보스 유니크 ${Math.round(UNIQUE_CHANCE.dungeonBoss[d ? d.tier || 0 : tier] * 100)}%`}
           </div>
           {party.map(p => (
             <div key={p.id} className="flex items-center gap-2">
