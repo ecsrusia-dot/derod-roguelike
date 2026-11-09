@@ -3,6 +3,6 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.215.0';
-export const VERSION_DATE = '2026-11-08';
-export const VERSION_LABEL = '🗼 황혼 연대기 — 무한 탑 「황혼의 첨탑」';
+export const GAME_VERSION = '1.215.1';
+export const VERSION_DATE = '2026-11-09';
+export const VERSION_LABEL = '🏰 황혼 연대기 — 던전 연속 도전 · 전투 집계 · 대장간 분류';

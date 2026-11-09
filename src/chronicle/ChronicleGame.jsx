@@ -155,9 +155,12 @@ function Portrait({ cid, size = 44, dim = false }) {
 
 // ===== 전투 재생 =====
 const SPEEDS = [1, 2, 4];
-function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boostLeft = 0, onAskBoost }) {
+function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boostLeft = 0, onAskBoost, dungeonAuto = false, onToggleDungeonAuto }) {
   const { sim, enemies, party, summary, ctx } = battle;
   const [idx, setIdx] = useState(0);
+  const [stats, setStats] = useState(null); // 전투 집계 (1.215.1)
+  const openStats = () => { const r = newHuntStats(); addHuntRecord(r, huntRecord(sim, party, { type: ctx.type, enemies }, summary)); setStats({ ...r, endedAt: r.startedAt }); };
+  const dungeonNext = ctx.kind === 'dungeon' && sim.result === 'win' && !summary.dungeonClear;
   const [speedPref, setSpeed] = useState(() => { try { return +localStorage.getItem('chronicleSpeed') || 2; } catch { return 2; } });
   // ×4는 이용권이 있을 때만 (1.213.0) — 만료되면 ×2로
   const speed = speedPref === 4 && boostLeft <= 0 ? 2 : speedPref;
@@ -171,10 +174,16 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
   }, [idx, speed, done, sim.events]);
   // 반복 사냥: 승리 후 자동 다음 전투
   useEffect(() => {
-    if (!done || !repeat || sim.result !== 'win' || ctx.kind !== 'field' || ctx.type === 'boss') return undefined;
+    if (!done || !repeat || stats || sim.result !== 'win' || ctx.kind !== 'field' || ctx.type === 'boss') return undefined;
     const t = setTimeout(onAgain, 1800);
     return () => clearTimeout(t);
-  }, [done, repeat, sim.result, ctx, onAgain]);
+  }, [done, repeat, stats, sim.result, ctx, onAgain]);
+  // 던전 연속 도전 (1.215.1): 승리하면 다음 층 → 보스까지 자동 진행
+  useEffect(() => {
+    if (!done || !dungeonAuto || !dungeonNext || stats) return undefined;
+    const t = setTimeout(onAgain, 1800);
+    return () => clearTimeout(t);
+  }, [done, dungeonAuto, dungeonNext, stats, onAgain]);
   const setSp = (s) => { setSpeed(s); try { localStorage.setItem('chronicleSpeed', String(s)); } catch { /* */ } };
 
   const cur = sim.events[Math.min(idx, sim.events.length - 1)];
@@ -304,7 +313,14 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
                 {ctx.kind === 'tower' ? `첨탑 ${summary.towerFell}층에서 쓰러졌다. 다음 도전은 체크포인트부터.` : ctx.kind === 'dungeon' ? '던전에서 쫓겨났다.' : `마을로 돌아간다.${summary.goldLost ? ` (골드 -${summary.goldLost})` : ''}`}
               </div>
             )}
-            <div className="flex gap-2 mt-3">
+            <div className="flex gap-2 mt-2.5">
+              <button onClick={openStats} className="ui-press flex-1" style={{ height: 34, borderRadius: 10, fontSize: 12, border: '1px solid var(--ui-line-strong)', color: PALETTE.text, background: 'transparent' }}>📊 전투 집계</button>
+              {battle.runReport && <button onClick={() => setStats(battle.runReport)} className="ui-press flex-1" style={{ height: 34, borderRadius: 10, fontSize: 12, border: '1px solid #c08ae888', color: '#c08ae8', background: 'transparent' }}>🏰 던전 전체 집계</button>}
+            </div>
+            <div className="flex gap-2 mt-2">
+              {dungeonNext && (
+                <UIButton variant={dungeonAuto ? 'gold' : 'ghost'} style={{ height: 42 }} onClick={onToggleDungeonAuto}>{dungeonAuto ? '연속 도전 중… (끄기)' : '연속 도전'}</UIButton>
+              )}
               {ctx.kind === 'field' && ctx.type !== 'boss' && sim.result === 'win' && (
                 <UIButton variant={repeat ? 'gold' : 'ghost'} style={{ height: 42 }} onClick={onToggleRepeat}>{repeat ? '반복 중… (끄기)' : '반복 사냥'}</UIButton>
               )}
@@ -316,6 +332,7 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
           </GlassPanel>
         </div>
       )}
+      {stats && <HuntReport report={stats} title={stats === battle.runReport ? '🏰 던전 전체 집계' : '📊 전투 집계'} onClose={() => setStats(null)} />}
     </div>
   );
 }
@@ -498,7 +515,7 @@ function FieldView({ save, onBack, onFight, playScene, sceneOpen }) {
 }
 
 // ===== 던전 =====
-function DungeonView({ save, onBack, onEnter, onFight, onLeave, onBuyKey }) {
+function DungeonView({ save, onBack, onEnter, onFight, onLeave, onBuyKey, dungeonAuto, onToggleDungeonAuto }) {
   const d = save.dungeon;
   const opened = CHRONICLE_DUNGEONS.filter(x => E.dungeonUnlocked(save, x.id));
   const [selId, setSelId] = useState(d?.id || opened[opened.length - 1]?.id || 'frostTomb');
@@ -586,7 +603,11 @@ function DungeonView({ save, onBack, onEnter, onFight, onLeave, onBuyKey }) {
           </>
         ) : (
           <>
-            <UIButton onClick={onFight}>{D.floors[d.floor].boss ? '보스와 싸운다' : `${d.floor + 1}층 전투`}</UIButton>
+            <UIButton onClick={onFight}>{D.floors[d.floor].boss ? '보스와 싸운다' : `${d.floor + 1}층 전투`}{dungeonAuto && !D.floors[d.floor].boss ? ' → 보스까지 연속' : ''}</UIButton>
+            <button onClick={onToggleDungeonAuto} className="ui-press flex items-center gap-1.5 self-start" style={{ background: 'transparent', border: 'none', color: dungeonAuto ? PALETTE.legendary : PALETTE.textDim, padding: '4px 0', fontSize: 12.5 }}>
+              <span className="flex items-center justify-center" style={{ width: 18, height: 18, borderRadius: 5, border: `1.5px solid ${dungeonAuto ? PALETTE.legendary : 'var(--ui-line-strong)'}`, background: dungeonAuto ? `${PALETTE.legendary}33` : 'transparent', fontSize: 12 }}>{dungeonAuto ? '✓' : ''}</span>
+              연속 도전 — 승리하면 다음 층으로 자동 진행 (보스까지)
+            </button>
             <UIButton variant="ghost" onClick={onLeave}>후퇴 (마을로)</UIButton>
           </>
         )}
@@ -731,16 +752,11 @@ function BagView({ save, setSave, onBack, flash }) {
   const [filter, setFilter] = useState('all');
   const [sel, setSel] = useState(null);
   // 정렬 (1.213.1): 착용 장비가 맨 위 → 그 아래 전투력(주 능력치) 높은 순
-  const [sortBy, setSortBy] = useState(() => { try { return localStorage.getItem('chronicleBagSort') || 'power'; } catch { return 'power'; } });
+  const [sortBy, pickSort] = useItemSort();
   const [incOther, setIncOther] = useState(() => { try { return localStorage.getItem('chronicleBulkOther') === '1'; } catch { return false; } });
-  const pickSort = (v) => { setSortBy(v); try { localStorage.setItem('chronicleBagSort', v); } catch { /* */ } };
   const toggleOther = () => { const v = !incOther; setIncOther(v); try { localStorage.setItem('chronicleBulkOther', v ? '1' : '0'); } catch { /* */ } };
   const hero = save.hero;
-  const slotIdx = (i) => SLOTS.findIndex(x => x.id === i.slot);
-  const eqd = (i) => (E.equippedBy(save, i.uid) ? 1 : 0);
-  const list = save.inventory.filter(i => filter === 'all' || (filter === 'other' ? !E.itemUsable(i, hero) : i.slot === filter))
-    .sort((a, b) => eqd(b) - eqd(a) || (eqd(a) && eqd(b) ? slotIdx(a) - slotIdx(b) : 0)
-      || (sortBy === 'grade' ? gradeIdx(b.grade) - gradeIdx(a.grade) || E.itemPower(b) - E.itemPower(a) : E.itemPower(b) - E.itemPower(a) || gradeIdx(b.grade) - gradeIdx(a.grade)));
+  const list = sortItems(save, filterItems(save.inventory, filter, hero), sortBy);
   const item = sel != null ? save.inventory.find(i => i.uid === sel) : null;
   const others = save.inventory.filter(i => !E.itemUsable(i, hero));
   const bulk = (maxGrade) => {
@@ -759,11 +775,7 @@ function BagView({ save, setSave, onBack, flash }) {
   return (
     <div className="absolute inset-0 flex flex-col">
       <Header title={`가방 ${save.inventory.length}/${CHRONICLE_TUNING.inventoryMax}`} onBack={onBack} right={<Wallet save={save} />} />
-      <div className="flex gap-1.5 px-3 pt-2 flex-none">
-        {[{ id: 'all', label: '전체' }, ...SLOTS, { id: 'other', label: '타직업' }].map(s => (
-          <button key={s.id} onClick={() => setFilter(s.id)} className="ui-press flex-1" style={{ height: 36, borderRadius: 10, fontSize: 11.5, border: `1px solid ${filter === s.id ? PALETTE.legendary : 'var(--ui-line)'}`, color: filter === s.id ? PALETTE.legendary : PALETTE.text, background: 'transparent' }}>{s.label}</button>
-        ))}
-      </div>
+      <ItemFilterBar filter={filter} setFilter={setFilter} />
       <div className="flex gap-1.5 px-3 pt-2 flex-none">
         <button onClick={() => { setSave(E.autoEquip(save)); flash('더 강한 장비로 교체'); }} className="ui-press flex-1" style={{ ...btn, border: `1px solid ${PALETTE.legendary}88`, color: PALETTE.legendary }}>자동 장착</button>
         <button disabled={!others.length} onClick={() => toStash(others.map(i => i.uid))} className="ui-press flex-1" style={{ ...btn, border: '1px solid #9cc4e488', color: '#9cc4e4', opacity: others.length ? 1 : 0.4 }}>타직업 → 창고 ({others.length})</button>
@@ -778,10 +790,7 @@ function BagView({ save, setSave, onBack, flash }) {
           일괄 분해에 타직업 장비 포함
         </button>
         <div className="flex-1" />
-        <span style={{ color: PALETTE.textDim }}>정렬</span>
-        {[['power', '전투력'], ['grade', '등급']].map(([v, l]) => (
-          <button key={v} onClick={() => pickSort(v)} className="ui-press" style={{ fontSize: 11.5, padding: '4px 8px', borderRadius: 8, border: `1px solid ${sortBy === v ? PALETTE.legendary : 'var(--ui-line)'}`, color: sortBy === v ? PALETTE.legendary : PALETTE.textDim, background: 'transparent' }}>{l}</button>
-        ))}
+        <SortButtons sortBy={sortBy} pickSort={pickSort} />
       </div>
       <div className="flex-1 overflow-y-auto px-3 py-2 flex flex-col gap-1.5">
         {list.map((it, i) => {
@@ -1145,9 +1154,46 @@ function StashView({ save, setSave, onBack, flash }) {
 }
 
 // ===== 대장간 =====
+// 가방·대장간 공용 정렬 (1.215.1): 착용 장비가 맨 위(부위 순) → 전투력 또는 등급 순
+function useItemSort() {
+  const [sortBy, setSortBy] = useState(() => { try { return localStorage.getItem('chronicleBagSort') || 'power'; } catch { return 'power'; } });
+  const pickSort = (v) => { setSortBy(v); try { localStorage.setItem('chronicleBagSort', v); } catch { /* */ } };
+  return [sortBy, pickSort];
+}
+function sortItems(save, items, sortBy) {
+  const slotIdx = (i) => SLOTS.findIndex(x => x.id === i.slot);
+  const eqd = (i) => (E.equippedBy(save, i.uid) ? 1 : 0);
+  return items.slice().sort((a, b) => eqd(b) - eqd(a) || (eqd(a) && eqd(b) ? slotIdx(a) - slotIdx(b) : 0)
+    || (sortBy === 'grade' ? gradeIdx(b.grade) - gradeIdx(a.grade) || E.itemPower(b) - E.itemPower(a) : E.itemPower(b) - E.itemPower(a) || gradeIdx(b.grade) - gradeIdx(a.grade)));
+}
+function filterItems(items, filter, hero) {
+  return items.filter(i => filter === 'all' || (filter === 'other' ? !E.itemUsable(i, hero) : i.slot === filter));
+}
+function ItemFilterBar({ filter, setFilter }) {
+  return (
+    <div className="flex gap-1.5 px-3 pt-2 flex-none">
+      {[{ id: 'all', label: '전체' }, ...SLOTS, { id: 'other', label: '타직업' }].map(s => (
+        <button key={s.id} onClick={() => setFilter(s.id)} className="ui-press flex-1" style={{ height: 36, borderRadius: 10, fontSize: 11.5, border: `1px solid ${filter === s.id ? PALETTE.legendary : 'var(--ui-line)'}`, color: filter === s.id ? PALETTE.legendary : PALETTE.text, background: 'transparent' }}>{s.label}</button>
+      ))}
+    </div>
+  );
+}
+function SortButtons({ sortBy, pickSort }) {
+  return (
+    <>
+      <span style={{ color: PALETTE.textDim }}>정렬</span>
+      {[['power', '전투력'], ['grade', '등급']].map(([v, l]) => (
+        <button key={v} onClick={() => pickSort(v)} className="ui-press" style={{ fontSize: 11.5, padding: '4px 8px', borderRadius: 8, border: `1px solid ${sortBy === v ? PALETTE.legendary : 'var(--ui-line)'}`, color: sortBy === v ? PALETTE.legendary : PALETTE.textDim, background: 'transparent' }}>{l}</button>
+      ))}
+    </>
+  );
+}
+
 function ForgeView({ save, setSave, onBack, flash }) {
   const [sel, setSel] = useState(null);
-  const list = save.inventory.slice().sort((a, b) => (E.equippedBy(save, b.uid) ? 1 : 0) - (E.equippedBy(save, a.uid) ? 1 : 0) || gradeIdx(b.grade) - gradeIdx(a.grade) || E.itemPower(b) - E.itemPower(a));
+  const [filter, setFilter] = useState('all');
+  const [sortBy, pickSort] = useItemSort();
+  const list = sortItems(save, filterItems(save.inventory, filter, save.hero), sortBy);
   const item = sel != null ? save.inventory.find(i => i.uid === sel) : null;
   const ec = item && E.enhanceCost(item);
   const pc = item && E.promoteCost(item);
@@ -1158,9 +1204,15 @@ function ForgeView({ save, setSave, onBack, flash }) {
       <div className="px-4 pt-3 flex-none" style={{ fontSize: 12, color: PALETTE.textDim, lineHeight: 1.55 }}>
         <b style={{ color: PALETTE.text }}>강화</b> +1당 능력치 +{Math.round(FORGE.enhancePct * 100)}% (최대 +{FORGE.maxEnhance}) · <b style={{ color: PALETTE.text }}>승급</b> 다음 등급으로 + 옵션 1개 추가 — 에픽 승급은 던전의 ◆ 고대 파편 필요 · 유니크는 승급 불가(강화만)
       </div>
+      <ItemFilterBar filter={filter} setFilter={setFilter} />
+      <div className="flex items-center gap-2 px-3 pt-1.5 flex-none" style={{ fontSize: 12 }}>
+        <span style={{ color: PALETTE.textDim }}>{list.length}개</span>
+        <div className="flex-1" />
+        <SortButtons sortBy={sortBy} pickSort={pickSort} />
+      </div>
       <div className="flex-1 overflow-y-auto px-3 py-2 flex flex-col gap-1.5">
         {list.map(it => <ItemRow key={it.uid} save={save} item={it} onClick={() => setSel(it.uid)} />)}
-        {!list.length && <div className="text-center py-10" style={{ fontSize: 12.5, color: PALETTE.textDim }}>가방에 장비가 없습니다</div>}
+        {!list.length && <div className="text-center py-10" style={{ fontSize: 12.5, color: PALETTE.textDim }}>{save.inventory.length ? '이 분류에 장비가 없습니다' : '가방에 장비가 없습니다'}</div>}
       </div>
       {item && (
         <BottomSheet title={E.itemName(item) + (item.plus ? ` +${item.plus}` : '')} onClose={() => setSel(null)} maxHeight="70%">
@@ -1437,17 +1489,19 @@ function addHuntRecord(st, r) {
   for (const g of r.items) st.items[g] = (st.items[g] || 0) + 1;
 }
 const TIER_LABEL = { normal: '일반 몹', elite: '강적', boss: '보스' };
-function HuntReport({ report: r, onClose }) {
+function HuntReport({ report: r, onClose, title = '📊 사냥 보고서' }) {
   const units = Object.entries(r.units).map(([key, u]) => ({ key, ...u })).sort((a, b) => b.dmg - a.dmg);
   const total = units.reduce((t, u) => t + u.dmg, 0) || 1;
   const skills = Object.entries(r.skills).map(([k, v]) => { const [uk, sn] = k.split('|'); return { uk, sn, v }; }).sort((a, b) => b.v - a.v).slice(0, 6);
   const mins = Math.max(1, Math.round((r.endedAt - r.startedAt) / 60000));
   const row = { display: 'flex', justifyContent: 'space-between', fontSize: 12.5, color: PALETTE.text, padding: '3px 0' };
   return (
-    <BottomSheet title="📊 사냥 보고서" onClose={onClose} maxHeight="85%">
+    <BottomSheet title={title} onClose={onClose} maxHeight="85%">
       <div className="flex flex-col gap-3">
         <GlassPanel className="p-3">
-          <div className="font-semibold mb-1" style={{ fontSize: 13, color: PALETTE.legendary }}>사냥 {r.battles}회 · 승리 {r.wins} · 패배 {r.losses} <span style={{ color: PALETTE.textDim, fontWeight: 400 }}>· 약 {mins}분</span></div>
+          <div className="font-semibold mb-1" style={{ fontSize: 13, color: PALETTE.legendary }}>
+            {r.battles === 1 ? <>{r.wins ? '승리' : '패배'} <span style={{ color: PALETTE.textDim, fontWeight: 400 }}>· {r.rounds}라운드</span></> : <>전투 {r.battles}회 · 승리 {r.wins} · 패배 {r.losses} <span style={{ color: PALETTE.textDim, fontWeight: 400 }}>· {r.rounds}라운드 · 약 {mins}분</span></>}
+          </div>
           {['normal', 'elite', 'boss'].filter(t => r.kills[t]).map(t => <div key={t} style={row}><span>{TIER_LABEL[t]} 처치</span><b>{r.kills[t]}마리</b></div>)}
           {r.types.gate ? <div style={row}><span>관문 전투</span><b>{r.types.gate}회</b></div> : null}
         </GlassPanel>
@@ -1473,7 +1527,7 @@ function HuntReport({ report: r, onClose }) {
             <div key={i} style={{ ...row, fontSize: 12 }}><span>{i + 1}. {x.sn} <span style={{ color: PALETTE.textDim }}>({r.units[x.uk]?.fam ? '사역마' : '주인공'})</span></span><span>{x.v.toLocaleString()} ({Math.round(x.v / total * 100)}%)</span></div>
           ))}
         </GlassPanel>
-        <GlassPanel className="p-3">
+        {(r.wins > 0 || r.battles > 1) && <GlassPanel className="p-3">
           <div className="font-semibold mb-1" style={{ fontSize: 13, color: PALETTE.text }}>획득</div>
           <div style={row}><span>경험치</span><b>{r.exp.toLocaleString()}</b></div>
           <div style={row}><span>골드</span><b>🪙 {r.gold.toLocaleString()}</b></div>
@@ -1481,7 +1535,7 @@ function HuntReport({ report: r, onClose }) {
           {r.famShards ? <div style={row}><span>계약서 조각</span><b>📜 {r.famShards}</b></div> : null}
           {r.levelUps ? <div style={row}><span>레벨 업</span><b>▲ {r.levelUps}</b></div> : null}
           <div style={row}><span>장비</span><b>{GRADES.filter(g => r.items[g.id]).map(g => <span key={g.id} style={{ color: g.color, marginLeft: 6 }}>{g.label} {r.items[g.id]}</span>)}{!Object.keys(r.items).length && '없음'}</b></div>
-        </GlassPanel>
+        </GlassPanel>}
         <UIButton onClick={onClose}>확인</UIButton>
       </div>
     </BottomSheet>
@@ -1524,6 +1578,10 @@ export default function ChronicleGame({ onExit }) {
   const lastRecRef = useRef(null);
   const [report, setReport] = useState(null);
   const [boostSheet, setBoostSheet] = useState(false);
+  // 던전 연속 도전 (1.215.1) — 설정은 기억, 던전 한 판의 전투 기록은 dungRunRef에 누적
+  const [dungeonAuto, setDungeonAuto] = useState(() => { try { return localStorage.getItem('chronicleDungeonAuto') === '1'; } catch { return false; } });
+  const toggleDungeonAuto = () => { const v = !dungeonAuto; setDungeonAuto(v); try { localStorage.setItem('chronicleDungeonAuto', v ? '1' : '0'); } catch { /* */ } };
+  const dungRunRef = useRef(null);
   const toggleRepeat = () => {
     if (!repeat) { repStatsRef.current = newHuntStats(); if (lastRecRef.current) addHuntRecord(repStatsRef.current, lastRecRef.current); }
     setRepeat(r => !r);
@@ -1597,7 +1655,14 @@ export default function ChronicleGame({ onExit }) {
     const r = E.applyBattle(save, ctx, sim, rng);
     r.summary.questsDone = Q.newlyDoneQuests(save, r.save);
     setSave(r.save);
-    setBattle({ sim, enemies: enc.enemies, party, summary: r.summary, ctx, key: Date.now() });
+    if (!dungRunRef.current) dungRunRef.current = newHuntStats();
+    addHuntRecord(dungRunRef.current, huntRecord(sim, party, enc, r.summary));
+    let runReport = null;
+    if (sim.result !== 'win' || r.summary.dungeonClear) {
+      if (dungRunRef.current.battles > 1) runReport = { ...dungRunRef.current, endedAt: Date.now() };
+      dungRunRef.current = null;
+    }
+    setBattle({ sim, enemies: enc.enemies, party, summary: r.summary, ctx, runReport, key: Date.now() });
     setView('battle');
   };
 
@@ -1632,7 +1697,8 @@ export default function ChronicleGame({ onExit }) {
     content = (
       <BattleView key={battle.key} battle={battle} save={save} onDone={afterBattle}
         repeat={repeat} onToggleRepeat={toggleRepeat}
-        onAgain={() => lastFieldRef.current && fightField(lastFieldRef.current.field, 'hunt', lastFieldRef.current.stage)}
+        onAgain={() => (battle.ctx.kind === 'dungeon' ? fightDungeon() : lastFieldRef.current && fightField(lastFieldRef.current.field, 'hunt', lastFieldRef.current.stage))}
+        dungeonAuto={dungeonAuto} onToggleDungeonAuto={toggleDungeonAuto}
         boostLeft={E.boostLeftMs(save)} onAskBoost={() => setBoostSheet(true)} />
     );
   } else if (view === 'field') {
@@ -1642,10 +1708,11 @@ export default function ChronicleGame({ onExit }) {
   } else if (view === 'dungeon') {
     content = (
       <DungeonView save={save} onBack={() => setView('town')}
-        onEnter={(id, tier) => setSave(E.startDungeon(save, id, tier))}
+        onEnter={(id, tier) => { dungRunRef.current = null; setSave(E.startDungeon(save, id, tier)); }}
+        dungeonAuto={dungeonAuto} onToggleDungeonAuto={toggleDungeonAuto}
         onBuyKey={() => { setSave(E.buyDungeonKey(save)); flash('🗝 던전 열쇠 +1'); }}
         onFight={fightDungeon}
-        onLeave={() => { setSave(E.leaveDungeon(save)); setView('town'); }} />
+        onLeave={() => { dungRunRef.current = null; setSave(E.leaveDungeon(save)); setView('town'); }} />
     );
   } else if (view === 'party') {
     content = <PartyView save={save} setSave={setSave} onBack={() => setView('town')} />;
