@@ -9,6 +9,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, Coins } from 'lucide-react';
 import { PALETTE } from '../utils/helpers.js';
 import { GlassPanel, UIButton, BottomSheet } from '../components/ui/CommonUI.jsx';
+import UpdateButton from '../components/ui/UpdateButton.jsx';
+import { GAME_VERSION } from '../data/version.js';
 import {
   CHRONICLE_TITLE, CHRONICLE_SUB, CHRONICLE_PARTS, CHRONICLE_SAVE_KEY, CHRONICLE_SAVE_KEY_V1, CHRONICLE_TUNING, CHRONICLE_CLASSES, CHRONICLE_FIELDS,
   CHRONICLE_DUNGEON, CHRONICLE_DUNGEONS, DUNGEON_TIERS, dungeonDef, STAT_META, STAT_KEYS, SKILL_MAX_LV, MASTERY_PCT, BOSS_DAILY_LIMIT, DUNGEON_KEYS, GRADES, gradeIdx, SLOTS, FORGE, UNIQUE_CHANCE, UNIQUE_ITEMS, fieldStages, FIELD_STAGES, BOOST, BAG_EXPAND,
@@ -1401,8 +1403,9 @@ function ForgeView({ save, setSave, onBack, flash }) {
 
 // ===== 시작 · 캐릭터 슬롯 =====
 // 직업당 캐릭터 1명 (최대 5). 재화·열쇠·공용 창고는 모든 캐릭터가 공유한다.
-function TitleView({ acc, onSelect, onCreate, onExit }) {
+function TitleView({ acc, onSelect, onCreate, onExit, onReset }) {
   const [picking, setPicking] = useState(null); // 새로 만들 직업 id
+  const [resetStep, setResetStep] = useState(0); // 0 닫힘 · 1 안내 · 2 최종 확인
   const chars = acc.chars || {};
   const owned = CHRONICLE_CLASSES.filter(c => chars[c.id]);
   const last = acc.active && chars[acc.active] ? acc.active : null;
@@ -1468,8 +1471,30 @@ function TitleView({ acc, onSelect, onCreate, onExit }) {
             );
           })}
           <button onClick={onExit} className="ui-press" style={{ background: 'transparent', border: 'none', color: PALETTE.dawn, padding: 10, fontSize: 12.5 }}>⇄ 게임 선택</button>
+          <div className="flex items-center justify-center gap-2 flex-wrap pb-1">
+            <span style={{ fontSize: 11, color: PALETTE.textDim }}>v{GAME_VERSION}</span>
+            <UpdateButton />
+            <button onClick={() => setResetStep(1)} className="ui-press" style={{ minHeight: 32, padding: '0 12px', borderRadius: 999, fontSize: 11, background: 'transparent', border: '1px solid #e06a5f66', color: '#e06a5f' }}>↺ 처음부터 다시</button>
+          </div>
         </div>
       </div>
+      {resetStep > 0 && (
+        <BottomSheet title="↺ 황혼 연대기 초기화" onClose={() => setResetStep(0)} maxHeight="70%">
+          <div style={{ fontSize: 12.5, color: PALETTE.text, lineHeight: 1.7 }}>
+            황혼 연대기의 <b style={{ color: '#e06a5f' }}>모든 진행이 삭제</b>되고 서장부터 다시 시작합니다.
+          </div>
+          <GlassPanel className="p-3 mt-2" style={{ fontSize: 12, color: PALETTE.textDim, lineHeight: 1.7 }}>
+            삭제: 캐릭터 {owned.length}명(레벨·전승·장비·스킬) · 골드 {acc.gold.toLocaleString()} · 재료 · 열쇠 · 공용 창고 {(acc.stash || []).length}개 · 사역마 {Object.keys(acc.fams || {}).length}마리 · 이야기·의뢰·첨탑 기록<br />
+            유지: 던앤트와일라잇 본편 · 트와일라잇 아르카나 · 무덤의 유산 등 <b style={{ color: PALETTE.text }}>다른 게임은 그대로</b>
+          </GlassPanel>
+          <div className="flex flex-col gap-2 mt-3">
+            {resetStep === 1
+              ? <UIButton variant="ghost" style={{ height: 42, color: '#e06a5f', borderColor: '#e06a5f88' }} onClick={() => setResetStep(2)}>초기화 진행</UIButton>
+              : <UIButton style={{ height: 42, background: '#8b1f1f' }} onClick={() => { setResetStep(0); onReset(); }}>정말 전부 지우고 처음부터 시작</UIButton>}
+            <UIButton variant="ghost" style={{ height: 40 }} onClick={() => setResetStep(0)}>취소</UIButton>
+          </div>
+        </BottomSheet>
+      )}
     </div>
   );
 }
@@ -1844,6 +1869,7 @@ export default function ChronicleGame({ onExit }) {
   if (!save || view === 'title') {
     content = (
       <TitleView acc={acc} onExit={onExit}
+        onReset={() => { setRepeat(false); setBattle(null); setScene(null); setAcc(A.newAccount(false)); flash('황혼 연대기를 처음부터 시작합니다'); }}
         onSelect={(cid) => { setRepeat(false); setAcc(a => A.selectCharacter(a, cid)); setView('town'); }}
         onCreate={(cid) => { setRepeat(false); setAcc(a => A.createCharacter(a, cid)); setView('town'); }} />
     );
