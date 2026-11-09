@@ -729,6 +729,22 @@ export function gateReady(save, fid, i) {
   return st.cleared === i && (st.kills[i] || 0) >= fieldStages(CHRONICLE_FIELDS[fid - 1])[i].kills;
 }
 export const bossReady = (save, fid) => stageState(save, fid).cleared >= FIELD_STAGES;
+// 자동 진행 다음 단계 (1.234.0) — { field, mode: 'hunt'|'gate'|'boss', stage } 또는 { field: null, reason }
+//   보스를 이미 잡은 지역이면 다음 지역으로 넘어간다 · 진행 중 스테이지 = 관문을 넘은 수(cleared)
+export function autoProgressStep(save, field) {
+  let f = field;
+  for (let guard = 0; f && save.progress.bossCleared[f.id] && guard < 30; guard++) {
+    const next = CHRONICLE_FIELDS[f.id]; // id는 1부터 — 다음 지역
+    if (!next) return { field: null, reason: '모든 지역의 보스를 쓰러뜨렸다' };
+    if (!fieldUnlocked(save, next.id)) return { field: null, reason: `${next.name}은 아직 열리지 않았다${next.reqRebirth ? ' (전승 필요)' : ''}` };
+    f = next;
+  }
+  if (!f) return { field: null, reason: '사냥터 없음' };
+  const st = stageState(save, f.id);
+  if (st.cleared >= FIELD_STAGES) return { field: f, mode: 'boss', stage: null };
+  const i = st.cleared;
+  return gateReady(save, f.id, i) ? { field: f, mode: 'gate', stage: i } : { field: f, mode: 'hunt', stage: i };
+}
 // 관문 강적 — 그 스테이지 강적 1 + 일반 1, 레벨 +1
 export function rollGateEncounter(field, stageIdx, rng) {
   const lv = fieldStages(field)[stageIdx].lv + STAGE_TUNING.gateLvAdd;
