@@ -4,7 +4,7 @@
 // 저장 객체(save)를 받아 새 save를 돌려주는 순수 함수 + 전투 시뮬.
 // 전투는 simulateChronicleBattle이 끝까지 계산해 사건 목록을 돌려주고, UI는 재생만 한다 (풀오토 관전).
 // ============================================
-import { fieldStages, FIELD_STAGES, STAGE_TUNING, BOOST } from './data.js';
+import { fieldStages, FIELD_STAGES, STAGE_TUNING, BOOST, BAG_EXPAND, SALVAGE, SALVAGE_ICON } from './data.js';
 import { TOWER, TOWER_SHOP, towerUnlocked, isTowerBoss, towerEnemyLv, towerArea, towerFloorPicks, kstWeekKey } from './tower.js';
 import { famCombatant, famSubFx, rollFamShards, FAM_TUNING, summonFamiliars, enhanceFamiliar, evolveFamiliar } from './familiar.js';
 import {
@@ -391,21 +391,44 @@ export function equippedBy(save, uid) {
   }
   return null;
 }
+// 분해 재화 (1.217.0) — 등급별 재화 종류 + 강화 단계 ✦ 환급
+export function salvageOf(it) {
+  const s = SALVAGE[it.grade] || {};
+  const out = {};
+  if (s.gold) out.gold = s.gold[0] + s.gold[1] * (it.ilv || 1);
+  for (const k of ['essence', 'shard', 'famShard', 'famSoul']) if (s[k]) out[k] = s[k];
+  if (it.plus) out.essence = (out.essence || 0) + it.plus * (it.grade === 'unique' ? 3 : 1);
+  return out;
+}
+function addSalvage(save, tot) {
+  save.gold += tot.gold || 0;
+  for (const k of ['essence', 'shard', 'famShard', 'famSoul']) if (tot[k]) save.mats[k] = (save.mats[k] || 0) + tot[k];
+}
+export function salvageText(tot) {
+  return Object.entries(SALVAGE_ICON).filter(([k]) => tot[k]).map(([k, ic]) => `${ic} +${tot[k].toLocaleString()}`).join(' ') || '없음';
+}
 export function dismantleItems(save0, uids) {
   const save = clone(save0);
-  let essence = 0; let shard = 0;
+  const tot = {};
   for (const uid of uids) {
     if (equippedBy(save, uid)) continue;
     const idx = save.inventory.findIndex(i => i.uid === uid);
     if (idx < 0) continue;
-    const it = save.inventory[idx];
-    const g = GRADES[gradeIdx(it.grade)];
-    essence += g.dismantle + (it.plus || 0) * (it.grade === 'unique' ? 3 : 1);
-    shard += g.shard || 0;
+    for (const [k, v] of Object.entries(salvageOf(save.inventory[idx]))) tot[k] = (tot[k] || 0) + v;
     save.inventory.splice(idx, 1);
   }
-  save.mats.essence += essence; save.mats.shard += shard;
-  return { save, essence, shard };
+  addSalvage(save, tot);
+  return { save, ...tot, essence: tot.essence || 0, shard: tot.shard || 0, salvage: tot };
+}
+// 가방 한도 (1.217.0) — 기본 + 확장
+export function bagMax(save) { return T.inventoryMax + BAG_EXPAND.step * (save.bagExpand || 0); }
+export function bagExpandCost(save) { return bagMax(save) >= BAG_EXPAND.max ? null : BAG_EXPAND.cost(save.bagExpand || 0); }
+export function expandBag(save0) {
+  const c = bagExpandCost(save0);
+  if (c == null || save0.gold < c) return save0;
+  const save = clone(save0);
+  save.gold -= c; save.bagExpand = (save.bagExpand || 0) + 1;
+  return save;
 }
 // 빈 슬롯·더 강한 장비 자동 장착 (파티 전원)
 export function autoEquip(save0) {
@@ -436,7 +459,7 @@ export function moveToStash(save0, uids) {
   return { save, moved };
 }
 export function takeFromStash(save0, uid) {
-  if (save0.inventory.length >= T.inventoryMax) return save0;
+  if (save0.inventory.length >= bagMax(save0)) return save0;
   const idx = (save0.stash || []).findIndex(i => i.uid === uid);
   if (idx < 0) return save0;
   const save = clone(save0);
@@ -445,17 +468,15 @@ export function takeFromStash(save0, uid) {
 }
 export function dismantleStash(save0, uids) {
   const save = clone(save0);
-  let essence = 0; let shard = 0;
+  const tot = {};
   for (const uid of uids) {
     const idx = (save.stash || []).findIndex(i => i.uid === uid);
     if (idx < 0) continue;
-    const it = save.stash[idx];
-    const g = GRADES[gradeIdx(it.grade)];
-    essence += g.dismantle + (it.plus || 0); shard += g.shard || 0;
+    for (const [k, v] of Object.entries(salvageOf(save.stash[idx]))) tot[k] = (tot[k] || 0) + v;
     save.stash.splice(idx, 1);
   }
-  save.mats.essence += essence; save.mats.shard += shard;
-  return { save, essence, shard };
+  addSalvage(save, tot);
+  return { save, ...tot, essence: tot.essence || 0, shard: tot.shard || 0, salvage: tot };
 }
 
 // ===== 대장간 =====
@@ -1009,7 +1030,7 @@ export function applyBattle(save0, ctx, battle, rng = Math.random) {
     if (ups) summary.levelUps[cid] = save.units[cid].lv;
   }
   for (const it of r.items) {
-    if (save.inventory.length >= T.inventoryMax) { const g = GRADES[gradeIdx(it.grade)]; save.mats.essence += g.dismantle; summary.autoDismantled = (summary.autoDismantled || 0) + 1; continue; }
+    if (save.inventory.length >= bagMax(save)) { addSalvage(save, salvageOf(it)); summary.autoDismantled = (summary.autoDismantled || 0) + 1; continue; }
     const item = { ...it, uid: save.nextUid++ };
     save.inventory.push(item);
     summary.items.push(item);
@@ -1144,7 +1165,7 @@ export function towerShopCanBuy(save, id) {
   const it = TOWER_SHOP.find(x => x.id === id);
   if (!it || (save.mats.towerCoin || 0) < it.cost) return false;
   if (id === 'key' && keyCount(save) >= DUNGEON_KEYS.max) return false;
-  if (id === 'unique' && save.inventory.length >= T.inventoryMax) return false;
+  if (id === 'unique' && save.inventory.length >= bagMax(save)) return false;
   return true;
 }
 export function buyTowerItem(save0, id, uniqueId = null) {
