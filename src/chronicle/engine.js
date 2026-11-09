@@ -243,14 +243,15 @@ export function deriveUnit(save, classId) {
     dodge: Math.min(0.35, st.agi * 0.002 + (fx.dodgeAdd || 0) + G('dodge')),
     counterPct: (fx.counterPct || 0) + G('counterPct'),
     lowHpDmg: (fx.lowHpDmg || 0) + G('lowHpDmg'),
-    lifesteal: G('lifesteal'), thornsPct: G('thornsPct'), armorPen: Math.min(0.8, G('armorPen')),
-    startShieldPct: G('shieldPct'), guts: G('guts') ? 1 : 0, cdr: Math.min(2, G('cdr')),
+    lifesteal: Math.min(T.lifestealCap || 1, G('lifesteal')), thornsPct: G('thornsPct'), armorPen: Math.min(0.8, G('armorPen')),
+    startShieldPct: Math.min(T.shieldCap || 1, G('shieldPct')), guts: G('guts') ? 1 : 0, cdr: Math.min(2, G('cdr')),
     dmgReduce: Math.min(0.5, G('dmgReduce')) - G('dmgTakenUp'),
     skills: Object.entries(u.skills)
       .map(([id, lv]) => ({ s: CHRONICLE_SKILLS[id], lv }))
       .filter(x => x.s && x.lv > 0 && x.s.kind !== 'passive'),
   };
   for (const k of PASS_KEYS) if (G(k)) out[k] = G(k);
+  if (out.holyDmg) out.holyDmg = Math.min(T.holyCap || 9, out.holyDmg); // 치유→신성 피해 상한 (1.216.0)
   return out;
 }
 export function unitPower(save, classId) {
@@ -655,7 +656,7 @@ export function dungeonEncounter(d, rng) {
 // ===== 전투 시뮬 (풀오토) =====
 export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
   const units = [
-    ...party0.map(p => ({ ...p, buffs: {}, shield: Math.round((p.startShieldPct || 0) * p.maxHp), taunt: 0, tauntDef: 0, dots: [], cds: {}, turn: 0, critNext: false, firstDone: false, reviveUsed: false, emergencyUsed: false })),
+    ...party0.map(p => ({ ...p, buffs: {}, shield: Math.round((p.startShieldPct || 0) * p.maxHp), taunt: p.startTaunt || 0, tauntDef: 0, dots: [], cds: {}, turn: 0, critNext: false, firstDone: false, reviveUsed: false, emergencyUsed: false })),
     ...enemies0.map(e => ({ ...e, buffs: {}, shield: 0, taunt: 0, tauntDef: 0, dots: [], cds: {}, turn: 0, skills: [] })),
   ];
   const events = [];
@@ -728,6 +729,9 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
     if (u.side === 'enemy') {
       const t = foes.find(f => f.taunt > 0);
       if (t && rng() < 0.85) return t;
+      // 수호 사역마 — 살아 있으면 등급별 확률로 공격을 대신 받는다 (1.216.0)
+      const g = foes.find(f => f.guardian);
+      if (g && rng() < g.guardian) return g;
       // 사역마가 있어도 적은 주인공을 노린다 (70%) — 동행이 방패막이로만 쓰이지 않게 (1.212.0)
       const leader = foes.find(f => f.leader);
       if (leader && foes.length > 1 && rng() < 0.7) return leader;

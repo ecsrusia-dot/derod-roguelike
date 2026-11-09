@@ -843,6 +843,41 @@ function BagView({ save, setSave, onBack, flash }) {
 
 // ===== 사역마 (1.212.0) — 조각 소환(가챠) · 강화 · 진화 · 편성 =====
 const famColor = (g) => F.famGrade(g).color;
+// 사역마 역할 안내 + 직업별 추천 (1.216.0)
+function FamRoleGuide({ heroCls }) {
+  const tip = F.FAM_CLASS_TIP[heroCls];
+  return (
+    <GlassPanel className="p-3" style={{ fontSize: 12, lineHeight: 1.6 }}>
+      <div className="font-semibold mb-1" style={{ fontSize: 13, color: PALETTE.text }}>역할 3종</div>
+      {Object.entries(F.FAM_ROLES).map(([id, r]) => (
+        <div key={id} style={{ color: PALETTE.textDim }}>
+          <b style={{ color: r.color }}>{r.icon} {r.label}</b>{tip?.best === id ? <span style={{ color: PALETTE.legendary }}> ★ 추천</span> : ''} — {r.desc}
+        </div>
+      ))}
+      {tip && <div className="mt-1.5" style={{ color: PALETTE.text }}>{chronicleClass(heroCls).name} 추천 동행: <b style={{ color: F.FAM_ROLES[tip.best].color }}>{F.FAM_ROLES[tip.best].icon} {F.FAM_ROLES[tip.best].label}</b> <span style={{ color: PALETTE.textDim }}>— {tip.why}</span></div>}
+    </GlassPanel>
+  );
+}
+// 보조 효과 등급표 — 청령부터 효과가 하나 더 붙는다
+function FamSubTable({ k, gi }) {
+  const rows = F.famSubPreview(k);
+  const keys = Object.keys(F.FAM_ROLES[F.famRole(k)].sub);
+  return (
+    <div className="mt-2" style={{ fontSize: 11.5 }}>
+      <div style={{ color: PALETTE.textDim, marginBottom: 3 }}>등급별 보조 효과 (강화 전 · 청령부터 효과 추가)</div>
+      <div className="grid gap-x-2" style={{ gridTemplateColumns: `auto repeat(${keys.length}, 1fr)` }}>
+        <span />
+        {keys.map(kk => <span key={kk} className="text-right" style={{ color: PALETTE.textDim }}>{F.famSubLabel(kk)}</span>)}
+        {rows.map((r, i) => (
+          <React.Fragment key={r.grade.id}>
+            <span style={{ color: r.grade.color, fontWeight: i === gi ? 700 : 400 }}>{i === gi ? '▶ ' : ''}{r.grade.label}</span>
+            {keys.map(kk => <span key={kk} className="text-right" style={{ color: i === gi ? PALETTE.text : PALETTE.textDim, fontWeight: i === gi ? 700 : 400 }}>{r.vals[kk] ? `${Math.round(r.vals[kk] * 1000) / 10}%` : '—'}</span>)}
+          </React.Fragment>
+        ))}
+      </div>
+    </div>
+  );
+}
 function FamCard({ k, f, onClick, right, size = 46 }) {
   const g = F.famGrade(f.grade);
   const role = F.FAM_ROLES[F.famRole(k)];
@@ -850,7 +885,7 @@ function FamCard({ k, f, onClick, right, size = 46 }) {
     <button onClick={onClick} className="ui-press w-full flex items-center gap-2.5 text-left" style={{ padding: '7px 10px', borderRadius: 12, background: `${g.color}12`, border: `1px solid ${g.color}66` }}>
       <img src={chronicleEnemyArt(k)} alt="" className="object-cover flex-none" style={{ width: size, height: size, borderRadius: 10, border: `1.5px solid ${g.color}` }} />
       <div className="flex-1 min-w-0">
-        <div className="truncate font-semibold" style={{ fontSize: 13, color: g.color }}>{F.famName(k)}{f.plus ? ` +${f.plus}` : ''} <span style={{ fontSize: 11, color: PALETTE.textDim, fontWeight: 400 }}>{g.label} · {role.icon} {role.label}</span></div>
+        <div className="truncate font-semibold" style={{ fontSize: 13, color: g.color }}>{F.famName(k)}{f.plus ? ` +${f.plus}` : ''} <span style={{ fontSize: 11, color: PALETTE.textDim, fontWeight: 400 }}>{g.label} · <span style={{ color: role.color }}>{role.icon} {role.label}</span></span></div>
         <div className="truncate" style={{ fontSize: 11, color: PALETTE.textDim }}>보조 효과: {F.famSubText(k, f)}</div>
       </div>
       {right}
@@ -937,6 +972,7 @@ function FamiliarView({ save, setSave, onBack, flash }) {
             </div>
           );
         })}
+        {tab === 'team' && <FamRoleGuide heroCls={save.hero} />}
         {tab === 'team' && <div style={{ fontSize: 11.5, color: PALETTE.textDim, lineHeight: 1.6 }}>동행 사역마는 주인공 능력치에 비례해 강해진다 (역할·등급·강화 반영). 주인공이 쓰러지면 패배. 사역마는 모든 캐릭터가 함께 쓴다.</div>}
       </div>
 
@@ -970,8 +1006,12 @@ function FamiliarView({ save, setSave, onBack, flash }) {
           <BottomSheet title={`${F.famName(sel)}${selF.plus ? ` +${selF.plus}` : ''}`} onClose={() => setSel(null)} maxHeight="80%">
             <img src={chronicleEnemyArt(sel)} alt="" className="w-full object-cover" style={{ aspectRatio: '16 / 8', borderRadius: 12, border: `1px solid ${g.color}` }} />
             <div className="text-center mt-2" style={{ fontSize: 13, color: g.color, fontWeight: 600 }}>{g.label} · {F.FAM_ROLES[F.famRole(sel)].icon} {F.FAM_ROLES[F.famRole(sel)].label}</div>
-            <div className="text-center" style={{ fontSize: 12, color: PALETTE.textDim }}>보조 효과: {F.famSubText(sel, selF)}</div>
-            <div className="text-center" style={{ fontSize: 12, color: PALETTE.textDim }}>동행 스킬: {F.FAM_SKILLS[F.famRole(sel)].map(x => x.name).join(' · ')}</div>
+            <div className="text-center mt-0.5" style={{ fontSize: 12, color: PALETTE.textDim }}>{F.FAM_ROLES[F.famRole(sel)].desc}</div>
+            <GlassPanel className="p-2.5 mt-2" style={{ fontSize: 12, color: PALETTE.text, lineHeight: 1.6 }}>
+              <div><b>동행</b> <span style={{ color: PALETTE.textDim }}>— {F.FAM_SKILLS[F.famRole(sel)].map(x => x.name).join(' · ')}{F.FAM_ROLES[F.famRole(sel)].guard ? ` · 수호 태세: 적 공격의 ${Math.round(F.FAM_ROLES[F.famRole(sel)].guard[gi] * 100)}%를 대신 받음` : ''}</span></div>
+              <div><b>보조</b> <span style={{ color: PALETTE.textDim }}>— {F.famSubText(sel, selF)}</span></div>
+            </GlassPanel>
+            <FamSubTable k={sel} gi={gi} />
             <div className="flex gap-1 mt-3 justify-center">{Array.from({ length: F.FAM_TUNING.maxPlus }, (_, i) => <span key={i} style={{ width: 18, height: 6, borderRadius: 3, background: i < selF.plus ? g.color : '#ffffff1a' }} />)}</div>
             <div className="mt-3 flex flex-col gap-2">
               {!maxed && <UIButton disabled={souls < ec} onClick={() => setSave(E.enhanceFam(save, sel))}>강화 +{selF.plus} → +{selF.plus + 1} (🔮{ec} / 보유 {souls})</UIButton>}
