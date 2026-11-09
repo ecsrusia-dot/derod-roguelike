@@ -574,6 +574,7 @@ function TownView({ save, go, onExit, onSwitchChar }) {
     { id: 'tower', icon: '🗼', label: '황혼의 첨탑', sub: E.towerUnlocked(save.progress) ? (save.tower?.run ? `${save.tower.run.floor}층 도전 중` : `최고 ${save.tower?.best || 0}층 · ✪${save.mats.towerCoin || 0}`) : '마계의 균열 보스 후 개방', locked: !E.towerUnlocked(save.progress) },
     { id: 'dungeon', icon: '🕳', label: '던전', sub: save.dungeon ? `${dungeonDef(save.dungeon.id).name} 진행 중` : E.dungeonUnlocked(save) ? `🗝 열쇠 ${E.keyCount(save)}개 · ${CHRONICLE_DUNGEONS.filter(d => E.dungeonUnlocked(save, d.id)).length}곳` : '죽은 자의 숲 보스 후 개방', locked: !E.dungeonUnlocked(save) },
     { id: 'party', icon: '🧭', label: '성장', sub: '능력치 · 스킬 · 장비', badge: alertParty },
+    { id: 'raid', icon: '⚔', label: '원정대 레이드', sub: (() => { const n = RD.RAID_TIERS.filter((t, i) => RD.raidUnlocked(save.roster, save.raid, i)).length; return n ? `「다섯 봉인」 ${n}단계 도전 가능` : '다섯 캐릭터 모두 Lv.60이면 입장'; })(), badge: RD.RAID_TIERS.some((t, i) => RD.raidUnlocked(save.roster, save.raid, i) && !(save.raid?.daily?.date === E.kstDateKey() && save.raid.daily.done?.[t.id])) },
     { id: 'roster', icon: '🏳', label: '원정대', sub: R.rosterQuestBadge(save) ? `의뢰 보상 ${R.rosterQuestBadge(save)}건` : `레벨 상한 ${E.levelCapOf(save)} · 전역 버프 · 의뢰`, badge: R.rosterQuestBadge(save) > 0 },
     { id: 'bag', icon: '🎒', label: '가방', sub: `${save.inventory.length}/${E.bagMax(save)}${save.inventory.some(i => !E.itemUsable(i, save.hero)) ? ' · 다른 직업 장비 있음' : ''}` },
     { id: 'fam', icon: '🐾', label: '사역마', sub: E.famSlotOpen(save, 'main') ? `📜 ${save.mats.famShard || 0} · 보유 ${Object.keys(save.fams || {}).length}` : `Lv.${F.FAM_TUNING.slotLv.main}부터 동행`, badge: (save.mats.famShard || 0) >= F.FAM_TUNING.shardsPerSummon || (save.mats.sealPlus || 0) > 0 },
@@ -2291,7 +2292,7 @@ export default function ChronicleGame({ onExit }) {
   } else if (view === 'party') {
     content = <PartyView save={save} setSave={setSave} onBack={() => setView('town')} />;
   } else if (view === 'raid') {
-    content = <RaidView save={save} onBack={() => setView('roster')} onFight={fightRaid} />;
+    content = <RaidView save={save} onBack={() => setView('town')} onFight={fightRaid} />;
   } else if (view === 'roster') {
     content = <RosterView save={save} setSave={setSave} flash={flash} onBack={() => setView('town')} onSwitchChar={() => setView('title')} onRaid={() => setView('raid')} />;
   } else if (view === 'bag') {
