@@ -291,6 +291,8 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
                 {summary.autoDismantled ? <div className="text-center" style={{ color: PALETTE.textDim }}>가방이 가득 차 {summary.autoDismantled}개 자동 분해</div> : null}
                 {summary.unlocks.map(u => <div key={u} className="text-center" style={{ color: '#9cc4e4' }}>🔓 {u} 개방</div>)}
                 {summary.dungeonClear && <div className="text-center font-semibold" style={{ color: '#c08ae8' }}>던전 정복!</div>}
+                {summary.towerCoins ? <div className="text-center" style={{ color: '#e8b04a' }}>✪ 첨탑 주화 +{summary.towerCoins}{summary.towerWeekly ? ` (주간 ${summary.towerFloor}층 첫 도달 +${summary.towerWeekly} 포함)` : ''}</div> : null}
+                {summary.towerCheckpoint ? <div className="text-center font-semibold" style={{ color: '#9cc4e4' }}>🚩 {summary.towerCheckpoint}층 체크포인트 저장 — 다음 도전은 {summary.towerCheckpoint + 1}층부터</div> : null}
                 {summary.gateOpen ? <div className="text-center font-semibold" style={{ color: PALETTE.legendary }}>⚔ 처치 목표 달성 — 관문 도전 가능!</div> : null}
                 {summary.stageClear ? <div className="text-center font-semibold" style={{ color: '#9cc4e4' }}>🔓 스테이지 {summary.stageClear} 관문 통과!</div> : null}
                 {summary.famShards ? <div className="text-center" style={{ color: '#d07ae8' }}>📜 계약서 조각 +{summary.famShards}</div> : null}
@@ -299,14 +301,14 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
               </div>
             ) : (
               <div className="mt-1 text-center" style={{ fontSize: 12.5, color: PALETTE.textDim }}>
-                {ctx.kind === 'dungeon' ? '던전에서 쫓겨났다.' : `마을로 돌아간다.${summary.goldLost ? ` (골드 -${summary.goldLost})` : ''}`}
+                {ctx.kind === 'tower' ? `첨탑 ${summary.towerFell}층에서 쓰러졌다. 다음 도전은 체크포인트부터.` : ctx.kind === 'dungeon' ? '던전에서 쫓겨났다.' : `마을로 돌아간다.${summary.goldLost ? ` (골드 -${summary.goldLost})` : ''}`}
               </div>
             )}
             <div className="flex gap-2 mt-3">
               {ctx.kind === 'field' && ctx.type !== 'boss' && sim.result === 'win' && (
                 <UIButton variant={repeat ? 'gold' : 'ghost'} style={{ height: 42 }} onClick={onToggleRepeat}>{repeat ? '반복 중… (끄기)' : '반복 사냥'}</UIButton>
               )}
-              <UIButton style={{ height: 42 }} onClick={onDone}>{ctx.kind === 'dungeon' && sim.result === 'win' && !summary.dungeonClear ? '다음 층으로' : '계속'}</UIButton>
+              <UIButton style={{ height: 42 }} onClick={onDone}>{(ctx.kind === 'dungeon' && sim.result === 'win' && !summary.dungeonClear) || (ctx.kind === 'tower' && sim.result === 'win') ? '다음 층으로' : '계속'}</UIButton>
             </div>
             {ctx.kind === 'field' && sim.result === 'win' && ctx.type !== 'boss' && (
               <button onClick={onAgain} className="ui-press w-full mt-2" style={{ fontSize: 12.5, color: PALETTE.dawn, background: 'transparent', border: 'none', padding: 6 }}>한 번 더 사냥</button>
@@ -332,6 +334,7 @@ function TownView({ save, go, onExit, onSwitchChar }) {
   const tiles = [
     { id: 'quests', icon: '📜', label: '의뢰 게시판', sub: qBadge ? `새 소식 ${qBadge}건` : '메인 · 의뢰 · 이야기', badge: qBadge > 0 },
     { id: 'field', icon: '⚔', label: '사냥터', sub: '몹 사냥 · 보스' },
+    { id: 'tower', icon: '🗼', label: '황혼의 첨탑', sub: E.towerUnlocked(save.progress) ? (save.tower?.run ? `${save.tower.run.floor}층 도전 중` : `최고 ${save.tower?.best || 0}층 · ✪${save.mats.towerCoin || 0}`) : '마계의 균열 보스 후 개방', locked: !E.towerUnlocked(save.progress) },
     { id: 'dungeon', icon: '🕳', label: '던전', sub: save.dungeon ? `${dungeonDef(save.dungeon.id).name} 진행 중` : E.dungeonUnlocked(save) ? `🗝 열쇠 ${E.keyCount(save)}개 · ${CHRONICLE_DUNGEONS.filter(d => E.dungeonUnlocked(save, d.id)).length}곳` : '죽은 자의 숲 보스 후 개방', locked: !E.dungeonUnlocked(save) },
     { id: 'party', icon: '🧭', label: '성장', sub: '능력치 · 스킬 · 장비', badge: alertParty },
     { id: 'bag', icon: '🎒', label: '가방', sub: `${save.inventory.length}/${CHRONICLE_TUNING.inventoryMax}${save.inventory.some(i => !E.itemUsable(i, save.hero)) ? ' · 다른 직업 장비 있음' : ''}` },
@@ -993,6 +996,101 @@ function FamiliarView({ save, setSave, onBack, flash }) {
   );
 }
 
+// ===== 무한 탑 「황혼의 첨탑」 (1.215.0) =====
+function TowerView({ save, setSave, onBack, onFight, flash }) {
+  const [shop, setShop] = useState(false);
+  const [pickUnique, setPickUnique] = useState(false);
+  const t = save.tower || { best: 0, checkpoint: 0, run: null };
+  const run = t.run;
+  const coins = save.mats.towerCoin || 0;
+  const wk = save.towerWeek;
+  const nextFloor = run ? run.floor : (t.checkpoint || 0) + 1;
+  const boss = E.isTowerBoss(nextFloor);
+  const party = E.partyCombatants(save, run?.hp);
+  const nextCp = Math.ceil(nextFloor / E.TOWER.bossEvery) * E.TOWER.bossEvery;
+  const myUniques = Object.values(UNIQUE_ITEMS).filter(u => !u.disabled && (u.cls === save.hero || u.cls === 'common'));
+  const buy = (id, uid) => { const n = E.buyTowerItem(save, id, uid); if (n === save) { flash('구매할 수 없습니다'); return false; } setSave(n); flash('구매 완료'); return true; };
+  return (
+    <div className="absolute inset-0 flex flex-col">
+      <Header title={run ? `황혼의 첨탑 · ${run.floor}층` : '황혼의 첨탑'} onBack={run ? null : onBack} right={<span style={{ fontSize: 12.5, color: '#e8b04a' }}>✪ {coins}</span>} />
+      <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
+        <div className="relative overflow-hidden" style={{ borderRadius: 16, aspectRatio: '16 / 8', border: '1px solid #e8b04a88' }}>
+          <img src={chronicleEnemyArt('champ_dawn_boss4', 'combat')} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ opacity: 0.85 }} />
+          <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, transparent 30%, #0a0608)' }} />
+          <div className="absolute bottom-2 left-3 right-3">
+            <div className="font-bold" style={{ fontSize: 18, color: PALETTE.text }}>{nextFloor}층 {boss ? '👑 보스' : nextFloor % 5 === 0 ? '⚔ 강적' : ''}</div>
+            <div style={{ fontSize: 12, color: PALETTE.textDim }}>적 Lv.{E.towerEnemyLv(nextFloor)} · 다음 체크포인트 {nextCp}층{boss ? ` · 유니크 ${Math.round(E.TOWER.uniqueChance(nextFloor) * 100)}%` : ''}</div>
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {[['최고 층', `${t.best || 0}`], ['체크포인트', `${t.checkpoint || 0}`], ['이번 주', `${wk?.key && wk.key === E.towerWeekKeyNow() ? wk.best : 0}`]].map(([l, v]) => (
+            <GlassPanel key={l} className="p-2 text-center"><div style={{ fontSize: 11, color: PALETTE.textDim }}>{l}</div><div className="font-bold" style={{ fontSize: 17, color: PALETTE.legendary }}>{v}층</div></GlassPanel>
+          ))}
+        </div>
+        {run && (
+          <GlassPanel className="p-3 flex flex-col gap-2">
+            <div style={{ fontSize: 11.5, color: PALETTE.textDim }}>내 상태 — 층 사이 최대 HP의 25%만 회복</div>
+            {party.map(p => (
+              <div key={p.id} className="flex items-center gap-2">
+                <UnitIcon u={p} size={30} dim={p.hp <= 0} />
+                <div className="flex-1"><Bar v={p.hp} max={p.maxHp} color="linear-gradient(90deg,#3d7a3a,#7fcf6a)" h={7} /></div>
+                <span style={{ fontSize: 11, color: PALETTE.textDim, width: 70, textAlign: 'right' }}>{p.hp}/{p.maxHp}</span>
+              </div>
+            ))}
+          </GlassPanel>
+        )}
+        {run ? (
+          <>
+            <UIButton onClick={onFight}>{boss ? `👑 ${run.floor}층 보스와 싸운다` : `${run.floor}층 전투`}</UIButton>
+            <UIButton variant="ghost" onClick={() => setSave(E.leaveTower(save))}>도전 종료 (체크포인트 {t.checkpoint || 0}층 유지)</UIButton>
+          </>
+        ) : (
+          <UIButton onClick={() => setSave(E.startTower(save))}>🗼 {nextFloor}층부터 도전 (무료)</UIButton>
+        )}
+        <UIButton variant="gold" onClick={() => setShop(true)}>✪ 첨탑 상점</UIButton>
+        <GlassPanel className="p-3" style={{ fontSize: 11.5, color: PALETTE.textDim, lineHeight: 1.6 }}>
+          층마다 적 레벨 +1 · 10층마다 보스 (사냥터·던전 보스 순환) · 보스를 쓰러뜨리면 그 층이 체크포인트가 된다.<br />
+          쓰러지면 이번 도전이 끝나고, 다음 도전은 체크포인트 다음 층부터. 입장은 무료.<br />
+          ✪ 첨탑 주화: 층마다 {E.TOWER.coins(1)}~ · 보스 층 ×{E.TOWER.bossCoinMult} · 이번 주 처음 도달한 10층 단위마다 층×3 보너스 (월요일 0시 초기화)
+        </GlassPanel>
+      </div>
+      {shop && (
+        <BottomSheet title={`✪ 첨탑 상점 — 보유 ${coins}`} onClose={() => setShop(false)} maxHeight="80%">
+          <div className="flex flex-col gap-2">
+            {E.TOWER_SHOP.map(it => {
+              const ok = E.towerShopCanBuy(save, it.id);
+              return (
+                <button key={it.id} disabled={!ok} onClick={() => (it.id === 'unique' ? setPickUnique(true) : buy(it.id))} className="ui-press flex items-center gap-2 text-left" style={{ padding: '10px 12px', borderRadius: 12, border: `1px solid ${ok ? '#e8b04a66' : 'var(--ui-line)'}`, background: 'transparent', opacity: ok ? 1 : 0.45 }}>
+                  <div className="flex-1 min-w-0">
+                    <div style={{ fontSize: 13, color: PALETTE.text }}>{it.name}</div>
+                    <div style={{ fontSize: 11, color: PALETTE.textDim }}>{it.desc}</div>
+                  </div>
+                  <span className="flex-none font-semibold" style={{ fontSize: 13, color: '#e8b04a' }}>✪ {it.cost}</span>
+                </button>
+              );
+            })}
+            <UIButton variant="ghost" style={{ height: 40 }} onClick={() => setShop(false)}>닫기</UIButton>
+          </div>
+        </BottomSheet>
+      )}
+      {pickUnique && (
+        <BottomSheet title="🎁 유니크 선택 — 하나를 고르세요" onClose={() => setPickUnique(false)} maxHeight="85%">
+          <div className="flex flex-col gap-1.5">
+            {myUniques.map(u => (
+              <button key={u.id} onClick={() => { if (buy('unique', u.id)) { setPickUnique(false); setShop(false); } }} className="ui-press text-left" style={{ padding: '9px 11px', borderRadius: 12, border: '1px solid #f0883e66', background: '#f0883e10' }}>
+                <div style={{ fontSize: 13, color: '#f0883e', fontWeight: 600 }}>{u.name} <span style={{ fontSize: 11, color: PALETTE.textDim, fontWeight: 400 }}>{SLOTS.find(s => s.id === u.slot)?.label} · {u.cls === 'common' ? '공용' : chronicleClass(u.cls).name}</span></div>
+                <div style={{ fontSize: 11.5, color: PALETTE.textDim }}>{Object.entries(u.opts).map(([k, v]) => E.statLabel(k, v)).join(' · ')}</div>
+                <div style={{ fontSize: 11.5, color: '#f0a86a' }}>✦ {u.desc}</div>
+              </button>
+            ))}
+            <UIButton variant="ghost" style={{ height: 40 }} onClick={() => setPickUnique(false)}>취소</UIButton>
+          </div>
+        </BottomSheet>
+      )}
+    </div>
+  );
+}
+
 // ===== 공용 창고 (계정 공유) =====
 function StashView({ save, setSave, onBack, flash }) {
   const [filter, setFilter] = useState('mine');
@@ -1503,10 +1601,23 @@ export default function ChronicleGame({ onExit }) {
     setView('battle');
   };
 
+  const fightTower = () => {
+    if (!save.tower?.run) return;
+    const enc = E.towerEncounter(save, rng);
+    const party = E.partyCombatants(save, save.tower.run.hp);
+    const sim = E.simulateChronicleBattle(party, enc.enemies, rng);
+    const ctx = { kind: 'tower', type: enc.type, enemies: enc.enemies, label: `황혼의 첨탑 ${enc.floor}층${E.isTowerBoss(enc.floor) ? ' 보스' : ''}` };
+    const r = E.applyBattle(save, ctx, sim, rng);
+    r.summary.questsDone = Q.newlyDoneQuests(save, r.save);
+    setSave(r.save);
+    setBattle({ sim, enemies: enc.enemies, party, summary: r.summary, ctx, key: Date.now() });
+    setView('battle');
+  };
   const afterBattle = () => {
     const ctx = battle?.ctx;
     setBattle(null);
     if (ctx?.kind === 'dungeon') setView(save.dungeon ? 'dungeon' : 'town');
+    else if (ctx?.kind === 'tower') setView('tower');
     else setView(battle?.sim.result === 'win' ? 'field' : 'town');
   };
 
@@ -1540,6 +1651,8 @@ export default function ChronicleGame({ onExit }) {
     content = <PartyView save={save} setSave={setSave} onBack={() => setView('town')} />;
   } else if (view === 'bag') {
     content = <BagView save={save} setSave={setSave} onBack={() => setView('town')} flash={flash} />;
+  } else if (view === 'tower') {
+    content = <TowerView save={save} setSave={setSave} onBack={() => setView('town')} onFight={fightTower} flash={flash} />;
   } else if (view === 'fam') {
     content = <FamiliarView save={save} setSave={setSave} onBack={() => setView('town')} flash={flash} />;
   } else if (view === 'stash') {

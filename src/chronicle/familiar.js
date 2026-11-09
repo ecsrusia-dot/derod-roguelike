@@ -188,6 +188,7 @@ export function evolveFamiliar(fams, souls, key, rng = Math.random) {
 // 전투 승리 시 계약서 조각
 export function rollFamShards(enemies, type, rng, dungeonTier = 0) {
   if (type === 'boss') return FAM_TUNING.dropBoss;
+  if (type === 'towerBoss') return FAM_TUNING.dropDungeonBoss[0];
   if (type === 'dungeonBoss') return FAM_TUNING.dropDungeonBoss[dungeonTier] || FAM_TUNING.dropDungeonBoss[0];
   let n = 0;
   for (const e of enemies) {

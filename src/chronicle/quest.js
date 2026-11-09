@@ -25,7 +25,8 @@ export function ensureQuestFields(save) {
   s.fams = s.fams || {};
   s.famTeam = s.famTeam || {};
   s.famPity = s.famPity || { total: 0, sinceViolet: 0 };
-  s.mats = { famShard: 0, famSoul: 0, sealPlus: 0, ...s.mats };
+  s.mats = { famShard: 0, famSoul: 0, sealPlus: 0, towerCoin: 0, ...s.mats };
+  s.tower = s.tower || { best: 0, checkpoint: 0, run: null };
   return refreshDungeonKeys(s);
 }
 
@@ -63,6 +64,7 @@ export function questProgress(save, q) {
     case 'level': return { cur: Math.min(g.n, save.units[save.hero].lv), max: g.n };
     case 'enhance': return { cur: Math.min(g.n, Math.max(0, ...save.inventory.map(i => i.plus || 0))), max: g.n };
     case 'dungeonTier': { const best = save.progress.dungeonTier?.[g.id]; return { cur: best != null && best >= g.tier ? 1 : 0, max: 1 }; }
+    case 'tower': return { cur: Math.min(g.n, save.tower?.best || 0), max: g.n };
     case 'grade': return { cur: save.inventory.some(i => gradeIdx(i.grade) >= gradeIdx(g.grade)) ? 1 : 0, max: 1 };
     default: return { cur: 0, max: 1 };
   }

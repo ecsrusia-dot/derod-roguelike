@@ -195,6 +195,15 @@ export const SCENES = [
     ],
   },
   {
+    id: 'tower_open', title: '황혼의 첨탑', bg: './enemies/championship/dawn/champ_dawn_boss4_intro.jpg',
+    when: (s, c) => bossDone(s, 4) && !!s.story.seen.p2_prologue && c.at === 'town',
+    lines: [
+      { sp: 'elder', t: '마을 동쪽 언덕에 탑 하나가 솟았다네. 꼭대기가 구름 위로 사라져서, 몇 층인지 아무도 몰라.' },
+      { sp: 'elder', t: '오를수록 강한 것들이 기다린다지. 열 층마다 문지기가 있고, 그 문지기를 넘으면 거기서 다시 시작할 수 있다고 하더군.' },
+      { sp: 'hero', t: '끝이 없는 탑이라… 어디까지 오를 수 있는지 보죠.' },
+    ],
+  },
+  {
     id: 'f5_enter', title: '되살아난 동토', bg: './enemies/championship/frost/champ_frost_boss3_intro.jpg',
     when: (s, c) => c.at === 'field' && c.fieldId === 5,
     lines: [
@@ -434,6 +443,10 @@ export const QUESTS = [
   { id: 's9b', kind: 'side', req: { field: 9 }, title: '여명의 신탁', desc: '학자: "신탁자들이 무엇을 예언하는지 알아야 하네."', goal: { type: 'killKey', key: 'champ_dawn_oracle', n: 22 }, reward: { gold: 5500, item: { grade: 'epic' }, keys: 2 } },
   { id: 's9c', kind: 'side', req: { field: 9 }, title: '첨탑의 수호자들', desc: '촌장: "신에게 닿기 전에, 그 날개들을 하나씩 꺾게."', goal: { type: 'elites', n: 10 }, reward: { gold: 6000, shard: 8, essence: 40 } },
   { id: 'g4', kind: 'side', req: { field: 6 }, title: '이름이 전설이 되다', desc: '촌장: "이제 자네 이름을 모르는 사람이 없네." — 주인공 Lv.75 달성', goal: { type: 'level', n: 75 }, reward: { gold: 5000, essence: 40, keys: 2 } },
+  // ── 무한 탑 (1.215.0)
+  { id: 't1', kind: 'side', req: { field: 5 }, title: '첨탑의 문지기', desc: '촌장: "첨탑 10층의 문지기를 넘어 보게."', goal: { type: 'tower', n: 10 }, reward: { gold: 2000, essence: 20, keys: 1 } },
+  { id: 't2', kind: 'side', req: { field: 7 }, title: '구름 위로', desc: '촌장: "30층이면 구름 위라던데, 거기서 마을이 보이는가?"', goal: { type: 'tower', n: 30 }, reward: { gold: 6000, shard: 8, essence: 40 } },
+  { id: 't3', kind: 'side', req: { main: 'm9' }, title: '끝없는 계단', desc: '깨어난 영웅: "50층. 우리 중 누구도 거기까지 가지 못했다."', goal: { type: 'tower', n: 50 }, reward: { gold: 15000, shard: 20, item: { grade: 'epic' } } },
   // ── 2부 던전 (1.214.0)
   { id: 'd6', kind: 'side', req: { field: 7 }, title: '심연의 왕좌', desc: '사냥꾼: "동굴의 빙왕을 쓰러뜨리면 동토가 다시 녹을지도 몰라."', goal: { type: 'dungeonTier', id: 'frostAbyss', tier: 0 }, reward: { gold: 4000, shard: 6, essence: 30, keys: 2 } },
   { id: 'd7', kind: 'side', req: { field: 8 }, title: '금고의 기록', desc: '학자: "성역의 금고에 무엇이 적혀 있는지 알아야 하네."', goal: { type: 'dungeonTier', id: 'sanctumVault', tier: 0 }, reward: { gold: 5500, shard: 8, essence: 40, keys: 2 } },

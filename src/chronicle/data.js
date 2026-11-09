@@ -443,6 +443,10 @@ export const FORGE = {
 export const DROP_TABLE = {
   normal: { itemChance: 0.18, grades: { common: 70, uncommon: 25, rare: 5 }, essence: [1, 2] },
   elite: { itemChance: 1, grades: { common: 25, uncommon: 50, rare: 25 }, essence: [3, 5] },
+  // 1.215.0 무한 탑
+  towerFloor: { itemChance: 0.35, grades: { uncommon: 45, rare: 50, epic: 5 }, essence: [2, 4], shard: [0, 1] },
+  towerElite: { itemChance: 1, grades: { uncommon: 30, rare: 60, epic: 10 }, essence: [4, 6], shard: [1, 2] },
+  towerBoss: { itemChance: 1, items: 2, grades: { rare: 60, epic: 40 }, essence: [10, 15], shard: [3, 5] },
   gate: { itemChance: 1, grades: { uncommon: 55, rare: 45 }, essence: [4, 6] }, // 1.213.0 관문 강적
   boss: { itemChance: 1, grades: { uncommon: 30, rare: 70 }, essence: [8, 12] },
   dungeonFloor: { itemChance: 0.5, grades: { uncommon: 40, rare: 55, epic: 5 }, essence: [3, 5], shard: [1, 2] },
