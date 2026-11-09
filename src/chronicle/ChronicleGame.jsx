@@ -12,7 +12,7 @@ import { GlassPanel, UIButton, BottomSheet } from '../components/ui/CommonUI.jsx
 import {
   CHRONICLE_TITLE, CHRONICLE_SUB, CHRONICLE_PARTS, CHRONICLE_SAVE_KEY, CHRONICLE_SAVE_KEY_V1, CHRONICLE_TUNING, CHRONICLE_CLASSES, CHRONICLE_FIELDS,
   CHRONICLE_DUNGEON, CHRONICLE_DUNGEONS, DUNGEON_TIERS, dungeonDef, STAT_META, STAT_KEYS, SKILL_MAX_LV, MASTERY_PCT, BOSS_DAILY_LIMIT, DUNGEON_KEYS, GRADES, gradeIdx, SLOTS, FORGE, UNIQUE_CHANCE, UNIQUE_ITEMS, fieldStages, FIELD_STAGES, BOOST, BAG_EXPAND,
-  chronicleClass, classSkills, describeSkill, chronicleEnemyArt,
+  chronicleClass, classSkills, describeSkill, chronicleEnemyArt, expNeedFor, REBIRTH, REBIRTH_BRANCHES, rebirthBranches,
 } from './data.js';
 import * as E from './engine.js';
 import * as Q from './quest.js';
@@ -136,6 +136,7 @@ function ItemRow({ save, item, onClick, right }) {
           {E.itemName(item)}{item.plus ? ` +${item.plus}` : ''} <span style={{ fontSize: 11, color: PALETTE.textDim, fontWeight: 400 }}>{g.label} · Lv.{item.ilv}</span>
         </div>
         <div className="truncate" style={{ fontSize: 11, color: usable ? PALETTE.textDim : '#e06a5f' }}>{usable ? clsTag(item) : `🔒 ${clsTag(item)} — 창고에 보관해 두세요`}</div>
+        {usable && !E.canWear(item, save.units[save.hero]) && <div className="truncate" style={{ fontSize: 11, color: '#e06a5f' }}>🔒 전승 착용 제한 — 내 레벨 {Math.max(1, item.ilv - REBIRTH.wearMargin)} 이상 필요{by ? ' (착용 중이지만 효과 없음)' : ''}</div>}
         <div className="truncate" style={{ fontSize: 11.5, color: PALETTE.textDim }}>{statLine(E.itemStats(item))}</div>
         <ItemSpecial item={item} />
       </div>
@@ -380,8 +381,8 @@ function TownView({ save, go, onExit, onSwitchChar }) {
             <button onClick={onSwitchChar} className="ui-press flex-none" style={{ fontSize: 11.5, padding: '6px 10px', borderRadius: 9, border: '1px solid var(--ui-line-strong)', color: PALETTE.dawn, background: 'transparent' }}>캐릭터 변경</button>
           </div>
           <div className="mt-2" style={{ fontSize: 12, color: PALETTE.dawn }}>▶ {goal}</div>
-          <div className="mt-1.5" style={{ fontSize: 11, color: PALETTE.textDim }}>경험치 {hero.exp}/{CHRONICLE_TUNING.expNeed(hero.lv)}</div>
-          <Bar v={hero.exp} max={CHRONICLE_TUNING.expNeed(hero.lv)} color={PALETTE.legendary} h={5} />
+          <div className="mt-1.5" style={{ fontSize: 11, color: PALETTE.textDim }}>경험치 {hero.exp}/{expNeedFor(hero)}</div>
+          <Bar v={hero.exp} max={expNeedFor(hero)} color={PALETTE.legendary} h={5} />
         </GlassPanel>
         <div className="grid grid-cols-2 gap-2.5 ui-stagger">
           {tiles.map(t => (
@@ -616,11 +617,53 @@ function DungeonView({ save, onBack, onEnter, onFight, onLeave, onBuyKey, dungeo
   );
 }
 
+// ===== 전승 (1.220.0) =====
+function RebirthSheet({ save, cid, onClose, onRebirth }) {
+  const u = save.units[cid];
+  const fixed = u.rebirth?.branch;
+  const [pick, setPick] = useState(fixed || null);
+  const [confirm, setConfirm] = useState(false);
+  const EXTRA = { healFromAtk: (v) => `공격력의 ${Math.round(v * 100)}%를 회복력으로`, armorPen: (v) => `방어 관통 +${Math.round(v * 100)}%`, spdPct: (v) => `속도 +${Math.round(v * 100)}%` };
+  const fxText = (fx) => Object.entries(fx).map(([k, v]) => (EXTRA[k] ? EXTRA[k](v) : statLine({ [k]: v }))).join(' · ');
+  const next = (u.rebirth?.count || 0) + 1;
+  return (
+    <BottomSheet title={`✦ ${next}차 전승`} onClose={onClose} maxHeight="88%">
+      <div style={{ fontSize: 12, color: PALETTE.textDim, lineHeight: 1.6 }}>
+        레벨·능력치·스킬·마스터리가 <b style={{ color: '#e06a5f' }}>Lv.1로 초기화</b>되고, 필요 경험치가 <b style={{ color: PALETTE.text }}>×{2 ** next}</b>가 된다.
+        장비·사역마·재화는 그대로지만 <b style={{ color: PALETTE.text }}>장비 레벨 ≤ 내 레벨 + {REBIRTH.wearMargin}</b>만 착용 효과가 있다.
+        전승마다 공격력·최대 HP <b style={{ color: PALETTE.legendary }}>+{Math.round(REBIRTH.bonusPct * 100)}%</b> 영구. {fixed ? '갈래는 첫 전승 때 고정되어 바꿀 수 없다.' : '갈래는 한 번 고르면 바꿀 수 없다.'}
+      </div>
+      <div className="flex flex-col gap-2 mt-3">
+        {rebirthBranches(cid).map(b => {
+          const on = pick === b.id;
+          const locked = fixed && fixed !== b.id;
+          return (
+            <button key={b.id} disabled={!!locked} onClick={() => setPick(b.id)} className="ui-press text-left" style={{ padding: 12, borderRadius: 14, border: `1.5px solid ${on ? b.color : 'var(--ui-line)'}`, background: on ? `${b.color}1a` : 'transparent', opacity: locked ? 0.35 : 1 }}>
+              <div className="font-bold" style={{ fontSize: 15, color: b.color }}>{b.name} <span style={{ fontSize: 12, color: PALETTE.textDim, fontWeight: 400 }}>{b.type}</span></div>
+              <div style={{ fontSize: 12, color: PALETTE.text }}>{b.desc}</div>
+              <div className="mt-1" style={{ fontSize: 11.5, color: PALETTE.legendary }}>기본 효과: {fxText(b.fx)}</div>
+              {classSkills(cid, b.id).filter(s => s.branch === b.id).map(s => (
+                <div key={s.id} style={{ fontSize: 11.5, color: PALETTE.textDim }}>✦ {s.name} (Lv.{s.reqLv}) — {describeSkill(s, 1)}</div>
+              ))}
+            </button>
+          );
+        })}
+      </div>
+      <div className="flex flex-col gap-2 mt-3">
+        {!confirm ? <UIButton variant="gold" disabled={!pick} onClick={() => setConfirm(true)}>{pick ? `${REBIRTH_BRANCHES[pick].name}(으)로 전승` : '갈래를 고르세요'}</UIButton>
+          : <UIButton onClick={() => onRebirth(pick)}>정말 전승한다 — Lv.1로 돌아간다</UIButton>}
+        <UIButton variant="ghost" style={{ height: 40 }} onClick={onClose}>닫기</UIButton>
+      </div>
+    </BottomSheet>
+  );
+}
+
 // ===== 파티 · 성장 =====
 function PartyView({ save, setSave, onBack }) {
   const cid = save.hero;
   const [slotPick, setSlotPick] = useState(null);
   const [skillInfo, setSkillInfo] = useState(null);
+  const [rebirthOpen, setRebirthOpen] = useState(false);
   const u = save.units[cid];
   const cls = chronicleClass(cid);
   const d = E.deriveUnit(save, cid);
@@ -632,11 +675,19 @@ function PartyView({ save, setSave, onBack }) {
           <img src={cls.combatImage} alt="" className="object-cover flex-none" style={{ width: 92, height: 92, borderRadius: 16, border: `1px solid ${cls.color}`, objectPosition: '50% 25%' }} />
           <div className="flex-1 min-w-0">
             <div className="font-bold" style={{ fontSize: 17, color: PALETTE.text }}>{cls.name} <span style={{ fontSize: 12, color: cls.color }}>{cls.role}</span></div>
+            {u.rebirth?.count > 0 && <div style={{ fontSize: 12, color: REBIRTH_BRANCHES[u.rebirth.branch].color, fontWeight: 700 }}>✦ 전승 {u.rebirth.count}회 · {REBIRTH_BRANCHES[u.rebirth.branch].name} <span style={{ fontWeight: 400, color: PALETTE.textDim }}>({REBIRTH_BRANCHES[u.rebirth.branch].type} · 경험치 ×{2 ** u.rebirth.count})</span></div>}
             <div style={{ fontSize: 12.5, color: PALETTE.legendary }}>Lv.{u.lv} / {CHRONICLE_TUNING.maxLevel} · 전투력 {E.unitPower(save, cid)}</div>
-            <div className="mt-1"><Bar v={u.exp} max={CHRONICLE_TUNING.expNeed(u.lv)} color={PALETTE.legendary} h={5} /></div>
-            <div style={{ fontSize: 10.5, color: PALETTE.textDim }}>경험치 {u.exp}/{CHRONICLE_TUNING.expNeed(u.lv)}</div>
+            <div className="mt-1"><Bar v={u.exp} max={expNeedFor(u)} color={PALETTE.legendary} h={5} /></div>
+            <div style={{ fontSize: 10.5, color: PALETTE.textDim }}>경험치 {u.exp}/{expNeedFor(u)}</div>
           </div>
         </div>
+
+        {E.canRebirth(save, cid) && (
+          <button onClick={() => setRebirthOpen(true)} className="ui-press ui-sheen w-full text-left" style={{ padding: 12, borderRadius: 14, border: `1.5px solid ${PALETTE.legendary}`, background: `${PALETTE.legendary}18` }}>
+            <div className="font-bold" style={{ fontSize: 14, color: PALETTE.legendary }}>✦ 전승 가능 — Lv.{REBIRTH.reqLevel} 달성</div>
+            <div style={{ fontSize: 12, color: PALETTE.textDim }}>{u.rebirth?.branch ? `${REBIRTH_BRANCHES[u.rebirth.branch].name} ${u.rebirth.count + 1}차 전승` : '두 갈래 중 하나를 골라 새로 태어난다'} · 레벨 1부터 다시</div>
+          </button>
+        )}
 
         {/* 능력치 */}
         <GlassPanel className="p-3">
@@ -669,14 +720,14 @@ function PartyView({ save, setSave, onBack }) {
             <span className="font-semibold" style={{ fontSize: 13.5, color: PALETTE.text }}>스킬 <span style={{ fontSize: 11, color: PALETTE.textDim, fontWeight: 400 }}>— 전투에서 자동 사용</span></span>
             <span style={{ fontSize: 12, color: u.sp ? PALETTE.legendary : PALETTE.textDim }}>스킬 포인트 {u.sp}</span>
           </div>
-          {classSkills(cid).map(s => {
+          {classSkills(cid, u.rebirth?.branch).map(s => {
             const lv = u.skills[s.id] || 0;
             const locked = s.reqLv > u.lv;
             const can = E.canLearn(u, s);
             return (
               <div key={s.id} className="flex items-center gap-2 mt-2">
                 <button onClick={() => setSkillInfo(s)} className="flex-1 min-w-0 text-left ui-press" style={{ background: 'transparent', border: 'none', padding: 0, opacity: locked ? 0.45 : 1 }}>
-                  <div style={{ fontSize: 13, color: lv ? PALETTE.text : PALETTE.textDim }}>{s.name} <span style={{ fontSize: 11, color: lv ? PALETTE.legendary : PALETTE.textDim }}>{lv ? `Lv.${lv}/${SKILL_MAX_LV}` : locked ? `Lv.${s.reqLv}부터` : '미습득'}</span></div>
+                  <div style={{ fontSize: 13, color: lv ? PALETTE.text : PALETTE.textDim }}>{s.branch ? <span style={{ color: REBIRTH_BRANCHES[s.branch].color }}>✦ </span> : null}{s.name} <span style={{ fontSize: 11, color: lv ? PALETTE.legendary : PALETTE.textDim }}>{lv ? `Lv.${lv}/${SKILL_MAX_LV}` : locked ? `Lv.${s.reqLv}부터` : '미습득'}</span></div>
                   <div className="truncate" style={{ fontSize: 11, color: PALETTE.textDim }}>{describeSkill(s, Math.max(1, lv))}</div>
                 </button>
                 <button disabled={!can} onClick={() => setSave(E.learnSkill(save, cid, s.id))} className="ui-press flex-none" style={{ height: 34, padding: '0 10px', borderRadius: 9, border: `1px solid ${can ? PALETTE.legendary : 'var(--ui-line)'}`, color: can ? PALETTE.legendary : PALETTE.textDim, background: 'transparent', fontSize: 12, opacity: can ? 1 : 0.4 }}>
@@ -710,13 +761,14 @@ function PartyView({ save, setSave, onBack }) {
           })}
         </GlassPanel>
       </div>
+      {rebirthOpen && <RebirthSheet save={save} cid={cid} onClose={() => setRebirthOpen(false)} onRebirth={(b) => { setSave(E.rebirth(save, b, cid)); setRebirthOpen(false); }} />}
       {slotPick && (
         <BottomSheet title={`${SLOTS.find(s => s.id === slotPick).label} 장착`} onClose={() => setSlotPick(null)}>
           <div className="flex flex-col gap-2">
             {u.equip[slotPick] != null && (
               <UIButton variant="ghost" style={{ height: 40 }} onClick={() => { setSave(E.unequipItem(save, cid, slotPick)); setSlotPick(null); }}>장착 해제</UIButton>
             )}
-            {save.inventory.filter(i => i.slot === slotPick && i.uid !== u.equip[slotPick] && E.itemUsable(i, cid))
+            {save.inventory.filter(i => i.slot === slotPick && i.uid !== u.equip[slotPick] && E.itemUsable(i, cid) && E.canWear(i, u))
               .sort((a, b) => E.itemPower(b) - E.itemPower(a))
               .map(it => {
                 const cur = save.inventory.find(i => i.uid === u.equip[slotPick]);
