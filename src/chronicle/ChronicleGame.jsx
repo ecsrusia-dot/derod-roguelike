@@ -269,7 +269,7 @@ function BattleLogLine({ e, latest, unitOf }) {
 
 // ===== 전투 재생 =====
 const SPEEDS = [1, 2, 4];
-function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boostLeft = 0, onAskBoost, dungeonAuto = false, onToggleDungeonAuto }) {
+function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boostLeft = 0, onAskBoost, dungeonAuto = false, onToggleDungeonAuto, autoProg = false, onStopAuto }) {
   const { sim, enemies, party, summary, ctx } = battle;
   const [idx, setIdx] = useState(0);
   const [stats, setStats] = useState(null); // 전투 집계 (1.215.1)
@@ -286,6 +286,12 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
     const t = setTimeout(() => setIdx(i => i + 1), base / speed);
     return () => clearTimeout(t);
   }, [idx, speed, done, sim.events]);
+  // 자동 진행 (1.234.0): 승리하면 다음 단계(사냥·관문·보스)로
+  useEffect(() => {
+    if (!done || !autoProg || stats || sim.result !== 'win' || ctx.kind !== 'field') return undefined;
+    const t = setTimeout(onAgain, 1800);
+    return () => clearTimeout(t);
+  }, [done, autoProg, stats, sim.result, ctx, onAgain]);
   // 반복 사냥: 승리 후 자동 다음 전투
   useEffect(() => {
     if (!done || !repeat || stats || sim.result !== 'win' || ctx.kind !== 'field' || ctx.type === 'boss') return undefined;
@@ -429,7 +435,10 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
               {dungeonNext && (
                 <UIButton variant={dungeonAuto ? 'gold' : 'ghost'} style={{ height: 42 }} onClick={onToggleDungeonAuto}>{dungeonAuto ? '연속 도전 중… (끄기)' : '연속 도전'}</UIButton>
               )}
-              {ctx.kind === 'field' && ctx.type !== 'boss' && sim.result === 'win' && (
+              {autoProg && ctx.kind === 'field' && (
+                <UIButton variant="gold" style={{ height: 42 }} onClick={onStopAuto}>자동 진행 중… (끄기)</UIButton>
+              )}
+              {!autoProg && ctx.kind === 'field' && ctx.type !== 'boss' && sim.result === 'win' && (
                 <UIButton variant={repeat ? 'gold' : 'ghost'} style={{ height: 42 }} onClick={onToggleRepeat}>{repeat ? '반복 중… (끄기)' : '반복 사냥'}</UIButton>
               )}
               <UIButton style={{ height: 42 }} onClick={onDone}>{(ctx.kind === 'dungeon' && sim.result === 'win' && !summary.dungeonClear) || (ctx.kind === 'tower' && sim.result === 'win') ? '다음 층으로' : '계속'}</UIButton>
@@ -705,7 +714,7 @@ function TownView({ save, acc, go, onExit, onSwitchChar }) {
 }
 
 // ===== 사냥터 (1.213.0 — 지역당 6스테이지 · 처치 목표 + 관문 강적 → 보스) =====
-function FieldView({ save, onBack, onFight, playScene, sceneOpen }) {
+function FieldView({ save, onBack, onFight, onAuto, playScene, sceneOpen }) {
   const [sel, setSel] = useState(() => [...CHRONICLE_FIELDS].reverse().find(f => E.fieldUnlocked(save, f.id))?.id || 1);
   useEffect(() => { if (!sceneOpen) playScene({ at: 'field', fieldId: sel }); }, [sel, sceneOpen]); // eslint-disable-line react-hooks/exhaustive-deps
   const f = CHRONICLE_FIELDS[sel - 1];
@@ -793,6 +802,7 @@ function FieldView({ save, onBack, onFight, playScene, sceneOpen }) {
             {cleared && <><br />보스 처치 완료 — 재도전은 하루 {BOSS_DAILY_LIMIT}회</>}
           </div>
         </GlassPanel>
+        <UIButton variant="gold" onClick={() => onAuto(f)} style={{ background: 'linear-gradient(90deg, #8a5a1c, #c9922e)' }}>▶ 자동 진행 <span style={{ fontSize: 11.5, fontWeight: 400 }}>— 사냥 → 관문 → 다음 스테이지 → 보스 (패배하면 멈춤)</span></UIButton>
         <UIButton onClick={() => onFight(f, 'hunt', stage)}>스테이지 {stage + 1} 사냥 (Lv.{S.lv})</UIButton>
         {!gateDone && (
           <UIButton variant="gold" disabled={!gateOk} onClick={() => onFight(f, 'gate', stage)}>
@@ -2651,15 +2661,32 @@ export default function ChronicleGame({ onExit }) {
   const dungRunRef = useRef(null);
   const towerRunRef = useRef(null); // 첨탑 한 번 도전 집계 (1.232.1)
   const toggleRepeat = () => {
-    if (!repeat) { repStatsRef.current = newHuntStats(); if (lastRecRef.current) addHuntRecord(repStatsRef.current, lastRecRef.current); }
+    if (!repeat) { setAutoProg(false); repStatsRef.current = newHuntStats(); if (lastRecRef.current) addHuntRecord(repStatsRef.current, lastRecRef.current); }
     setRepeat(r => !r);
   };
+  // 자동 진행 (1.234.0) — 사냥 → 관문 → 다음 스테이지 → … → 보스 → 다음 지역. 보스 앞 이야기는 건너뜀, 패배하면 멈춤
+  const [autoProg, setAutoProg] = useState(false);
+  const autoFieldRef = useRef(null);
+  const startAuto = (field) => {
+    setRepeat(false);
+    repStatsRef.current = newHuntStats();
+    autoFieldRef.current = field;
+    setAutoProg(true);
+    autoStep(field, true);
+  };
+  const stopAuto = (msg) => { setAutoProg(false); if (msg) flash(msg); };
+  const autoStep = (fieldArg, first = false) => {
+    const step = E.autoProgressStep(save, fieldArg || autoFieldRef.current);
+    if (!step.field) { stopAuto(`자동 진행 종료 — ${step.reason}`); if (first) setView('field'); return; }
+    autoFieldRef.current = step.field;
+    fightField(step.field, step.mode, step.stage, { auto: true });
+  };
   useEffect(() => {
-    if (repeat || !repStatsRef.current) return;
+    if (repeat || autoProg || !repStatsRef.current) return;
     const st = repStatsRef.current;
     repStatsRef.current = null;
     if (st.battles > 1) { const rep = { ...st, endedAt: Date.now(), kind: 'hunt' }; logEfficiency(rep); setReport(rep); }
-  }, [repeat]);
+  }, [repeat, autoProg]);
 
   useEffect(() => { writeAccount(acc); }, [acc]);
   // 🗝 날짜가 바뀌면 열쇠 충전 (화면 이동 때마다 확인)
@@ -2720,12 +2747,17 @@ export default function ChronicleGame({ onExit }) {
     if (view === 'town' && save && !scene && !battle) playScene({ at: 'town' });
   }, [view, save, scene, battle]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const saveNow = save;
   // 전투 시작: 끝까지 계산 → 저장 반영 → 재생
   // mode: 'hunt' | 'gate' | 'boss' · stage: 스테이지 번호
-  const fightField = (field, mode = 'hunt', stage = 0) => {
+  const fightField = (field, mode = 'hunt', stage = 0, opts = {}) => {
     const boss = mode === 'boss';
-    if (boss && E.bossAttemptsLeft(save, field.id) <= 0) { flash('오늘 보스 재도전 횟수를 모두 썼습니다'); return; }
-    if (boss && playScene({ at: 'bossPre', fieldId: field.id }, () => flash('준비되면 「보스 도전」을 누르세요'))) return; // 보스 앞 장면 먼저 (저장 반영 후 다시 도전)
+    let save = saveNow; // 자동 진행이 이야기를 건너뛰면 그 기록이 반영된 저장으로 싸운다
+    if (boss && E.bossAttemptsLeft(save, field.id) <= 0) { flash('오늘 보스 재도전 횟수를 모두 썼습니다'); if (opts.auto) stopAuto(); return; }
+    if (boss && opts.auto) {
+      // 자동 진행: 보스 앞 이야기는 본 것으로 처리하고 바로 싸운다 (게시판 「이야기」에서 다시 볼 수 있음)
+      for (let sc = Q.nextScene(save, { at: 'bossPre', fieldId: field.id }); sc; sc = Q.nextScene(save, { at: 'bossPre', fieldId: field.id })) save = Q.markSceneSeen(save, sc);
+    } else if (boss && playScene({ at: 'bossPre', fieldId: field.id }, () => flash('준비되면 「보스 도전」을 누르세요'))) return; // 보스 앞 장면 먼저 (저장 반영 후 다시 도전)
     if (mode === 'hunt') { lastFieldRef.current = { field, stage }; try { localStorage.setItem(LAST_HUNT_KEY, JSON.stringify({ hero: save.hero, fieldId: field.id, stage })); } catch { /* */ } }
     const enc = mode === 'gate' ? E.rollGateEncounter(field, stage, rng) : E.rollFieldEncounter(field, rng, boss, null, boss ? null : stage);
     enc.enemies = E.scaleEnemiesForRebirth(save, enc.enemies);
@@ -2740,7 +2772,9 @@ export default function ChronicleGame({ onExit }) {
     const rec = huntRecord(sim, party, enc, r.summary, readSpeedPref(E.boostLeftMs(save)), ctx.label);
     lastRecRef.current = rec;
     if (repStatsRef.current) addHuntRecord(repStatsRef.current, rec);
-    if (mode !== 'hunt' || sim.result !== 'win' || r.summary.questsDone.length) setRepeat(false);
+    // 반복 사냥은 사냥에서만 · 패배하면 반복·자동 진행 모두 멈춤 (1.234.0: 의뢰 완료로는 멈추지 않음)
+    if (mode !== 'hunt' || sim.result !== 'win') setRepeat(false);
+    if (opts.auto && sim.result !== 'win') stopAuto(`자동 진행 중단 — ${ctx.label}에서 패배`);
     setBattle({ sim, enemies: enc.enemies, party, summary: r.summary, ctx, key: Date.now() });
     setView('battle');
   };
@@ -2804,6 +2838,7 @@ export default function ChronicleGame({ onExit }) {
   };
   const afterBattle = () => {
     const ctx = battle?.ctx;
+    if (autoProg) stopAuto(); // 「계속」을 누르면 자동 진행도 멈춘다
     setBattle(null);
     if (ctx?.kind === 'raid') setView('raid');
     else if (ctx?.kind === 'dungeon') setView(save.dungeon ? 'dungeon' : 'town');
@@ -2823,12 +2858,13 @@ export default function ChronicleGame({ onExit }) {
     content = (
       <BattleView key={battle.key} battle={battle} save={save} onDone={afterBattle}
         repeat={repeat} onToggleRepeat={toggleRepeat}
-        onAgain={() => (battle.ctx.kind === 'dungeon' ? fightDungeon() : lastFieldRef.current && fightField(lastFieldRef.current.field, 'hunt', lastFieldRef.current.stage))}
+        autoProg={autoProg} onStopAuto={() => stopAuto('자동 진행을 멈췄습니다')}
+        onAgain={() => (battle.ctx.kind === 'dungeon' ? fightDungeon() : autoProg ? autoStep() : lastFieldRef.current && fightField(lastFieldRef.current.field, 'hunt', lastFieldRef.current.stage))}
         dungeonAuto={dungeonAuto} onToggleDungeonAuto={toggleDungeonAuto}
         boostLeft={E.boostLeftMs(save)} onAskBoost={() => setBoostSheet(true)} />
     );
   } else if (view === 'field') {
-    content = <FieldView save={save} onBack={() => { setRepeat(false); setView('town'); }} onFight={fightField} playScene={playScene} sceneOpen={!!scene} />;
+    content = <FieldView save={save} onBack={() => { setRepeat(false); setView('town'); }} onFight={fightField} onAuto={startAuto} playScene={playScene} sceneOpen={!!scene} />;
   } else if (view === 'quests') {
     content = <QuestView save={save} setSave={setSave} onBack={() => setView('town')} flash={flash} onReplay={(sc) => setScene({ scene: sc, replay: true })} />;
   } else if (view === 'dungeon') {
