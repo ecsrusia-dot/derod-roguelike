@@ -13,6 +13,7 @@ import {
   ARCANA_KEYWORDS, ARCANA_TUNING, RARITY_META, TYPE_META, arcanaClass, cardDef, describeCard, enemyArt,
 } from './data.js';
 import * as E from './engine.js';
+import { useGameCloudSync } from '../cloud/useGameCloudSync.js';
 
 // ===== 저장 =====
 const EMPTY_SAVE = { run: null, records: { runs: 0, wins: 0, bestAct: 0, byClass: {} } };
@@ -24,6 +25,17 @@ function loadSave() {
     return { ...EMPTY_SAVE, ...s, records: { ...EMPTY_SAVE.records, ...(s.records || {}) } };
   } catch { return EMPTY_SAVE; }
 }
+// 클라우드 저장 (1.237.2) — users/{uid}/arcana/save · 비교용 요약
+const normalizeSave = (s) => ({ ...EMPTY_SAVE, ...s, records: { ...EMPTY_SAVE.records, ...(s?.records || {}) } });
+const validArcanaSave = (o) => !!o && typeof o === 'object' && !!o.records && typeof o.records.runs === 'number';
+const arcanaSummary = (s) => ({ runs: s.records?.runs || 0, wins: s.records?.wins || 0, bestAct: s.records?.bestAct || 0, inRun: s.run && !['victory', 'defeat'].includes(s.run.phase) ? `${s.run.classId}·${s.run.act}막 ${s.run.floor + 1}층` : null });
+const compareArcana = (l, c) => ({
+  same: l.runs === c.runs && l.wins === c.wins && l.bestAct === c.bestAct && (l.inRun || null) === (c.inRun || null),
+  cloudAhead: c.runs > l.runs || (c.runs === l.runs && !!c.inRun && !l.inRun),
+});
+const sumText = (m) => `원정 ${m.runs} · 승리 ${m.wins} · 최고 ${m.bestAct}막${m.inRun ? ` · 진행 중 ${m.inRun}` : ''}`;
+const whenText = (ms) => { if (!ms) return '알 수 없음'; const d = new Date(ms); const p = (n) => String(n).padStart(2, '0'); return `${d.getMonth() + 1}/${d.getDate()} ${p(d.getHours())}:${p(d.getMinutes())}`; };
+
 function writeSave(s) {
   try { localStorage.setItem(ARCANA_SAVE_KEY, JSON.stringify(s)); } catch { /* 저장 불가 환경 — 진행은 계속 */ }
 }
@@ -576,7 +588,7 @@ function ResultView({ run, onDone }) {
 }
 
 // ===== 타이틀 · 직업 선택 =====
-function TitleView({ save, onContinue, onNew, onExit, onGlossary }) {
+function TitleView({ save, onContinue, onNew, onExit, onGlossary, onCloud, cloudLine }) {
   const rec = save.records;
   return (
     <div className="absolute inset-0 flex flex-col">
@@ -594,6 +606,8 @@ function TitleView({ save, onContinue, onNew, onExit, onGlossary }) {
           )}
           <UIButton variant={save.run ? 'ghost' : 'primary'} onClick={onNew}>새 원정</UIButton>
           <UIButton variant="ghost" onClick={onGlossary}>카드 용어</UIButton>
+          <UIButton variant="ghost" onClick={onCloud}>☁ 클라우드 저장</UIButton>
+          {cloudLine ? <div className="text-center" style={{ fontSize: 11.5, color: PALETTE.textDim }}>{cloudLine}</div> : null}
           <div className="flex justify-between items-center mt-1 px-1" style={{ fontSize: 11.5, color: PALETTE.textDim }}>
             <button onClick={onExit} className="ui-press" style={{ background: 'transparent', border: 'none', color: PALETTE.dawn, padding: '8px 2px', fontSize: 12 }}>⇄ 게임 선택</button>
             <span>원정 {rec.runs} · 승리 {rec.wins} · 최고 {rec.bestAct || 0}막</span>
@@ -663,6 +677,15 @@ export default function ArcanaGame({ onExit }) {
   const rng = Math.random;
 
   useEffect(() => { writeSave(save); }, [save]);
+  // 클라우드 자동 저장 (1.237.2) — 본편과 같은 계정 · 확인 전에는 자동 업로드 안 함
+  const sync = useGameCloudSync({
+    slot: 'arcana', data: save, validate: validArcanaSave, summarize: arcanaSummary, compare: compareArcana,
+    onLoad: (o) => { setSave(normalizeSave(o)); setView('title'); },
+  });
+  const [cloudOpen, setCloudOpen] = useState(false);
+  const [cloudMsg, setCloudMsg] = useState(null);
+  const [cloudPick, setCloudPick] = useState(null); // 불러오기 확인 대기 {obj, savedAt}
+  const cloudLine = !sync.user ? null : sync.state.error ? `⚠ ${sync.state.error}` : sync.state.busy ? '☁ 동기화 중…' : sync.state.lastUp ? `☁ 클라우드 저장됨 ${whenText(sync.state.lastUp)}` : null;
 
   const run = save.run;
   const setRun = (next) => {
@@ -722,7 +745,7 @@ export default function ArcanaGame({ onExit }) {
     );
   } else {
     content = (
-      <TitleView save={save} onExit={onExit} onGlossary={() => setGlossary(true)}
+      <TitleView save={save} onExit={onExit} onGlossary={() => setGlossary(true)} onCloud={() => { setCloudMsg(null); setCloudOpen(true); }} cloudLine={cloudLine}
         onContinue={() => setView('run')}
         onNew={() => setView('classSelect')} />
     );
@@ -735,6 +758,52 @@ export default function ArcanaGame({ onExit }) {
         <BottomSheet title={`덱 ${run.deck.length}장`} onClose={() => setDeckOpen(false)}>
           <DeckGrid deck={run.deck} />
           <div className="mt-4"><UIButton variant="ghost" onClick={() => setDeckOpen(false)}>닫기</UIButton></div>
+        </BottomSheet>
+      )}
+      {sync.conflict && (
+        <BottomSheet title="☁ 클라우드 저장 확인" onClose={() => {}}>
+          <div style={{ fontSize: 12.5, lineHeight: 1.7 }}>이 기기의 기록과 클라우드 저장이 다릅니다. 어느 쪽으로 이어갈까요? <b style={{ color: '#e06a5f' }}>고르지 않은 쪽은 덮어씌워집니다.</b></div>
+          <GlassPanel className="p-3 mt-2" style={{ fontSize: 12, color: PALETTE.textDim, lineHeight: 1.7 }}>
+            ☁ 클라우드{sync.conflict.savedAt ? ` (${whenText(sync.conflict.savedAt)})` : ''}: <b style={{ color: PALETTE.text }}>{sumText(sync.conflict.cloud)}</b><br />📱 이 기기: {sumText(sync.conflict.local)}
+          </GlassPanel>
+          <div className="flex flex-col gap-2 mt-3">
+            <UIButton variant={sync.conflict.cloudAhead ? 'primary' : 'ghost'} onClick={sync.chooseCloud}>☁ 클라우드 저장으로 이어하기</UIButton>
+            <UIButton variant={sync.conflict.cloudAhead ? 'ghost' : 'primary'} onClick={sync.chooseLocal}>📱 이 기기 기록 유지 (클라우드에 올리기)</UIButton>
+          </div>
+        </BottomSheet>
+      )}
+      {cloudOpen && (
+        <BottomSheet title="☁ 클라우드 저장" onClose={() => setCloudOpen(false)}>
+          {cloudPick ? (
+            <>
+              <div style={{ fontSize: 12.5, lineHeight: 1.7 }}>지금 기록이 <b style={{ color: '#e06a5f' }}>클라우드 저장으로 바뀝니다</b>.</div>
+              <GlassPanel className="p-3 mt-2" style={{ fontSize: 12, color: PALETTE.textDim, lineHeight: 1.7 }}>
+                지금: {sumText(arcanaSummary(save))}<br />클라우드{cloudPick.savedAt ? ` (${whenText(cloudPick.savedAt)})` : ''}: <b style={{ color: PALETTE.text }}>{sumText(arcanaSummary(normalizeSave(cloudPick.obj)))}</b>
+              </GlassPanel>
+              <div className="flex gap-2 mt-3">
+                <UIButton variant="ghost" onClick={() => setCloudPick(null)}>취소</UIButton>
+                <UIButton onClick={() => { setSave(normalizeSave(cloudPick.obj)); setView('title'); setCloudPick(null); setCloudOpen(false); }}>클라우드로 바꾸기</UIButton>
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: 12, color: PALETTE.textDim, lineHeight: 1.6 }}>본편과 같은 구글(또는 게스트) 계정으로 저장합니다. 로그인돼 있으면 바뀐 내용이 있을 때 30초마다·앱을 내릴 때 자동 저장됩니다.</div>
+              {!sync.user ? (
+                <div className="mt-3"><UIButton onClick={sync.login}>구글 로그인</UIButton></div>
+              ) : (
+                <>
+                  <div className="mt-2" style={{ fontSize: 12, color: PALETTE.textDim }}>{sync.user.isAnonymous ? '게스트 계정 (이 기기 전용)' : `${sync.user.displayName}${sync.user.email ? ` · ${sync.user.email}` : ''}`} · {sync.state.busy ? '동기화 중…' : sync.state.lastUp ? `마지막 저장 ${whenText(sync.state.lastUp)}` : '자동 저장 대기'}</div>
+                  <div className="flex gap-2 mt-3">
+                    <UIButton onClick={async () => { const r = await sync.upload(); setCloudMsg(r.ok ? '클라우드에 저장했습니다' : r.error); }}>⬆ 지금 올리기</UIButton>
+                    <UIButton variant="ghost" onClick={async () => { const r = await sync.download(); if (!r) return; if (!r.ok) setCloudMsg(r.error); else if (!r.exists) setCloudMsg('클라우드에 저장된 기록이 없습니다'); else setCloudPick({ obj: r.obj, savedAt: r.savedAt }); }}>⬇ 불러오기</UIButton>
+                  </div>
+                </>
+              )}
+              {sync.state.error ? <div className="mt-2" style={{ fontSize: 12, color: '#e06a5f' }}>⚠ {sync.state.error}</div> : null}
+              {cloudMsg ? <div className="mt-2" style={{ fontSize: 12, color: PALETTE.dawn }}>{cloudMsg}</div> : null}
+              <div className="mt-4"><UIButton variant="ghost" onClick={() => setCloudOpen(false)}>닫기</UIButton></div>
+            </>
+          )}
         </BottomSheet>
       )}
       {glossary && (

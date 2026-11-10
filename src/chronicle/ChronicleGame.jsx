@@ -2038,7 +2038,7 @@ function CloudPanel({ api, onPick, setMsg }) {
         <>
           <div style={{ color: PALETTE.textDim, marginBottom: 6, lineHeight: 1.6 }}>
             {user.isAnonymous ? '게스트 계정 (이 기기 전용 — 기기를 바꾸려면 본편에서 구글 계정 연동)' : `${user.displayName}${user.email ? ` · ${user.email}` : ''}`}<br />
-            {state.busy ? '동기화 중…' : state.lastUp ? `마지막 저장 ${fmtWhen(state.lastUp)} · 3분마다 자동 저장` : state.checkedUid ? '자동 저장 켜짐' : '클라우드 확인 전 — 자동 저장 대기'}
+            {state.busy ? '동기화 중…' : state.lastUp ? `마지막 저장 ${fmtWhen(state.lastUp)} · 30초마다 자동 저장` : state.checkedUid ? '자동 저장 켜짐' : '클라우드 확인 전 — 자동 저장 대기'}
           </div>
           <div className="flex gap-2">
             <UIButton onClick={async () => { const r = await api.upload(); if (r) setMsg(r.ok ? '클라우드에 저장했습니다' : r.error); }}>⬆ 지금 올리기</UIButton>
