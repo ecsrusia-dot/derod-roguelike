@@ -1263,29 +1263,7 @@ function PartyView({ save, setSave, onBack, onForge }) {
               if (!it) return (
                 <button key={sl.id} onClick={() => setSlotPick(sl.id)} className="ui-press w-full text-left" style={{ padding: '10px 12px', border: `1px dashed ${MS.line}`, background: 'transparent', color: PALETTE.textDim, fontSize: 12.5 }}>{sl.icon} {sl.label} — 비어 있음 (눌러서 장착)</button>
               );
-              const g = gradeOf(it.grade); const st = E.itemStats(it); const ud = E.uniqueDef(it); const eo = E.epicOptOf(it);
-              const rows = Object.keys(st).filter(k => st[k]).sort((x, y) => (BASE_STATS.indexOf(x) + 1 || 99) - (BASE_STATS.indexOf(y) + 1 || 99)).map(k => {
-                if (BASE_STATS.includes(k)) return { k, l: BASE_LABEL[k] === '공격' ? '공격력' : BASE_LABEL[k], v: Math.round(st[k]).toLocaleString(), base: true };
-                const t = E.statLabel(k, st[k]); const m = t.match(/^(.*?)\s*([+-]?[\d.]+.*)$/); return { k, l: m ? m[1] : t, v: m ? m[2] : '' };
-              });
-              return (
-                <button key={sl.id} onClick={() => setEqInfo(it.uid)} className="ui-press w-full text-left" style={{ padding: '8px 10px 8px 12px', background: MS.box, border: `1px solid ${MS.line}`, borderLeft: `3px solid ${g.color}` }}>
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="truncate font-bold" style={{ fontSize: 13.5, color: g.color }}>{sl.icon} {E.itemName(it)}{it.plus ? ` +${it.plus}` : ''}</span>
-                    <b className="flex-none" style={{ fontSize: 12.5, color: MS.gold }}>⚔ {E.itemPower(it).toLocaleString()}</b>
-                  </div>
-                  <div style={{ fontSize: 11, color: PALETTE.textDim }}>{g.label} · Lv.{it.ilv} · {sl.label}</div>
-                  <div className="grid mt-1" style={{ gridTemplateColumns: '1fr 1fr', columnGap: 12 }}>
-                    {rows.map(r => (
-                      <div key={r.k} className="flex items-baseline justify-between gap-1" style={{ padding: '1px 0', minWidth: 0 }}>
-                        <span className="truncate" style={{ fontSize: 11.5, color: PALETTE.textDim }}>{r.l}</span>
-                        <span className="flex-none" style={{ fontSize: 12, fontWeight: 800, color: r.base ? PALETTE.text : MS.red }}>{r.v}</span>
-                      </div>
-                    ))}
-                  </div>
-                  {(ud || eo) && <div className="mt-1" style={{ fontSize: 11.5, color: '#c79bff', lineHeight: 1.45 }}>★ {(ud || eo).name} — <span style={{ color: PALETTE.text }}>{(ud || eo).desc}</span></div>}
-                </button>
-              );
+              return <MainGearCard key={sl.id} it={it} onClick={() => setEqInfo(it.uid)} />;
             })}
           </div>
         </div>
@@ -1585,6 +1563,33 @@ function BagView({ save, setSave, onBack, flash, onForge }) {
   );
 }
 
+// 장비 카드 — 성능 한눈에 (1.251.1 성장 정보 탭 → 1.252.0 공용 창고 공용)
+function MainGearCard({ it, onClick, note, dim = false }) {
+  const sl = SLOTS.find(x => x.id === it.slot);
+  const g = gradeOf(it.grade); const st = E.itemStats(it); const ud = E.uniqueDef(it); const eo = E.epicOptOf(it);
+  const rows = Object.keys(st).filter(k => st[k]).sort((x, y) => (BASE_STATS.indexOf(x) + 1 || 99) - (BASE_STATS.indexOf(y) + 1 || 99)).map(k => {
+    if (BASE_STATS.includes(k)) return { k, l: BASE_LABEL[k] === '공격' ? '공격력' : BASE_LABEL[k], v: Math.round(st[k]).toLocaleString(), base: true };
+    const t = E.statLabel(k, st[k]); const m = t.match(/^(.*?)\s*([+-]?[\d.]+.*)$/); return { k, l: m ? m[1] : t, v: m ? m[2] : '' };
+  });
+  return (
+    <button onClick={onClick} className="ui-press w-full text-left" style={{ opacity: dim ? 0.6 : 1, padding: '8px 10px 8px 12px', background: MS.box, border: `1px solid ${MS.line}`, borderLeft: `3px solid ${g.color}` }}>
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="truncate font-bold" style={{ fontSize: 13.5, color: g.color }}>{sl.icon} {E.itemName(it)}{it.plus ? ` +${it.plus}` : ''}</span>
+        <b className="flex-none" style={{ fontSize: 12.5, color: MS.gold }}>⚔ {E.itemPower(it).toLocaleString()}</b>
+      </div>
+      <div style={{ fontSize: 11, color: PALETTE.textDim }}>{g.label} · Lv.{it.ilv} · {sl.label}{note ? <> · {note}</> : null}</div>
+      <div className="grid mt-1" style={{ gridTemplateColumns: '1fr 1fr', columnGap: 12 }}>
+        {rows.map(r => (
+          <div key={r.k} className="flex items-baseline justify-between gap-1" style={{ padding: '1px 0', minWidth: 0 }}>
+            <span className="truncate" style={{ fontSize: 11.5, color: PALETTE.textDim }}>{r.l}</span>
+            <span className="flex-none" style={{ fontSize: 12, fontWeight: 800, color: r.base ? PALETTE.text : MS.red }}>{r.v}</span>
+          </div>
+        ))}
+      </div>
+      {(ud || eo) && <div className="mt-1" style={{ fontSize: 11.5, color: '#c79bff', lineHeight: 1.45 }}>★ {(ud || eo).name} — <span style={{ color: PALETTE.text }}>{(ud || eo).desc}</span></div>}
+    </button>
+  );
+}
 // 장비 정보창 — 본편 카드 모달 (1.249.0, PM 승인 시안 ⑭)
 function MainItemModal({ save, item, cur, by, usable, onClose, footer }) {
   const g = gradeOf(item.grade);
@@ -2244,53 +2249,75 @@ function TowerView({ save, setSave, onBack, onFight, flash, towerAuto = false, o
 
 // ===== 공용 창고 (계정 공유) =====
 function StashView({ save, setSave, onBack, flash }) {
+  // 1.252.0 — 본편 스타일 (시안 ㉗ + PM 「장비 탭과 같은 카드」)
   const [filter, setFilter] = useState('mine');
   const [sel, setSel] = useState(null);
+  const [manage, setManage] = useState(false);
+  const [confirm, setConfirm] = useState(null);
   const stash = save.stash || [];
   const hero = save.hero;
   const list = stash.filter(i => filter === 'all' || (filter === 'mine' ? E.itemUsable(i, hero) : filter === 'unique' ? i.grade === 'unique' : i.cls === filter))
     .sort((a, b) => gradeIdx(b.grade) - gradeIdx(a.grade) || E.itemPower(b) - E.itemPower(a));
   const item = sel != null ? stash.find(i => i.uid === sel) : null;
   const bagFull = save.inventory.length >= E.bagMax(save);
-  const tabs = [{ id: 'mine', label: '착용 가능' }, { id: 'unique', label: '유니크' }, { id: 'all', label: '전체' }];
+  const cnt = (f) => stash.filter(f).length;
+  const shortCls = { wanderer: '검사', sage: '술법사', demonblood: '마족', elf: '정령사', priest: '사제' };
+  const askDismantle = (uids, title) => {
+    if (!uids.length) { flash('분해할 장비가 없습니다'); return; }
+    const sal = {}; for (const it of stash.filter(i => uids.includes(i.uid))) for (const [k, v] of Object.entries(E.salvageOf(it))) sal[k] = (sal[k] || 0) + v;
+    setConfirm({
+      title,
+      lines: [{ t: `장비 ${uids.length}개` }, { t: `얻는 재화: ${E.salvageText(sal)}` }, { t: '분해한 장비는 되돌릴 수 없습니다', color: PALETTE.textDim }],
+      confirmLabel: `${uids.length}개 분해`,
+      onConfirm: () => { const r = E.dismantleStash(save, uids); setSave(r.save); flash(`${uids.length}개 분해 → ${E.salvageText(r.salvage)}`); setConfirm(null); setManage(false); },
+    });
+  };
+  const fb = (extra = {}) => ({ height: 42, fontSize: 13, background: 'transparent', border: `1px solid ${MS.line}`, color: PALETTE.text, ...extra });
   return (
     <div className="absolute inset-0 flex flex-col">
-      <Header title={`공용 창고 ${stash.length}/${A.STASH_MAX}`} onBack={onBack} right={<Wallet save={save} />} />
-      <div className="px-4 pt-2 flex-none" style={{ fontSize: 11.5, color: PALETTE.textDim, lineHeight: 1.5 }}>
-        모든 캐릭터가 함께 쓰는 창고 — 다른 직업 장비를 넣어 두면 그 직업 캐릭터가 꺼내 쓸 수 있습니다. (가방 {save.inventory.length}/{E.bagMax(save)})
+      <Header title="공용 창고" onBack={onBack} right={<button onClick={() => setManage(true)} className="ui-press" style={{ fontSize: 12, padding: '5px 10px', border: `1px solid ${MS.line}`, background: MS.box, color: PALETTE.text }}>⚙ 관리</button>} />
+      <div className="px-4 pt-2 flex-none">
+        <div className="flex justify-between" style={{ fontSize: 12.5 }}><span style={{ color: PALETTE.textDim }}>보관 <span style={{ fontSize: 11 }}>· 가방 {save.inventory.length}/{E.bagMax(save)}</span></span><b style={{ color: PALETTE.text }}>{stash.length} / {A.STASH_MAX}</b></div>
+        <div className="mt-1"><Bar v={stash.length} max={A.STASH_MAX} color={MS.gold} h={5} /></div>
       </div>
-      <div className="flex gap-1.5 px-3 pt-2 flex-none">
-        {tabs.map(s => (
-          <button key={s.id} onClick={() => setFilter(s.id)} className="ui-press flex-1" style={{ height: 36, borderRadius: 10, fontSize: 12, border: `1px solid ${filter === s.id ? PALETTE.legendary : 'var(--ui-line)'}`, color: filter === s.id ? PALETTE.legendary : PALETTE.text, background: 'transparent' }}>{s.label}</button>
-        ))}
-      </div>
-      <div className="flex gap-1.5 px-3 pt-1.5 flex-none overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
-        {CHRONICLE_CLASSES.map(c => (
-          <button key={c.id} onClick={() => setFilter(c.id)} className="ui-press flex-none" style={{ height: 32, padding: '0 10px', borderRadius: 9, fontSize: 11.5, border: `1px solid ${filter === c.id ? c.color : 'var(--ui-line)'}`, color: filter === c.id ? c.color : PALETTE.textDim, background: 'transparent' }}>
-            {c.name} {stash.filter(i => i.cls === c.id).length}
-          </button>
-        ))}
+      <div className="px-3 pt-2 flex-none">
+        <MainTabs value={filter} onChange={setFilter} items={[['mine', `착용 가능 ${cnt(i => E.itemUsable(i, hero))}`], ['unique', `유니크 ${cnt(i => i.grade === 'unique')}`], ['all', `전체 ${stash.length}`]]} />
+        <MainTabs size={11.5} value={filter} onChange={setFilter} items={CHRONICLE_CLASSES.map(c => [c.id, `${shortCls[c.id] || c.name} ${cnt(i => i.cls === c.id)}`])} />
       </div>
       <div className="flex-1 overflow-y-auto px-3 py-2 flex flex-col gap-1.5">
-        {list.map(it => <ItemRow key={it.uid} save={save} item={it} onClick={() => setSel(it.uid)} />)}
+        {list.map(it => {
+          const usable = E.itemUsable(it, hero);
+          return <MainGearCard key={it.uid} it={it} dim={!usable} note={usable ? null : `${chronicleClass(hero).name} 착용 불가`} onClick={() => setSel(it.uid)} />;
+        })}
         {!list.length && <div className="text-center py-10" style={{ fontSize: 12.5, color: PALETTE.textDim }}>보관된 장비가 없습니다 — 가방에서 「창고로」를 눌러 보관하세요</div>}
+        <div style={{ fontSize: 11, color: PALETTE.textDim, marginTop: 4 }}>모든 캐릭터가 함께 쓰는 창고 — 다른 직업 장비를 넣어 두면 그 직업 캐릭터가 꺼내 쓴다</div>
       </div>
-      {item && (
-        <BottomSheet title={E.itemName(item) + (item.plus ? ` +${item.plus}` : '')} onClose={() => setSel(null)} maxHeight="70%">
-          <div style={{ fontSize: 12.5, color: gradeOf(item.grade).color }} className="text-center">{gradeOf(item.grade).label} · Lv.{item.ilv} · {SLOTS.find(s => s.id === item.slot).label} · {clsTag(item)}</div>
-          <div className="text-center mt-1" style={{ fontSize: 12.5, color: PALETTE.text, lineHeight: 1.6 }}>{statLine(E.itemStats(item))}</div>
-          <ItemSpecial item={item} center />
-          <div className="mt-3 flex flex-col gap-2">
-            <UIButton style={{ height: 42 }} disabled={bagFull} onClick={() => { setSave(E.takeFromStash(save, item.uid)); setSel(null); flash('가방으로 꺼냄'); }}>
-              {bagFull ? '가방이 가득 찼습니다' : `가방으로 꺼내기${E.itemUsable(item, hero) ? '' : ' (지금 캐릭터는 착용 불가)'}`}
-            </UIButton>
-            <UIButton variant="ghost" style={{ height: 42 }} onClick={() => { const r = E.dismantleStash(save, [item.uid]); setSave(r.save); setSel(null); flash(`분해 → ${E.salvageText(r.salvage)}`); }}>
-              분해 {E.salvageText(E.salvageOf(item))}
-            </UIButton>
-            <UIButton variant="ghost" style={{ height: 40 }} onClick={() => setSel(null)}>닫기</UIButton>
+      {item && (() => {
+        const usable = E.itemUsable(item, hero);
+        const cur = save.inventory.find(i => i.uid === save.units[hero].equip[item.slot]);
+        return (
+          <MainItemModal save={save} item={item} cur={cur} by={null} usable={usable} onClose={() => setSel(null)}
+            footer={<div className="grid gap-1.5" style={{ gridTemplateColumns: '1fr 1fr' }}>
+              <button disabled={bagFull} onClick={() => { setSave(E.takeFromStash(save, item.uid)); setSel(null); flash('가방으로 꺼냄'); }} className="ui-press" style={fb({ color: bagFull ? PALETTE.textDim : MS.gold, borderColor: bagFull ? MS.line : MS.gold, fontWeight: 800 })}>{bagFull ? '가방이 가득 참' : '가방으로 꺼내기'}</button>
+              <button onClick={() => askDismantle([item.uid], `${E.itemName(item)} 분해`)} className="ui-press" style={fb({ color: '#e07a6a' })}>분해 {E.salvageText(E.salvageOf(item))}</button>
+            </div>} />
+        );
+      })()}
+      {manage && (
+        <MainModal kicker="STASH" title="창고 관리" onClose={() => setManage(false)}>
+          <MainSecHead title="일 괄 분 해" />
+          <div style={{ fontSize: 11.5, color: PALETTE.textDim, marginBottom: 6 }}>지금 보이는 목록({list.length}개) 기준 · 유니크는 제외</div>
+          <div className="grid gap-1.5" style={{ gridTemplateColumns: '1fr 1fr' }}>
+            {[['고급 이하', 1], ['희귀 이하', 2]].map(([l, gi]) => {
+              const ids = list.filter(i => i.grade !== 'unique' && gradeIdx(i.grade) <= gi).map(i => i.uid);
+              return <button key={l} onClick={() => askDismantle(ids, `창고 ${l} ${ids.length}개 분해`)} className="ui-press" style={fb({ color: '#e07a6a' })}>{l} {ids.length}개</button>;
+            })}
+            {(() => { const ids = list.filter(i => !E.itemUsable(i, hero) && i.grade !== 'unique').map(i => i.uid);
+              return <button onClick={() => askDismantle(ids, `착용 불가 장비 ${ids.length}개 분해`)} className="ui-press" style={fb({ gridColumn: 'span 2' })}>{chronicleClass(hero).name} 착용 불가 {ids.length}개</button>; })()}
           </div>
-        </BottomSheet>
+        </MainModal>
       )}
+      {confirm && <ConfirmSheet {...confirm} danger onCancel={() => setConfirm(null)} />}
     </div>
   );
 }
@@ -2838,66 +2865,82 @@ function SceneView({ save, scene, onEnd }) {
 
 // ===== 의뢰 게시판 =====
 const Q_KIND = { main: { label: '메인', color: '#e8b04a' }, side: { label: '의뢰', color: '#9cc4e4' }, companion: { label: '동료', color: '#9fd18a' } };
+// 1.252.0 — 본편 스타일 (시안 ㉕)
 function QuestCard({ save, item, onAccept, onClaim, onAbandon }) {
   const { q, status, prog } = item;
   const k = Q_KIND[q.kind];
+  const done = status === 'done';
+  const btn = (label, onClick, hot) => (
+    <button onClick={onClick} className="ui-press flex-none" style={{ fontSize: 12, padding: '4px 11px', fontWeight: hot ? 800 : 500, border: `1px solid ${hot ? MS.red : MS.line}`, background: hot ? 'rgba(224,87,76,0.22)' : 'transparent', color: hot ? '#ff8a7e' : PALETTE.text }}>{label}</button>
+  );
   return (
-    <div style={{ padding: 12, borderRadius: 14, background: status === 'done' ? 'rgba(232,176,74,0.08)' : 'rgba(255,255,255,0.03)', border: `1px solid ${status === 'done' ? PALETTE.legendary : 'var(--ui-line)'}` }}>
+    <div style={{ padding: '9px 10px', background: MS.box, border: `1px solid ${done ? MS.gold : MS.line}`, opacity: status === 'claimed' ? 0.6 : 1 }}>
       <div className="flex items-center gap-2">
-        <span style={{ fontSize: 10.5, padding: '1px 7px', borderRadius: 999, color: k.color, border: `1px solid ${k.color}66` }}>{k.label}</span>
-        <span className="flex-1 font-semibold truncate" style={{ fontSize: 13.5, color: status === 'claimed' ? PALETTE.textDim : PALETTE.text }}>{q.title}</span>
-        {q.kind === 'companion' && <Portrait cid={q.req.companion} size={26} />}
+        <span className="flex-none" style={{ fontSize: 10.5, padding: '1px 7px', color: k.color, border: `1px solid ${k.color}88` }}>{k.label}</span>
+        <span className="flex-1 font-bold truncate" style={{ fontSize: 13.5, color: PALETTE.text }}>{q.title}</span>
+        {q.kind === 'companion' && <Portrait cid={q.req.companion} size={24} />}
+        {status === 'available' && btn('수락', onAccept)}
+        {done && btn('받기', onClaim, true)}
+        {status === 'active' && q.kind !== 'main' && onAbandon && btn('포기', onAbandon)}
       </div>
-      <div className="mt-1" style={{ fontSize: 12, color: PALETTE.textDim, lineHeight: 1.5 }}>{q.desc}</div>
-      {(status === 'active' || status === 'done') && (
-        <div className="mt-2 flex items-center gap-2">
-          <div className="flex-1"><Bar v={prog.cur} max={prog.max} color={status === 'done' ? PALETTE.legendary : '#9cc4e4'} h={6} /></div>
-          <span style={{ fontSize: 11.5, color: PALETTE.text }}>{Math.max(0, prog.cur)}/{prog.max}</span>
+      <div className="mt-1" style={{ fontSize: 11.5, color: PALETTE.textDim, lineHeight: 1.45, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{q.desc}</div>
+      {(status === 'active' || done) && (
+        <div className="mt-1.5 flex items-center gap-2">
+          <div className="flex-1"><Bar v={prog.cur} max={prog.max} color={done ? MS.gold : '#7fa8d8'} h={4} /></div>
+          <span style={{ fontSize: 11.5, color: done ? MS.gold : PALETTE.text, fontWeight: 700 }}>{Math.max(0, prog.cur)}/{prog.max}</span>
         </div>
       )}
-      <div className="mt-1.5" style={{ fontSize: 11.5, color: PALETTE.legendary }}>보상: {Q.rewardText(q.reward)}</div>
-      {status === 'available' && <UIButton variant="ghost" style={{ height: 38, marginTop: 8 }} onClick={onAccept}>수락</UIButton>}
-      {status === 'done' && <UIButton style={{ height: 38, marginTop: 8 }} onClick={onClaim}>보상 받기</UIButton>}
-      {status === 'active' && q.kind !== 'main' && (
-        <button onClick={onAbandon} className="ui-press mt-1" style={{ fontSize: 11, color: PALETTE.textDim, background: 'transparent', border: 'none', padding: '4px 0' }}>포기하기</button>
-      )}
+      <div className="mt-1" style={{ fontSize: 11.5, color: MS.gold }}>{Q.rewardText(q.reward)}</div>
     </div>
   );
 }
 function QuestView({ save, setSave, onBack, flash, onReplay }) {
   const [tab, setTab] = useState('board');
   const list = Q.questList(save);
-  const order = { done: 0, active: 1, available: 2 };
-  const shown = list.filter(x => order[x.status] != null).sort((a, b) => order[a.status] - order[b.status] || (a.q.kind === 'main' ? -1 : 0));
+  const mainFirst = (a, b) => (a.q.kind === 'main' ? -1 : 0) - (b.q.kind === 'main' ? -1 : 0);
+  const done = list.filter(x => x.status === 'done').sort(mainFirst);
+  const active = list.filter(x => x.status === 'active').sort(mainFirst);
+  const avail = list.filter(x => x.status === 'available').sort(mainFirst);
   const claimed = list.filter(x => x.status === 'claimed');
   const seen = Q.seenScenes(save);
+  const card = (item) => (
+    <QuestCard key={item.q.id} save={save} item={item}
+      onAccept={() => { setSave(Q.acceptQuest(save, item.q.id)); flash(`「${item.q.title}」 수락`); }}
+      onAbandon={() => setSave(Q.abandonQuest(save, item.q.id))}
+      onClaim={() => {
+        const r = Q.claimQuest(save, item.q.id, Math.random);
+        setSave(r.save);
+        flash(r.gained?.item ? `보상 수령 — ${E.itemName(r.gained.item)} 획득` : r.gained?.keysGot ? `보상 수령 — 🗝 열쇠 +${r.gained.keysGot}` : '보상 수령!');
+      }} />
+  );
+  const sec = (title, n) => (
+    <div className="flex items-center justify-between" style={{ margin: '10px 0 5px' }}>
+      <span style={{ fontSize: 12.5, letterSpacing: 4, color: MS.red, fontWeight: 700 }}>◆ {title}</span>
+      <span style={{ fontSize: 11.5, color: PALETTE.textDim }}>{n}</span>
+    </div>
+  );
   return (
     <div className="absolute inset-0 flex flex-col">
       <Header title="의뢰 게시판" onBack={onBack} right={<Wallet save={save} />} />
-      <div className="flex gap-1.5 px-3 pt-2 flex-none">
-        {[['board', `게시판 ${shown.length}`], ['done', `완료 ${claimed.length}`], ['story', '지난 이야기']].map(([id, label]) => (
-          <button key={id} onClick={() => setTab(id)} className="ui-press flex-1" style={{ height: 36, borderRadius: 10, fontSize: 12, border: `1px solid ${tab === id ? PALETTE.legendary : 'var(--ui-line)'}`, color: tab === id ? PALETTE.legendary : PALETTE.text, background: 'transparent' }}>{label}</button>
-        ))}
+      <div className="px-3 pt-1 flex-none">
+        <MainTabs value={tab} onChange={setTab} items={[['board', `게시판 ${done.length + active.length + avail.length}`, done.length > 0], ['done', `완료 ${claimed.length}`], ['story', '지난 이야기']]} />
       </div>
-      <div className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-2">
-        {tab === 'board' && shown.map(item => (
-          <QuestCard key={item.q.id} save={save} item={item}
-            onAccept={() => { setSave(Q.acceptQuest(save, item.q.id)); flash(`「${item.q.title}」 수락`); }}
-            onAbandon={() => setSave(Q.abandonQuest(save, item.q.id))}
-            onClaim={() => {
-              const r = Q.claimQuest(save, item.q.id, Math.random);
-              setSave(r.save);
-              flash(r.gained?.item ? `보상 수령 — ${E.itemName(r.gained.item)} 획득` : r.gained?.keysGot ? `보상 수령 — 🗝 열쇠 +${r.gained.keysGot}` : '보상 수령!');
-            }} />
-        ))}
-        {tab === 'board' && !shown.length && <div className="text-center py-10" style={{ fontSize: 12.5, color: PALETTE.textDim }}>지금 받을 수 있는 의뢰가 없습니다 — 새 지역을 열면 의뢰가 붙습니다</div>}
-        {tab === 'done' && claimed.map(item => <QuestCard key={item.q.id} save={save} item={item} />)}
-        {tab === 'story' && seen.map(sc => (
-          <button key={sc.id} onClick={() => onReplay(sc)} className="ui-press text-left" style={{ padding: 12, borderRadius: 14, border: '1px solid var(--ui-line)', background: 'rgba(255,255,255,0.03)' }}>
-            <div className="font-semibold" style={{ fontSize: 13.5, color: PALETTE.text }}>{sc.title}</div>
+      <div className="flex-1 overflow-y-auto px-3 pb-3 flex flex-col gap-1.5">
+        {tab === 'board' && <>
+          {done.length > 0 && <>{sec('보상 받기', done.length)}{done.map(card)}</>}
+          {sec('진행 중', active.length)}
+          {active.length ? active.map(card) : <div style={{ fontSize: 12, color: PALETTE.textDim }}>수락한 의뢰가 없다</div>}
+          {sec('받을 수 있는 의뢰', avail.length)}
+          {avail.length ? avail.map(card) : <div style={{ fontSize: 12, color: PALETTE.textDim }}>지금 받을 수 있는 의뢰가 없다 — 새 지역을 열면 의뢰가 붙는다</div>}
+        </>}
+        {tab === 'done' && <div className="pt-2 flex flex-col gap-1.5">{claimed.map(item => <QuestCard key={item.q.id} save={save} item={item} />)}</div>}
+        {tab === 'done' && !claimed.length && <div className="text-center py-10" style={{ fontSize: 12.5, color: PALETTE.textDim }}>아직 끝낸 의뢰가 없습니다</div>}
+        {tab === 'story' && <div className="pt-2 flex flex-col gap-1.5">{seen.map(sc => (
+          <button key={sc.id} onClick={() => onReplay(sc)} className="ui-press text-left" style={{ padding: '9px 10px', border: `1px solid ${MS.line}`, background: MS.box }}>
+            <div className="flex justify-between gap-2"><span className="font-bold truncate" style={{ fontSize: 13.5, color: PALETTE.text }}>{sc.title}</span><span style={{ fontSize: 12, color: PALETTE.textDim }}>다시 보기 ›</span></div>
             <div className="truncate" style={{ fontSize: 11.5, color: PALETTE.textDim }}>{sc.lines[0].t}</div>
           </button>
-        ))}
+        ))}</div>}
         {tab === 'story' && !seen.length && <div className="text-center py-10" style={{ fontSize: 12.5, color: PALETTE.textDim }}>아직 본 이야기가 없습니다</div>}
       </div>
     </div>
@@ -3171,41 +3214,47 @@ function OfflineSheet({ pd, onClaim }) {
 
 // ===== 일일 임무 (1.233.0) =====
 function DailyView({ acc, onBack, onClaim, onBonus }) {
+  // 1.252.0 — 본편 스타일 (시안 ㉖)
   const st = D.dailyState(acc);
   const allClaimed = D.bonusReady(acc);
+  const states = D.DAILY_MISSIONS.map(m => ({ m, ms: D.missionState(acc, m) }));
+  const fin = states.filter(x => x.ms.status !== 'progress').length;
+  const left = states.filter(x => x.ms.status !== 'claimed').length;
+  const hot = { fontSize: 12, padding: '3px 12px', fontWeight: 800, border: `1px solid ${MS.red}`, background: 'rgba(224,87,76,0.22)', color: '#ff8a7e' };
+  const sec = (title, right) => (
+    <div className="flex items-center justify-between" style={{ margin: '12px 0 6px' }}>
+      <span style={{ fontSize: 12.5, letterSpacing: 4, color: MS.red, fontWeight: 700 }}>◆ {title}</span>
+      <span style={{ fontSize: 11.5, color: PALETTE.textDim }}>{right}</span>
+    </div>
+  );
   return (
     <div className="absolute inset-0 flex flex-col">
-      <Header title="📅 일일 임무" onBack={onBack} />
-      <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2">
-        <div style={{ fontSize: 12, color: PALETTE.textDim }}>매일 KST 0시 초기화 · 어느 캐릭터로 해도 진행된다</div>
-        {D.DAILY_MISSIONS.map(m => {
-          const ms = D.missionState(acc, m);
-          return (
-            <GlassPanel key={m.id} className="p-3">
-              <div className="flex items-center gap-2">
-                <span style={{ fontSize: 20, width: 26, textAlign: 'center' }}>{m.icon}</span>
-                <div className="flex-1 min-w-0">
-                  <div className="font-semibold" style={{ fontSize: 13, color: ms.status === 'claimed' ? PALETTE.textDim : PALETTE.text }}>{m.title}</div>
-                  <div style={{ fontSize: 11.5, color: PALETTE.textDim }}>{D.dailyRewardText(m.reward)}</div>
-                  <div className="mt-1"><Bar v={ms.cur} max={m.need} color={ms.status === 'progress' ? '#9cc4e4' : PALETTE.legendary} h={4} /></div>
-                </div>
-                {ms.status === 'done' ? <button onClick={() => onClaim(m.id)} className="ui-press flex-none font-semibold" style={{ height: 36, padding: '0 14px', borderRadius: 9, border: `1px solid ${PALETTE.legendary}`, color: '#1a1206', background: PALETTE.legendary, fontSize: 12.5 }}>받기</button>
-                  : <span className="flex-none" style={{ fontSize: 12, color: ms.status === 'claimed' ? '#8fe08a' : PALETTE.textDim }}>{ms.status === 'claimed' ? '✔ 완료' : `${ms.cur}/${m.need}`}</span>}
+      <Header title="일일 임무" onBack={onBack} right={<span style={{ fontSize: 11.5, color: PALETTE.textDim }}>매일 0시 초기화</span>} />
+      <div className="flex-1 overflow-y-auto px-4 pb-4">
+        {sec('오늘 진행', <b style={{ color: MS.gold, fontSize: 13 }}>{fin} / {states.length}</b>)}
+        <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${states.length}, 1fr)` }}>
+          {states.map(({ m, ms }) => {
+            const ok = ms.status !== 'progress';
+            return <div key={m.id} className="text-center" style={{ padding: '6px 0', fontSize: 16, border: `1px solid ${ok ? MS.gold : MS.line}`, background: ok ? 'rgba(232,176,74,0.12)' : MS.box, opacity: ok ? 1 : 0.7 }}>{m.icon}</div>;
+          })}
+        </div>
+        {sec('임무', '어느 캐릭터로 해도 진행')}
+        <div className="flex flex-col gap-1.5">
+          {states.map(({ m, ms }) => (
+            <div key={m.id} style={{ padding: '9px 10px', background: MS.box, border: `1px solid ${ms.status === 'done' ? MS.gold : MS.line}`, opacity: ms.status === 'claimed' ? 0.6 : 1 }}>
+              <div className="flex items-center justify-between gap-2">
+                <b style={{ fontSize: 13, color: PALETTE.text }}>{m.icon} {m.title}</b>
+                {ms.status === 'done' ? <button onClick={() => onClaim(m.id)} className="ui-press flex-none" style={hot}>받기</button>
+                  : <span className="flex-none" style={{ fontSize: 12, color: ms.status === 'claimed' ? '#8fe08a' : PALETTE.textDim }}>{ms.status === 'claimed' ? '✔ 받음' : `${ms.cur}/${m.need}`}</span>}
               </div>
-            </GlassPanel>
-          );
-        })}
-        <GlassPanel className="p-3" style={{ border: `1px solid ${allClaimed && !st.bonus ? PALETTE.legendary : 'var(--ui-line)'}` }}>
-          <div className="flex items-center gap-2">
-            <span style={{ fontSize: 20, width: 26, textAlign: 'center' }}>🎁</span>
-            <div className="flex-1">
-              <div className="font-semibold" style={{ fontSize: 13, color: PALETTE.text }}>오늘의 임무 모두 완료</div>
-              <div style={{ fontSize: 11.5, color: PALETTE.textDim }}>{D.dailyRewardText(D.DAILY_BONUS.reward)}</div>
+              <div style={{ margin: '5px 0 4px' }}><Bar v={ms.cur} max={m.need} color={ms.status === 'progress' ? '#7fa8d8' : MS.gold} h={4} /></div>
+              <div className="flex justify-between" style={{ fontSize: 11.5 }}><span style={{ color: MS.gold }}>{D.dailyRewardText(m.reward)}</span>{ms.status === 'done' && <span style={{ color: PALETTE.text }}>{m.need}/{m.need}</span>}</div>
             </div>
-            {st.bonus ? <span style={{ fontSize: 12, color: '#8fe08a' }}>✔ 완료</span>
-              : <button disabled={!allClaimed} onClick={onBonus} className="ui-press flex-none font-semibold" style={{ height: 36, padding: '0 14px', borderRadius: 9, border: `1px solid ${PALETTE.legendary}`, color: allClaimed ? '#1a1206' : PALETTE.textDim, background: allClaimed ? PALETTE.legendary : 'transparent', fontSize: 12.5, opacity: allClaimed ? 1 : 0.5 }}>받기</button>}
-          </div>
-        </GlassPanel>
+          ))}
+        </div>
+        <button disabled={!allClaimed || st.bonus} onClick={onBonus} className="ui-press w-full mt-2" style={{ padding: '12px 0', fontSize: 13.5, fontWeight: 800, border: `1px solid ${allClaimed && !st.bonus ? MS.red : MS.line}`, background: allClaimed && !st.bonus ? 'rgba(224,87,76,0.2)' : 'transparent', color: st.bonus ? '#8fe08a' : allClaimed ? '#ff8a7e' : PALETTE.textDim }}>
+          🎁 모두 완료 보상 — {D.dailyRewardText(D.DAILY_BONUS.reward)} <span style={{ fontWeight: 400 }}>{st.bonus ? '(받음)' : allClaimed ? '' : `(${left}개 남음)`}</span>
+        </button>
       </div>
     </div>
   );
