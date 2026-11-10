@@ -1015,6 +1015,7 @@ function DungeonView({ save, onBack, onEnter, onFight, onLeave, onBuyKey, dungeo
 
 // ===== 전승 (1.220.0) =====
 function RebirthSheet({ save, cid, onClose, onRebirth }) {
+  // 1.256.0 — 본편 카드 창 (시안 ㊳)
   const u = save.units[cid];
   const fixed = u.rebirth?.branch;
   const [pick, setPick] = useState(fixed || null);
@@ -1022,35 +1023,41 @@ function RebirthSheet({ save, cid, onClose, onRebirth }) {
   const EXTRA = { healFromAtk: (v) => `공격력의 ${Math.round(v * 100)}%를 회복력으로`, armorPen: (v) => `방어 관통 +${Math.round(v * 100)}%`, spdPct: (v) => `속도 +${Math.round(v * 100)}%` };
   const fxText = (fx) => Object.entries(fx).map(([k, v]) => (EXTRA[k] ? EXTRA[k](v) : statLine({ [k]: v }))).join(' · ');
   const next = (u.rebirth?.count || 0) + 1;
+  const pb = pick && REBIRTH_BRANCHES[pick];
   return (
-    <BottomSheet title={`✦ ${next}차 전승`} onClose={onClose} maxHeight="88%">
-      <div style={{ fontSize: 12, color: PALETTE.textDim, lineHeight: 1.6 }}>
-        레벨·능력치·스킬·특성이 <b style={{ color: '#e06a5f' }}>Lv.1로 초기화</b>되고, 필요 경험치가 <b style={{ color: PALETTE.text }}>×{rebirthExpMult(next)}</b>가 되고, 모든 적이 <b style={{ color: '#ff6ad5' }}>전승 {next}단계</b>(HP +{Math.round(REBIRTH.enemyHp * next * 100)}% · 공격 +{Math.round(REBIRTH.enemyAtk * next * 100)}%)로 강해진다. 대신 전승 장비·갈래 유니크가 떨어진다.
-        장비·사역마·재화는 그대로지만 <b style={{ color: PALETTE.text }}>장비 레벨 ≤ 내 레벨</b>만 착용 효과가 있다.
-        전승마다 공격력·최대 HP <b style={{ color: PALETTE.legendary }}>+{Math.round(REBIRTH.bonusPct * 100)}%</b> 영구. {fixed ? '갈래는 첫 전승 때 고정되어 바꿀 수 없다.' : '갈래는 한 번 고르면 바꿀 수 없다.'}
-      </div>
-      <div className="flex flex-col gap-2 mt-3">
+    <MainModal kicker="REBIRTH" title={`${next}차 전승`} color={MS.gold} badge={`Lv.${u.lv}`} sub={fixed ? '갈래는 첫 전승 때 고정되어 바꿀 수 없다' : '갈래는 한 번 고르면 바꿀 수 없다'} onClose={onClose}
+      footer={!confirm
+        ? <button disabled={!pick} onClick={() => setConfirm(true)} className="ui-press" style={{ height: 44, fontSize: 14, fontWeight: 800, border: `1px solid ${pick ? MS.gold : MS.line}`, background: 'transparent', color: pick ? MS.gold : PALETTE.textDim }}>{pb ? `${pb.name}(으)로 전승` : '갈래를 고르세요'}</button>
+        : <button onClick={() => onRebirth(pick)} className="ui-press" style={{ height: 44, fontSize: 14, fontWeight: 800, border: `1px solid ${MS.red}`, background: 'rgba(224,87,76,0.22)', color: '#ff8a7e' }}>정말 전승한다 — Lv.1로 돌아간다</button>}>
+      <MainSecHead title="바 뀌 는 것" />
+      <MainKvRows rows={[
+        { l: '레벨·스킬·특성', v: 'Lv.1 초기화', c: '#e06a5f' }, { l: '필요 경험치', v: `×${rebirthExpMult(next)}` },
+        { l: '적 HP', v: `+${Math.round(REBIRTH.enemyHp * next * 100)}%`, c: '#ff6ad5' }, { l: '적 공격', v: `+${Math.round(REBIRTH.enemyAtk * next * 100)}%`, c: '#ff6ad5' },
+        { l: '공격·HP 영구', v: `+${Math.round(REBIRTH.bonusPct * 100)}%`, c: MS.gold }, { l: '장비·사역마', v: '그대로', c: '#8fd08a' },
+      ]} />
+      <div className="mt-1" style={{ fontSize: 11, color: PALETTE.textDim, lineHeight: 1.5 }}>장비는 <b style={{ color: PALETTE.text }}>장비 레벨 ≤ 내 레벨</b>일 때만 착용 효과 · 전승 장비·갈래 유니크가 떨어지기 시작한다</div>
+      <MainSecHead title="갈 래 선 택" />
+      <div className="flex flex-col gap-1.5 mt-1">
         {rebirthBranches(cid).map(b => {
           const on = pick === b.id;
           const locked = fixed && fixed !== b.id;
+          const skills = classSkills(cid, b.id).filter(s => s.branch === b.id);
           return (
-            <button key={b.id} disabled={!!locked} onClick={() => setPick(b.id)} className="ui-press text-left" style={{ padding: 12, borderRadius: 14, border: `1.5px solid ${on ? b.color : 'var(--ui-line)'}`, background: on ? `${b.color}1a` : 'transparent', opacity: locked ? 0.35 : 1 }}>
-              <div className="font-bold" style={{ fontSize: 15, color: b.color }}>{b.name} <span style={{ fontSize: 12, color: PALETTE.textDim, fontWeight: 400 }}>{b.type}</span></div>
+            <button key={b.id} disabled={!!locked} onClick={() => { setPick(b.id); setConfirm(false); }} className="ui-press text-left" style={{ padding: 10, border: `1.5px solid ${on ? b.color : MS.line}`, background: on ? `${b.color}18` : MS.box, opacity: locked ? 0.35 : 1 }}>
+              <div className="flex items-baseline justify-between gap-2"><b style={{ fontSize: 15, color: b.color }}>{b.name}</b><span style={{ fontSize: 11.5, color: PALETTE.textDim }}>{b.type}{on ? ' · ✓ 선택' : ''}</span></div>
               <div style={{ fontSize: 12, color: PALETTE.text }}>{b.desc}</div>
-              <div className="mt-1" style={{ fontSize: 11.5, color: PALETTE.legendary }}>기본 효과: {fxText(b.fx)}</div>
-              {classSkills(cid, b.id).filter(s => s.branch === b.id).map(s => (
-                <div key={s.id} style={{ fontSize: 11.5, color: PALETTE.textDim }}>✦ {s.name} (Lv.{s.reqLv}) — {describeSkill(s, 1)}</div>
-              ))}
+              <div className="mt-0.5" style={{ fontSize: 11.5, color: MS.gold }}>기본 효과 {fxText(b.fx)}</div>
+              {on && <div className="mt-1 flex flex-col gap-0.5">{skills.map(s => (
+                <div key={s.id} className="flex items-baseline justify-between gap-2" style={{ fontSize: 11.5 }}>
+                  <span className="flex-none" style={{ color: PALETTE.text }}>✦ {s.name} <span style={{ color: PALETTE.textDim }}>Lv.{s.reqLv}</span></span>
+                  <span className="text-right" style={{ color: PALETTE.textDim }}>{describeSkill(s, 1)}</span>
+                </div>
+              ))}</div>}
             </button>
           );
         })}
       </div>
-      <div className="flex flex-col gap-2 mt-3">
-        {!confirm ? <UIButton variant="gold" disabled={!pick} onClick={() => setConfirm(true)}>{pick ? `${REBIRTH_BRANCHES[pick].name}(으)로 전승` : '갈래를 고르세요'}</UIButton>
-          : <UIButton onClick={() => onRebirth(pick)}>정말 전승한다 — Lv.1로 돌아간다</UIButton>}
-        <UIButton variant="ghost" style={{ height: 40 }} onClick={onClose}>닫기</UIButton>
-      </div>
-    </BottomSheet>
+    </MainModal>
   );
 }
 
@@ -1902,10 +1909,11 @@ function FamiliarView({ save, setSave, onBack, flash, onTrack = () => {} }) {
   const pity = save.famPity || { total: 0, sinceViolet: 0 };
   const team = save.famTeam || {};
   const list = Object.entries(fams).sort((a, b) => F.famGradeIdx(b[1].grade) - F.famGradeIdx(a[1].grade) || b[1].plus - a[1].plus);
+  const [rollId, setRollId] = useState(0);
   const doSummon = (n) => {
     const r = E.summonFam(save, n);
     if (!r.results) { flash('계약서 조각이 부족합니다'); return; }
-    setSave(r.save); setResults(r.results); onTrack({ summon: r.results.length });
+    setSave(r.save); setResults(r.results); setRollId(x => x + 1); onTrack({ summon: r.results.length });
   };
   const slots = [
     { id: 'main', label: '동행', desc: '전투에 함께 싸운다' },
@@ -1986,25 +1994,40 @@ function FamiliarView({ save, setSave, onBack, flash, onTrack = () => {} }) {
         {tab === 'team' && <div style={{ fontSize: 11.5, color: PALETTE.textDim, lineHeight: 1.6 }}>동행 사역마의 능력치는 사역마 자신의 레벨·등급·강화·역할로 정해진다 (주인공 직업과 무관). 새 사역마는 Lv.1 — 동행 칸에서 이길 때만 경험치를 받고, 주인공 레벨이 상한. 보조 칸은 사역마마다 경험치·골드·아이템 획득 중 하나를 더 준다. 주인공이 쓰러지면 패배. 사역마는 모든 캐릭터가 함께 쓴다.</div>}
       </div>
 
-      {results && (
-        <BottomSheet title="소환 결과" onClose={() => setResults(null)} maxHeight="80%">
-          <div className="grid grid-cols-2 gap-1.5">
-            {results.map((r, i) => {
-              const g = F.famGrade(r.grade);
-              return (
-                <div key={i} className={`flex items-center gap-2 ${F.famGradeIdx(r.grade) >= 2 ? 'chr-flip-hi' : 'chr-flip'}`} style={{ padding: 6, borderRadius: 10, border: `1px solid ${g.color}`, background: `${g.color}1a`, animationDelay: `${i * 90}ms`, '--g': g.color }}>
-                  <img src={chronicleEnemyArt(r.key)} alt="" className="object-cover flex-none" style={{ width: 36, height: 36, borderRadius: 8 }} />
-                  <div className="min-w-0">
-                    <div className="truncate" style={{ fontSize: 12, color: g.color, fontWeight: 600 }}>{g.label} {F.famName(r.key)}</div>
-                    <div style={{ fontSize: 10.5, color: r.isNew ? '#8fe08a' : r.upgraded ? PALETTE.legendary : PALETTE.textDim }}>{r.isNew ? 'NEW!' : r.upgraded ? '등급 상승!' : `중복 → 🔮+${r.soul}`}</div>
+      {results && (() => {
+        // 1.256.0 — 본편 카드 창 (시안 ㊴) + 다시 소환
+        const nNew = results.filter(r => r.isNew).length;
+        const nUp = results.filter(r => r.upgraded).length;
+        const soul = results.reduce((t, r) => t + (r.soul || 0), 0);
+        const sq = (on, hot) => ({ height: 42, fontSize: 13, fontWeight: 800, border: `1px solid ${hot && on ? MS.red : MS.line}`, background: hot && on ? 'rgba(224,87,76,0.2)' : MS.box, color: !on ? PALETTE.textDim : hot ? '#ff8a7e' : PALETTE.text, opacity: on ? 1 : 0.55 });
+        return (
+          <MainModal kicker="SUMMON" title="소환 결과" badge={`📜 −${results.length * per}`} sub={`${results.length}회 소환${results.length >= 10 ? ' · 청령 이상 1마리 확정' : ''} · 남은 조각 📜 ${shards}`} onClose={() => setResults(null)}
+            footer={<div className="grid gap-1.5" style={{ gridTemplateColumns: '1fr 1fr' }}>
+              <button disabled={shards < per} onClick={() => doSummon(1)} className="ui-press" style={sq(shards >= per, false)}>🎲 1회 더 (📜{per})</button>
+              <button disabled={shards < per * 10} onClick={() => doSummon(10)} className="ui-press" style={sq(shards >= per * 10, true)}>🎲 10회 더 (📜{per * 10})</button>
+            </div>}>
+            <div className="grid gap-1" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+              {[['신규', nNew, '#8fd08a'], ['등급 상승', nUp, MS.gold], ['사역혼', `🔮 +${soul}`, MS.violet]].map(([l, v, c]) => (
+                <div key={l} className="text-center" style={{ padding: '5px 0', border: `1px solid ${MS.line}`, background: MS.box }}><div style={{ fontSize: 11, color: PALETTE.textDim }}>{l}</div><b style={{ fontSize: 13.5, color: c }}>{v}</b></div>
+              ))}
+            </div>
+            <div key={rollId} className="grid gap-1.5 mt-2" style={{ gridTemplateColumns: '1fr 1fr' }}>
+              {results.map((r, i) => {
+                const g = F.famGrade(r.grade);
+                return (
+                  <div key={i} className={`flex items-center gap-2 ${F.famGradeIdx(r.grade) >= 2 ? 'chr-flip-hi' : 'chr-flip'}`} style={{ padding: 6, border: `1px solid ${g.color}`, background: MS.box, animationDelay: `${i * 90}ms`, '--g': g.color, minWidth: 0 }}>
+                    <img src={chronicleEnemyArt(r.key)} alt="" className="object-cover flex-none" style={{ width: 40, height: 40 }} />
+                    <div className="min-w-0">
+                      <div className="truncate" style={{ fontSize: 12, color: g.color, fontWeight: 800 }}>{g.label} {F.famName(r.key)}</div>
+                      <div style={{ fontSize: 11, color: r.isNew ? '#8fd08a' : r.upgraded ? MS.gold : PALETTE.textDim }}>{r.isNew ? 'NEW!' : r.upgraded ? '등급 상승!' : `중복 → 🔮+${r.soul}`}</div>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-          <div className="mt-4"><UIButton onClick={() => setResults(null)}>확인</UIButton></div>
-        </BottomSheet>
-      )}
+                );
+              })}
+            </div>
+          </MainModal>
+        );
+      })()}
       {selF && (() => {
         const g = F.famGrade(selF.grade);
         const gi = F.famGradeIdx(selF.grade);
@@ -3175,17 +3198,26 @@ function MainSkillModal({ s, lv, u, d, sp, can, onLearn, onClose }) {
 
 // ===== 오프라인 보상 (1.233.0) =====
 function OfflineSheet({ pd, onClaim }) {
+  // 1.256.0 — 본편 카드 창 (시안 ㊲)
+  const cls = chronicleClass(pd.hero);
+  const cell = (l, v, c) => (
+    <div className="text-center" style={{ padding: '5px 0', border: `1px solid ${MS.line}`, background: MS.box }}>
+      <div style={{ fontSize: 11, color: PALETTE.textDim }}>{l}</div><b style={{ fontSize: 12.5, color: c || PALETTE.text }}>{v}</b>
+    </div>
+  );
   return (
-    <BottomSheet title="🌙 자리를 비운 사이" onClose={onClaim} maxHeight="60%">
-      <div className="text-center" style={{ fontSize: 12.5, color: PALETTE.textDim, lineHeight: 1.6 }}>
-        <b style={{ color: PALETTE.text }}>{iga(chronicleClass(pd.hero).name)}</b> <b style={{ color: PALETTE.text }}>{pd.place}</b>에서 {O.fmtAway(pd.ms)} 동안 사냥했다
-        <div style={{ fontSize: 11 }}>최대 {O.OFFLINE.maxMs / 3600000}시간 · 접속 중 ×1 효율의 {Math.round(O.OFFLINE.eff * 100)}% · 승률 {Math.round(pd.winRate * 100)}% 반영</div>
+    <MainModal img={cls.combatImage} kicker="OFFLINE" title="자리를 비운 사이" sub={`${iga(cls.name)} ${pd.place}에서 사냥했다`} onClose={onClaim}
+      footer={<button onClick={onClaim} className="ui-press" style={{ height: 44, fontSize: 14, fontWeight: 800, border: `1px solid ${MS.red}`, background: 'rgba(224,87,76,0.2)', color: '#ff8a7e' }}>받기</button>}>
+      <div className="grid gap-1" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+        {cell('비운 시간', O.fmtAway(pd.ms), MS.gold)}{cell('효율', `×1의 ${Math.round(O.OFFLINE.eff * 100)}%`)}{cell('승률', `${Math.round(pd.winRate * 100)}%`)}{cell('최대', `${O.OFFLINE.maxMs / 3600000}시간`)}
       </div>
-      <div className="mt-3 flex flex-col gap-1 text-center" style={{ fontSize: 14, color: PALETTE.text }}>
-        <div>🪙 <b style={{ color: PALETTE.legendary }}>+<CountUp v={pd.gold} /></b> · ✦ <b>+{pd.essence}</b></div>
-      </div>
-      <UIButton style={{ height: 44, marginTop: 14 }} onClick={onClaim}>받기</UIButton>
-    </BottomSheet>
+      <MainSecHead title="획 득" />
+      <MainKvRows rows={[
+        { l: '골드', v: <>🪙 +<CountUp v={pd.gold} /></>, c: MS.gold }, { l: '정수', v: `✦ +${pd.essence}` },
+        { l: '경험치', v: '없음', c: PALETTE.textDim }, { l: '장비', v: '없음', c: PALETTE.textDim },
+      ]} />
+      <div className="mt-1" style={{ fontSize: 11, color: PALETTE.textDim }}>오프라인 보상은 골드·정수만 — 경험치·장비는 접속 중 사냥으로</div>
+    </MainModal>
   );
 }
 
@@ -3652,6 +3684,7 @@ const EFF_SORTS = [
   { id: 'exp', label: '경험치/분' }, { id: 'gold', label: '골드/분' }, { id: 'essence', label: '정수/분' }, { id: 'drops', label: '장비/분' }, { id: 'at', label: '최근 순' },
 ];
 function EfficiencyLog({ onClose }) {
+  // 1.256.0 — 본편 카드 창 (시안 ㊱) · 집계 창 위에 뜨도록 z 위로
   const [log, setLog] = useState(readEffLog);
   const [sort, setSort] = useState(() => { try { return localStorage.getItem('chronicleEffSort') || 'exp'; } catch { return 'exp'; } });
   const pickSort = (id) => { setSort(id); try { localStorage.setItem('chronicleEffSort', id); } catch { /* */ } };
@@ -3659,44 +3692,39 @@ function EfficiencyLog({ onClose }) {
   const list = [...log].sort((a, b) => (sort === 'at' ? b.at - a.at : pm(b, sort) - pm(a, sort)));
   const best = sort === 'at' ? null : list[0];
   const clear = () => { try { localStorage.removeItem(EFF_KEY); } catch { /* */ } setLog([]); };
+  const shortLabel = { exp: '경험치', gold: '골드', essence: '정수', drops: '장비', at: '최근' };
   return (
-    <BottomSheet title="📈 효율 기록 비교" onClose={onClose} maxHeight="88%">
-      <div style={{ fontSize: 11.5, color: PALETTE.textDim, lineHeight: 1.5, marginBottom: 8 }}>
-        반복 사냥·던전 한 판·첨탑 도전(2전투 이상)이 끝날 때마다 자동 기록 · 최근 {EFF_MAX}건 · 이 기기에만 저장<br />
-        같은 배속끼리 비교하세요 (배속이 2배면 분당 값도 2배)
-      </div>
-      <div className="flex flex-wrap gap-1.5 mb-2">
-        {EFF_SORTS.map(o => (
-          <button key={o.id} onClick={() => pickSort(o.id)} className="ui-press" style={{ height: 30, padding: '0 10px', borderRadius: 8, fontSize: 12, border: `1px solid ${sort === o.id ? PALETTE.legendary : 'var(--ui-line)'}`, color: sort === o.id ? PALETTE.legendary : PALETTE.textDim, background: 'transparent' }}>{o.label}</button>
-        ))}
-      </div>
-      {!list.length && <div className="text-center py-8" style={{ fontSize: 12.5, color: PALETTE.textDim }}>아직 기록이 없습니다 — 반복 사냥이나 던전을 한 판 돌려 보세요</div>}
-      <div className="flex flex-col gap-2">
-        {list.map((e, i) => (
-          <div key={e.at} style={{ padding: 10, borderRadius: 12, border: `1px solid ${e === best ? PALETTE.legendary + '99' : 'var(--ui-line)'}`, background: 'rgba(255,255,255,0.03)' }}>
-            <div className="flex justify-between items-baseline" style={{ fontSize: 12.5, color: PALETTE.text }}>
-              <span className="font-semibold truncate">{sort !== 'at' ? `${i + 1}. ` : ''}{e.kind === 'dungeon' ? '🏰 ' : e.kind === 'tower' ? '🗼 ' : '🌾 '}{e.place || '—'}</span>
-              <span style={{ fontSize: 11, color: PALETTE.textDim, whiteSpace: 'nowrap', marginLeft: 6 }}>{e.speed} · {fmtDur(e.ms)}</span>
-            </div>
-            <div style={{ fontSize: 11.5, color: PALETTE.textDim }}>
-              {e.classId ? <span style={{ color: chronicleClass(e.classId).color }}>{chronicleClass(e.classId).name} Lv.{e.lv}</span> : null}
-              {' · '}{e.fam ? `🐾 ${e.fam}` : '사역마 없음'} · 전투 {e.battles}회 (승 {e.wins})
-            </div>
-            <div className="grid grid-cols-4 gap-1 mt-1" style={{ fontSize: 11.5 }}>
-              {[['exp', '⭐'], ['gold', '🪙'], ['essence', '✦'], ['drops', '⚔']].map(([k, ic]) => (
-                <div key={k} style={{ textAlign: 'center', padding: '3px 0', borderRadius: 6, background: sort === k ? 'rgba(232,176,74,0.12)' : 'transparent', color: sort === k ? PALETTE.legendary : PALETTE.text }}>
-                  {ic} {fmtNum(pm(e, k))}<div style={{ fontSize: 10, color: PALETTE.textDim }}>/분</div>
+    <div className="absolute inset-0" style={{ zIndex: 46 }}>
+      <MainModal kicker="EFFICIENCY" title="효율 기록 비교" badge={`${log.length}건`} color={MS.red} sub={`최근 ${EFF_MAX}건 · 이 기기에만 저장 · 같은 배속끼리 비교`} onClose={onClose}
+        footer={log.length > 0 ? <button onClick={clear} className="ui-press" style={{ height: 40, fontSize: 13, border: `1px solid ${MS.line}`, background: MS.box, color: PALETTE.text }}>기록 지우기</button> : null}>
+        <MainTabs size={12.5} value={sort} onChange={pickSort} items={EFF_SORTS.map(o => [o.id, shortLabel[o.id] || o.label.replace(/\/.*$/, '')])} />
+        {!list.length && <div className="text-center py-8" style={{ fontSize: 12.5, color: PALETTE.textDim }}>아직 기록이 없습니다 — 반복 사냥·던전 한 판·첨탑 도전(2전투 이상)이 끝나면 자동 기록</div>}
+        <div className="flex flex-col gap-1.5 mt-2">
+          {list.map((e, i) => {
+            const top = e === best;
+            return (
+              <div key={e.at} style={{ padding: '8px 10px', background: MS.box, border: `1px solid ${top ? MS.gold : MS.line}`, borderLeft: `3px solid ${top ? MS.gold : e.kind === 'dungeon' ? MS.violet : e.kind === 'tower' ? MS.blue : MS.line}` }}>
+                <div className="flex justify-between items-baseline gap-2">
+                  <b className="truncate" style={{ fontSize: 13, color: PALETTE.text }}>{sort !== 'at' ? `${i + 1}. ` : ''}{e.kind === 'dungeon' ? '🏰 ' : e.kind === 'tower' ? '🗼 ' : '🌾 '}{e.place || '—'}</b>
+                  <span className="flex-none" style={{ fontSize: 11, color: PALETTE.textDim }}>{e.speed} · {fmtDur(e.ms)}</span>
                 </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="flex gap-2 mt-3">
-        {log.length > 0 && <UIButton variant="ghost" style={{ height: 40 }} onClick={clear}>기록 지우기</UIButton>}
-        <UIButton style={{ height: 40 }} onClick={onClose}>닫기</UIButton>
-      </div>
-    </BottomSheet>
+                <div className="truncate" style={{ fontSize: 11.5, color: PALETTE.textDim }}>
+                  {e.classId ? <span style={{ color: chronicleClass(e.classId).color }}>{chronicleClass(e.classId).name} Lv.{e.lv}</span> : null}
+                  {' · '}{e.fam ? `🐾 ${e.fam}` : '사역마 없음'} · 전투 {e.battles} (승 {e.wins})
+                </div>
+                <div className="grid gap-1 mt-1" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+                  {[['exp', '⭐'], ['gold', '🪙'], ['essence', '✦'], ['drops', '⚔']].map(([k, ic]) => (
+                    <div key={k} className="text-center" style={{ padding: '3px 0', fontSize: 12, fontWeight: sort === k ? 800 : 500, border: `1px solid ${sort === k ? MS.gold : MS.line}`, background: sort === k ? 'rgba(232,176,74,0.1)' : 'transparent', color: sort === k ? MS.gold : PALETTE.text }}>
+                      {ic} {fmtNum(pm(e, k))}<div style={{ fontSize: 10, fontWeight: 400, color: PALETTE.textDim }}>/분</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </MainModal>
+    </div>
   );
 }
 // ×4 배속 이용권 구매 창
