@@ -1288,6 +1288,8 @@ function PartyView({ save, setSave, onBack }) {
   const [skillInfo, setSkillInfo] = useState(null);
   const [rulesOpen, setRulesOpen] = useState(false); // 자동 사용 규칙 펼치기 (1.245.0)
   const [statPick, setStatPick] = useState(null); // 능력치 설명·배분 (1.247.0)
+  const [gtab, setGtab] = useState(() => { try { return localStorage.getItem('chronicleGrowthTab') || 'info'; } catch { return 'info'; } });
+  const pickGtab = (t) => { setGtab(t); try { localStorage.setItem('chronicleGrowthTab', t); } catch { /* */ } };
   const [rowInfo, setRowInfo] = useState(null);   // 수치 줄 설명 (1.247.0)
   const [rebirthOpen, setRebirthOpen] = useState(false);
   const u = save.units[cid];
@@ -1296,8 +1298,9 @@ function PartyView({ save, setSave, onBack }) {
   return (
     <div className="absolute inset-0 flex flex-col">
       <Header title="성장" onBack={onBack} right={<Wallet save={save} />} />
-      <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
-        <div className="flex items-center gap-3 pb-3" style={{ borderBottom: `1px solid ${MS.line}` }}>
+      {/* 1.248.0 PM 「육성 창을 정보·스킬·특성 3탭으로」 */}
+      <div className="flex-none px-4 pt-3">
+        <div className="flex items-center gap-3 pb-3">
           <img src={cls.combatImage} alt="" className="object-cover flex-none" style={{ width: 84, height: 84, borderRadius: 14, border: `1.5px solid ${MS.gold}`, objectPosition: '50% 25%' }} />
           <div className="flex-1 min-w-0">
             <div style={{ fontSize: 10.5, letterSpacing: 4, color: MS.red }}>{CLASS_PATH[cid] || 'PATH'}</div>
@@ -1309,7 +1312,17 @@ function PartyView({ save, setSave, onBack }) {
             <div style={{ fontSize: 10.5, color: PALETTE.textDim }}>경험치 {u.exp.toLocaleString()} / {expNeedFor(u).toLocaleString()}</div>
           </div>
         </div>
+        <div className="grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', borderBottom: `1px solid ${MS.line}` }}>
+          {[['info', '정보', u.points > 0], ['skill', '스킬', classSkills(cid, u.rebirth?.branch).some(x => E.canLearn(u, x))], ['talent', '특성', u.sp > 0]].map(([id, label, dot]) => (
+            <button key={id} onClick={() => pickGtab(id)} className="ui-press relative" style={{ height: 40, background: 'transparent', border: 'none', borderBottom: `2px solid ${gtab === id ? MS.red : 'transparent'}`, color: gtab === id ? MS.red : PALETTE.textDim, fontSize: 14, fontWeight: gtab === id ? 800 : 500, letterSpacing: 3 }}>
+              {label}{dot && <span style={{ position: 'absolute', top: 9, marginLeft: 3, width: 6, height: 6, borderRadius: 3, background: MS.gold, display: 'inline-block' }} />}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
 
+        {gtab === 'info' && <>
         {E.canRebirth(save, cid) && (
           <button onClick={() => setRebirthOpen(true)} className="ui-press ui-sheen w-full text-left" style={{ padding: 12, borderRadius: 14, border: `1.5px solid ${PALETTE.legendary}`, background: `${PALETTE.legendary}18` }}>
             <div className="font-bold" style={{ fontSize: 14, color: PALETTE.legendary }}>✦ 전승 가능 — Lv.{REBIRTH.reqLevel} 달성</div>
@@ -1343,6 +1356,23 @@ function PartyView({ save, setSave, onBack }) {
           <DetailStats d={d} cid={cid} onPick={setRowInfo} />
         </div>
 
+        {/* 장비 */}
+        <GlassPanel className="p-3 flex flex-col gap-2">
+          <span className="font-semibold" style={{ fontSize: 13.5, color: PALETTE.text }}>장비</span>
+          {SLOTS.map(sl => {
+            const it = save.inventory.find(i => i.uid === u.equip[sl.id]);
+            return it ? (
+              <ItemRow key={sl.id} save={save} item={it} onClick={() => setSlotPick(sl.id)} right={<span style={{ fontSize: 11, color: PALETTE.dawn }}>교체</span>} />
+            ) : (
+              <button key={sl.id} onClick={() => setSlotPick(sl.id)} className="ui-press w-full text-left" style={{ padding: '12px', borderRadius: 12, border: '1px dashed var(--ui-line-strong)', background: 'transparent', color: PALETTE.textDim, fontSize: 12.5 }}>
+                {sl.icon} {sl.label} — 비어 있음 (눌러서 장착)
+              </button>
+            );
+          })}
+        </GlassPanel>
+        </>}
+
+        {gtab === 'skill' && <>
         {/* 스킬 — 본편 스킬 카드 스타일 (1.247.0) */}
         <div>
           {(() => {
@@ -1372,30 +1402,22 @@ function PartyView({ save, setSave, onBack }) {
                 <div style={{ fontSize: 11.5, color: PALETTE.textDim, lineHeight: 1.6 }}>
                   ⏱ = 재사용 대기 (쓴 뒤 내 차례 N번은 못 씀){d.cdr || d.skillCdr ? <> · <b style={{ color: '#7fd1c8' }}>재사용 단축 반영됨</b> (모든 스킬 = 유니크·특성 / 스킬 하나 = 일반 장비 옵션)</> : null}<br />
                   쓸 수 있는 스킬이 여럿이면 쿨타임이 아니라 <b style={{ color: PALETTE.text }}>상황 순서</b>로 고른다: 회복(위급) → 보호막 → 강화 → 도발(위급) → 광역(적 2명+) → 단일 중 가장 센 스킬 → 없으면 기본 공격<br />
-                  스킬을 다 올리고 남은 포인트는 아래 <b style={{ color: PALETTE.legendary }}>특성</b>에 찍는다.
+                  스킬을 다 올리고 남은 포인트는 <b style={{ color: PALETTE.legendary }}>특성</b> 탭에서 찍는다.
                 </div>
               )}
             </InfoSection>
           </button>
         </div>
 
+        </>}
+
+        {gtab === 'talent' && (
+          <>
         {/* 특성 트리 (1.224.0) */}
         <TalentPanel save={save} setSave={setSave} cid={cid} />
 
-        {/* 장비 */}
-        <GlassPanel className="p-3 flex flex-col gap-2">
-          <span className="font-semibold" style={{ fontSize: 13.5, color: PALETTE.text }}>장비</span>
-          {SLOTS.map(sl => {
-            const it = save.inventory.find(i => i.uid === u.equip[sl.id]);
-            return it ? (
-              <ItemRow key={sl.id} save={save} item={it} onClick={() => setSlotPick(sl.id)} right={<span style={{ fontSize: 11, color: PALETTE.dawn }}>교체</span>} />
-            ) : (
-              <button key={sl.id} onClick={() => setSlotPick(sl.id)} className="ui-press w-full text-left" style={{ padding: '12px', borderRadius: 12, border: '1px dashed var(--ui-line-strong)', background: 'transparent', color: PALETTE.textDim, fontSize: 12.5 }}>
-                {sl.icon} {sl.label} — 비어 있음 (눌러서 장착)
-              </button>
-            );
-          })}
-        </GlassPanel>
+          </>
+        )}
       </div>
       {rebirthOpen && <RebirthSheet save={save} cid={cid} onClose={() => setRebirthOpen(false)} onRebirth={(b) => { setSave(E.rebirth(save, b, cid)); setRebirthOpen(false); }} />}
       {slotPick && (
@@ -2972,7 +2994,7 @@ function MainSkillCard({ s, lv, u, d, can, onClick }) {
       <div className="truncate" style={{ fontSize: 11, color: PALETTE.textDim }}>
         {locked ? `Lv.${s.reqLv}부터` : <>{SKILL_KIND_SHORT[s.kind] || '스킬'} · <span style={{ color: cdr ? '#7fd1c8' : PALETTE.textDim }}>⏱{s.cd ? (w ? `${w}턴` : '매 턴') : '매 턴'}</span></>}
       </div>
-      <div style={{ fontSize: 9, letterSpacing: 1.5, color: MS.gold }}>{'●'.repeat(lv)}<span style={{ color: PALETTE.textDim }}>{'○'.repeat(Math.max(0, SKILL_MAX_LV - lv))}</span></div>
+      <div style={{ fontSize: 12, fontWeight: 800, color: lv ? MS.gold : PALETTE.textDim }}>{lv ? <>Lv.{lv}{lv >= SKILL_MAX_LV ? <span style={{ fontSize: 10.5, marginLeft: 4, color: MS.red }}>MAX</span> : <span style={{ fontSize: 10.5, fontWeight: 400, color: PALETTE.textDim }}> / {SKILL_MAX_LV}</span>}</> : '미습득'}</div>
     </button>
   );
 }
