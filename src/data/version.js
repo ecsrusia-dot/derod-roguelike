@@ -3,6 +3,6 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.251.1';
+export const GAME_VERSION = '1.251.2';
 export const VERSION_DATE = '2026-11-10';
-export const VERSION_LABEL = '🔥 황혼 연대기 — 개전 겁화 표시 · 성장 화면 장비 성능';
+export const VERSION_LABEL = '🔥 황혼 연대기 — 개전 겁화 지속 피해 % 적용 · 표시 정리';

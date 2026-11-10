@@ -1345,7 +1345,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
   // 1.252.0 — 시작 로그 추가(PM 「겁화가 적용 안 되는 것 같다」: 실제로는 걸렸지만 로그에 출처가 없어 안 보였음)
   //   스킬 「겁화」와 별개 · 턴 소모 없음 · 쿨타임 무관 · 매 턴 공격력 × openInferno (유니크 60% + 특성 선제 화염 4%/점)
   for (const p of units.filter(x => x.side === 'party' && x.openInferno)) {
-    const v = Math.max(1, Math.round(p.atk * p.openInferno)); const turns = 3 * (p.dotTurnsMult || 1);
+    const v = Math.max(1, Math.round(p.atk * p.openInferno * (1 + (p.dotDmg || 0)))); const turns = 3 * (p.dotTurnsMult || 1);
     const foes = units.filter(x => x.side === 'enemy' && !immuneTo(p, x));
     for (const e of foes) e.dots.push({ v, t: turns, src: p.id, sn: '개전 겁화' });
     push({ a: p.id, n: `개전 겁화 (매 턴 ${v.toLocaleString()} · ${turns}턴)`, k: 'open', hits: foes.map(e => ({ t: e.id, burn: true })) });
