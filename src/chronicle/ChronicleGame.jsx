@@ -328,12 +328,13 @@ function BattleLogLine({ e, latest, unitOf }) {
 
 // ===== 전투 재생 =====
 const SPEEDS = [1, 2, 4];
-function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boostLeft = 0, onAskBoost, dungeonAuto = false, onToggleDungeonAuto, autoProg = false, onStopAuto, onReplayDone, sessionReport = null, holdAuto = false }) {
+function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boostLeft = 0, onAskBoost, dungeonAuto = false, onToggleDungeonAuto, autoProg = false, onStopAuto, onReplayDone, sessionReport = null, holdAuto = false, towerAuto = false, onToggleTowerAuto }) {
   const { sim, enemies, party, summary, ctx, xp } = battle;
   const [idx, setIdx] = useState(0);
   const [stats, setStats] = useState(null); // 전투 집계 (1.215.1)
   const openStats = () => { const r = newHuntStats(); addHuntRecord(r, huntRecord(sim, party, { type: ctx.type, enemies }, summary, speed, ctx.label)); setStats(r); };
   const dungeonNext = ctx.kind === 'dungeon' && sim.result === 'win' && !summary.dungeonClear;
+  const towerNext = ctx.kind === 'tower' && sim.result === 'win'; // 첨탑은 지면 도전이 끝난다 — 이기는 동안 계속
   const [speedPref, setSpeed] = useState(() => { try { return +localStorage.getItem('chronicleSpeed') || 2; } catch { return 2; } });
   // ×4는 이용권이 있을 때만 (1.213.0) — 만료되면 ×2로
   const speed = speedPref === 4 && boostLeft <= 0 ? 2 : speedPref;
@@ -364,6 +365,12 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
     const t = setTimeout(onAgain, 1800);
     return () => clearTimeout(t);
   }, [done, dungeonAuto, dungeonNext, stats, onAgain]);
+  // 첨탑 자동 등반 (1.240.0): 승리하면 다음 층 → 패배할 때까지
+  useEffect(() => {
+    if (!done || !towerAuto || !towerNext || stats || holdAuto) return undefined;
+    const t = setTimeout(onAgain, 1800);
+    return () => clearTimeout(t);
+  }, [done, towerAuto, towerNext, stats, holdAuto, onAgain]);
   const setSp = (s) => { setSpeed(s); try { localStorage.setItem('chronicleSpeed', String(s)); } catch { /* */ } };
 
   const cur = sim.events[Math.min(idx, sim.events.length - 1)];
@@ -504,6 +511,9 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
               {battle.runReport && <button onClick={() => setStats(battle.runReport)} className="ui-press flex-1" style={{ height: 34, borderRadius: 10, fontSize: 12, border: '1px solid #c08ae888', color: '#c08ae8', background: 'transparent' }}>{battle.runReport.kind === 'tower' ? '🗼 첨탑 도전 집계' : '🏰 던전 전체 집계'}</button>}
             </div>
             <div className="flex gap-2 mt-2">
+              {towerNext && (
+                <UIButton variant={towerAuto ? 'gold' : 'ghost'} style={{ height: 42 }} onClick={onToggleTowerAuto}>{towerAuto ? '자동 등반 중… (끄기)' : '자동 등반'}</UIButton>
+              )}
               {dungeonNext && (
                 <UIButton variant={dungeonAuto ? 'gold' : 'ghost'} style={{ height: 42 }} onClick={onToggleDungeonAuto}>{dungeonAuto ? '연속 도전 중… (끄기)' : '연속 도전'}</UIButton>
               )}
@@ -1805,7 +1815,15 @@ function FamiliarView({ save, setSave, onBack, flash, onTrack = () => {} }) {
 }
 
 // ===== 무한 탑 「황혼의 첨탑」 (1.215.0) =====
-function TowerView({ save, setSave, onBack, onFight, flash }) {
+function TowerAutoToggle({ on, onToggle }) {
+  return (
+    <button onClick={onToggle} className="ui-press flex items-center gap-1.5 self-start" style={{ background: 'transparent', border: 'none', color: on ? PALETTE.legendary : PALETTE.textDim, padding: '4px 0', fontSize: 12.5 }}>
+      <span className="flex items-center justify-center" style={{ width: 18, height: 18, borderRadius: 5, border: `1.5px solid ${on ? PALETTE.legendary : 'var(--ui-line-strong)'}`, background: on ? `${PALETTE.legendary}33` : 'transparent', fontSize: 12 }}>{on ? '✓' : ''}</span>
+      자동 등반 — 승리하면 다음 층으로, 패배하면 멈춤
+    </button>
+  );
+}
+function TowerView({ save, setSave, onBack, onFight, flash, towerAuto = false, onToggleTowerAuto, onStartAuto }) {
   const [shop, setShop] = useState(false);
   const [pickUnique, setPickUnique] = useState(false);
   const t = save.tower || { best: 0, checkpoint: 0, run: null };
@@ -1849,11 +1867,15 @@ function TowerView({ save, setSave, onBack, onFight, flash }) {
         )}
         {run ? (
           <>
-            <UIButton onClick={onFight}>{boss ? `👑 ${run.floor}층 보스와 싸운다` : `${run.floor}층 전투`}</UIButton>
+            <UIButton onClick={onFight}>{boss ? `👑 ${run.floor}층 보스와 싸운다` : `${run.floor}층 전투`}{towerAuto ? ' → 실패할 때까지 자동' : ''}</UIButton>
+            <TowerAutoToggle on={towerAuto} onToggle={onToggleTowerAuto} />
             <UIButton variant="ghost" onClick={() => setSave(E.leaveTower(save))}>도전 종료 (체크포인트 {t.checkpoint || 0}층 유지)</UIButton>
           </>
         ) : (
-          <UIButton onClick={() => setSave(E.startTower(save))}>🗼 {nextFloor}층부터 도전 (무료)</UIButton>
+          <>
+            <UIButton onClick={() => setSave(E.startTower(save))}>🗼 {nextFloor}층부터 도전 (무료)</UIButton>
+            <UIButton variant="gold" onClick={onStartAuto}>⏫ {nextFloor}층부터 자동 등반 (실패할 때까지)</UIButton>
+          </>
         )}
         <UIButton variant="gold" onClick={() => setShop(true)}>✪ 첨탑 상점</UIButton>
         <GlassPanel className="p-3" style={{ fontSize: 11.5, color: PALETTE.textDim, lineHeight: 1.6 }}>
@@ -3042,6 +3064,10 @@ export default function ChronicleGame({ onExit }) {
   const [dungeonAuto, setDungeonAuto] = useState(() => { try { return localStorage.getItem('chronicleDungeonAuto') === '1'; } catch { return false; } });
   const toggleDungeonAuto = () => { const v = !dungeonAuto; setDungeonAuto(v); try { localStorage.setItem('chronicleDungeonAuto', v ? '1' : '0'); } catch { /* */ } };
   const dungRunRef = useRef(null);
+  // 첨탑 자동 등반 (1.240.0) — 켜 두면 승리할 때마다 다음 층으로, 패배(도전 종료)하면 멈춤
+  const [towerAuto, setTowerAuto] = useState(() => { try { return localStorage.getItem('chronicleTowerAuto') === '1'; } catch { return false; } });
+  const toggleTowerAuto = () => { const v = !towerAuto; setTowerAuto(v); try { localStorage.setItem('chronicleTowerAuto', v ? '1' : '0'); } catch { /* */ } };
+  const startTowerAuto = () => { const s0 = E.startTower(save); if (s0 === save) return; setSave(s0); if (!towerAuto) toggleTowerAuto(); fightTower(s0); };
   const towerRunRef = useRef(null); // 첨탑 한 번 도전 집계 (1.232.1)
   const toggleRepeat = () => {
     if (!repeat) { setAutoProg(false); repStatsRef.current = newHuntStats(); if (lastRecRef.current) addHuntRecord(repStatsRef.current, lastRecRef.current); }
@@ -3247,20 +3273,21 @@ export default function ChronicleGame({ onExit }) {
     setView('battle');
   };
 
-  const fightTower = () => {
-    if (!save.tower?.run) return;
-    const enc = E.towerEncounter(save, rng);
-    enc.enemies = E.scaleEnemiesForRebirth(save, enc.enemies);
-    const party = E.partyCombatants(save, save.tower.run.hp);
+  const fightTower = (sArg) => {
+    const sv = sArg || save; // 자동 등반 시작 직후엔 막 만든 도전 저장으로 싸운다
+    if (!sv.tower?.run) return;
+    const enc = E.towerEncounter(sv, rng);
+    enc.enemies = E.scaleEnemiesForRebirth(sv, enc.enemies);
+    const party = E.partyCombatants(sv, sv.tower.run.hp);
     const sim = E.simulateChronicleBattle(party, enc.enemies, rng);
     const ctx = { kind: 'tower', type: enc.type, enemies: enc.enemies, label: `황혼의 첨탑 ${enc.floor}층${E.isTowerBoss(enc.floor) ? ' 보스' : ''}` };
-    const r = E.applyBattle(save, ctx, sim, rng);
-    r.summary.questsDone = Q.newlyDoneQuests(save, r.save);
+    const r = E.applyBattle(sv, ctx, sim, rng);
+    r.summary.questsDone = Q.newlyDoneQuests(sv, r.save);
     setSave(r.save);
     trackDaily(winDeltas(sim, enc.enemies));
     // 첨탑 한 번 도전 집계 (1.232.1) — 층이 이어지지 않으면 새 도전
     if (!towerRunRef.current || towerRunRef.current.lastFloor + 1 !== enc.floor) towerRunRef.current = { st: newHuntStats(), lastFloor: enc.floor - 1 };
-    addHuntRecord(towerRunRef.current.st, huntRecord(sim, party, enc, r.summary, readSpeedPref(E.boostLeftMs(save)), ctx.label));
+    addHuntRecord(towerRunRef.current.st, huntRecord(sim, party, enc, r.summary, readSpeedPref(E.boostLeftMs(sv)), ctx.label));
     towerRunRef.current.lastFloor = enc.floor;
     let runReport = null;
     if (sim.result !== 'win') {
@@ -3269,7 +3296,7 @@ export default function ChronicleGame({ onExit }) {
     }
     const key = Date.now();
     if (runReport) queueReport(runReport, key);
-    setBattle({ sim, enemies: enc.enemies, party, summary: r.summary, ctx, runReport, xp: { before: expSnap(save), after: expSnap(r.save) }, key });
+    setBattle({ sim, enemies: enc.enemies, party, summary: r.summary, ctx, runReport, xp: { before: expSnap(sv), after: expSnap(r.save) }, key });
     setView('battle');
   };
   // 원정대 레이드 (1.231.0) — 계정 단위: 5캐릭 파티 · 결과·보상은 계정에 직접
@@ -3311,8 +3338,9 @@ export default function ChronicleGame({ onExit }) {
         holdAuto={!!pendingReport || !!report}
         repeat={repeat} onToggleRepeat={toggleRepeat}
         autoProg={autoProg} onStopAuto={() => stopAuto('자동 진행을 멈췄습니다')}
-        onAgain={() => (battle.ctx.kind === 'dungeon' ? fightDungeon() : autoProg ? autoStep() : lastFieldRef.current && fightField(lastFieldRef.current.field, 'hunt', lastFieldRef.current.stage))}
+        onAgain={() => (battle.ctx.kind === 'dungeon' ? fightDungeon() : battle.ctx.kind === 'tower' ? fightTower() : autoProg ? autoStep() : lastFieldRef.current && fightField(lastFieldRef.current.field, 'hunt', lastFieldRef.current.stage))}
         dungeonAuto={dungeonAuto} onToggleDungeonAuto={toggleDungeonAuto}
+        towerAuto={towerAuto} onToggleTowerAuto={toggleTowerAuto}
         boostLeft={E.boostLeftMs(save)} onAskBoost={() => setBoostSheet(true)} />
     );
   } else if (view === 'field') {
@@ -3337,7 +3365,7 @@ export default function ChronicleGame({ onExit }) {
   } else if (view === 'bag') {
     content = <BagView save={save} setSave={setSave} onBack={() => setView('town')} flash={flash} />;
   } else if (view === 'tower') {
-    content = <TowerView save={save} setSave={setSave} onBack={() => setView('town')} onFight={fightTower} flash={flash} />;
+    content = <TowerView save={save} setSave={setSave} onBack={() => setView('town')} onFight={() => fightTower()} flash={flash} towerAuto={towerAuto} onToggleTowerAuto={toggleTowerAuto} onStartAuto={startTowerAuto} />;
   } else if (view === 'fam') {
     content = <FamiliarView save={save} setSave={setSave} onBack={() => setView('town')} flash={flash} onTrack={trackDaily} />;
   } else if (view === 'stash') {
