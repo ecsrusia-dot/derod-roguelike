@@ -1661,92 +1661,8 @@ function FamRoleGuide({ heroCls }) {
 }
 // 동행 스킬 · 능력치 상세 (1.217.0)
 // 사역마 설명창 「효과」 탭 (1.244.0) — 어디서 적용되나 기준 4구획
-function FamEffectSections({ k, f, fams, heroLv, slot }) {
-  const gi = F.famGradeIdx(f.grade);
-  const role = F.FAM_ROLES[F.famRole(k)];
-  const base = F.famGrade(F.famBaseGrade(k, f));
-  const sig = F.famHasSignature(k, f) ? F.famSignature(k, f.grade) : null;
-  const pv = F.famPassive(k, f);
-  const subs = F.famSubItems(k, f, heroLv);
-  const own = gi >= F.FAM_OWN_MIN_GRADE ? Object.entries(F.famOwnValues(k, f)).filter(([, v]) => v) : [];
-  const bonds = F.FAM_BONDS.filter(b => b.members.includes(k));
-  const pct = (v) => `+${Math.round(v * 1000) / 10}%`;
-  return (
-    <div className="flex flex-col gap-2 mt-2">
-      <InfoSection icon="⚔" title="동행 칸에 있을 때" color="#e8b04a" right={slot === 'main' ? '사용 중' : null} dim={slot && slot !== 'main'}>
-        <InfoRow first label="함께 싸움" value="능력치·스킬 탭에서 확인" color={PALETTE.textDim} />
-        {role.guard && <InfoRow label="수호 태세" value={`적 공격의 ${Math.round(role.guard[gi] * 100)}% 대신 받음`} />}
-        <InfoRow label="★ 고유 스킬" value={sig ? sig.name : '없음'} color={sig ? '#d07ae8' : PALETTE.textDim} note={!sig ? (F.famGradeIdx(base.id) < F.FAM_SIG_MIN_GRADE ? '남령 이상으로 소환된 사역마만 (진화로는 생기지 않음)' : null) : null} />
-        <InfoRow label="◆ 고유 패시브" value={pv ? pv.name : '없음'} color={pv ? '#c79bff' : PALETTE.textDim} note={pv ? pv.desc : '자령으로 소환된 사역마만 (진화로는 생기지 않음)'} />
-        <InfoRow label="베이스 등급" value={base.label} color={base.color} note={F.famGradeIdx(base.id) < gi ? '진화로 능력치·스킬 배율만 올랐다' : null} />
-      </InfoSection>
-      <InfoSection icon="✦" title="보조 칸에 있을 때" color="#c79bff" right={`효과 ${F.famSubPctOf(f, heroLv)}% (Lv.${F.famLv(f)}/${heroLv})`} dim={slot === 'main'}>
-        {subs.map((it, i) => <InfoRow key={it.k} first={i === 0} label={<>{it.icon && `${it.icon} `}{it.label}{it.econ && <span style={{ marginLeft: 4, fontSize: 10.5, color: '#c79bff' }}>재화 특성</span>}</>} value={it.k === 'shieldPct' ? `최대 HP ${it.text}` : it.text} />)}
-      </InfoSection>
-      <InfoSection icon="◎" title="가지고만 있어도" color="#8fe08a" right="편성 무관" dim={!own.length}>
-        {own.length ? own.map(([kk, v], i) => <InfoRow key={kk} first={i === 0} label={F.famFxText({ [kk]: 1 }).split(' +')[0]} value={pct(v)} />)
-          : <InfoRow first label="보유 효과" value="남령부터" color={PALETTE.textDim} />}
-      </InfoSection>
-      {bonds.length > 0 && (
-        <InfoSection icon="🔗" title="인연" color="#9cc4e4">
-          {bonds.map((b, i) => {
-            const t = F.bondTier(fams, b);
-            const have = b.members.filter(m => fams[m]).length;
-            return <InfoRow key={b.id || b.name} first={i === 0} label={b.name} value={t ? `${t}단계 달성` : `${have}/${b.members.length} 모음`} color={t ? '#9cc4e4' : PALETTE.textDim} note={F.famFxText(b.fx)} />;
-          })}
-        </InfoSection>
-      )}
-    </div>
-  );
-}
 const FAM_KIND_LABEL = { taunt: '도발', strike: '단일 공격', multi: '연속 공격', aoe: '광역 공격', heal: '회복', shield: '보호막' };
 // 「능력치·스킬」 탭 (1.244.0) — 능력치 타일 + 스킬 카드
-function FamSkillPanel({ k, f, save }) {
-  const skills = F.famSkillInfo(k, f);
-  const heroLv = save.units[save.hero]?.lv || 1;
-  const famPct = E.deriveUnit(save, save.hero).famPct || 0;
-  const r = F.famStats(k, f, heroLv, famPct);
-  const guard = F.famGuard(k, f);
-  const pv = F.famPassive(k, f);
-  const tiles = [
-    { label: '최대 HP', value: r.maxHp.toLocaleString() }, { label: '공격력', value: r.atk.toLocaleString() }, { label: '방어', value: r.def.toLocaleString() },
-    { label: '회복력', value: r.healPower.toLocaleString() }, { label: '속도', value: r.spd },
-    guard ? { label: '수호 태세', value: `${Math.round(guard * 100)}%`, accent: '#e8b04a' } : { label: '역할', value: F.FAM_ROLES[F.famRole(k)].label },
-  ];
-  return (
-    <div className="flex flex-col gap-2 mt-2">
-      <InfoSection title="동행 능력치" color={PALETTE.text} right={`Lv.${r.lv} 기준 · 주인공 직업 무관`}>
-        <div className="mt-1"><StatTiles items={tiles} /></div>
-        {famPct > 0 && <div style={{ fontSize: 11, color: PALETTE.textDim, marginTop: 4 }}>주인공 장비 「사역마 능력치」 +{Math.round(famPct * 100)}% 포함</div>}
-      </InfoSection>
-      {pv && (
-        <div style={{ borderRadius: 12, padding: 9, border: '1px solid #c79bff88', background: '#c79bff12' }}>
-          <div style={{ fontSize: 11, color: '#c79bff', fontWeight: 700 }}>◆ 자령 고유 패시브</div>
-          <div style={{ fontSize: 13.5, fontWeight: 800, color: PALETTE.legendary }}>{pv.name}</div>
-          <div style={{ fontSize: 12, color: PALETTE.text, marginTop: 2 }}><HiNum text={pv.desc} /></div>
-        </div>
-      )}
-      {skills.map(sk => {
-        const parts = String(sk.effect).split(/ — |\. | · /).filter(Boolean);
-        return (
-          <div key={sk.id} style={{ borderRadius: 12, padding: 9, border: `1px solid ${sk.sig ? '#d07ae888' : 'var(--ui-line)'}`, background: sk.sig ? '#d07ae810' : 'rgba(255,255,255,0.02)' }}>
-            <div className="flex items-center justify-between gap-2">
-              <span style={{ fontSize: 13.5, fontWeight: 800, color: PALETTE.legendary }}>{sk.sig ? '★ ' : ''}{sk.name}</span>
-              <ValueChip label={`⏱ ${sk.cd}턴`} />
-            </div>
-            <div style={{ fontSize: 11, color: sk.sig ? '#d07ae8' : PALETTE.textDim }}>{sk.sig ? `고유 스킬 · ${sk.sigType}` : FAM_KIND_LABEL[sk.kind] || sk.kind}</div>
-            <div className="flex flex-wrap gap-1 mt-1.5">
-              {parts.map((p, i) => <span key={i} style={{ fontSize: 11.5, padding: '2px 7px', borderRadius: 7, background: 'rgba(111,168,220,0.1)', border: '1px solid rgba(111,168,220,0.3)', color: PALETTE.textDim }}><HiNum text={p} /></span>)}
-            </div>
-            {sk.when && <div className="mt-1.5" style={{ fontSize: 11, color: PALETTE.textDim, background: 'rgba(0,0,0,0.25)', borderRadius: 8, padding: '5px 7px' }}>발동 ▸ {sk.when}</div>}
-          </div>
-        );
-      })}
-      {!F.famHasSignature(k, f) && <div style={{ fontSize: 11, color: PALETTE.textDim }}>★ 고유 스킬 없음 — <b style={{ color: '#7a6ae8' }}>남령</b> 이상으로 소환된 사역마만 가진다 (진화로는 생기지 않음)</div>}
-      <div style={{ color: PALETTE.textDim, fontSize: 11 }}>스킬이 모두 대기 중이면 일반 공격. 스킬 위력은 등급이 오를수록 커지고, 자령은 고유 스킬 지속 턴 +1.</div>
-    </div>
-  );
-}
 // 보조 효과 등급표 — 청령부터 효과가 하나 더 붙는다
 function FamSubTable({ k, gi }) {
   const rows = F.famSubPreview(k);
@@ -1887,6 +1803,116 @@ function FamBondView({ fams, onPick }) {
   );
 }
 
+// ===== 사역마 본편 스타일 (1.250.0, 시안 ⑮ ⑯-B) =====
+const FAM_SLOT_TAG = { main: '★ 동행', sub1: '보조 1', sub2: '보조 2' };
+function MainFamTeam({ save, onOpen, onPick }) {
+  const team = save.famTeam || {}; const fams = save.fams || {};
+  return (
+    <div className="grid gap-1.5" style={{ gridTemplateColumns: '1.3fr 1fr 1fr' }}>
+      {['main', 'sub1', 'sub2'].map(sl => {
+        const open = E.famSlotOpen(save, sl); const k = team[sl]; const f = k && fams[k]; const g = f ? F.famGrade(f.grade) : null;
+        const role = f ? F.FAM_ROLES[F.famRole(k)] : null;
+        return (
+          <button key={sl} onClick={() => (f ? onOpen(k) : open ? onPick(sl) : null)} className="ui-press relative text-left overflow-hidden" style={{ borderRadius: 12, border: `1.5px solid ${f ? g.color : MS.line}`, background: MS.box, padding: 0, minWidth: 0, opacity: open ? 1 : 0.55 }}>
+            <span className="absolute" style={{ top: 4, left: 4, fontSize: 10.5, fontWeight: 800, padding: '1px 6px', background: 'rgba(0,0,0,0.7)', border: `1px solid ${f ? g.color : MS.line}`, color: f ? g.color : PALETTE.textDim, zIndex: 1 }}>{FAM_SLOT_TAG[sl]}</span>
+            {f ? <img src={chronicleEnemyArt(k)} alt="" className="w-full object-cover" style={{ height: 72, display: 'block' }} />
+              : <div className="flex items-center justify-center" style={{ height: 72, fontSize: 22, color: PALETTE.textDim }}>{open ? '＋' : '🔒'}</div>}
+            <div style={{ padding: '4px 6px' }}>
+              <div className="truncate font-bold" style={{ fontSize: 11.5, color: f ? g.color : PALETTE.textDim }}>{f ? `${F.famName(k)}${f.plus ? ` +${f.plus}` : ''}` : open ? '비어 있음' : `Lv.${F.FAM_TUNING.slotLv[sl]} 개방`}</div>
+              <div className="truncate" style={{ fontSize: 10.5, color: PALETTE.textDim }}>{f ? `${g.label} · ${role.icon}${role.label} · Lv.${F.famLv(f)}` : open ? '눌러서 편성' : '주인공 레벨'}</div>
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+function MainFamTile({ k, f, slot, heroLv, onClick }) {
+  const g = F.famGrade(f.grade); const role = F.FAM_ROLES[F.famRole(k)];
+  return (
+    <button onClick={onClick} className="ui-press relative flex items-center gap-2 text-left" style={{ padding: 6, borderRadius: 10, background: MS.box, border: `1px solid ${MS.line}`, borderLeft: `3px solid ${g.color}`, minWidth: 0 }}>
+      {slot && <span className="absolute" style={{ top: 4, right: 6, fontSize: 10.5, fontWeight: 800, color: slot === 'main' ? MS.gold : MS.violet }}>{FAM_SLOT_TAG[slot].replace(' ', '')}</span>}
+      <img src={chronicleEnemyArt(k)} alt="" className="flex-none object-cover" style={{ width: 44, height: 44, borderRadius: 8, border: `1px solid ${g.color}` }} />
+      <div className="min-w-0">
+        <div className="truncate font-bold" style={{ fontSize: 12.5, color: g.color, paddingRight: slot ? 30 : 0 }}>{F.famName(k)}{f.plus ? ` +${f.plus}` : ''}</div>
+        <div className="truncate" style={{ fontSize: 10.5, color: PALETTE.textDim }}>{g.label} · <span style={{ color: role.color }}>{role.icon}{role.label}</span></div>
+        <div style={{ fontSize: 11, color: heroLv && F.famLv(f) < heroLv ? MS.gold : PALETTE.text }}>Lv.{F.famLv(f)}</div>
+      </div>
+    </button>
+  );
+}
+function MainKvRows({ rows }) {
+  return (
+    <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', columnGap: 14 }}>
+      {rows.map((r, i) => (
+        <div key={i} className="flex items-baseline justify-between gap-1" style={{ padding: '4px 0', minWidth: 0, gridColumn: r.wide ? 'span 2' : 'auto' }}>
+          <span className="truncate" style={{ fontSize: 12, color: PALETTE.textDim }}>{r.l}</span>
+          <span className="flex-none text-right" style={{ fontSize: 12.5, fontWeight: 800, color: r.c || PALETTE.text }}>{r.v}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+function MainFamFx({ k, f, fams, heroLv, slot }) {
+  const gi = F.famGradeIdx(f.grade); const role = F.FAM_ROLES[F.famRole(k)];
+  const base = F.famGrade(F.famBaseGrade(k, f));
+  const sig = F.famHasSignature(k, f) ? F.famSignature(k, f.grade) : null;
+  const pv = F.famPassive(k, f);
+  const subs = F.famSubItems(k, f, heroLv);
+  const own = gi >= F.FAM_OWN_MIN_GRADE ? Object.entries(F.famOwnValues(k, f)).filter(([, v]) => v) : [];
+  const bonds = F.FAM_BONDS.filter(b => b.members.includes(k));
+  const pct = (v) => `+${Math.round(v * 1000) / 10}%`;
+  return (
+    <>
+      <MainSecHead title={`동 행 효 과${slot === 'main' ? ' (사 용 중)' : ''}`} />
+      <MainKvRows rows={[
+        ...(role.guard ? [{ l: '수호 태세', v: `${Math.round(role.guard[gi] * 100)}%`, c: MS.blue }] : []),
+        { l: '역할', v: `${role.icon} ${role.label}`, c: role.color },
+        { l: '★ 고유 스킬', v: sig ? sig.name : '없음', c: sig ? '#d07ae8' : PALETTE.textDim },
+        { l: '◆ 고유 패시브', v: pv ? pv.name : '없음', c: pv ? '#c79bff' : PALETTE.textDim },
+        { l: '베이스 등급', v: base.label, c: base.color },
+      ]} />
+      <MainSecHead title={`보 조 칸 에 두 면 (${F.famSubPctOf(f, heroLv)}%)`} />
+      <MainKvRows rows={subs.map(it => ({ l: `${it.icon ? `${it.icon} ` : ''}${it.label}`, v: it.k === 'shieldPct' ? `HP ${it.text}` : it.text, c: it.econ ? MS.gold : MS.blue }))} />
+      <MainSecHead title="보 유 효 과 (편 성 무 관)" />
+      {own.length ? <MainKvRows rows={own.map(([kk, v]) => ({ l: F.famFxText({ [kk]: 1 }).split(' +')[0], v: pct(v), c: '#8fd08a' }))} /> : <div style={{ fontSize: 12, color: PALETTE.textDim }}>남령부터 생긴다</div>}
+      {bonds.length > 0 && <>
+        <MainSecHead title="인 연" />
+        <MainKvRows rows={bonds.map(b => { const t = F.bondTier(fams, b); const have = b.members.filter(m => fams[m]).length; return { l: b.name, v: t ? `${t}단계` : `${have}/${b.members.length}`, c: t ? '#9cc4e4' : PALETTE.textDim }; })} />
+      </>}
+      {(!sig || !pv) && <div className="mt-1" style={{ fontSize: 11, color: PALETTE.textDim }}>고유 스킬 = 남령 이상 · 고유 패시브 = 자령으로 <b>소환</b>된 사역마만 (진화로는 생기지 않음)</div>}
+    </>
+  );
+}
+function MainFamSkill({ k, f, save }) {
+  const skills = F.famSkillInfo(k, f);
+  const heroLv = save.units[save.hero]?.lv || 1;
+  const famPct = E.deriveUnit(save, save.hero).famPct || 0;
+  const r = F.famStats(k, f, heroLv, famPct);
+  const guard = F.famGuard(k, f); const pv = F.famPassive(k, f);
+  return (
+    <>
+      <div className="grid gap-1.5 mt-2" style={{ gridTemplateColumns: '1fr 1fr' }}>
+        <MainCell label="HP" value={r.maxHp.toLocaleString()} />
+        <MainCell label="공격력" value={r.atk.toLocaleString()} color={MS.gold} />
+        <MainCell label="방어" value={r.def.toLocaleString()} color={MS.blue} />
+        <MainCell label="회복력" value={r.healPower.toLocaleString()} color="#8fd08a" />
+        <MainCell label="속도" value={r.spd} />
+        <MainCell label={guard ? '수호 태세' : '역할'} value={guard ? `${Math.round(guard * 100)}%` : F.FAM_ROLES[F.famRole(k)].label} color={guard ? MS.blue : null} />
+      </div>
+      <div className="mt-1" style={{ fontSize: 11, color: PALETTE.textDim }}>Lv.{r.lv} 기준 · 주인공 직업 무관{famPct > 0 ? ` · 주인공 장비 사역마 능력치 +${Math.round(famPct * 100)}% 포함` : ''}</div>
+      {pv && <div className="mt-2" style={{ padding: '8px 10px', border: '1px solid #c79bff88', background: MS.box, fontSize: 12.5, lineHeight: 1.55 }}><b style={{ color: '#c79bff' }}>◇ 자령 고유 패시브 「{pv.name}」</b> <HiNum text={pv.desc} /></div>}
+      {skills.map(sk => (
+        <div key={sk.id} className="mt-2" style={{ padding: '8px 10px', border: `1px solid ${sk.sig ? '#d07ae888' : MS.line}`, background: MS.box, fontSize: 12.5, lineHeight: 1.55 }}>
+          <div className="flex justify-between gap-2"><b style={{ color: sk.sig ? '#d07ae8' : MS.red }}>◇ {sk.sig ? '고유 스킬 ' : ''}「{sk.name}」</b><span style={{ fontSize: 11, color: PALETTE.textDim }}>⏱ {sk.cd}턴 · {sk.sig ? sk.sigType : FAM_KIND_LABEL[sk.kind] || sk.kind}</span></div>
+          <div style={{ color: PALETTE.text }}><HiNum text={sk.effect} /></div>
+          {sk.when && <div style={{ fontSize: 11, color: PALETTE.textDim }}>발동: {sk.when}</div>}
+        </div>
+      ))}
+    </>
+  );
+}
+
 function FamiliarView({ save, setSave, onBack, flash, onTrack = () => {} }) {
   const [tab, setTab] = useState('summon');
   const [results, setResults] = useState(null);
@@ -1918,11 +1944,17 @@ function FamiliarView({ save, setSave, onBack, flash, onTrack = () => {} }) {
   const inTeam = list.filter(([k]) => slotOf(k));
   const waiting = list.filter(([k]) => !slotOf(k));
   const grpHead = (left, right) => <div className="flex justify-between" style={{ fontSize: 11.5, fontWeight: 700, color: PALETTE.textDim, marginTop: 2 }}><span>{left}</span>{right && <span style={{ fontWeight: 400 }}>{right}</span>}</div>;
-  const tabBtn = (id, label) => <button key={id} onClick={() => setTab(id)} className="ui-press flex-1" style={{ height: 36, borderRadius: 10, fontSize: 12, border: `1px solid ${tab === id ? PALETTE.legendary : 'var(--ui-line)'}`, color: tab === id ? PALETTE.legendary : PALETTE.text, background: 'transparent' }}>{label}</button>;
   return (
     <div className="absolute inset-0 flex flex-col">
       <Header title="사역마" onBack={onBack} right={<div className="flex items-center gap-2" style={{ fontSize: 12 }}><span style={{ color: '#d07ae8' }}>📜{shards}</span><span style={{ color: '#9cc4e4' }}>🔮{souls}</span></div>} />
-      <div className="flex gap-1.5 px-3 pt-2 flex-none">{tabBtn('summon', '소환')}{tabBtn('list', `보관함 ${list.length}`)}{tabBtn('team', '편성')}{tabBtn('bond', `인연 ${F.FAM_BONDS.filter(b => F.bondTier(fams, b) > 0).length}`)}</div>
+      <div className="flex-none px-4 pt-2">
+        <div className="flex items-center justify-between" style={{ marginBottom: 6 }}>
+          <span style={{ fontSize: 12.5, letterSpacing: 4, color: MS.red, fontWeight: 700 }}>◆ 편성</span>
+          <span style={{ fontSize: 11.5, color: PALETTE.textDim }}>누르면 정보 · 빈 칸은 편성</span>
+        </div>
+        <MainFamTeam save={save} onOpen={(k) => setSel(k)} onPick={(sl) => setPickSlot(sl)} />
+        <div className="mt-2"><MainTabs items={[['summon', '소환'], ['list', `보관함 ${list.length}`], ['team', '편성'], ['bond', `인연 ${F.FAM_BONDS.filter(b => F.bondTier(fams, b) > 0).length}`]]} value={tab} onChange={setTab} /></div>
+      </div>
       <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
         {tab === 'summon' && (
           <>
@@ -1956,10 +1988,10 @@ function FamiliarView({ save, setSave, onBack, flash, onTrack = () => {} }) {
         )}
         {tab === 'list' && (
           <>
-            {inTeam.length > 0 && grpHead(`편성 중 ${inTeam.length}`)}
-            {inTeam.map(([k, f]) => <FamCard key={k} k={k} f={f} heroLv={heroLv} slot={slotOf(k)} onClick={() => setSel(k)} />)}
-            {waiting.length > 0 && grpHead(`대기 ${waiting.length}`, '등급 순')}
-            {waiting.map(([k, f]) => <FamCard key={k} k={k} f={f} heroLv={heroLv} slot={null} onClick={() => setSel(k)} />)}
+            <div className="flex justify-between" style={{ fontSize: 12, color: PALETTE.textDim }}><span>보관 <b style={{ color: PALETTE.text }}>{list.length}</b> · 정렬 <b style={{ color: MS.gold }}>등급</b></span><span>📜 {shards} · 🔮 {souls}</span></div>
+            <div className="grid gap-2" style={{ gridTemplateColumns: '1fr 1fr' }}>
+              {[...inTeam, ...waiting].map(([k, f]) => <MainFamTile key={k} k={k} f={f} slot={slotOf(k)} heroLv={heroLv} onClick={() => setSel(k)} />)}
+            </div>
             {!list.length && <div className="text-center py-10" style={{ fontSize: 12.5, color: PALETTE.textDim }}>아직 사역마가 없습니다 — 계약서 조각을 모아 소환하세요</div>}
           </>
         )}
@@ -2008,50 +2040,47 @@ function FamiliarView({ save, setSave, onBack, flash, onTrack = () => {} }) {
         const vc = F.FAM_TUNING.evolveCost(selF.grade);
         const last = gi >= F.FAM_GRADES.length - 1;
         return (
-          <BottomSheet title={`${F.famName(sel)}${selF.plus ? ` +${selF.plus}` : ''}`} onClose={() => setSel(null)} maxHeight="80%">
-            <img src={chronicleEnemyArt(sel)} alt="" className="w-full object-cover" style={{ aspectRatio: '16 / 8', borderRadius: 12, border: `1px solid ${g.color}` }} />
-            <div className="text-center mt-2" style={{ fontSize: 13, color: g.color, fontWeight: 600 }}>{g.label} · {F.FAM_ROLES[F.famRole(sel)].icon} {F.FAM_ROLES[F.famRole(sel)].label}</div>
-            <div className="text-center mt-0.5" style={{ fontSize: 12, color: PALETTE.textDim }}>{F.FAM_ROLES[F.famRole(sel)].desc}</div>
-            <div className="flex gap-1 mt-2">
-              {[['fx', '효과'], ['skill', '능력치·스킬'], ['grow', '성장']].map(([id, l]) => (
-                <button key={id} onClick={() => setSelTab(id)} className="ui-press flex-1" style={{ height: 34, borderRadius: 9, fontSize: 12, fontWeight: selTab === id ? 700 : 400, border: `1px solid ${selTab === id ? PALETTE.legendary : 'var(--ui-line)'}`, color: selTab === id ? PALETTE.legendary : PALETTE.textDim, background: 'transparent' }}>{l}</button>
-              ))}
-            </div>
-            {selTab === 'fx' && <FamEffectSections k={sel} f={selF} fams={fams} heroLv={heroLv} slot={slotOf(sel)} />}
-            {selTab === 'skill' && <FamSkillPanel k={sel} f={selF} save={save} />}
+          <MainModal img={chronicleEnemyArt(sel)} kicker={`${g.label} · ${F.FAM_ROLES[F.famRole(sel)].label}`.split('').join(' ').replace(/ {3}/g, '  ')} title={`${F.famName(sel)}${selF.plus ? ` +${selF.plus}` : ''}`} color={g.color} badge={`Lv.${F.famLv(selF)}`}
+            sub={`Lv.${F.famLv(selF)} / ${heroLv}${slotOf(sel) ? ` · ${FAM_SLOT_TAG[slotOf(sel)]} 중` : ' · 대기'}`} onClose={() => setSel(null)}
+            footer={<div className="grid gap-1.5" style={{ gridTemplateColumns: '1fr 1fr' }}>
+              {slotOf(sel) ? <button onClick={() => { setSave(E.setFamTeam(save, slotOf(sel), null)); flash('편성 해제'); }} className="ui-press" style={{ height: 42, border: `1px solid ${MS.gold}`, color: MS.gold, background: 'transparent', fontSize: 13, gridColumn: 'span 2' }}>편성 해제</button> : <>
+                <button disabled={!E.famSlotOpen(save, 'main')} onClick={() => { setSave(E.setFamTeam(save, 'main', sel)); flash('동행으로 편성'); }} className="ui-press" style={{ height: 42, border: `1px solid ${MS.gold}`, color: MS.gold, background: 'transparent', fontSize: 13, fontWeight: 800 }}>★ 동행으로</button>
+                {(() => { const sl = ['sub1', 'sub2'].find(x => E.famSlotOpen(save, x) && !team[x]) || (E.famSlotOpen(save, 'sub1') ? 'sub1' : null); return <button disabled={!sl} onClick={() => { setSave(E.setFamTeam(save, sl, sel)); flash(`${FAM_SLOT_TAG[sl]}에 편성`); }} className="ui-press" style={{ height: 42, border: `1px solid ${MS.line}`, color: sl ? MS.violet : PALETTE.textDim, background: 'transparent', fontSize: 13 }}>{sl ? `${FAM_SLOT_TAG[sl]}에 편성` : '보조 칸 잠김'}</button>; })()}
+              </>}
+            </div>}>
+            <MainTabs items={[['fx', '효과'], ['skill', '능력치·스킬'], ['grow', '성장', !maxed ? souls >= ec : !last && souls >= vc]]} value={selTab} onChange={setSelTab} />
+            {selTab === 'fx' && <MainFamFx k={sel} f={selF} fams={fams} heroLv={heroLv} slot={slotOf(sel)} />}
+            {selTab === 'skill' && <MainFamSkill k={sel} f={selF} save={save} />}
             {selTab === 'grow' && <>
-              <GlassPanel className="p-2.5 mt-2" style={{ fontSize: 12, color: PALETTE.text }}>
-                <div className="flex items-center justify-between">
-                  <b style={{ color: PALETTE.legendary }}>Lv.{F.famLv(selF)} <span style={{ fontWeight: 400, color: PALETTE.textDim }}>/ 주인공 Lv.{heroLv}</span></b>
-                  <span style={{ fontSize: 11, color: PALETTE.textDim }}>보조 효과 {F.famSubPctOf(selF, heroLv)}%</span>
-                </div>
-                {F.famLv(selF) < heroLv ? <>
-                  <div className="mt-1"><Bar v={selF.exp || 0} max={F.FAM_LEVEL.expNeed(F.famLv(selF))} color="#e8b04a" h={5} /></div>
-                  <div style={{ fontSize: 11, color: PALETTE.textDim }}>경험치 {selF.exp || 0}/{F.FAM_LEVEL.expNeed(F.famLv(selF))} · <b style={{ color: '#e8b04a' }}>동행 칸</b>에서 이길 때만 오른다</div>
-                </> : <div style={{ fontSize: 11, color: PALETTE.textDim }}>주인공 레벨 도달 — 주인공이 레벨업하면 다시 경험치를 받는다</div>}
-              </GlassPanel>
+              <div className="grid gap-1.5 mt-2" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                <MainCell label="레벨" value={`${F.famLv(selF)} / ${heroLv}`} />
+                <MainCell label="강화" value={`+${selF.plus} / +${F.FAM_TUNING.maxPlus}`} color={MS.gold} />
+                <MainCell label="등급" value={g.label} color={g.color} />
+                <MainCell label="베이스" value={F.famGrade(F.famBaseGrade(sel, selF)).label} color={F.famGrade(F.famBaseGrade(sel, selF)).color} />
+              </div>
+              <MainSecHead title="경 험 치" />
+              {F.famLv(selF) < heroLv ? <>
+                <Bar v={selF.exp || 0} max={F.FAM_LEVEL.expNeed(F.famLv(selF))} color={MS.violet} h={6} />
+                <div className="mt-1" style={{ fontSize: 11.5, color: PALETTE.textDim }}>{(selF.exp || 0).toLocaleString()} / {F.FAM_LEVEL.expNeed(F.famLv(selF)).toLocaleString()} · <b style={{ color: MS.gold }}>동행 칸</b>에서 이길 때만 오른다 · 보조 효과 {F.famSubPctOf(selF, heroLv)}%</div>
+              </> : <div style={{ fontSize: 11.5, color: PALETTE.textDim }}>주인공 레벨 도달 — 주인공이 레벨업하면 다시 경험치를 받는다</div>}
+              <div className="flex gap-1 mt-3 justify-center">{Array.from({ length: F.FAM_TUNING.maxPlus }, (_, i) => <span key={i} style={{ width: 18, height: 6, background: i < selF.plus ? g.color : '#ffffff1a' }} />)}</div>
+              <div className="grid gap-1.5 mt-3" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                <button disabled={maxed || souls < ec} onClick={() => setSave(E.enhanceFam(save, sel))} className="ui-press" style={{ padding: '8px 0', border: `1px solid ${!maxed && souls >= ec ? MS.gold : MS.line}`, background: 'transparent', color: !maxed && souls >= ec ? MS.gold : PALETTE.textDim, fontSize: 12.5, lineHeight: 1.35 }}>
+                  {maxed ? '최대 강화' : <>⬆ 강화 +{selF.plus}→+{selF.plus + 1}<br /><span style={{ fontSize: 11 }}>🔮 {ec} / 보유 {souls}</span></>}
+                </button>
+                <button disabled={!maxed || last || souls < vc} onClick={() => {
+                  const r = E.evolveFam(save, sel); if (!r.result) return; setSave(r.save);
+                  flash(r.result === 'success' ? `진화 성공! ${F.FAM_GRADES[gi + 1].label}(으)로` : `진화 실패… 강화 -${F.famEvolveFailDrop(selF.grade)}단계 · 다음 성공률 ${Math.round(F.famEvolveRate(r.save.fams[sel]) * 100)}%`);
+                }} className="ui-press" style={{ padding: '8px 0', border: `1px solid ${maxed && !last && souls >= vc ? MS.violet : MS.line}`, background: 'transparent', color: maxed && !last && souls >= vc ? MS.violet : PALETTE.textDim, fontSize: 12.5, lineHeight: 1.35 }}>
+                  {last ? '최고 등급' : <>✦ 진화 → {F.FAM_GRADES[gi + 1].label}<br /><span style={{ fontSize: 11 }}>{maxed ? `🔮 ${vc} · ${Math.round(F.famEvolveRate(selF) * 100)}% (최대 ${F.famEvolveMaxTries(selF.grade)}회)` : `+${F.FAM_TUNING.maxPlus}에서 도전`}</span></>}
+                </button>
+              </div>
+              <div className="mt-2" style={{ padding: '8px 10px', border: `1px solid ${MS.line}`, background: MS.box, fontSize: 12, color: PALETTE.text, lineHeight: 1.55 }}>
+                <b style={{ color: MS.red }}>◇ 진화</b> 같은 사역마의 등급이 오른다 · 성공하면 강화 +0으로 · 실패하면 강화 -{F.famEvolveFailDrop(selF.grade)} · 실패할수록 다음 성공률 +{Math.round((F.FAM_TUNING.evolvePityAdd[selF.grade] || 0) * 100)}%p
+              </div>
               <FamSubTable k={sel} gi={gi} />
             </>}
-            <div className="flex gap-1 mt-3 justify-center">{Array.from({ length: F.FAM_TUNING.maxPlus }, (_, i) => <span key={i} style={{ width: 18, height: 6, borderRadius: 3, background: i < selF.plus ? g.color : '#ffffff1a' }} />)}</div>
-            <div className="mt-3 flex flex-col gap-2">
-              {!maxed && <UIButton disabled={souls < ec} onClick={() => setSave(E.enhanceFam(save, sel))}>강화 +{selF.plus} → +{selF.plus + 1} (🔮{ec} / 보유 {souls})</UIButton>}
-              {maxed && !last && (
-                <UIButton variant="gold" disabled={souls < vc} onClick={() => {
-                  const r = E.evolveFam(save, sel);
-                  if (!r.result) return;
-                  setSave(r.save);
-                  flash(r.result === 'success' ? `진화 성공! ${F.FAM_GRADES[gi + 1].label}(으)로` : `진화 실패… 강화 -${F.famEvolveFailDrop(selF.grade)}단계 · 다음 성공률 ${Math.round(F.famEvolveRate(r.save.fams[sel]) * 100)}%`);
-                }}>
-                  {F.FAM_GRADES[gi + 1].label}(으)로 진화 — 성공률 {Math.round(F.famEvolveRate(selF) * 100)}% (🔮{vc})
-                </UIButton>
-              )}
-              {maxed && !last && <div className="text-center" style={{ fontSize: 11, color: PALETTE.textDim }}>
-                기본 {Math.round(g.evolve * 100)}% + 천장 {Math.round((F.famEvolveRate(selF) - g.evolve) * 100)}%p (실패 {selF.evoFails || 0}회 × {Math.round((F.FAM_TUNING.evolvePityAdd[selF.grade] || 0) * 100)}%p) · 최대 {F.famEvolveMaxTries(selF.grade)}번째 시도에 확정 · 실패 시 강화 -{F.famEvolveFailDrop(selF.grade)}
-              </div>}
-              {maxed && last && <div className="text-center" style={{ fontSize: 12.5, color: g.color }}>최고 등급 · 최대 강화</div>}
-              <UIButton variant="ghost" style={{ height: 40 }} onClick={() => setSel(null)}>닫기</UIButton>
-            </div>
-          </BottomSheet>
+          </MainModal>
         );
       })()}
       {pickSlot && (() => {
@@ -2311,61 +2340,85 @@ function RiskLine({ rate, fail, danger }) {
   );
 }
 // 대장간 부품 (1.246.0)
-function ForgeHead({ item, by }) {
-  const g = gradeOf(item.grade); const slot = SLOTS.find(sl => sl.id === item.slot);
-  const C = ({ children, color }) => <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 7, border: `1px solid ${color ? `${color}66` : 'var(--ui-line)'}`, color: color || PALETTE.textDim, background: 'rgba(255,255,255,0.04)' }}>{children}</span>;
-  return (
-    <div className="flex items-center gap-2.5" style={{ padding: 10, borderRadius: 14, border: `1px solid ${g.color}88`, background: `${g.color}12` }}>
-      <div className="flex-none flex items-center justify-center" style={{ width: 44, height: 44, borderRadius: 10, background: '#000', fontSize: 20, border: `1.5px solid ${g.color}` }}>{slot?.icon}</div>
-      <div className="flex-1 min-w-0">
-        <div className="font-bold" style={{ fontSize: 14.5, color: g.color }}>{E.itemName(item)}{item.plus ? ` +${item.plus}` : ''}</div>
-        <div className="flex flex-wrap gap-1 mt-1"><C color={g.color}>{g.label}</C><C>Lv.{item.ilv}</C>{by ? <C color="#e8b04a">★ 착용 중</C> : <C>가방</C>}</div>
-      </div>
-    </div>
-  );
-}
-function ForgeCompare({ before, after, title, extra }) {
-  const a = E.itemStats(before), b = E.itemStats(after);
-  const keys = [...new Set([...Object.keys(a), ...Object.keys(b)])].filter(k => a[k] || b[k]);
-  const val = (k, v) => (v ? E.statLabel(k, v).replace(/^[^\d+-]*(?=[+-]?\d)/, '') : '—');
-  const name = (k) => ({ atk: '공격', def: '방어', hp: 'HP', spd: '속도' }[k] || E.statLabel(k, 1).replace(/\s*[+-]?[\d.]+.*$/, ''));
-  return (
-    <InfoSection icon="◆" title={title} color="#e8b04a" right="지금 → 이후">
-      {keys.map((k, i) => { const d = +((b[k] || 0) - (a[k] || 0)).toFixed(3); return (
-        <InfoRow key={k} first={i === 0} label={name(k)} value={<>{val(k, a[k])} → {val(k, b[k])}{d ? <b style={{ color: d > 0 ? '#8fe08a' : '#e07a6a', marginLeft: 5 }}>{d > 0 ? '▲' : '▼'}{E.statLabel(k, Math.abs(d)).replace(/^[^\d]*/, '')}</b> : null}</>} />
-      ); })}
-      {extra && <InfoRow label="추가" value={extra} color="#c79bff" />}
-    </InfoSection>
-  );
-}
 const FORGE_COST_ROWS = [['gold', '🪙 골드', (s) => s.gold], ['essence', '✦ 정수', (s) => s.mats.essence || 0], ['shard', '◆ 고대 파편', (s) => s.mats.shard || 0]];
-function ForgeCost({ save, cost }) {
-  const rows = FORGE_COST_ROWS.filter(([k]) => cost[k]);
-  return (
-    <InfoSection icon="🪙" title="비용" color={PALETTE.dawn}>
-      {rows.map(([k, l, have], i) => { const h = have(save); const ok = h >= cost[k]; return (
-        <InfoRow key={k} first={i === 0} label={l} value={<>{cost[k].toLocaleString()} <span style={{ color: PALETTE.textDim, fontWeight: 400 }}>/ 보유 {h.toLocaleString()}</span> <b style={{ color: ok ? '#8fe08a' : '#e07a6a' }}>{ok ? '✓' : '부족'}</b></>} />
-      ); })}
-    </InfoSection>
-  );
-}
 function forgeShort(save, cost) {
   const miss = FORGE_COST_ROWS.filter(([k, , have]) => cost[k] && have(save) < cost[k]).map(([k, l, have]) => `${l.replace(/^\S+\s/, '')} ${(cost[k] - have(save)).toLocaleString()}`);
   return miss.length ? `${miss.join(' · ')} 부족합니다` : '진행할 수 없습니다';
 }
-function ForgeOdds({ outcomes }) {
-  const list = outcomes.filter(([, p]) => p > 0.0005);
+// ===== 본편 스타일 공용 (1.250.0) — 밑줄 탭 · 착용 4칸 상자 =====
+function MainTabs({ items, value, onChange, size = 13 }) {
   return (
-    <InfoSection icon="🎲" title="결과 확률" color="#e07a6a">
-      <div className="flex mt-1" style={{ height: 14, borderRadius: 7, overflow: 'hidden' }}>
-        {list.map(([l, p, c]) => <div key={l} style={{ width: `${p * 100}%`, background: c }} />)}
-      </div>
-      <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5" style={{ fontSize: 11.5, color: PALETTE.textDim }}>
-        {list.map(([l, p, c]) => <span key={l}><i style={{ display: 'inline-block', width: 9, height: 9, borderRadius: 3, background: c, marginRight: 4, verticalAlign: -1 }} />{l} <b style={{ color: PALETTE.text }}>{Math.round(p * 100)}%</b></span>)}
-      </div>
-    </InfoSection>
+    <div className="grid" style={{ gridTemplateColumns: `repeat(${items.length}, 1fr)`, borderBottom: `1px solid ${MS.line}` }}>
+      {items.map(([id, label, dot]) => (
+        <button key={id} onClick={() => onChange(id)} className="ui-press relative" style={{ height: 38, background: 'transparent', border: 'none', borderBottom: `2px solid ${value === id ? MS.red : 'transparent'}`, color: value === id ? MS.red : PALETTE.textDim, fontSize: size, fontWeight: value === id ? 800 : 500 }}>
+          {label}{dot && <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: 3, background: MS.gold, marginLeft: 3, verticalAlign: 6 }} />}
+        </button>
+      ))}
+    </div>
   );
 }
+function EquipBoxes({ save, hero, onPick, sub }) {
+  return (
+    <div className="grid gap-1.5" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+      {SLOTS.map(sl => {
+        const it = save.inventory.find(i => i.uid === save.units[hero].equip[sl.id]);
+        const g = it ? gradeOf(it.grade) : null;
+        return (
+          <button key={sl.id} onClick={() => onPick(sl, it)} className="ui-press text-center" style={{ padding: '6px 3px', borderRadius: 12, border: `1.5px solid ${it ? `${g.color}99` : MS.line}`, background: MS.box, minWidth: 0 }}>
+            <div style={{ fontSize: 18, lineHeight: 1.2 }}>{sl.icon}</div>
+            <div className="truncate font-bold" style={{ fontSize: 11, color: it ? g.color : PALETTE.textDim }}>{it ? E.itemName(it) : `${sl.label} 비어 있음`}</div>
+            <div className="truncate" style={{ fontSize: 10.5, color: PALETTE.textDim }}>{it ? sub(it) : '—'}</div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+// ===== 대장간 본편 스타일 (1.250.0, 시안 ⑰⑱) =====
+const forgeNextRate = (it) => ((it.plus || 0) >= FORGE.maxEnhance ? null : E.enhanceRisk(it).rate);
+function MainForgeCompare({ before, after }) {
+  const a = E.itemStats(before), b = E.itemStats(after);
+  const keys = [...new Set([...Object.keys(a), ...Object.keys(b)])].filter(k => a[k] || b[k]);
+  const val = (k, v) => (v ? (BASE_STATS.includes(k) ? Math.round(v).toLocaleString() : E.statLabel(k, v).replace(/^[^\d+-]*(?=[+-]?\d)/, '')) : '—');
+  const name = (k) => (BASE_LABEL[k] === '공격' ? '공격력' : BASE_LABEL[k]) || E.statLabel(k, 1).replace(/\s*[+-]?[\d.]+.*$/, '');
+  const pa = E.itemPower(before), pb = E.itemPower(after);
+  const rows = [...keys.map(k => ({ k, l: name(k), from: val(k, a[k]), to: val(k, b[k]), d: +((b[k] || 0) - (a[k] || 0)).toFixed(3) })), { k: '_pw', l: '전투력', from: pa, to: pb, d: pb - pa }];
+  return (
+    <>
+      <MainSecHead title="지 금 → 이 후" />
+      <div className="grid" style={{ gridTemplateColumns: '1fr', rowGap: 0 }}>
+        {rows.map(r => (
+          <div key={r.k} className="flex items-baseline justify-between gap-2" style={{ padding: '4px 0', borderBottom: '1px dashed rgba(196,69,61,0.18)' }}>
+            <span style={{ fontSize: 12, color: PALETTE.textDim }}>{r.l}</span>
+            <span style={{ fontSize: 12.5, fontWeight: 800, color: r.k === '_pw' ? MS.gold : PALETTE.text }}>{r.from} → {r.to}{r.d ? <span style={{ fontSize: 11, marginLeft: 4, color: r.d > 0 ? '#8fd08a' : '#e07a6a' }}>{r.d > 0 ? '▲' : '▼'}{r.k === '_pw' || BASE_STATS.includes(r.k) ? Math.abs(Math.round(r.d)).toLocaleString() : E.statLabel(r.k, Math.abs(r.d)).replace(/^[^\d]*/, '')}</span> : null}</span>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+function MainForgeCost({ save, cost }) {
+  const rows = FORGE_COST_ROWS.filter(([k]) => cost[k]);
+  return (
+    <>
+      <MainSecHead title="비 용" />
+      <div className="grid gap-1.5" style={{ gridTemplateColumns: '1fr 1fr' }}>
+        {rows.map(([k, l, have]) => { const h = have(save); const ok = h >= cost[k]; return <MainCell key={k} label={l} value={<>{cost[k].toLocaleString()}<span style={{ fontSize: 11, fontWeight: 400, color: PALETTE.textDim }}> / {h.toLocaleString()}</span></>} color={ok ? '#8fd08a' : '#e07a6a'} />; })}
+      </div>
+    </>
+  );
+}
+function MainForgeOdds({ outcomes }) {
+  const list = outcomes.filter(([, p]) => p > 0.0005);
+  return (
+    <>
+      <MainSecHead title="결 과 확 률" />
+      <div className="flex" style={{ height: 10 }}>{list.map(([l, p, c]) => <div key={l} style={{ width: `${p * 100}%`, background: c }} />)}</div>
+      <div className="mt-1" style={{ fontSize: 12 }}>{list.map(([l, p, c], i) => <React.Fragment key={l}>{i ? <span style={{ color: PALETTE.textDim }}> · </span> : null}<b style={{ color: c }}>{l} {Math.round(p * 100)}%</b></React.Fragment>)}</div>
+    </>
+  );
+}
+
 function ForgeView({ save, setSave, onBack, flash, onTrack = () => {} }) {
   const [sel, setSel] = useState(null);
   const [filter, setFilter] = useState('all');
@@ -2387,82 +2440,121 @@ function ForgeView({ save, setSave, onBack, flash, onTrack = () => {} }) {
     if (!risky || forgeConfirmSkip) { run(); return; }
     setConfirm({ ...info, onConfirm: () => { forgeConfirmSkip = skipAsk; setConfirm(null); run(); } });
   };
+  const hero = save.hero;
+  const bagList = list.filter(it => !E.equippedBy(save, it.uid));
+  const by = item ? E.equippedBy(save, item.uid) : null;
+  const maxed = item && (item.plus || 0) >= FORGE.maxEnhance;
+  const doEnhance = () => guard(er.drop || er.breakChance > 0, {
+    title: `강화 +${item.plus || 0} → +${(item.plus || 0) + 1}`,
+    lines: [
+      { t: `성공 확률 ${Math.round(er.rate * 100)}%` },
+      { t: er.breakChance ? `실패하면 1단계 하락, 그중 ${Math.round(er.breakChance * 100)}%는 장비가 파괴됩니다` : '실패하면 1단계 하락합니다', color: er.breakChance ? '#e06a5f' : '#e8b04a' },
+      ...(by ? [{ t: '⚠ 착용 중인 장비입니다', color: '#e8b04a' }] : []),
+    ],
+    confirmLabel: '강화한다', danger: er.breakChance > 0,
+  }, () => {
+    const r = E.forgeEnhance(save, item.uid); if (!r.result) return; setSave(r.save); onTrack({ forge: 1 });
+    if (r.result === 'destroy') { setSel(null); showPop('destroy', '장비 파괴', `${E.itemName(item)} +${item.plus || 0}`); }
+    else if (r.result === 'success') showPop('success', `강화 성공! +${(item.plus || 0) + 1}`, E.itemName(item));
+    else if (r.result === 'down') showPop('down', `강화 실패 — +${Math.max(0, (item.plus || 0) - 1)}로 하락`, E.itemName(item));
+    else showPop('fail', '강화 실패', '재료만 잃었습니다');
+  });
+  const doPromote = () => guard(pr.breaks, {
+    title: `${gradeOf(ng).label} 승급`,
+    lines: [
+      { t: `성공 확률 ${Math.round(pr.rate * 100)}%` },
+      { t: '실패하면 장비가 파괴됩니다', color: '#e06a5f' },
+      ...(by ? [{ t: '⚠ 착용 중인 장비입니다', color: '#e8b04a' }] : []),
+    ],
+    confirmLabel: '승급한다', danger: true,
+  }, () => {
+    const r = E.forgePromote(save, item.uid); if (!r.result) return; setSave(r.save); onTrack({ forge: 1 });
+    if (r.result === 'destroy') { setSel(null); showPop('destroy', '장비 파괴', `${gradeOf(ng).label} 승급 실패`); return; }
+    if (r.result === 'fail') { showPop('fail', '승급 실패', '재료만 잃었습니다'); return; }
+    const it2 = r.save.inventory.find(i => i.uid === item.uid); showPop('success', `${gradeOf(ng).label} 등급으로 승급!`, E.epicOptOf(it2) ? `에픽 효과 「${E.epicOptOf(it2).name}」` : E.itemName(it2));
+  });
+  const bigBtn = (on, label, onClick, gold) => (
+    <button disabled={!on} onClick={onClick} className="ui-press" style={{ height: 46, fontSize: 14, fontWeight: 800, border: `1px solid ${on ? (gold ? MS.gold : MS.red) : MS.line}`, background: on ? (gold ? 'rgba(232,176,74,0.14)' : 'rgba(224,87,76,0.16)') : 'transparent', color: on ? (gold ? MS.gold : '#ff8a7e') : PALETTE.textDim }}>{label}</button>
+  );
   return (
     <div className="absolute inset-0 flex flex-col">
       <Header title="대장간" onBack={onBack} right={<Wallet save={save} />} />
-      <div className="px-3 pt-2 flex-none">
-        <button onClick={() => setRulesOpen(!rulesOpen)} className="ui-press w-full text-left" style={{ background: 'transparent', border: 'none', padding: 0 }}>
-          <InfoSection icon="ⓘ" title="강화·승급 규칙" color={PALETTE.dawn} right={rulesOpen ? '접기 ▴' : '펼치기 ▾'}>
-            {rulesOpen && <>
-              <InfoRow first label="강화 +1당" value={`능력치 +${Math.round(FORGE.enhancePct * 100)}% (최대 +${FORGE.maxEnhance})`} />
-              <InfoRow label="실패 위험" value="+3부터 실패 · +6부터 하락 · +8부터 파괴" color="#e07a6a" />
-              <InfoRow label="승급" value="다음 등급 + 옵션 1개" note="에픽 승급은 던전의 ◆ 고대 파편 필요 · 유니크는 승급 불가(강화만)" />
-            </>}
-          </InfoSection>
-        </button>
+      <div className="flex-none px-4 pt-2">
+        <div className="flex items-center justify-between" style={{ marginBottom: 6 }}>
+          <span style={{ fontSize: 12.5, letterSpacing: 4, color: MS.red, fontWeight: 700 }}>◆ 착용 장비</span>
+          <span style={{ fontSize: 11.5, color: PALETTE.textDim }}>누르면 강화 창</span>
+        </div>
+        <EquipBoxes save={save} hero={hero} onPick={(sl, it) => (it ? setSel(it.uid) : setFilter(sl.id))} sub={(it) => { const r = forgeNextRate(it); return `+${it.plus || 0} · ${r == null ? '최대' : `다음 ${Math.round(r * 100)}%`}`; }} />
+        <div className="mt-2"><MainTabs items={[['all', '전체'], ...SLOTS.map(s => [s.id, s.label]), ['other', '타직업']]} value={filter} onChange={setFilter} size={12.5} /></div>
+        <div className="flex items-center gap-1.5 py-2" style={{ fontSize: 12 }}>
+          <span style={{ color: PALETTE.textDim }}>보관 <b style={{ color: PALETTE.text }}>{bagList.length}</b> · 정렬 <b style={{ color: MS.gold }}>{sortBy === 'grade' ? '등급' : '전투력'}</b></span>
+          <div className="flex-1" />
+          <button onClick={() => setRulesOpen(true)} className="ui-press" style={{ fontSize: 12, padding: '5px 10px', border: `1px solid ${MS.line}`, background: MS.box, color: PALETTE.text }}>ⓘ 규칙 · 정렬</button>
+        </div>
       </div>
-      <ItemFilterBar filter={filter} setFilter={setFilter} />
-      <div className="flex items-center gap-2 px-3 pt-1.5 flex-none" style={{ fontSize: 12 }}>
-        <span style={{ color: PALETTE.textDim }}>{list.length}개</span>
-        <div className="flex-1" />
-        <SortButtons sortBy={sortBy} pickSort={pickSort} />
+      <div className="flex-1 overflow-y-auto px-4 pb-3">
+        <div className="grid gap-2" style={{ gridTemplateColumns: '1fr 1fr' }}>
+          {bagList.map(it => {
+            const g = gradeOf(it.grade); const r = forgeNextRate(it); const ngi = E.nextGrade(it); const prr = ngi && E.promoteRisk(it);
+            return (
+              <button key={it.uid} onClick={() => setSel(it.uid)} className="ui-press text-left" style={{ padding: '7px 9px 7px 11px', borderRadius: 10, background: MS.box, border: `1px solid ${MS.line}`, borderLeft: `3px solid ${g.color}`, minWidth: 0 }}>
+                <div className="truncate font-bold" style={{ fontSize: 13, color: g.color }}>{E.itemName(it)}{it.plus ? ` +${it.plus}` : ''}</div>
+                <div className="truncate" style={{ fontSize: 11, color: PALETTE.textDim }}>{g.label} · Lv.{it.ilv} · +{it.plus || 0}</div>
+                <div className="truncate" style={{ fontSize: 11 }}>
+                  <span style={{ color: PALETTE.textDim }}>⚒ </span><b style={{ color: r == null ? PALETTE.textDim : r >= 1 ? '#8fd08a' : r >= 0.5 ? MS.gold : '#e07a6a' }}>{r == null ? '최대' : `${Math.round(r * 100)}%`}</b>
+                  <span style={{ color: PALETTE.textDim }}> · ⬆ {ngi ? `${gradeOf(ngi).label} ${Math.round(prr.rate * 100)}%` : '불가'}</span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+        {!bagList.length && <div className="text-center py-10" style={{ fontSize: 12.5, color: PALETTE.textDim }}>{list.length ? '보관 중인 장비가 없습니다 — 착용 장비는 위 상자를 누르세요' : save.inventory.length ? '이 분류에 장비가 없습니다' : '가방에 장비가 없습니다'}</div>}
       </div>
-      <div className="flex-1 overflow-y-auto px-3 py-2 flex flex-col gap-1.5">
-        {list.map(it => <ItemRow key={it.uid} save={save} item={it} onClick={() => setSel(it.uid)} />)}
-        {!list.length && <div className="text-center py-10" style={{ fontSize: 12.5, color: PALETTE.textDim }}>{save.inventory.length ? '이 분류에 장비가 없습니다' : '가방에 장비가 없습니다'}</div>}
-      </div>
-      {item && (
-        <BottomSheet title="대장간" onClose={() => setSel(null)} maxHeight="82%">
-          <ForgeHead item={item} by={E.equippedBy(save, item.uid)} />
-          <div className="flex gap-1 mt-2">
-            {[['enhance', `⚒ 강화 +${item.plus || 0} → +${Math.min(FORGE.maxEnhance, (item.plus || 0) + 1)}`], ['promote', ng ? `⬆ 승급 → ${gradeOf(ng).label}` : '⬆ 승급']].map(([id, l]) => (
-              <button key={id} onClick={() => setFtab(id)} className="ui-press flex-1" style={{ height: 36, borderRadius: 9, fontSize: 12, fontWeight: ftab === id ? 700 : 400, border: `1px solid ${ftab === id ? PALETTE.legendary : 'var(--ui-line)'}`, color: ftab === id ? PALETTE.legendary : PALETTE.textDim, background: 'transparent' }}>{l}</button>
-            ))}
+      {rulesOpen && (
+        <MainModal kicker="대 장 간" title="ⓘ 규칙 · 정렬" onClose={() => setRulesOpen(false)}>
+          <div style={{ fontSize: 12.5, color: PALETTE.text, lineHeight: 1.7 }}>
+            <div>◇ 강화 +1당 능력치 <b style={{ color: MS.gold }}>+{Math.round(FORGE.enhancePct * 100)}%</b> · 최대 <b>+{FORGE.maxEnhance}</b></div>
+            <div style={{ color: '#e07a6a' }}>◇ +3부터 실패 · +6부터 실패 시 하락 · +8부터 파괴 위험</div>
+            <div>◇ 승급 = 다음 등급 + 옵션 1개 · 에픽 승급은 던전의 ◆ 고대 파편 필요</div>
+            <div style={{ color: PALETTE.textDim }}>◇ 유니크·전승 장비는 승급 불가 (강화만)</div>
           </div>
-          <div className="mt-2 flex flex-col gap-2">
-            {ftab === 'enhance' && ((item.plus || 0) < FORGE.maxEnhance ? <>
-              <ForgeCompare before={item} after={{ ...item, plus: (item.plus || 0) + 1 }} title="강화하면" />
-              <ForgeCost save={save} cost={ec} />
-              <ForgeOdds outcomes={(() => { const f = 1 - er.rate; return er.drop ? [['성공', er.rate, '#8fe08a'], [`+${Math.max(0, (item.plus || 0) - 1)}로 하락`, f * (1 - er.breakChance), '#e8b04a'], ['파괴', f * er.breakChance, '#e07a6a']] : [['성공', er.rate, '#8fe08a'], ['실패 (재료만 잃음)', f, '#9b8975']]; })()} />
-              {E.canEnhance(save, item) ? <UIButton style={{ height: 42 }} disabled={!E.canEnhance(save, item)} onClick={() => guard(er.drop || er.breakChance > 0, {
-                    title: `강화 +${item.plus || 0} → +${(item.plus || 0) + 1}`,
-                    lines: [
-                      { t: `성공 확률 ${Math.round(er.rate * 100)}%` },
-                      { t: er.breakChance ? `실패하면 1단계 하락, 그중 ${Math.round(er.breakChance * 100)}%는 장비가 파괴됩니다` : '실패하면 1단계 하락합니다', color: er.breakChance ? '#e06a5f' : '#e8b04a' },
-                      ...(E.equippedBy(save, item.uid) ? [{ t: '⚠ 착용 중인 장비입니다', color: '#e8b04a' }] : []),
-                    ],
-                    confirmLabel: '강화한다', danger: er.breakChance > 0,
-                  }, () => {
-                    const r = E.forgeEnhance(save, item.uid); if (!r.result) return; setSave(r.save); onTrack({ forge: 1 });
-                    if (r.result === 'destroy') { setSel(null); showPop('destroy', '장비 파괴', `${E.itemName(item)} +${item.plus || 0}`); }
-                    else if (r.result === 'success') showPop('success', `강화 성공! +${(item.plus || 0) + 1}`, E.itemName(item));
-                    else if (r.result === 'down') showPop('down', `강화 실패 — +${Math.max(0, (item.plus || 0) - 1)}로 하락`, E.itemName(item));
-                    else showPop('fail', '강화 실패', '재료만 잃었습니다');
-                  })}>강화</UIButton> : <div className="text-center" style={{ padding: 10, borderRadius: 12, border: '1px solid var(--ui-line)', fontSize: 12.5, color: PALETTE.textDim }}>{forgeShort(save, ec)}</div>}
-            </> : <InfoSection title="최대 강화" color={PALETTE.textDim}><InfoRow first label="현재" value={`+${item.plus} / +${FORGE.maxEnhance}`} /></InfoSection>)}
-            {ftab === 'promote' && (ng ? <>
-              <ForgeCompare before={item} after={{ ...item, grade: ng }} title="승급하면" extra={`무작위 옵션 1개 추가${ng === 'epic' && item.slot === 'accessory' ? ' + 에픽 장신구 효과' : ''}`} />
-              <ForgeCost save={save} cost={pc} />
-              <ForgeOdds outcomes={[['성공', pr.rate, '#8fe08a'], [pr.breaks ? '파괴' : '실패 (재료만 잃음)', 1 - pr.rate, pr.breaks ? '#e07a6a' : '#9b8975']]} />
-              {E.canPromote(save, item) ? <UIButton variant="gold" style={{ height: 42 }} disabled={!E.canPromote(save, item)} onClick={() => guard(pr.breaks, {
-                    title: `${gradeOf(ng).label} 승급`,
-                    lines: [
-                      { t: `성공 확률 ${Math.round(pr.rate * 100)}%` },
-                      { t: '실패하면 장비가 파괴됩니다', color: '#e06a5f' },
-                      ...(E.equippedBy(save, item.uid) ? [{ t: '⚠ 착용 중인 장비입니다', color: '#e8b04a' }] : []),
-                    ],
-                    confirmLabel: '승급한다', danger: true,
-                  }, () => {
-                    const r = E.forgePromote(save, item.uid); if (!r.result) return; setSave(r.save); onTrack({ forge: 1 });
-                    if (r.result === 'destroy') { setSel(null); showPop('destroy', '장비 파괴', `${gradeOf(ng).label} 승급 실패`); return; }
-                    if (r.result === 'fail') { showPop('fail', '승급 실패', '재료만 잃었습니다'); return; }
-                    const it2 = r.save.inventory.find(i => i.uid === item.uid); showPop('success', `${gradeOf(ng).label} 등급으로 승급!`, E.epicOptOf(it2) ? `에픽 효과 「${E.epicOptOf(it2).name}」` : E.itemName(it2));
-                  })}>승급</UIButton> : <div className="text-center" style={{ padding: 10, borderRadius: 12, border: '1px solid var(--ui-line)', fontSize: 12.5, color: PALETTE.textDim }}>{forgeShort(save, pc)}</div>}
-            </> : <InfoSection title="승급 불가" color={PALETTE.textDim}><InfoRow first label="등급" value={item.grade === 'unique' || item.grade === 'mythic' ? '유니크·전승 장비는 강화만' : '최고 등급'} /></InfoSection>)}
-            <UIButton variant="ghost" style={{ height: 40 }} onClick={() => setSel(null)}>닫기</UIButton>
+          <MainSecHead title="정 렬" />
+          <div className="grid gap-1.5" style={{ gridTemplateColumns: '1fr 1fr' }}>
+            {[['power', '전투력 높은 순'], ['grade', '등급 높은 순']].map(([v, l]) => <button key={v} onClick={() => pickSort(v)} className="ui-press" style={{ height: 36, fontSize: 12, border: `1px solid ${sortBy === v ? MS.gold : MS.line}`, color: sortBy === v ? MS.gold : PALETTE.textDim, background: sortBy === v ? 'rgba(232,176,74,0.12)' : MS.box }}>{l}</button>)}
           </div>
-        </BottomSheet>
+        </MainModal>
       )}
+      {item && (() => {
+        const g = gradeOf(item.grade); const slot = SLOTS.find(sl => sl.id === item.slot);
+        const enhOk = !maxed && E.canEnhance(save, item);
+        const proOk = ng && E.canPromote(save, item);
+        return (
+          <MainModal kicker={`${g.label} · ${slot?.label || ''}${by ? ' · 착용 중' : ''}`.split('').join(' ').replace(/ {3}/g, '  ')} title={`${E.itemName(item)}${item.plus ? ` +${item.plus}` : ''}`} color={g.color} badge={`⚔ ${E.itemPower(item)}`} sub={`Lv.${item.ilv} · ${clsTag(item)} · 최대 +${FORGE.maxEnhance}`} onClose={() => setSel(null)}
+            footer={ftab === 'enhance'
+              ? (maxed ? null : enhOk ? bigBtn(true, `⚒ 강화 +${item.plus || 0} → +${(item.plus || 0) + 1}`, doEnhance) : bigBtn(false, forgeShort(save, ec)))
+              : (!ng ? null : proOk ? bigBtn(true, `⬆ ${gradeOf(ng).label} 승급`, doPromote, true) : bigBtn(false, forgeShort(save, pc)))}>
+            <MainTabs items={[['enhance', maxed ? '⚒ 최대 강화' : `⚒ 강화 +${item.plus || 0} → +${(item.plus || 0) + 1}`], ['promote', ng ? `⬆ 승급 → ${gradeOf(ng).label}` : '⬆ 승급']]} value={ftab} onChange={setFtab} size={12.5} />
+            {ftab === 'enhance' && (maxed
+              ? <div className="mt-3" style={{ fontSize: 12.5, color: PALETTE.textDim }}>최대 강화 +{FORGE.maxEnhance}에 도달했습니다</div>
+              : <>
+                <MainForgeCompare before={item} after={{ ...item, plus: (item.plus || 0) + 1 }} />
+                <MainForgeCost save={save} cost={ec} />
+                <MainForgeOdds outcomes={(() => { const f = 1 - er.rate; return er.drop ? [['성공', er.rate, '#8fd08a'], [`+${Math.max(0, (item.plus || 0) - 1)}로 하락`, f * (1 - er.breakChance), '#e8b04a'], ['파괴', f * er.breakChance, '#e07a6a']] : [['성공', er.rate, '#8fd08a'], ['실패 (재료만 잃음)', f, '#9b8975']]; })()} />
+                <div className="mt-2" style={{ padding: '8px 10px', border: `1px solid ${MS.line}`, background: MS.box, fontSize: 12, color: PALETTE.text, lineHeight: 1.55 }}>
+                  <b style={{ color: MS.red }}>◇ 규칙</b> +6부터 실패 시 하락 · +8부터 실패 시 파괴 위험 · 파괴되면 착용 칸이 빈다
+                </div>
+              </>)}
+            {ftab === 'promote' && (ng
+              ? <>
+                <MainForgeCompare before={item} after={{ ...item, grade: ng }} />
+                <div className="mt-1" style={{ fontSize: 12, color: '#c79bff' }}>◇ 무작위 옵션 1개 추가{ng === 'epic' && item.slot === 'accessory' ? ' + 에픽 장신구 효과' : ''}</div>
+                <MainForgeCost save={save} cost={pc} />
+                <MainForgeOdds outcomes={[['성공', pr.rate, '#8fd08a'], [pr.breaks ? '파괴' : '실패 (재료만 잃음)', 1 - pr.rate, pr.breaks ? '#e07a6a' : '#9b8975']]} />
+              </>
+              : <div className="mt-3" style={{ fontSize: 12.5, color: PALETTE.textDim }}>{item.grade === 'unique' || item.grade === 'mythic' ? '유니크·전승 장비는 승급할 수 없다 — 강화만' : '최고 등급입니다'}</div>)}
+          </MainModal>
+        );
+      })()}
       {confirm && <ConfirmSheet {...confirm} onCancel={() => setConfirm(null)} skipLabel="이번 접속 동안 다시 묻지 않기" skip={skipAsk} onSkipChange={setSkipAsk} />}
       {pop && <ForgePop pop={pop} onDone={() => setPop(null)} />}
     </div>
@@ -2929,14 +3021,18 @@ function MainKvGrid({ rows, onPick }) {
   );
 }
 // 본편 카드 정보 모달 — 붉은 테두리 · 작은 머리말 + 큰 이름 · 닫기
-function MainModal({ kicker, title, badge, color = MS.red, onClose, children, footer }) {
+function MainModal({ kicker, title, badge, color = MS.red, onClose, children, footer, img, sub }) {
   return (
-    <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: 60, background: 'rgba(0,0,0,0.72)', padding: 16 }} onClick={onClose}>
+    <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: 45, background: 'rgba(0,0,0,0.72)', padding: 16 }} onClick={onClose}>
       <div className="ui-screen-enter w-full flex flex-col" style={{ maxWidth: 420, maxHeight: '86%', borderRadius: 4, border: `2px solid ${color}`, background: '#150a0d', boxShadow: `0 0 28px ${color}55` }} onClick={e => e.stopPropagation()}>
         <div className="flex items-start justify-between gap-2" style={{ padding: '12px 14px 10px', borderBottom: `1px solid ${MS.line}` }}>
-          <div className="min-w-0">
-            <div style={{ fontSize: 11, letterSpacing: 4, color: PALETTE.textDim }}>◆ {kicker}</div>
-            <div className="font-bold" style={{ fontSize: 21, color, lineHeight: 1.25 }}>{title}</div>
+          <div className="flex gap-2.5 min-w-0">
+            {img && <img src={img} alt="" className="flex-none object-cover" style={{ width: 62, height: 62, border: `1.5px solid ${color}` }} />}
+            <div className="min-w-0">
+              <div style={{ fontSize: 11, letterSpacing: 4, color: PALETTE.textDim }}>◆ {kicker}</div>
+              <div className="font-bold" style={{ fontSize: 21, color, lineHeight: 1.25 }}>{title}</div>
+              {sub && <div style={{ fontSize: 11.5, color: PALETTE.textDim }}>{sub}</div>}
+            </div>
           </div>
           {badge && <span className="flex-none" style={{ fontSize: 12, padding: '3px 9px', border: `1px solid ${color}`, color }}>{badge}</span>}
         </div>
