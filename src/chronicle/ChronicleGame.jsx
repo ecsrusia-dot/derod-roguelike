@@ -2179,42 +2179,51 @@ function TowerView({ save, setSave, onBack, onFight, flash, towerAuto = false, o
         })()}
       </div>
       {shop && (
-        <BottomSheet title={`✪ 첨탑 상점 — 보유 ✪ ${coins}`} onClose={() => setShop(false)} maxHeight="80%">
-          <div className="flex flex-col gap-2">
-            <div className="grid gap-1.5" style={{ gridTemplateColumns: '1fr 1fr' }}>
-              {E.TOWER_SHOP.map(it => {
-                const ok = E.towerShopCanBuy(save, it.id);
-                const lack = Math.max(0, it.cost - coins);
-                const wide = it.id === 'unique';
-                return (
-                  <button key={it.id} disabled={!ok} onClick={() => (it.id === 'unique' ? setPickUnique(true) : buy(it.id))} className="ui-press text-left flex flex-col" style={{ gridColumn: wide ? 'span 2' : undefined, padding: 9, borderRadius: 12, border: `1px solid ${wide ? '#f0883e88' : ok ? '#e8b04a66' : 'var(--ui-line)'}`, background: 'rgba(255,255,255,0.02)', opacity: ok ? 1 : 0.65 }}>
-                    <div style={{ fontSize: 13, fontWeight: 800, color: wide ? '#f0a86a' : PALETTE.text }}>{it.name}</div>
-                    <div className="flex-1" style={{ fontSize: 11, color: PALETTE.textDim }}>{it.desc}</div>
-                    <div className="flex items-center justify-between mt-1.5" style={{ fontSize: 12 }}>
-                      <span style={{ padding: '1px 7px', borderRadius: 7, border: '1px solid #e8b04a66', color: '#e8b04a', fontWeight: 700 }}>✪ {it.cost}</span>
-                      <b style={{ color: ok ? '#8fe08a' : '#e07a6a' }}>{ok ? '구매' : lack ? `${lack} 부족` : '구매 불가'}</b>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-            <UIButton variant="ghost" style={{ height: 40 }} onClick={() => setShop(false)}>닫기</UIButton>
+        // 1.255.0 — 본편 카드 창 (시안 ㉝)
+        <MainModal kicker="TOWER SHOP" title="첨탑 상점" badge={`✪ ${coins}`} color={MS.red} sub="층을 올라 받은 ✪ 주화로 구매" onClose={() => setShop(false)}>
+          <div className="grid gap-1.5" style={{ gridTemplateColumns: '1fr 1fr' }}>
+            {E.TOWER_SHOP.map(it => {
+              const ok = E.towerShopCanBuy(save, it.id);
+              const lack = Math.max(0, it.cost - coins);
+              const wide = it.id === 'unique';
+              return (
+                <button key={it.id} disabled={!ok} onClick={() => (it.id === 'unique' ? setPickUnique(true) : buy(it.id))} className="ui-press text-left flex flex-col" style={{ gridColumn: wide ? 'span 2' : undefined, padding: '8px 9px', border: `1px solid ${wide ? '#f0883e88' : MS.line}`, background: MS.box, opacity: ok ? 1 : 0.6 }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: wide ? '#f0a86a' : PALETTE.text }}>{it.name}</div>
+                  <div className="flex-1" style={{ fontSize: 11, color: PALETTE.textDim, lineHeight: 1.4, minHeight: 28 }}>{it.desc}</div>
+                  <div className="flex items-center justify-between mt-1.5" style={{ fontSize: 12 }}>
+                    <span style={{ padding: '0 7px', border: `1px solid ${MS.gold}`, color: MS.gold, fontWeight: 700 }}>✪ {it.cost}</span>
+                    <b style={{ color: ok ? '#8fd08a' : '#e07a6a' }}>{ok ? '구매' : lack ? `${lack} 부족` : '구매 불가'}</b>
+                  </div>
+                </button>
+              );
+            })}
           </div>
-        </BottomSheet>
+        </MainModal>
       )}
       {pickUnique && (
-        <BottomSheet title="🎁 유니크 선택 — 하나를 고르세요" onClose={() => setPickUnique(false)} maxHeight="85%">
+        <MainModal kicker="UNIQUE BOX" title="유니크 선택" badge={`Lv.${save.units[save.hero].lv}`} color="#f0883e" sub="하나를 고르면 ✪ 600을 쓰고 바로 얻는다" onClose={() => setPickUnique(false)}>
           <div className="flex flex-col gap-1.5">
-            {myUniques.map(u => (
-              <button key={u.id} onClick={() => { if (buy('unique', u.id)) { setPickUnique(false); setShop(false); } }} className="ui-press text-left" style={{ padding: '9px 11px', borderRadius: 12, border: '1px solid #f0883e66', background: '#f0883e10' }}>
-                <div style={{ fontSize: 13, color: '#f0883e', fontWeight: 600 }}>{u.name} <span style={{ fontSize: 11, color: PALETTE.textDim, fontWeight: 400 }}>{SLOTS.find(s => s.id === u.slot)?.label} · {u.cls === 'common' ? '공용' : chronicleClass(u.cls).name}</span></div>
-                <div style={{ fontSize: 11.5, color: PALETTE.textDim }}>{Object.entries(u.opts).map(([k, v]) => E.statLabel(k, v)).join(' · ')}</div>
-                <div style={{ fontSize: 11.5, color: '#f0a86a' }}>✦ {u.desc}</div>
-              </button>
-            ))}
-            <UIButton variant="ghost" style={{ height: 40 }} onClick={() => setPickUnique(false)}>취소</UIButton>
+            {myUniques.map(u => {
+              const sl = SLOTS.find(x => x.id === u.slot);
+              return (
+                <button key={u.id} onClick={() => { if (buy('unique', u.id)) { setPickUnique(false); setShop(false); } }} className="ui-press w-full text-left" style={{ padding: '8px 10px 8px 12px', background: MS.box, border: `1px solid ${MS.line}`, borderLeft: '3px solid #f0883e' }}>
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="truncate font-bold" style={{ fontSize: 13.5, color: '#f0883e' }}>{sl?.icon} {u.name}</span>
+                    <span className="flex-none" style={{ fontSize: 11, color: PALETTE.textDim }}>{sl?.label} · {u.cls === 'common' ? '공용' : chronicleClass(u.cls).name}</span>
+                  </div>
+                  <div className="grid mt-1" style={{ gridTemplateColumns: '1fr 1fr', columnGap: 12 }}>
+                    {Object.entries(u.opts).map(([k, v]) => { const t = E.statLabel(k, v); const m = t.match(/^(.*?)\s*([+-]?[\d.]+.*)$/); return (
+                      <div key={k} className="flex items-baseline justify-between gap-1" style={{ padding: '1px 0' }}>
+                        <span className="truncate" style={{ fontSize: 11.5, color: PALETTE.textDim }}>{m ? m[1] : t}</span><span style={{ fontSize: 12, fontWeight: 800, color: MS.red }}>{m ? m[2] : ''}</span>
+                      </div>
+                    ); })}
+                  </div>
+                  <div className="mt-1" style={{ fontSize: 11.5, color: '#c79bff', lineHeight: 1.45 }}>★ <span style={{ color: PALETTE.text }}>{u.desc}</span></div>
+                </button>
+              );
+            })}
           </div>
-        </BottomSheet>
+        </MainModal>
       )}
     </div>
   );
@@ -2560,30 +2569,46 @@ function fmtWhen(ms) {
 function SummaryLine({ sm }) {
   return <span>캐릭터 {sm.chars}명 · 최고 Lv.{sm.maxLv} · 🪙{sm.gold.toLocaleString()} · 사역마 {sm.fams} · 창고 {sm.stash}</span>;
 }
+// 1.255.0 — 본편 카드 창 (시안 ㉟)
+const bkBtn = (extra = {}) => ({ height: 42, width: '100%', fontSize: 13, fontWeight: 800, border: `1px solid ${MS.line}`, background: MS.box, color: PALETTE.text, ...extra });
+const bkHot = () => ({ border: `1px solid ${MS.red}`, background: 'rgba(224,87,76,0.2)', color: '#ff8a7e' });
+function BkSec({ title, right }) {
+  return (
+    <div className="flex items-center justify-between" style={{ margin: '14px 0 6px' }}>
+      <span style={{ fontSize: 12.5, letterSpacing: 4, color: MS.red, fontWeight: 700 }}>◆ {title}</span>
+      {right && <span style={{ fontSize: 11.5, color: PALETTE.textDim }}>{right}</span>}
+    </div>
+  );
+}
+const summaryRows = (sm) => [
+  { l: '캐릭터', v: `${sm.chars}명` }, { l: '최고 레벨', v: `Lv.${sm.maxLv}`, c: MS.gold },
+  { l: '골드', v: `🪙 ${sm.gold.toLocaleString()}` }, { l: '사역마 · 창고', v: `${sm.fams} · ${sm.stash}` },
+];
 function CloudPanel({ api, onPick, setMsg }) {
   const { user, state } = api;
   return (
-    <GlassPanel className="p-3 mt-2" style={{ fontSize: 12, color: PALETTE.text }}>
-      <div className="font-semibold mb-1">☁ 클라우드 저장</div>
+    <>
+      <BkSec title="클라우드 저장" right="다른 기기에서 이어하기" />
       {!user ? (
         <>
-          <div style={{ color: PALETTE.textDim, marginBottom: 6 }}>구글 계정으로 로그인하면 다른 기기에서도 이어서 할 수 있습니다. 본편과 같은 계정을 씁니다.</div>
-          <UIButton onClick={api.login}>구글 로그인</UIButton>
+          <div style={{ fontSize: 11.5, color: PALETTE.textDim, marginBottom: 6 }}>본편과 같은 구글 계정 · 로그인하면 30초마다 자동 저장</div>
+          <button onClick={api.login} className="ui-press" style={bkBtn(bkHot())}>구글 로그인</button>
         </>
       ) : (
         <>
-          <div style={{ color: PALETTE.textDim, marginBottom: 6, lineHeight: 1.6 }}>
-            {user.isAnonymous ? '게스트 계정 (이 기기 전용 — 기기를 바꾸려면 본편에서 구글 계정 연동)' : `${user.displayName}${user.email ? ` · ${user.email}` : ''}`}<br />
-            {state.busy ? '동기화 중…' : state.lastUp ? `마지막 저장 ${fmtWhen(state.lastUp)} · 30초마다 자동 저장` : state.checkedUid ? '자동 저장 켜짐' : '클라우드 확인 전 — 자동 저장 대기'}
-          </div>
-          <div className="flex gap-2">
-            <UIButton onClick={async () => { const r = await api.upload(); if (r) setMsg(r.ok ? '클라우드에 저장했습니다' : r.error); }}>⬆ 지금 올리기</UIButton>
-            <UIButton variant="ghost" onClick={async () => { const r = await api.download(); if (!r) return; if (!r.ok) setMsg(r.error); else if (!r.exists) setMsg('클라우드에 저장된 진행이 없습니다'); else onPick(r); }}>⬇ 불러오기</UIButton>
+          <MainKvRows rows={[
+            { l: '계정', wide: true, v: user.isAnonymous ? '게스트 (이 기기 전용)' : `${user.displayName || ''}${user.email ? ` · ${user.email}` : ''}` },
+            { l: '상태', wide: true, v: state.busy ? '동기화 중…' : state.lastUp ? `마지막 저장 ${fmtWhen(state.lastUp)} · 30초마다 자동` : state.checkedUid ? '자동 저장 켜짐' : '클라우드 확인 전 — 자동 저장 대기', c: state.lastUp || state.checkedUid ? '#8fd08a' : PALETTE.textDim },
+          ]} />
+          {user.isAnonymous && <div style={{ fontSize: 11, color: PALETTE.textDim }}>기기를 바꾸려면 본편에서 구글 계정을 연동하세요</div>}
+          <div className="grid gap-1.5 mt-1.5" style={{ gridTemplateColumns: '1fr 1fr' }}>
+            <button onClick={async () => { const r = await api.upload(); if (r) setMsg(r.ok ? '클라우드에 저장했습니다' : r.error); }} className="ui-press" style={bkBtn(bkHot())}>⬆ 지금 올리기</button>
+            <button onClick={async () => { const r = await api.download(); if (!r) return; if (!r.ok) setMsg(r.error); else if (!r.exists) setMsg('클라우드에 저장된 진행이 없습니다'); else onPick(r); }} className="ui-press" style={bkBtn()}>⬇ 불러오기</button>
           </div>
         </>
       )}
-      {state.error ? <div className="mt-1.5" style={{ color: '#e06a5f' }}>⚠ {state.error}</div> : null}
-    </GlassPanel>
+      {state.error ? <div className="mt-1.5" style={{ fontSize: 12, color: '#e06a5f' }}>⚠ {state.error}</div> : null}
+    </>
   );
 }
 function BackupSheet({ acc, onClose, onImport, cloudApi }) {
@@ -2619,48 +2644,39 @@ function BackupSheet({ acc, onClose, onImport, cloudApi }) {
   if (pending) {
     const sm = BK.accountSummary(pending.acc);
     return (
-      <BottomSheet title="가져오기 확인" onClose={() => setPending(null)} maxHeight="70%">
-        <div style={{ fontSize: 12.5, color: PALETTE.text, lineHeight: 1.7 }}>지금 진행이 <b style={{ color: '#e06a5f' }}>백업 내용으로 바뀝니다</b>. 되돌릴 수 없으니 필요하면 먼저 지금 진행을 내보내 두세요.</div>
-        <GlassPanel className="p-3 mt-2" style={{ fontSize: 12, color: PALETTE.textDim, lineHeight: 1.7 }}>
-          지금: <SummaryLine sm={cur} /><br />백업{pending.at ? ` (${fmtWhen(pending.at)})` : ''}: <b style={{ color: PALETTE.text }}><SummaryLine sm={sm} /></b>
-        </GlassPanel>
-        <div className="flex gap-2 mt-3">
-          <UIButton variant="ghost" onClick={() => setPending(null)}>취소</UIButton>
-          <UIButton onClick={() => onImport(pending.acc)}>백업으로 바꾸기</UIButton>
-        </div>
-      </BottomSheet>
+      <MainModal kicker="IMPORT" title="가져오기 확인" color="#e06a5f" sub="지금 진행이 백업 내용으로 바뀝니다 — 되돌릴 수 없음" onClose={() => setPending(null)}
+        footer={<button onClick={() => onImport(pending.acc)} className="ui-press" style={bkBtn(bkHot())}>백업으로 바꾸기</button>}>
+        <BkSec title="지금" />
+        <MainKvRows rows={summaryRows(cur)} />
+        <BkSec title="백업" right={pending.at ? fmtWhen(pending.at) : null} />
+        <MainKvRows rows={summaryRows(sm)} />
+        <div className="mt-2" style={{ fontSize: 11.5, color: PALETTE.textDim }}>필요하면 먼저 지금 진행을 「파일로 저장」해 두세요.</div>
+      </MainModal>
     );
   }
   return (
-    <BottomSheet title="💾 저장 백업" onClose={onClose} maxHeight="85%">
-      <div style={{ fontSize: 12, color: PALETTE.textDim, lineHeight: 1.6 }}>기본 저장은 이 기기의 브라우저입니다. 구글 로그인으로 클라우드 저장을 켜거나, 기기를 바꾸기 전에 파일로 백업해 두세요.</div>
+    <MainModal kicker="SAVE" title="저장 백업" badge={cloudApi?.user ? '☁ 로그인됨' : '☁ 로그인 안 함'} color={MS.red} sub="기본 저장 = 이 기기의 브라우저" onClose={onClose}>
       {cloudApi && <CloudPanel api={cloudApi} onPick={(r) => setPending({ acc: r.acc, at: r.savedAt })} setMsg={setMsg} />}
-      <GlassPanel className="p-3 mt-2" style={{ fontSize: 12, color: PALETTE.text }}>
-        <div className="font-semibold mb-1">내보내기</div>
-        <div style={{ color: PALETTE.textDim, marginBottom: 6 }}>지금: <SummaryLine sm={cur} /></div>
-        <div className="flex gap-2">
-          <UIButton onClick={download}>📥 파일로 저장</UIButton>
-          <UIButton variant="ghost" onClick={copy}>📋 텍스트 복사</UIButton>
-        </div>
-      </GlassPanel>
-      <GlassPanel className="p-3 mt-2" style={{ fontSize: 12, color: PALETTE.text }}>
-        <div className="font-semibold mb-1">가져오기</div>
-        <input ref={fileRef} type="file" accept=".json,application/json,text/plain" onChange={onFile} style={{ display: 'none' }} />
-        <UIButton variant="ghost" onClick={() => fileRef.current?.click()}>📂 백업 파일 선택</UIButton>
-        <textarea value={paste} onChange={(e) => setPaste(e.target.value)} placeholder="또는 백업 텍스트를 여기에 붙여 넣기" rows={3} className="w-full mt-2" style={{ fontSize: 11.5, padding: 8, borderRadius: 10, background: '#0006', color: PALETTE.text, border: '1px solid var(--ui-line)', resize: 'vertical' }} />
-        {paste.trim() ? <div className="mt-1"><UIButton variant="ghost" onClick={() => tryImport(paste)}>붙여 넣은 텍스트로 가져오기</UIButton></div> : null}
-      </GlassPanel>
-      <GlassPanel className="p-3 mt-2" style={{ fontSize: 12, color: PALETTE.text }}>
-        <div className="font-semibold mb-1">자동 백업 (10분마다)</div>
-        {auto ? (
-          <>
-            <div style={{ color: PALETTE.textDim, marginBottom: 6 }}>{fmtWhen(auto.at)} 저장본: <SummaryLine sm={auto.summary} /></div>
-            <UIButton variant="ghost" onClick={() => setPending({ acc: auto.acc, at: auto.at })}>↺ 자동 백업으로 되돌리기</UIButton>
-          </>
-        ) : <div style={{ color: PALETTE.textDim }}>아직 자동 백업이 없습니다 (10분 이상 플레이하면 생깁니다)</div>}
-      </GlassPanel>
+      <BkSec title="지금 저장" right="내보내기" />
+      <MainKvRows rows={summaryRows(cur)} />
+      <div className="grid gap-1.5 mt-1.5" style={{ gridTemplateColumns: '1fr 1fr' }}>
+        <button onClick={download} className="ui-press" style={bkBtn()}>📥 파일로 저장</button>
+        <button onClick={copy} className="ui-press" style={bkBtn()}>📋 텍스트 복사</button>
+      </div>
+      <BkSec title="가져오기" right="지금 저장을 바꾼다" />
+      <input ref={fileRef} type="file" accept=".json,application/json,text/plain" onChange={onFile} style={{ display: 'none' }} />
+      <button onClick={() => fileRef.current?.click()} className="ui-press" style={bkBtn()}>📂 백업 파일 선택</button>
+      <textarea value={paste} onChange={(e) => setPaste(e.target.value)} placeholder="또는 백업 텍스트를 여기에 붙여 넣기" rows={2} className="w-full mt-1.5" style={{ fontSize: 11.5, padding: 8, background: MS.box, color: PALETTE.text, border: `1px solid ${MS.line}`, resize: 'vertical' }} />
+      {paste.trim() ? <button onClick={() => tryImport(paste)} className="ui-press mt-1" style={bkBtn()}>붙여 넣은 텍스트로 가져오기</button> : null}
+      <BkSec title="자동 백업" right="10분마다" />
+      {auto ? (
+        <>
+          <MainKvRows rows={[{ l: '저장 시각', v: fmtWhen(auto.at) }, { l: '내용', v: `Lv.${auto.summary.maxLv} · 🪙${auto.summary.gold.toLocaleString()}` }]} />
+          <button onClick={() => setPending({ acc: auto.acc, at: auto.at })} className="ui-press mt-1.5" style={bkBtn()}>↺ 자동 백업으로 되돌리기</button>
+        </>
+      ) : <div style={{ fontSize: 12, color: PALETTE.textDim }}>아직 자동 백업이 없습니다 (10분 이상 플레이하면 생깁니다)</div>}
       {msg ? <div className="mt-2" style={{ fontSize: 12, color: PALETTE.dawn }}>{msg}</div> : null}
-    </BottomSheet>
+    </MainModal>
   );
 }
 
@@ -3382,9 +3398,9 @@ function addHuntRecord(st, r) {
 }
 const TIER_LABEL = { normal: '일반 몹', elite: '강적', boss: '보스' };
 function HuntReport({ report: r, onClose, title = '📊 사냥 보고서' }) {
+  // 1.255.0 — 본편 카드 창 (시안 ㉞)
   const units = Object.entries(r.units).map(([key, u]) => ({ key, ...u })).sort((a, b) => b.dmg - a.dmg);
   const total = units.reduce((t, u) => t + u.dmg, 0) || 1;
-  // 적 공격 분담 (1.239.2) — 상세 통계의 「공격받은 횟수」 비율
   const dUnits = r.detail?.units || {};
   const tAll = Object.values(dUnits).reduce((t, x) => t + (x.targeted || 0), 0);
   const atkShare = (k) => (Object.keys(dUnits).length > 1 && tAll && dUnits[k]?.targeted ? pctTxt(dUnits[k].targeted, tAll) : null);
@@ -3393,81 +3409,80 @@ function HuntReport({ report: r, onClose, title = '📊 사냥 보고서' }) {
   const [effOpen, setEffOpen] = useState(false);
   const [tab, setTab] = useState(() => { try { return localStorage.getItem('chronicleReportTab') || 'sum'; } catch { return 'sum'; } });
   const pickTab = (t) => { setTab(t); try { localStorage.setItem('chronicleReportTab', t); } catch { /* */ } };
-  const row = { display: 'flex', justifyContent: 'space-between', fontSize: 12.5, color: PALETTE.text, padding: '3px 0' };
   const hasDetail = !!r.detail && Object.keys(r.detail.units || {}).length > 0;
+  const kills = ['normal', 'elite', 'boss'].reduce((t, k) => t + (r.kills[k] || 0), 0);
+  const one = r.battles === 1;
+  const badge = one ? (r.wins ? '승리' : '패배') : `${r.wins}승 ${r.losses}패`;
+  const cleanTitle = String(title).replace(/^\S+\s/, '');
+  const cell = (l, v, c) => (
+    <div className="text-center" style={{ padding: '5px 0', border: `1px solid ${MS.line}`, background: MS.box }}>
+      <div style={{ fontSize: 11, color: PALETTE.textDim }}>{l}</div><b style={{ fontSize: 13.5, color: c || PALETTE.text }}>{v}</b>
+    </div>
+  );
+  const th = { fontSize: 11, color: PALETTE.textDim, textAlign: 'right' };
   return (
-    <BottomSheet title={title} onClose={onClose} maxHeight="85%">
-      {hasDetail && <div className="flex gap-1.5 mb-3">
-        {[['sum', '📊 요약'], ['detail', '📈 상세 통계']].map(([id, label]) => (
-          <button key={id} onClick={() => pickTab(id)} className="ui-press flex-1" style={{ height: 36, borderRadius: 10, fontSize: 13, fontWeight: 600, border: `1px solid ${tab === id ? PALETTE.legendary : 'var(--ui-line)'}`, color: tab === id ? PALETTE.legendary : PALETTE.textDim, background: tab === id ? 'rgba(232,176,74,0.1)' : 'transparent' }}>{label}</button>
-        ))}
-      </div>}
-      {hasDetail && tab === 'detail' ? <DetailReport r={r} onClose={onClose} /> : <div className="flex flex-col gap-3">
-        <GlassPanel className="p-3">
-          <div className="font-semibold mb-1" style={{ fontSize: 13, color: PALETTE.legendary }}>
-            {r.battles === 1 ? <>{r.wins ? '승리' : '패배'} <span style={{ color: PALETTE.textDim, fontWeight: 400 }}>· {r.rounds}라운드 · {fmtDur(ms)}</span></> : <>전투 {r.battles}회 · 승리 {r.wins} · 패배 {r.losses} <span style={{ color: PALETTE.textDim, fontWeight: 400 }}>· {r.rounds}라운드 · {fmtDur(ms)}</span></>}
-          </div>
-          {['normal', 'elite', 'boss'].filter(t => r.kills[t]).map(t => <div key={t} style={row}><span>{TIER_LABEL[t]} 처치</span><b>{r.kills[t]}마리</b></div>)}
-          {r.types.gate ? <div style={row}><span>관문 전투</span><b>{r.types.gate}회</b></div> : null}
-          <SetupLine r={r} />
-        </GlassPanel>
-        <GlassPanel className="p-3">
-          <div className="font-semibold mb-2" style={{ fontSize: 13, color: PALETTE.text }}>기여도 · 피해(DPS) 순위 + 회복 · 보호막 · 받아낸 피해</div>
-          {units.map((u, i) => {
+    <MainModal kicker="BATTLE REPORT" title={cleanTitle} badge={badge} color={one && !r.wins ? '#e06a5f' : MS.red} sub={<SetupLine r={r} />} onClose={onClose}
+      footer={tab !== 'detail' ? <button onClick={() => setEffOpen(true)} className="ui-press" style={{ height: 40, fontSize: 13, border: `1px solid ${MS.gold}`, background: 'transparent', color: MS.gold }}>📈 효율 기록 비교</button> : null}>
+      {hasDetail && <MainTabs value={tab} onChange={pickTab} items={[['sum', '📊 요약'], ['detail', '📈 상세 통계']]} />}
+      {hasDetail && tab === 'detail' ? <DetailReport r={r} /> : <>
+        <div className="grid gap-1 mt-2" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+          {cell('전투', `${r.battles}회`)}{cell('라운드', r.rounds)}{cell('시간', fmtDur(ms))}{cell('처치', kills, MS.gold)}
+        </div>
+        {(r.kills.elite || r.kills.boss || r.types.gate) ? <div className="mt-1.5"><MainKvRows rows={[
+          ...['normal', 'elite', 'boss'].filter(t => r.kills[t]).map(t => ({ l: `${TIER_LABEL[t]} 처치`, v: `${r.kills[t]}마리` })),
+          ...(r.types.gate ? [{ l: '관문 전투', v: `${r.types.gate}회` }] : []),
+        ]} /></div> : null}
+        <MainSecHead title="기 여 도" />
+        <div className="flex flex-col gap-2 mt-1">
+          {units.map((u) => {
             const pct = Math.round(u.dmg / total * 100);
             const dps = Math.round(u.dmg / Math.max(1, u.rounds));
+            const col = u.fam ? MS.violet : MS.gold;
             return (
-              <div key={u.key} className="flex items-center gap-2 mb-2">
-                <span style={{ width: 18, fontSize: 13, fontWeight: 700, color: i === 0 ? PALETTE.legendary : PALETTE.textDim }}>{i + 1}</span>
-                <UnitIcon u={u} size={30} />
+              <div key={u.key} className="flex items-center gap-2">
+                <UnitIcon u={u} size={32} />
                 <div className="flex-1 min-w-0">
-                  <div className="flex justify-between" style={{ fontSize: 12, color: PALETTE.text }}><span className="truncate">{u.fam ? `🐾 ${u.name}` : u.name}</span><span>{pct}%</span></div>
-                  <Bar v={u.dmg} max={total} color={u.fam ? '#d07ae8' : PALETTE.legendary} h={6} />
-                  <div style={{ fontSize: 11, color: PALETTE.textDim }}>총 {u.dmg.toLocaleString()} · 라운드당 {dps.toLocaleString()}</div>
-                  {(u.heal > 0 || u.shield > 0 || u.taken > 0 || atkShare(u.key)) && <div style={{ fontSize: 11, color: PALETTE.textDim }}>
-                    {u.heal > 0 && <span style={{ color: '#8fe08a' }}>✚ 회복 {Math.round(u.heal).toLocaleString()} </span>}
-                    {u.shield > 0 && <span style={{ color: '#9cc4e4' }}>◈ 보호막 {Math.round(u.shield).toLocaleString()} </span>}
-                    {u.taken > 0 && <span style={{ color: '#e8b04a' }}>🛡 받아낸 피해 {Math.round(u.taken).toLocaleString()}</span>}
-                    {atkShare(u.key) ? <span style={{ color: '#e8b04a' }}> · 적 공격의 {atkShare(u.key)} 받음</span> : null}
-                  </div>}
+                  <div className="flex justify-between gap-2" style={{ fontSize: 12.5 }}><b className="truncate" style={{ color: PALETTE.text }}>{u.fam ? `🐾 ${u.name}` : u.name}</b><b className="flex-none" style={{ color: col }}>{pct}% · {u.dmg.toLocaleString()}</b></div>
+                  <Bar v={u.dmg} max={total} color={col} h={5} />
+                  <div style={{ fontSize: 11, color: PALETTE.textDim, lineHeight: 1.45 }}>
+                    라운드당 {dps.toLocaleString()}
+                    {u.heal > 0 && <span style={{ color: '#8fe08a' }}> · ✚ 회복 {Math.round(u.heal).toLocaleString()}</span>}
+                    {u.shield > 0 && <span style={{ color: '#9cc4e4' }}> · ◈ 보호막 {Math.round(u.shield).toLocaleString()}</span>}
+                    {u.taken > 0 && <span style={{ color: MS.gold }}> · 🛡 받아낸 피해 {Math.round(u.taken).toLocaleString()}</span>}
+                    {atkShare(u.key) ? <span style={{ color: MS.gold }}> · 적 공격의 {atkShare(u.key)} 받음</span> : null}
+                  </div>
                 </div>
               </div>
             );
           })}
-          {skills.length > 0 && <div className="mt-1" style={{ fontSize: 11.5, color: PALETTE.textDim }}>스킬별 피해 상위</div>}
-          {skills.map((x, i) => (
-            <div key={i} style={{ ...row, fontSize: 12 }}><span>{i + 1}. {x.sn} <span style={{ color: PALETTE.textDim }}>({r.units[x.uk]?.fam ? '사역마' : '주인공'})</span></span><span>{x.v.toLocaleString()} ({Math.round(x.v / total * 100)}%)</span></div>
-          ))}
-        </GlassPanel>
-        {(r.wins > 0 || r.battles > 1) && <GlassPanel className="p-3">
-          <div className="flex justify-between items-baseline mb-1">
-            <span className="font-semibold" style={{ fontSize: 13, color: PALETTE.text }}>획득 · 분당 효율</span>
-            <span style={{ fontSize: 11, color: PALETTE.textDim }}>{speedText(r)} 재생 기준</span>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto', columnGap: 10, rowGap: 3, fontSize: 12.5, color: PALETTE.text, alignItems: 'baseline' }}>
-            <span style={{ fontSize: 11, color: PALETTE.textDim }}>항목</span>
-            <span style={{ fontSize: 11, color: PALETTE.textDim, textAlign: 'right' }}>총량</span>
-            <span style={{ fontSize: 11, color: PALETTE.legendary, textAlign: 'right' }}>분당</span>
-            <span style={{ fontSize: 11, color: PALETTE.textDim, textAlign: 'right' }}>전투당</span>
+        </div>
+        {skills.length > 0 && <>
+          <MainSecHead title="스 킬 별 피 해" />
+          <MainKvRows rows={skills.map(x => ({ l: `${x.sn}${r.units[x.uk]?.fam ? ' 🐾' : ''}`, v: <>{x.v.toLocaleString()} <span style={{ fontWeight: 400, color: PALETTE.textDim }}>{Math.round(x.v / total * 100)}%</span></> }))} />
+        </>}
+        {(r.wins > 0 || r.battles > 1) && <>
+          <MainSecHead title="획 득 · 분 당 효 율" right={<span style={{ fontSize: 11, color: PALETTE.textDim }}>{speedText(r)} 재생 기준</span>} />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto', columnGap: 12, rowGap: 3, fontSize: 12.5, color: PALETTE.text, alignItems: 'baseline', marginTop: 4 }}>
+            <span style={{ ...th, textAlign: 'left' }}>항목</span><span style={th}>총량</span><span style={{ ...th, color: MS.gold }}>분당</span><span style={th}>전투당</span>
             {gainRows(r).map(g => (
               <React.Fragment key={g.k}>
                 <span>{g.icon} {g.label}{g.sub ? <span style={{ fontSize: 10.5, color: PALETTE.textDim }}> {g.sub}</span> : null}</span>
                 <b style={{ textAlign: 'right' }}>{fmtNum(g.v)}</b>
-                <b style={{ textAlign: 'right', color: PALETTE.legendary }}>{fmtNum(g.v * 60000 / ms)}</b>
+                <b style={{ textAlign: 'right', color: MS.gold }}>{fmtNum(g.v * 60000 / ms)}</b>
                 <span style={{ textAlign: 'right', color: PALETTE.textDim }}>{fmtNum(g.v / Math.max(1, r.battles))}</span>
               </React.Fragment>
             ))}
           </div>
-          {r.levelUps ? <div style={{ ...row, marginTop: 4 }}><span>레벨 업</span><b>▲ {r.levelUps}</b></div> : null}
-          <div style={row}><span>장비 (보관)</span><b>{GRADES.filter(g => r.items[g.id]).map(g => <span key={g.id} style={{ color: g.color, marginLeft: 6 }}>{g.label} {r.items[g.id]}</span>)}{!Object.keys(r.items).length && '없음'}</b></div>
+          <div className="mt-1"><MainKvRows rows={[
+            ...(r.levelUps ? [{ l: '레벨 업', v: `▲ ${r.levelUps}`, c: MS.gold }] : []),
+            { l: '장비 (보관)', wide: true, v: Object.keys(r.items).length ? GRADES.filter(g => r.items[g.id]).map(g => <span key={g.id} style={{ color: g.color, marginLeft: 6 }}>{g.label} {r.items[g.id]}</span>) : '없음' },
+          ]} /></div>
           {r.salvaged ? <div style={{ fontSize: 11, color: PALETTE.textDim }}>자동 분해 {r.salvaged}개 — 분해로 얻은 재화는 위 골드·정수·파편에 포함</div> : null}
-          <div style={{ fontSize: 11, color: PALETTE.textDim, marginTop: 4, lineHeight: 1.5 }}>분당 = 전투 재생 시간(다음 전투 대기 1.8초 포함) 기준 · 배속이 다르면 분당 값도 달라지므로 비교는 같은 배속끼리 · 전투당 값은 배속과 무관</div>
-        </GlassPanel>}
-        <UIButton variant="ghost" style={{ height: 40 }} onClick={() => setEffOpen(true)}>📈 효율 기록 비교</UIButton>
-        <UIButton onClick={onClose}>확인</UIButton>
-      </div>}
+          <div style={{ fontSize: 11, color: PALETTE.textDim, marginTop: 4, lineHeight: 1.5 }}>분당 = 전투 재생 시간(다음 전투 대기 1.8초 포함) 기준 · 배속이 다르면 분당 값도 달라지므로 비교는 같은 배속끼리</div>
+        </>}
+      </>}
       {effOpen && <EfficiencyLog onClose={() => setEffOpen(false)} />}
-    </BottomSheet>
+    </MainModal>
   );
 }
 
@@ -3502,7 +3517,7 @@ function detailSections(d, rounds, share = null) {
     ] },
   ];
 }
-function DetailReport({ r, onClose }) {
+function DetailReport({ r }) {
   const units = Object.entries(r.units).map(([key, u]) => ({ key, ...u })).sort((a, b) => (a.fam ? 1 : 0) - (b.fam ? 1 : 0));
   const [sel, setSel] = useState(units[0]?.key);
   const u = units.find(x => x.key === sel) || units[0];
@@ -3515,18 +3530,21 @@ function DetailReport({ r, onClose }) {
     .sort((a, b) => (b.dmg + b.heal + b.shield) - (a.dmg + a.heal + a.shield) || b.uses - a.uses);
   const cell = { fontSize: 12, color: PALETTE.text, textAlign: 'right' };
   const head = { fontSize: 10.5, color: PALETTE.textDim, textAlign: 'right' };
+  const SEC_TITLE = { '⚔ 공격': '공 격', '🎯 행동': '행 동', '✚ 지원': '지 원', '🛡 방어': '방 어' };
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex gap-1.5 flex-wrap">
-        {units.map(x => (
-          <button key={x.key} onClick={() => setSel(x.key)} className="ui-press flex items-center gap-1.5" style={{ height: 40, padding: '0 10px', borderRadius: 10, fontSize: 12.5, border: `1px solid ${x.key === u?.key ? (x.fam ? '#d07ae8' : PALETTE.legendary) : 'var(--ui-line)'}`, color: x.key === u?.key ? PALETTE.text : PALETTE.textDim, background: 'transparent' }}>
-            <UnitIcon u={x} size={26} />{x.fam ? `🐾 ${x.name}` : x.name}
-          </button>
-        ))}
+    <>
+      <div className="grid gap-1.5 mt-2" style={{ gridTemplateColumns: `repeat(${Math.min(units.length, 3)}, 1fr)` }}>
+        {units.map(x => {
+          const on = x.key === u?.key; const col = x.fam ? MS.violet : MS.gold;
+          return (
+            <button key={x.key} onClick={() => setSel(x.key)} className="ui-press flex items-center gap-1.5 min-w-0" style={{ height: 40, padding: '0 6px', fontSize: 12.5, fontWeight: on ? 800 : 500, border: `1px solid ${on ? col : MS.line}`, color: on ? col : PALETTE.textDim, background: on ? `${col}1a` : MS.box }}>
+              <UnitIcon u={x} size={26} /><span className="truncate">{x.fam ? `🐾 ${x.name}` : x.name}</span>
+            </button>
+          );
+        })}
       </div>
-      <div style={{ fontSize: 11, color: PALETTE.textDim }}>전투 {r.battles}회 · {rounds}라운드 집계{n > 1 ? ' · 오른쪽 칸 = 전투당 평균' : ''}</div>
+      <div className="mt-1" style={{ fontSize: 11, color: PALETTE.textDim }}>전투 {r.battles}회 · {rounds}라운드 집계{n > 1 ? ' · 괄호 = 전투당 평균' : ''} · 작은 글씨 = 비율</div>
       {d ? detailSections(d, rounds, (() => {
-        // 파티 안 분담 — 탱커 사역마가 실제로 얼마나 맞아 주는지
         const all = Object.values(r.detail.units);
         const tAll = all.reduce((t, x) => t + (x.targeted || 0), 0);
         const iAll = all.reduce((t, x) => t + (x.incoming ?? x.taken + x.absorbed), 0);
@@ -3535,24 +3553,22 @@ function DetailReport({ r, onClose }) {
         const rows = sec.rows.filter(([, v, always]) => always || v > 0);
         if (!rows.length) return null;
         return (
-          <GlassPanel key={sec.title} className="p-3">
-            <div className="font-semibold mb-1.5" style={{ fontSize: 13, color: sec.color }}>{sec.title}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', columnGap: 12, rowGap: 3, alignItems: 'baseline' }}>
-              {n > 1 && <><span /><span style={head}>합계</span><span style={head}>전투당</span></>}
+          <div key={sec.title}>
+            <MainSecHead title={SEC_TITLE[sec.title] || sec.title} />
+            <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', columnGap: 14 }}>
               {rows.map(([label, v, , kind, note]) => (
-                <React.Fragment key={label}>
-                  <span style={{ fontSize: 12.5, color: PALETTE.text }}>{label}{note ? <span style={{ fontSize: 10.5, color: PALETTE.textDim }}> · {note}</span> : null}</span>
-                  <b style={cell}>{fmtNum(v)}</b>
-                  <span style={{ ...cell, color: PALETTE.textDim }}>{kind || n === 1 ? '' : fmtNum(v / n)}</span>
-                </React.Fragment>
+                <div key={label} className="flex items-baseline justify-between gap-1" style={{ padding: '3px 0', minWidth: 0 }}>
+                  <span className="min-w-0" style={{ fontSize: 12, color: PALETTE.textDim, lineHeight: 1.3 }}>{label}{note ? <span className="block" style={{ fontSize: 10, opacity: 0.85 }}>{note}</span> : null}</span>
+                  <b className="flex-none text-right" style={{ fontSize: 12.5, color: PALETTE.text }}>{fmtNum(v)}{!kind && n > 1 ? <span style={{ fontSize: 10.5, fontWeight: 400, color: PALETTE.textDim }}> ({fmtNum(v / n)})</span> : null}</b>
+                </div>
               ))}
             </div>
-          </GlassPanel>
+          </div>
         );
-      }) : <GlassPanel className="p-3"><div style={{ fontSize: 12, color: PALETTE.textDim }}>기록 없음</div></GlassPanel>}
-      {skills.length > 0 && <GlassPanel className="p-3">
-        <div className="font-semibold mb-1.5" style={{ fontSize: 13, color: PALETTE.text }}>✦ 스킬별</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto auto', columnGap: 9, rowGap: 4, alignItems: 'baseline' }}>
+      }) : <div className="mt-2" style={{ fontSize: 12, color: PALETTE.textDim }}>기록 없음</div>}
+      {skills.length > 0 && <>
+        <MainSecHead title="스 킬 별" />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto auto', columnGap: 9, rowGap: 4, alignItems: 'baseline', marginTop: 4 }}>
           <span style={{ ...head, textAlign: 'left' }}>스킬</span><span style={head}>사용</span><span style={head}>피해</span><span style={head}>1회 평균</span><span style={head}>치명률</span>
           {skills.map(x => {
             const main = x.dmg || x.heal || x.shield;
@@ -3568,10 +3584,9 @@ function DetailReport({ r, onClose }) {
             );
           })}
         </div>
-        <div style={{ fontSize: 10.5, color: PALETTE.textDim, marginTop: 6, lineHeight: 1.5 }}>피해 칸의 ✚ = 회복량 · ◈ = 보호막 (피해 없는 스킬) · 추가타·지속 피해는 스킬 이름 옆에 따로 표시 · 사용 횟수가 없는 줄 = 지속 피해·추가타처럼 다른 행동에서 따라 나온 피해</div>
-      </GlassPanel>}
-      <UIButton onClick={onClose}>확인</UIButton>
-    </div>
+        <div style={{ fontSize: 10.5, color: PALETTE.textDim, marginTop: 6, lineHeight: 1.5 }}>✚ = 회복량 · ◈ = 보호막 (피해 없는 스킬) · 사용 횟수가 없는 줄 = 지속 피해·추가타처럼 다른 행동에서 따라 나온 피해</div>
+      </>}
+    </>
   );
 }
 
