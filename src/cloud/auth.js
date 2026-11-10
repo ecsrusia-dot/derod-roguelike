@@ -38,6 +38,7 @@ export async function signInGoogle() {
     // 모바일에서는 popup 차단 가능 → redirect 폴백
     if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user') {
       try {
+        markPendingGoogle(); // 1.237.3~ 돌아왔을 때 구글 모드로 이어서 처리하도록 표시
         await signInWithRedirect(auth, provider);
         return null; // redirect 후 페이지 리로드
       } catch (e) {
@@ -47,6 +48,19 @@ export async function signInGoogle() {
     }
     throw err;
   }
+}
+
+// 1.237.3~ redirect 로그인 표시 — 페이지 이동 후 돌아오면 App이 구글 모드로 이어서 처리
+const PENDING_KEY = 'derod_pendingGoogle';
+function markPendingGoogle() {
+  try { localStorage.setItem(PENDING_KEY, String(Date.now())); } catch { /* 무시 */ }
+}
+export function consumePendingGoogle() {
+  try {
+    const at = Number(localStorage.getItem(PENDING_KEY)) || 0;
+    localStorage.removeItem(PENDING_KEY);
+    return at > 0 && Date.now() - at < 10 * 60 * 1000;
+  } catch { return false; }
 }
 
 // 게스트 계정을 구글 계정으로 연동 (데이터 유지)
