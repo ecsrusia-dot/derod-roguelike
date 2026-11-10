@@ -135,6 +135,52 @@ function Bar({ v, max, color, h = 8, shield = 0 }) {
     </div>
   );
 }
+// ===== 경험치 바 (1.239.0) — 주인공 금색 · 사역마 보라 =====
+const XP_HERO = 'linear-gradient(90deg,#a8781e,#f0c25a)';
+const XP_FAM = 'linear-gradient(90deg,#7a3a9a,#d07ae8)';
+// 주인공·동행 사역마 경험치 스냅샷 — 전투 전/후를 비교해 이번 획득 구간을 그린다
+function expSnap(save) {
+  const h = save?.units?.[save?.hero];
+  const hero = h ? { lv: h.lv, exp: h.exp || 0, need: expNeedFor(h), cap: h.lv >= E.levelCapOf(save) } : null;
+  const fk = save?.famTeam?.main;
+  const f = fk ? save.fams?.[fk] : null;
+  const fam = f ? { key: fk, lv: F.famLv(f), exp: f.exp || 0, need: F.FAM_LEVEL.expNeed(F.famLv(f)), cap: h ? F.famLv(f) >= h.lv : false } : null;
+  return { hero, fam };
+}
+const xpPct = (x) => (x ? Math.max(0, Math.min(100, (x.exp / Math.max(1, x.need)) * 100)) : 0);
+// 승리 결과창 굵은 바 — 어두운 구간 = 원래 있던 경험치 · 밝은 구간 = 이번 획득 (레벨 업이면 0부터)
+function XpGainBar({ before, after, fam = false, h = 8 }) {
+  const [shown, setShown] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setShown(true), 120); return () => clearTimeout(t); }, []);
+  if (!after) return null;
+  const up = before && after.lv > before.lv;
+  const base = up || !before || after.key !== before.key ? 0 : xpPct(before);
+  const gain = Math.max(0, xpPct(after) - base);
+  return (
+    <div className="flex overflow-hidden" style={{ height: h, borderRadius: 999, background: '#0008', border: '1px solid #ffffff14' }}>
+      <div style={{ width: `${base}%`, background: fam ? XP_FAM : XP_HERO }} />
+      <div style={{ width: shown ? `${gain}%` : '0%', background: fam ? '#f0d0ff' : '#fff3c4', boxShadow: `0 0 8px ${fam ? '#d07ae8' : '#ffe08a'}`, transition: 'width .9s ease-out' }} />
+    </div>
+  );
+}
+function XpResultRow({ art, name, before, after, fam = false }) {
+  if (!after) return null;
+  const up = before && after.lv > before.lv;
+  const color = fam ? '#d07ae8' : PALETTE.legendary;
+  return (
+    <div className="flex items-center gap-2">
+      <img src={art} alt="" className="object-cover flex-none" style={{ width: 32, height: 32, borderRadius: 9, objectPosition: '50% 20%', border: `1px solid ${color}88` }} />
+      <div className="flex-1 min-w-0">
+        <div className="flex justify-between gap-2" style={{ fontSize: 11.5 }}>
+          <span className="truncate" style={{ color: PALETTE.text }}>{fam ? '🐾 ' : ''}{name} <b style={{ color }}>Lv.{up ? `${before.lv} → ${after.lv}` : after.lv}</b>{up ? <b className="chr-levelup" style={{ color: '#ffe08a', marginLeft: 4 }}>▲ LEVEL UP</b> : null}</span>
+          <span className="flex-none" style={{ color: PALETTE.textDim }}>{after.cap && after.exp === 0 && !up ? (fam ? '주인공 레벨 도달' : '레벨 상한') : `${after.exp.toLocaleString()} / ${after.need.toLocaleString()}`}</span>
+        </div>
+        <XpGainBar before={before} after={after} fam={fam} />
+      </div>
+    </div>
+  );
+}
+
 // 장비 비교 (1.213.1) — 새 장비 vs 지금 착용 중인 같은 부위 장비
 const STAT_ORDER = ['atk', 'def', 'hp', 'spd'];
 function itemDiff(item, cur) {
@@ -203,7 +249,7 @@ function Portrait({ cid, size = 44, dim = false }) {
 }
 
 // ===== 전투 카드 · 로그 (1.227.0) =====
-function BattleCard({ u, art, hp, sh, acting, fx, h, enemy = false, border, children }) {
+function BattleCard({ u, art, hp, sh, acting, fx, h, enemy = false, border, children, xp = null }) {
   const dead = hp <= 0;
   const accent = enemy ? '#ff8a80' : u.fam ? '#d07ae8' : chronicleClass(u.classId).color;
   return (
@@ -228,6 +274,13 @@ function BattleCard({ u, art, hp, sh, acting, fx, h, enemy = false, border, chil
                 <span className="flex-none" style={{ fontSize: 10.5, color: '#ddd', textShadow: '0 1px 2px #000' }}>{Math.max(0, hp).toLocaleString()}{sh > 0 ? <span style={{ color: '#9cc4e4' }}> ◈{sh.toLocaleString()}</span> : null}</span>
               </div>
               <Bar v={hp} max={u.maxHp} shield={sh} color={enemy ? 'linear-gradient(90deg,#8b1f1f,#e0574c)' : 'linear-gradient(90deg,#3d7a3a,#7fcf6a)'} h={7} />
+              {xp && <>
+                <div className="mt-0.5"><Bar v={xp.pct} max={100} color={u.fam ? XP_FAM : XP_HERO} h={4} /></div>
+                <div className="flex justify-between" style={{ fontSize: 10, color: '#e8d3a0', textShadow: '0 1px 2px #000' }}>
+                  <span>EXP {Math.floor(xp.pct)}%</span>
+                  {xp.gain > 0 ? <b style={{ color: u.fam ? '#e8b8ff' : '#ffe08a' }}>+{xp.gain.toLocaleString()}</b> : null}
+                </div>
+              </>}
             </>
           )}
         </div>
@@ -276,7 +329,7 @@ function BattleLogLine({ e, latest, unitOf }) {
 // ===== 전투 재생 =====
 const SPEEDS = [1, 2, 4];
 function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boostLeft = 0, onAskBoost, dungeonAuto = false, onToggleDungeonAuto, autoProg = false, onStopAuto }) {
-  const { sim, enemies, party, summary, ctx } = battle;
+  const { sim, enemies, party, summary, ctx, xp } = battle;
   const [idx, setIdx] = useState(0);
   const [stats, setStats] = useState(null); // 전투 집계 (1.215.1)
   const openStats = () => { const r = newHuntStats(); addHuntRecord(r, huntRecord(sim, party, { type: ctx.type, enemies }, summary, speed, ctx.label)); setStats(r); };
@@ -391,7 +444,13 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
       <div className="relative flex gap-2 px-3 pb-2 flex-none">
         {party.map(p => (
           <BattleCard key={p.id} u={p} art={p.fam ? chronicleEnemyArt(p.famKey) : chronicleClass(p.classId).combatImage} hp={hpOf(p)} sh={shOf(p)} acting={cur?.a === p.id} fx={fxClass(p.id)} h={cardH}
-            border={p.fam ? '#d07ae888' : `${chronicleClass(p.classId).color}88`}>
+            border={p.fam ? '#d07ae888' : `${chronicleClass(p.classId).color}88`}
+            xp={xp && cardH >= 150 ? (() => {
+              const b = p.fam ? xp.before.fam : xp.before.hero; const a = p.fam ? xp.after.fam : xp.after.hero;
+              if (!b) return null;
+              const win = done && sim.result === 'win' && a;
+              return { pct: xpPct(win ? a : b), gain: win ? (p.fam ? summary.famExp?.gained || 0 : summary.exp || 0) : 0 };
+            })() : null}>
             <Float id={p.id} />
           </BattleCard>
         ))}
@@ -407,6 +466,10 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
             {sim.result === 'win' ? (
               <div className="mt-1.5 flex flex-col gap-1" style={{ fontSize: 12.5, color: PALETTE.text }}>
                 {ctx.kind !== 'raid' && <div className="text-center">경험치 +<CountUp v={summary.exp} /> · 🪙 +<CountUp v={summary.gold} /> · ✦ +{summary.essence}{summary.shard ? ` · ◆ +${summary.shard}` : ''}</div>}
+                {xp && (xp.after.hero || xp.after.fam) && <div className="flex flex-col gap-1.5 mt-1 mb-0.5">
+                  <XpResultRow art={chronicleClass(save.hero).combatImage} name={chronicleClass(save.hero).name} before={xp.before.hero} after={xp.after.hero} />
+                  {xp.after.fam && summary.famExp ? <XpResultRow fam art={chronicleEnemyArt(xp.after.fam.key)} name={F.famName(xp.after.fam.key)} before={xp.before.fam} after={xp.after.fam} /> : null}
+                </div>}
                 {Object.entries(summary.levelUps).map(([cid, lv]) => (
                   <div key={cid} className="text-center font-semibold chr-levelup" style={{ color: PALETTE.legendary }}>▲ 레벨 업! {chronicleClass(cid).name} Lv.{lv}</div>
                 ))}
@@ -686,8 +749,26 @@ function TownView({ save, acc, go, onExit, onSwitchChar }) {
             <button onClick={onSwitchChar} className="ui-press flex-none" style={{ fontSize: 11.5, padding: '6px 10px', borderRadius: 9, border: '1px solid var(--ui-line-strong)', color: PALETTE.dawn, background: 'transparent' }}>캐릭터 변경</button>
           </div>
           <div className="mt-2" style={{ fontSize: 12, color: PALETTE.dawn }}>▶ {goal}</div>
-          <div className="mt-1.5" style={{ fontSize: 11, color: PALETTE.textDim }}>경험치 {hero.exp}/{expNeedFor(hero)}</div>
-          <Bar v={hero.exp} max={expNeedFor(hero)} color={PALETTE.legendary} h={5} />
+          <div className="mt-1.5 flex justify-between" style={{ fontSize: 11, color: PALETTE.textDim }}><span>⭐ 경험치</span><span>{hero.exp.toLocaleString()} / {expNeedFor(hero).toLocaleString()} ({Math.floor(hero.exp / Math.max(1, expNeedFor(hero)) * 100)}%)</span></div>
+          <Bar v={hero.exp} max={expNeedFor(hero)} color={XP_HERO} h={6} />
+          {(() => {
+            const fx = expSnap(save).fam;
+            if (!fx) return <button onClick={() => go('fam')} className="ui-press w-full text-left mt-2" style={{ fontSize: 11, color: PALETTE.textDim, background: 'transparent', border: 'none', padding: 0 }}>🐾 동행 사역마 없음 — 사역마에서 편성</button>;
+            const f = save.fams[fx.key];
+            return (
+              <div className="flex items-center gap-2 mt-2.5">
+                <img src={chronicleEnemyArt(fx.key)} alt="" className="object-cover flex-none" style={{ width: 30, height: 30, borderRadius: 8, border: '1px solid #d07ae8' }} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between gap-2" style={{ fontSize: 11 }}>
+                    <span className="truncate" style={{ color: PALETTE.text }}>🐾 {F.famName(fx.key)} <b style={{ color: '#d07ae8' }}>Lv.{fx.lv}</b> <span style={{ color: PALETTE.textDim }}>· {F.famGrade(f.grade).label}{f.plus ? ` +${f.plus}` : ''}</span></span>
+                    <span className="flex-none" style={{ color: PALETTE.textDim }}>{fx.cap ? '주인공 레벨 도달' : `${fx.exp.toLocaleString()} / ${fx.need.toLocaleString()} (${Math.floor(xpPct(fx))}%)`}</span>
+                  </div>
+                  <Bar v={fx.cap ? 100 : fx.exp} max={fx.cap ? 100 : fx.need} color={XP_FAM} h={6} />
+                </div>
+              </div>
+            );
+          })()}
+          {expSnap(save).fam && <div className="mt-1" style={{ fontSize: 10.5, color: PALETTE.textDim }}>사역마는 주인공 레벨(Lv.{hero.lv})까지만 오른다 · 동행일 때 이기면 상승</div>}
         </GlassPanel>
         <GlassPanel className="p-3">
           <div className="font-semibold mb-1.5" style={{ fontSize: 13, color: PALETTE.legendary }}>✦ 지금 할 일</div>
@@ -3109,7 +3190,7 @@ export default function ChronicleGame({ onExit }) {
     // 반복 사냥은 사냥에서만 · 패배하면 반복·자동 진행 모두 멈춤 (1.234.0: 의뢰 완료로는 멈추지 않음)
     if (mode !== 'hunt' || sim.result !== 'win') setRepeat(false);
     if (opts.auto && sim.result !== 'win') stopAuto(`자동 진행 중단 — ${ctx.label}에서 패배`);
-    setBattle({ sim, enemies: enc.enemies, party, summary: r.summary, ctx, key: Date.now() });
+    setBattle({ sim, enemies: enc.enemies, party, summary: r.summary, ctx, xp: { before: expSnap(save), after: expSnap(r.save) }, key: Date.now() });
     setView('battle');
   };
   const fightDungeon = () => {
@@ -3131,7 +3212,7 @@ export default function ChronicleGame({ onExit }) {
       if (dungRunRef.current.battles > 1) { runReport = { ...dungRunRef.current, endedAt: Date.now(), kind: 'dungeon' }; logEfficiency(runReport); }
       dungRunRef.current = null;
     }
-    setBattle({ sim, enemies: enc.enemies, party, summary: r.summary, ctx, runReport, key: Date.now() });
+    setBattle({ sim, enemies: enc.enemies, party, summary: r.summary, ctx, runReport, xp: { before: expSnap(save), after: expSnap(r.save) }, key: Date.now() });
     setView('battle');
   };
 
@@ -3155,7 +3236,7 @@ export default function ChronicleGame({ onExit }) {
       if (towerRunRef.current.st.battles > 1) { runReport = { ...towerRunRef.current.st, endedAt: Date.now(), kind: 'tower' }; logEfficiency(runReport); }
       towerRunRef.current = null;
     }
-    setBattle({ sim, enemies: enc.enemies, party, summary: r.summary, ctx, runReport, key: Date.now() });
+    setBattle({ sim, enemies: enc.enemies, party, summary: r.summary, ctx, runReport, xp: { before: expSnap(save), after: expSnap(r.save) }, key: Date.now() });
     setView('battle');
   };
   // 원정대 레이드 (1.231.0) — 계정 단위: 5캐릭 파티 · 결과·보상은 계정에 직접
