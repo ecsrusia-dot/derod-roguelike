@@ -9,6 +9,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, Coins } from 'lucide-react';
 import { PALETTE } from '../utils/helpers.js';
 import { GlassPanel, UIButton, BottomSheet } from '../components/ui/CommonUI.jsx';
+import { InfoSection, InfoRow, StatTiles, ValueChip, HiNum } from '../components/ui/InfoBlocks.jsx';
 import UpdateButton from '../components/ui/UpdateButton.jsx';
 import { GAME_VERSION } from '../data/version.js';
 import {
@@ -1528,45 +1529,91 @@ function FamRoleGuide({ heroCls }) {
   );
 }
 // 동행 스킬 · 능력치 상세 (1.217.0)
+// 사역마 설명창 「효과」 탭 (1.244.0) — 어디서 적용되나 기준 4구획
+function FamEffectSections({ k, f, fams, heroLv, slot }) {
+  const gi = F.famGradeIdx(f.grade);
+  const role = F.FAM_ROLES[F.famRole(k)];
+  const base = F.famGrade(F.famBaseGrade(k, f));
+  const sig = F.famHasSignature(k, f) ? F.famSignature(k, f.grade) : null;
+  const pv = F.famPassive(k, f);
+  const subs = F.famSubItems(k, f, heroLv);
+  const own = gi >= F.FAM_OWN_MIN_GRADE ? Object.entries(F.famOwnValues(k, f)).filter(([, v]) => v) : [];
+  const bonds = F.FAM_BONDS.filter(b => b.members.includes(k));
+  const pct = (v) => `+${Math.round(v * 1000) / 10}%`;
+  return (
+    <div className="flex flex-col gap-2 mt-2">
+      <InfoSection icon="⚔" title="동행 칸에 있을 때" color="#e8b04a" right={slot === 'main' ? '사용 중' : null} dim={slot && slot !== 'main'}>
+        <InfoRow first label="함께 싸움" value="능력치·스킬 탭에서 확인" color={PALETTE.textDim} />
+        {role.guard && <InfoRow label="수호 태세" value={`적 공격의 ${Math.round(role.guard[gi] * 100)}% 대신 받음`} />}
+        <InfoRow label="★ 고유 스킬" value={sig ? sig.name : '없음'} color={sig ? '#d07ae8' : PALETTE.textDim} note={!sig ? (F.famGradeIdx(base.id) < F.FAM_SIG_MIN_GRADE ? '남령 이상으로 소환된 사역마만 (진화로는 생기지 않음)' : null) : null} />
+        <InfoRow label="◆ 고유 패시브" value={pv ? pv.name : '없음'} color={pv ? '#c79bff' : PALETTE.textDim} note={pv ? pv.desc : '자령으로 소환된 사역마만 (진화로는 생기지 않음)'} />
+        <InfoRow label="베이스 등급" value={base.label} color={base.color} note={F.famGradeIdx(base.id) < gi ? '진화로 능력치·스킬 배율만 올랐다' : null} />
+      </InfoSection>
+      <InfoSection icon="✦" title="보조 칸에 있을 때" color="#c79bff" right={`효과 ${F.famSubPctOf(f, heroLv)}% (Lv.${F.famLv(f)}/${heroLv})`} dim={slot === 'main'}>
+        {subs.map((it, i) => <InfoRow key={it.k} first={i === 0} label={<>{it.icon && `${it.icon} `}{it.label}{it.econ && <span style={{ marginLeft: 4, fontSize: 10.5, color: '#c79bff' }}>재화 특성</span>}</>} value={it.k === 'shieldPct' ? `최대 HP ${it.text}` : it.text} />)}
+      </InfoSection>
+      <InfoSection icon="◎" title="가지고만 있어도" color="#8fe08a" right="편성 무관" dim={!own.length}>
+        {own.length ? own.map(([kk, v], i) => <InfoRow key={kk} first={i === 0} label={F.famFxText({ [kk]: 1 }).split(' +')[0]} value={pct(v)} />)
+          : <InfoRow first label="보유 효과" value="남령부터" color={PALETTE.textDim} />}
+      </InfoSection>
+      {bonds.length > 0 && (
+        <InfoSection icon="🔗" title="인연" color="#9cc4e4">
+          {bonds.map((b, i) => {
+            const t = F.bondTier(fams, b);
+            const have = b.members.filter(m => fams[m]).length;
+            return <InfoRow key={b.id || b.name} first={i === 0} label={b.name} value={t ? `${t}단계 달성` : `${have}/${b.members.length} 모음`} color={t ? '#9cc4e4' : PALETTE.textDim} note={F.famFxText(b.fx)} />;
+          })}
+        </InfoSection>
+      )}
+    </div>
+  );
+}
+const FAM_KIND_LABEL = { taunt: '도발', strike: '단일 공격', multi: '연속 공격', aoe: '광역 공격', heal: '회복', shield: '보호막' };
+// 「능력치·스킬」 탭 (1.244.0) — 능력치 타일 + 스킬 카드
 function FamSkillPanel({ k, f, save }) {
   const skills = F.famSkillInfo(k, f);
   const heroLv = save.units[save.hero]?.lv || 1;
   const famPct = E.deriveUnit(save, save.hero).famPct || 0;
   const r = F.famStats(k, f, heroLv, famPct);
   const guard = F.famGuard(k, f);
+  const pv = F.famPassive(k, f);
+  const tiles = [
+    { label: '최대 HP', value: r.maxHp.toLocaleString() }, { label: '공격력', value: r.atk.toLocaleString() }, { label: '방어', value: r.def.toLocaleString() },
+    { label: '회복력', value: r.healPower.toLocaleString() }, { label: '속도', value: r.spd },
+    guard ? { label: '수호 태세', value: `${Math.round(guard * 100)}%`, accent: '#e8b04a' } : { label: '역할', value: F.FAM_ROLES[F.famRole(k)].label },
+  ];
   return (
-    <GlassPanel className="p-2.5 mt-2" style={{ fontSize: 12, lineHeight: 1.55 }}>
-      <div className="font-semibold" style={{ color: PALETTE.text }}>동행 시 능력치 <span style={{ color: PALETTE.textDim, fontWeight: 400 }}>(Lv.{r.lv} 기준 · 주인공 직업과 무관)</span></div>
-      <div style={{ color: PALETTE.textDim }}>최대 HP <b style={{ color: PALETTE.text }}>{r.maxHp.toLocaleString()}</b> · 공격력 <b style={{ color: PALETTE.text }}>{r.atk}</b> · 방어 <b style={{ color: PALETTE.text }}>{r.def}</b> · 회복력 <b style={{ color: PALETTE.text }}>{r.healPower}</b> · 속도 {r.spd}{guard ? ` · 수호 태세 ${Math.round(guard * 100)}%` : ''}</div>
-      {famPct > 0 && <div style={{ fontSize: 11, color: PALETTE.textDim }}>주인공 장비 「사역마 능력치」 옵션 +{Math.round(famPct * 100)}% 포함</div>}
-      <div className="font-semibold mt-2" style={{ color: PALETTE.text }}>동행 스킬</div>
-      {(() => {
-        const base = F.famGrade(F.famBaseGrade(k, f)); const bi = F.famGradeIdx(base.id); const gi = F.famGradeIdx(f.grade);
+    <div className="flex flex-col gap-2 mt-2">
+      <InfoSection title="동행 능력치" color={PALETTE.text} right={`Lv.${r.lv} 기준 · 주인공 직업 무관`}>
+        <div className="mt-1"><StatTiles items={tiles} /></div>
+        {famPct > 0 && <div style={{ fontSize: 11, color: PALETTE.textDim, marginTop: 4 }}>주인공 장비 「사역마 능력치」 +{Math.round(famPct * 100)}% 포함</div>}
+      </InfoSection>
+      {pv && (
+        <div style={{ borderRadius: 12, padding: 9, border: '1px solid #c79bff88', background: '#c79bff12' }}>
+          <div style={{ fontSize: 11, color: '#c79bff', fontWeight: 700 }}>◆ 자령 고유 패시브</div>
+          <div style={{ fontSize: 13.5, fontWeight: 800, color: PALETTE.legendary }}>{pv.name}</div>
+          <div style={{ fontSize: 12, color: PALETTE.text, marginTop: 2 }}><HiNum text={pv.desc} /></div>
+        </div>
+      )}
+      {skills.map(sk => {
+        const parts = String(sk.effect).split(/ — |\. | · /).filter(Boolean);
         return (
-          <div style={{ fontSize: 11, color: PALETTE.textDim }}>
-            베이스 등급 <b style={{ color: base.color }}>{base.label}</b>{bi < gi ? ' — 진화로 능력치·스킬 배율만 올랐다' : ''}
-            {bi < F.FAM_SIG_MIN_GRADE && <div>★ 고유 스킬 없음 — <b style={{ color: '#7a6ae8' }}>남령</b> 이상으로 소환된 사역마만 가진다 (진화로는 생기지 않음)</div>}
-            {bi >= F.FAM_SIG_MIN_GRADE && bi < F.FAM_PASSIVE_MIN_GRADE && <div>◆ 고유 패시브 없음 — <b style={{ color: '#c79bff' }}>자령</b>으로 소환된 사역마만 가진다 (진화로는 생기지 않음)</div>}
+          <div key={sk.id} style={{ borderRadius: 12, padding: 9, border: `1px solid ${sk.sig ? '#d07ae888' : 'var(--ui-line)'}`, background: sk.sig ? '#d07ae810' : 'rgba(255,255,255,0.02)' }}>
+            <div className="flex items-center justify-between gap-2">
+              <span style={{ fontSize: 13.5, fontWeight: 800, color: PALETTE.legendary }}>{sk.sig ? '★ ' : ''}{sk.name}</span>
+              <ValueChip label={`⏱ ${sk.cd}턴`} />
+            </div>
+            <div style={{ fontSize: 11, color: sk.sig ? '#d07ae8' : PALETTE.textDim }}>{sk.sig ? `고유 스킬 · ${sk.sigType}` : FAM_KIND_LABEL[sk.kind] || sk.kind}</div>
+            <div className="flex flex-wrap gap-1 mt-1.5">
+              {parts.map((p, i) => <span key={i} style={{ fontSize: 11.5, padding: '2px 7px', borderRadius: 7, background: 'rgba(111,168,220,0.1)', border: '1px solid rgba(111,168,220,0.3)', color: PALETTE.textDim }}><HiNum text={p} /></span>)}
+            </div>
+            {sk.when && <div className="mt-1.5" style={{ fontSize: 11, color: PALETTE.textDim, background: 'rgba(0,0,0,0.25)', borderRadius: 8, padding: '5px 7px' }}>발동 ▸ {sk.when}</div>}
           </div>
         );
-      })()}
-      {(() => { const pv = F.famPassive(k, f); return pv && (
-        <div className="mt-1.5" style={{ paddingLeft: 8, borderLeft: '2px solid #c79bff' }}>
-          <div style={{ fontSize: 11, color: '#c79bff', fontWeight: 700 }}>◆ 자령 고유 패시브</div>
-          <div style={{ color: PALETTE.legendary, fontWeight: 600 }}>{pv.name}</div>
-          <div style={{ color: PALETTE.text }}>{pv.desc}</div>
-        </div>
-      ); })()}
-      {skills.map(sk => (
-        <div key={sk.id} className="mt-1.5" style={{ paddingLeft: 8, borderLeft: `2px solid ${sk.sig ? '#d07ae8' : 'var(--ui-line-strong)'}`, opacity: sk.locked ? 0.55 : 1 }}>
-          {sk.sig && <div style={{ fontSize: 11, color: '#d07ae8', fontWeight: 700 }}>★ 고유 스킬 · {sk.sigType}</div>}
-          <div style={{ color: PALETTE.legendary, fontWeight: 600 }}>{sk.name} <span style={{ color: PALETTE.textDim, fontWeight: 400 }}>· 재사용 {sk.cd}턴</span></div>
-          <div style={{ color: PALETTE.text }}>{sk.effect}</div>
-          <div style={{ color: PALETTE.textDim }}>발동: {sk.when}</div>
-        </div>
-      ))}
-      <div className="mt-1.5" style={{ color: PALETTE.textDim, fontSize: 11.5 }}>스킬이 모두 대기 중이면 일반 공격. 스킬 위력은 등급이 오를수록 커지고, 자령은 고유 스킬 지속 턴 +1.</div>
-    </GlassPanel>
+      })}
+      {!F.famHasSignature(k, f) && <div style={{ fontSize: 11, color: PALETTE.textDim }}>★ 고유 스킬 없음 — <b style={{ color: '#7a6ae8' }}>남령</b> 이상으로 소환된 사역마만 가진다 (진화로는 생기지 않음)</div>}
+      <div style={{ color: PALETTE.textDim, fontSize: 11 }}>스킬이 모두 대기 중이면 일반 공격. 스킬 위력은 등급이 오를수록 커지고, 자령은 고유 스킬 지속 턴 +1.</div>
+    </div>
   );
 }
 // 보조 효과 등급표 — 청령부터 효과가 하나 더 붙는다
@@ -1589,16 +1636,62 @@ function FamSubTable({ k, gi }) {
     </div>
   );
 }
-function FamCard({ k, f, onClick, right, size = 46, heroLv = 0 }) {
+// 동행 칸 후보 — 지금 동행 대비 능력치 증감 (1.244.0)
+function FamMainDelta({ k, f, curK, curF, save }) {
+  const heroLv = save.units[save.hero]?.lv || 1;
+  const famPct = E.deriveUnit(save, save.hero).famPct || 0;
+  const a = F.famStats(k, f, heroLv, famPct);
+  const b = curF ? F.famStats(curK, curF, heroLv, famPct) : null;
+  const items = [['HP', 'maxHp'], ['공격', 'atk'], ['방어', 'def'], ['회복력', 'healPower']];
+  return (
+    <div className="flex flex-wrap gap-1 mt-1" style={{ paddingLeft: 4 }}>
+      {items.map(([l, key]) => {
+        const d = b ? a[key] - b[key] : 0;
+        return <ValueChip key={key} label={l} value={a[key].toLocaleString()} delta={b && d ? { kind: d > 0 ? 'up' : 'down', text: `${d > 0 ? '▲' : '▼'}${Math.abs(d).toLocaleString()}` } : null} />;
+      })}
+      {F.famGuard(k, f) > 0 && <ValueChip label="수호 태세" value={`${Math.round(F.famGuard(k, f) * 100)}%`} tone="#e8b04a" />}
+    </div>
+  );
+}
+// 편성 칸 배지 (1.244.0) — ★ 동행 / 보조 1·2 / 대기
+const FAM_SLOT_BADGE = {
+  main: { text: '★ 동행', color: '#e8b04a' },
+  sub1: { text: '보조 1', color: '#c79bff' },
+  sub2: { text: '보조 2', color: '#c79bff' },
+  wait: { text: '대기', color: null },
+};
+function FamSlotBadge({ slot, mark }) {
+  const b = FAM_SLOT_BADGE[slot || 'wait'];
+  return (
+    <span className="flex-none" style={{ fontSize: 11, fontWeight: 800, padding: '2px 7px', borderRadius: 6, whiteSpace: 'nowrap', color: b.color || PALETTE.textDim, background: b.color ? `${b.color}22` : 'rgba(255,255,255,0.04)', border: `1px solid ${b.color ? `${b.color}77` : 'var(--ui-line)'}` }}>{b.text}{mark ? ' ◀' : ''}</span>
+  );
+}
+// 보조 효과 칩 줄 — cur(지금 칸 값)를 주면 ▲▼ 비교
+function FamSubChips({ k, f, heroLv, cur }) {
+  const items = F.famSubItems(k, f, heroLv);
+  const vals = Object.fromEntries(items.map(it => [it.k, it.v]));
+  const gone = cur ? Object.keys(cur).filter(kk => !vals[kk]) : [];
+  return (
+    <div className="flex flex-wrap gap-1 mt-1">
+      {items.map(it => <ValueChip key={it.k} label={`${it.icon ? `${it.icon} ` : ''}${it.label}`} value={it.text} delta={F.famSubDelta(it.k, vals, cur)} />)}
+      {gone.map(kk => <ValueChip key={kk} label={F.famSubLabel(kk)} delta={F.famSubDelta(kk, vals, cur)} />)}
+    </div>
+  );
+}
+function FamCard({ k, f, onClick, right, size = 46, heroLv = 0, slot, mark, cur, dim = false, hideSub = false }) {
   const g = F.famGrade(f.grade);
   const role = F.FAM_ROLES[F.famRole(k)];
   return (
-    <button onClick={onClick} className="ui-press w-full flex items-center gap-2.5 text-left" style={{ padding: '7px 10px', borderRadius: 12, background: `${g.color}12`, border: `1px solid ${g.color}66` }}>
-      <img src={chronicleEnemyArt(k)} alt="" className="object-cover flex-none" style={{ width: size, height: size, borderRadius: 10, border: `1.5px solid ${g.color}` }} />
+    <button onClick={onClick} className="ui-press w-full flex items-center gap-2.5 text-left" style={{ padding: '7px 10px', borderRadius: 12, background: `${g.color}12`, border: `1px solid ${mark ? '#c79bff' : `${g.color}66`}`, opacity: dim ? 0.72 : 1 }}>
+      <img src={chronicleEnemyArt(k)} alt="" className="object-cover flex-none self-start" style={{ width: size, height: size, borderRadius: 10, border: `1.5px solid ${g.color}` }} />
       <div className="flex-1 min-w-0">
-        <div className="truncate font-semibold" style={{ fontSize: 13, color: g.color }}><span style={{ color: heroLv && F.famLv(f) < heroLv ? '#e8b04a' : PALETTE.legendary }}>Lv.{F.famLv(f)}</span> {F.famName(k)}{f.plus ? ` +${f.plus}` : ''} <span style={{ fontSize: 11, color: PALETTE.textDim, fontWeight: 400 }}>{g.label} · <span style={{ color: role.color }}>{role.icon} {role.label}</span></span></div>
-        <div className="truncate" style={{ fontSize: 11, color: PALETTE.textDim }}>보조 효과: {F.famSubText(k, f, heroLv)}</div>
-        {heroLv > 0 && F.famLv(f) < heroLv && <div className="mt-0.5"><Bar v={f.exp || 0} max={F.FAM_LEVEL.expNeed(F.famLv(f))} color="#e8b04a" h={3} /></div>}
+        <div className="flex items-center gap-1.5">
+          <div className="truncate font-semibold flex-1 min-w-0" style={{ fontSize: 13, color: g.color }}><span style={{ color: heroLv && F.famLv(f) < heroLv ? '#e8b04a' : PALETTE.legendary }}>Lv.{F.famLv(f)}</span> {F.famName(k)}{f.plus ? ` +${f.plus}` : ''}</div>
+          {slot !== undefined && <FamSlotBadge slot={slot} mark={mark} />}
+        </div>
+        <div style={{ fontSize: 11, color: PALETTE.textDim }}>{g.label} · <span style={{ color: role.color }}>{role.icon} {role.label}</span>{heroLv > 0 && F.famLv(f) < heroLv ? ` · 보조 효과 ${F.famSubPctOf(f, heroLv)}%` : ''}</div>
+        {!hideSub && <FamSubChips k={k} f={f} heroLv={heroLv} cur={cur} />}
+        {heroLv > 0 && F.famLv(f) < heroLv && <div className="mt-1"><Bar v={f.exp || 0} max={F.FAM_LEVEL.expNeed(F.famLv(f))} color="#e8b04a" h={3} /></div>}
       </div>
       {right}
     </button>
@@ -1668,6 +1761,7 @@ function FamiliarView({ save, setSave, onBack, flash, onTrack = () => {} }) {
   const [results, setResults] = useState(null);
   const [sel, setSel] = useState(null);
   const [pickSlot, setPickSlot] = useState(null);
+  const [selTab, setSelTab] = useState('fx'); // 설명창 탭 (1.244.0)
   const [preview, setPreview] = useState(null); // 효율 미리보기 (1.232.0)
   const fams = save.fams || {};
   const shards = save.mats.famShard || 0;
@@ -1689,6 +1783,10 @@ function FamiliarView({ save, setSave, onBack, flash, onTrack = () => {} }) {
     { id: 'sub2', label: '보조 2', desc: '패시브 효과만' },
   ];
   const selF = sel && fams[sel];
+  const slotOf = (k) => ['main', 'sub1', 'sub2'].find(sl => team[sl] === k) || null;
+  const inTeam = list.filter(([k]) => slotOf(k));
+  const waiting = list.filter(([k]) => !slotOf(k));
+  const grpHead = (left, right) => <div className="flex justify-between" style={{ fontSize: 11.5, fontWeight: 700, color: PALETTE.textDim, marginTop: 2 }}><span>{left}</span>{right && <span style={{ fontWeight: 400 }}>{right}</span>}</div>;
   const tabBtn = (id, label) => <button key={id} onClick={() => setTab(id)} className="ui-press flex-1" style={{ height: 36, borderRadius: 10, fontSize: 12, border: `1px solid ${tab === id ? PALETTE.legendary : 'var(--ui-line)'}`, color: tab === id ? PALETTE.legendary : PALETTE.text, background: 'transparent' }}>{label}</button>;
   return (
     <div className="absolute inset-0 flex flex-col">
@@ -1727,7 +1825,10 @@ function FamiliarView({ save, setSave, onBack, flash, onTrack = () => {} }) {
         )}
         {tab === 'list' && (
           <>
-            {list.map(([k, f]) => <FamCard key={k} k={k} f={f} heroLv={heroLv} onClick={() => setSel(k)} right={['main', 'sub1', 'sub2'].find(sl => team[sl] === k) && <span style={{ fontSize: 11, color: PALETTE.dawn }}>{slots.find(x => x.id === ['main', 'sub1', 'sub2'].find(sl => team[sl] === k)).label}</span>} />)}
+            {inTeam.length > 0 && grpHead(`편성 중 ${inTeam.length}`)}
+            {inTeam.map(([k, f]) => <FamCard key={k} k={k} f={f} heroLv={heroLv} slot={slotOf(k)} onClick={() => setSel(k)} />)}
+            {waiting.length > 0 && grpHead(`대기 ${waiting.length}`, '등급 순')}
+            {waiting.map(([k, f]) => <FamCard key={k} k={k} f={f} heroLv={heroLv} slot={null} onClick={() => setSel(k)} />)}
             {!list.length && <div className="text-center py-10" style={{ fontSize: 12.5, color: PALETTE.textDim }}>아직 사역마가 없습니다 — 계약서 조각을 모아 소환하세요</div>}
           </>
         )}
@@ -1740,7 +1841,7 @@ function FamiliarView({ save, setSave, onBack, flash, onTrack = () => {} }) {
             <div key={sl.id}>
               <div style={{ fontSize: 12, color: PALETTE.text, marginBottom: 4 }}><b>{sl.label}</b> <span style={{ color: PALETTE.textDim }}>— {sl.desc}</span></div>
               {!open ? <div style={{ padding: 12, borderRadius: 12, border: '1px dashed var(--ui-line)', color: PALETTE.textDim, fontSize: 12.5 }}>🔒 주인공 Lv.{F.FAM_TUNING.slotLv[sl.id]}에 개방</div>
-                : f ? <FamCard k={k} f={f} heroLv={heroLv} onClick={() => setPickSlot(sl.id)} right={<span style={{ fontSize: 11, color: PALETTE.dawn }}>교체</span>} />
+                : f ? <FamCard k={k} f={f} heroLv={heroLv} slot={sl.id} onClick={() => setPickSlot(sl.id)} right={<span className="flex-none" style={{ fontSize: 11, color: PALETTE.dawn }}>교체</span>} />
                   : <button onClick={() => setPickSlot(sl.id)} className="ui-press w-full text-left" style={{ padding: 12, borderRadius: 12, border: '1px dashed var(--ui-line-strong)', background: 'transparent', color: PALETTE.textDim, fontSize: 12.5 }}>＋ 비어 있음 (눌러서 편성)</button>}
             </div>
           );
@@ -1780,25 +1881,26 @@ function FamiliarView({ save, setSave, onBack, flash, onTrack = () => {} }) {
             <img src={chronicleEnemyArt(sel)} alt="" className="w-full object-cover" style={{ aspectRatio: '16 / 8', borderRadius: 12, border: `1px solid ${g.color}` }} />
             <div className="text-center mt-2" style={{ fontSize: 13, color: g.color, fontWeight: 600 }}>{g.label} · {F.FAM_ROLES[F.famRole(sel)].icon} {F.FAM_ROLES[F.famRole(sel)].label}</div>
             <div className="text-center mt-0.5" style={{ fontSize: 12, color: PALETTE.textDim }}>{F.FAM_ROLES[F.famRole(sel)].desc}</div>
-            <GlassPanel className="p-2.5 mt-2" style={{ fontSize: 12, color: PALETTE.text, lineHeight: 1.6 }}>
-              <div><b>동행</b> <span style={{ color: PALETTE.textDim }}>— {gi >= F.FAM_SIG_MIN_GRADE ? `★${F.famSignature(sel, selF.grade).name} · ` : ''}{F.FAM_SKILLS[F.famRole(sel)].map(x => x.name).join(' · ')}{F.FAM_ROLES[F.famRole(sel)].guard ? ` · 수호 태세: 적 공격의 ${Math.round(F.FAM_ROLES[F.famRole(sel)].guard[gi] * 100)}%를 대신 받음` : ''}</span></div>
-              <div><b>보조</b> <span style={{ color: PALETTE.textDim }}>— {F.famSubText(sel, selF, heroLv)}</span></div>
-              <div><b>재화 특성</b> <span style={{ color: PALETTE.textDim }}>— {F.FAM_ECON[F.famEconId(sel)].icon} {F.FAM_ECON[F.famEconId(sel)].label} (보조 칸에서만)</span></div>
-              <div><b style={{ color: gi >= F.FAM_OWN_MIN_GRADE ? '#c79bff' : PALETTE.text }}>보유 효과</b> <span style={{ color: PALETTE.textDim }}>— {gi >= F.FAM_OWN_MIN_GRADE ? `${F.famFxText(F.famOwnValues(sel, selF))} (편성 안 해도 적용)` : '남령으로 진화하면 열린다 — 가지고만 있어도 적용되는 패시브'}</span></div>
-              {(() => { const bs = F.FAM_BONDS.filter(b => b.members.includes(sel)); return bs.length ? <div><b>인연</b> <span style={{ color: PALETTE.textDim }}>— {bs.map(b => `${b.name}${F.bondTier(fams, b) ? ` (${F.bondTier(fams, b)}단계)` : ''}`).join(' · ')}</span></div> : null; })()}
-            </GlassPanel>
-            <GlassPanel className="p-2.5 mt-2" style={{ fontSize: 12, color: PALETTE.text }}>
-              <div className="flex items-center justify-between">
-                <b style={{ color: PALETTE.legendary }}>Lv.{F.famLv(selF)} <span style={{ fontWeight: 400, color: PALETTE.textDim }}>/ 주인공 Lv.{heroLv}</span></b>
-                <span style={{ fontSize: 11, color: PALETTE.textDim }}>보조 효과 {Math.round((F.FAM_LEVEL.subMin + (1 - F.FAM_LEVEL.subMin) * (F.famEffLv(selF, heroLv) / heroLv)) * 100)}%</span>
-              </div>
-              {F.famLv(selF) < heroLv ? <>
-                <div className="mt-1"><Bar v={selF.exp || 0} max={F.FAM_LEVEL.expNeed(F.famLv(selF))} color="#e8b04a" h={5} /></div>
-                <div style={{ fontSize: 11, color: PALETTE.textDim }}>경험치 {selF.exp || 0}/{F.FAM_LEVEL.expNeed(F.famLv(selF))} · <b style={{ color: '#e8b04a' }}>동행 칸</b>에서 이길 때만 오른다</div>
-              </> : <div style={{ fontSize: 11, color: PALETTE.textDim }}>주인공 레벨 도달 — 주인공이 레벨업하면 다시 경험치를 받는다</div>}
-            </GlassPanel>
-            <FamSubTable k={sel} gi={gi} />
-            <FamSkillPanel k={sel} f={selF} save={save} />
+            <div className="flex gap-1 mt-2">
+              {[['fx', '효과'], ['skill', '능력치·스킬'], ['grow', '성장']].map(([id, l]) => (
+                <button key={id} onClick={() => setSelTab(id)} className="ui-press flex-1" style={{ height: 34, borderRadius: 9, fontSize: 12, fontWeight: selTab === id ? 700 : 400, border: `1px solid ${selTab === id ? PALETTE.legendary : 'var(--ui-line)'}`, color: selTab === id ? PALETTE.legendary : PALETTE.textDim, background: 'transparent' }}>{l}</button>
+              ))}
+            </div>
+            {selTab === 'fx' && <FamEffectSections k={sel} f={selF} fams={fams} heroLv={heroLv} slot={slotOf(sel)} />}
+            {selTab === 'skill' && <FamSkillPanel k={sel} f={selF} save={save} />}
+            {selTab === 'grow' && <>
+              <GlassPanel className="p-2.5 mt-2" style={{ fontSize: 12, color: PALETTE.text }}>
+                <div className="flex items-center justify-between">
+                  <b style={{ color: PALETTE.legendary }}>Lv.{F.famLv(selF)} <span style={{ fontWeight: 400, color: PALETTE.textDim }}>/ 주인공 Lv.{heroLv}</span></b>
+                  <span style={{ fontSize: 11, color: PALETTE.textDim }}>보조 효과 {F.famSubPctOf(selF, heroLv)}%</span>
+                </div>
+                {F.famLv(selF) < heroLv ? <>
+                  <div className="mt-1"><Bar v={selF.exp || 0} max={F.FAM_LEVEL.expNeed(F.famLv(selF))} color="#e8b04a" h={5} /></div>
+                  <div style={{ fontSize: 11, color: PALETTE.textDim }}>경험치 {selF.exp || 0}/{F.FAM_LEVEL.expNeed(F.famLv(selF))} · <b style={{ color: '#e8b04a' }}>동행 칸</b>에서 이길 때만 오른다</div>
+                </> : <div style={{ fontSize: 11, color: PALETTE.textDim }}>주인공 레벨 도달 — 주인공이 레벨업하면 다시 경험치를 받는다</div>}
+              </GlassPanel>
+              <FamSubTable k={sel} gi={gi} />
+            </>}
             <div className="flex gap-1 mt-3 justify-center">{Array.from({ length: F.FAM_TUNING.maxPlus }, (_, i) => <span key={i} style={{ width: 18, height: 6, borderRadius: 3, background: i < selF.plus ? g.color : '#ffffff1a' }} />)}</div>
             <div className="mt-3 flex flex-col gap-2">
               {!maxed && <UIButton disabled={souls < ec} onClick={() => setSave(E.enhanceFam(save, sel))}>강화 +{selF.plus} → +{selF.plus + 1} (🔮{ec} / 보유 {souls})</UIButton>}
@@ -1821,22 +1923,41 @@ function FamiliarView({ save, setSave, onBack, flash, onTrack = () => {} }) {
           </BottomSheet>
         );
       })()}
-      {pickSlot && (
-        <BottomSheet title={`${slots.find(x => x.id === pickSlot).label} 편성`} onClose={() => setPickSlot(null)} maxHeight="75%">
-          <div className="flex flex-col gap-1.5">
-            {team[pickSlot] && <UIButton variant="ghost" style={{ height: 40 }} onClick={() => { setSave(E.setFamTeam(save, pickSlot, null)); setPickSlot(null); }}>편성 해제</UIButton>}
-            <div style={{ fontSize: 11.5, color: PALETTE.textDim }}>📊 = 이 사역마로 바꾸면 사냥 효율이 어떻게 되는지 미리보기</div>
-            {list.filter(([k]) => k !== team[pickSlot]).map(([k, f]) => (
-              <div key={k} className="flex items-stretch gap-1.5">
-                <div className="flex-1 min-w-0"><FamCard k={k} f={f} heroLv={heroLv} onClick={() => { setSave(E.setFamTeam(save, pickSlot, k)); setPickSlot(null); }} /></div>
-                <button onClick={() => setPreview({ after: E.setFamTeam(save, pickSlot, k), title: `🐾 ${slots.find(x => x.id === pickSlot).label}: ${F.famName(k)}(으)로 바꾸면` })} className="ui-press flex-none" aria-label="효율 미리보기" style={{ width: 44, borderRadius: 12, border: `1px dashed ${PALETTE.legendary}88`, color: PALETTE.legendary, background: 'transparent', fontSize: 16 }}>📊</button>
-              </div>
-            ))}
-            {!list.length && <div className="text-center py-6" style={{ fontSize: 12.5, color: PALETTE.textDim }}>보유한 사역마가 없습니다</div>}
-            <UIButton variant="ghost" style={{ height: 40 }} onClick={() => setPickSlot(null)}>닫기</UIButton>
+      {pickSlot && (() => {
+        const slotLabel = slots.find(x => x.id === pickSlot).label;
+        const curK = team[pickSlot];
+        const curF = curK && fams[curK];
+        const isMain = pickSlot === 'main';
+        const curVals = isMain ? null : (curF ? F.famSubValues(curK, curF, heroLv) : {});
+        const row = ([k, f], others) => (
+          <div key={k} className="flex items-stretch gap-1.5">
+            <div className="flex-1 min-w-0">
+              <FamCard k={k} f={f} heroLv={heroLv} slot={slotOf(k)} cur={curVals} dim={others} hideSub={isMain} onClick={() => { setSave(E.setFamTeam(save, pickSlot, k)); setPickSlot(null); }} />
+              {isMain && <FamMainDelta k={k} f={f} curK={curK} curF={curF} save={save} />}
+            </div>
+            <button onClick={() => setPreview({ after: E.setFamTeam(save, pickSlot, k), title: `🐾 ${slotLabel}: ${F.famName(k)}(으)로 바꾸면` })} className="ui-press flex-none" aria-label="효율 미리보기" style={{ width: 44, borderRadius: 12, border: `1px dashed ${PALETTE.legendary}88`, color: PALETTE.legendary, background: 'transparent', fontSize: 16 }}>📊</button>
           </div>
-        </BottomSheet>
-      )}
+        );
+        const others = list.filter(([k]) => k !== curK && slotOf(k));
+        const rest = list.filter(([k]) => !slotOf(k));
+        return (
+          <BottomSheet title={`${slotLabel} 편성`} onClose={() => setPickSlot(null)} maxHeight="80%">
+            <div className="flex flex-col gap-1.5">
+              <div style={{ fontSize: 11.5, color: PALETTE.textDim }}>{isMain ? '동행 칸 = 함께 싸운다 · 아래 숫자는 지금 동행과 비교한 능력치' : '보조 칸 = 효과만 준다 · ▲▼ = 지금 이 칸의 사역마와 비교'} · 📊 = 사냥 효율 미리보기</div>
+              {grpHead(`지금 ${slotLabel} 칸`)}
+              {curF ? <><FamCard k={curK} f={curF} heroLv={heroLv} slot={pickSlot} mark hideSub={isMain} onClick={() => setPickSlot(null)} />{isMain && <FamMainDelta k={curK} f={curF} curK={null} curF={null} save={save} />}</>
+                : <div style={{ padding: 10, borderRadius: 12, border: '1px dashed var(--ui-line-strong)', fontSize: 12, color: PALETTE.textDim }}>비어 있음</div>}
+              {curF && <UIButton variant="ghost" style={{ height: 38 }} onClick={() => { setSave(E.setFamTeam(save, pickSlot, null)); setPickSlot(null); }}>편성 해제</UIButton>}
+              {others.length > 0 && grpHead(`다른 칸에 편성 중 ${others.length}`, '고르면 그 칸은 비게 됨')}
+              {others.map(e => row(e, true))}
+              {rest.length > 0 && grpHead(`대기 ${rest.length}`, '등급 순')}
+              {rest.map(e => row(e, false))}
+              {!list.length && <div className="text-center py-6" style={{ fontSize: 12.5, color: PALETTE.textDim }}>보유한 사역마가 없습니다</div>}
+              <UIButton variant="ghost" style={{ height: 40 }} onClick={() => setPickSlot(null)}>닫기</UIButton>
+            </div>
+          </BottomSheet>
+        );
+      })()}
       {preview && <PreviewSheet save={save} after={preview.after} title={preview.title} onClose={() => setPreview(null)} />}
     </div>
   );
