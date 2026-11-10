@@ -301,8 +301,8 @@ function BattleLogLine({ e, latest, unitOf }) {
   const actor = unitOf(e.a);
   const nameColor = (u) => (!u ? PALETTE.text : u.side === 'enemy' ? '#ff7a5c' : u.fam ? '#c79bff' : chronicleClass(u.classId).color);
   const N = ({ id }) => { const u = unitOf(id); return <b style={{ color: nameColor(u), fontWeight: 600 }}>{u?.fam ? '🐾' : ''}{u?.name || ''}</b>; };
-  const icon = e.k === 'dotTick' ? '☠' : e.k === 'hot' ? '✚' : e.skill ? '✦' : e.k === 'heavy' ? '💢' : e.k === 'aoe' ? '💥' : '⚔';
-  const actColor = e.k === 'dotTick' ? LOG_C.debuff : e.k === 'hot' ? LOG_C.heal : e.skill ? LOG_C.skill : e.k === 'heavy' ? LOG_C.crit : PALETTE.text;
+  const icon = e.k === 'open' ? '🔥' : e.k === 'dotTick' ? '☠' : e.k === 'hot' ? '✚' : e.skill ? '✦' : e.k === 'heavy' ? '💢' : e.k === 'aoe' ? '💥' : '⚔';
+  const actColor = e.k === 'open' ? LOG_C.crit : e.k === 'dotTick' ? LOG_C.debuff : e.k === 'hot' ? LOG_C.heal : e.skill ? LOG_C.skill : e.k === 'heavy' ? LOG_C.crit : PALETTE.text;
   const chip = (h, i) => {
     const sp = { marginLeft: 6, whiteSpace: 'nowrap', display: 'inline-block', maxWidth: '100%' }; // inline-block = 칩 사이에서 줄바꿈 (1.232.1)
     if (h.m) return <span key={i} style={{ ...sp, color: LOG_C.miss }}><N id={h.t} /> 빗나감</span>;
@@ -318,6 +318,7 @@ function BattleLogLine({ e, latest, unitOf }) {
     if (h.s) return <span key={i} style={{ ...sp, color: LOG_C.shield, fontWeight: 600 }}>◈ <N id={h.t} /> +{(h.es ?? h.s).toLocaleString()}</span>;
     if (h.buff) return <span key={i} style={{ ...sp, color: LOG_C.buff }}>▲ <N id={h.t} /> 강화</span>;
     if (h.debuff) return <span key={i} style={{ ...sp, color: LOG_C.debuff }}>▼ <N id={h.t} /> 약화</span>;
+    if (h.burn) return <span key={i} style={{ ...sp, color: LOG_C.crit }}>🔥 <N id={h.t} /></span>;
     if (h.dot) return <span key={i} style={{ ...sp, color: LOG_C.debuff }}>☠ <N id={h.t} /> 중독</span>;
     return null;
   };
@@ -1177,9 +1178,10 @@ function TalentPanel({ save, setSave, cid }) {
 }
 
 // ===== 파티 · 성장 =====
-function PartyView({ save, setSave, onBack }) {
+function PartyView({ save, setSave, onBack, onForge }) {
   const cid = save.hero;
   const [slotPick, setSlotPick] = useState(null);
+  const [eqInfo, setEqInfo] = useState(null); // 장비 정보 (1.252.0)
   const [skillInfo, setSkillInfo] = useState(null);
   const [rulesOpen, setRulesOpen] = useState(false); // 자동 사용 규칙 펼치기 (1.245.0)
   const [statPick, setStatPick] = useState(null); // 능력치 설명·배분 (1.247.0)
@@ -1251,20 +1253,41 @@ function PartyView({ save, setSave, onBack }) {
           <DetailStats d={d} cid={cid} onPick={setRowInfo} />
         </div>
 
-        {/* 장비 */}
-        <GlassPanel className="p-3 flex flex-col gap-2">
-          <span className="font-semibold" style={{ fontSize: 13.5, color: PALETTE.text }}>장비</span>
-          {SLOTS.map(sl => {
-            const it = save.inventory.find(i => i.uid === u.equip[sl.id]);
-            return it ? (
-              <ItemRow key={sl.id} save={save} item={it} onClick={() => setSlotPick(sl.id)} right={<span style={{ fontSize: 11, color: PALETTE.dawn }}>교체</span>} />
-            ) : (
-              <button key={sl.id} onClick={() => setSlotPick(sl.id)} className="ui-press w-full text-left" style={{ padding: '12px', borderRadius: 12, border: '1px dashed var(--ui-line-strong)', background: 'transparent', color: PALETTE.textDim, fontSize: 12.5 }}>
-                {sl.icon} {sl.label} — 비어 있음 (눌러서 장착)
-              </button>
-            );
-          })}
-        </GlassPanel>
+        {/* 장비 — 1.252.0 PM 「장비 성능을 한눈에 · 누르면 정보부터」 */}
+        <div>
+          <MainSecHead title="장 비" right={<span style={{ fontSize: 11.5, color: PALETTE.textDim }}>⚔ 전투력 {SLOTS.reduce((t, sl) => { const it = save.inventory.find(i => i.uid === u.equip[sl.id]); return t + (it ? E.itemPower(it) : 0); }, 0).toLocaleString()} · 누르면 정보</span>} />
+          <div className="flex flex-col gap-1.5 mt-1">
+            {SLOTS.map(sl => {
+              const it = save.inventory.find(i => i.uid === u.equip[sl.id]);
+              if (!it) return (
+                <button key={sl.id} onClick={() => setSlotPick(sl.id)} className="ui-press w-full text-left" style={{ padding: '10px 12px', border: `1px dashed ${MS.line}`, background: 'transparent', color: PALETTE.textDim, fontSize: 12.5 }}>{sl.icon} {sl.label} — 비어 있음 (눌러서 장착)</button>
+              );
+              const g = gradeOf(it.grade); const st = E.itemStats(it); const ud = E.uniqueDef(it); const eo = E.epicOptOf(it);
+              const rows = Object.keys(st).filter(k => st[k]).sort((x, y) => (BASE_STATS.indexOf(x) + 1 || 99) - (BASE_STATS.indexOf(y) + 1 || 99)).map(k => {
+                if (BASE_STATS.includes(k)) return { k, l: BASE_LABEL[k] === '공격' ? '공격력' : BASE_LABEL[k], v: Math.round(st[k]).toLocaleString(), base: true };
+                const t = E.statLabel(k, st[k]); const m = t.match(/^(.*?)\s*([+-]?[\d.]+.*)$/); return { k, l: m ? m[1] : t, v: m ? m[2] : '' };
+              });
+              return (
+                <button key={sl.id} onClick={() => setEqInfo(it.uid)} className="ui-press w-full text-left" style={{ padding: '8px 10px 8px 12px', background: MS.box, border: `1px solid ${MS.line}`, borderLeft: `3px solid ${g.color}` }}>
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="truncate font-bold" style={{ fontSize: 13.5, color: g.color }}>{sl.icon} {E.itemName(it)}{it.plus ? ` +${it.plus}` : ''}</span>
+                    <b className="flex-none" style={{ fontSize: 12.5, color: MS.gold }}>⚔ {E.itemPower(it).toLocaleString()}</b>
+                  </div>
+                  <div style={{ fontSize: 11, color: PALETTE.textDim }}>{g.label} · Lv.{it.ilv} · {sl.label}</div>
+                  <div className="grid mt-1" style={{ gridTemplateColumns: '1fr 1fr', columnGap: 12 }}>
+                    {rows.map(r => (
+                      <div key={r.k} className="flex items-baseline justify-between gap-1" style={{ padding: '1px 0', minWidth: 0 }}>
+                        <span className="truncate" style={{ fontSize: 11.5, color: PALETTE.textDim }}>{r.l}</span>
+                        <span className="flex-none" style={{ fontSize: 12, fontWeight: 800, color: r.base ? PALETTE.text : MS.red }}>{r.v}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {(ud || eo) && <div className="mt-1" style={{ fontSize: 11.5, color: '#c79bff', lineHeight: 1.45 }}>★ {(ud || eo).name} — <span style={{ color: PALETTE.text }}>{(ud || eo).desc}</span></div>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
         </>}
 
         {gtab === 'skill' && <>
@@ -1315,6 +1338,18 @@ function PartyView({ save, setSave, onBack }) {
         )}
       </div>
       {rebirthOpen && <RebirthSheet save={save} cid={cid} onClose={() => setRebirthOpen(false)} onRebirth={(b) => { setSave(E.rebirth(save, b, cid)); setRebirthOpen(false); }} />}
+      {eqInfo != null && (() => {
+        const it = save.inventory.find(i => i.uid === eqInfo); if (!it) return null;
+        const fb = (extra = {}) => ({ height: 42, fontSize: 13, background: 'transparent', border: `1px solid ${MS.line}`, color: PALETTE.text, ...extra });
+        return (
+          <MainItemModal save={save} item={it} cur={it} by={cid} usable onClose={() => setEqInfo(null)}
+            footer={<div className="grid gap-1.5" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
+              <button onClick={() => { setEqInfo(null); setSlotPick(it.slot); }} className="ui-press" style={fb({ color: MS.gold, borderColor: MS.gold, fontWeight: 800 })}>⇄ 교체</button>
+              <button onClick={() => { setSave(E.unequipItem(save, cid, it.slot)); setEqInfo(null); }} className="ui-press" style={fb()}>착용 해제</button>
+              <button onClick={() => { setEqInfo(null); onForge?.(); }} className="ui-press" style={fb()}>⚒ 대장간</button>
+            </div>} />
+        );
+      })()}
       {slotPick && (
         <BottomSheet title={`${SLOTS.find(s => s.id === slotPick).label} 장착`} onClose={() => setSlotPick(null)}>
           <div className="flex flex-col gap-2">
@@ -2926,7 +2961,7 @@ const DETAIL_STATS = [
   ['startShieldPct', '시작 보호막', 'pct'], ['skillShield', '스킬 사용 시 보호막(공격력 대비)', 'pct'], ['overhealShield', '넘친 회복 → 보호막', 'flag'],
   ['regenPct', '매 턴 HP 재생', 'pct'], ['dodgeHeal', '회피 시 회복', 'pct'], ['emergencyHeal', '위기 회복(HP 30%↓, 1회)', 'pct'],
   ['revive', '부활(1회) HP', 'pct'], ['guts', '불굴(1회 HP 1로 버팀)', 'flag'], ['cdr', '모든 스킬 재사용 단축', 'turn'], ['resetEvery', '재사용 초기화 주기', 'turn'],
-  ['openInferno', '시작 시 적 전체 겁화', 'flag'], ['rageDouble', '광폭화 중 모든 공격 2회', 'flag'], ['rageTurnsAdd', '광폭화 지속', 'turn'], ['rageLifesteal', '광폭화 중 흡혈 2배', 'flag'], ['multiHitsAdd', '연속 화살 타수', 'num'], ['spiritArrow', '정령 화살 확률', 'pct'],
+  ['openInferno', '개전 겁화 (매 턴 공격력의)', 'pct'], ['rageDouble', '광폭화 중 모든 공격 2회', 'flag'], ['rageTurnsAdd', '광폭화 지속', 'turn'], ['rageLifesteal', '광폭화 중 흡혈 2배', 'flag'], ['multiHitsAdd', '연속 화살 타수', 'num'], ['spiritArrow', '정령 화살 확률', 'pct'],
   ['blessMult', '축복 효과', 'x'], ['blessTurns', '축복 지속', 'turn'],
   ['famPct', '사역마 능력치', 'pct'], ['expPct', '경험치 획득', 'pct'], ['goldPct', '골드 획득', 'pct'], ['dropPct', '장비 획득률', 'pct'],
 ];
@@ -3032,6 +3067,7 @@ const DETAIL_DESC = {
   skillDmg: '스킬로 주는 피해가 이만큼 늘어난다.', dotDmg: '화상·출혈 같은 지속 피해가 이만큼 늘어난다.', regenPct: '매 턴 최대 HP의 이 비율만큼 회복한다.',
   cdr: '모든 스킬의 재사용 대기를 줄인다. 스킬별 단축과 합쳐 최대 2턴.', rageDouble: '광폭화가 켜진 동안 모든 공격이 2번 들어간다.',
   rageTurnsAdd: '광폭화가 이 턴만큼 더 오래 유지된다 (광기의 낙인).', rageLifesteal: '광폭화가 켜진 동안 흡혈량이 2배가 된다 (광기의 낙인).',
+  openInferno: '전투 시작 순간 적 전체에 거는 화상. 스킬 「겁화」와 별개로, 턴을 쓰지 않고 쿨타임과도 무관하다. 매 턴 공격력의 이 비율만큼 피해 · 3턴(지속 시간 배율 적용). 출처: 이프리트의 계약서 60% + 특성 「선제 화염」 1점당 4%.',
   expPct: '전투 경험치가 이만큼 늘어난다.', goldPct: '전투 골드가 이만큼 늘어난다.', dropPct: '장비가 떨어질 확률이 이만큼 늘어난다.',
 };
 const DETAIL_GREEN = ['regenPct', 'dodgeHeal', 'emergencyHeal', 'revive', 'guts', 'lifesteal', 'rageLifesteal', 'overhealShield', 'blessMult', 'blessTurns'];
@@ -3980,7 +4016,7 @@ export default function ChronicleGame({ onExit }) {
         onLeave={() => { dungRunRef.current = null; setSave(E.leaveDungeon(save)); setView('town'); }} />
     );
   } else if (view === 'party') {
-    content = <PartyView save={save} setSave={setSave} onBack={() => setView('town')} />;
+    content = <PartyView save={save} setSave={setSave} onBack={() => setView('town')} onForge={() => setView('forge')} />;
   } else if (view === 'raid') {
     content = <RaidView save={save} onBack={() => setView('town')} onFight={fightRaid} />;
   } else if (view === 'roster') {

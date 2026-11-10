@@ -192,7 +192,7 @@ const LBL = {
   critAfterCounter: ['반격·회피 직후 다음 공격 치명 확정', 'flag'], dmgReduce: ['받는 피해 감소', '%'], tauntReduce: ['도발 중 받는 피해 감소', '%'],
   regenPct: ['매 턴 HP 재생', '%'], shieldPct: ['전투 시작 보호막(최대 HP)', '%'], guts: ['전투당 1회 HP 1로 버팀', 'flag'], emergencyHeal: ['HP 30% 미만 시 1회 회복', '%'],
   thornsPct: ['받은 피해 반사', '%'], armorPen: ['방어 관통', '%'], chain: ['단일 공격 뒤 추가 타격 확률', '%'], execute: ['HP 30% 미만 적에게 피해', '%'],
-  cdr: ['모든 스킬 재사용 대기', 'turn'], dotDmg: ['지속 피해', '%'], skillDmg: ['스킬 피해', '%'], openInferno: ['전투 시작 시 적 전체 겁화(공격력)', '%'],
+  cdr: ['모든 스킬 재사용 대기', 'turn'], dotDmg: ['지속 피해', '%'], skillDmg: ['스킬 피해', '%'], openInferno: ['개전 겁화(매 턴 공격력 대비 · 스킬 겁화와 별개)', '%'],
   dotTurnsMult: ['지속 피해 지속 시간 ×', 'x'], firstCrit: ['전투 첫 공격 치명 확정', 'flag'], skillShield: ['스킬 사용 시 보호막(공격력)', '%'],
   shieldReduce: ['보호막이 있는 동안 받는 피해 감소', '%'], overhealShield: ['최대 HP를 넘는 회복은 보호막으로', 'flag'], lowHpDmg: ['HP 50% 이하일 때 피해', '%'],
   missingHpAtk: ['잃은 HP 10%마다 공격력', '%'], revive: ['전투당 1회 쓰러지면 부활(최대 HP)', '%'], rageDouble: ['광폭화 중 모든 공격 2회', 'flag'],
