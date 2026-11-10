@@ -119,7 +119,19 @@ function rollOption(rng, cls, gradeId, have) {
   let v = (d.v[0] + rng() * (d.v[1] - d.v[0])) * gm;
   v = d.pct ? +v.toFixed(3) : Math.max(1, Math.round(v));
   if (k === 'cdr') v = 1;
+  if (k === 'scdr') { const list = scdrSkillList(cls); if (!list.length) return null; return { k, v: 1, sk: pick(rng, list) }; }
   return { k, v };
+}
+// 1.241.0 「스킬 재사용 단축」 옵션 대상 — 그 직업의 시전 스킬 (갈래 전용 제외, 재사용 2턴 이상)
+export function scdrSkillList(cls) {
+  return Object.values(CHRONICLE_SKILLS).filter(s => s.cls === cls && !s.branch && s.kind !== 'passive' && (s.cd || 0) >= 2).map(s => s.id);
+}
+// 구 장비의 「재사용 단축(모든 스킬)」 옵션 → 그 직업 스킬 1개 전용으로 읽는다 (장비 번호로 고정 — 매번 같은 스킬)
+function normOpt(item, o) {
+  if (o.k !== 'cdr' || item.named) return o;
+  const list = scdrSkillList(item.cls);
+  if (!list.length) return o;
+  return { k: 'scdr', v: o.v || 1, sk: list[Math.abs((item.uid ?? 0) * 7 + 3) % list.length] };
 }
 // 장비 생성 — cls: 직업 id 또는 'common'(장신구)
 export function makeItem(rng, { cls, slot, grade, ilv, set = 'field', named = null }) {
@@ -175,14 +187,19 @@ export function itemStats(item) {
     for (const [k, v] of Object.entries(b.pct)) add(k, +(v * gm).toFixed(3));
   }
   const optM = 1 + 0.5 * FORGE.enhancePct * (item.plus || 0);
-  for (const o of item.opts || []) add(o.k, o.k === 'cdr' ? o.v : (OPTION_DEFS[o.k]?.pct ? +(o.v * optM).toFixed(3) : Math.round(o.v * optM)));
+  for (const o0 of item.opts || []) {
+    const o = normOpt(item, o0);
+    if (o.k === 'scdr') { add(`scdr_${o.sk}`, o.v); continue; }
+    add(o.k, o.k === 'cdr' ? o.v : (OPTION_DEFS[o.k]?.pct ? +(o.v * optM).toFixed(3) : Math.round(o.v * optM)));
+  }
   return out;
 }
 export function itemPower(item) {
   const s = itemStats(item);
   let pctSum = 0;
-  for (const [k, v] of Object.entries(s)) if (OPTION_DEFS[k]?.pct) pctSum += v;
-  return Math.round((s.atk || 0) * 2 + (s.def || 0) * 2 + (s.hp || 0) * 0.3 + (s.spd || 0) * 3 + (s.cdr || 0) * 20 + pctSum * (30 + item.ilv * 5)
+  let scdr = 0;
+  for (const [k, v] of Object.entries(s)) { if (OPTION_DEFS[k]?.pct) pctSum += v; if (k.startsWith('scdr_')) scdr += v; }
+  return Math.round((s.atk || 0) * 2 + (s.def || 0) * 2 + (s.hp || 0) * 0.3 + (s.spd || 0) * 3 + (s.cdr || 0) * 20 + scdr * 10 + pctSum * (30 + item.ilv * 5)
     + (item.named ? 60 + item.ilv * 3 : 0) + (item.eopt ? 30 + item.ilv * 2 : 0));
 }
 export function statLabel(k, v) {
@@ -190,6 +207,7 @@ export function statLabel(k, v) {
   if (k === 'atk') return `공격 ${v}`;
   if (k === 'def') return `방어 ${v}`;
   if (k === 'hp') return `HP ${v}`;
+  if (k.startsWith('scdr_')) return `「${CHRONICLE_SKILLS[k.slice(5)]?.name || '스킬'}」 재사용 -${v}턴`;
   if (!d) return `${k} ${v}`;
   if (d.pct) return `${d.label} +${Math.round(v * 1000) / 10}%`;
   return `${d.label} ${k === 'cdr' ? '-' : '+'}${v}${d.unit || ''}`;
@@ -242,6 +260,9 @@ function gearTotals(save, u) {
   }
   return t;
 }
+// 실제 재사용 단축 = 모든 스킬(유니크·특성) + 이 스킬 전용(일반 장비·시간의 모래) — 합계 최대 2턴
+export const CDR_CAP = 2;
+export function skillCdrOf(u, skillId) { return Math.min(CDR_CAP, (u.cdr || 0) + (u.skillCdr?.[skillId] || 0)); }
 function passiveFx(u) {
   const fx = {};
   for (const [id, lv] of Object.entries(u.skills)) {
@@ -305,6 +326,14 @@ export function deriveUnit(save, classId) {
   };
   for (const k of PASS_KEYS) if (G(k)) out[k] = G(k);
   if (Object.keys(skillBoost).length) out.skillBoost = skillBoost;
+  // 스킬별 재사용 단축 (1.241.0) — 일반 장비 「「스킬」 재사용 -1턴」 + 에픽 「시간의 모래」(가장 긴 스킬)
+  const skillCdr = {};
+  for (const [k, v] of Object.entries(g)) if (k.startsWith('scdr_') && v) skillCdr[k.slice(5)] = (skillCdr[k.slice(5)] || 0) + v;
+  if (G('longCdr')) {
+    const longest = out.skills.slice().sort((a, b) => (b.s.cd || 0) - (a.s.cd || 0))[0];
+    if (longest) skillCdr[longest.s.id] = (skillCdr[longest.s.id] || 0) + G('longCdr');
+  }
+  if (Object.keys(skillCdr).length) out.skillCdr = skillCdr;
   if (out.holyDmg) out.holyDmg = Math.min(T.holyCap || 9, out.holyDmg); // 치유→신성 피해 상한 (1.216.0)
   return out;
 }
@@ -1176,7 +1205,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
     }
     const { s, lv } = choice;
     const v = (s.base + s.perLv * (lv - 1)) * (1 + (u.skillBoost?.[s.id] || 0));
-    u.cds[s.id] = Math.max(1, s.cd + 1 - (u.cdr || 0));
+    u.cds[s.id] = Math.max(1, s.cd + 1 - skillCdrOf(u, s.id));
     const hits = [];
     const foes = alive('enemy').filter(f => !immuneTo(u, f)); // 봉인 레이드: 깰 수 없는 대상 제외 (1.231.0)
     const allies = alive('party');
