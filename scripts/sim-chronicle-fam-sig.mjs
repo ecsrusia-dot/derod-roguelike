@@ -11,7 +11,7 @@ const G = process.env.G || 'indigo', P = +(process.env.P ?? 5), R = +(process.en
 const keys = Object.keys(ENEMIES).filter(k => ENEMIES[k].name);
 const byArch = {}; for (const k of keys) { const a = famSignatureId(k); if (!byArch[a]) byArch[a] = k; }
 function run(save, id, tier, rng) { let s = structuredClone(save); s.dungeon = { id, tier, floor: 0, hp: null };
-  for (let i = 0; i < 8; i++) { const d = s.dungeon; if (!d) return false; const enc = E.dungeonEncounter(d, rng); const p = E.partyCombatants(s, d.hp); const b = E.simulateChronicleBattle(p, enc.enemies, rng);
+  for (let i = 0; i < 8; i++) { const d = s.dungeon; if (!d) return false; const enc = E.dungeonEncounter(d, rng); const p = E.partyCombatants(s, d.hp); const b = E.simulateChronicleBattle(p, (enc.enemies = E.scaleEnemiesForRebirth(s, enc.enemies)), rng);
     const r = E.applyBattle(s, { kind: 'dungeon', type: enc.type, enemies: enc.enemies }, b, rng); s = r.save; if (b.result !== 'win') return false; if (r.summary.dungeonClear) return true; } return false; }
 const archs = (process.env.A || Object.keys(FAM_SIGS).join(',')).split(',');
 console.log(`${did} ${G}+${P} 영웅/전설 ${R}회`);

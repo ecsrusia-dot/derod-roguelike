@@ -207,6 +207,7 @@ function BattleCard({ u, art, hp, sh, acting, fx, h, enemy = false, border, chil
       <div className="relative overflow-hidden" style={{ height: h, borderRadius: 12, border: `1.5px solid ${acting ? accent : border}`, boxShadow: acting ? `0 0 12px ${accent}66` : 'none', transition: 'box-shadow .2s, border-color .2s' }}>
         <img src={art} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ objectPosition: enemy ? '50% 40%' : '50% 22%', filter: dead ? 'grayscale(1)' : 'none' }} draggable={false} />
         <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, transparent 45%, #000d)' }} />
+        {enemy && u.intim ? <div className="absolute top-1 left-1 px-1.5" style={{ fontSize: 10.5, borderRadius: 6, background: u.intim >= 4 ? '#7a0d0dee' : '#3a1a1acc', color: u.intim >= 4 ? '#ffd0d0' : '#ff9a8a', border: '1px solid #ff6a5a88' }}>{u.intim >= 4 ? '☠ 절대 위압' : `☗ 위압 ${u.intim}`}</div> : null}
         <div className="absolute bottom-1 left-1.5 right-1.5">
           {h < 150 ? (
             // 좁은 카드 (레이드 등 인원이 많을 때) — 짧은 이름 + 바 아래 HP
@@ -339,12 +340,13 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
     return '';
   };
   const cardH = enemies.length > 3 || party.length > 3 ? 118 : 150;
+  const maxIntim = Math.max(0, ...enemies.map(e => e.intim || 0));
 
   return (
     <div className="absolute inset-0 flex flex-col" style={{ background: PALETTE.bg }}>
       {bg && <img src={bg} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ opacity: 0.18 }} onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
       <div className="relative flex items-center gap-2 px-3 pt-2 flex-none" style={{ minHeight: 44 }}>
-        <span style={{ fontSize: 12, color: PALETTE.textDim }}>{ctx.label} · {round}라운드{enemies[0]?.rebirthTier ? <span style={{ color: '#ff6ad5' }}> · ✦전승 {enemies[0].rebirthTier}단계</span> : null}</span>
+        <span style={{ fontSize: 12, color: PALETTE.textDim }}>{ctx.label} · {round}라운드{enemies[0]?.rebirthTier ? <span style={{ color: '#ff6ad5' }}> · ✦전승 {enemies[0].rebirthTier}단계</span> : null}{maxIntim ? <span style={{ color: '#ff7a6a' }}> · {maxIntim >= 4 ? '☠절대 위압' : `☗위압 ${maxIntim}단계`}</span> : null}</span>
         <div className="flex-1" />
         {SPEEDS.map(s => {
           const locked = s === 4 && boostLeft <= 0;
@@ -714,6 +716,13 @@ function TownView({ save, acc, go, onExit, onSwitchChar }) {
 }
 
 // ===== 사냥터 (1.213.0 — 지역당 6스테이지 · 처치 목표 + 관문 강적 → 보스) =====
+// 위압 안내 (1.235.0) — 적이 나보다 레벨이 높아 강화될 때만 표시
+function IntimNote({ heroLv, lv, what }) {
+  const n = E.intimidateLevel(heroLv, lv);
+  if (!n) return null;
+  const st = E.intimidateStep(n);
+  return <div style={{ fontSize: 11.5, color: n >= 4 ? '#ff6a5a' : '#ff9a7a' }}>{n >= 4 ? '☠' : '☗'} {what} Lv.{lv} — {st.label} (적 HP ×{st.hp} · 공격 ×{st.atk}){n >= 4 ? ' · 극복 불가 수준' : ''}</div>;
+}
 function FieldView({ save, onBack, onFight, onAuto, playScene, sceneOpen }) {
   const [sel, setSel] = useState(() => [...CHRONICLE_FIELDS].reverse().find(f => E.fieldUnlocked(save, f.id))?.id || 1);
   useEffect(() => { if (!sceneOpen) playScene({ at: 'field', fieldId: sel }); }, [sel, sceneOpen]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -764,6 +773,7 @@ function FieldView({ save, onBack, onFight, onAuto, playScene, sceneOpen }) {
           <div className="absolute bottom-2 left-3 right-3">
             <div className="font-bold" style={{ fontSize: 17, color: PALETTE.text }}>{f.name} <span style={{ fontSize: 13, color: f.color }}>· 스테이지 {stage + 1}</span></div>
             <div style={{ fontSize: 12, color: PALETTE.textDim }}>몹 <b style={{ color: lvColor(S.lv) }}>Lv.{S.lv}</b> · 강적 Lv.{S.lv + 1} · 보스 Lv.{f.bossLv}</div>
+            <IntimNote heroLv={heroLv} lv={S.lv} what="몹" />
           </div>
         </div>
 
@@ -878,7 +888,7 @@ function DungeonView({ save, onBack, onEnter, onFight, onLeave, onBuyKey, dungeo
             const past = d && d.floor > i;
             return (
               <div key={i} className="flex-1 text-center" style={{ padding: '8px 0', borderRadius: 10, fontSize: 11.5, border: `1px solid ${curF ? D.color : 'var(--ui-line)'}`, color: past ? PALETTE.textDim : curF ? D.color : PALETTE.text, background: curF ? `${D.color}1c` : 'transparent' }}>
-                {f.boss ? '👑' : `${i + 1}층`}<br /><span style={{ fontSize: 10.5 }}>Lv.{f.lv + T.lv}</span>
+                {f.boss ? '👑' : `${i + 1}층`}<br /><span style={{ fontSize: 10.5, color: E.intimidateLevel(save.units[save.hero].lv, f.lv + T.lv) ? '#ff7a6a' : undefined }}>Lv.{f.lv + T.lv}</span>
               </div>
             );
           })}
@@ -887,6 +897,7 @@ function DungeonView({ save, onBack, onEnter, onFight, onLeave, onBuyKey, dungeo
           <div style={{ fontSize: 11.5, color: PALETTE.textDim }}>
             {d ? '내 상태 — 층 사이 최대 HP의 25%만 회복' : `권장 Lv.${D.recLv + T.lv} · 적 HP ×${T.hp} · 공격 ×${T.atk} · 에픽 확률 ×${T.epicMult} · ◆ ×${T.shardMult} · 보스 유니크 ${Math.round(UNIQUE_CHANCE.dungeonBoss[d ? d.tier || 0 : tier] * 100)}%`}
           </div>
+          <IntimNote heroLv={save.units[save.hero].lv} lv={Math.max(...D.floors.map(x => x.lv)) + T.lv} what="던전 최고층" />
           {party.map(p => (
             <div key={p.id} className="flex items-center gap-2">
               <UnitIcon u={p} size={30} dim={p.hp <= 0} />

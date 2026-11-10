@@ -27,6 +27,13 @@ export const CHRONICLE_TUNING = {
   soloHp: 0.9, soloAtk: 1.3, soloGrowth: 0.055, expMult: 3,
   // 레벨 차이 경험치 감쇠 (1.234.1 PM 결정) — 몹이 나보다 free레벨 넘게 낮으면 1레벨당 perLv씩 감소, 최저 min
   expGap: { free: 5, perLv: 0.15, min: 0.1 },
+  // 위압 (1.235.0) — 적 레벨 − 주인공 레벨 차이가 클수록 적 HP·공격 강화. 10 이상은 극복 불가 수준
+  intimidate: [
+    { gap: 3, hp: 1.3, atk: 1.25, label: '위압 1단계' },
+    { gap: 5, hp: 1.8, atk: 1.8, label: '위압 2단계' },
+    { gap: 7, hp: 2.6, atk: 2.8, label: '위압 3단계' },
+    { gap: 10, hp: 8, atk: 7, label: '절대 위압' },
+  ],
   // 던전 솔로 보정 (1.214.0) — 층 사이 회복이 없으므로 던전 적만 따로 낮춘다 · 층당 적 수
   holyCap: 0.2, // 치유→신성 피해 합계 상한 (1.216.0 — 사제 + 사역마 조합 독주 보정)
   shieldCap: 0.15, // 시작 보호막 합계 상한 (1.216.0)

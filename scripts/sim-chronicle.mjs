@@ -69,7 +69,7 @@ function run(classId, seed) {
     const tryGate = !tryBoss && E.gateReady(save, fid, si) && lv > (failLv[gateKey] ?? -1);
     const enc = tryGate ? { ...E.rollGateEncounter(field, si, rng), stage: si } : E.rollFieldEncounter(field, rng, tryBoss, null, tryBoss ? null : si);
     const party = E.partyCombatants(save);
-    const b = E.simulateChronicleBattle(party, enc.enemies, rng);
+    const b = E.simulateChronicleBattle(party, (enc.enemies = E.scaleEnemiesForRebirth(save, enc.enemies)), rng);
     battles++;
     const t = enc.type;
     wr[t][1]++; if (b.result === 'win') { wr[t][0]++; if (t === 'normal') hpLoss.push(1 - b.finalHp[classId] / party[0].maxHp); }
