@@ -1267,7 +1267,7 @@ function PartyView({ save, setSave, onBack }) {
             return (
               <div key={s.id} className="flex items-center gap-2 mt-2">
                 <button onClick={() => setSkillInfo(s)} className="flex-1 min-w-0 text-left ui-press" style={{ background: 'transparent', border: 'none', padding: 0, opacity: locked ? 0.45 : 1 }}>
-                  <div style={{ fontSize: 13, color: lv ? PALETTE.text : PALETTE.textDim }}>{s.branch ? <span style={{ color: REBIRTH_BRANCHES[s.branch].color }}>✦ </span> : null}{s.name} <span style={{ fontSize: 11, color: lv ? PALETTE.legendary : PALETTE.textDim }}>{lv ? `Lv.${lv}/${SKILL_MAX_LV}` : locked ? `Lv.${s.reqLv}부터` : '미습득'}</span></div>
+                  <div style={{ fontSize: 13, color: lv ? PALETTE.text : PALETTE.textDim }}>{s.branch ? <span style={{ color: REBIRTH_BRANCHES[s.branch].color }}>✦ </span> : null}{s.name} <span style={{ fontSize: 11, color: lv ? PALETTE.legendary : PALETTE.textDim }}>{lv ? `Lv.${lv}/${SKILL_MAX_LV}` : locked ? `Lv.${s.reqLv}부터` : '미습득'}</span> <CdChip s={s} cdr={d.cdr || 0} /></div>
                   <div className="truncate" style={{ fontSize: 11, color: PALETTE.textDim }}>{describeSkill(s, Math.max(1, lv))}</div>
                 </button>
                 <button disabled={!can} onClick={() => setSave(E.learnSkill(save, cid, s.id))} className="ui-press flex-none" style={{ height: 34, padding: '0 10px', borderRadius: 9, border: `1px solid ${can ? PALETTE.legendary : 'var(--ui-line)'}`, color: can ? PALETTE.legendary : PALETTE.textDim, background: 'transparent', fontSize: 12, opacity: can ? 1 : 0.4 }}>
@@ -1276,7 +1276,11 @@ function PartyView({ save, setSave, onBack }) {
               </div>
             );
           })}
-          <div className="mt-2" style={{ fontSize: 11, color: PALETTE.textDim }}>스킬을 다 올리고 남은 포인트는 아래 <b style={{ color: PALETTE.legendary }}>특성</b>에 찍는다.</div>
+          <div className="mt-2" style={{ fontSize: 11, color: PALETTE.textDim, lineHeight: 1.55 }}>
+            ⏱ = 재사용 대기 (쓴 뒤 내 차례 N번은 못 씀){d.cdr ? <> · 장비·특성 <b style={{ color: '#7fd1c8' }}>재사용 단축 -{d.cdr}턴</b> 반영됨</> : null}<br />
+            쓸 수 있는 스킬이 여럿이면 쿨타임이 아니라 <b style={{ color: PALETTE.text }}>상황 순서</b>로 고른다: 회복(위급) → 보호막 → 강화 → 도발(위급) → 광역(적 2명+) → 단일 중 가장 센 스킬 → 없으면 기본 공격<br />
+            스킬을 다 올리고 남은 포인트는 아래 <b style={{ color: PALETTE.legendary }}>특성</b>에 찍는다.
+          </div>
         </GlassPanel>
 
         {/* 특성 트리 (1.224.0) */}
@@ -1323,7 +1327,8 @@ function PartyView({ save, setSave, onBack }) {
       {skillInfo && (
         <BottomSheet title={skillInfo.name} onClose={() => setSkillInfo(null)} maxHeight="60%">
           <div className="flex flex-col gap-1.5" style={{ fontSize: 12.5, color: PALETTE.text }}>
-            <div style={{ color: PALETTE.textDim }}>배울 수 있는 레벨 Lv.{skillInfo.reqLv}{skillInfo.cd ? ` · 재사용 ${skillInfo.cd}턴` : ''}</div>
+            <div style={{ color: PALETTE.textDim }}>배울 수 있는 레벨 Lv.{skillInfo.reqLv}</div>
+            <CdDetail s={skillInfo} cdr={d.cdr || 0} />
             {[1, 2, 3, 4, 5].map(l => (
               <div key={l} style={{ color: (u.skills[skillInfo.id] || 0) === l ? PALETTE.legendary : PALETTE.text }}>Lv.{l} — {describeSkill(skillInfo, l)}</div>
             ))}
@@ -2457,6 +2462,31 @@ function QuestView({ save, setSave, onBack, flash, onReplay }) {
         ))}
         {tab === 'story' && !seen.length && <div className="text-center py-10" style={{ fontSize: 12.5, color: PALETTE.textDim }}>아직 본 이야기가 없습니다</div>}
       </div>
+    </div>
+  );
+}
+
+// ===== 스킬 쿨타임 표시 (1.240.1) — 엔진 규칙: 쓴 뒤 대기 = max(0, 재사용 - 단축), 단축은 장비·특성 합산 최대 2 =====
+const cdWait = (s, cdr) => Math.max(0, (s.cd || 0) - (cdr || 0));
+function CdChip({ s, cdr }) {
+  if (s.kind === 'passive') return <span style={{ fontSize: 10.5, color: PALETTE.textDim }}>· 패시브</span>;
+  if (!s.cd) return null;
+  const w = cdWait(s, cdr);
+  return (
+    <span style={{ fontSize: 10.5, color: cdr ? '#7fd1c8' : PALETTE.textDim, whiteSpace: 'nowrap' }}>
+      ⏱ {cdr ? <><s style={{ opacity: 0.6 }}>{s.cd}</s>→{w ? `${w}턴` : '매 턴'}</> : `${s.cd}턴`}
+    </span>
+  );
+}
+function CdDetail({ s, cdr }) {
+  if (s.kind === 'passive') return <div style={{ color: PALETTE.textDim }}>패시브 — 쿨타임 없이 항상 적용</div>;
+  if (!s.cd) return null;
+  const w = cdWait(s, cdr);
+  return (
+    <div style={{ color: PALETTE.textDim, lineHeight: 1.55 }}>
+      ⏱ 재사용 대기 <b style={{ color: PALETTE.text }}>{s.cd}턴</b>
+      {cdr ? <> − 재사용 단축 <b style={{ color: '#7fd1c8' }}>{cdr}턴</b> (장비 옵션·유니크·특성 합산, 최대 2) = <b style={{ color: '#7fd1c8' }}>{w ? `${w}턴` : '매 턴 사용 가능'}</b></> : null}
+      <br />쓴 뒤 내 차례 {w}번은 이 스킬을 쓸 수 없고, 그 다음 차례부터 다시 쓸 수 있다
     </div>
   );
 }
