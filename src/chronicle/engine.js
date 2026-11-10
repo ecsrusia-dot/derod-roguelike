@@ -1342,8 +1342,13 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
     hits.push({ t: t.id, d, holy: true });
   }
   // 전투 시작 효과 — 이프리트의 계약서
+  // 1.252.0 — 시작 로그 추가(PM 「겁화가 적용 안 되는 것 같다」: 실제로는 걸렸지만 로그에 출처가 없어 안 보였음)
+  //   스킬 「겁화」와 별개 · 턴 소모 없음 · 쿨타임 무관 · 매 턴 공격력 × openInferno (유니크 60% + 특성 선제 화염 4%/점)
   for (const p of units.filter(x => x.side === 'party' && x.openInferno)) {
-    for (const e of units.filter(x => x.side === 'enemy')) e.dots.push({ v: Math.max(1, Math.round(p.atk * p.openInferno)), t: 3 * (p.dotTurnsMult || 1), src: p.id, sn: '겁화(계약서)' });
+    const v = Math.max(1, Math.round(p.atk * p.openInferno)); const turns = 3 * (p.dotTurnsMult || 1);
+    const foes = units.filter(x => x.side === 'enemy' && !immuneTo(p, x));
+    for (const e of foes) e.dots.push({ v, t: turns, src: p.id, sn: '개전 겁화' });
+    push({ a: p.id, n: `개전 겁화 (매 턴 ${v.toLocaleString()} · ${turns}턴)`, k: 'open', hits: foes.map(e => ({ t: e.id, burn: true })) });
   }
 
   let round = 0;
@@ -1649,6 +1654,8 @@ export function battleDetailStats(sim, party) {
         const S = sk(id, sn); S.dmg += d;
       }
       if (mine) { const d = e.hits?.[0]?.d || 0; U.dotTaken += d; U.taken += d; }
+    } else if (e.k === 'open') {
+      // 개전 효과 — 행동 아님 (피해는 이후 dotTick으로 집계)
     } else if (e.k === 'hot') {
       for (const h of e.hits || []) {
         if (mine) { U.hotHeal += h.h || 0; U.heal += h.h || 0; }

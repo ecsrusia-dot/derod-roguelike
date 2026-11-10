@@ -563,7 +563,7 @@ export const UNIQUE_ITEMS = {
   u_w_cloak: U('u_w_cloak', 'wanderer', 'armor', '먼지 낀 망토', { dmgReduce: 0.06, hpPct: 0.10 }, { critAfterCounter: 1 }, '반격·회피 직후 다음 공격 치명 확정'),
   u_w_beads: U('u_w_beads', 'wanderer', 'accessory', '스승의 염주', { hpPct: 0.10, defPct: 0.10 }, { emergencyHeal: 0.5, cdr: 1 }, '전투당 1회, HP 30% 이하가 되면 HP 50% 회복 · 모든 스킬 재사용 -1턴'),
   u_s_staff: U('u_s_staff', 'sage', 'weapon', '영겁의 지팡이', { skillDmg: 0.12, dotDmg: 0.2 }, { dotTurnsMult: 2 }, '지속 피해가 2배 길게 지속'),
-  u_s_pact: U('u_s_pact', 'sage', 'offhand', '이프리트의 계약서', { skillDmg: 0.10, atkPct: 0.08 }, { openInferno: 0.6 }, '전투 시작 시 적 전체에 「겁화」(3턴 지속 피해)'),
+  u_s_pact: U('u_s_pact', 'sage', 'offhand', '이프리트의 계약서', { skillDmg: 0.10, atkPct: 0.08 }, { openInferno: 0.6 }, '전투 시작 시 적 전체에 개전 겁화 — 매 턴 공격력 60% · 3턴 (스킬 「겁화」와 별개 · 턴 소모 없음)'),
   u_s_robe: U('u_s_robe', 'sage', 'armor', '재의 로브', { shieldPct: 0.08, hpPct: 0.08 }, { skillShield: 0.2 }, '스킬 사용 시 공격력 20%만큼 보호막'),
   u_s_glass: U('u_s_glass', 'sage', 'accessory', '시간의 모래시계', { atkPct: 0.08, critDmg: 0.2 }, { resetEvery: 3, cdr: 1 }, '3턴마다 무작위 스킬 재사용 대기 초기화 · 모든 스킬 재사용 -1턴'),
   u_d_thirst: U('u_d_thirst', 'demonblood', 'weapon', '피의 갈망', { atkPct: 0.10, hpPct: 0.08 }, { lifesteal: 0.15, overhealShield: 1 }, '흡혈 15%, 최대 HP를 넘는 회복은 보호막으로'),
