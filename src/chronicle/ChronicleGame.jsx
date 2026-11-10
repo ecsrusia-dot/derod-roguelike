@@ -26,22 +26,24 @@ import * as F from './familiar.js';
 import * as P from './preview.js';
 import * as O from './offline.js';
 import * as D from './daily.js';
+import * as BK from './backup.js';
 import { NPCS } from './story.js';
 import { CENEMIES as ENEMIES } from './enemies.js';
 
 const FONT_TITLE = '"Cinzel", "Noto Serif KR", serif';
 
 // 2.0 저장 = 계정(캐릭터 슬롯 + 공유 창고·재화). 1.x 저장(v1 키)은 읽기만 — 있었으면 시작 보상.
+// 1.236.1 저장 안전: 깨진 저장은 자동 백업으로 복구 · 백업도 없으면 원본을 따로 보관하고 새 계정 (backup.js)
+let loadStatus = { status: 'ok' };
 function loadAccount() {
-  try {
-    const raw = localStorage.getItem(CHRONICLE_SAVE_KEY);
-    if (raw) return JSON.parse(raw);
-    return A.newAccount(!!localStorage.getItem(CHRONICLE_SAVE_KEY_V1));
-  } catch { return A.newAccount(false); }
+  const r = BK.loadAccountSafe();
+  loadStatus = r;
+  if (r.acc) return r.acc;
+  let hadV1 = false;
+  try { hadV1 = !!localStorage.getItem(CHRONICLE_SAVE_KEY_V1); } catch { /* */ }
+  return A.newAccount(r.status === 'empty' && hadV1);
 }
-function writeAccount(acc) {
-  try { localStorage.setItem(CHRONICLE_SAVE_KEY, JSON.stringify(acc)); } catch { /* 저장 불가 */ }
-}
+function writeAccount(acc) { BK.writeAccountSafe(acc); }
 
 // ===== 작은 부품 =====
 const gradeOf = (id) => GRADES[gradeIdx(id)] || GRADES[0];
@@ -1996,8 +1998,95 @@ function ForgeView({ save, setSave, onBack, flash, onTrack = () => {} }) {
 
 // ===== 시작 · 캐릭터 슬롯 =====
 // 직업당 캐릭터 1명 (최대 5). 재화·열쇠·공용 창고는 모든 캐릭터가 공유한다.
-function TitleView({ acc, onSelect, onCreate, onExit, onReset }) {
+// ===== 저장 백업 (1.236.1) — 내보내기·가져오기·자동 백업 복원 =====
+function fmtWhen(ms) {
+  if (!ms) return '알 수 없음';
+  const d = new Date(ms); const p = (n) => String(n).padStart(2, '0');
+  return `${d.getMonth() + 1}/${d.getDate()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function SummaryLine({ sm }) {
+  return <span>캐릭터 {sm.chars}명 · 최고 Lv.{sm.maxLv} · 🪙{sm.gold.toLocaleString()} · 사역마 {sm.fams} · 창고 {sm.stash}</span>;
+}
+function BackupSheet({ acc, onClose, onImport }) {
+  const [msg, setMsg] = useState(null);
+  const [paste, setPaste] = useState('');
+  const [pending, setPending] = useState(null); // 가져올 계정 (확인 대기)
+  const fileRef = useRef(null);
+  const auto = useMemo(() => BK.backupInfo(), []);
+  const download = () => {
+    try {
+      const blob = new Blob([BK.exportText(acc)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = BK.exportFileName(); document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      setMsg('백업 파일을 저장했습니다 (다운로드 폴더 확인)');
+    } catch { setMsg('파일 저장에 실패했습니다 — 「텍스트 복사」를 써 주세요'); }
+  };
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(BK.exportText(acc)); setMsg('백업 텍스트를 복사했습니다 — 메모장 등에 붙여 넣어 보관하세요'); }
+    catch { setMsg('복사에 실패했습니다 — 「파일로 저장」을 써 주세요'); }
+  };
+  const tryImport = (text) => {
+    const r = BK.parseImport(text);
+    if (r.error) { setMsg(r.error); return; }
+    setPending(r);
+  };
+  const onFile = (e) => {
+    const f = e.target.files?.[0]; if (!f) return;
+    const rd = new FileReader(); rd.onload = () => tryImport(rd.result); rd.readAsText(f);
+    e.target.value = '';
+  };
+  const cur = BK.accountSummary(acc);
+  if (pending) {
+    const sm = BK.accountSummary(pending.acc);
+    return (
+      <BottomSheet title="가져오기 확인" onClose={() => setPending(null)} maxHeight="70%">
+        <div style={{ fontSize: 12.5, color: PALETTE.text, lineHeight: 1.7 }}>지금 진행이 <b style={{ color: '#e06a5f' }}>백업 내용으로 바뀝니다</b>. 되돌릴 수 없으니 필요하면 먼저 지금 진행을 내보내 두세요.</div>
+        <GlassPanel className="p-3 mt-2" style={{ fontSize: 12, color: PALETTE.textDim, lineHeight: 1.7 }}>
+          지금: <SummaryLine sm={cur} /><br />백업{pending.at ? ` (${fmtWhen(pending.at)})` : ''}: <b style={{ color: PALETTE.text }}><SummaryLine sm={sm} /></b>
+        </GlassPanel>
+        <div className="flex gap-2 mt-3">
+          <UIButton variant="ghost" onClick={() => setPending(null)}>취소</UIButton>
+          <UIButton onClick={() => onImport(pending.acc)}>백업으로 바꾸기</UIButton>
+        </div>
+      </BottomSheet>
+    );
+  }
+  return (
+    <BottomSheet title="💾 저장 백업" onClose={onClose} maxHeight="85%">
+      <div style={{ fontSize: 12, color: PALETTE.textDim, lineHeight: 1.6 }}>황혼 연대기는 이 기기의 브라우저에만 저장됩니다. 기기를 바꾸거나 브라우저 데이터를 지우기 전에 백업해 두세요.</div>
+      <GlassPanel className="p-3 mt-2" style={{ fontSize: 12, color: PALETTE.text }}>
+        <div className="font-semibold mb-1">내보내기</div>
+        <div style={{ color: PALETTE.textDim, marginBottom: 6 }}>지금: <SummaryLine sm={cur} /></div>
+        <div className="flex gap-2">
+          <UIButton onClick={download}>📥 파일로 저장</UIButton>
+          <UIButton variant="ghost" onClick={copy}>📋 텍스트 복사</UIButton>
+        </div>
+      </GlassPanel>
+      <GlassPanel className="p-3 mt-2" style={{ fontSize: 12, color: PALETTE.text }}>
+        <div className="font-semibold mb-1">가져오기</div>
+        <input ref={fileRef} type="file" accept=".json,application/json,text/plain" onChange={onFile} style={{ display: 'none' }} />
+        <UIButton variant="ghost" onClick={() => fileRef.current?.click()}>📂 백업 파일 선택</UIButton>
+        <textarea value={paste} onChange={(e) => setPaste(e.target.value)} placeholder="또는 백업 텍스트를 여기에 붙여 넣기" rows={3} className="w-full mt-2" style={{ fontSize: 11.5, padding: 8, borderRadius: 10, background: '#0006', color: PALETTE.text, border: '1px solid var(--ui-line)', resize: 'vertical' }} />
+        {paste.trim() ? <div className="mt-1"><UIButton variant="ghost" onClick={() => tryImport(paste)}>붙여 넣은 텍스트로 가져오기</UIButton></div> : null}
+      </GlassPanel>
+      <GlassPanel className="p-3 mt-2" style={{ fontSize: 12, color: PALETTE.text }}>
+        <div className="font-semibold mb-1">자동 백업 (10분마다)</div>
+        {auto ? (
+          <>
+            <div style={{ color: PALETTE.textDim, marginBottom: 6 }}>{fmtWhen(auto.at)} 저장본: <SummaryLine sm={auto.summary} /></div>
+            <UIButton variant="ghost" onClick={() => setPending({ acc: auto.acc, at: auto.at })}>↺ 자동 백업으로 되돌리기</UIButton>
+          </>
+        ) : <div style={{ color: PALETTE.textDim }}>아직 자동 백업이 없습니다 (10분 이상 플레이하면 생깁니다)</div>}
+      </GlassPanel>
+      {msg ? <div className="mt-2" style={{ fontSize: 12, color: PALETTE.dawn }}>{msg}</div> : null}
+    </BottomSheet>
+  );
+}
+
+function TitleView({ acc, onSelect, onCreate, onExit, onReset, onImport }) {
   const [picking, setPicking] = useState(null); // 새로 만들 직업 id
+  const [backupOpen, setBackupOpen] = useState(false);
   const [resetStep, setResetStep] = useState(0); // 0 닫힘 · 1 안내 · 2 최종 확인
   const chars = acc.chars || {};
   const owned = CHRONICLE_CLASSES.filter(c => chars[c.id]);
@@ -2067,10 +2156,12 @@ function TitleView({ acc, onSelect, onCreate, onExit, onReset }) {
           <div className="flex items-center justify-center gap-2 flex-wrap pb-1">
             <span style={{ fontSize: 11, color: PALETTE.textDim }}>v{GAME_VERSION}</span>
             <UpdateButton />
+            <button onClick={() => setBackupOpen(true)} className="ui-press" style={{ minHeight: 32, padding: '0 12px', borderRadius: 999, fontSize: 11, background: 'transparent', border: '1px solid #9cc4e466', color: '#9cc4e4' }}>💾 백업</button>
             <button onClick={() => setResetStep(1)} className="ui-press" style={{ minHeight: 32, padding: '0 12px', borderRadius: 999, fontSize: 11, background: 'transparent', border: '1px solid #e06a5f66', color: '#e06a5f' }}>↺ 처음부터 다시</button>
           </div>
         </div>
       </div>
+      {backupOpen && <BackupSheet acc={acc} onClose={() => setBackupOpen(false)} onImport={(a) => { setBackupOpen(false); onImport(a); }} />}
       {resetStep > 0 && (
         <BottomSheet title="↺ 황혼 연대기 초기화" onClose={() => setResetStep(0)} maxHeight="70%">
           <div style={{ fontSize: 12.5, color: PALETTE.text, lineHeight: 1.7 }}>
@@ -2674,6 +2765,7 @@ function BoostSheet({ save, onClose, onBuy }) {
 // ===== 메인 =====
 export default function ChronicleGame({ onExit }) {
   const [acc, setAcc] = useState(loadAccount);
+  const [loadNotice, setLoadNotice] = useState(() => (loadStatus.status === 'restored' || loadStatus.status === 'lost' ? loadStatus : null)); // 1.236.1 깨진 저장 안내
   const save = useMemo(() => A.toView(acc), [acc]);
   const [view, setView] = useState('title');
   const [battle, setBattle] = useState(null);
@@ -2882,6 +2974,7 @@ export default function ChronicleGame({ onExit }) {
   if (!save || view === 'title') {
     content = (
       <TitleView acc={acc} onExit={onExit}
+        onImport={(a) => { setRepeat(false); setBattle(null); setScene(null); setAcc(a); flash('백업을 불러왔습니다'); }}
         onReset={() => { setRepeat(false); setBattle(null); setScene(null); setAcc(A.newAccount(false)); flash('황혼 연대기를 처음부터 시작합니다'); }}
         onSelect={(cid) => { setRepeat(false); setAcc(a => A.selectCharacter(a, cid)); setView('town'); }}
         onCreate={(cid) => { setRepeat(false); setAcc(a => A.createCharacter(a, cid)); setView('town'); }} />
@@ -2937,6 +3030,16 @@ export default function ChronicleGame({ onExit }) {
       {boostSheet && save && <BoostSheet save={save} onClose={() => setBoostSheet(false)} onBuy={() => { const n = E.buyBoost(save); if (n === save) { flash(save.gold < E.boostCost(save) ? '골드가 부족합니다' : `최대 ${BOOST.maxStackMin / 60}시간까지 쌓을 수 있습니다`); return; } setSave(n); flash(`⏩ ×4 배속 +${BOOST.minutes}분`); }} />}
       {acc.giftNotice && view === 'title' && <GiftNotice acc={acc} onClose={() => setAcc(a => ({ ...a, giftNotice: false }))} />}
       {view === 'town' && !scene && acc.offline?.pending && acc.chars?.[acc.offline.pending.hero] && <OfflineSheet pd={acc.offline.pending} onClaim={claimOffline} />}
+      {loadNotice && (
+        <BottomSheet title={loadNotice.status === 'restored' ? '⚠ 저장 복구' : '⚠ 저장을 읽지 못했습니다'} onClose={() => setLoadNotice(null)} maxHeight="60%">
+          <div style={{ fontSize: 12.5, color: PALETTE.text, lineHeight: 1.7 }}>
+            {loadNotice.status === 'restored'
+              ? <>저장 파일이 손상되어 <b style={{ color: PALETTE.legendary }}>자동 백업({fmtWhen(loadNotice.at)})으로 복구</b>했습니다. 그 이후 진행 일부가 빠졌을 수 있습니다.</>
+              : <>저장 파일이 손상되어 새로 시작합니다. <b style={{ color: PALETTE.legendary }}>손상된 원본은 지우지 않고 따로 보관</b>했습니다. 백업 파일이 있다면 타이틀의 「💾 백업 → 가져오기」로 되돌릴 수 있습니다.</>}
+          </div>
+          <div className="mt-3"><UIButton onClick={() => setLoadNotice(null)}>확인</UIButton></div>
+        </BottomSheet>
+      )}
       {scene && <SceneView key={scene.scene.id} save={save} scene={scene.scene} onEnd={endScene} />}
       {toast && (
         <div className="absolute left-1/2 z-50 pointer-events-none" style={{ bottom: 90, transform: 'translateX(-50%)', padding: '8px 14px', borderRadius: 999, background: '#000d', border: '1px solid var(--ui-line-strong)', color: PALETTE.legendary, fontSize: 12.5, whiteSpace: 'nowrap' }}>{toast}</div>
