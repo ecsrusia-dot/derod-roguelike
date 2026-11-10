@@ -27,6 +27,8 @@ import * as P from './preview.js';
 import * as O from './offline.js';
 import * as D from './daily.js';
 import * as BK from './backup.js';
+import * as CS from './cloudSave.js';
+import { watchAuthState, signInGoogle, getUserInfo } from '../cloud/auth.js';
 import { NPCS } from './story.js';
 import { CENEMIES as ENEMIES } from './enemies.js';
 
@@ -2022,7 +2024,33 @@ function fmtWhen(ms) {
 function SummaryLine({ sm }) {
   return <span>캐릭터 {sm.chars}명 · 최고 Lv.{sm.maxLv} · 🪙{sm.gold.toLocaleString()} · 사역마 {sm.fams} · 창고 {sm.stash}</span>;
 }
-function BackupSheet({ acc, onClose, onImport }) {
+function CloudPanel({ api, onPick, setMsg }) {
+  const { user, state } = api;
+  return (
+    <GlassPanel className="p-3 mt-2" style={{ fontSize: 12, color: PALETTE.text }}>
+      <div className="font-semibold mb-1">☁ 클라우드 저장</div>
+      {!user ? (
+        <>
+          <div style={{ color: PALETTE.textDim, marginBottom: 6 }}>구글 계정으로 로그인하면 다른 기기에서도 이어서 할 수 있습니다. 본편과 같은 계정을 씁니다.</div>
+          <UIButton onClick={api.login}>구글 로그인</UIButton>
+        </>
+      ) : (
+        <>
+          <div style={{ color: PALETTE.textDim, marginBottom: 6, lineHeight: 1.6 }}>
+            {user.isAnonymous ? '게스트 계정 (이 기기 전용 — 기기를 바꾸려면 본편에서 구글 계정 연동)' : `${user.displayName}${user.email ? ` · ${user.email}` : ''}`}<br />
+            {state.busy ? '동기화 중…' : state.lastUp ? `마지막 저장 ${fmtWhen(state.lastUp)} · 3분마다 자동 저장` : state.checkedUid ? '자동 저장 켜짐' : '클라우드 확인 전 — 자동 저장 대기'}
+          </div>
+          <div className="flex gap-2">
+            <UIButton onClick={async () => { const r = await api.upload(); if (r) setMsg(r.ok ? '클라우드에 저장했습니다' : r.error); }}>⬆ 지금 올리기</UIButton>
+            <UIButton variant="ghost" onClick={async () => { const r = await api.download(); if (!r) return; if (!r.ok) setMsg(r.error); else if (!r.exists) setMsg('클라우드에 저장된 진행이 없습니다'); else onPick(r); }}>⬇ 불러오기</UIButton>
+          </div>
+        </>
+      )}
+      {state.error ? <div className="mt-1.5" style={{ color: '#e06a5f' }}>⚠ {state.error}</div> : null}
+    </GlassPanel>
+  );
+}
+function BackupSheet({ acc, onClose, onImport, cloudApi }) {
   const [msg, setMsg] = useState(null);
   const [paste, setPaste] = useState('');
   const [pending, setPending] = useState(null); // 가져올 계정 (확인 대기)
@@ -2069,7 +2097,8 @@ function BackupSheet({ acc, onClose, onImport }) {
   }
   return (
     <BottomSheet title="💾 저장 백업" onClose={onClose} maxHeight="85%">
-      <div style={{ fontSize: 12, color: PALETTE.textDim, lineHeight: 1.6 }}>황혼 연대기는 이 기기의 브라우저에만 저장됩니다. 기기를 바꾸거나 브라우저 데이터를 지우기 전에 백업해 두세요.</div>
+      <div style={{ fontSize: 12, color: PALETTE.textDim, lineHeight: 1.6 }}>기본 저장은 이 기기의 브라우저입니다. 구글 로그인으로 클라우드 저장을 켜거나, 기기를 바꾸기 전에 파일로 백업해 두세요.</div>
+      {cloudApi && <CloudPanel api={cloudApi} onPick={(r) => setPending({ acc: r.acc, at: r.savedAt })} setMsg={setMsg} />}
       <GlassPanel className="p-3 mt-2" style={{ fontSize: 12, color: PALETTE.text }}>
         <div className="font-semibold mb-1">내보내기</div>
         <div style={{ color: PALETTE.textDim, marginBottom: 6 }}>지금: <SummaryLine sm={cur} /></div>
@@ -2099,7 +2128,7 @@ function BackupSheet({ acc, onClose, onImport }) {
   );
 }
 
-function TitleView({ acc, onSelect, onCreate, onExit, onReset, onImport }) {
+function TitleView({ acc, onSelect, onCreate, onExit, onReset, onImport, cloudApi }) {
   const [picking, setPicking] = useState(null); // 새로 만들 직업 id
   const [backupOpen, setBackupOpen] = useState(false);
   const [resetStep, setResetStep] = useState(0); // 0 닫힘 · 1 안내 · 2 최종 확인
@@ -2176,7 +2205,7 @@ function TitleView({ acc, onSelect, onCreate, onExit, onReset, onImport }) {
           </div>
         </div>
       </div>
-      {backupOpen && <BackupSheet acc={acc} onClose={() => setBackupOpen(false)} onImport={(a) => { setBackupOpen(false); onImport(a); }} />}
+      {backupOpen && <BackupSheet acc={acc} cloudApi={cloudApi} onClose={() => setBackupOpen(false)} onImport={(a) => { setBackupOpen(false); onImport(a); }} />}
       {resetStep > 0 && (
         <BottomSheet title="↺ 황혼 연대기 초기화" onClose={() => setResetStep(0)} maxHeight="70%">
           <div style={{ fontSize: 12.5, color: PALETTE.text, lineHeight: 1.7 }}>
@@ -2828,6 +2857,59 @@ export default function ChronicleGame({ onExit }) {
   }, [repeat, autoProg]);
 
   useEffect(() => { writeAccount(acc); }, [acc]);
+  // ===== 클라우드 저장 (1.237.1) — 본편과 같은 Firebase 계정, 위치는 users/{uid}/chronicle/save =====
+  // checkedUid: 이 기기에서 클라우드를 한 번 확인한 계정 — 확인 전에는 자동 업로드하지 않는다 (빈 새 기기가 클라우드를 덮지 않게)
+  const [cloudUser, setCloudUser] = useState(null);
+  const [cloud, setCloud] = useState({ checkedUid: null, lastUp: null, busy: false, error: null, conflict: null });
+  const accRef = useRef(acc); accRef.current = acc;
+  const dirtyRef = useRef(false);
+  useEffect(() => { dirtyRef.current = true; }, [acc]);
+  useEffect(() => {
+    let unsub = () => {};
+    try { unsub = watchAuthState((u) => setCloudUser(u ? getUserInfo(u) : null)); } catch { /* firebase 미초기화 */ }
+    return unsub;
+  }, []);
+  const cloudUpload = async (uid, a) => {
+    setCloud(c => ({ ...c, busy: true }));
+    const r = await CS.uploadChronicle(uid, a);
+    if (r.ok) dirtyRef.current = false;
+    setCloud(c => ({ ...c, busy: false, lastUp: r.ok ? r.savedAt : c.lastUp, error: r.ok ? null : r.error, checkedUid: r.ok ? uid : c.checkedUid }));
+    return r;
+  };
+  // 로그인 확인되면 클라우드와 비교 — 같으면 그대로, 없으면 올리기, 다르면 사용자에게 묻기
+  useEffect(() => {
+    const uid = cloudUser?.uid;
+    if (!uid || cloud.checkedUid === uid) return;
+    let alive = true;
+    (async () => {
+      setCloud(c => ({ ...c, busy: true, error: null }));
+      const r = await CS.downloadChronicle(uid);
+      if (!alive) return;
+      if (!r.ok) { setCloud(c => ({ ...c, busy: false, error: r.error })); return; }
+      if (!r.exists) { setCloud(c => ({ ...c, busy: false })); await cloudUpload(uid, accRef.current); return; }
+      const local = BK.accountSummary(accRef.current);
+      const cmp = CS.compareSummaries(local, r.summary);
+      if (cmp.same) { setCloud(c => ({ ...c, busy: false, checkedUid: uid, lastUp: r.savedAt })); return; }
+      setCloud(c => ({ ...c, busy: false, conflict: { uid, acc: r.acc, savedAt: r.savedAt, summary: r.summary, local, cloudAhead: cmp.cloudAhead } }));
+    })();
+    return () => { alive = false; };
+  }, [cloudUser?.uid, cloud.checkedUid]); // eslint-disable-line react-hooks/exhaustive-deps
+  // 자동 업로드 — 확인된 계정만, 바뀐 게 있을 때 3분마다 + 화면을 떠날 때
+  useEffect(() => {
+    const uid = cloudUser?.uid;
+    if (!uid || cloud.checkedUid !== uid) return;
+    const tick = () => { if (dirtyRef.current && !cloud.busy) cloudUpload(uid, accRef.current); };
+    const id = setInterval(tick, CS.CLOUD.autoEveryMs);
+    const onHide = () => { if (document.visibilityState === 'hidden') tick(); };
+    document.addEventListener('visibilitychange', onHide);
+    return () => { clearInterval(id); document.removeEventListener('visibilitychange', onHide); };
+  }, [cloudUser?.uid, cloud.checkedUid]); // eslint-disable-line react-hooks/exhaustive-deps
+  const cloudApi = {
+    user: cloudUser, state: cloud,
+    login: async () => { try { await signInGoogle(); } catch { setCloud(c => ({ ...c, error: '구글 로그인에 실패했습니다' })); } },
+    upload: async () => { if (!cloudUser) return; const r = await cloudUpload(cloudUser.uid, accRef.current); return r; },
+    download: async () => { if (!cloudUser) return null; setCloud(c => ({ ...c, busy: true })); const r = await CS.downloadChronicle(cloudUser.uid); setCloud(c => ({ ...c, busy: false, error: r.ok ? null : r.error })); return r; },
+  };
   // 🗝 날짜가 바뀌면 열쇠 충전 (화면 이동 때마다 확인)
   useEffect(() => {
     if (!save) return;
@@ -2988,7 +3070,7 @@ export default function ChronicleGame({ onExit }) {
   let content;
   if (!save || view === 'title') {
     content = (
-      <TitleView acc={acc} onExit={onExit}
+      <TitleView acc={acc} onExit={onExit} cloudApi={cloudApi}
         onImport={(a) => { setRepeat(false); setBattle(null); setScene(null); setAcc(a); flash('백업을 불러왔습니다'); }}
         onReset={() => { setRepeat(false); setBattle(null); setScene(null); setAcc(A.newAccount(false)); flash('황혼 연대기를 처음부터 시작합니다'); }}
         onSelect={(cid) => { setRepeat(false); setAcc(a => A.selectCharacter(a, cid)); setView('town'); }}
@@ -3045,6 +3127,19 @@ export default function ChronicleGame({ onExit }) {
       {boostSheet && save && <BoostSheet save={save} onClose={() => setBoostSheet(false)} onBuy={() => { const n = E.buyBoost(save); if (n === save) { flash(save.gold < E.boostCost(save) ? '골드가 부족합니다' : `최대 ${BOOST.maxStackMin / 60}시간까지 쌓을 수 있습니다`); return; } setSave(n); flash(`⏩ ×4 배속 +${BOOST.minutes}분`); }} />}
       {acc.giftNotice && view === 'title' && <GiftNotice acc={acc} onClose={() => setAcc(a => ({ ...a, giftNotice: false }))} />}
       {view === 'town' && !scene && acc.offline?.pending && acc.chars?.[acc.offline.pending.hero] && <OfflineSheet pd={acc.offline.pending} onClaim={claimOffline} />}
+      {cloud.conflict && (
+        <BottomSheet title="☁ 클라우드 저장 확인" onClose={() => {}} maxHeight="70%">
+          <div style={{ fontSize: 12.5, color: PALETTE.text, lineHeight: 1.7 }}>이 기기의 진행과 클라우드 저장이 다릅니다. 어느 쪽으로 이어갈까요? <b style={{ color: '#e06a5f' }}>고르지 않은 쪽은 덮어씌워집니다.</b></div>
+          <GlassPanel className="p-3 mt-2" style={{ fontSize: 12, color: PALETTE.textDim, lineHeight: 1.7 }}>
+            ☁ 클라우드{cloud.conflict.savedAt ? ` (${fmtWhen(cloud.conflict.savedAt)})` : ''}: <b style={{ color: PALETTE.text }}><SummaryLine sm={cloud.conflict.summary} /></b><br />
+            📱 이 기기: <SummaryLine sm={cloud.conflict.local} />
+          </GlassPanel>
+          <div className="flex flex-col gap-2 mt-3">
+            <UIButton variant={cloud.conflict.cloudAhead ? 'primary' : 'ghost'} onClick={() => { const cf = cloud.conflict; setRepeat(false); setBattle(null); setScene(null); setAcc(cf.acc); dirtyRef.current = false; setCloud(c => ({ ...c, conflict: null, checkedUid: cf.uid, lastUp: cf.savedAt })); setView('title'); flash('클라우드 저장을 불러왔습니다'); }}>☁ 클라우드 저장으로 이어하기{cloud.conflict.cloudAhead ? ' (진행이 더 많음)' : ''}</UIButton>
+            <UIButton variant={cloud.conflict.cloudAhead ? 'ghost' : 'primary'} onClick={async () => { const cf = cloud.conflict; setCloud(c => ({ ...c, conflict: null })); const r = await cloudUpload(cf.uid, accRef.current); flash(r.ok ? '이 기기 진행을 클라우드에 올렸습니다' : r.error); }}>📱 이 기기 진행 유지 (클라우드에 올리기)</UIButton>
+          </div>
+        </BottomSheet>
+      )}
       {loadNotice && (
         <BottomSheet title={loadNotice.status === 'restored' ? '⚠ 저장 복구' : '⚠ 저장을 읽지 못했습니다'} onClose={() => setLoadNotice(null)} maxHeight="60%">
           <div style={{ fontSize: 12.5, color: PALETTE.text, lineHeight: 1.7 }}>
