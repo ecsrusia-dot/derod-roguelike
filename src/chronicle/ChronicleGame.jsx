@@ -492,7 +492,7 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
                 {summary.towerCheckpoint ? <div className="text-center font-semibold" style={{ color: '#9cc4e4' }}>🚩 {summary.towerCheckpoint}층 체크포인트 저장 — 다음 도전은 {summary.towerCheckpoint + 1}층부터</div> : null}
                 {summary.gateOpen ? <div className="text-center font-semibold" style={{ color: PALETTE.legendary }}>⚔ 처치 목표 달성 — 관문 도전 가능!</div> : null}
                 {summary.stageClear ? <div className="text-center font-semibold" style={{ color: '#9cc4e4' }}>🔓 스테이지 {summary.stageClear} 관문 통과!</div> : null}
-                {summary.famShards ? <div className="text-center" style={{ color: '#d07ae8' }}>📜 계약서 조각 +{summary.famShards}</div> : null}
+                {summary.famShards || summary.famSouls ? <div className="text-center" style={{ color: '#d07ae8' }}>{summary.famShards ? `📜 계약서 조각 +${summary.famShards}` : ''}{summary.famShards && summary.famSouls ? ' · ' : ''}{summary.famSouls ? `🔮 사역혼 +${summary.famSouls}` : ''}</div> : null}
                 {summary.famExp?.ups ? <div className="text-center font-semibold" style={{ color: '#e8b04a' }}>🐾 {F.famName(summary.famExp.key)} Lv.{summary.famExp.lv} 달성!</div> : null}
                 {summary.keys ? <div className="text-center font-semibold" style={{ color: PALETTE.legendary }}>🗝 던전 열쇠 +{summary.keys}</div> : null}
                 {summary.talentScroll ? <div className="text-center font-semibold" style={{ color: '#7fd1c8' }}>📖 특성 초기화 주문서 +{summary.talentScroll}</div> : null}
@@ -1704,7 +1704,8 @@ function FamiliarView({ save, setSave, onBack, flash, onTrack = () => {} }) {
             </div>
             <GlassPanel className="p-3" style={{ fontSize: 11.5, color: PALETTE.textDim, lineHeight: 1.6 }}>
               <b style={{ color: PALETTE.text }}>중복</b> → 🔮 사역혼 (적 1 · 녹 3 · 청 10 · 남 30 · 자 100). 더 높은 등급으로 중복이 나오면 그 등급으로 올라간다.<br />
-              <b style={{ color: PALETTE.text }}>강화</b> +1~+{F.FAM_TUNING.maxPlus} (단계당 능력치 +{Math.round(F.FAM_TUNING.plusStatPct * 100)}%) → <b style={{ color: PALETTE.text }}>+{F.FAM_TUNING.maxPlus}에서 진화</b> 도전 — 실패하면 강화 -{F.FAM_TUNING.evolveFailDrop}단계.
+              <b style={{ color: PALETTE.text }}>사역혼 얻기</b> — 중복 소환 · <b style={{ color: PALETTE.text }}>전투 승리</b>(강적 40% · 보스·던전·첨탑 보스 확정) · 일일 임무.<br />
+              <b style={{ color: PALETTE.text }}>강화</b> +1~+{F.FAM_TUNING.maxPlus} (단계당 능력치 +{Math.round(F.FAM_TUNING.plusStatPct * 100)}%) → <b style={{ color: PALETTE.text }}>+{F.FAM_TUNING.maxPlus}에서 진화</b> 도전 — 실패하면 강화 -{F.FAM_TUNING.evolveFailDrop}단계(남령→자령은 -{F.famEvolveFailDrop('indigo')}) · <b style={{ color: PALETTE.text }}>천장</b>: 실패할 때마다 다음 성공률이 오른다.
             </GlassPanel>
           </>
         )}
@@ -1790,11 +1791,14 @@ function FamiliarView({ save, setSave, onBack, flash, onTrack = () => {} }) {
                   const r = E.evolveFam(save, sel);
                   if (!r.result) return;
                   setSave(r.save);
-                  flash(r.result === 'success' ? `진화 성공! ${F.FAM_GRADES[gi + 1].label}(으)로` : `진화 실패… 강화 -${F.FAM_TUNING.evolveFailDrop}단계`);
+                  flash(r.result === 'success' ? `진화 성공! ${F.FAM_GRADES[gi + 1].label}(으)로` : `진화 실패… 강화 -${F.famEvolveFailDrop(selF.grade)}단계 · 다음 성공률 ${Math.round(F.famEvolveRate(r.save.fams[sel]) * 100)}%`);
                 }}>
-                  {F.FAM_GRADES[gi + 1].label}(으)로 진화 — 성공률 {Math.round(g.evolve * 100)}% (🔮{vc})
+                  {F.FAM_GRADES[gi + 1].label}(으)로 진화 — 성공률 {Math.round(F.famEvolveRate(selF) * 100)}% (🔮{vc})
                 </UIButton>
               )}
+              {maxed && !last && <div className="text-center" style={{ fontSize: 11, color: PALETTE.textDim }}>
+                기본 {Math.round(g.evolve * 100)}% + 천장 {Math.round((F.famEvolveRate(selF) - g.evolve) * 100)}%p (실패 {selF.evoFails || 0}회 × {Math.round((F.FAM_TUNING.evolvePityAdd[selF.grade] || 0) * 100)}%p) · 최대 {F.famEvolveMaxTries(selF.grade)}번째 시도에 확정 · 실패 시 강화 -{F.famEvolveFailDrop(selF.grade)}
+              </div>}
               {maxed && last && <div className="text-center" style={{ fontSize: 12.5, color: g.color }}>최고 등급 · 최대 강화</div>}
               <UIButton variant="ghost" style={{ height: 40 }} onClick={() => setSel(null)}>닫기</UIButton>
             </div>
@@ -2705,7 +2709,7 @@ function huntRecord(sim, party, enc, summary, speed = 2, label = '') {
     win: sim.result === 'win', type: enc.type, rounds: dmg.rounds,
     kills: sim.result === 'win' ? enc.enemies.reduce((m, e) => ({ ...m, [e.tier]: (m[e.tier] || 0) + 1 }), {}) : {},
     units, skills: dmg.bySkill, detail: E.battleDetailStats(sim, party),
-    exp: summary.exp || 0, gold: summary.gold || 0, essence: summary.essence || 0, famShards: summary.famShards || 0, talentScroll: summary.talentScroll || 0,
+    exp: summary.exp || 0, gold: summary.gold || 0, essence: summary.essence || 0, famShards: summary.famShards || 0, famSouls: summary.famSouls || 0, talentScroll: summary.talentScroll || 0,
     shard: summary.shard || 0, keys: summary.keys || 0, famExp: summary.famExp?.gained || 0, salv,
     salvaged: (summary.autoSalvaged || 0) + (summary.autoDismantled || 0),
     items: (summary.items || []).map(i => i.grade), levelUps: Object.keys(summary.levelUps || {}).length,
@@ -2742,7 +2746,7 @@ function addHuntRecord(st, r) {
     const key = `${u?.fam ? `fam:${u.famKey}` : id}|${sn}`;
     st.skills[key] = (st.skills[key] || 0) + v;
   }
-  st.exp += r.exp; st.gold += r.gold; st.essence += r.essence; st.famShards += r.famShards; st.talentScroll = (st.talentScroll || 0) + (r.talentScroll || 0); st.levelUps += r.levelUps;
+  st.exp += r.exp; st.gold += r.gold; st.essence += r.essence; st.famShards += r.famShards; st.famSouls = (st.famSouls || 0) + (r.famSouls || 0); st.talentScroll = (st.talentScroll || 0) + (r.talentScroll || 0); st.levelUps += r.levelUps;
   st.shard = (st.shard || 0) + (r.shard || 0); st.keys = (st.keys || 0) + (r.keys || 0); st.famExp = (st.famExp || 0) + (r.famExp || 0); st.salvaged = (st.salvaged || 0) + (r.salvaged || 0);
   st.salv = st.salv || {}; for (const [k, v] of Object.entries(r.salv || {})) st.salv[k] = (st.salv[k] || 0) + v;
   st.ms = (st.ms || 0) + (r.ms || 0);
@@ -2965,7 +2969,7 @@ function gainRows(r) {
     { k: 'essence', icon: '✦', label: '정수', v: (r.essence || 0) + (sv.essence || 0) },
     { k: 'shard', icon: '◆', label: '파편', v: (r.shard || 0) + (sv.shard || 0) },
     { k: 'famShards', icon: '📜', label: '계약서 조각', v: (r.famShards || 0) + (sv.famShard || 0) },
-    { k: 'famSoul', icon: '🔮', label: '사역혼', v: sv.famSoul || 0 },
+    { k: 'famSoul', icon: '🔮', label: '사역혼', v: (r.famSouls || 0) + (sv.famSoul || 0) },
     { k: 'famExp', icon: '🐾', label: '사역마 경험치', v: r.famExp || 0 },
     { k: 'talentScroll', icon: '📖', label: '특성 주문서', v: r.talentScroll || 0 },
     { k: 'keys', icon: '🗝', label: '던전 열쇠', v: r.keys || 0 },

@@ -31,7 +31,12 @@ export const FAM_TUNING = {
   plusStatPct: 0.05,            // 강화 1단계당 능력치 +5%
   enhanceCost: (plus, g) => (plus + 1) * famGrade(g).cost,   // +n → +n+1 사역혼
   evolveCost: (g) => 10 * famGrade(g).cost,
-  evolveFailDrop: 3,            // 진화 실패 시 강화 단계 하락
+  evolveFailDrop: 1,            // 진화 실패 시 강화 단계 하락 (1.242.0 PM: 3 → 1)
+  evolveFailDropBy: { indigo: 3 }, // 남령 → 자령은 실패 시 -3 (최상위 진화는 무겁게)
+  // 진화 천장 (1.242.0) — 실패할 때마다 다음 진화 성공률 +이만큼 (성공하면 초기화 · f.evoFails에 저장)
+  evolvePityAdd: { red: 0.2, green: 0.2, blue: 0.15, indigo: 0.03 },
+  // 🔮 사역혼 전투 드랍 (1.242.0 PM: 중복 소환만으로는 너무 느림) — 일반 몹 확률 · 강적 확률×개수 · 보스 확정
+  soulNormal: 0.05, soulElite: 0.4, soulEliteN: [1, 3], soulBoss: 8, soulDungeonBoss: [15, 22, 32], soulTowerBoss: 12,
   // 계약서 조각 드랍 (사냥터 일반 몹 1마리당 · 강적 1마리당 · 보스 확정)
   dropNormal: 0.15, dropElite: 0.6, dropEliteN: [1, 2], dropBoss: 3, dropDungeonBoss: [5, 8, 12],
   slotLv: { main: 5, sub1: 20, sub2: 40 }, // 주인공 레벨 개방
@@ -402,8 +407,32 @@ export function evolveFamiliar(fams, souls, key, rng = Math.random) {
   if (!f || f.plus < FAM_TUNING.maxPlus || gi >= FAM_GRADES.length - 1) return { fams, souls, result: null };
   const c = FAM_TUNING.evolveCost(f.grade);
   if (souls < c) return { fams, souls, result: null };
-  if (rng() < FAM_GRADES[gi].evolve) return { fams: { ...fams, [key]: { ...f, grade: FAM_GRADES[gi + 1].id, plus: 0 } }, souls: souls - c, result: 'success' };
-  return { fams: { ...fams, [key]: { ...f, plus: Math.max(0, f.plus - FAM_TUNING.evolveFailDrop) } }, souls: souls - c, result: 'fail' };
+  if (rng() < famEvolveRate(f)) return { fams: { ...fams, [key]: { ...f, grade: FAM_GRADES[gi + 1].id, plus: 0, evoFails: 0 } }, souls: souls - c, result: 'success' };
+  return { fams: { ...fams, [key]: { ...f, plus: Math.max(0, f.plus - famEvolveFailDrop(f.grade)), evoFails: (f.evoFails || 0) + 1 } }, souls: souls - c, result: 'fail' };
+}
+export const famEvolveFailDrop = (g) => FAM_TUNING.evolveFailDropBy?.[g] ?? FAM_TUNING.evolveFailDrop;
+// 지금 진화 성공률 = 등급 기본 + 실패 횟수 × 천장 보정 (최대 100%)
+export function famEvolveRate(f) {
+  const g = famGrade(f?.grade);
+  return Math.min(1, (g.evolve || 0) + (f?.evoFails || 0) * (FAM_TUNING.evolvePityAdd[g.id] || 0));
+}
+// 이 등급에서 진화가 확정되는 최대 시도 횟수
+export function famEvolveMaxTries(gradeId) {
+  const g = famGrade(gradeId); const add = FAM_TUNING.evolvePityAdd[g.id] || 0;
+  return add > 0 ? Math.ceil((1 - g.evolve) / add) + 1 : null;
+}
+// 🔮 사역혼 전투 드랍 (1.242.0)
+export function rollFamSouls(enemies, type, rng, dungeonTier = 0) {
+  const T = FAM_TUNING;
+  if (type === 'boss') return T.soulBoss;
+  if (type === 'towerBoss') return T.soulTowerBoss;
+  if (type === 'dungeonBoss') return T.soulDungeonBoss[dungeonTier] || T.soulDungeonBoss[0];
+  let n = 0;
+  for (const e of enemies) {
+    if (e.tier === 'elite') { if (rng() < T.soulElite) n += T.soulEliteN[0] + Math.floor(rng() * (T.soulEliteN[1] - T.soulEliteN[0] + 1)); }
+    else if (rng() < T.soulNormal * (e.goldMult || 1)) n += 1;
+  }
+  return n;
 }
 
 // 전투 승리 시 계약서 조각

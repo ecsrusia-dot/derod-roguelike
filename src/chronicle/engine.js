@@ -8,7 +8,7 @@ import { levelCap, globalBuffFx } from './roster.js';
 import { talentFx, canLearnTalent, talentNode, talentResetCost, talentTrees, tierUnlocked } from './talents.js';
 import { BOSS_MECHS, BOSS_MECH_OF, fieldStages, FIELD_STAGES, STAGE_TUNING, BOOST, BAG_EXPAND, SALVAGE, SALVAGE_ICON, REBIRTH, REBIRTH_BRANCHES, expNeedFor } from './data.js';
 import { TOWER, TOWER_SHOP, towerUnlocked, isTowerBoss, towerEnemyLv, towerArea, towerFloorPicks, kstWeekKey } from './tower.js';
-import { famCombatant, famRole, famSubFx, famOwnFx, famBondFx, rollFamShards, gainFamExp, FAM_AI, FAM_TUNING, summonFamiliars, enhanceFamiliar, evolveFamiliar } from './familiar.js';
+import { famCombatant, famRole, famSubFx, famOwnFx, famBondFx, rollFamShards, rollFamSouls, gainFamExp, FAM_AI, FAM_TUNING, summonFamiliars, enhanceFamiliar, evolveFamiliar } from './familiar.js';
 import {
   CHRONICLE_TUNING as T, CHRONICLE_CLASSES, CHRONICLE_SKILLS, CHRONICLE_FIELDS, CHRONICLE_DUNGEON, CHRONICLE_DUNGEONS, DUNGEON_TIERS, dungeonDef,
   STAT_KEYS, SKILL_MAX_LV, MASTERY_PCT, BOSS_DAILY_LIMIT, DUNGEON_KEYS, GRADES, gradeIdx, SLOTS, CLASS_SLOTS, FORGE, DROP_TABLE,
@@ -1462,6 +1462,9 @@ export function applyBattle(save0, ctx, battle, rng = Math.random) {
   // 📜 계약서 조각 (1.212.0 — 사역마 소환 재료, 계정 공유)
   const fs = rollFamShards(ctx.enemies, ctx.type, rng, save.dungeon?.tier || 0);
   if (fs) { save.mats.famShard = (save.mats.famShard || 0) + fs; summary.famShards = fs; }
+  // 🔮 사역혼 (1.242.0 — 강화·진화 재료 직접 드랍)
+  const fso = rollFamSouls(ctx.enemies, ctx.type, rng, save.dungeon?.tier || 0);
+  if (fso) { save.mats.famSoul = (save.mats.famSoul || 0) + fso; summary.famSouls = fso; }
   mods = { ...mods, heroLv: save.units[save.hero]?.lv };
   const r = battleRewards(ctx.enemies, ctx.type, rng, mods);
   // 장비 옵션 — 경험치·골드 % (주인공 기준)
