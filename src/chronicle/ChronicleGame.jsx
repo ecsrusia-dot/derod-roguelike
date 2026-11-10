@@ -1540,10 +1540,26 @@ function FamSkillPanel({ k, f, save }) {
       <div style={{ color: PALETTE.textDim }}>최대 HP <b style={{ color: PALETTE.text }}>{r.maxHp.toLocaleString()}</b> · 공격력 <b style={{ color: PALETTE.text }}>{r.atk}</b> · 방어 <b style={{ color: PALETTE.text }}>{r.def}</b> · 회복력 <b style={{ color: PALETTE.text }}>{r.healPower}</b> · 속도 {r.spd}{guard ? ` · 수호 태세 ${Math.round(guard * 100)}%` : ''}</div>
       {famPct > 0 && <div style={{ fontSize: 11, color: PALETTE.textDim }}>주인공 장비 「사역마 능력치」 옵션 +{Math.round(famPct * 100)}% 포함</div>}
       <div className="font-semibold mt-2" style={{ color: PALETTE.text }}>동행 스킬</div>
-      {F.famGradeIdx(f.grade) < F.FAM_SIG_MIN_GRADE && <div style={{ fontSize: 11, color: PALETTE.textDim }}>★ 고유 스킬은 <b style={{ color: '#7a6ae8' }}>남령</b>으로 진화하면 열린다</div>}
+      {(() => {
+        const base = F.famGrade(F.famBaseGrade(k, f)); const bi = F.famGradeIdx(base.id); const gi = F.famGradeIdx(f.grade);
+        return (
+          <div style={{ fontSize: 11, color: PALETTE.textDim }}>
+            베이스 등급 <b style={{ color: base.color }}>{base.label}</b>{bi < gi ? ' — 진화로 능력치·스킬 배율만 올랐다' : ''}
+            {bi < F.FAM_SIG_MIN_GRADE && <div>★ 고유 스킬 없음 — <b style={{ color: '#7a6ae8' }}>남령</b> 이상으로 소환된 사역마만 가진다 (진화로는 생기지 않음)</div>}
+            {bi >= F.FAM_SIG_MIN_GRADE && bi < F.FAM_PASSIVE_MIN_GRADE && <div>◆ 고유 패시브 없음 — <b style={{ color: '#c79bff' }}>자령</b>으로 소환된 사역마만 가진다 (진화로는 생기지 않음)</div>}
+          </div>
+        );
+      })()}
+      {(() => { const pv = F.famPassive(k, f); return pv && (
+        <div className="mt-1.5" style={{ paddingLeft: 8, borderLeft: '2px solid #c79bff' }}>
+          <div style={{ fontSize: 11, color: '#c79bff', fontWeight: 700 }}>◆ 자령 고유 패시브</div>
+          <div style={{ color: PALETTE.legendary, fontWeight: 600 }}>{pv.name}</div>
+          <div style={{ color: PALETTE.text }}>{pv.desc}</div>
+        </div>
+      ); })()}
       {skills.map(sk => (
         <div key={sk.id} className="mt-1.5" style={{ paddingLeft: 8, borderLeft: `2px solid ${sk.sig ? '#d07ae8' : 'var(--ui-line-strong)'}`, opacity: sk.locked ? 0.55 : 1 }}>
-          {sk.sig && <div style={{ fontSize: 11, color: '#d07ae8', fontWeight: 700 }}>★ 고유 스킬 · {sk.sigType}{sk.locked ? ' — 🔒 남령부터 사용 (수치는 남령 기준)' : ''}</div>}
+          {sk.sig && <div style={{ fontSize: 11, color: '#d07ae8', fontWeight: 700 }}>★ 고유 스킬 · {sk.sigType}</div>}
           <div style={{ color: PALETTE.legendary, fontWeight: 600 }}>{sk.name} <span style={{ color: PALETTE.textDim, fontWeight: 400 }}>· 재사용 {sk.cd}턴</span></div>
           <div style={{ color: PALETTE.text }}>{sk.effect}</div>
           <div style={{ color: PALETTE.textDim }}>발동: {sk.when}</div>

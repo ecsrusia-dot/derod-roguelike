@@ -985,6 +985,11 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
   };
   // 쓰러짐 직전 처리 — 불굴(guts) · 부활(revive) · 응급(emergencyHeal)
   const onHurt = (def) => {
+    // 자령 수호 고유 패시브 (1.243.0) — 전투당 1회, 주인공이 쓰러질 피해를 사역마가 막아 HP n%로 버틴다
+    if (def.hp <= 0 && def.leader) {
+      const g = units.find(x => x.side === def.side && x.vGuard && !x.vGuardUsed && x.hp > 0);
+      if (g) { g.vGuardUsed = true; def.hp = Math.max(1, Math.round(def.maxHp * g.vGuard)); }
+    }
     if (def.hp <= 0 && def.guts > 0) { def.hp = 1; def.guts = 0; }
     if (def.hp <= 0 && def.revive && !def.reviveUsed) { def.reviveUsed = true; def.hp = Math.round(def.maxHp * def.revive); }
     if (def.hp > 0 && def.emergencyHeal && !def.emergencyUsed && def.hp < def.maxHp * 0.3) { def.emergencyUsed = true; def.hp = Math.min(def.maxHp, def.hp + Math.round(def.maxHp * def.emergencyHeal)); }
@@ -1271,19 +1276,19 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
         u.buffs.rage = { v, t: s.turns }; hits.push({ t: u.id, buff: true });
         break;
       case 'taunt':
-        u.taunt = s.turns; u.tauntDef = v; hits.push({ t: u.id, buff: true });
+        u.taunt = s.turns + 1; u.tauntDef = v; // 1.243.0 — 자기 턴 끝에 1 감소하므로 +1 (N턴 = 적이 N라운드 공격하는 동안) hits.push({ t: u.id, buff: true });
         break;
       // ===== 사역마 고유 스킬 (1.218.0) =====
       case 'duel': {
         const t = foes.filter(f => !(f.forced?.t > 0)).sort((a, b) => b.atk - a.atk)[0] || foes[0];
         t.forced = { by: u.id, t: s.turns };
-        u.fx.guardDef = { v, t: s.turns };
+        u.fx.guardDef = { v, t: s.turns + 1 };
         hits.push({ t: t.id, debuff: true }, { t: u.id, buff: true });
         break;
       }
       case 'warcry':
         for (const f of foes) { f.forced = { by: u.id, t: s.turns }; hits.push({ t: f.id, debuff: true }); }
-        u.fx.guardDef = { v, t: s.turns }; hits.push({ t: u.id, buff: true });
+        u.fx.guardDef = { v, t: s.turns + 1 }; hits.push({ t: u.id, buff: true });
         break;
       case 'cover': {
         const ld = allies.find(a => a.leader) || allies[0];
@@ -1363,6 +1368,11 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
         if (!alive('enemy').length) { result = 'win'; break; }
         if (u.leader && u.hp <= 0) { result = 'lose'; break; }
         if (u.hp <= 0) continue;
+      }
+      // 자령 치유 고유 패시브 (1.243.0) — 자기 턴마다 아군 전원 소량 회복
+      if (u.vRegenAll) {
+        const hits = units.filter(x => x.side === u.side && x.hp > 0 && x.hp < x.maxHp).map(x => ({ t: x.id, h: healUnit(x, Math.round(u.healPower * u.vRegenAll)) }));
+        if (hits.length) push({ a: u.id, n: u.vName || '생명의 순환', k: 'hot', hits });
       }
       act(u);
       for (const k of Object.keys(u.cds)) if (u.cds[k] > 0) u.cds[k] -= 1;
