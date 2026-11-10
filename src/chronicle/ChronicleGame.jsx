@@ -575,7 +575,7 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
               </div>
             ) : (
               <div className="mt-1 text-center" style={{ fontSize: 12.5, color: PALETTE.textDim }}>
-                {ctx.kind === 'raid' ? '원정대가 무너졌다 — 봉인의 주인이 쓰러지면 그 봉인은 깰 수 없다. 약한 캐릭터를 더 키워 다시 도전하자.' : ctx.kind === 'tower' ? `첨탑 ${summary.towerFell}층에서 쓰러졌다. 다음 도전은 체크포인트부터.` : ctx.kind === 'dungeon' ? '던전에서 쫓겨났다.' : `마을로 돌아간다.${summary.goldLost ? ` (골드 -${summary.goldLost})` : ''}`}
+                {ctx.kind === 'raid' ? '원정대가 무너졌다 — 봉인의 주인이 쓰러지면 그 봉인은 깰 수 없다. 약한 캐릭터를 더 키워 다시 도전하자.' : ctx.kind === 'tower' ? `첨탑 ${summary.towerFell}층에서 쓰러졌다. 다음 도전은 체크포인트부터.` : ctx.kind === 'dungeon' ? '던전에서 쫓겨났다.' : `쓰러졌다 — 사냥터로 돌아간다.${summary.goldLost ? ` (골드 -${summary.goldLost})` : ''}`}
               </div>
             )}
             <div className="flex gap-2 mt-2.5">
@@ -596,8 +596,13 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
               {!autoProg && ctx.kind === 'field' && ctx.type !== 'boss' && sim.result === 'win' && (
                 <UIButton variant={repeat ? 'gold' : 'ghost'} style={{ height: 42 }} onClick={onToggleRepeat}>{repeat ? '반복 중… (끄기)' : '반복 사냥'}</UIButton>
               )}
-              <UIButton style={{ height: 42 }} onClick={onDone}>{(ctx.kind === 'dungeon' && sim.result === 'win' && !summary.dungeonClear) || (ctx.kind === 'tower' && sim.result === 'win') ? '다음 층으로' : '계속'}</UIButton>
+              {(dungeonNext || towerNext)
+                ? <UIButton style={{ height: 42 }} onClick={onAgain}>다음 층으로 ▸</UIButton>
+                : <UIButton style={{ height: 42 }} onClick={onDone}>{ctx.kind === 'dungeon' ? '던전 목록으로' : ctx.kind === 'tower' ? '첨탑으로' : ctx.kind === 'raid' ? '레이드로' : '사냥터로'}</UIButton>}
             </div>
+            {(dungeonNext || towerNext) && (
+              <button onClick={onDone} className="ui-press w-full mt-2" style={{ fontSize: 12.5, color: PALETTE.dawn, background: 'transparent', border: 'none', padding: 6 }}>잠시 멈추기 ({ctx.kind === 'dungeon' ? '던전 화면' : '첨탑 화면'}으로)</button>
+            )}
             {ctx.kind === 'field' && sim.result === 'win' && ctx.type !== 'boss' && (
               <button onClick={onAgain} className="ui-press w-full mt-2" style={{ fontSize: 12.5, color: PALETTE.dawn, background: 'transparent', border: 'none', padding: 6 }}>한 번 더 사냥</button>
             )}
@@ -1282,6 +1287,8 @@ function PartyView({ save, setSave, onBack }) {
   const [slotPick, setSlotPick] = useState(null);
   const [skillInfo, setSkillInfo] = useState(null);
   const [rulesOpen, setRulesOpen] = useState(false); // 자동 사용 규칙 펼치기 (1.245.0)
+  const [statPick, setStatPick] = useState(null); // 능력치 설명·배분 (1.247.0)
+  const [rowInfo, setRowInfo] = useState(null);   // 수치 줄 설명 (1.247.0)
   const [rebirthOpen, setRebirthOpen] = useState(false);
   const u = save.units[cid];
   const cls = chronicleClass(cid);
@@ -1290,15 +1297,16 @@ function PartyView({ save, setSave, onBack }) {
     <div className="absolute inset-0 flex flex-col">
       <Header title="성장" onBack={onBack} right={<Wallet save={save} />} />
       <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
-        <div className="flex items-center gap-3">
-          <img src={cls.combatImage} alt="" className="object-cover flex-none" style={{ width: 92, height: 92, borderRadius: 16, border: `1px solid ${cls.color}`, objectPosition: '50% 25%' }} />
+        <div className="flex items-center gap-3 pb-3" style={{ borderBottom: `1px solid ${MS.line}` }}>
+          <img src={cls.combatImage} alt="" className="object-cover flex-none" style={{ width: 84, height: 84, borderRadius: 14, border: `1.5px solid ${MS.gold}`, objectPosition: '50% 25%' }} />
           <div className="flex-1 min-w-0">
-            <div className="font-bold" style={{ fontSize: 17, color: PALETTE.text }}>{cls.name} <span style={{ fontSize: 12, color: cls.color }}>{cls.role}</span></div>
-            {u.rebirth?.count > 0 && <div style={{ fontSize: 12, color: REBIRTH_BRANCHES[u.rebirth.branch].color, fontWeight: 700 }}>✦ 전승 {u.rebirth.count}회 · {REBIRTH_BRANCHES[u.rebirth.branch].name} <span style={{ fontWeight: 400, color: PALETTE.textDim }}>({REBIRTH_BRANCHES[u.rebirth.branch].type} · 경험치 ×{rebirthExpMult(u.rebirth.count)})</span></div>}
-            <div style={{ fontSize: 12.5, color: PALETTE.legendary }}>Lv.{u.lv} / {E.levelCapOf(save)} · 전투력 {E.unitPower(save, cid)}</div>
+            <div style={{ fontSize: 10.5, letterSpacing: 4, color: MS.red }}>{CLASS_PATH[cid] || 'PATH'}</div>
+            <div className="font-bold" style={{ fontSize: 21, color: PALETTE.text, lineHeight: 1.2 }}>{cls.name} <span style={{ fontSize: 14, color: MS.gold }}>Lv.{u.lv}</span> <span style={{ fontSize: 11, fontWeight: 400, color: PALETTE.textDim }}>/ {E.levelCapOf(save)} · {cls.role}</span></div>
+            <div style={{ fontSize: 13, color: PALETTE.text }}>♡ {d.maxHp.toLocaleString()} · ⚔ 전투력 {E.unitPower(save, cid).toLocaleString()}</div>
+            {u.rebirth?.count > 0 && <div style={{ fontSize: 11.5, color: REBIRTH_BRANCHES[u.rebirth.branch].color, fontWeight: 700 }}>✦ 전승 {u.rebirth.count}회 · {REBIRTH_BRANCHES[u.rebirth.branch].name} <span style={{ fontWeight: 400, color: PALETTE.textDim }}>({REBIRTH_BRANCHES[u.rebirth.branch].type} · 경험치 ×{rebirthExpMult(u.rebirth.count)})</span></div>}
             {u.lv >= E.levelCapOf(save) && u.lv < CHRONICLE_TUNING.maxLevel && <div style={{ fontSize: 11, color: '#e8b04a' }}>🔒 원정대 레벨 상한 — 다른 캐릭터를 Lv.{R.ROSTER.unlockLv}까지 키우면 +{R.ROSTER.perChar} (경험치 정지 중)</div>}
-            <div className="mt-1"><Bar v={u.exp} max={expNeedFor(u)} color={PALETTE.legendary} h={5} /></div>
-            <div style={{ fontSize: 10.5, color: PALETTE.textDim }}>경험치 {u.exp}/{expNeedFor(u)}</div>
+            <div className="mt-1"><Bar v={u.exp} max={expNeedFor(u)} color={PALETTE.legendary} h={4} /></div>
+            <div style={{ fontSize: 10.5, color: PALETTE.textDim }}>경험치 {u.exp.toLocaleString()} / {expNeedFor(u).toLocaleString()}</div>
           </div>
         </div>
 
@@ -1309,60 +1317,55 @@ function PartyView({ save, setSave, onBack }) {
           </button>
         )}
 
-        {/* 능력치 */}
-        <GlassPanel className="p-3">
-          <div className="flex items-center justify-between">
-            <span className="font-semibold" style={{ fontSize: 13.5, color: PALETTE.text }}>능력치</span>
-            <span style={{ fontSize: 12, color: u.points ? PALETTE.legendary : PALETTE.textDim }}>남은 포인트 {u.points}</span>
+        {/* 능력치 — 본편 정보창 스타일 (1.247.0) */}
+        <div>
+          <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+            {STAT_KEYS.map(k => (
+              <button key={k} onClick={() => setStatPick(k)} className="ui-press text-center" style={{ padding: '7px 0', borderRadius: 12, border: `1.5px solid ${k === cls.main ? MS.gold : MS.line}`, background: MS.box }}>
+                <div style={{ fontSize: 12, color: PALETTE.textDim }}>{STAT_META[k].label}</div>
+                <div className="font-bold" style={{ fontSize: 20, color: k === cls.main ? MS.gold : PALETTE.text, lineHeight: 1.2 }}>{u.stats[k]}</div>
+              </button>
+            ))}
           </div>
-          {STAT_KEYS.map(k => (
-            <div key={k} className="flex items-center gap-2 mt-1.5">
-              <span style={{ width: 34, fontSize: 13, color: k === cls.main ? PALETTE.legendary : PALETTE.text }}>{STAT_META[k].label}</span>
-              <span className="font-semibold" style={{ width: 30, fontSize: 13.5, color: PALETTE.text }}>{u.stats[k]}</span>
-              <span className="flex-1 truncate" style={{ fontSize: 11, color: PALETTE.textDim }}>{STAT_META[k].desc}</span>
-              <button disabled={!u.points} onClick={() => setSave(E.addStat(save, cid, k, 1))} className="ui-press flex-none" style={{ width: 40, height: 34, borderRadius: 9, border: '1px solid var(--ui-line-strong)', color: PALETTE.legendary, background: 'transparent', opacity: u.points ? 1 : 0.3, fontSize: 16 }}>+</button>
-            </div>
-          ))}
-          {u.points > 0 && <button onClick={() => setSave(E.autoAllocate(save, cid))} className="ui-press w-full mt-2" style={{ height: 36, borderRadius: 10, border: '1px dashed var(--ui-line-strong)', color: PALETTE.dawn, background: 'transparent', fontSize: 12.5 }}>추천 배분 ({cls.role} 기준)</button>}
-          <div className="mt-2">
-            <div style={{ fontSize: 11.5, color: PALETTE.textDim, marginBottom: 4 }}>전투 능력치</div>
-            <StatTiles items={[
-              { label: 'HP', value: d.maxHp.toLocaleString() }, { label: '공격력', value: d.atk.toLocaleString() }, { label: '방어', value: d.def.toLocaleString() },
-              { label: '속도', value: d.spd }, { label: '치명', value: `${Math.round(d.crit * 100)}%` }, { label: '회피', value: `${Math.round(d.dodge * 100)}%` },
-              ...(cid === 'priest' ? [{ label: '치유력', value: d.healPower.toLocaleString(), accent: '#8fe08a' }] : []),
-            ]} />
-          </div>
-          <DetailStats d={d} cid={cid} />
-        </GlassPanel>
+          <div className="text-center mt-1.5" style={{ fontSize: 11.5, color: PALETTE.textDim }}>능력치를 누르면 효과와 포인트 배분 · 남은 포인트 <b style={{ color: u.points ? MS.gold : PALETTE.textDim }}>{u.points}</b></div>
+          {u.points > 0 && <button onClick={() => setSave(E.autoAllocate(save, cid))} className="ui-press w-full mt-2" style={{ height: 36, borderRadius: 10, border: `1px dashed ${MS.gold}`, color: MS.gold, background: 'transparent', fontSize: 12.5 }}>추천 배분 ({cls.role} 기준) — {u.points}포인트</button>}
 
-        {/* 스킬 */}
-        <GlassPanel className="p-3">
-          <div className="flex items-center justify-between">
-            <span className="font-semibold" style={{ fontSize: 13.5, color: PALETTE.text }}>스킬 <span style={{ fontSize: 11, color: PALETTE.textDim, fontWeight: 400 }}>— 전투에서 자동 사용</span></span>
-            <span style={{ fontSize: 12, color: u.sp ? PALETTE.legendary : PALETTE.textDim }}>스킬 포인트 {u.sp}</span>
-          </div>
-          {classSkills(cid, u.rebirth?.branch).map(s => {
-            const lv = u.skills[s.id] || 0;
-            const locked = s.reqLv > u.lv;
-            const can = E.canLearn(u, s);
+          <MainSecHead title="전 투 수 치" />
+          <MainKvGrid onPick={setRowInfo} rows={[
+            { key: 'hp', label: 'HP', value: d.maxHp.toLocaleString(), desc: COMBAT_DESC.hp },
+            { key: 'atk', label: '공격력', value: d.atk.toLocaleString(), color: MS.gold, desc: COMBAT_DESC.atk },
+            { key: 'def', label: '방어', value: d.def.toLocaleString(), color: MS.blue, desc: COMBAT_DESC.def },
+            { key: 'spd', label: '속도', value: d.spd, desc: COMBAT_DESC.spd },
+            { key: 'crit', label: '치명', value: `${Math.round(d.crit * 100)}%`, color: MS.gold, desc: COMBAT_DESC.crit },
+            { key: 'dodge', label: '회피', value: `${Math.round(d.dodge * 100)}%`, color: MS.green, desc: COMBAT_DESC.dodge },
+            ...(cid === 'priest' ? [{ key: 'heal', label: '치유력', value: d.healPower.toLocaleString(), color: MS.green, desc: COMBAT_DESC.heal }] : []),
+          ]} />
+          <DetailStats d={d} cid={cid} onPick={setRowInfo} />
+        </div>
+
+        {/* 스킬 — 본편 스킬 카드 스타일 (1.247.0) */}
+        <div>
+          {(() => {
+            const list = classSkills(cid, u.rebirth?.branch);
+            const act = list.filter(s => s.kind !== 'passive');
+            const pas = list.filter(s => s.kind === 'passive');
             return (
-              <div key={s.id} className="flex items-stretch gap-2 mt-2" style={{ borderRadius: 12, padding: 9, border: '1px solid var(--ui-line)', background: 'rgba(255,255,255,0.02)', opacity: locked ? 0.5 : 1 }}>
-                <button onClick={() => setSkillInfo(s)} className="flex-1 min-w-0 text-left ui-press" style={{ background: 'transparent', border: 'none', padding: 0 }}>
-                  <div className="flex items-center justify-between gap-2">
-                    <span style={{ fontSize: 13.5, fontWeight: 800, color: lv ? PALETTE.legendary : PALETTE.textDim }}>{s.branch ? <span style={{ color: REBIRTH_BRANCHES[s.branch].color }}>✦ </span> : null}{s.name} <span style={{ fontSize: 11, fontWeight: 600 }}>{lv ? `Lv.${lv}/${SKILL_MAX_LV}` : locked ? `Lv.${s.reqLv}부터` : '미습득'}</span></span>
-                    <span className="flex-none" style={{ fontSize: 11, padding: '1px 7px', borderRadius: 7, border: '1px solid var(--ui-line)' }}>{s.kind === 'passive' ? <span style={{ color: PALETTE.textDim }}>패시브</span> : s.cd ? <CdChip s={s} cdr={d} /> : <span style={{ color: PALETTE.textDim }}>매 턴</span>}</span>
-                  </div>
-                  <div style={{ fontSize: 11, color: PALETTE.textDim }}>{SKILL_KIND_LABEL[s.kind] || '스킬'} · <span style={{ letterSpacing: 1, color: PALETTE.legendary }}>{'●'.repeat(lv)}<span style={{ color: PALETTE.textDim }}>{'○'.repeat(Math.max(0, SKILL_MAX_LV - lv))}</span></span></div>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {skillParts(describeSkill(s, Math.max(1, lv))).map((t, i) => <span key={i} style={{ fontSize: 11.5, padding: '2px 7px', borderRadius: 7, background: 'rgba(111,168,220,0.1)', border: '1px solid rgba(111,168,220,0.3)', color: PALETTE.textDim }}><HiNum text={t} /></span>)}
-                  </div>
-                </button>
-                <button disabled={!can} onClick={() => setSave(E.learnSkill(save, cid, s.id))} className="ui-press flex-none self-center" style={{ height: 34, padding: '0 10px', borderRadius: 9, border: `1px solid ${can ? PALETTE.legendary : 'var(--ui-line)'}`, color: can ? PALETTE.legendary : PALETTE.textDim, background: 'transparent', fontSize: 12, opacity: can ? 1 : 0.4 }}>
-                  {lv ? '강화' : '배우기'}
-                </button>
-              </div>
+              <>
+                <div className="flex items-center justify-between" style={{ marginTop: 4, marginBottom: 6 }}>
+                  <span style={{ fontSize: 13, letterSpacing: 4, color: MS.red, fontWeight: 700 }}>◆ 액티브 스킬</span>
+                  <span style={{ fontSize: 12, color: u.sp ? MS.gold : PALETTE.textDim }}>스킬 포인트 {u.sp}</span>
+                </div>
+                <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                  {act.map(s => <MainSkillCard key={s.id} s={s} lv={u.skills[s.id] || 0} u={u} d={d} can={E.canLearn(u, s)} onClick={() => setSkillInfo(s)} />)}
+                </div>
+                {pas.length > 0 && <div style={{ fontSize: 13, letterSpacing: 4, color: MS.red, fontWeight: 700, margin: '12px 0 6px' }}>◆ 패시브</div>}
+                <div className="flex flex-col gap-2">
+                  {pas.map(s => <MainPassiveCard key={s.id} s={s} lv={u.skills[s.id] || 0} u={u} can={E.canLearn(u, s)} onClick={() => setSkillInfo(s)} />)}
+                </div>
+                <div className="mt-1.5" style={{ fontSize: 11, color: PALETTE.textDim }}>스킬을 누르면 효과·발동 조건과 <b style={{ color: MS.gold }}>배우기·강화</b> — ＋ 표시 = 지금 올릴 수 있음</div>
+              </>
             );
-          })}
+          })()}
           <button onClick={() => setRulesOpen(!rulesOpen)} className="ui-press w-full text-left mt-2" style={{ background: 'transparent', border: 'none', padding: 0 }}>
             <InfoSection icon="ⓘ" title="자동 사용 규칙" color={PALETTE.dawn} right={rulesOpen ? '접기 ▴' : '펼치기 ▾'}>
               {rulesOpen && (
@@ -1374,7 +1377,7 @@ function PartyView({ save, setSave, onBack }) {
               )}
             </InfoSection>
           </button>
-        </GlassPanel>
+        </div>
 
         {/* 특성 트리 (1.224.0) */}
         <TalentPanel save={save} setSave={setSave} cid={cid} />
@@ -1418,10 +1421,30 @@ function PartyView({ save, setSave, onBack }) {
         </BottomSheet>
       )}
       {skillInfo && (
-        <BottomSheet title={skillInfo.name} onClose={() => setSkillInfo(null)} maxHeight="75%">
-          <SkillInfoBody s={skillInfo} lv={u.skills[skillInfo.id] || 0} d={d} />
-          <div className="mt-4"><UIButton variant="ghost" onClick={() => setSkillInfo(null)}>닫기</UIButton></div>
-        </BottomSheet>
+        <MainSkillModal s={skillInfo} lv={u.skills[skillInfo.id] || 0} u={u} d={d} sp={u.sp} can={E.canLearn(u, skillInfo)}
+          onLearn={() => setSave(E.learnSkill(save, cid, skillInfo.id))} onClose={() => setSkillInfo(null)} />
+      )}
+      {statPick && (
+        <MainModal kicker="능 력 치" title={STAT_META[statPick].label} color={statPick === cls.main ? MS.gold : MS.red} badge={statPick === cls.main ? '주 능력치' : null} onClose={() => setStatPick(null)}
+          footer={<div className="grid gap-2" style={{ gridTemplateColumns: '1fr 1fr' }}>
+            <button disabled={!u.points} onClick={() => setSave(E.addStat(save, cid, statPick, 1))} className="ui-press" style={{ height: 42, border: `1px solid ${u.points ? MS.gold : MS.line}`, color: u.points ? MS.gold : PALETTE.textDim, background: 'transparent', fontWeight: 800, opacity: u.points ? 1 : 0.5 }}>+1</button>
+            <button disabled={!u.points} onClick={() => setSave(E.addStat(save, cid, statPick, u.points))} className="ui-press" style={{ height: 42, border: `1px solid ${u.points ? MS.gold : MS.line}`, color: u.points ? MS.gold : PALETTE.textDim, background: 'transparent', fontWeight: 800, opacity: u.points ? 1 : 0.5 }}>전부 (+{u.points})</button>
+          </div>}>
+          <div className="grid gap-1.5" style={{ gridTemplateColumns: '1fr 1fr' }}>
+            <MainCell label="현재" value={u.stats[statPick]} color={MS.gold} />
+            <MainCell label="남은 포인트" value={u.points} />
+          </div>
+          <div className="mt-2" style={{ padding: '8px 10px', border: `1px solid ${MS.line}`, background: MS.box, fontSize: 12.5, color: PALETTE.text }}>
+            <b style={{ color: MS.red }}>◇ 효과</b> {STAT_META[statPick].desc}
+          </div>
+          <div className="mt-2" style={{ fontSize: 11.5, color: PALETTE.textDim }}>레벨업마다 포인트를 받는다. {cls.name}의 주 능력치는 <b style={{ color: MS.gold }}>{STAT_META[cls.main].label}</b>.</div>
+        </MainModal>
+      )}
+      {rowInfo && (
+        <MainModal kicker="능 력 치 설 명" title={rowInfo.label} color={rowInfo.color || MS.red} badge={String(rowInfo.value)} onClose={() => setRowInfo(null)}>
+          <div style={{ fontSize: 13, color: PALETTE.text, lineHeight: 1.6 }}>{rowInfo.desc || `${rowInfo.label} — 장비·특성·사역마·원정대 버프·전승을 모두 합산한 값.`}</div>
+          <div className="mt-2" style={{ fontSize: 11.5, color: PALETTE.textDim }}>◇ 출처: 장비 옵션 · 유니크 · 특성 · 사역마(보조·보유·인연) · 원정대 버프 · 전승 갈래 합산</div>
+        </MainModal>
       )}
     </div>
   );
@@ -2782,35 +2805,6 @@ const SKILL_WHEN_TEXT = {
 const skillTarget = (s) => (/heal|shield|buff|hot/i.test(s.kind) ? (s.kind === 'heal' || s.kind === 'hot' || s.kind === 'healShield' || s.kind === 'healBuff' ? '아군 1명' : '아군 전체') : s.kind === 'rage' || s.kind === 'taunt' ? '자신' : s.kind === 'passive' ? '자신' : s.kind === 'aoe' || (s.kind === 'dot' && s.all) ? '적 전체' : '적 1명');
 const skillParts = (t) => String(t).split(/, | — | \+ (?=\d+턴간|보호막|그 적|방어|받는)/).filter(Boolean);
 const skillPower = (s, lv) => (s.kind === 'passive' ? null : Math.round((s.base + s.perLv * (Math.max(1, lv) - 1)) * 100));
-function SkillInfoBody({ s, lv, d }) {
-  const cur = Math.max(1, lv);
-  const pw = skillPower(s, cur);
-  const w = cdWait(s, d); const cdr = cdOf(s, d);
-  const all = d?.cdr || 0; const own = d?.skillCdr?.[s.id] || 0;
-  return (
-    <div className="flex flex-col gap-2">
-      <div style={{ fontSize: 12, color: PALETTE.textDim }}>{SKILL_KIND_LABEL[s.kind] || '스킬'} · {lv ? `Lv.${lv}/${SKILL_MAX_LV}` : `미습득 (Lv.${s.reqLv}부터)`}</div>
-      <StatTiles items={[
-        { label: '위력', value: pw != null ? `${pw}%` : '상시' },
-        { label: '재사용', value: s.kind === 'passive' ? '—' : !s.cd ? '매 턴' : w ? `${w}턴` : '매 턴', accent: cdr ? '#7fd1c8' : null },
-        { label: '대상', value: skillTarget(s) },
-      ]} />
-      <InfoSection title="레벨별 효과" color={PALETTE.legendary}>
-        {[1, 2, 3, 4, 5].map((l, i) => <InfoRow key={l} first={i === 0} label={`Lv.${l}${lv === l ? ' ◀ 지금' : ''}`} value={<span style={{ fontWeight: lv === l ? 800 : 400, color: lv === l ? PALETTE.legendary : PALETTE.textDim }}>{skillPower(s, l) != null ? `${skillPower(s, l)}%` : ''}</span>} note={lv === l ? describeSkill(s, l) : null} />)}
-      </InfoSection>
-      {s.kind !== 'passive' && s.cd > 0 && (
-        <InfoSection title="재사용 계산" color="#9cc4e4">
-          <InfoRow first label="기본" value={`${s.cd}턴`} />
-          {all > 0 && <InfoRow label="모든 스킬 단축 (유니크·특성)" value={`-${all}턴`} />}
-          {own > 0 && <InfoRow label="이 스킬 전용 단축 (장비 옵션·시간의 모래)" value={`-${own}턴`} />}
-          {cdr > 0 && cdr < all + own && <InfoRow label={`합계 상한 ${E.CDR_CAP}턴`} value={`-${cdr}턴만 적용`} color={PALETTE.textDim} />}
-          <InfoRow label="실제 대기" value={w ? `${w}턴` : '매 턴 사용 가능'} color="#9cc4e4" note="쓴 뒤 내 차례 N번은 이 스킬을 쓸 수 없다" />
-        </InfoSection>
-      )}
-      <div style={{ fontSize: 11.5, color: PALETTE.textDim, background: 'rgba(0,0,0,0.25)', borderRadius: 8, padding: '6px 8px' }}>발동 ▸ {SKILL_WHEN_TEXT[s.kind] || '다른 조건이 맞지 않을 때 — 준비된 단일 공격 중 위력이 가장 높은 것'}</div>
-    </div>
-  );
-}
 
 // ===== 스킬 쿨타임 표시 (1.240.1) — 엔진 규칙: 쓴 뒤 대기 = max(0, 재사용 - 단축), 단축은 장비·특성 합산 최대 2 =====
 // 1.241.0: cdr 인자 = deriveUnit 결과(d) — 모든 스킬 단축 + 스킬별 단축을 합쳐 계산
@@ -2855,31 +2849,189 @@ const DETAIL_STATS = [
   ['startShieldPct', '시작 보호막', 'pct'], ['skillShield', '스킬 사용 시 보호막(공격력 대비)', 'pct'], ['overhealShield', '넘친 회복 → 보호막', 'flag'],
   ['regenPct', '매 턴 HP 재생', 'pct'], ['dodgeHeal', '회피 시 회복', 'pct'], ['emergencyHeal', '위기 회복(HP 30%↓, 1회)', 'pct'],
   ['revive', '부활(1회) HP', 'pct'], ['guts', '불굴(1회 HP 1로 버팀)', 'flag'], ['cdr', '모든 스킬 재사용 단축', 'turn'], ['resetEvery', '재사용 초기화 주기', 'turn'],
-  ['openInferno', '시작 시 적 전체 겁화', 'flag'], ['rageDouble', '분노 중 2회 행동', 'flag'], ['multiHitsAdd', '연속 화살 타수', 'num'], ['spiritArrow', '정령 화살 확률', 'pct'],
+  ['openInferno', '시작 시 적 전체 겁화', 'flag'], ['rageDouble', '광폭화 중 모든 공격 2회', 'flag'], ['rageTurnsAdd', '광폭화 지속', 'turn'], ['rageLifesteal', '광폭화 중 흡혈 2배', 'flag'], ['multiHitsAdd', '연속 화살 타수', 'num'], ['spiritArrow', '정령 화살 확률', 'pct'],
   ['blessMult', '축복 효과', 'x'], ['blessTurns', '축복 지속', 'turn'],
   ['famPct', '사역마 능력치', 'pct'], ['expPct', '경험치 획득', 'pct'], ['goldPct', '골드 획득', 'pct'], ['dropPct', '장비 획득률', 'pct'],
 ];
 const fmtDetail = (v, f) => (f === 'pct' ? `${Math.round(v * 1000) / 10}%` : f === 'pctMult' ? `${Math.round(v * 100)}%` : f === 'turn' ? `${v}턴` : f === 'x' ? `×${v}` : f === 'flag' ? '보유' : `+${v}`);
 // 1.245.0 — 성격별 4구획 (PM 승인 시안)
 const DETAIL_GROUPS = [
-  { id: 'atk', icon: '⚔', title: '공격', color: '#e07a6a', keys: ['critMult', 'counterPct', 'counterDmg', 'counterDouble', 'critAfterCounter', 'firstCrit', 'armorPen', 'lowHpDmg', 'missingHpAtk', 'execute', 'chain', 'skillDmg', 'dotDmg', 'dotTurnsMult', 'holyDmg', 'openInferno', 'rageDouble', 'multiHitsAdd', 'spiritArrow'] },
-  { id: 'surv', icon: '🛡', title: '생존', color: '#6aa6e0', keys: ['dmgReduce', 'tauntReduce', 'shieldReduce', 'lifesteal', 'thornsPct', 'startShieldPct', 'skillShield', 'overhealShield', 'regenPct', 'dodgeHeal', 'emergencyHeal', 'revive', 'guts', 'blessMult', 'blessTurns'] },
+  { id: 'atk', icon: '⚔', title: '공격', color: '#e07a6a', keys: ['critMult', 'counterPct', 'counterDmg', 'counterDouble', 'critAfterCounter', 'firstCrit', 'armorPen', 'lowHpDmg', 'missingHpAtk', 'execute', 'chain', 'skillDmg', 'dotDmg', 'dotTurnsMult', 'holyDmg', 'openInferno', 'rageDouble', 'rageTurnsAdd', 'multiHitsAdd', 'spiritArrow'] },
+  { id: 'surv', icon: '🛡', title: '생존', color: '#6aa6e0', keys: ['dmgReduce', 'tauntReduce', 'shieldReduce', 'lifesteal', 'rageLifesteal', 'thornsPct', 'startShieldPct', 'skillShield', 'overhealShield', 'regenPct', 'dodgeHeal', 'emergencyHeal', 'revive', 'guts', 'blessMult', 'blessTurns'] },
   { id: 'skill', icon: '⏱', title: '스킬', color: '#9cc4e4', keys: ['cdr', 'resetEvery'] },
   { id: 'gain', icon: '💰', title: '획득', color: '#8fe08a', keys: ['famPct', 'expPct', 'goldPct', 'dropPct'] },
 ];
-function DetailStats({ d, cid }) {
+function DetailStats({ d, cid, onPick }) {
   const show = (k) => d[k] || (k === 'counterPct' && cid === 'wanderer') || k === 'critMult';
   const byKey = Object.fromEntries(DETAIL_STATS.map(r => [r[0], r]));
   const groups = DETAIL_GROUPS.map(g => ({ ...g, rows: g.keys.filter(k => byKey[k] && show(k)).map(k => byKey[k]) })).filter(g => g.rows.length);
+  // 1.247.0 — 본편 스타일: 스킬·획득은 한 구획으로
+  const merged = [];
+  for (const g of groups) {
+    const last = merged[merged.length - 1];
+    if ((g.id === 'gain' || g.id === 'skill') && last && (last.id === 'skill' || last.id === 'gain')) last.rows.push(...g.rows.map(r => [...r, g.id]));
+    else merged.push({ ...g, title: g.id === 'skill' || g.id === 'gain' ? '스킬 · 획득' : g.title, rows: g.rows.map(r => [...r, g.id]) });
+  }
   return (
-    <div className="mt-2 flex flex-col gap-2">
-      <div style={{ fontSize: 11.5, color: PALETTE.textDim }}>세부 능력치 <span style={{ fontSize: 11 }}>— 장비·특성·사역마·원정대 버프·전승 합산</span></div>
-      {groups.map(g => (
-        <InfoSection key={g.id} icon={g.icon} title={g.title} color={g.color}>
-          {g.rows.map(([k, label, f], i) => <InfoRow key={k} first={i === 0} label={label} value={fmtDetail(d[k] || 0, f)} />)}
-        </InfoSection>
+    <>
+      {merged.map(g => (
+        <div key={g.id} style={{ borderTop: `1px solid ${MS.line}`, marginTop: 6, paddingTop: 2 }}>
+          <MainSecHead title={g.title.split('').join(' ')} />
+          <MainKvGrid onPick={onPick} rows={g.rows.map(([k, label, f, gid]) => ({ key: k, label, value: detailValue(d[k] || 0, f, k, gid), color: detailColor(k, gid), desc: DETAIL_DESC[k] }))} />
+        </div>
+      ))}
+    </>
+  );
+}
+
+// ===== 본편 정보창 스타일 (1.247.0 — PM 「트와일라잇 UI가 더 깔끔, 본편 참고」 시안 ⑪⑫ 승인) =====
+const MS = { line: 'rgba(196,69,61,0.38)', strong: 'rgba(196,69,61,0.7)', red: '#e0574c', box: '#231014', gold: '#e8b04a', blue: '#7fa8d8', green: '#8fd08a', violet: '#b48cf0' };
+const CLASS_PATH = { wanderer: 'SWORD PATH', sage: 'ARCANE PATH', demonblood: 'BLOOD PATH', elf: 'SPIRIT PATH', priest: 'DAWN PATH' };
+function MainSecHead({ title, right }) {
+  return (
+    <div className="flex items-center justify-between" style={{ marginTop: 6, marginBottom: 2 }}>
+      <span style={{ fontSize: 12, letterSpacing: 4, color: PALETTE.textDim }}>— {title} —</span>
+      {right}
+    </div>
+  );
+}
+function MainKvGrid({ rows, onPick }) {
+  return (
+    <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', columnGap: 14 }}>
+      {rows.map(r => (
+        <button key={r.key} onClick={() => onPick(r)} className="ui-press flex items-baseline justify-between gap-1 text-left" style={{ background: 'transparent', border: 'none', padding: '5px 0', minWidth: 0 }}>
+          <span className="truncate" style={{ fontSize: 12.5, color: PALETTE.textDim }}>{r.label} <span style={{ fontSize: 10, opacity: 0.7 }}>◇</span></span>
+          <span className="flex-none" style={{ fontSize: 13.5, fontWeight: 800, color: r.color || PALETTE.text }}>{r.value}</span>
+        </button>
       ))}
     </div>
+  );
+}
+// 본편 카드 정보 모달 — 붉은 테두리 · 작은 머리말 + 큰 이름 · 닫기
+function MainModal({ kicker, title, badge, color = MS.red, onClose, children, footer }) {
+  return (
+    <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: 60, background: 'rgba(0,0,0,0.72)', padding: 16 }} onClick={onClose}>
+      <div className="ui-screen-enter w-full flex flex-col" style={{ maxWidth: 420, maxHeight: '86%', borderRadius: 4, border: `2px solid ${color}`, background: '#150a0d', boxShadow: `0 0 28px ${color}55` }} onClick={e => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-2" style={{ padding: '12px 14px 10px', borderBottom: `1px solid ${MS.line}` }}>
+          <div className="min-w-0">
+            <div style={{ fontSize: 11, letterSpacing: 4, color: PALETTE.textDim }}>◆ {kicker}</div>
+            <div className="font-bold" style={{ fontSize: 21, color, lineHeight: 1.25 }}>{title}</div>
+          </div>
+          {badge && <span className="flex-none" style={{ fontSize: 12, padding: '3px 9px', border: `1px solid ${color}`, color }}>{badge}</span>}
+        </div>
+        <div className="overflow-y-auto" style={{ padding: '12px 14px' }}>{children}</div>
+        <div className="flex flex-col gap-2" style={{ padding: '0 14px 14px' }}>
+          {footer}
+          <button onClick={onClose} className="ui-press" style={{ height: 40, border: `1px solid ${MS.line}`, background: 'transparent', color: PALETTE.textDim, letterSpacing: 6, fontSize: 13 }}>닫기</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+function MainCell({ label, value, color }) {
+  return (
+    <div className="flex items-baseline justify-between gap-1" style={{ padding: '7px 9px', border: `1px solid ${MS.line}`, background: MS.box }}>
+      <span style={{ fontSize: 11.5, color: PALETTE.textDim }}>{label}</span>
+      <span className="text-right" style={{ fontSize: 13, fontWeight: 800, color: color || PALETTE.text }}>{value}</span>
+    </div>
+  );
+}
+const COMBAT_DESC = {
+  hp: '최대 체력. 체력 능력치·장비·특성·사역마 보유 효과·원정대 버프를 합산한다.',
+  atk: '모든 공격·스킬 피해의 기준. 주 능력치(힘·지능·민첩)와 무기가 가장 크게 올린다.',
+  def: '받는 피해를 줄인다. 체력 능력치와 방어구가 올린다.',
+  spd: '행동 순서. 높을수록 라운드에서 먼저 행동한다.',
+  crit: '치명타 확률. 치명타는 「치명 피해」 배율만큼 세게 들어간다.',
+  dodge: '적 공격을 완전히 피할 확률.',
+  heal: '회복·보호막 스킬의 기준 수치 (사제).',
+};
+const DETAIL_DESC = {
+  critMult: '치명타가 들어갈 때 평소 피해의 몇 %로 들어가는지.', counterPct: '공격을 받거나 피했을 때 바로 되받아칠 확률 (방랑검사).',
+  dmgReduce: '적에게 받는 피해를 이 비율만큼 줄인다.', lifesteal: '준 피해의 이 비율만큼 HP를 회복한다.', armorPen: '적 방어의 이 비율을 무시한다.',
+  skillDmg: '스킬로 주는 피해가 이만큼 늘어난다.', dotDmg: '화상·출혈 같은 지속 피해가 이만큼 늘어난다.', regenPct: '매 턴 최대 HP의 이 비율만큼 회복한다.',
+  cdr: '모든 스킬의 재사용 대기를 줄인다. 스킬별 단축과 합쳐 최대 2턴.', rageDouble: '광폭화가 켜진 동안 모든 공격이 2번 들어간다.',
+  rageTurnsAdd: '광폭화가 이 턴만큼 더 오래 유지된다 (광기의 낙인).', rageLifesteal: '광폭화가 켜진 동안 흡혈량이 2배가 된다 (광기의 낙인).',
+  expPct: '전투 경험치가 이만큼 늘어난다.', goldPct: '전투 골드가 이만큼 늘어난다.', dropPct: '장비가 떨어질 확률이 이만큼 늘어난다.',
+};
+const DETAIL_GREEN = ['regenPct', 'dodgeHeal', 'emergencyHeal', 'revive', 'guts', 'lifesteal', 'rageLifesteal', 'overhealShield', 'blessMult', 'blessTurns'];
+const DETAIL_GOLD = ['critMult', 'counterPct', 'counterDmg', 'counterDouble', 'critAfterCounter', 'firstCrit', 'chain', 'multiHitsAdd', 'spiritArrow'];
+const detailColor = (k, gid) => (gid === 'gain' ? MS.gold : gid === 'skill' ? MS.violet : DETAIL_GREEN.includes(k) ? MS.green : gid === 'surv' ? MS.blue : DETAIL_GOLD.includes(k) ? MS.gold : MS.red);
+const detailValue = (v, f, k, gid) => {
+  const t = fmtDetail(v, f);
+  if (k === 'cdr') return `-${v}턴`;
+  return f === 'pct' && (gid === 'atk' || gid === 'gain') && v > 0 ? `+${t}` : t;
+};
+const SKILL_KIND_SHORT = { strike: '단일', multi: '연속', aoe: '광역', dot: '지속', lifesteal: '흡혈', heal: '회복', healAll: '전체 회복', shield: '보호막', buffAtk: '강화', rage: '강화', taunt: '도발', executeStrike: '처형', breakStrike: '방어 파괴', weakStrike: '약화', markStrike: '표식', healShield: '회복', healBuff: '회복', hot: '지속 회복' };
+function MainSkillCard({ s, lv, u, d, can, onClick }) {
+  const locked = s.reqLv > u.lv;
+  const w = cdWait(s, d); const cdr = cdOf(s, d);
+  return (
+    <button onClick={onClick} className="ui-press relative text-left" style={{ padding: '8px 9px', borderRadius: 12, border: `1px solid ${lv ? MS.strong : MS.line}`, background: MS.box, opacity: locked ? 0.45 : 1, minWidth: 0 }}>
+      {can && <span className="absolute" style={{ top: 5, right: 7, fontSize: 11, fontWeight: 800, color: MS.gold }}>＋</span>}
+      <div className="truncate font-bold" style={{ fontSize: 13.5, color: lv ? PALETTE.text : PALETTE.textDim }}>{s.branch ? <span style={{ color: REBIRTH_BRANCHES[s.branch].color }}>✦</span> : null}{s.name}</div>
+      <div className="truncate" style={{ fontSize: 11, color: PALETTE.textDim }}>
+        {locked ? `Lv.${s.reqLv}부터` : <>{SKILL_KIND_SHORT[s.kind] || '스킬'} · <span style={{ color: cdr ? '#7fd1c8' : PALETTE.textDim }}>⏱{s.cd ? (w ? `${w}턴` : '매 턴') : '매 턴'}</span></>}
+      </div>
+      <div style={{ fontSize: 9, letterSpacing: 1.5, color: MS.gold }}>{'●'.repeat(lv)}<span style={{ color: PALETTE.textDim }}>{'○'.repeat(Math.max(0, SKILL_MAX_LV - lv))}</span></div>
+    </button>
+  );
+}
+function MainPassiveCard({ s, lv, u, can, onClick }) {
+  const locked = s.reqLv > u.lv;
+  return (
+    <button onClick={onClick} className="ui-press w-full text-left" style={{ padding: '9px 12px', borderRadius: 12, border: `1px solid ${lv ? MS.strong : MS.line}`, background: MS.box, opacity: locked ? 0.45 : 1 }}>
+      <div className="flex items-center gap-2">
+        <span className="font-bold truncate" style={{ fontSize: 14, color: lv ? MS.red : PALETTE.textDim }}>{s.branch ? <span style={{ color: REBIRTH_BRANCHES[s.branch].color }}>✦ </span> : null}{s.name}</span>
+        <span className="flex-none" style={{ fontSize: 11, padding: '1px 7px', borderRadius: 7, background: 'rgba(255,255,255,0.06)', color: PALETTE.textDim }}>{locked ? `Lv.${s.reqLv}부터` : `Lv.${lv} / ${SKILL_MAX_LV}`}</span>
+        {can && <span className="ml-auto" style={{ fontSize: 12, fontWeight: 800, color: MS.gold }}>＋</span>}
+      </div>
+      <div className="mt-1.5" style={{ height: 5, borderRadius: 3, background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+        <div style={{ width: `${(lv / SKILL_MAX_LV) * 100}%`, height: '100%', background: MS.red }} />
+      </div>
+    </button>
+  );
+}
+function MainSkillModal({ s, lv, u, d, sp, can, onLearn, onClose }) {
+  const cur = Math.max(1, lv);
+  const pw = skillPower(s, cur);
+  const w = cdWait(s, d); const cdr = cdOf(s, d);
+  const all = d?.cdr || 0; const own = d?.skillCdr?.[s.id] || 0;
+  const passive = s.kind === 'passive';
+  const locked = s.reqLv > u.lv;
+  const color = s.branch ? REBIRTH_BRANCHES[s.branch].color : MS.red;
+  return (
+    <MainModal kicker={passive ? '패 시 브' : s.branch ? '전 승 스 킬' : '액 티 브 스 킬'} title={s.name} color={color} badge={lv ? `Lv.${lv}` : locked ? `Lv.${s.reqLv}부터` : '미습득'} onClose={onClose}
+      footer={!locked && lv < SKILL_MAX_LV && (
+        <button disabled={!can} onClick={onLearn} className="ui-press" style={{ height: 42, border: `1px solid ${can ? MS.gold : MS.line}`, background: can ? 'rgba(232,176,74,0.12)' : 'transparent', color: can ? MS.gold : PALETTE.textDim, fontSize: 13.5, fontWeight: 800, opacity: can ? 1 : 0.6 }}>
+          {lv ? `강화 → Lv.${lv + 1}` : '배우기'} <span style={{ fontSize: 11.5, fontWeight: 400 }}>(스킬 포인트 1 · 보유 {sp})</span>
+        </button>
+      )}>
+      <div style={{ fontSize: 13, color: PALETTE.text, lineHeight: 1.55 }}><HiNum text={describeSkill(s, cur)} /></div>
+      <div className="grid gap-1.5 mt-3" style={{ gridTemplateColumns: '1fr 1fr' }}>
+        <MainCell label="위력" value={pw != null ? `${pw}%` : '상시'} />
+        <MainCell label="대상" value={skillTarget(s)} />
+        <MainCell label="재사용" value={passive ? '—' : !s.cd ? '매 턴' : cdr ? `${s.cd} → ${w ? `${w}턴` : '매 턴'}` : `${s.cd}턴`} color={cdr ? '#7fd1c8' : null} />
+        <MainCell label="종류" value={SKILL_KIND_LABEL[s.kind] || '스킬'} />
+      </div>
+      <div className="mt-2" style={{ padding: '8px 10px', border: `1px solid ${MS.line}`, background: MS.box, fontSize: 12.5, color: PALETTE.text }}>
+        <b style={{ color }}>◇ 발동</b> {SKILL_WHEN_TEXT[s.kind] || '다른 조건이 맞지 않을 때 — 준비된 단일 공격 중 위력이 가장 높은 것'}
+      </div>
+      {pw != null && (
+        <div className="mt-2" style={{ fontSize: 12.5, color: PALETTE.textDim, lineHeight: 1.7 }}>
+          {[1, 2, 3, 4, 5].map(l => (
+            <div key={l} style={{ color: lv === l ? PALETTE.text : PALETTE.textDim, fontWeight: lv === l ? 700 : 400 }}>
+              ◇ <b style={{ color }}>Lv.{l}</b> {skillPower(s, l)}%{lv === l ? ' ◀ 지금' : ''}
+            </div>
+          ))}
+        </div>
+      )}
+      {passive && lv > 0 && <div className="mt-2" style={{ fontSize: 12, color: PALETTE.textDim }}>◇ 다음 레벨: {lv < SKILL_MAX_LV ? describeSkill(s, lv + 1) : '최대 레벨'}</div>}
+      {!passive && s.cd > 0 && (
+        <div className="mt-1" style={{ fontSize: 12, color: PALETTE.textDim, lineHeight: 1.6 }}>
+          ◇ 재사용 {s.cd}턴{all ? ` · 모든 스킬 -${all} (유니크·특성)` : ''}{own ? ` · 이 스킬 전용 -${own} (장비 옵션)` : ''}{cdr && cdr < all + own ? ` · 합계 상한 ${E.CDR_CAP}턴` : ''} → 쓴 뒤 내 차례 {w}번은 못 쓴다
+        </div>
+      )}
+    </MainModal>
   );
 }
 
@@ -3446,7 +3598,8 @@ export default function ChronicleGame({ onExit }) {
   const [pendingReport, setPendingReport] = useState(null);   // { rep, battleKey }
   const [replayDoneKey, setReplayDoneKey] = useState(null);   // 재생이 끝난 전투의 key
   const [sessionReport, setSessionReport] = useState(null);   // 마지막 집계 — 결과창 버튼으로 다시 열기
-  const queueReport = (rep, battleKey) => { setPendingReport({ rep, battleKey }); setSessionReport({ rep, battleKey }); };
+  // 1.247.0 PM 「전투 종료 시 집계가 자동으로 열리지 않게」 — 결과창의 📋 버튼으로만 연다
+  const queueReport = (rep, battleKey) => { setSessionReport({ rep, battleKey }); };
   const [boostSheet, setBoostSheet] = useState(false);
   // 던전 연속 도전 (1.215.1) — 설정은 기억, 던전 한 판의 전투 기록은 dungRunRef에 누적
   const [dungeonAuto, setDungeonAuto] = useState(() => { try { return localStorage.getItem('chronicleDungeonAuto') === '1'; } catch { return false; } });
@@ -3703,10 +3856,11 @@ export default function ChronicleGame({ onExit }) {
     const ctx = battle?.ctx;
     if (autoProg) stopAuto(); // 「계속」을 누르면 자동 진행도 멈춘다
     setBattle(null);
+    // 1.247.0 — 끝난 콘텐츠의 화면으로 돌아간다 (던전 클리어·패배도 마을이 아니라 던전 목록, 사냥 패배도 사냥터)
     if (ctx?.kind === 'raid') setView('raid');
-    else if (ctx?.kind === 'dungeon') setView(save.dungeon ? 'dungeon' : 'town');
+    else if (ctx?.kind === 'dungeon') setView('dungeon');
     else if (ctx?.kind === 'tower') setView('tower');
-    else setView(battle?.sim.result === 'win' ? 'field' : 'town');
+    else setView('field');
   };
 
   let content;
