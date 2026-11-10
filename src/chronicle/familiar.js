@@ -186,7 +186,7 @@ export function famSkillInfo(key, f) {
   const lv = famGradeIdx(f.grade) + 1;
   const pct = (x) => `${Math.round(x * 100)}%`;
   const sig = famSignature(key, f.grade);
-  const sigLocked = lv - 1 < FAM_SIG_MIN_GRADE;
+  const sigLocked = !famHasSignature(key, f);
   // 1.225.1 — 남령 미만은 고유 스킬을 목록에서 뺀다 (전투에서도 쓰지 않음 · 화면엔 안내 한 줄만)
   return [...(sigLocked ? [] : [sig]), ...FAM_SKILLS[roleId]].map(s => {
     const sv = Math.max(lv, FAM_SIG_MIN_GRADE + 1);
@@ -248,6 +248,51 @@ const BOSS_SIGS = {
   '광기의 종말 마에스트로': ['D5', '종말의 교향곡'], '마왕의 그림자': ['D2', '그림자 잠식'],
 };
 export const FAM_SIG_MIN_GRADE = 3; // 남령
+export const FAM_PASSIVE_MIN_GRADE = 4; // 자령
+
+// ===== 베이스 등급 (1.243.0 — PM 결정) =====
+// 진화는 「같은 사역마의 등급」만 올린다 — 능력치·스킬 배율은 새 등급을 따르지만
+// 고유 스킬(남령)·고유 패시브(자령)는 처음 얻은 등급(베이스)이 그 등급 이상일 때만 열린다.
+// 베이스 = 소환된 등급 (같은 사역마를 더 높은 등급으로 다시 뽑으면 갱신). 구 저장은 출신 한계와 현재 등급 중 낮은 쪽.
+let _natural = null;
+export function famNaturalGrade(key) {
+  if (!_natural) {
+    _natural = {};
+    const put = (k, g) => { if (k && famGradeIdx(g) > famGradeIdx(_natural[k] || 'red')) _natural[k] = g; };
+    for (const f of CHRONICLE_FIELDS) {
+      for (const k of f.normals || []) put(k, 'green');
+      for (const k of f.elites || []) put(k, 'blue');
+      put(f.boss, f.part >= 2 ? 'violet' : 'indigo');
+    }
+    for (const d of CHRONICLE_DUNGEONS) put(d.floors[d.floors.length - 1].enemies[0], 'violet');
+  }
+  return _natural[key] || 'violet';
+}
+export function famBaseGrade(key, f) {
+  if (!f) return 'red';
+  if (f.base) return f.base;
+  const n = famNaturalGrade(key);
+  return famGradeIdx(n) < famGradeIdx(f.grade) ? n : f.grade;
+}
+export const famHasSignature = (key, f) => famGradeIdx(f?.grade) >= FAM_SIG_MIN_GRADE && famGradeIdx(famBaseGrade(key, f)) >= FAM_SIG_MIN_GRADE;
+export const famHasPassive = (key, f) => famGradeIdx(f?.grade) >= FAM_PASSIVE_MIN_GRADE && famGradeIdx(famBaseGrade(key, f)) >= FAM_PASSIVE_MIN_GRADE;
+
+// ===== 자령 고유 패시브 (1.243.0) — 역할별 3종, 보스 출신은 전용 이름 =====
+export const FAM_PASSIVES = {
+  tank: { name: '수호신의 가호', vGuard: 0.2, desc: '전투당 1회 — 주인공이 쓰러질 피해를 받으면 대신 막아 HP 20%로 버틴다 (사역마가 살아 있을 때)' },
+  healer: { name: '생명의 순환', vRegenAll: 0.15, desc: '사역마 턴마다 아군 전원을 회복력 15%만큼 회복' },
+  dps: { name: '약점 간파', armorPen: 0.3, crit: 0.15, desc: '사역마 공격이 적 방어 30% 무시 · 치명타 확률 +15%' },
+};
+const BOSS_PASSIVE_NAMES = {
+  '절대영도의 군주': '절대영도의 가호', '동굴의 빙왕': '빙왕의 수호', '절대봉인의 군주': '봉인의 성채',
+  '정원의 대천사': '대천사의 은총', '광기의 마녀': '광기의 순환', '심처의 봉인자': '심연의 맥동', '여명의 신': '여명의 순환',
+  '광기의 종말 마에스트로': '종말의 악보', '심장의 마왕': '마왕의 안목', '협곡의 한기룡': '한기룡의 눈', '마왕의 화신': '화신의 안목',
+};
+export function famPassive(key, f) {
+  if (!famHasPassive(key, f)) return null;
+  const p = FAM_PASSIVES[famRole(key)];
+  return { ...p, name: BOSS_PASSIVE_NAMES[ENEMIES[key]?.name] || p.name };
+}
 export function famSignatureId(key) {
   const b = BOSS_SIGS[ENEMIES[key]?.name];
   if (b) return b[0];
@@ -284,6 +329,11 @@ export function famStats(key, f, heroLv, famPct = 0) {
     spd: +Math.max(5, b.spd - 2).toFixed(1),
   };
 }
+function passiveFields(key, f) {
+  const p = famPassive(key, f);
+  if (!p) return {};
+  return { vName: p.name, ...(p.vGuard ? { vGuard: p.vGuard } : {}), ...(p.vRegenAll ? { vRegenAll: p.vRegenAll } : {}), ...(p.armorPen ? { armorPen: p.armorPen } : {}), ...(p.crit ? { crit: 0.08 + p.crit } : {}) };
+}
 export function famCombatant(key, f, hero, famPct = 0) {
   const roleId = famRole(key);
   const role = FAM_ROLES[roleId];
@@ -295,7 +345,8 @@ export function famCombatant(key, f, hero, famPct = 0) {
     def: st.def, spd: st.spd, crit: 0.08, critMult: 1.5, dodge: 0.05,
     tauntReduce: role.tauntReduce ? Math.min(0.5, role.tauntReduce + 0.05 * (lv - 1)) : 0,
     guardian: role.guard ? role.guard[lv - 1] : 0, startTaunt: role.guard ? 2 : 0,
-    skills: [...(famGradeIdx(f.grade) >= FAM_SIG_MIN_GRADE ? [{ s: famSignature(key, f.grade), lv }] : []), ...FAM_SKILLS[roleId].map(s => ({ s, lv }))],
+    skills: [...(famHasSignature(key, f) ? [{ s: famSignature(key, f.grade), lv }] : []), ...FAM_SKILLS[roleId].map(s => ({ s, lv }))],
+    ...passiveFields(key, f),
   };
 }
 // 보조 사역마 → 주인공 패시브 합산 (등급별 값 × 강화 × 레벨 비례) + 재화 특성 1개 (1.225.0)
@@ -384,8 +435,9 @@ export function summonFamiliars(fams0, pity0, progress, n, rng = Math.random) {
     const key = pickR(rng, pool[gid]);
     const have = fams[key];
     const r = { key, grade: gid, isNew: !have, upgraded: false, soul: 0 };
-    if (!have) fams[key] = { grade: gid, plus: 0, lv: 1, exp: 0 };
-    else if (famGradeIdx(gid) > famGradeIdx(have.grade)) { fams[key] = { ...have, grade: gid }; r.upgraded = true; }
+    if (!have) fams[key] = { grade: gid, base: gid, plus: 0, lv: 1, exp: 0 };
+    else if (famGradeIdx(gid) > famGradeIdx(have.grade)) { fams[key] = { ...have, grade: gid, base: gid }; r.upgraded = true; }
+    else if (famGradeIdx(gid) > famGradeIdx(famBaseGrade(key, have))) fams[key] = { ...have, base: gid }; // 진화로 넘은 등급을 소환으로 다시 뽑으면 베이스 회복
     else { r.soul = famGrade(gid).dupSoul; souls += r.soul; }
     results.push(r);
   }
