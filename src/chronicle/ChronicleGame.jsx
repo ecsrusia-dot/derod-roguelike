@@ -679,6 +679,10 @@ function RosterView({ save, setSave, flash, onBack, onSwitchChar, onRaid }) {
   const hint = R.nextCapHint(roster);
   const got = R.globalBuffFx(roster, save.hero);
   const n60 = R.reachedCount(roster, R.ROSTER.unlockLv);
+  // 1.246.0 — 의뢰 정렬(받기 → 진행 → 받음) · 받는 버프 출처
+  const qOrder = { done: 0, progress: 1, claimed: 2 };
+  const qs = R.ROSTER_QUESTS.map(q => ({ q, st: R.rosterQuestState(save, q) })).sort((a, b) => (qOrder[a.st.status] ?? 1) - (qOrder[b.st.status] ?? 1));
+  const buffSrc = CHRONICLE_CLASSES.filter(c => c.id !== save.hero && roster[c.id]).flatMap(c => R.ROSTER_MILESTONES.map((lv, i) => ({ lv, i })).filter(({ lv }) => roster[c.id].peak >= lv).map(({ lv, i }) => ({ key: `${c.id}${lv}`, name: c.name, lv, fx: R.GLOBAL_BUFFS[c.id].fx[i] })));
   return (
     <div className="absolute inset-0 flex flex-col">
       <Header title="원정대" onBack={onBack} />
@@ -700,32 +704,35 @@ function RosterView({ save, setSave, flash, onBack, onSwitchChar, onRaid }) {
           <div style={{ fontSize: 11.5, color: PALETTE.textDim }}>{RD.raidEligible(roster, RD.RAID_TIERS[0]) ? '다섯 캐릭터가 함께 싸운다 — 각자 자기 봉인을 깨야 보스에 닿는다' : '다섯 캐릭터 모두 Lv.60이 되면 입장 — 눌러서 규칙 보기'}</div>
         </button>
 
-        <GlassPanel className="p-3" style={{ fontSize: 12 }}>
-          <div className="font-semibold" style={{ fontSize: 13.5, color: PALETTE.text }}>원정대 의뢰 <span style={{ fontSize: 11, color: PALETTE.textDim, fontWeight: 400 }}>— 계정 목표 · 보상은 모든 캐릭터 공유</span></div>
-          {R.ROSTER_QUESTS.map(q => {
-            const st = R.rosterQuestState(save, q);
-            return (
-              <div key={q.id} className="flex items-center gap-2 mt-2" style={{ opacity: st.status === 'claimed' ? 0.5 : 1 }}>
-                <div className="flex-1 min-w-0">
-                  <div className="truncate" style={{ fontSize: 12.5, color: st.status === 'done' ? PALETTE.legendary : PALETTE.text, fontWeight: 600 }}>{q.title} <span style={{ fontSize: 11, color: PALETTE.textDim, fontWeight: 400 }}>{q.desc}</span></div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1"><Bar v={st.cur} max={q.need} color={st.status === 'progress' ? PALETTE.dawn : PALETTE.legendary} h={4} /></div>
-                    <span style={{ fontSize: 11, color: PALETTE.textDim }}>{st.cur}/{q.need}</span>
-                  </div>
-                  <div style={{ fontSize: 11, color: PALETTE.textDim }}>{R.rosterRewardText(q.reward)}</div>
-                </div>
-                {st.status === 'done' && <button onClick={() => { setSave(R.claimRosterQuest(save, q.id)); flash(`원정대 의뢰 「${q.title}」 보상 — ${R.rosterRewardText(q.reward)}`); }} className="ui-press flex-none font-semibold" style={{ height: 34, padding: '0 12px', borderRadius: 9, border: `1px solid ${PALETTE.legendary}`, color: '#1a1206', background: PALETTE.legendary, fontSize: 12 }}>받기</button>}
-                {st.status === 'claimed' && <span className="flex-none" style={{ fontSize: 11, color: PALETTE.textDim }}>완료</span>}
-              </div>
-            );
-          })}
-        </GlassPanel>
+        <InfoSection icon="✦" title={`${chronicleClass(save.hero).name}가 받는 전역 버프`} color="#8fe08a" right="다른 캐릭터에게서">
+          {buffSrc.length ? buffSrc.map((x, i) => <InfoRow key={x.key} first={i === 0} label={R.rosterFxText(x.fx)} value={<span style={{ fontWeight: 400, color: PALETTE.textDim }}>{x.name} Lv.{x.lv}</span>} />)
+            : <InfoRow first label="아직 없음" value="다른 캐릭터를 Lv.20 이상 키우면 생긴다" color={PALETTE.textDim} />}
+          {buffSrc.length > 0 && <InfoRow label="합계" value={R.rosterFxText(got)} color="#8fe08a" />}
+          <div style={{ fontSize: 11, color: PALETTE.textDim, marginTop: 3 }}>각 캐릭터가 Lv.20 · 40 · 60 · 80 · 100에 도달할 때마다 「다른」 캐릭터 전원에게 영구 버프 (전승해도 최고 레벨 기준 유지)</div>
+        </InfoSection>
 
-        <GlassPanel className="p-3" style={{ fontSize: 12, lineHeight: 1.6 }}>
-          <div className="font-semibold" style={{ fontSize: 13.5, color: PALETTE.text }}>{chronicleClass(save.hero).name}가 받는 전역 버프</div>
-          <div style={{ color: Object.keys(got).length ? PALETTE.text : PALETTE.textDim }}>{R.rosterFxText(got) || '아직 없음 — 다른 캐릭터를 Lv.20 이상 키우면 생긴다'}</div>
-          <div style={{ fontSize: 11, color: PALETTE.textDim }}>각 캐릭터가 Lv.20 · 40 · 60 · 80 · 100에 도달할 때마다 「다른」 캐릭터 전원에게 영구 버프. 전승해도 최고 레벨 기준으로 유지.</div>
-        </GlassPanel>
+        <div className="flex justify-between" style={{ fontSize: 12, fontWeight: 700, color: PALETTE.textDim }}>
+          <span>🏳 원정대 의뢰 <span style={{ fontWeight: 400 }}>— 보상은 모든 캐릭터 공유</span></span>
+          <span style={{ fontWeight: 400 }}>받기 {qs.filter(x => x.st.status === 'done').length} · 진행 {qs.filter(x => x.st.status === 'progress').length} · 완료 {qs.filter(x => x.st.status === 'claimed').length}</span>
+        </div>
+        {qs.map(({ q, st }) => {
+          const done = st.status === 'done', claimed = st.status === 'claimed';
+          return (
+            <div key={q.id} style={{ borderRadius: 12, padding: 10, border: `1px solid ${done ? PALETTE.legendary : 'var(--ui-line)'}`, background: done ? `${PALETTE.legendary}12` : 'rgba(255,255,255,0.02)', opacity: claimed ? 0.5 : 1 }}>
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-bold" style={{ fontSize: 13, color: done ? PALETTE.legendary : PALETTE.text }}>{q.title}</span>
+                {done ? <button onClick={() => { setSave(R.claimRosterQuest(save, q.id)); flash(`원정대 의뢰 「${q.title}」 보상 — ${R.rosterRewardText(q.reward)}`); }} className="ui-press flex-none font-bold" style={{ height: 30, padding: '0 12px', borderRadius: 8, border: `1px solid ${PALETTE.legendary}`, color: '#1a1206', background: PALETTE.legendary, fontSize: 12 }}>받기</button>
+                  : claimed ? <span style={{ fontSize: 11, fontWeight: 700, color: '#c79bff' }}>✓ 받음</span>
+                    : <span style={{ fontSize: 11, color: PALETTE.textDim }}>{st.cur}/{q.need}</span>}
+              </div>
+              <div style={{ fontSize: 11.5, color: PALETTE.textDim }}>{q.desc}{done || claimed ? '' : ''}</div>
+              {!claimed && st.status === 'progress' && <div className="mt-1"><Bar v={st.cur} max={q.need} color={PALETTE.dawn} h={4} /></div>}
+              {!claimed && <div className="flex flex-wrap gap-1 mt-1">{R.rosterRewardText(q.reward).split(' · ').map((t, i) => <ValueChip key={i} label={t} />)}</div>}
+            </div>
+          );
+        })}
+
+
 
         {CHRONICLE_CLASSES.map(c => {
           const r = roster[c.id];
@@ -2107,27 +2114,39 @@ function TowerView({ save, setSave, onBack, onFight, flash, towerAuto = false, o
           </>
         )}
         <UIButton variant="gold" onClick={() => setShop(true)}>✪ 첨탑 상점</UIButton>
-        <GlassPanel className="p-3" style={{ fontSize: 11.5, color: PALETTE.textDim, lineHeight: 1.6 }}>
-          층마다 적 레벨 +1 · 10층마다 보스 (사냥터·던전 보스 순환) · 보스를 쓰러뜨리면 그 층이 체크포인트가 된다.<br />
-          쓰러지면 이번 도전이 끝나고, 다음 도전은 체크포인트 다음 층부터. 입장은 무료.<br />
-          ✪ 첨탑 주화: 층마다 {E.TOWER.coins(1)}~ · 보스 층 ×{E.TOWER.bossCoinMult} · 이번 주 처음 도달한 10층 단위마다 층×3 보너스 (월요일 0시 초기화)
-        </GlassPanel>
+        <InfoSection icon="🗼" title="첨탑 규칙" color="#c79bff">
+          <InfoRow first label="층마다" value="적 레벨 +1" />
+          <InfoRow label="10층마다" value="보스 — 쓰러뜨리면 체크포인트" note="사냥터·던전 보스가 번갈아 나온다" />
+          <InfoRow label="쓰러지면" value="도전 종료 · 다음은 체크포인트 다음 층부터" />
+          <InfoRow label="층 사이 회복" value="최대 HP의 25%" />
+          <InfoRow label="입장" value="무료" color="#8fe08a" />
+        </InfoSection>
+        <InfoSection icon="✪" title="첨탑 주화" color="#e8b04a">
+          <InfoRow first label="일반 층" value={`층마다 ${E.TOWER.coins(1)}~`} />
+          <InfoRow label="보스 층" value={`×${E.TOWER.bossCoinMult}`} />
+          <InfoRow label="주간 보너스" value="처음 도달한 10층 단위마다 층×3" note="월요일 0시 초기화" />
+        </InfoSection>
       </div>
       {shop && (
-        <BottomSheet title={`✪ 첨탑 상점 — 보유 ${coins}`} onClose={() => setShop(false)} maxHeight="80%">
+        <BottomSheet title={`✪ 첨탑 상점 — 보유 ✪ ${coins}`} onClose={() => setShop(false)} maxHeight="80%">
           <div className="flex flex-col gap-2">
-            {E.TOWER_SHOP.map(it => {
-              const ok = E.towerShopCanBuy(save, it.id);
-              return (
-                <button key={it.id} disabled={!ok} onClick={() => (it.id === 'unique' ? setPickUnique(true) : buy(it.id))} className="ui-press flex items-center gap-2 text-left" style={{ padding: '10px 12px', borderRadius: 12, border: `1px solid ${ok ? '#e8b04a66' : 'var(--ui-line)'}`, background: 'transparent', opacity: ok ? 1 : 0.45 }}>
-                  <div className="flex-1 min-w-0">
-                    <div style={{ fontSize: 13, color: PALETTE.text }}>{it.name}</div>
-                    <div style={{ fontSize: 11, color: PALETTE.textDim }}>{it.desc}</div>
-                  </div>
-                  <span className="flex-none font-semibold" style={{ fontSize: 13, color: '#e8b04a' }}>✪ {it.cost}</span>
-                </button>
-              );
-            })}
+            <div className="grid gap-1.5" style={{ gridTemplateColumns: '1fr 1fr' }}>
+              {E.TOWER_SHOP.map(it => {
+                const ok = E.towerShopCanBuy(save, it.id);
+                const lack = Math.max(0, it.cost - coins);
+                const wide = it.id === 'unique';
+                return (
+                  <button key={it.id} disabled={!ok} onClick={() => (it.id === 'unique' ? setPickUnique(true) : buy(it.id))} className="ui-press text-left flex flex-col" style={{ gridColumn: wide ? 'span 2' : undefined, padding: 9, borderRadius: 12, border: `1px solid ${wide ? '#f0883e88' : ok ? '#e8b04a66' : 'var(--ui-line)'}`, background: 'rgba(255,255,255,0.02)', opacity: ok ? 1 : 0.65 }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: wide ? '#f0a86a' : PALETTE.text }}>{it.name}</div>
+                    <div className="flex-1" style={{ fontSize: 11, color: PALETTE.textDim }}>{it.desc}</div>
+                    <div className="flex items-center justify-between mt-1.5" style={{ fontSize: 12 }}>
+                      <span style={{ padding: '1px 7px', borderRadius: 7, border: '1px solid #e8b04a66', color: '#e8b04a', fontWeight: 700 }}>✪ {it.cost}</span>
+                      <b style={{ color: ok ? '#8fe08a' : '#e07a6a' }}>{ok ? '구매' : lack ? `${lack} 부족` : '구매 불가'}</b>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
             <UIButton variant="ghost" style={{ height: 40 }} onClick={() => setShop(false)}>닫기</UIButton>
           </div>
         </BottomSheet>
@@ -2247,6 +2266,62 @@ function RiskLine({ rate, fail, danger }) {
     </div>
   );
 }
+// 대장간 부품 (1.246.0)
+function ForgeHead({ item, by }) {
+  const g = gradeOf(item.grade); const slot = SLOTS.find(sl => sl.id === item.slot);
+  const C = ({ children, color }) => <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 7, border: `1px solid ${color ? `${color}66` : 'var(--ui-line)'}`, color: color || PALETTE.textDim, background: 'rgba(255,255,255,0.04)' }}>{children}</span>;
+  return (
+    <div className="flex items-center gap-2.5" style={{ padding: 10, borderRadius: 14, border: `1px solid ${g.color}88`, background: `${g.color}12` }}>
+      <div className="flex-none flex items-center justify-center" style={{ width: 44, height: 44, borderRadius: 10, background: '#000', fontSize: 20, border: `1.5px solid ${g.color}` }}>{slot?.icon}</div>
+      <div className="flex-1 min-w-0">
+        <div className="font-bold" style={{ fontSize: 14.5, color: g.color }}>{E.itemName(item)}{item.plus ? ` +${item.plus}` : ''}</div>
+        <div className="flex flex-wrap gap-1 mt-1"><C color={g.color}>{g.label}</C><C>Lv.{item.ilv}</C>{by ? <C color="#e8b04a">★ 착용 중</C> : <C>가방</C>}</div>
+      </div>
+    </div>
+  );
+}
+function ForgeCompare({ before, after, title, extra }) {
+  const a = E.itemStats(before), b = E.itemStats(after);
+  const keys = [...new Set([...Object.keys(a), ...Object.keys(b)])].filter(k => a[k] || b[k]);
+  const val = (k, v) => (v ? E.statLabel(k, v).replace(/^[^\d+-]*(?=[+-]?\d)/, '') : '—');
+  const name = (k) => ({ atk: '공격', def: '방어', hp: 'HP', spd: '속도' }[k] || E.statLabel(k, 1).replace(/\s*[+-]?[\d.]+.*$/, ''));
+  return (
+    <InfoSection icon="◆" title={title} color="#e8b04a" right="지금 → 이후">
+      {keys.map((k, i) => { const d = +((b[k] || 0) - (a[k] || 0)).toFixed(3); return (
+        <InfoRow key={k} first={i === 0} label={name(k)} value={<>{val(k, a[k])} → {val(k, b[k])}{d ? <b style={{ color: d > 0 ? '#8fe08a' : '#e07a6a', marginLeft: 5 }}>{d > 0 ? '▲' : '▼'}{E.statLabel(k, Math.abs(d)).replace(/^[^\d]*/, '')}</b> : null}</>} />
+      ); })}
+      {extra && <InfoRow label="추가" value={extra} color="#c79bff" />}
+    </InfoSection>
+  );
+}
+const FORGE_COST_ROWS = [['gold', '🪙 골드', (s) => s.gold], ['essence', '✦ 정수', (s) => s.mats.essence || 0], ['shard', '◆ 고대 파편', (s) => s.mats.shard || 0]];
+function ForgeCost({ save, cost }) {
+  const rows = FORGE_COST_ROWS.filter(([k]) => cost[k]);
+  return (
+    <InfoSection icon="🪙" title="비용" color={PALETTE.dawn}>
+      {rows.map(([k, l, have], i) => { const h = have(save); const ok = h >= cost[k]; return (
+        <InfoRow key={k} first={i === 0} label={l} value={<>{cost[k].toLocaleString()} <span style={{ color: PALETTE.textDim, fontWeight: 400 }}>/ 보유 {h.toLocaleString()}</span> <b style={{ color: ok ? '#8fe08a' : '#e07a6a' }}>{ok ? '✓' : '부족'}</b></>} />
+      ); })}
+    </InfoSection>
+  );
+}
+function forgeShort(save, cost) {
+  const miss = FORGE_COST_ROWS.filter(([k, , have]) => cost[k] && have(save) < cost[k]).map(([k, l, have]) => `${l.replace(/^\S+\s/, '')} ${(cost[k] - have(save)).toLocaleString()}`);
+  return miss.length ? `${miss.join(' · ')} 부족합니다` : '진행할 수 없습니다';
+}
+function ForgeOdds({ outcomes }) {
+  const list = outcomes.filter(([, p]) => p > 0.0005);
+  return (
+    <InfoSection icon="🎲" title="결과 확률" color="#e07a6a">
+      <div className="flex mt-1" style={{ height: 14, borderRadius: 7, overflow: 'hidden' }}>
+        {list.map(([l, p, c]) => <div key={l} style={{ width: `${p * 100}%`, background: c }} />)}
+      </div>
+      <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5" style={{ fontSize: 11.5, color: PALETTE.textDim }}>
+        {list.map(([l, p, c]) => <span key={l}><i style={{ display: 'inline-block', width: 9, height: 9, borderRadius: 3, background: c, marginRight: 4, verticalAlign: -1 }} />{l} <b style={{ color: PALETTE.text }}>{Math.round(p * 100)}%</b></span>)}
+      </div>
+    </InfoSection>
+  );
+}
 function ForgeView({ save, setSave, onBack, flash, onTrack = () => {} }) {
   const [sel, setSel] = useState(null);
   const [filter, setFilter] = useState('all');
@@ -2262,6 +2337,8 @@ function ForgeView({ save, setSave, onBack, flash, onTrack = () => {} }) {
   const [pop, setPop] = useState(null); // 결과 팝업 (1.232.2)
   const showPop = (kind, title, sub) => setPop({ kind, title, sub, key: Date.now() });
   const [skipAsk, setSkipAsk] = useState(forgeConfirmSkip);
+  const [ftab, setFtab] = useState('enhance'); // 강화/승급 탭 (1.246.0)
+  const [rulesOpen, setRulesOpen] = useState(false);
   const guard = (risky, info, run) => {
     if (!risky || forgeConfirmSkip) { run(); return; }
     setConfirm({ ...info, onConfirm: () => { forgeConfirmSkip = skipAsk; setConfirm(null); run(); } });
@@ -2269,8 +2346,16 @@ function ForgeView({ save, setSave, onBack, flash, onTrack = () => {} }) {
   return (
     <div className="absolute inset-0 flex flex-col">
       <Header title="대장간" onBack={onBack} right={<Wallet save={save} />} />
-      <div className="px-4 pt-3 flex-none" style={{ fontSize: 12, color: PALETTE.textDim, lineHeight: 1.55 }}>
-        <b style={{ color: PALETTE.text }}>강화</b> +1당 능력치 +{Math.round(FORGE.enhancePct * 100)}% (최대 +{FORGE.maxEnhance}, +3부터 실패 · +6부터 하락 · +8부터 파괴 위험) · <b style={{ color: PALETTE.text }}>승급</b> 다음 등급으로 + 옵션 1개 추가 — 에픽 승급은 던전의 ◆ 고대 파편 필요 · 유니크는 승급 불가(강화만)
+      <div className="px-3 pt-2 flex-none">
+        <button onClick={() => setRulesOpen(!rulesOpen)} className="ui-press w-full text-left" style={{ background: 'transparent', border: 'none', padding: 0 }}>
+          <InfoSection icon="ⓘ" title="강화·승급 규칙" color={PALETTE.dawn} right={rulesOpen ? '접기 ▴' : '펼치기 ▾'}>
+            {rulesOpen && <>
+              <InfoRow first label="강화 +1당" value={`능력치 +${Math.round(FORGE.enhancePct * 100)}% (최대 +${FORGE.maxEnhance})`} />
+              <InfoRow label="실패 위험" value="+3부터 실패 · +6부터 하락 · +8부터 파괴" color="#e07a6a" />
+              <InfoRow label="승급" value="다음 등급 + 옵션 1개" note="에픽 승급은 던전의 ◆ 고대 파편 필요 · 유니크는 승급 불가(강화만)" />
+            </>}
+          </InfoSection>
+        </button>
       </div>
       <ItemFilterBar filter={filter} setFilter={setFilter} />
       <div className="flex items-center gap-2 px-3 pt-1.5 flex-none" style={{ fontSize: 12 }}>
@@ -2283,19 +2368,19 @@ function ForgeView({ save, setSave, onBack, flash, onTrack = () => {} }) {
         {!list.length && <div className="text-center py-10" style={{ fontSize: 12.5, color: PALETTE.textDim }}>{save.inventory.length ? '이 분류에 장비가 없습니다' : '가방에 장비가 없습니다'}</div>}
       </div>
       {item && (
-        <BottomSheet title={E.itemName(item) + (item.plus ? ` +${item.plus}` : '')} onClose={() => setSel(null)} maxHeight="70%">
-          <div className="text-center" style={{ fontSize: 12.5, color: gradeOf(item.grade).color }}>{gradeOf(item.grade).label} · Lv.{item.ilv}</div>
-          <div className="text-center mt-1" style={{ fontSize: 12.5, color: PALETTE.text }}>{statLine(E.itemStats(item))}</div>
-          <ItemSpecial item={item} center />
-          <div className="mt-3 flex flex-col gap-2">
-            <GlassPanel className="p-3">
-              <div style={{ fontSize: 13, color: PALETTE.text }} className="font-semibold">강화 +{item.plus || 0} → +{(item.plus || 0) + 1}</div>
-              {(item.plus || 0) < FORGE.maxEnhance ? (
-                <>
-                  <div style={{ fontSize: 12, color: PALETTE.textDim }}>결과: {statLine(E.itemStats({ ...item, plus: (item.plus || 0) + 1 }))}</div>
-                  <div style={{ fontSize: 12, color: PALETTE.textDim }}>비용: 🪙 {ec.gold} · ✦ {ec.essence}</div>
-                  <RiskLine rate={er.rate} fail={er.breakChance ? `실패 시 1단계 하락 · 그중 ${Math.round(er.breakChance * 100)}%는 장비 파괴` : er.drop ? '실패 시 1단계 하락' : er.rate < 1 ? '실패 시 재료만 잃음' : ''} danger={!!er.breakChance} />
-                  <UIButton style={{ height: 40, marginTop: 8 }} disabled={!E.canEnhance(save, item)} onClick={() => guard(er.drop || er.breakChance > 0, {
+        <BottomSheet title="대장간" onClose={() => setSel(null)} maxHeight="82%">
+          <ForgeHead item={item} by={E.equippedBy(save, item.uid)} />
+          <div className="flex gap-1 mt-2">
+            {[['enhance', `⚒ 강화 +${item.plus || 0} → +${Math.min(FORGE.maxEnhance, (item.plus || 0) + 1)}`], ['promote', ng ? `⬆ 승급 → ${gradeOf(ng).label}` : '⬆ 승급']].map(([id, l]) => (
+              <button key={id} onClick={() => setFtab(id)} className="ui-press flex-1" style={{ height: 36, borderRadius: 9, fontSize: 12, fontWeight: ftab === id ? 700 : 400, border: `1px solid ${ftab === id ? PALETTE.legendary : 'var(--ui-line)'}`, color: ftab === id ? PALETTE.legendary : PALETTE.textDim, background: 'transparent' }}>{l}</button>
+            ))}
+          </div>
+          <div className="mt-2 flex flex-col gap-2">
+            {ftab === 'enhance' && ((item.plus || 0) < FORGE.maxEnhance ? <>
+              <ForgeCompare before={item} after={{ ...item, plus: (item.plus || 0) + 1 }} title="강화하면" />
+              <ForgeCost save={save} cost={ec} />
+              <ForgeOdds outcomes={(() => { const f = 1 - er.rate; return er.drop ? [['성공', er.rate, '#8fe08a'], [`+${Math.max(0, (item.plus || 0) - 1)}로 하락`, f * (1 - er.breakChance), '#e8b04a'], ['파괴', f * er.breakChance, '#e07a6a']] : [['성공', er.rate, '#8fe08a'], ['실패 (재료만 잃음)', f, '#9b8975']]; })()} />
+              {E.canEnhance(save, item) ? <UIButton style={{ height: 42 }} disabled={!E.canEnhance(save, item)} onClick={() => guard(er.drop || er.breakChance > 0, {
                     title: `강화 +${item.plus || 0} → +${(item.plus || 0) + 1}`,
                     lines: [
                       { t: `성공 확률 ${Math.round(er.rate * 100)}%` },
@@ -2309,18 +2394,13 @@ function ForgeView({ save, setSave, onBack, flash, onTrack = () => {} }) {
                     else if (r.result === 'success') showPop('success', `강화 성공! +${(item.plus || 0) + 1}`, E.itemName(item));
                     else if (r.result === 'down') showPop('down', `강화 실패 — +${Math.max(0, (item.plus || 0) - 1)}로 하락`, E.itemName(item));
                     else showPop('fail', '강화 실패', '재료만 잃었습니다');
-                  })}>강화</UIButton>
-                </>
-              ) : <div style={{ fontSize: 12, color: PALETTE.textDim }}>최대 강화</div>}
-            </GlassPanel>
-            <GlassPanel className="p-3">
-              <div style={{ fontSize: 13, color: PALETTE.text }} className="font-semibold">등급 승급 {ng ? `→ ${gradeOf(ng).label}` : ''}</div>
-              {ng ? (
-                <>
-                  <div style={{ fontSize: 12, color: PALETTE.textDim }}>결과: {statLine(E.itemStats({ ...item, grade: ng }))}{` + 무작위 옵션 1개`}{ng === 'epic' && item.slot === 'accessory' ? ' + 에픽 장신구 효과' : ''}</div>
-                  <div style={{ fontSize: 12, color: PALETTE.textDim }}>비용: 🪙 {pc.gold} · ✦ {pc.essence}{pc.shard ? ` · ◆ ${pc.shard}` : ''}</div>
-                  <RiskLine rate={pr.rate} fail={pr.breaks ? '실패 시 장비 파괴' : '실패 시 재료만 잃음'} danger={pr.breaks} />
-                  <UIButton variant="gold" style={{ height: 40, marginTop: 8 }} disabled={!E.canPromote(save, item)} onClick={() => guard(pr.breaks, {
+                  })}>강화</UIButton> : <div className="text-center" style={{ padding: 10, borderRadius: 12, border: '1px solid var(--ui-line)', fontSize: 12.5, color: PALETTE.textDim }}>{forgeShort(save, ec)}</div>}
+            </> : <InfoSection title="최대 강화" color={PALETTE.textDim}><InfoRow first label="현재" value={`+${item.plus} / +${FORGE.maxEnhance}`} /></InfoSection>)}
+            {ftab === 'promote' && (ng ? <>
+              <ForgeCompare before={item} after={{ ...item, grade: ng }} title="승급하면" extra={`무작위 옵션 1개 추가${ng === 'epic' && item.slot === 'accessory' ? ' + 에픽 장신구 효과' : ''}`} />
+              <ForgeCost save={save} cost={pc} />
+              <ForgeOdds outcomes={[['성공', pr.rate, '#8fe08a'], [pr.breaks ? '파괴' : '실패 (재료만 잃음)', 1 - pr.rate, pr.breaks ? '#e07a6a' : '#9b8975']]} />
+              {E.canPromote(save, item) ? <UIButton variant="gold" style={{ height: 42 }} disabled={!E.canPromote(save, item)} onClick={() => guard(pr.breaks, {
                     title: `${gradeOf(ng).label} 승급`,
                     lines: [
                       { t: `성공 확률 ${Math.round(pr.rate * 100)}%` },
@@ -2333,10 +2413,8 @@ function ForgeView({ save, setSave, onBack, flash, onTrack = () => {} }) {
                     if (r.result === 'destroy') { setSel(null); showPop('destroy', '장비 파괴', `${gradeOf(ng).label} 승급 실패`); return; }
                     if (r.result === 'fail') { showPop('fail', '승급 실패', '재료만 잃었습니다'); return; }
                     const it2 = r.save.inventory.find(i => i.uid === item.uid); showPop('success', `${gradeOf(ng).label} 등급으로 승급!`, E.epicOptOf(it2) ? `에픽 효과 「${E.epicOptOf(it2).name}」` : E.itemName(it2));
-                  })}>승급</UIButton>
-                </>
-              ) : <div style={{ fontSize: 12, color: PALETTE.textDim }}>최고 등급</div>}
-            </GlassPanel>
+                  })}>승급</UIButton> : <div className="text-center" style={{ padding: 10, borderRadius: 12, border: '1px solid var(--ui-line)', fontSize: 12.5, color: PALETTE.textDim }}>{forgeShort(save, pc)}</div>}
+            </> : <InfoSection title="승급 불가" color={PALETTE.textDim}><InfoRow first label="등급" value={item.grade === 'unique' || item.grade === 'mythic' ? '유니크·전승 장비는 강화만' : '최고 등급'} /></InfoSection>)}
             <UIButton variant="ghost" style={{ height: 40 }} onClick={() => setSel(null)}>닫기</UIButton>
           </div>
         </BottomSheet>
