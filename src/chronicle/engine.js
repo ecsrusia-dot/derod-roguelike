@@ -1564,6 +1564,121 @@ export function battleDamageStats(sim, party) {
 }
 
 
+// ===== 상세 전투 통계 (1.238.0) — 전투 집계 「📈 상세 통계」 탭 =====
+// 유닛(주인공·사역마)마다 행동·스킬·피해·치명·빗나감·반격·추가타·처치·회복·보호막·받은 피해·회피·흡수·대신 맞기·쓰러짐을 센다
+// 스킬마다 사용 횟수·피해·적중·치명·회복·보호막 · 합치기는 mergeDetailStats (최대값 키는 max, 나머지는 합)
+export const DETAIL_MAX_KEYS = ['maxHit', 'maxTaken', 'maxHeal'];
+function emptyDetail() {
+  return {
+    acts: 0, skillUses: 0, basicUses: 0,
+    dmg: 0, hitDmg: 0, landed: 0, crits: 0, critDmg: 0, misses: 0, maxHit: 0,
+    dotDmg: 0, counters: 0, counterDmg: 0, chains: 0, chainDmg: 0, holyDmg: 0, reflectDmg: 0, kills: 0,
+    heal: 0, overheal: 0, hotHeal: 0, maxHeal: 0, shield: 0, buffs: 0, debuffs: 0,
+    taken: 0, timesHit: 0, maxTaken: 0, absorbed: 0, dodged: 0, coverHits: 0, coverDmg: 0, dotTaken: 0,
+    healRecv: 0, shieldRecv: 0, deaths: 0,
+  };
+}
+export function battleDetailStats(sim, party) {
+  const ids = new Set(party.map(p => p.id));
+  const units = Object.fromEntries(party.map(p => [p.id, emptyDetail()]));
+  const skills = {}; // `${id}|${스킬명}` → { uses, dmg, hits, crits, heal, shield }
+  const sk = (id, n) => { const k = `${id}|${n}`; return (skills[k] = skills[k] || { uses: 0, dmg: 0, hits: 0, crits: 0, heal: 0, shield: 0 }); };
+  const prevHp = {};
+  for (const e of sim.events) {
+    if (!e.a) continue;
+    const mine = ids.has(e.a);
+    const U = mine ? units[e.a] : null;
+    // 처치·쓰러짐 — 사건 뒤 HP 스냅샷이 0이 된 유닛 (처치 공로 = 마지막 일격의 주인)
+    const credit = (tid) => {
+      if (e.k === 'dotTick') { const top = Object.entries(e.dotSrc || {}).sort((a, b) => b[1] - a[1])[0]; return top ? top[0].split('|')[0] : null; }
+      const h = (e.hits || []).find(x => x.t === tid && x.counter);
+      return h ? h.by : e.a;
+    };
+    if (e.k === 'dotTick') {
+      for (const [k, d] of Object.entries(e.dotSrc || {})) {
+        const [id, sn] = k.split('|');
+        if (!ids.has(id)) continue;
+        units[id].dotDmg += d; units[id].dmg += d;
+        const S = sk(id, sn); S.dmg += d;
+      }
+      if (mine) { const d = e.hits?.[0]?.d || 0; U.dotTaken += d; U.taken += d; }
+    } else if (e.k === 'hot') {
+      for (const h of e.hits || []) {
+        if (mine) { U.hotHeal += h.h || 0; U.heal += h.h || 0; }
+        if (ids.has(h.t)) units[h.t].healRecv += h.h || 0;
+      }
+    } else {
+      if (mine) {
+        U.acts += 1;
+        if (e.skill) U.skillUses += 1; else if (e.k === 'attack') U.basicUses += 1;
+        sk(e.a, e.n).uses += 1;
+      }
+      for (const h of e.hits || []) {
+        const toParty = ids.has(h.t);
+        // 반격 — 맞은 쪽(by)이 공격자에게 되돌린 피해
+        if (h.counter) {
+          if (ids.has(h.by) && !toParty && h.d > 0) {
+            const C = units[h.by]; C.counters += 1; C.counterDmg += h.d; C.dmg += h.d; C.landed += 1; C.maxHit = Math.max(C.maxHit, h.d);
+            if (h.c) { C.crits += 1; C.critDmg += h.d; }
+            const S = sk(h.by, '반격'); S.uses += 1; S.dmg += h.d; S.hits += 1; if (h.c) S.crits += 1;
+          }
+          continue;
+        }
+        if (mine) {
+          const S = sk(e.a, h.chain ? `${e.n}(추가타)` : e.n);
+          if (!toParty) {
+            if (h.m) { U.misses += 1; continue; }
+            if (h.d > 0) {
+              U.dmg += h.d; U.landed += 1; U.maxHit = Math.max(U.maxHit, h.d);
+              if (h.holy) U.holyDmg += h.d; else if (h.chain) { U.chains += 1; U.chainDmg += h.d; } else if (e.k === 'reflect') U.reflectDmg += h.d; else U.hitDmg += h.d;
+              if (h.c) { U.crits += 1; U.critDmg += h.d; S.crits += 1; }
+              S.dmg += h.d; S.hits += 1;
+            }
+            if (h.debuff) U.debuffs += 1;
+          } else {
+            const eh = h.eh ?? 0;
+            if (eh > 0 || h.h > 0) { U.heal += eh; U.overheal += Math.max(0, (h.h || 0) - eh); U.maxHeal = Math.max(U.maxHeal, eh); S.heal += eh; units[h.t].healRecv += eh; }
+            if (h.es > 0) { U.shield += h.es; S.shield += h.es; units[h.t].shieldRecv += h.es; }
+            if (h.buff) U.buffs += 1;
+          }
+        } else if (toParty) {
+          // 적의 공격 → 파티가 받은 피해
+          const T = units[h.t];
+          if (h.m) { T.dodged += 1; continue; }
+          if (h.d > 0) {
+            T.taken += h.d; T.timesHit += 1; T.maxTaken = Math.max(T.maxTaken, h.d);
+            if (h.cover) { T.coverHits += 1; T.coverDmg += h.d; }
+          }
+          if (h.ab > 0) T.absorbed += h.ab;
+        }
+      }
+    }
+    for (const [id, v] of Object.entries(e.st || {})) {
+      const hp = v[0];
+      if ((prevHp[id] ?? 1) > 0 && hp <= 0) {
+        if (ids.has(id)) units[id].deaths += 1;
+        else { const c = credit(id); if (c && ids.has(c)) units[c].kills += 1; }
+      }
+      prevHp[id] = hp;
+    }
+  }
+  return { units, skills };
+}
+export function mergeDetailStats(a, b) {
+  const out = { units: { ...(a?.units || {}) }, skills: { ...(a?.skills || {}) } };
+  for (const [k, u] of Object.entries(b?.units || {})) {
+    const cur = { ...(out.units[k] || emptyDetail()) };
+    for (const [f, v] of Object.entries(u)) cur[f] = DETAIL_MAX_KEYS.includes(f) ? Math.max(cur[f] || 0, v) : (cur[f] || 0) + v;
+    out.units[k] = cur;
+  }
+  for (const [k, s] of Object.entries(b?.skills || {})) {
+    const cur = { ...(out.skills[k] || { uses: 0, dmg: 0, hits: 0, crits: 0, heal: 0, shield: 0 }) };
+    for (const [f, v] of Object.entries(s)) cur[f] = (cur[f] || 0) + v;
+    out.skills[k] = cur;
+  }
+  return out;
+}
+
 // ===== 무한 탑 「황혼의 첨탑」 (1.215.0) =====
 // 캐릭터: save.tower = { best, checkpoint, run: {floor, hp} | null }
 // 계정: mats.towerCoin · save.towerWeek = { key(월요일), best, claimed: [10,20,…] }
