@@ -141,6 +141,15 @@ export const TALENT_TREES = {
 
 // ===== 조회 =====
 export const talentTrees = (classId) => TALENT_TREES[classId] || [];
+// 갈래 → 짝 동행 역할 (1.236.0 PM: 특성 테크에 따라 최적 동행이 바뀌도록)
+//   딜 갈래 = 수호(내가 때리는 동안 막아 줌) · 생존 갈래 = 맹공(내가 버티는 동안 정리) · 지속·반격 갈래 = 치유(긴 전투)
+export const TREE_FAM = {
+  w_t_counter: 'healer', w_t_guard: 'dps', w_t_blade: 'tank',
+  s_t_flame: 'healer', s_t_arcane: 'tank', s_t_ward: 'dps',
+  d_t_blood: 'healer', d_t_undying: 'dps', d_t_carnage: 'tank',
+  e_t_wind: 'dps', e_t_spirit: 'healer', e_t_marks: 'tank',
+  p_t_heal: 'dps', p_t_bless: 'tank', p_t_judge: 'healer',
+};
 const NODE_INDEX = {};
 for (const [cid, trees] of Object.entries(TALENT_TREES)) {
   trees.forEach(tree => tree.tiers.forEach((row, ti) => row.forEach(n => { NODE_INDEX[n.id] = { ...n, cls: cid, tree: tree.id, tier: ti }; })));
@@ -166,6 +175,8 @@ export function talentFx(u) {
     const n = NODE_INDEX[id];
     if (!n || !r) continue;
     for (const [k, v] of Object.entries(n.fx)) fx[k] = (fx[k] || 0) + v * r;
+    const role = TREE_FAM[n.tree];
+    if (role) fx[`fam_${role}`] = (fx[`fam_${role}`] || 0) + r; // 짝 역할 시너지 포인트 수 (효과는 engine famSynergyFx)
   }
   return fx;
 }

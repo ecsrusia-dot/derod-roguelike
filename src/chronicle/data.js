@@ -44,6 +44,27 @@ export const CHRONICLE_TUNING = {
   critMult: 1.6,
   maxRounds: 50,
   eliteChance: 0.12,
+  // 적 무리 (1.236.0 PM) — 사냥터 일반·강적·관문 전투는 3마리 고정, 역할은 마리마다 랜덤 (수호 3마리·맹공 3마리도 가능)
+  //   수호 = 2턴 도발(아군 공격 80%가 그쪽으로) · 치유 = 체력 75% 미만 아군 회복 · 맹공 = 기존 그대로
+  //   보스전은 이번 PR에서 변경 없음 (보스별 공략 설계는 다음 PR)
+  enemyParty: {
+    on: true,
+    packSize: 3, packMult: { hp: 0.6, atk: 0.6 }, packReward: 0.6,   // 평균 1.8마리 → 3마리 보정 (일반 몹만 · 경험치·골드도 마리당 ×0.6)
+    roleWeights: { tank: 1, healer: 1, dps: 2 },
+    roles: {
+      tank: { hp: 1.5, atk: 0.6, def: 1.5, tauntEvery: 3, tauntTurns: 2, tauntPull: 0.8 },
+      healer: { hp: 0.8, atk: 0.5, heal: 0.15, cd: 2, below: 0.75 },
+    },
+  },
+  // 특성 갈래 ↔ 동행 사역마 시너지 (1.236.0 PM — 갈래 1포인트당, 갈래 완성 35포인트 기준 괄호)
+  //   딜 갈래 → 수호: 대신 맞기 확률 +0.8%p (+28%p)
+  //   반격·지속 갈래 → 치유: 회복력 +2% (+70%) · 회복 시작 HP +0.4%p (+14%p) · 회복량의 1%를 보호막으로 (+35%)
+  //   생존 갈래 → 맹공: 연격 확률 +1.2%p (+42%p) · 공격력 +0.8% (+28%)
+  famSynergy: {
+    tank: { guard: 0.008 },
+    healer: { healPower: 0.02, healBelow: 0.004, healShield: 0.01 },
+    dps: { chain: 0.012, atk: 0.008 },
+  },
   fieldDefeatGoldLoss: 0.1,
   inventoryMax: 40,           // 캐릭터 개인 가방
   stashMax: 100,              // 계정 공용 창고

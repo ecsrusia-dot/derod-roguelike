@@ -414,7 +414,7 @@ export function rollFamShards(enemies, type, rng, dungeonTier = 0) {
   let n = 0;
   for (const e of enemies) {
     if (e.tier === 'elite') { if (rng() < FAM_TUNING.dropElite) n += FAM_TUNING.dropEliteN[0] + Math.floor(rng() * (FAM_TUNING.dropEliteN[1] - FAM_TUNING.dropEliteN[0] + 1)); }
-    else if (rng() < FAM_TUNING.dropNormal) n += 1;
+    else if (rng() < FAM_TUNING.dropNormal * (e.goldMult || 1)) n += 1; // 1.236.0 3마리 무리는 마리당 ×0.6
   }
   return n;
 }
