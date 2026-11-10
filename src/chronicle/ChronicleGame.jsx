@@ -221,75 +221,6 @@ function DiffLine({ item, cur, compact = false }) {
 // 장비 상세 본문 (1.245.0) — 기본 능력치 / 추가 옵션 / 특수 효과 / 강화 구획 + 착용 비교
 const BASE_STATS = ['atk', 'def', 'hp', 'spd'];
 const BASE_LABEL = { atk: '공격', def: '방어', hp: 'HP', spd: '속도' };
-function ItemDetailBody({ save, item, cur, by, usable }) {
-  const g = gradeOf(item.grade);
-  const slot = SLOTS.find(sl => sl.id === item.slot);
-  const st = E.itemStats(item);
-  const base = BASE_STATS.filter(k => st[k]);
-  const opts = Object.keys(st).filter(k => !BASE_STATS.includes(k) && st[k]);
-  const optCap = g.opts || 0;
-  const ud = E.uniqueDef(item); const eo = E.epicOptOf(item);
-  const maxPlus = FORGE.maxEnhance;
-  const risk = (item.plus || 0) < maxPlus ? E.enhanceRisk(item) : null;
-  const showCmp = usable && !by;
-  const cmp = (() => {
-    if (!showCmp) return null;
-    const b = cur ? E.itemStats(cur) : {};
-    const keys = [...new Set([...Object.keys(st), ...Object.keys(b)])].filter(k => st[k] || b[k])
-      .sort((x, y) => (BASE_STATS.indexOf(x) + 1 || 99) - (BASE_STATS.indexOf(y) + 1 || 99));
-    return keys.map(k => {
-      const a = st[k] || 0, c = b[k] || 0, d = +(a - c).toFixed(3);
-      const val = a ? E.statLabel(k, a).replace(/^[^\d+-]*(?=[+-]?\d)/, '') : '';
-      const name = BASE_LABEL[k] || E.statLabel(k, 1).replace(/\s*[+-]?[\d.]+.*$/, '');
-      let delta = null;
-      if (cur && a && !c) delta = { kind: 'new', text: '신규' };
-      else if (cur && !a && c) delta = { kind: 'gone', text: '사라짐' };
-      else if (d) delta = { kind: d > 0 ? 'up' : 'down', text: `${d > 0 ? '▲' : '▼'}${E.statLabel(k, Math.abs(d)).replace(/^[^\d]*/, '')}` };
-      return { k, name, val, delta };
-    });
-  })();
-  const pd = showCmp ? E.itemPower(item) - (cur ? E.itemPower(cur) : 0) : 0;
-  const DC = { up: '#8fe08a', new: '#8fe08a', down: '#e07a6a', gone: '#e07a6a' };
-  const Chip2 = ({ children, color }) => <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 7, border: `1px solid ${color ? `${color}66` : 'var(--ui-line)'}`, color: color || PALETTE.textDim, background: 'rgba(255,255,255,0.04)' }}>{children}</span>;
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-2.5" style={{ padding: 10, borderRadius: 14, border: `1px solid ${g.color}88`, background: `${g.color}12` }}>
-        <div className="flex-none flex items-center justify-center" style={{ width: 48, height: 48, borderRadius: 11, background: '#000', fontSize: 22, border: `1.5px solid ${g.color}` }}>{slot?.icon}</div>
-        <div className="flex-1 min-w-0">
-          <div className="font-bold" style={{ fontSize: 15, color: g.color }}>{E.itemName(item)}{item.plus ? ` +${item.plus}` : ''}</div>
-          <div className="flex flex-wrap gap-1 mt-1">
-            <Chip2 color={g.color}>{g.label}</Chip2><Chip2>Lv.{item.ilv}</Chip2><Chip2>{slot?.label}</Chip2><Chip2>{clsTag(item)}</Chip2>
-            {by ? <Chip2 color="#e8b04a">★ 착용 중</Chip2> : <Chip2>가방</Chip2>}
-          </div>
-        </div>
-      </div>
-      {showCmp && (
-        <InfoSection icon="⇄" title={cur ? `지금 착용(${E.itemName(cur)}${cur.plus ? ` +${cur.plus}` : ''})과 비교` : '이 부위 비어 있음'} color="#8fe08a"
-          right={<b style={{ color: pd > 0 ? '#8fe08a' : pd < 0 ? '#e07a6a' : PALETTE.textDim }}>전투력 {pd > 0 ? `▲${pd}` : pd < 0 ? `▼${-pd}` : '='}</b>}>
-          {cmp.map((r, i) => <InfoRow key={r.k} first={i === 0} label={r.name} value={<>{r.val}{r.delta && <b style={{ color: DC[r.delta.kind], marginLeft: 5 }}>{r.delta.text}</b>}</>} />)}
-          {(E.uniqueDef(cur) || E.epicOptOf(cur)) && <div style={{ fontSize: 11, color: '#e07a6a', marginTop: 3 }}>※ 교체하면 착용 중 장비의 특수 효과를 잃습니다</div>}
-        </InfoSection>
-      )}
-      <InfoSection icon="◆" title="기본 능력치" color="#e8b04a" right={item.plus ? `강화 +${item.plus} 반영` : null}>
-        <div className="mt-1"><StatTiles cols={2} items={[...base.map(k => ({ label: BASE_LABEL[k], value: (st[k] || 0).toLocaleString() })), { label: '전투력', value: `⚔${E.itemPower(item)}`, accent: '#e8b04a' }]} /></div>
-      </InfoSection>
-      <InfoSection icon="✦" title="추가 옵션" color={g.color} right={`${opts.length} / ${Math.max(optCap, opts.length)}칸`}>
-        {opts.length ? opts.map((k, i) => { const t = E.statLabel(k, st[k]); const m = t.match(/^(.*?)\s*([+-]?[\d.]+.*)$/); return <InfoRow key={k} first={i === 0} label={m ? m[1] : t} value={m ? m[2] : ''} />; })
-          : <InfoRow first label="옵션" value={optCap ? '없음' : '고급 등급부터'} color={PALETTE.textDim} />}
-      </InfoSection>
-      <InfoSection icon="★" title="특수 효과" color="#c79bff" dim={!ud && !eo}>
-        {ud ? <InfoRow first label="유니크 고유 효과" value={ud.name || ''} note={ud.desc} color="#f0a86a" />
-          : eo ? <InfoRow first label={`에픽 고유 — ${eo.name}`} value="" note={eo.desc} color="#d7a8ff" />
-            : <InfoRow first label="고유 효과" value="없음" note="에픽 장신구 · 유니크 장비만 가진다" color={PALETTE.textDim} />}
-      </InfoSection>
-      <InfoSection icon="⚒" title="강화" color="#e07a6a">
-        <InfoRow first label="현재" value={`+${item.plus || 0} / +${maxPlus}`} />
-        {risk ? <InfoRow label="다음 강화" value={`성공 ${Math.round(risk.rate * 100)}%`} note={risk.breakChance ? `실패 시 파괴 ${Math.round(risk.breakChance * 100)}%` : risk.drop ? '실패 시 강화 단계 하락' : '실패해도 단계 유지'} color={risk.breakChance ? '#e07a6a' : PALETTE.text} />
-          : <InfoRow label="다음 강화" value="최대 강화" color={PALETTE.textDim} />}
-      </InfoSection>
-    </div>
-  );
-}
 function ItemRow({ save, item, onClick, right }) {
   const g = gradeOf(item.grade);
   const by = save.inventory.some(i => i.uid === item.uid) ? E.equippedBy(save, item.uid) : null;
@@ -1473,7 +1404,7 @@ function PartyView({ save, setSave, onBack }) {
 }
 
 // ===== 가방 (캐릭터 전용) =====
-function BagView({ save, setSave, onBack, flash }) {
+function BagView({ save, setSave, onBack, flash, onForge }) {
   const [filter, setFilter] = useState('all');
   const [preview, setPreview] = useState(null); // 효율 미리보기 (1.232.0)
   const [sel, setSel] = useState(null);
@@ -1521,82 +1452,75 @@ function BagView({ save, setSave, onBack, flash }) {
     setSave(r.save);
     flash(r.moved ? `창고로 ${r.moved}개 보관` : '창고가 가득 찼습니다');
   };
-  const btn = { height: 34, borderRadius: 10, fontSize: 11.5, background: 'transparent' };
+  // 1.249.0 — 본편 스타일 가방 (PM 승인 시안 ⑬): 착용 4칸 상자 · 밑줄 탭 · 2열 카드 · 관리 창
+  const [manage, setManage] = useState(false);
+  const eqUids = Object.values(save.units[hero].equip).filter(v => v != null);
+  const eqPower = eqUids.reduce((s, uid) => { const it = save.inventory.find(i => i.uid === uid); return s + (it ? E.itemPower(it) : 0); }, 0);
+  const bagList = list.filter(it => !E.equippedBy(save, it.uid));
+  const mBtn = { height: 40, fontSize: 12.5, background: MS.box, border: `1px solid ${MS.line}`, color: PALETTE.text };
+  const ec = E.bagExpandCost(save);
   return (
     <div className="absolute inset-0 flex flex-col">
       <Header title={`가방 ${save.inventory.length}/${E.bagMax(save)}`} onBack={onBack} right={<Wallet save={save} />} />
-      {(() => {
-        const c = E.bagExpandCost(save);
-        return (
-          <div className="flex items-center gap-2 px-3 pt-2 flex-none" style={{ fontSize: 12 }}>
-            <span style={{ color: PALETTE.textDim }}>가방 확장 (최대 {BAG_EXPAND.max}칸)</span>
-            <div className="flex-1" />
-            {c == null ? <span style={{ color: PALETTE.textDim }}>최대 확장</span> : (
-              <button disabled={save.gold < c} onClick={() => { setSave(E.expandBag(save)); flash(`가방 +${BAG_EXPAND.step}칸 → ${E.bagMax(save) + BAG_EXPAND.step}칸`); }} className="ui-press" style={{ fontSize: 12, padding: '5px 10px', borderRadius: 9, border: `1px solid ${PALETTE.legendary}88`, color: PALETTE.legendary, background: 'transparent', opacity: save.gold < c ? 0.45 : 1 }}>
-                +{BAG_EXPAND.step}칸 · 🪙 {c.toLocaleString()}
+      <div className="flex-none px-4 pt-2">
+        <div className="flex items-center justify-between" style={{ marginBottom: 6 }}>
+          <span style={{ fontSize: 12.5, letterSpacing: 4, color: MS.red, fontWeight: 700 }}>◆ 착용 장비</span>
+          <span style={{ fontSize: 12, color: PALETTE.textDim }}>⚔ 전투력 {eqPower.toLocaleString()}</span>
+        </div>
+        <div className="grid gap-1.5" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+          {SLOTS.map(sl => {
+            const it = save.inventory.find(i => i.uid === save.units[hero].equip[sl.id]);
+            const g = it ? gradeOf(it.grade) : null;
+            return (
+              <button key={sl.id} onClick={() => (it ? setSel(it.uid) : setFilter(sl.id))} className="ui-press text-center" style={{ padding: '6px 3px', borderRadius: 12, border: `1.5px solid ${it ? `${g.color}99` : MS.line}`, background: MS.box, minWidth: 0 }}>
+                <div style={{ fontSize: 18, lineHeight: 1.2 }}>{sl.icon}</div>
+                <div className="truncate font-bold" style={{ fontSize: 11, color: it ? g.color : PALETTE.textDim }}>{it ? E.itemName(it) : `${sl.label} 비어 있음`}</div>
+                <div style={{ fontSize: 10.5, color: PALETTE.textDim }}>{it ? `${it.plus ? `+${it.plus} · ` : ''}⚔${E.itemPower(it)}` : '눌러서 찾기'}</div>
               </button>
-            )}
-          </div>
-        );
-      })()}
-      <ItemFilterBar filter={filter} setFilter={setFilter} />
-      <div className="flex gap-1.5 px-3 pt-2 flex-none">
-        <button onClick={() => { setSave(E.autoEquip(save)); flash('더 강한 장비로 교체'); }} className="ui-press flex-1" style={{ ...btn, border: `1px solid ${PALETTE.legendary}88`, color: PALETTE.legendary }}>자동 장착</button>
-        <button disabled={!others.length} onClick={() => toStash(others.map(i => i.uid))} className="ui-press flex-1" style={{ ...btn, border: '1px solid #9cc4e488', color: '#9cc4e4', opacity: others.length ? 1 : 0.4 }}>타직업 → 창고 ({others.length})</button>
+            );
+          })}
+        </div>
+        <div className="grid mt-2" style={{ gridTemplateColumns: 'repeat(6, 1fr)', borderBottom: `1px solid ${MS.line}` }}>
+          {[{ id: 'all', label: '전체' }, ...SLOTS, { id: 'other', label: '타직업' }].map(s => (
+            <button key={s.id} onClick={() => setFilter(s.id)} className="ui-press" style={{ height: 36, background: 'transparent', border: 'none', borderBottom: `2px solid ${filter === s.id ? MS.red : 'transparent'}`, color: filter === s.id ? MS.red : PALETTE.textDim, fontSize: 12.5, fontWeight: filter === s.id ? 800 : 500 }}>{s.label}</button>
+          ))}
+        </div>
+        <div className="flex items-center gap-1.5 py-2" style={{ fontSize: 12 }}>
+          <span style={{ color: PALETTE.textDim }}>보관 <b style={{ color: PALETTE.text }}>{bagList.length}</b> · 정렬 <b style={{ color: MS.gold }}>{sortBy === 'grade' ? '등급' : '전투력'}</b></span>
+          <div className="flex-1" />
+          <button onClick={() => setManage(true)} className="ui-press" style={{ fontSize: 12, padding: '5px 10px', border: `1px solid ${MS.line}`, background: MS.box, color: PALETTE.text }}>⚙ 관리</button>
+          <button onClick={() => (picking ? endPick() : setPicking(true))} className="ui-press" style={{ fontSize: 12, padding: '5px 10px', border: `1px solid ${picking ? MS.gold : MS.line}`, background: picking ? 'rgba(232,176,74,0.12)' : MS.box, color: picking ? MS.gold : PALETTE.text }}>{picking ? '선택 끝' : '☑ 선택'}</button>
+        </div>
       </div>
-      <div className="flex gap-1.5 px-3 pt-1.5 flex-none">
-        <button onClick={() => bulk(0)} className="ui-press flex-1" style={{ ...btn, border: '1px dashed var(--ui-line-strong)', color: PALETTE.textDim }}>일반 분해</button>
-        <button onClick={() => bulk(1)} className="ui-press flex-1" style={{ ...btn, border: '1px dashed var(--ui-line-strong)', color: PALETTE.textDim }}>고급 이하 분해</button>
-        <button onClick={() => bulk(2)} className="ui-press flex-1" style={{ ...btn, border: '1px dashed #6aa6e088', color: '#6aa6e0' }}>희귀 이하 분해</button>
-        <button onClick={() => (picking ? endPick() : setPicking(true))} className="ui-press flex-1" style={{ ...btn, border: `1px solid ${picking ? PALETTE.legendary : 'var(--ui-line-strong)'}`, color: picking ? PALETTE.legendary : PALETTE.text, background: picking ? `${PALETTE.legendary}1f` : 'transparent' }}>{picking ? '선택 끝내기' : '☑ 선택 분해'}</button>
-      </div>
-      <div className="flex items-center gap-1 px-3 pt-1.5 flex-none" style={{ fontSize: 11.5 }}>
-        <span className="flex-none" style={{ color: PALETTE.textDim }}>획득 즉시 자동 분해</span>
-        {[[-1, '끔'], [0, '일반'], [1, '고급↓'], [2, '희귀↓']].map(([g, l]) => (
-          <button key={g} onClick={() => setAutoG(g)} className="ui-press flex-1" style={{ height: 28, borderRadius: 8, fontSize: 11.5, border: `1px solid ${autoG === g ? (g === 2 ? '#6aa6e0' : PALETTE.legendary) : 'var(--ui-line)'}`, color: autoG === g ? (g === 2 ? '#6aa6e0' : PALETTE.legendary) : PALETTE.textDim, background: autoG === g ? '#ffffff10' : 'transparent' }}>{l}</button>
-        ))}
-      </div>
-      <div className="px-3 pt-1 flex-none" style={{ fontSize: 11, color: PALETTE.textDim }}>분해 재화 — 일반 🪙 · 고급 ✦ · 희귀 ✦📜 · 에픽 ✦◆ · 유니크 ◆🔮</div>
-      <div className="flex items-center gap-2 px-3 pt-1.5 flex-none" style={{ fontSize: 12 }}>
-        <button onClick={toggleOther} className="ui-press flex items-center gap-1.5" style={{ background: 'transparent', border: 'none', color: incOther ? PALETTE.legendary : PALETTE.textDim, padding: '4px 0' }}>
-          <span className="flex items-center justify-center" style={{ width: 18, height: 18, borderRadius: 5, border: `1.5px solid ${incOther ? PALETTE.legendary : 'var(--ui-line-strong)'}`, background: incOther ? `${PALETTE.legendary}33` : 'transparent', fontSize: 12 }}>{incOther ? '✓' : ''}</span>
-          분해·자동 분해에 타직업 장비 포함
-        </button>
-        <div className="flex-1" />
-        <SortButtons sortBy={sortBy} pickSort={pickSort} />
-      </div>
-      <div className="flex-1 overflow-y-auto px-3 py-2 flex flex-col gap-1.5">
-        {list.map((it, i) => {
-          const by = E.equippedBy(save, it.uid);
-          const cur = !by && E.itemUsable(it, hero) ? save.inventory.find(x => x.uid === save.units[hero].equip[it.slot]) : null;
-          const firstUnequipped = !by && (i === 0 || E.equippedBy(save, list[i - 1].uid));
-          return (
-            <React.Fragment key={it.uid}>
-              {i === 0 && by && <div style={{ fontSize: 11.5, color: PALETTE.dawn, padding: '2px 2px 0' }}>착용 중</div>}
-              {firstUnequipped && <div style={{ fontSize: 11.5, color: PALETTE.textDim, padding: '6px 2px 0' }}>보관 중 · {sortBy === 'grade' ? '등급' : '전투력'} 높은 순</div>}
-              {picking ? (
-                <div className="flex items-center gap-2">
-                  <span className="flex-none flex items-center justify-center" style={{ width: 22, height: 22, borderRadius: 6, border: `1.5px solid ${picked.has(it.uid) ? '#e06a5f' : 'var(--ui-line-strong)'}`, background: picked.has(it.uid) ? '#e06a5f33' : 'transparent', color: '#e06a5f', fontSize: 13, opacity: by ? 0.3 : 1 }}>{picked.has(it.uid) ? '✓' : ''}</span>
-                  <div className="flex-1 min-w-0" style={{ opacity: by ? 0.45 : 1 }}>
-                    <ItemRow save={save} item={it} onClick={() => !by && togglePick(it.uid)} right={<span className="flex-none text-right" style={{ fontSize: 11, color: by ? PALETTE.dawn : PALETTE.textDim }}>{by ? '착용' : ''}<br />⚔{E.itemPower(it)}</span>} />
-                  </div>
-                </div>
-              ) : (
-                <ItemRow save={save} item={it} onClick={() => setSel(it.uid)} right={<span className="flex-none text-right" style={{ fontSize: 11, color: by ? PALETTE.dawn : PALETTE.textDim }}>{by ? '착용' : ''}<br />⚔{E.itemPower(it)}</span>} />
-              )}
-              {!by && E.itemUsable(it, hero) && <div className="px-2"><DiffLine item={it} cur={cur} compact /></div>}
-            </React.Fragment>
-          );
-        })}
-        {!list.length && <div className="text-center py-10" style={{ fontSize: 12.5, color: PALETTE.textDim }}>비어 있습니다 — 사냥터에서 장비를 모아 보세요</div>}
+      <div className="flex-1 overflow-y-auto px-4 pb-3">
+        <div className="grid gap-2" style={{ gridTemplateColumns: '1fr 1fr' }}>
+          {bagList.map(it => {
+            const g = gradeOf(it.grade);
+            const usable = E.itemUsable(it, hero);
+            const cur = usable ? save.inventory.find(x => x.uid === save.units[hero].equip[it.slot]) : null;
+            const pd = usable ? E.itemPower(it) - (cur ? E.itemPower(cur) : 0) : 0;
+            const slot = SLOTS.find(s => s.id === it.slot);
+            const on = picked.has(it.uid);
+            return (
+              <button key={it.uid} onClick={() => (picking ? togglePick(it.uid) : setSel(it.uid))} className="ui-press relative text-left" style={{ padding: '7px 9px 7px 11px', borderRadius: 10, background: on ? 'rgba(224,106,95,0.16)' : MS.box, border: `1px solid ${on ? '#e06a5f' : MS.line}`, borderLeft: `3px solid ${g.color}`, minWidth: 0, opacity: usable ? 1 : 0.7 }}>
+                {picking ? <span className="absolute flex items-center justify-center" style={{ top: 6, right: 7, width: 18, height: 18, borderRadius: 5, border: `1.5px solid ${on ? '#e06a5f' : MS.line}`, color: '#e06a5f', fontSize: 12 }}>{on ? '✓' : ''}</span>
+                  : pd > 0 ? <span className="absolute" style={{ top: 6, right: 8, fontSize: 11, fontWeight: 800, color: '#8fd08a' }}>▲ {pd}</span> : null}
+                <div className="truncate font-bold" style={{ fontSize: 13, color: g.color, paddingRight: 36 }}>{E.itemName(it)}{it.plus ? ` +${it.plus}` : ''}</div>
+                <div className="truncate" style={{ fontSize: 11, color: PALETTE.textDim }}>{g.label} · Lv.{it.ilv} · {usable ? slot?.label : clsTag(it)}</div>
+                <div style={{ fontSize: 12.5, fontWeight: 800, color: MS.gold }}>⚔ {E.itemPower(it)}{(E.uniqueDef(it) || E.epicOptOf(it)) && <span style={{ fontSize: 10.5, marginLeft: 5, color: '#c79bff' }}>★특수</span>}</div>
+              </button>
+            );
+          })}
+        </div>
+        {!bagList.length && <div className="text-center py-10" style={{ fontSize: 12.5, color: PALETTE.textDim }}>{list.length ? '보관 중인 장비가 없습니다 — 착용 장비만 있어요' : '비어 있습니다 — 사냥터에서 장비를 모아 보세요'}</div>}
       </div>
       {picking && (
-        <div className="flex-none px-3 py-2 flex flex-col gap-1.5" style={{ borderTop: '1px solid var(--ui-line)', background: 'rgba(0,0,0,0.45)' }}>
+        <div className="flex-none px-3 py-2 flex flex-col gap-1.5" style={{ borderTop: `1px solid ${MS.line}`, background: 'rgba(0,0,0,0.5)' }}>
           <div className="flex items-center gap-2" style={{ fontSize: 12 }}>
             <span style={{ color: PALETTE.text }}>선택 <b style={{ color: '#e06a5f' }}>{picked.size}</b>개{picked.size ? ` → ${E.salvageText(pickedSalvage)}` : ''}</span>
             <div className="flex-1" />
-            <button onClick={() => setPicked(new Set(list.filter(i => !E.equippedBy(save, i.uid)).map(i => i.uid)))} className="ui-press" style={{ fontSize: 11.5, padding: '4px 8px', borderRadius: 8, border: '1px solid var(--ui-line-strong)', color: PALETTE.dawn, background: 'transparent' }}>보이는 것 전체</button>
-            <button onClick={() => setPicked(new Set())} className="ui-press" style={{ fontSize: 11.5, padding: '4px 8px', borderRadius: 8, border: '1px solid var(--ui-line-strong)', color: PALETTE.textDim, background: 'transparent' }}>해제</button>
+            <button onClick={() => setPicked(new Set(bagList.map(i => i.uid)))} className="ui-press" style={{ fontSize: 11.5, padding: '4px 8px', border: `1px solid ${MS.line}`, color: PALETTE.dawn, background: 'transparent' }}>보이는 것 전체</button>
+            <button onClick={() => setPicked(new Set())} className="ui-press" style={{ fontSize: 11.5, padding: '4px 8px', border: `1px solid ${MS.line}`, color: PALETTE.textDim, background: 'transparent' }}>해제</button>
           </div>
           <div className="flex gap-2">
             <UIButton variant="ghost" style={{ height: 40 }} disabled={!picked.size} onClick={() => { toStash([...picked]); endPick(); }}>{picked.size ? `${picked.size}개 창고로` : '창고로'}</UIButton>
@@ -1604,42 +1528,117 @@ function BagView({ save, setSave, onBack, flash }) {
           </div>
         </div>
       )}
+      {manage && (
+        <MainModal kicker="가 방 관 리" title="⚙ 관리" onClose={() => setManage(false)}>
+          <MainSecHead title="정 리" />
+          <div className="grid gap-1.5" style={{ gridTemplateColumns: '1fr 1fr' }}>
+            <button onClick={() => { setSave(E.autoEquip(save)); flash('더 강한 장비로 교체'); }} className="ui-press" style={{ ...mBtn, color: MS.gold, borderColor: `${MS.gold}88` }}>자동 장착</button>
+            <button disabled={!others.length} onClick={() => toStash(others.map(i => i.uid))} className="ui-press" style={{ ...mBtn, color: '#9cc4e4', opacity: others.length ? 1 : 0.45 }}>타직업 → 창고 ({others.length})</button>
+            <button disabled={ec == null || save.gold < ec} onClick={() => { setSave(E.expandBag(save)); flash(`가방 +${BAG_EXPAND.step}칸`); }} className="ui-press" style={{ ...mBtn, gridColumn: 'span 2', opacity: ec == null || save.gold < ec ? 0.45 : 1 }}>{ec == null ? `가방 최대 확장 (${BAG_EXPAND.max}칸)` : `가방 +${BAG_EXPAND.step}칸 · 🪙 ${ec.toLocaleString()}`}</button>
+          </div>
+          <MainSecHead title="일 괄 분 해" />
+          <div className="grid gap-1.5" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
+            {[[0, '일반'], [1, '고급 이하'], [2, '희귀 이하']].map(([g, l]) => <button key={g} onClick={() => bulk(g)} className="ui-press" style={{ ...mBtn, color: g === 2 ? '#6aa6e0' : PALETTE.text }}>{l}</button>)}
+          </div>
+          <div className="mt-1.5" style={{ fontSize: 11, color: PALETTE.textDim }}>착용 장비는 항상 제외 · 분해 재화 — 일반 🪙 · 고급 ✦ · 희귀 ✦📜 · 에픽 ✦◆ · 유니크 ◆🔮</div>
+          <MainSecHead title="획 득 즉 시 자 동 분 해" />
+          <div className="grid gap-1.5" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+            {[[-1, '끔'], [0, '일반'], [1, '고급↓'], [2, '희귀↓']].map(([g, l]) => (
+              <button key={g} onClick={() => setAutoG(g)} className="ui-press" style={{ height: 36, fontSize: 12, border: `1px solid ${autoG === g ? MS.gold : MS.line}`, color: autoG === g ? MS.gold : PALETTE.textDim, background: autoG === g ? 'rgba(232,176,74,0.12)' : MS.box }}>{l}</button>
+            ))}
+          </div>
+          <button onClick={toggleOther} className="ui-press flex items-center gap-1.5 mt-2" style={{ background: 'transparent', border: 'none', color: incOther ? MS.gold : PALETTE.textDim, padding: '4px 0', fontSize: 12 }}>
+            <span className="flex items-center justify-center" style={{ width: 18, height: 18, border: `1.5px solid ${incOther ? MS.gold : MS.line}`, fontSize: 12 }}>{incOther ? '✓' : ''}</span>
+            분해·자동 분해에 타직업 장비 포함
+          </button>
+          <MainSecHead title="정 렬" />
+          <div className="grid gap-1.5" style={{ gridTemplateColumns: '1fr 1fr' }}>
+            {[['power', '전투력 높은 순'], ['grade', '등급 높은 순']].map(([v, l]) => <button key={v} onClick={() => pickSort(v)} className="ui-press" style={{ height: 36, fontSize: 12, border: `1px solid ${sortBy === v ? MS.gold : MS.line}`, color: sortBy === v ? MS.gold : PALETTE.textDim, background: sortBy === v ? 'rgba(232,176,74,0.12)' : MS.box }}>{l}</button>)}
+          </div>
+        </MainModal>
+      )}
       {item && (() => {
         const usable = E.itemUsable(item, hero);
         const by = E.equippedBy(save, item.uid);
         const cur = save.inventory.find(i => i.uid === save.units[hero].equip[item.slot]);
-        const diff = E.itemPower(item) - (cur ? E.itemPower(cur) : 0);
+        const canPrev = usable && !by && E.canWear(item, save.units[hero]);
+        const fb = (extra = {}) => ({ height: 42, fontSize: 13, background: 'transparent', border: `1px solid ${MS.line}`, color: PALETTE.text, ...extra });
         return (
-          <BottomSheet title="장비 정보" onClose={() => setSel(null)} maxHeight="80%">
-            <ItemDetailBody save={save} item={item} cur={cur} by={by} usable={usable} />
-            {usable && !by && E.canWear(item, save.units[hero]) && (
-              <button onClick={() => setPreview({ after: E.equipItem(save, hero, item.uid), title: `⚔ ${E.itemName(item)}${item.plus ? ` +${item.plus}` : ''} 장착 시` })} className="ui-press w-full mt-2" style={{ height: 38, borderRadius: 10, border: `1px dashed ${PALETTE.legendary}88`, color: PALETTE.legendary, background: 'transparent', fontSize: 12.5 }}>📊 이걸 끼면? — 사냥 효율 미리보기</button>
-            )}
-            {!usable && <div className="text-center mt-2" style={{ fontSize: 12, color: '#e06a5f' }}>{chronicleClass(save.hero).name}{'는 착용할 수 없습니다 — 공용 창고에 넣으면 '}{chronicleClass(item.cls).name} 캐릭터가 쓸 수 있습니다</div>}
-            <div className="mt-3 flex flex-col gap-2">
-              {usable && !by && (
-                <UIButton style={{ height: 42 }} onClick={() => { setSave(E.equipItem(save, hero, item.uid)); setSel(null); flash('장착'); }}>
-                  착용 {diff > 0 ? `(전투력 ▲ ${diff})` : diff < 0 ? `(전투력 ▼ ${-diff})` : ''}
-                </UIButton>
-              )}
-              {by ? (
-                <UIButton variant="ghost" style={{ height: 42 }} onClick={() => { setSave(E.unequipItem(save, by, item.slot)); setSel(null); flash('착용 해제'); }}>착용 해제</UIButton>
-              ) : (
-                <div className="flex gap-2">
-                  <UIButton variant="ghost" style={{ height: 42 }} onClick={() => { toStash([item.uid]); setSel(null); }}>창고로</UIButton>
-                  <UIButton variant="ghost" style={{ height: 42, color: '#e07a6a' }} onClick={() => { const r = E.dismantleItems(save, [item.uid]); setSave(r.save); setSel(null); flash(`분해 → ${E.salvageText(r.salvage)}`); }}>
-                    분해 {E.salvageText(E.salvageOf(item))}
-                  </UIButton>
-                </div>
-              )}
-              <UIButton variant="ghost" style={{ height: 40 }} onClick={() => setSel(null)}>닫기</UIButton>
-            </div>
-          </BottomSheet>
+          <MainItemModal save={save} item={item} cur={cur} by={by} usable={usable} onClose={() => setSel(null)}
+            footer={<>
+              <div className="grid gap-1.5" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                {by ? <button onClick={() => { setSave(E.unequipItem(save, by, item.slot)); setSel(null); flash('착용 해제'); }} className="ui-press" style={fb({ color: MS.gold, borderColor: MS.gold })}>착용 해제</button>
+                  : usable && E.canWear(item, save.units[hero]) ? <button onClick={() => { setSave(E.equipItem(save, hero, item.uid)); setSel(null); flash('장착'); }} className="ui-press" style={fb({ color: MS.gold, borderColor: MS.gold, fontWeight: 800 })}>착용</button>
+                    : <button disabled className="ui-press" style={fb({ color: PALETTE.textDim, opacity: 0.6 })}>{usable ? `Lv.${item.ilv}부터 착용` : '착용 불가'}</button>}
+                {canPrev ? <button onClick={() => setPreview({ after: E.equipItem(save, hero, item.uid), title: `⚔ ${E.itemName(item)}${item.plus ? ` +${item.plus}` : ''} 장착 시` })} className="ui-press" style={fb()}>📊 효율 미리보기</button>
+                  : <button onClick={() => { setSel(null); onForge?.(); }} className="ui-press" style={fb()}>⚒ 대장간</button>}
+                {canPrev && <button onClick={() => { setSel(null); onForge?.(); }} className="ui-press" style={fb()}>⚒ 대장간</button>}
+                {!by && <button onClick={() => { toStash([item.uid]); setSel(null); }} className="ui-press" style={fb({ color: '#9cc4e4' })}>창고로</button>}
+                {!by && <button onClick={() => { const r = E.dismantleItems(save, [item.uid]); setSave(r.save); setSel(null); flash(`분해 → ${E.salvageText(r.salvage)}`); }} className="ui-press" style={fb({ color: '#e07a6a', gridColumn: canPrev ? 'span 2' : 'auto' })}>분해 {E.salvageText(E.salvageOf(item))}</button>}
+              </div>
+            </>} />
         );
       })()}
       {confirm && <ConfirmSheet {...confirm} danger onCancel={() => setConfirm(null)} />}
       {preview && <PreviewSheet save={save} after={preview.after} title={preview.title} onClose={() => setPreview(null)} />}
     </div>
+  );
+}
+
+// 장비 정보창 — 본편 카드 모달 (1.249.0, PM 승인 시안 ⑭)
+function MainItemModal({ save, item, cur, by, usable, onClose, footer }) {
+  const g = gradeOf(item.grade);
+  const slot = SLOTS.find(sl => sl.id === item.slot);
+  const st = E.itemStats(item);
+  const showCmp = usable && !by;
+  const b = showCmp && cur ? E.itemStats(cur) : {};
+  const opts = Object.keys(st).filter(k => !BASE_STATS.includes(k) && st[k]);
+  const gone = showCmp && cur ? Object.keys(b).filter(k => !BASE_STATS.includes(k) && b[k] && !st[k]) : [];
+  const optCap = Math.max(g.opts || 0, opts.length);
+  const ud = E.uniqueDef(item); const eo = E.epicOptOf(item);
+  const risk = (item.plus || 0) < FORGE.maxEnhance ? E.enhanceRisk(item) : null;
+  const pd = showCmp ? E.itemPower(item) - (cur ? E.itemPower(cur) : 0) : 0;
+  const split = (k, v) => { const t = E.statLabel(k, v); const m = t.match(/^(.*?)\s*([+-]?[\d.]+.*)$/); return m ? [m[1], m[2]] : [t, '']; };
+  const dTag = (k) => {
+    if (!showCmp || !cur) return null;
+    const a = st[k] || 0, c = b[k] || 0, d = +(a - c).toFixed(3);
+    if (a && !c) return <span style={{ fontSize: 10.5, color: '#8fd08a', marginLeft: 3 }}>신규</span>;
+    if (!d) return null;
+    const txt = BASE_STATS.includes(k) ? Math.abs(Math.round(d)).toLocaleString() : split(k, Math.abs(d))[1].replace(/^\+/, '');
+    return <span style={{ fontSize: 10.5, color: d > 0 ? '#8fd08a' : '#e07a6a', marginLeft: 3 }}>{d > 0 ? '▲' : '▼'}{txt}</span>;
+  };
+  const optColor = (k) => (/crit/i.test(k) ? MS.gold : /^scdr_|cdr/.test(k) ? MS.violet : /hp|def|reduce|regen|shield|heal|steal/i.test(k) ? MS.blue : MS.red);
+  return (
+    <MainModal kicker={`${g.label} · ${slot?.label || ''}`.split('').join(' ').replace(/ {3}/g, '  ')} title={`${E.itemName(item)}${item.plus ? ` +${item.plus}` : ''}`} color={g.color} badge={`⚔ ${E.itemPower(item)}`} onClose={onClose} footer={footer}>
+      <div style={{ fontSize: 11.5, color: PALETTE.textDim, marginTop: -6, marginBottom: 8 }}>Lv.{item.ilv} · {clsTag(item)} · {by ? '착용 중' : '가방'}</div>
+      <div className="grid gap-1.5" style={{ gridTemplateColumns: '1fr 1fr' }}>
+        {BASE_STATS.map(k => <MainCell key={k} label={BASE_LABEL[k] === '공격' ? '공격력' : BASE_LABEL[k]} value={st[k] ? <>{Math.round(st[k]).toLocaleString()}{dTag(k)}</> : (b[k] ? <span style={{ color: '#e07a6a', fontSize: 12 }}>▼{Math.round(b[k]).toLocaleString()}</span> : '—')} />)}
+      </div>
+      <MainSecHead title={`추 가 옵 션 (${opts.length}/${optCap})`} />
+      {opts.length || gone.length ? (
+        <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', columnGap: 14 }}>
+          {opts.map(k => { const [l, v] = split(k, st[k]); return (
+            <div key={k} className="flex items-baseline justify-between gap-1" style={{ padding: '4px 0', minWidth: 0 }}>
+              <span className="truncate" style={{ fontSize: 12, color: PALETTE.textDim }}>{l}</span>
+              <span className="flex-none" style={{ fontSize: 12.5, fontWeight: 800, color: optColor(k) }}>{v}{dTag(k)}</span>
+            </div>); })}
+          {gone.map(k => <div key={k} className="flex items-baseline justify-between gap-1" style={{ padding: '4px 0', minWidth: 0 }}><span className="truncate" style={{ fontSize: 12, color: PALETTE.textDim }}>{split(k, b[k])[0]}</span><span className="flex-none" style={{ fontSize: 12, fontWeight: 800, color: '#e07a6a' }}>사라짐 ▼</span></div>)}
+        </div>
+      ) : <div style={{ fontSize: 12, color: PALETTE.textDim }}>{g.opts ? '옵션 없음' : '추가 옵션은 고급 등급부터 붙는다'}</div>}
+      <div className="mt-2" style={{ padding: '8px 10px', border: `1px solid ${MS.line}`, background: MS.box, fontSize: 12.5, color: PALETTE.text, lineHeight: 1.55 }}>
+        <b style={{ color: ud || eo ? '#c79bff' : MS.red }}>◇ 특수 효과</b> {ud ? <><b style={{ color: '#f0a86a' }}>{ud.name}</b> — {ud.desc}</> : eo ? <><b style={{ color: '#d7a8ff' }}>{eo.name}</b> — {eo.desc}</> : <span style={{ color: PALETTE.textDim }}>없음 (에픽 장신구 · 유니크 장비에만 붙는다)</span>}
+      </div>
+      {showCmp && (
+        <div className="mt-2" style={{ padding: '8px 10px', border: `1px solid ${MS.line}`, background: MS.box, fontSize: 12.5, color: PALETTE.text, lineHeight: 1.55 }}>
+          <b style={{ color: MS.red }}>◇ 비교 기준</b> {cur ? <>지금 착용 「{E.itemName(cur)}{cur.plus ? ` +${cur.plus}` : ''}」 · 전투력 <b style={{ color: pd > 0 ? '#8fd08a' : pd < 0 ? '#e07a6a' : PALETTE.textDim }}>{pd > 0 ? `▲ ${pd}` : pd < 0 ? `▼ ${-pd}` : '같음'}</b></> : '이 부위 비어 있음 — 끼면 전부 추가'}
+          {(E.uniqueDef(cur) || E.epicOptOf(cur)) && <div style={{ fontSize: 11.5, color: '#e07a6a' }}>※ 교체하면 착용 중 장비의 특수 효과를 잃는다</div>}
+        </div>
+      )}
+      <div className="mt-2" style={{ padding: '8px 10px', border: `1px solid ${MS.line}`, background: MS.box, fontSize: 12.5, color: PALETTE.text, lineHeight: 1.55 }}>
+        <b style={{ color: MS.red }}>◇ 강화</b> {risk ? <>+{item.plus || 0} → +{(item.plus || 0) + 1} 성공 <b>{Math.round(risk.rate * 100)}%</b> · {risk.breakChance ? <span style={{ color: '#e07a6a' }}>실패 시 파괴 {Math.round(risk.breakChance * 100)}%</span> : risk.drop ? '실패 시 단계 하락' : '실패해도 단계 유지'} (대장간)</> : <span style={{ color: PALETTE.textDim }}>최대 강화 +{FORGE.maxEnhance}</span>}
+      </div>
+      {!usable && <div className="mt-2" style={{ fontSize: 12, color: '#e06a5f' }}>{chronicleClass(save.hero).name}는 착용할 수 없다 — 공용 창고에 넣으면 {chronicleClass(item.cls).name} 캐릭터가 쓸 수 있다</div>}
+    </MainModal>
   );
 }
 
@@ -3927,7 +3926,7 @@ export default function ChronicleGame({ onExit }) {
   } else if (view === 'roster') {
     content = <RosterView save={save} setSave={setSave} flash={flash} onBack={() => setView('town')} onSwitchChar={() => setView('title')} onRaid={() => setView('raid')} />;
   } else if (view === 'bag') {
-    content = <BagView save={save} setSave={setSave} onBack={() => setView('town')} flash={flash} />;
+    content = <BagView save={save} setSave={setSave} onBack={() => setView('town')} flash={flash} onForge={() => setView('forge')} />;
   } else if (view === 'tower') {
     content = <TowerView save={save} setSave={setSave} onBack={() => setView('town')} onFight={() => fightTower()} flash={flash} towerAuto={towerAuto} onToggleTowerAuto={toggleTowerAuto} onStartAuto={startTowerAuto} />;
   } else if (view === 'fam') {
