@@ -319,13 +319,13 @@ function BattleLogLine({ e, latest, unitOf }) {
     if (h.buff) return <span key={i} style={{ ...sp, color: LOG_C.buff }}>▲ <N id={h.t} /> 강화</span>;
     if (h.debuff) return <span key={i} style={{ ...sp, color: LOG_C.debuff }}>▼ <N id={h.t} /> 약화</span>;
     if (h.burn) return <span key={i} style={{ ...sp, color: LOG_C.crit }}>🔥 <N id={h.t} /></span>;
-    if (h.dot) return <span key={i} style={{ ...sp, color: LOG_C.debuff }}>☠ <N id={h.t} /> 중독</span>;
+    if (h.dot) return <span key={i} style={{ ...sp, color: LOG_C.debuff }}>☠ <N id={h.t} /> 「{e.n}」 부여</span>;
     return null;
   };
   return (
     <div className={latest ? 'chr-log-in' : ''} style={{ fontSize: 12, lineHeight: 1.5, padding: latest ? '3px 6px' : '0 6px', borderRadius: 8, background: latest ? 'rgba(232,176,74,0.10)' : 'transparent', borderLeft: `2px solid ${latest ? actColor : 'transparent'}`, color: PALETTE.textDim, opacity: latest ? 1 : 0.85 }}>
       <span style={{ color: actColor }}>{icon} </span>
-      {e.k === 'dotTick' ? <><N id={e.a} /> <span style={{ color: LOG_C.debuff }}>지속 피해</span></> : <><N id={e.a} /> <span style={{ color: actColor, fontWeight: e.skill ? 700 : 400 }}>{e.n}</span></>}
+      {e.k === 'dotTick' ? <><N id={e.a} /> <span style={{ color: LOG_C.debuff }}>지속 피해{e.dotSrc && Object.keys(e.dotSrc).length ? ` (${[...new Set(Object.keys(e.dotSrc).map(k => k.split('|')[1]))].join('·')})` : ''}</span></> : <><N id={e.a} /> <span style={{ color: actColor, fontWeight: e.skill ? 700 : 400 }}>{e.n}</span></>}
       {(e.hits || []).map(chip)}
     </div>
   );
@@ -1148,6 +1148,7 @@ function TalentPanel({ save, setSave, cid }) {
                     <div style={{ fontSize: 11, color: PALETTE.textDim, lineHeight: 1.35 }}>
                       {n.max > 1 ? '1점당 ' : ''}{TL.talentFxText(n.fx, skillName)}
                     </div>
+                    {n.max > 1 && r > 0 && <div style={{ fontSize: 11, fontWeight: 700, color: tree.color, lineHeight: 1.35 }}>지금 {TL.talentFxText(Object.fromEntries(Object.entries(n.fx).map(([k, v]) => [k, +(v * r).toFixed(4)])), skillName)}</div>}
                   </button>
                 );
               })}
@@ -3067,7 +3068,7 @@ const DETAIL_DESC = {
   skillDmg: '스킬로 주는 피해가 이만큼 늘어난다.', dotDmg: '화상·출혈 같은 지속 피해가 이만큼 늘어난다.', regenPct: '매 턴 최대 HP의 이 비율만큼 회복한다.',
   cdr: '모든 스킬의 재사용 대기를 줄인다. 스킬별 단축과 합쳐 최대 2턴.', rageDouble: '광폭화가 켜진 동안 모든 공격이 2번 들어간다.',
   rageTurnsAdd: '광폭화가 이 턴만큼 더 오래 유지된다 (광기의 낙인).', rageLifesteal: '광폭화가 켜진 동안 흡혈량이 2배가 된다 (광기의 낙인).',
-  openInferno: '전투 시작 순간 적 전체에 거는 화상. 스킬 「겁화」와 별개로, 턴을 쓰지 않고 쿨타임과도 무관하다. 매 턴 공격력의 이 비율만큼 피해 · 3턴(지속 시간 배율 적용). 출처: 이프리트의 계약서 60% + 특성 「선제 화염」 1점당 4%.',
+  openInferno: '전투 시작 순간 적 전체에 거는 화상. 스킬 「겁화」와 별개로, 턴을 쓰지 않고 쿨타임과도 무관하다. 피해 = 매 턴 공격력 × 이 비율 × (1 + 지속 피해 %) · 3턴(지속 시간 배율 적용). 출처: 이프리트의 계약서 60% + 특성 「선제 화염」 1점당 4%.',
   expPct: '전투 경험치가 이만큼 늘어난다.', goldPct: '전투 골드가 이만큼 늘어난다.', dropPct: '장비가 떨어질 확률이 이만큼 늘어난다.',
 };
 const DETAIL_GREEN = ['regenPct', 'dodgeHeal', 'emergencyHeal', 'revive', 'guts', 'lifesteal', 'rageLifesteal', 'overhealShield', 'blessMult', 'blessTurns'];
