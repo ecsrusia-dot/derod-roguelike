@@ -275,7 +275,7 @@ function passiveFx(u) {
 
 // 전투 능력치 (2.0 — 장비 옵션·유니크 효과 합산)
 const PASS_KEYS = ['counterDouble', 'tauntReduce', 'critAfterCounter', 'emergencyHeal', 'dotTurnsMult', 'openInferno', 'skillShield', 'resetEvery',
-  'overhealShield', 'missingHpAtk', 'rageDouble', 'multiHitsAdd', 'spiritArrow', 'dodgeHeal', 'firstCrit', 'revive', 'shieldReduce', 'blessMult', 'blessTurns',
+  'overhealShield', 'missingHpAtk', 'rageDouble', 'rageTurnsAdd', 'rageLifesteal', 'multiHitsAdd', 'spiritArrow', 'dodgeHeal', 'firstCrit', 'revive', 'shieldReduce', 'blessMult', 'blessTurns',
   'execute', 'chain', 'holyDmg', 'regenPct', 'counterDmg', 'skillDmg', 'dotDmg', 'expPct', 'goldPct', 'dropPct', 'famPct', 'fam_tank', 'fam_healer', 'fam_dps'];
 const MULT_KEYS = ['dotTurnsMult', 'blessMult'];
 export function deriveUnit(save, classId) {
@@ -298,6 +298,9 @@ export function deriveUnit(save, classId) {
     else if (MULT_KEYS.includes(k)) g[k] = Math.max(g[k] || 0, v);
     else g[k] = (g[k] || 0) + v;
   }
+  // 1.247.0 PM 결정 「겹칠 때만 대체」 — 「광폭화 중 2회」가 두 출처(광기의 낙인 + 특성 피의 광란)에서 겹치면
+  // 겹친 몫은 「광폭화 지속 +1턴 · 광폭화 중 흡혈 2배」로 바뀐다 (2회 공격은 2중첩이 없으므로)
+  if ((g.rageDouble || 0) >= 2) { g.rageTurnsAdd = (g.rageTurnsAdd || 0) + 1; g.rageLifesteal = 1; }
   const rb = 1 + REBIRTH.bonusPct * (u.rebirth?.count || 0);
   const G = (k) => g[k] || 0;
   const fx = passiveFx(u);
@@ -325,6 +328,7 @@ export function deriveUnit(save, classId) {
       .filter(x => x.s && x.lv > 0 && x.s.kind !== 'passive'),
   };
   for (const k of PASS_KEYS) if (G(k)) out[k] = G(k);
+  if (out.rageDouble) out.rageDouble = 1; // 중첩 수가 아닌 보유 여부
   if (Object.keys(skillBoost).length) out.skillBoost = skillBoost;
   // 스킬별 재사용 단축 (1.241.0) — 일반 장비 「「스킬」 재사용 -1턴」 + 에픽 「시간의 모래」(가장 긴 스킬)
   const skillCdr = {};
@@ -1027,7 +1031,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
     }
     def.hp = Math.max(0, def.hp - d);
     onHurt(def);
-    if (att.lifesteal && d > 0 && att.hp > 0) healUnit(att, Math.round(d * att.lifesteal));
+    if (att.lifesteal && d > 0 && att.hp > 0) healUnit(att, Math.round(d * att.lifesteal * (att.rageLifesteal && att.buffs?.rage?.t > 0 ? 2 : 1))); // 1.247.0 광폭화 중 흡혈 2배
     if (def.thornsPct && d > 0 && att.hp > 0 && !immuneTo(def, att)) att.hp = Math.max(0, att.hp - Math.max(1, Math.round(d * def.thornsPct)));
     // 반사 갑주 (1.237.0 보스 기믹) — 직접 공격 피해의 일부를 되돌린다 (지속 피해는 이 함수를 거치지 않아 반사 안 됨)
     if (def.fx?.reflect?.t > 0 && att.side === 'party' && d > 0 && att.hp > 0) {
@@ -1226,7 +1230,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
         }
         spiritHit(u, hits);
         if (s.kind === 'lifesteal' && r.d > 0) {
-          const h = Math.round(r.d * s.steal);
+          const h = Math.round(r.d * s.steal * (u.rageLifesteal && u.buffs.rage?.t > 0 ? 2 : 1)); // 1.247.0 광기의 낙인
           const before = u.hp;
           u.hp = Math.min(u.maxHp, u.hp + h);
           hits.push({ t: u.id, h, eh: u.hp - before });
@@ -1273,10 +1277,11 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
         for (const a of allies) { a.buffs.bless = { v: v * (u.blessMult || 1), t: s.turns + (u.blessTurns || 0) }; hits.push({ t: a.id, buff: true }); }
         break;
       case 'rage':
-        u.buffs.rage = { v, t: s.turns }; hits.push({ t: u.id, buff: true });
+        u.buffs.rage = { v, t: s.turns + (u.rageTurnsAdd || 0) }; hits.push({ t: u.id, buff: true }); // 1.247.0 광기의 낙인 — 광폭화 지속 +N
         break;
       case 'taunt':
-        u.taunt = s.turns + 1; u.tauntDef = v; // 1.243.0 — 자기 턴 끝에 1 감소하므로 +1 (N턴 = 적이 N라운드 공격하는 동안) hits.push({ t: u.id, buff: true });
+        u.taunt = s.turns + 1; u.tauntDef = v; // 1.243.0 — 자기 턴 끝에 1 감소하므로 +1 (N턴 = 적이 N라운드 공격하는 동안)
+        hits.push({ t: u.id, buff: true });
         break;
       // ===== 사역마 고유 스킬 (1.218.0) =====
       case 'duel': {

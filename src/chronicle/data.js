@@ -569,7 +569,7 @@ export const UNIQUE_ITEMS = {
   u_d_thirst: U('u_d_thirst', 'demonblood', 'weapon', '피의 갈망', { atkPct: 0.10, hpPct: 0.08 }, { lifesteal: 0.15, overhealShield: 1 }, '흡혈 15%, 최대 HP를 넘는 회복은 보호막으로'),
   u_d_heart: U('u_d_heart', 'demonblood', 'offhand', '마왕의 심장 조각', { hpPct: 0.12, lowHpDmg: 0.1 }, { missingHpAtk: 0.06 }, '잃은 HP 10%마다 공격력 +6%'),
   u_d_scar: U('u_d_scar', 'demonblood', 'armor', '흉터 갑주', { hpPct: 0.12, dmgReduce: 0.04 }, { thornsPct: 0.15 }, '받은 피해 15% 반사'),
-  u_d_brand: U('u_d_brand', 'demonblood', 'accessory', '광기의 낙인', { atkPct: 0.10, lifesteal: 0.04 }, { rageDouble: 1, cdr: 1 }, '광폭화 중 모든 공격 2회 · 모든 스킬 재사용 -1턴'),
+  u_d_brand: U('u_d_brand', 'demonblood', 'accessory', '광기의 낙인', { atkPct: 0.10, lifesteal: 0.04 }, { rageDouble: 1, cdr: 1 }, '광폭화 중 모든 공격 2회 · 모든 스킬 재사용 -1턴 · 특성 「피의 광란」과 겹치면 겹친 몫이 「광폭화 지속 +1턴 · 광폭화 중 흡혈 2배」로 바뀐다'),
   u_e_string: U('u_e_string', 'elf', 'weapon', '바람의 현', { crit: 0.06, chain: 0.08 }, { multiHitsAdd: 2 }, '「연속 화살」 타수 +2'),
   u_e_quiver: U('u_e_quiver', 'elf', 'offhand', '정령 화살통', { crit: 0.05, spd: 3 }, { spiritArrow: 0.2 }, '공격 시 20% 확률로 정령 화살(공격력 80%)'),
   u_e_leaf: U('u_e_leaf', 'elf', 'armor', '잎새 갑옷', { dodge: 0.05, hpPct: 0.08 }, { dodgeHeal: 0.05 }, '회피할 때마다 HP 5% 회복'),
