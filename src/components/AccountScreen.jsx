@@ -6,7 +6,7 @@
 // 게스트 → 구글 연동 (데이터 유지)
 // ============================================
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PALETTE } from '../utils/helpers.js';
 
 export default function AccountScreen({ 
@@ -15,11 +15,31 @@ export default function AccountScreen({
   meta,             // 현재 메타 (souls 등 정보 표시용)
   onLogout,         // 로그아웃 핸들러
   onLinkGoogle,     // 게스트 → 구글 연동 핸들러
+  cloudStatus,      // 1.237.3~ { checked, blocked, error }
+  onLoadCloudBackup,    // 1.237.3~ → { ok, exists, meta, savedAt }
+  onRestoreCloudBackup, // 1.237.3~ (backupMeta) → 복구 선택 화면
   onClose,
 }) {
   const [loading, setLoading] = useState(null);
   const [error, setError] = useState(null);
   const [confirmLogout, setConfirmLogout] = useState(false);
+  const [backup, setBackup] = useState(null); // null = 불러오는 중 · { ok, exists, meta, savedAt }
+  const isCloud = authMode === 'guest' || authMode === 'google';
+  useEffect(() => {
+    if (!isCloud || !onLoadCloudBackup) return;
+    let alive = true;
+    onLoadCloudBackup().then((b) => { if (alive) setBackup(b || { ok: false }); });
+    return () => { alive = false; };
+  }, [isCloud]); // eslint-disable-line react-hooks/exhaustive-deps
+  const cloudLine = !cloudStatus ? null
+    : cloudStatus.blocked ? { t: '⚠ 저장 멈춤 — 진행도 급락 감지 (클라우드 보호 중)', c: PALETTE.accent }
+    : !cloudStatus.checked ? { t: '… 클라우드 확인 중 — 확인 전엔 이 기기에만 저장', c: PALETTE.textDim }
+    : cloudStatus.error === 'too-large' ? { t: '⚠ 저장 실패 — 데이터가 너무 큼 (1MB 초과)', c: PALETTE.accent }
+    : cloudStatus.error === 'permission-denied' ? { t: '⚠ 저장 실패 — 권한 없음 (보안 규칙 확인)', c: PALETTE.accent }
+    : cloudStatus.error ? { t: `⚠ 저장 실패 (${cloudStatus.error}) — 다시 시도 중`, c: PALETTE.accent }
+    : { t: '✓ 클라우드 동기화 정상 (변경 2초 뒤 자동 저장)', c: PALETTE.green };
+  const bk = backup?.ok && backup.exists ? backup : null;
+  const bkAwaken = bk ? Object.values(bk.meta?.engravings || {}).reduce((s2, e) => s2 + (e?.lv || 0), 0) : 0;
   
   const userInfo = firebaseUser ? {
     name: firebaseUser.displayName || (firebaseUser.isAnonymous ? '게스트' : '플레이어'),
@@ -178,6 +198,27 @@ export default function AccountScreen({
           </div>
         )}
         
+        {/* 1.237.3~ 클라우드 상태 + 백업본 */}
+        {isCloud && (
+          <div className="p-3 space-y-2" style={{ border: `1px solid ${PALETTE.panelBorder}`, borderRadius: 12 }}>
+            <div className="text-[11px] font-bold" style={{ color: PALETTE.text }}>☁ 클라우드 저장</div>
+            {cloudLine && <div className="text-[11px]" style={{ color: cloudLine.c }}>{cloudLine.t}</div>}
+            <div className="text-[11px]" style={{ color: PALETTE.textDim, lineHeight: 1.5 }}>
+              {backup === null ? '백업본 확인 중…'
+                : !backup.ok ? '백업본을 불러오지 못했습니다'
+                : !bk ? '백업본 없음 — 덮어쓰기 직전 사본이 6시간마다·진행도가 줄 때 자동 보관됩니다'
+                : <>백업본: <b>{bk.savedAt ? new Date(bk.savedAt).toLocaleString('ko-KR') : '-'}</b><br />
+                    영혼 ✦{bk.meta?.souls || 0} · 처치 {bk.meta?.totalKills || 0} · 원정 {bk.meta?.totalRuns || 0}회 · 각성도 합 {bkAwaken}</>}
+            </div>
+            {bk && (
+              <button onClick={() => onRestoreCloudBackup?.(bk.meta)} className="w-full py-2"
+                style={{ background: 'transparent', color: PALETTE.text, border: `1px solid ${PALETTE.ice}`, borderRadius: 10, fontSize: '11px' }}>
+                ↺ 백업본과 비교해 되돌리기
+              </button>
+            )}
+          </div>
+        )}
+
         {/* 모드 정보 — 로컬일 때 경고 */}
         {authMode === 'local' && (
           <div className="p-3" style={{ 

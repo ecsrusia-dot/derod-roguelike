@@ -81,8 +81,8 @@ import NodeInfoModal from './components/NodeInfoModal.jsx';
 import BossIntroScreen from './components/BossIntroScreen.jsx';
 import PCSidebar from './components/PCSidebar.jsx';
 import { LATEST_VERSION } from './data/changelog.js';
-import { signInGuest, signInGoogle, signOut, watchAuthState, getUserInfo, linkGuestToGoogle } from './cloud/auth.js';
-import { saveCloudMeta, loadCloudMeta, pickLatest } from './cloud/sync.js';
+import { signInGuest, signInGoogle, signOut, watchAuthState, getUserInfo, linkGuestToGoogle, consumePendingGoogle } from './cloud/auth.js';
+import { saveCloudMeta, pickLatest, fetchCloudMeta, saveCloudBackup, loadCloudBackup, cloudBackupDue, progressScore as cloudProgressScore, CLOUD_GUARD, getCloudSaveError } from './cloud/sync.js';
 import StartScreen from './components/StartScreen.jsx';
 import VictoryScreen from './components/VictoryScreen.jsx';
 import ChapterClearScreen from './components/ChapterClearScreen.jsx';
@@ -1006,6 +1006,13 @@ export default function App({ onSwitchGame = null } = {}) {
   const [authMode, setAuthModeState] = useState(getAuthMode());
   const [firebaseUser, setFirebaseUser] = useState(null);
   const [authReady, setAuthReady] = useState(false);
+  // 1.237.3~ 초기화 사고 방지 — 클라우드를 한 번 확인하기 전엔 자동 업로드 금지 (cloud/sync.js 주석 참조)
+  const [cloudChecked, setCloudChecked] = useState(null);   // 확인 끝난 uid
+  const [cloudBlocked, setCloudBlocked] = useState(false);  // 진행도 급락 저장 차단 중
+  const [cloudSaveErr, setCloudSaveErr] = useState(null);   // 마지막 저장 실패 코드
+  const cloudBaseRef = useRef(null);                        // 마지막으로 확인한 클라우드 내용
+  const signInBusyRef = useRef(false);                      // 로그인 처리 중엔 부팅 로드 생략
+  const metaRef = useRef(meta); metaRef.current = meta;
   
   // Firebase auth state 감시 (모드가 cloud인 경우만 의미)
   useEffect(() => {
@@ -1029,82 +1036,71 @@ export default function App({ onSwitchGame = null } = {}) {
     }
   };
   
+  // 1.237.3~ 로그인 직후 공통 처리 — 클라우드 불러오기 실패를 「새 계정」으로 오판하지 않는다
+  //   이전: 불러오기 실패 → 빈 데이터 시작 + 로컬 삭제 + 2초 뒤 빈 데이터로 클라우드 덮어쓰기 (PM 실사고)
+  const afterCloudSignIn = async (user, mode) => {
+    signInBusyRef.current = true;
+    try {
+      setAuthMode(mode);
+      setAuthModeState(mode);
+      const r = await fetchCloudMeta(user.uid);
+      const localExisting = await loadMeta();
+      const localMine = localExisting && (!localExisting.ownerUid || localExisting.ownerUid === user.uid) ? localExisting : null;
+      let safe;
+      if (!r.ok) {
+        // 확인 실패 — 같은 계정의 로컬 데이터가 있으면 그것으로, 없으면 임시 기본값. 로컬은 지우지 않고
+        // 클라우드에도 올리지 않는다 (뒤에서 재시도 → 확인되면 비교)
+        const ownLocal = localExisting?.ownerUid === user.uid ? localExisting : null;
+        safe = { ...getDefaultMeta(), ...(ownLocal || {}), ownerUid: user.uid };
+        setCloudChecked(null);
+      } else if (r.exists) {
+        const cloud = r.meta;
+        cloudBaseRef.current = cloud;
+        // 1.99.4~ 진행도 급락 감지 시 선택 화면 (복구 안전망)
+        if (shouldOfferRecovery(localMine, cloud)) {
+          setRecoveryChoice({ local: localMine, cloud, uid: user.uid });
+          return;
+        }
+        // 같은 계정 재로그인 — 클라우드 데이터 사용 (1.99.3~ 이전 계정 로컬 잔재도 즉시 폐기)
+        safe = { ...getDefaultMeta(), ...cloud, ownerUid: user.uid };
+        await clearLocalMeta();
+        setCloudChecked(user.uid);
+      } else {
+        // 클라우드에 정말 데이터가 없음(확인 성공) — 새 계정. 이전 모드의 데이터가 섞이지 않게 기본값 시작
+        safe = { ...getDefaultMeta(), ownerUid: user.uid };
+        await clearLocalMeta();
+        cloudBaseRef.current = null;
+        await saveCloudMeta(user.uid, safe);
+        setCloudChecked(user.uid);
+      }
+      setMeta(safe);
+      setMetaLoaded(true);
+      if (safe.lastSeenVersion !== LATEST_VERSION) {
+        setShowChangelog({ firstSeen: true });
+      }
+    } finally {
+      signInBusyRef.current = false;
+    }
+  };
+
   const handleSelectGuest = async () => {
     const user = await signInGuest();
-    if (user) {
-      setAuthMode('guest');
-      setAuthModeState('guest');
-      // 클라우드에 기존 데이터가 있는지 확인 (재로그인 케이스)
-      const cloud = await loadCloudMeta(user.uid);
-      let safe;
-      if (cloud) {
-        // 1.99.4~ 진행도 급락 감지 시 선택 화면 (복구 안전망 — 구글 로그인과 동일)
-        const localExisting = await loadMeta();
-        const localMine = localExisting && (!localExisting.ownerUid || localExisting.ownerUid === user.uid) ? localExisting : null;
-        if (shouldOfferRecovery(localMine, cloud)) {
-          setAuthMode('guest');
-          setAuthModeState('guest');
-          setRecoveryChoice({ local: localMine, cloud, uid: user.uid });
-          return;
-        }
-        // 같은 UID로 재로그인 — 클라우드 데이터 사용 (1.99.3~ 이전 계정 로컬 잔재도 즉시 폐기)
-        safe = { ...getDefaultMeta(), ...cloud, ownerUid: user.uid };
-        await clearLocalMeta();
-      } else {
-        // 새 게스트 — 로컬 데이터 무시하고 기본값 시작
-        // (이전 모드의 데이터가 들어가는 것 방지)
-        safe = { ...getDefaultMeta(), ownerUid: user.uid };
-        // 로컬도 초기화
-        await clearLocalMeta();
-      }
-      setMeta(safe);
-      setMetaLoaded(true);
-      if (!cloud) {
-        await saveCloudMeta(user.uid, safe);
-      }
-      if (safe.lastSeenVersion !== LATEST_VERSION) {
-        setShowChangelog({ firstSeen: true });
-      }
-    }
+    if (user) await afterCloudSignIn(user, 'guest');
   };
-  
+
   const handleSelectGoogle = async () => {
     const user = await signInGoogle();
-    if (user) {
-      setAuthMode('google');
-      setAuthModeState('google');
-      // 클라우드에 기존 데이터가 있는지 확인
-      const cloud = await loadCloudMeta(user.uid);
-      let safe;
-      if (cloud) {
-        // 1.99.4~ 로컬이 같은 계정(또는 표식 없음)이고 진행도가 크게 어긋나면 선택 화면 (복구 안전망)
-        const localExisting = await loadMeta();
-        const localMine = localExisting && (!localExisting.ownerUid || localExisting.ownerUid === user.uid) ? localExisting : null;
-        if (shouldOfferRecovery(localMine, cloud)) {
-          setAuthMode('google');
-          setAuthModeState('google');
-          setRecoveryChoice({ local: localMine, cloud, uid: user.uid });
-          return;
-        }
-        // 기존 구글 계정 재로그인 — 클라우드 데이터 사용 (1.99.3~ 이전 계정 로컬 잔재도 즉시 폐기)
-        safe = { ...getDefaultMeta(), ...cloud, ownerUid: user.uid };
-        await clearLocalMeta();
-      } else {
-        // 새 구글 계정 — 로컬 데이터 무시하고 기본값 시작
-        safe = { ...getDefaultMeta(), ownerUid: user.uid };
-        await clearLocalMeta();
-      }
-      setMeta(safe);
-      setMetaLoaded(true);
-      if (!cloud) {
-        await saveCloudMeta(user.uid, safe);
-      }
-      if (safe.lastSeenVersion !== LATEST_VERSION) {
-        setShowChangelog({ firstSeen: true });
-      }
-    }
+    // user 없음 = 팝업 차단으로 페이지 이동 로그인(redirect) — 돌아오면 아래 effect가 이어서 처리
+    if (user) await afterCloudSignIn(user, 'google');
   };
-  
+
+  // 1.237.3~ redirect 로그인 복귀 — 이전엔 모드가 저장되지 않아 로그인 화면으로 되돌아갔다
+  useEffect(() => {
+    if (!authReady || !firebaseUser || authMode || firebaseUser.isAnonymous) return;
+    if (!consumePendingGoogle()) return;
+    afterCloudSignIn(firebaseUser, 'google');
+  }, [authReady, firebaseUser, authMode]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // 로그아웃 — Firebase signOut + 로컬 클리어 + 모드 리셋
   // 1.99.3 픽스: signOut이 실패해도 로컬 클리어·모드 리셋은 반드시 수행 (finally)
   //   — 이전엔 signOut 오류 시 로컬에 이전 계정 데이터가 남아 다음 계정을 오염시킬 수 있었음
@@ -1122,6 +1118,9 @@ export default function App({ onSwitchGame = null } = {}) {
       setAuthMode(null);
       setAuthModeState(null);
       setFirebaseUser(null);
+      setCloudChecked(null);
+      setCloudBlocked(false);
+      cloudBaseRef.current = null;
       setMetaLoaded(false);
       setMeta({ souls: 0, upgrades: {}, unlocks: [], clearedExpeditions: [] });
       setScreen('title');  // LoginScreen이 표시될 것
@@ -1169,16 +1168,24 @@ export default function App({ onSwitchGame = null } = {}) {
 
   const resolveRecovery = async (pick) => {
     if (!recoveryChoice) return;
+    // 백업본 비교에서 「지금 데이터」 = 아무것도 바꾸지 않음 (백업본을 덮어쓰지 않게)
+    if (recoveryChoice.kind === 'backup' && pick === 'local') { setRecoveryChoice(null); return; }
     const src = pick === 'local' ? recoveryChoice.local : recoveryChoice.cloud;
-    const safe = { ...getDefaultMeta(), ...src, ownerUid: recoveryChoice.uid };
+    const { uid } = recoveryChoice;
+    const safe = { ...getDefaultMeta(), ...src, ownerUid: uid };
     const raidBackfill = backfillRaidSeries(safe.raid);
     if (raidBackfill.changed) safe.raid = raidBackfill.raid;
+    // 1.237.3~ 덮어쓰기 전에 지금 클라우드 내용을 백업본으로 보관 (선택을 잘못해도 되돌릴 수 있게)
+    if (cloudBaseRef.current && cloudBaseRef.current !== src) await saveCloudBackup(uid, cloudBaseRef.current, 'recovery');
+    cloudBaseRef.current = safe;
+    setCloudBlocked(false);
+    setCloudChecked(uid);
     setMeta(safe);
     setMetaLoaded(true);
     setRecoveryChoice(null);
     // 선택한 데이터를 양쪽(로컬+클라우드) 정본으로 즉시 확정
     saveMeta(safe);
-    try { await saveCloudMeta(recoveryChoice.uid, safe); } catch (e) { console.warn('[Recovery] cloud save 지연:', e); }
+    try { await saveCloudMeta(uid, safe); } catch (e) { console.warn('[Recovery] cloud save 지연:', e); }
   };
 
   // 메타 데이터 로드 (앱 시작 시 한 번, authMode가 이미 결정된 경우만)
@@ -1186,7 +1193,8 @@ export default function App({ onSwitchGame = null } = {}) {
     if (!authReady) return;  // Firebase 초기화 대기
     if (metaLoaded) return;  // 이미 로드됨
     if (!authMode) return;   // 모드 미선택 — LoginScreen이 표시됨
-    
+    if (signInBusyRef.current) return; // 로그인 처리(afterCloudSignIn)가 직접 로드 중
+
     (async () => {
       try {
         if (authMode === 'local') {
@@ -1195,7 +1203,9 @@ export default function App({ onSwitchGame = null } = {}) {
         } else if (authMode === 'guest' || authMode === 'google') {
           // Firebase 사용자가 있어야 함
           if (firebaseUser) {
-            const cloud = await loadCloudMeta(firebaseUser.uid);
+            // 1.237.3~ 실패와 「데이터 없음」을 구분 (재시도 포함)
+            const r = await fetchCloudMeta(firebaseUser.uid);
+            const cloud = r.ok ? r.meta : null;
             let local = await loadMeta();
             // 1.99.3 픽스: 로컬 데이터가 다른 계정 소유면 병합에서 제외 + 즉시 폐기
             //   (계정 전환 시 이전 계정의 로컬이 최신이라는 이유로 승리 → 현재 계정 클라우드를
@@ -1204,6 +1214,7 @@ export default function App({ onSwitchGame = null } = {}) {
               local = null;
               await clearLocalMeta();
             }
+            if (r.ok) cloudBaseRef.current = cloud;
             // 1.99.4~ 진행도가 크게 어긋나면 자동 병합 대신 사용자 선택 (복구 안전망)
             if (shouldOfferRecovery(local, cloud)) {
               setRecoveryChoice({ local, cloud, uid: firebaseUser.uid });
@@ -1215,6 +1226,8 @@ export default function App({ onSwitchGame = null } = {}) {
             const raidBackfill = backfillRaidSeries(safe.raid);
             if (raidBackfill.changed) safe.raid = raidBackfill.raid;
             setMeta(safe);
+            // 확인 실패면 로컬로 계속하고 업로드는 보류 — 아래 재시도 effect가 확인되면 비교
+            setCloudChecked(r.ok ? firebaseUser.uid : null);
           } else {
             // 모드는 cloud인데 user 없음 → 다시 로그인 화면
             console.warn('[Auth] Mode is', authMode, 'but no user');
@@ -1243,13 +1256,78 @@ export default function App({ onSwitchGame = null } = {}) {
     // 로컬 저장은 항상
     saveMeta(meta);
     // 클라우드 모드면 클라우드도 (디바운스 — 짧은 시간 내 여러 번 변경 시 마지막만)
-    if ((authMode === 'guest' || authMode === 'google') && firebaseUser) {
-      const timer = setTimeout(() => {
-        saveCloudMeta(firebaseUser.uid, meta);
+    // 1.237.3~ 클라우드 확인(cloudChecked)이 끝난 계정만 — 확인 전 업로드가 초기화 사고의 원인이었다
+    if ((authMode === 'guest' || authMode === 'google') && firebaseUser && cloudChecked === firebaseUser.uid) {
+      const uid = firebaseUser.uid;
+      const timer = setTimeout(async () => {
+        const base = cloudBaseRef.current;
+        const bs = cloudProgressScore(base);
+        const ms = cloudProgressScore(meta);
+        // 클라우드 진행도의 30% 미만으로 덮어쓰기 = 초기화로 보고 차단 (복구 선택은 배너에서)
+        if (base && bs > 100 && ms < bs * CLOUD_GUARD.blockBelow) {
+          console.warn(`[Sync] Blocked cloud overwrite: progress ${Math.round(ms)} < ${Math.round(bs)} × ${CLOUD_GUARD.blockBelow}`);
+          setCloudBlocked(true);
+          return;
+        }
+        // 덮어쓰기 전 백업본 — 진행도가 줄어드는 저장이거나 정기(6시간) 시점
+        if (base && ((bs > 100 && ms < bs * CLOUD_GUARD.backupBelow) || cloudBackupDue(uid))) {
+          await saveCloudBackup(uid, base, ms < bs * CLOUD_GUARD.backupBelow ? 'drop' : 'periodic');
+        }
+        const ok = await saveCloudMeta(uid, meta);
+        if (ok) cloudBaseRef.current = meta;
+        setCloudSaveErr(ok ? null : getCloudSaveError());
       }, 2000); // 2초 디바운스
       return () => clearTimeout(timer);
     }
-  }, [meta, metaLoaded, authMode, firebaseUser]);
+  }, [meta, metaLoaded, authMode, firebaseUser, cloudChecked]);
+
+  // 1.237.3~ 클라우드 확인 재시도 — 부팅·로그인 때 불러오기에 실패했으면 15초마다·온라인 복귀·화면 복귀 시
+  useEffect(() => {
+    if (!metaLoaded || !firebaseUser || !(authMode === 'guest' || authMode === 'google')) return undefined;
+    const uid = firebaseUser.uid;
+    if (cloudChecked === uid || recoveryChoice) return undefined;
+    let alive = true;
+    let busy = false;
+    const attempt = async () => {
+      if (busy || !alive) return;
+      busy = true;
+      const r = await fetchCloudMeta(uid, 1);
+      busy = false;
+      if (!alive || !r.ok) return;
+      const cur = metaRef.current;
+      if (!r.exists) { cloudBaseRef.current = null; setCloudChecked(uid); return; } // 자동 저장이 올린다
+      cloudBaseRef.current = r.meta;
+      if (shouldOfferRecovery(cur, r.meta)) { setRecoveryChoice({ local: cur, cloud: r.meta, uid }); return; }
+      // 클라우드가 더 최신이고 진행도도 더 크면 클라우드로, 아니면 이 기기 진행 유지 (다음 자동 저장이 올림)
+      const cloudAhead = (r.meta.lastSavedAt || 0) > (cur.lastSavedAt || 0)
+        && cloudProgressScore(r.meta) > cloudProgressScore(cur);
+      if (cloudAhead) setMeta({ ...getDefaultMeta(), ...r.meta, ownerUid: uid });
+      setCloudChecked(uid);
+    };
+    const first = setTimeout(attempt, 3000);
+    const id = setInterval(attempt, 15000);
+    const onWake = () => { if (document.visibilityState === 'visible') attempt(); };
+    window.addEventListener('online', attempt);
+    document.addEventListener('visibilitychange', onWake);
+    return () => {
+      alive = false;
+      clearTimeout(first); clearInterval(id);
+      window.removeEventListener('online', attempt);
+      document.removeEventListener('visibilitychange', onWake);
+    };
+  }, [metaLoaded, firebaseUser, authMode, cloudChecked, recoveryChoice]);
+
+  // 1.237.3~ 계정 화면 — 클라우드 백업본으로 되돌리기 (복구 선택 화면 재사용)
+  const handleOpenCloudBackup = async () => {
+    if (!firebaseUser) return { ok: false, error: 'no-user' };
+    const b = await loadCloudBackup(firebaseUser.uid);
+    return b;
+  };
+  const handleRestoreCloudBackup = (backupMeta) => {
+    if (!firebaseUser || !backupMeta) return;
+    setRecoveryChoice({ local: meta, cloud: backupMeta, uid: firebaseUser.uid, kind: 'backup' });
+    setScreen('title');
+  };
 
   // 진행 중인 런 스냅샷 자동 저장 — 맵 화면 진입/갱신 시점에 실행
   // 앱이 어떤 식으로든 종료되어도 다음 접속에서 이어하기 가능.
@@ -3410,6 +3488,9 @@ export default function App({ onSwitchGame = null } = {}) {
               meta={meta} 
               onLogout={handleLogout} 
               onLinkGoogle={handleLinkGoogle} 
+              cloudStatus={{ checked: !!firebaseUser && cloudChecked === firebaseUser.uid, blocked: cloudBlocked, error: cloudSaveErr }}
+              onLoadCloudBackup={handleOpenCloudBackup}
+              onRestoreCloudBackup={handleRestoreCloudBackup}
               onClose={() => setScreen('title')} 
             />}
             {screen === 'classSelect' && <ClassSelect meta={meta} selected={selectedClass} onSelect={setSelectedClass} onNext={() => setScreen('start')} onBack={() => {
@@ -3563,6 +3644,20 @@ export default function App({ onSwitchGame = null } = {}) {
                 }}
               />
             )}
+            {/* 1.237.3~ 진행도 급락 저장 차단 배너 — 초기화된 데이터가 클라우드를 덮지 않게 막은 상태 */}
+            {cloudBlocked && !recoveryChoice && firebaseUser && (
+              <div className="absolute left-3 right-3 top-3 z-[95] p-3" style={{ borderRadius: 12, background: PALETTE.bgDeep, border: `1.5px solid ${PALETTE.accent}` }}>
+                <div className="text-[12px] font-bold" style={{ color: PALETTE.accent }}>⚠ 클라우드 저장을 멈췄습니다</div>
+                <div className="text-[11px] mt-1" style={{ color: PALETTE.textDim, lineHeight: 1.5 }}>
+                  지금 데이터의 진행도가 클라우드보다 크게 낮습니다 (초기화 의심). 클라우드 데이터는 그대로 보호 중입니다.
+                </div>
+                <button onClick={() => setRecoveryChoice({ local: meta, cloud: cloudBaseRef.current, uid: firebaseUser.uid })}
+                  className="ui-press w-full mt-2 py-2 text-[11px] font-bold"
+                  style={{ borderRadius: 10, background: `${PALETTE.accent}30`, border: `1px solid ${PALETTE.accent}`, color: PALETTE.text }}>
+                  어느 데이터를 쓸지 선택
+                </button>
+              </div>
+            )}
             {/* 1.99.4~ 데이터 선택 복구 — 로컬·클라우드 진행도 급락 감지 시에만 표시 */}
             {recoveryChoice && (() => {
               const fmt = (m) => {
@@ -3591,15 +3686,21 @@ export default function App({ onSwitchGame = null } = {}) {
               return (
                 <div className="absolute inset-0 z-[100] flex items-center justify-center px-4" style={{ background: 'rgba(0,0,0,0.92)' }}>
                   <div className="w-full max-w-md p-4" style={{ background: PALETTE.bgDeep, border: `1.5px solid ${PALETTE.legendary}`, borderRadius: 16 }}>
-                    <div className="text-center text-[13px] font-bold mb-1" style={{ color: PALETTE.legendary }}>⚠ 데이터 선택 필요</div>
+                    <div className="text-center text-[13px] font-bold mb-1" style={{ color: PALETTE.legendary }}>{recoveryChoice.kind === 'backup' ? '☁ 클라우드 백업본으로 되돌리기' : '⚠ 데이터 선택 필요'}</div>
                     <div className="text-[10.5px] text-center mb-3" style={{ color: PALETTE.textDim, lineHeight: 1.5 }}>
-                      이 기기의 데이터와 클라우드 데이터의 진행도가 크게 다릅니다.<br />
+                      {recoveryChoice.kind === 'backup' ? '지금 데이터와 클라우드 백업본(덮어쓰기 직전 사본)을 비교하세요.' : '이 기기의 데이터와 클라우드 데이터의 진행도가 크게 다릅니다.'}<br />
                       <b style={{ color: PALETTE.accent }}>어느 쪽을 유지할지 직접 선택하세요 — 선택하지 않은 쪽은 덮어써집니다.</b>
                     </div>
                     <div className="flex gap-2.5">
-                      <Card title="📱 이 기기 데이터" d={L} pick="local" color={PALETTE.green} />
-                      <Card title="☁️ 클라우드 데이터" d={C} pick="cloud" color={PALETTE.ice} />
+                      <Card title={recoveryChoice.kind === 'backup' ? '📱 지금 데이터' : '📱 이 기기 데이터'} d={L} pick="local" color={PALETTE.green} />
+                      <Card title={recoveryChoice.kind === 'backup' ? '☁️ 백업본' : '☁️ 클라우드 데이터'} d={C} pick="cloud" color={PALETTE.ice} />
                     </div>
+                    {recoveryChoice.kind === 'backup' && (
+                      <button onClick={() => setRecoveryChoice(null)} className="ui-press w-full mt-2.5 py-2 text-[11px]"
+                        style={{ borderRadius: 10, background: 'transparent', border: `1px solid ${PALETTE.panelBorder}`, color: PALETTE.textDim }}>
+                        취소
+                      </button>
+                    )}
                     <div className="text-[9px] text-center mt-2.5" style={{ color: PALETTE.textDim }}>
                       보통 진행도(영혼·처치·각성도)가 큰 쪽이 본래 데이터입니다. 저장 시각이 최신이라도 진행도가 낮다면 오염된 데이터일 수 있습니다.
                     </div>
