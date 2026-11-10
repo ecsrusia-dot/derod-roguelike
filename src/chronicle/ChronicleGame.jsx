@@ -328,7 +328,7 @@ function BattleLogLine({ e, latest, unitOf }) {
 
 // ===== 전투 재생 =====
 const SPEEDS = [1, 2, 4];
-function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boostLeft = 0, onAskBoost, dungeonAuto = false, onToggleDungeonAuto, autoProg = false, onStopAuto }) {
+function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boostLeft = 0, onAskBoost, dungeonAuto = false, onToggleDungeonAuto, autoProg = false, onStopAuto, onReplayDone, sessionReport = null, holdAuto = false }) {
   const { sim, enemies, party, summary, ctx, xp } = battle;
   const [idx, setIdx] = useState(0);
   const [stats, setStats] = useState(null); // 전투 집계 (1.215.1)
@@ -338,6 +338,7 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
   // ×4는 이용권이 있을 때만 (1.213.0) — 만료되면 ×2로
   const speed = speedPref === 4 && boostLeft <= 0 ? 2 : speedPref;
   const done = idx >= sim.events.length;
+  useEffect(() => { if (done) onReplayDone?.(); }, [done]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (done) return undefined;
     const ev = sim.events[idx];
@@ -347,19 +348,19 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
   }, [idx, speed, done, sim.events]);
   // 자동 진행 (1.234.0): 승리하면 다음 단계(사냥·관문·보스)로
   useEffect(() => {
-    if (!done || !autoProg || stats || sim.result !== 'win' || ctx.kind !== 'field') return undefined;
+    if (!done || !autoProg || stats || holdAuto || sim.result !== 'win' || ctx.kind !== 'field') return undefined;
     const t = setTimeout(onAgain, 1800);
     return () => clearTimeout(t);
   }, [done, autoProg, stats, sim.result, ctx, onAgain]);
   // 반복 사냥: 승리 후 자동 다음 전투
   useEffect(() => {
-    if (!done || !repeat || stats || sim.result !== 'win' || ctx.kind !== 'field' || ctx.type === 'boss') return undefined;
+    if (!done || !repeat || stats || holdAuto || sim.result !== 'win' || ctx.kind !== 'field' || ctx.type === 'boss') return undefined;
     const t = setTimeout(onAgain, 1800);
     return () => clearTimeout(t);
   }, [done, repeat, stats, sim.result, ctx, onAgain]);
   // 던전 연속 도전 (1.215.1): 승리하면 다음 층 → 보스까지 자동 진행
   useEffect(() => {
-    if (!done || !dungeonAuto || !dungeonNext || stats) return undefined;
+    if (!done || !dungeonAuto || !dungeonNext || stats || holdAuto) return undefined;
     const t = setTimeout(onAgain, 1800);
     return () => clearTimeout(t);
   }, [done, dungeonAuto, dungeonNext, stats, onAgain]);
@@ -499,6 +500,7 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
             )}
             <div className="flex gap-2 mt-2.5">
               <button onClick={openStats} className="ui-press flex-1" style={{ height: 34, borderRadius: 10, fontSize: 12, border: '1px solid var(--ui-line-strong)', color: PALETTE.text, background: 'transparent' }}>📊 전투 집계</button>
+              {sessionReport && <button onClick={() => setStats(sessionReport)} className="ui-press flex-1" style={{ height: 34, borderRadius: 10, fontSize: 12, border: '1px solid #e8b04a88', color: PALETTE.legendary, background: 'transparent' }}>📋 사냥 보고서</button>}
               {battle.runReport && <button onClick={() => setStats(battle.runReport)} className="ui-press flex-1" style={{ height: 34, borderRadius: 10, fontSize: 12, border: '1px solid #c08ae888', color: '#c08ae8', background: 'transparent' }}>{battle.runReport.kind === 'tower' ? '🗼 첨탑 도전 집계' : '🏰 던전 전체 집계'}</button>}
             </div>
             <div className="flex gap-2 mt-2">
@@ -519,7 +521,7 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
           </GlassPanel>
         </div>
       )}
-      {stats && <HuntReport report={stats} title={stats === battle.runReport ? (battle.runReport.kind === 'tower' ? '🗼 첨탑 도전 집계' : '🏰 던전 전체 집계') : '📊 전투 집계'} onClose={() => setStats(null)} />}
+      {stats && <HuntReport report={stats} title={stats === battle.runReport ? (battle.runReport.kind === 'tower' ? '🗼 첨탑 도전 집계' : '🏰 던전 전체 집계') : stats === sessionReport ? '📋 사냥 보고서' : '📊 전투 집계'} onClose={() => setStats(null)} />}
     </div>
   );
 }
@@ -3016,6 +3018,12 @@ export default function ChronicleGame({ onExit }) {
   const repStatsRef = useRef(null);
   const lastRecRef = useRef(null);
   const [report, setReport] = useState(null);
+  // 집계 창 여는 규칙 (1.239.1) — 반복 사냥·자동 진행·던전 한 판·첨탑 도전이 끝나면 집계를 「대기」에 올리고,
+  // 전투 재생이 끝나 결과(승리/전멸)가 보인 뒤에 연다. 이전엔 계산 시점(재생 시작 전)에 바로 열려 패배 화면을 가렸다
+  const [pendingReport, setPendingReport] = useState(null);   // { rep, battleKey }
+  const [replayDoneKey, setReplayDoneKey] = useState(null);   // 재생이 끝난 전투의 key
+  const [sessionReport, setSessionReport] = useState(null);   // 마지막 집계 — 결과창 버튼으로 다시 열기
+  const queueReport = (rep, battleKey) => { setPendingReport({ rep, battleKey }); setSessionReport({ rep, battleKey }); };
   const [boostSheet, setBoostSheet] = useState(false);
   // 던전 연속 도전 (1.215.1) — 설정은 기억, 던전 한 판의 전투 기록은 dungRunRef에 누적
   const [dungeonAuto, setDungeonAuto] = useState(() => { try { return localStorage.getItem('chronicleDungeonAuto') === '1'; } catch { return false; } });
@@ -3047,8 +3055,16 @@ export default function ChronicleGame({ onExit }) {
     if (repeat || autoProg || !repStatsRef.current) return;
     const st = repStatsRef.current;
     repStatsRef.current = null;
-    if (st.battles > 1) { const rep = { ...st, endedAt: Date.now(), kind: 'hunt' }; logEfficiency(rep); setReport(rep); }
-  }, [repeat, autoProg]);
+    if (st.battles > 1) { const rep = { ...st, endedAt: Date.now(), kind: 'hunt' }; logEfficiency(rep); queueReport(rep, battle?.key); }
+  }, [repeat, autoProg]); // eslint-disable-line react-hooks/exhaustive-deps
+  // 대기 중인 집계 열기 — 전투 화면이면 재생이 끝난 뒤 0.9초(결과를 먼저 보이게), 다른 화면이면 바로
+  useEffect(() => {
+    if (!pendingReport) return undefined;
+    const inBattle = view === 'battle' && battle;
+    if (inBattle && replayDoneKey !== battle.key) return undefined;
+    const t = setTimeout(() => { setReport(pendingReport.rep); setPendingReport(null); }, inBattle ? 900 : 0);
+    return () => clearTimeout(t);
+  }, [pendingReport, view, battle, replayDoneKey]);
 
   useEffect(() => { writeAccount(acc); }, [acc]);
   // ===== 클라우드 저장 (1.237.1) — 본편과 같은 Firebase 계정, 위치는 users/{uid}/chronicle/save =====
@@ -3212,7 +3228,9 @@ export default function ChronicleGame({ onExit }) {
       if (dungRunRef.current.battles > 1) { runReport = { ...dungRunRef.current, endedAt: Date.now(), kind: 'dungeon' }; logEfficiency(runReport); }
       dungRunRef.current = null;
     }
-    setBattle({ sim, enemies: enc.enemies, party, summary: r.summary, ctx, runReport, xp: { before: expSnap(save), after: expSnap(r.save) }, key: Date.now() });
+    const key = Date.now();
+    if (runReport) queueReport(runReport, key);
+    setBattle({ sim, enemies: enc.enemies, party, summary: r.summary, ctx, runReport, xp: { before: expSnap(save), after: expSnap(r.save) }, key });
     setView('battle');
   };
 
@@ -3236,7 +3254,9 @@ export default function ChronicleGame({ onExit }) {
       if (towerRunRef.current.st.battles > 1) { runReport = { ...towerRunRef.current.st, endedAt: Date.now(), kind: 'tower' }; logEfficiency(runReport); }
       towerRunRef.current = null;
     }
-    setBattle({ sim, enemies: enc.enemies, party, summary: r.summary, ctx, runReport, xp: { before: expSnap(save), after: expSnap(r.save) }, key: Date.now() });
+    const key = Date.now();
+    if (runReport) queueReport(runReport, key);
+    setBattle({ sim, enemies: enc.enemies, party, summary: r.summary, ctx, runReport, xp: { before: expSnap(save), after: expSnap(r.save) }, key });
     setView('battle');
   };
   // 원정대 레이드 (1.231.0) — 계정 단위: 5캐릭 파티 · 결과·보상은 계정에 직접
@@ -3273,6 +3293,9 @@ export default function ChronicleGame({ onExit }) {
   } else if (view === 'battle' && battle) {
     content = (
       <BattleView key={battle.key} battle={battle} save={save} onDone={afterBattle}
+        onReplayDone={() => setReplayDoneKey(battle.key)}
+        sessionReport={sessionReport && sessionReport.battleKey === battle.key && sessionReport.rep.kind === 'hunt' ? sessionReport.rep : null}
+        holdAuto={!!pendingReport || !!report}
         repeat={repeat} onToggleRepeat={toggleRepeat}
         autoProg={autoProg} onStopAuto={() => stopAuto('자동 진행을 멈췄습니다')}
         onAgain={() => (battle.ctx.kind === 'dungeon' ? fightDungeon() : autoProg ? autoStep() : lastFieldRef.current && fightField(lastFieldRef.current.field, 'hunt', lastFieldRef.current.stage))}
@@ -3317,7 +3340,7 @@ export default function ChronicleGame({ onExit }) {
   return (
     <div className="absolute inset-0" style={{ background: PALETTE.bg, fontFamily: '"Noto Serif KR", serif', color: PALETTE.text }}>
       <div key={view} className="ui-screen-enter absolute inset-0">{content}</div>
-      {report && <HuntReport report={report} save={save} onClose={() => setReport(null)} />}
+      {report && <HuntReport report={report} save={save} title={report.kind === 'tower' ? '🗼 첨탑 도전 집계' : report.kind === 'dungeon' ? '🏰 던전 전체 집계' : '📋 사냥 보고서'} onClose={() => setReport(null)} />}
       {boostSheet && save && <BoostSheet save={save} onClose={() => setBoostSheet(false)} onBuy={() => { const n = E.buyBoost(save); if (n === save) { flash(save.gold < E.boostCost(save) ? '골드가 부족합니다' : `최대 ${BOOST.maxStackMin / 60}시간까지 쌓을 수 있습니다`); return; } setSave(n); flash(`⏩ ×4 배속 +${BOOST.minutes}분`); }} />}
       {acc.giftNotice && view === 'title' && <GiftNotice acc={acc} onClose={() => setAcc(a => ({ ...a, giftNotice: false }))} />}
       {view === 'town' && !scene && acc.offline?.pending && acc.chars?.[acc.offline.pending.hero] && <OfflineSheet pd={acc.offline.pending} onClaim={claimOffline} />}
