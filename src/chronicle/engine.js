@@ -204,11 +204,28 @@ export function canWear(it, u) {
 }
 // 전승 단계 (1.221.0) — 전승 횟수만큼 적 강화. UI·시뮬이 조우 직후 호출
 export function rebirthCount(save) { return save.units[save.hero]?.rebirth?.count || 0; }
+// 위압 (1.235.0) — 적이 주인공보다 레벨이 높을수록 단계별 강화 (T.intimidate 표). 단계 0 = 없음
+export function intimidateLevel(heroLv, enemyLv) {
+  const steps = T.intimidate || [];
+  if (heroLv == null || enemyLv == null) return 0;
+  const gap = enemyLv - heroLv;
+  let n = 0;
+  steps.forEach((s, i) => { if (gap >= s.gap) n = i + 1; });
+  return n;
+}
+export const intimidateStep = (n) => (n > 0 ? (T.intimidate || [])[n - 1] : null);
+// 전투 직전 적 보정 — 전승 단계 + 위압. 전투 경로(사냥·던전·첨탑·미리보기)는 반드시 이 함수를 거친다
 export function scaleEnemiesForRebirth(save, enemies) {
   const c = rebirthCount(save);
-  if (!c) return enemies;
   const hm = 1 + REBIRTH.enemyHp * c; const am = 1 + REBIRTH.enemyAtk * c;
-  return enemies.map(e => ({ ...e, hp: Math.round(e.hp * hm), maxHp: Math.round(e.maxHp * hm), atk: Math.round(e.atk * am), rebirthTier: c }));
+  const heroLv = save.units?.[save.hero]?.lv;
+  return enemies.map(e => {
+    const n = intimidateLevel(heroLv, e.lv);
+    const st = intimidateStep(n);
+    const h = hm * (st ? st.hp : 1); const a = am * (st ? st.atk : 1);
+    if (h === 1 && a === 1) return e;
+    return { ...e, hp: Math.round(e.hp * h), maxHp: Math.round(e.maxHp * h), atk: Math.round(e.atk * a), ...(c ? { rebirthTier: c } : {}), ...(n ? { intim: n } : {}) };
+  });
 }
 function gearTotals(save, u) {
   const t = {};

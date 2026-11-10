@@ -28,7 +28,7 @@ for (const c of CHRONICLE_CLASSES) {
     const tryBoss = E.bossReady(save, fid) && lv >= field.bossLv - 2 && lv > (failLv[fid] ?? -1) && E.bossAttemptsLeft(save, fid) > 0;
     const tryGate = !tryBoss && E.gateReady(save, fid, si) && lv > (failLv[fid + ':' + si] ?? -1);
     const enc = tryGate ? { ...E.rollGateEncounter(field, si, rng), stage: si } : E.rollFieldEncounter(field, rng, tryBoss, null, tryBoss ? null : si);
-    const b = E.simulateChronicleBattle(E.partyCombatants(save), enc.enemies, rng);
+    const b = E.simulateChronicleBattle(E.partyCombatants(save), (enc.enemies = E.scaleEnemiesForRebirth(save, enc.enemies)), rng);
     save = E.applyBattle(save, { kind: 'field', fieldId: fid, type: enc.type, enemies: enc.enemies, stage: enc.stage }, b, rng).save;
     save.bossDaily = { date: 'x', counts: {} };
     if (b.result !== 'win' && enc.type === 'boss') failLv[fid] = lv; if (b.result !== 'win' && enc.type === 'gate') failLv[fid + ':' + si] = lv;
