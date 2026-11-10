@@ -74,6 +74,7 @@ export function famBaseStats(lv) {
 export const famLv = (f) => Math.max(1, f?.lv || 1);
 export const famEffLv = (f, heroLv) => Math.min(famLv(f), Math.max(1, heroLv || 1));
 const subLvMult = (f, heroLv) => (heroLv ? FAM_LEVEL.subMin + (1 - FAM_LEVEL.subMin) * (famEffLv(f, heroLv) / heroLv) : 1);
+export const famSubPctOf = (f, heroLv) => Math.round(subLvMult(f, heroLv) * 100);
 // 승리 경험치 → 사역마 (주인공 레벨이 상한) → { f, ups }
 export function gainFamExp(f0, n, heroLv) {
   const f = { ...f0, lv: famLv(f0), exp: f0.exp || 0 };
@@ -372,6 +373,25 @@ export function famSubFx(fams, keys, heroLv = 0) {
 const SUB_LABEL = { expPct: '경험치 +', goldPct: '골드 +', dropPct: '아이템 획득 +', dmgReduce: '받는 피해 -', shieldPct: '전투 시작 보호막 (최대 HP) ', atkPct: '공격력 +', critDmg: '치명타 피해 +', healPct: '회복량 +', regenPct: '매 턴 HP 재생 ', emergencyHeal: 'HP 30% 미만 시 1회 회복 ' };
 export function famSubText(key, f, heroLv = 0) {
   return Object.entries(famSubValues(key, f, heroLv)).map(([k, v]) => `${SUB_LABEL[k] || k}${Math.round(v * 1000) / 10}%`).join(' · ');
+}
+// 보조 효과 항목 목록 (1.244.0 — 칩·표 표시용) [{k, label, sign, v, text, econ}]
+const subSign = (k) => { const t = (SUB_LABEL[k] || k).trim(); const c = t[t.length - 1]; return c === '+' || c === '-' ? c : ''; };
+const pct1 = (v) => `${Math.round(v * 1000) / 10}%`;
+export function famSubItems(key, f, heroLv = 0) {
+  const ek = famEconId(key);
+  return Object.entries(famSubValues(key, f, heroLv)).map(([k, v]) => ({
+    k, v, label: famSubLabel(k), sign: subSign(k), text: `${subSign(k)}${pct1(v)}`, econ: k === ek, icon: k === ek ? FAM_ECON[ek].icon : '',
+  }));
+}
+// 후보 vs 지금 칸 비교 (값은 클수록 좋다 — 받는 피해 감소도 감소량이 값)
+export function famSubDelta(k, cand, cur) {
+  const a = cand[k] || 0, b = cur?.[k] || 0;
+  if (!cur) return null;
+  if (a && !b) return { kind: 'new', text: '신규' };
+  if (!a && b) return { kind: 'gone', text: `▼${Math.round(b * 1000) / 10} 사라짐` };
+  const d = Math.round((a - b) * 1000) / 10;
+  if (Math.abs(d) < 0.05) return null;
+  return d > 0 ? { kind: 'up', text: `▲${d}` } : { kind: 'down', text: `▼${-d}` };
 }
 // 다음 등급에서 새로 생기는 보조 효과 (청령부터) — UI 안내용
 export function famSubPreview(key) {
