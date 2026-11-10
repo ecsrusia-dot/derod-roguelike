@@ -2694,6 +2694,10 @@ const TIER_LABEL = { normal: '일반 몹', elite: '강적', boss: '보스' };
 function HuntReport({ report: r, onClose, title = '📊 사냥 보고서' }) {
   const units = Object.entries(r.units).map(([key, u]) => ({ key, ...u })).sort((a, b) => b.dmg - a.dmg);
   const total = units.reduce((t, u) => t + u.dmg, 0) || 1;
+  // 적 공격 분담 (1.239.2) — 상세 통계의 「공격받은 횟수」 비율
+  const dUnits = r.detail?.units || {};
+  const tAll = Object.values(dUnits).reduce((t, x) => t + (x.targeted || 0), 0);
+  const atkShare = (k) => (Object.keys(dUnits).length > 1 && tAll && dUnits[k]?.targeted ? pctTxt(dUnits[k].targeted, tAll) : null);
   const skills = Object.entries(r.skills).map(([k, v]) => { const [uk, sn] = k.split('|'); return { uk, sn, v }; }).sort((a, b) => b.v - a.v).slice(0, 6);
   const ms = r.ms || Math.max(60000, (r.endedAt || Date.now()) - r.startedAt);
   const [effOpen, setEffOpen] = useState(false);
@@ -2730,10 +2734,11 @@ function HuntReport({ report: r, onClose, title = '📊 사냥 보고서' }) {
                   <div className="flex justify-between" style={{ fontSize: 12, color: PALETTE.text }}><span className="truncate">{u.fam ? `🐾 ${u.name}` : u.name}</span><span>{pct}%</span></div>
                   <Bar v={u.dmg} max={total} color={u.fam ? '#d07ae8' : PALETTE.legendary} h={6} />
                   <div style={{ fontSize: 11, color: PALETTE.textDim }}>총 {u.dmg.toLocaleString()} · 라운드당 {dps.toLocaleString()}</div>
-                  {(u.heal > 0 || u.shield > 0 || u.taken > 0) && <div style={{ fontSize: 11, color: PALETTE.textDim }}>
+                  {(u.heal > 0 || u.shield > 0 || u.taken > 0 || atkShare(u.key)) && <div style={{ fontSize: 11, color: PALETTE.textDim }}>
                     {u.heal > 0 && <span style={{ color: '#8fe08a' }}>✚ 회복 {Math.round(u.heal).toLocaleString()} </span>}
                     {u.shield > 0 && <span style={{ color: '#9cc4e4' }}>◈ 보호막 {Math.round(u.shield).toLocaleString()} </span>}
                     {u.taken > 0 && <span style={{ color: '#e8b04a' }}>🛡 받아낸 피해 {Math.round(u.taken).toLocaleString()}</span>}
+                    {atkShare(u.key) ? <span style={{ color: '#e8b04a' }}> · 적 공격의 {atkShare(u.key)} 받음</span> : null}
                   </div>}
                 </div>
               </div>
@@ -2778,7 +2783,7 @@ function HuntReport({ report: r, onClose, title = '📊 사냥 보고서' }) {
 
 // ===== 상세 통계 탭 (1.238.0) — engine battleDetailStats 집계를 유닛별·스킬별로 =====
 const pctTxt = (a, b) => (b > 0 ? `${Math.round(a / b * 1000) / 10}%` : '-');
-function detailSections(d, rounds) {
+function detailSections(d, rounds, share = null) {
   const hitTry = d.landed + d.misses;
   const defTry = d.timesHit + d.dodged;
   return [
@@ -2798,8 +2803,10 @@ function detailSections(d, rounds) {
       ['지속 회복', d.hotHeal], ['최대 1회 회복', d.maxHeal, false, 'x'], ['보호막 부여', d.shield],
     ] },
     { title: '🛡 방어', color: '#e8b04a', rows: [
-      ['받은 피해', d.taken, true], ['피격', d.timesHit, true], ['회피', d.dodged, true, '', `회피율 ${pctTxt(d.dodged, defTry)}`],
-      ['최대 피격', d.maxTaken, false, 'x'], ['보호막 흡수', d.absorbed, false, '', d.absorbed ? `받은 피해의 ${pctTxt(d.absorbed, d.absorbed + d.taken)} 막음` : ''],
+      ['공격받은 횟수', d.targeted || 0, true, '', share ? `적 공격의 ${share.atk} · 들어온 피해의 ${share.dmg}` : ''],
+      ['들어온 피해', d.incoming ?? d.taken + d.absorbed, true, '', '보호막에 막힌 양 포함'],
+      ['HP로 받은 피해', d.taken, true], ['피격', d.timesHit, true, '', '보호막에 전부 막힌 타격 포함'], ['회피', d.dodged, true, '', `회피율 ${pctTxt(d.dodged, defTry)}`],
+      ['최대 피격', d.maxTaken, false, 'x'], ['보호막 흡수', d.absorbed, false, '', d.absorbed ? `들어온 피해의 ${pctTxt(d.absorbed, d.absorbed + d.taken)} 막음` : ''],
       ['대신 맞기', d.coverHits, false, '', d.coverDmg ? `피해 ${fmtNum(d.coverDmg)}` : ''], ['지속 피해 받음', d.dotTaken],
       ['받은 회복', d.healRecv], ['받은 보호막', d.shieldRecv], ['쓰러짐', d.deaths, true],
     ] },
@@ -2828,7 +2835,13 @@ function DetailReport({ r, onClose }) {
         ))}
       </div>
       <div style={{ fontSize: 11, color: PALETTE.textDim }}>전투 {r.battles}회 · {rounds}라운드 집계{n > 1 ? ' · 오른쪽 칸 = 전투당 평균' : ''}</div>
-      {d ? detailSections(d, rounds).map(sec => {
+      {d ? detailSections(d, rounds, (() => {
+        // 파티 안 분담 — 탱커 사역마가 실제로 얼마나 맞아 주는지
+        const all = Object.values(r.detail.units);
+        const tAll = all.reduce((t, x) => t + (x.targeted || 0), 0);
+        const iAll = all.reduce((t, x) => t + (x.incoming ?? x.taken + x.absorbed), 0);
+        return all.length > 1 && tAll ? { atk: pctTxt(d.targeted || 0, tAll), dmg: pctTxt(d.incoming ?? d.taken + d.absorbed, iAll) } : null;
+      })()).map(sec => {
         const rows = sec.rows.filter(([, v, always]) => always || v > 0);
         if (!rows.length) return null;
         return (
