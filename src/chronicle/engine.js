@@ -6,7 +6,7 @@
 // ============================================
 import { levelCap, globalBuffFx } from './roster.js';
 import { talentFx, canLearnTalent, talentNode, talentResetCost, talentTrees, tierUnlocked } from './talents.js';
-import { fieldStages, FIELD_STAGES, STAGE_TUNING, BOOST, BAG_EXPAND, SALVAGE, SALVAGE_ICON, REBIRTH, REBIRTH_BRANCHES, expNeedFor } from './data.js';
+import { BOSS_MECHS, BOSS_MECH_OF, fieldStages, FIELD_STAGES, STAGE_TUNING, BOOST, BAG_EXPAND, SALVAGE, SALVAGE_ICON, REBIRTH, REBIRTH_BRANCHES, expNeedFor } from './data.js';
 import { TOWER, TOWER_SHOP, towerUnlocked, isTowerBoss, towerEnemyLv, towerArea, towerFloorPicks, kstWeekKey } from './tower.js';
 import { famCombatant, famRole, famSubFx, famOwnFx, famBondFx, rollFamShards, gainFamExp, FAM_AI, FAM_TUNING, summonFamiliars, enhanceFamiliar, evolveFamiliar } from './familiar.js';
 import {
@@ -818,9 +818,29 @@ function packOf(rng, list) {
     return e.tier === 'normal' ? { ...r, rewardMult: (e.rewardMult || 1) * P.packReward, goldMult: P.packReward } : r;
   });
 }
+// ===== 보스 공략 기믹 (1.237.0) — boss = 보스 적 객체 · make(key, i, {hp, atk}) = 같은 조건의 수행원 생성 =====
+export const bossMechOf = (kind, id) => BOSS_MECH_OF[kind]?.[id] || null;
+export function withBossMech(boss, mechId, pool, make, rng) {
+  const M = T.bossMech?.[mechId];
+  if (!M || !BOSS_MECHS[mechId]) return [boss];
+  const b = { ...boss, mech: mechId };
+  if (M.bossHp) { b.hp = Math.round(b.hp * M.bossHp); b.maxHp = Math.round(b.maxHp * M.bossHp); }
+  const minion = (role, i, hp, atk, extra) => {
+    const e = make(pick(rng, pool), i, { hp, atk });
+    return { ...e, erole: role, rewardMult: (e.rewardMult || 1) * 0.2, goldMult: 0.2, ...extra };
+  };
+  if (mechId === 'ward') return [b, ...Array.from({ length: M.guards }, (_, i) => minion('tank', i + 1, M.guardHp, M.guardAtk, { warden: true }))];
+  if (mechId === 'ritual') return [b, minion('healer', 1, M.acolyteHp, M.acolyteAtk, { acolyte: true, healPct: M.heal, healCd: 0, healBelow: 1 })];
+  return [b];
+}
 export function rollFieldEncounter(field, rng, boss = false, partyLv = null, stage = null) {
   const EP = T.enemyParty?.on;
-  if (boss) return { type: 'boss', enemies: [buildChronicleEnemy(field.boss, field.bossLv, 'e0', field.area)] };
+  if (boss) {
+    const b = buildChronicleEnemy(field.boss, field.bossLv, 'e0', field.area);
+    const pool = field.elites.length ? field.elites : field.normals;
+    const make = (key, i, m) => buildChronicleEnemy(key, field.bossLv - 2, `e${i}`, { hpMult: field.area.hpMult * (m.hp || 1), atkMult: field.area.atkMult * (m.atk || 1) });
+    return { type: 'boss', mech: bossMechOf('field', field.id), enemies: withBossMech(b, bossMechOf('field', field.id), pool, make, rng) };
+  }
   if (EP && stage != null) {
     const slv = fieldStages(field)[stage].lv;
     if (rng() < T.eliteChance && field.elites.length) {
@@ -865,7 +885,12 @@ export function dungeonEncounter(d, rng) {
   // 경험치 배율 (1.234.1) — 난이도 HP 배율 대신 고정 보너스 (일반 기준 = 지역 × 솔로 보정)
   const rm = D.area.hpMult * ds.hp * (tier.expMult || 1);
   const mk = (key, i) => ({ ...buildChronicleEnemy(key, lv, `e${i}`, area), rewardMult: rm });
-  if (f.boss) return { type: 'dungeonBoss', enemies: [mk(f.enemies[0], 0)] };
+  if (f.boss) {
+    const mech = bossMechOf('dungeon', d.id);
+    const pool = [...new Set(D.floors.filter(x => !x.boss).flatMap(x => x.enemies))];
+    const make = (key, i, m) => ({ ...buildChronicleEnemy(key, lv - 2, `e${i}`, { hpMult: area.hpMult * (m.hp || 1) * 3, atkMult: area.atkMult * (m.atk || 1) * 1.6 }), rewardMult: rm });
+    return { type: 'dungeonBoss', mech, enemies: withBossMech(mk(f.enemies[0], 0), mech, pool.length ? pool : f.enemies, make, rng) };
+  }
   const [n0, n1] = T.dungeonFloorEnemies || [2, 3];
   const n = n0 + Math.floor(rng() * (n1 - n0 + 1));
   const enemies = [];
@@ -911,6 +936,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
     for (const b of Object.values(u.buffs)) if (b.t > 0) m += b.v;
     if (u.lowHpDmg && u.hp < u.maxHp * 0.5) m += u.lowHpDmg;
     if (u.missingHpAtk) m += Math.floor((1 - u.hp / u.maxHp) * 10) * u.missingHpAtk;
+    if (u.mech === 'enrage' && round > T.bossMech.enrage.after) m += (round - T.bossMech.enrage.after) * T.bossMech.enrage.perRound; // 광폭 타이머
     return m;
   };
   // 일시 효과 (1.218.0 사역마 고유 스킬): armorBreak·weak·vuln(적) / guardDef·guardRed(아군)
@@ -935,7 +961,8 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
     if (def.hp > 0 && def.emergencyHeal && !def.emergencyUsed && def.hp < def.maxHp * 0.3) { def.emergencyUsed = true; def.hp = Math.min(def.maxHp, def.hp + Math.round(def.maxHp * def.emergencyHeal)); }
   };
   // 원정대 레이드 「다섯 봉인」 (1.231.0) — 봉인은 그 직업만, 봉인이 남아 있으면 보스 무적. 일반 전투엔 봉인이 없어 영향 0
-  const immuneTo = (att, def) => !!def && ((def.sealOf && att?.classId !== def.sealOf) || (def.sealedBoss && units.some(x => x.sealOf && x.hp > 0)));
+  const immuneTo = (att, def) => !!def && ((def.sealOf && att?.classId !== def.sealOf) || (def.sealedBoss && units.some(x => x.sealOf && x.hp > 0))
+    || (def.mech === 'ward' && units.some(x => x.warden && x.hp > 0))); // 호위 결계 (1.237.0)
   const damage = (att, def, mult, { noDodge = false, skill = false } = {}) => {
     if (immuneTo(att, def)) return { d: 0, immune: true };
     if (!noDodge && rng() < (def.dodge || 0)) {
@@ -968,6 +995,12 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
     onHurt(def);
     if (att.lifesteal && d > 0 && att.hp > 0) healUnit(att, Math.round(d * att.lifesteal));
     if (def.thornsPct && d > 0 && att.hp > 0 && !immuneTo(def, att)) att.hp = Math.max(0, att.hp - Math.max(1, Math.round(d * def.thornsPct)));
+    // 반사 갑주 (1.237.0 보스 기믹) — 직접 공격 피해의 일부를 되돌린다 (지속 피해는 이 함수를 거치지 않아 반사 안 됨)
+    if (def.fx?.reflect?.t > 0 && att.side === 'party' && d > 0 && att.hp > 0) {
+      const rd = Math.max(1, Math.min(Math.round(d * def.fx.reflect.v), Math.round(att.maxHp * (T.bossMech?.reflect?.capPct || 1))));
+      att.hp = Math.max(0, att.hp - rd); onHurt(att);
+      push({ a: def.id, n: '반사', k: 'reflect', hits: [{ t: att.id, d: rd }] });
+    }
     return { d, crit, absorbed, cover };
   };
   // 정령 화살 — 공격 뒤 확률 추가 타격 (유니크)
@@ -1084,16 +1117,31 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
         return;
       }
       if (u.erole === 'healer' && !(u.cds.eheal > 0)) {
-        const al = alive('enemy').filter(x => x.hp < x.maxHp * ER.healer.below).sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];
+        const below = u.healBelow ?? ER.healer.below;
+        const cand = alive('enemy').filter(x => x.hp < x.maxHp * below);
+        // 의식 사제 = 보스 우선 (1.237.0)
+        const al = (u.acolyte && cand.find(x => x.mech)) || cand.sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];
         if (al) {
-          const h = Math.round(al.maxHp * ER.healer.heal);
+          const h = Math.round(al.maxHp * (u.healPct ?? ER.healer.heal));
           const before = al.hp; al.hp = Math.min(al.maxHp, al.hp + h);
-          u.cds.eheal = ER.healer.cd + 1;
+          u.cds.eheal = (u.healCd ?? ER.healer.cd) + 1;
           push({ a: u.id, n: '치유', k: 'heal', skill: true, hits: [{ t: al.id, h: al.hp - before }] });
           return;
         }
       }
-      const bossAoe = u.tier === 'boss' && u.turn % 4 === 0;
+      const BM = T.bossMech || {};
+      if (u.mech === 'reflect' && (u.turn - 1) % BM.reflect.every === 0) {
+        u.fx.reflect = { v: BM.reflect.pct, t: BM.reflect.turns + 1 };
+        push({ a: u.id, n: '반사 갑주', k: 'buff', skill: true, hits: [{ t: u.id, buff: true }] });
+        return;
+      }
+      if (u.mech === 'storm' && u.turn % BM.storm.every === 0) {
+        const hits = [];
+        for (const f of foes) { const r = damage(u, f, BM.storm.mult); hits.push({ t: f.id, d: r.d, c: r.crit, m: r.miss, ab: r.absorbed }); if (r.cover) hits.push({ t: r.cover.t, d: r.cover.d, cover: true }); }
+        push({ a: u.id, n: '광역 폭풍', k: 'aoe', skill: true, hits });
+        return;
+      }
+      const bossAoe = u.tier === 'boss' && !u.mech && u.turn % 4 === 0;
       const heavy = (u.tier !== 'normal') && u.turn % 3 === 0;
       if (bossAoe) {
         const hits = [];
@@ -1102,11 +1150,12 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
         return;
       }
       const t = pickEnemyTarget(u);
-      const r = damage(u, t, heavy ? 1.6 : 1);
+      const exec = u.mech === 'execute' && t.leader && t.hp < t.maxHp * T.bossMech.execute.below; // 처형 표식
+      const r = damage(u, t, exec ? T.bossMech.execute.mult : heavy ? 1.6 : 1);
       const hits = [{ t: t.id, d: r.d, c: r.crit, m: r.miss, ab: r.absorbed }];
       if (r.cover) hits.push({ t: r.cover.t, d: r.cover.d, cover: true });
       if (!r.miss) counterCheck(t, u, hits);
-      push({ a: u.id, n: heavy ? '강공격' : '공격', k: heavy ? 'heavy' : 'attack', hits });
+      push({ a: u.id, n: exec ? '처형' : heavy ? '강공격' : '공격', k: exec || heavy ? 'heavy' : 'attack', ...(exec ? { skill: true } : {}), hits });
       return;
     }
     if (!alive('enemy').length) return;

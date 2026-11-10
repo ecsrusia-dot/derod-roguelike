@@ -13,7 +13,7 @@ import UpdateButton from '../components/ui/UpdateButton.jsx';
 import { GAME_VERSION } from '../data/version.js';
 import {
   CHRONICLE_TITLE, CHRONICLE_SUB, CHRONICLE_PARTS, CHRONICLE_SAVE_KEY, CHRONICLE_SAVE_KEY_V1, CHRONICLE_TUNING, CHRONICLE_CLASSES, CHRONICLE_FIELDS,
-  CHRONICLE_SKILLS, CHRONICLE_DUNGEON, CHRONICLE_DUNGEONS, DUNGEON_TIERS, dungeonDef, STAT_META, STAT_KEYS, SKILL_MAX_LV, MASTERY_PCT, BOSS_DAILY_LIMIT, DUNGEON_KEYS, GRADES, gradeIdx, SLOTS, FORGE, UNIQUE_CHANCE, UNIQUE_ITEMS, fieldStages, FIELD_STAGES, BOOST, BAG_EXPAND,
+  CHRONICLE_SKILLS, CHRONICLE_DUNGEON, CHRONICLE_DUNGEONS, DUNGEON_TIERS, dungeonDef, STAT_META, STAT_KEYS, SKILL_MAX_LV, MASTERY_PCT, BOSS_DAILY_LIMIT, BOSS_MECHS, DUNGEON_KEYS, GRADES, gradeIdx, SLOTS, FORGE, UNIQUE_CHANCE, UNIQUE_ITEMS, fieldStages, FIELD_STAGES, BOOST, BAG_EXPAND,
   chronicleClass, classSkills, describeSkill, chronicleEnemyArt, expNeedFor, rebirthExpMult, REBIRTH, REBIRTH_BRANCHES, rebirthBranches,
 } from './data.js';
 import * as E from './engine.js';
@@ -209,7 +209,7 @@ function BattleCard({ u, art, hp, sh, acting, fx, h, enemy = false, border, chil
       <div className="relative overflow-hidden" style={{ height: h, borderRadius: 12, border: `1.5px solid ${acting ? accent : border}`, boxShadow: acting ? `0 0 12px ${accent}66` : 'none', transition: 'box-shadow .2s, border-color .2s' }}>
         <img src={art} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ objectPosition: enemy ? '50% 40%' : '50% 22%', filter: dead ? 'grayscale(1)' : 'none' }} draggable={false} />
         <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, transparent 45%, #000d)' }} />
-        {enemy && u.erole ? <div className="absolute top-1 right-1 px-1.5" style={{ fontSize: 10.5, borderRadius: 6, background: '#000a', color: u.erole === 'tank' ? '#9cc4e4' : '#8fe08a', border: `1px solid ${u.erole === 'tank' ? '#9cc4e4' : '#8fe08a'}66` }}>{u.erole === 'tank' ? '🛡 수호' : '✚ 치유'}</div> : null}
+        {enemy && u.erole ? <div className="absolute top-1 right-1 px-1.5" style={{ fontSize: 10.5, borderRadius: 6, background: '#000a', color: u.erole === 'tank' ? '#9cc4e4' : '#8fe08a', border: `1px solid ${u.erole === 'tank' ? '#9cc4e4' : '#8fe08a'}66` }}>{u.warden ? '🛡 결계 호위' : u.acolyte ? '✚ 의식 사제' : u.erole === 'tank' ? '🛡 수호' : '✚ 치유'}</div> : null}
         {enemy && u.intim ? <div className="absolute top-1 left-1 px-1.5" style={{ fontSize: 10.5, borderRadius: 6, background: u.intim >= 4 ? '#7a0d0dee' : '#3a1a1acc', color: u.intim >= 4 ? '#ffd0d0' : '#ff9a8a', border: '1px solid #ff6a5a88' }}>{u.intim >= 4 ? '☠ 절대 위압' : `☗ 위압 ${u.intim}`}</div> : null}
         <div className="absolute bottom-1 left-1.5 right-1.5">
           {h < 150 ? (
@@ -349,7 +349,7 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
     <div className="absolute inset-0 flex flex-col" style={{ background: PALETTE.bg }}>
       {bg && <img src={bg} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ opacity: 0.18 }} onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
       <div className="relative flex items-center gap-2 px-3 pt-2 flex-none" style={{ minHeight: 44 }}>
-        <span style={{ fontSize: 12, color: PALETTE.textDim }}>{ctx.label} · {round}라운드{enemies[0]?.rebirthTier ? <span style={{ color: '#ff6ad5' }}> · ✦전승 {enemies[0].rebirthTier}단계</span> : null}{maxIntim ? <span style={{ color: '#ff7a6a' }}> · {maxIntim >= 4 ? '☠절대 위압' : `☗위압 ${maxIntim}단계`}</span> : null}</span>
+        <span style={{ fontSize: 12, color: PALETTE.textDim }}>{ctx.label} · {round}라운드{enemies[0]?.rebirthTier ? <span style={{ color: '#ff6ad5' }}> · ✦전승 {enemies[0].rebirthTier}단계</span> : null}{enemies[0]?.mech && BOSS_MECHS[enemies[0].mech] ? <span style={{ color: PALETTE.legendary }}> · {BOSS_MECHS[enemies[0].mech].icon}{BOSS_MECHS[enemies[0].mech].name}</span> : null}{maxIntim ? <span style={{ color: '#ff7a6a' }}> · {maxIntim >= 4 ? '☠절대 위압' : `☗위압 ${maxIntim}단계`}</span> : null}</span>
         <div className="flex-1" />
         {SPEEDS.map(s => {
           const locked = s === 4 && boostLeft <= 0;
@@ -719,6 +719,17 @@ function TownView({ save, acc, go, onExit, onSwitchChar }) {
 }
 
 // ===== 사냥터 (1.213.0 — 지역당 6스테이지 · 처치 목표 + 관문 강적 → 보스) =====
+// 보스 공략 힌트 (1.237.0) — 기믹 이름·설명·추천 조합
+function BossMechNote({ mech, compact = false }) {
+  const m = BOSS_MECHS[mech];
+  if (!m) return null;
+  return (
+    <div className="px-2.5 py-2" style={{ fontSize: 12, borderRadius: 10, background: '#e8b04a12', border: '1px solid #e8b04a55', color: PALETTE.text, lineHeight: 1.55 }}>
+      <b style={{ color: PALETTE.legendary }}>{m.icon} 보스 기믹 · {m.name}</b>{compact ? null : <div style={{ color: PALETTE.textDim }}>{m.desc}</div>}
+      <div style={{ color: PALETTE.dawn }}>💡 공략: {m.tip}</div>
+    </div>
+  );
+}
 // 특성 갈래 ↔ 동행 사역마 시너지 안내 (1.236.0)
 const SYN_ROLE = { tank: ['🛡', '수호'], healer: ['✚', '치유'], dps: ['🗡', '맹공'] };
 function FamSynergyNote({ tree, pts }) {
@@ -847,9 +858,12 @@ function FieldView({ save, onBack, onFight, onAuto, playScene, sceneOpen }) {
           if (!bossOpen) return <UIButton variant="ghost" disabled>{`👑 보스 — 스테이지 ${FIELD_STAGES} 관문을 넘으면 개방`}</UIButton>;
           if (cleared && left <= 0) return <UIButton variant="gold" disabled>보스 재도전 — 오늘 횟수 소진 (0시 초기화)</UIButton>;
           return (
+            <>
+            <BossMechNote mech={E.bossMechOf('field', f.id)} />
             <UIButton variant="gold" onClick={() => onFight(f, 'boss', null)}>
               {cleared ? `👑 보스 재도전 — ${bossName} (오늘 ${left}/${BOSS_DAILY_LIMIT})` : `👑 보스 도전 — ${bossName} Lv.${f.bossLv}`}
             </UIButton>
+            </>
           );
         })()}
       </div>
@@ -920,6 +934,7 @@ function DungeonView({ save, onBack, onEnter, onFight, onLeave, onBuyKey, dungeo
             {d ? '내 상태 — 층 사이 최대 HP의 25%만 회복' : `권장 Lv.${D.recLv + T.lv} · 적 HP ×${T.hp} · 공격 ×${T.atk} · 에픽 확률 ×${T.epicMult} · ◆ ×${T.shardMult} · 보스 유니크 ${Math.round(UNIQUE_CHANCE.dungeonBoss[d ? d.tier || 0 : tier] * 100)}%`}
           </div>
           <IntimNote heroLv={save.units[save.hero].lv} lv={Math.max(...D.floors.map(x => x.lv)) + T.lv} what="던전 최고층" />
+          <BossMechNote mech={E.bossMechOf('dungeon', D.id)} compact={!!d && d.floor < D.floors.length - 1} />
           {party.map(p => (
             <div key={p.id} className="flex items-center gap-2">
               <UnitIcon u={p} size={30} dim={p.hp <= 0} />

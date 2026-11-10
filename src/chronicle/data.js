@@ -56,6 +56,15 @@ export const CHRONICLE_TUNING = {
       healer: { hp: 0.8, atk: 0.5, heal: 0.15, cd: 2, below: 0.75 },
     },
   },
+  // 보스 공략 기믹 수치 (1.237.0) — BOSS_MECHS
+  bossMech: {
+    ward: { bossHp: 0.8, guards: 2, guardHp: 0.5, guardAtk: 0.4 },
+    ritual: { bossHp: 0.85, acolyteHp: 0.45, acolyteAtk: 0.3, heal: 0.07 },
+    storm: { every: 3, mult: 1.1 },
+    execute: { below: 0.35, mult: 3 },
+    reflect: { every: 4, turns: 2, pct: 0.3, capPct: 0.08 },   // 1회 반사 상한 = 공격자 최대 HP의 8%
+    enrage: { after: 8, perRound: 0.25 },
+  },
   // 특성 갈래 ↔ 동행 사역마 시너지 (1.236.0 PM — 갈래 1포인트당, 갈래 완성 35포인트 기준 괄호)
   //   딜 갈래 → 수호: 대신 맞기 확률 +0.8%p (+28%p)
   //   반격·지속 갈래 → 치유: 회복력 +2% (+70%) · 회복 시작 HP +0.4%p (+14%p) · 회복량의 1%를 보호막으로 (+35%)
@@ -396,6 +405,21 @@ export const CHRONICLE_DUNGEON = CHRONICLE_DUNGEONS[0]; // 1.205~1.207 호환 (�
 export const dungeonDef = (id) => CHRONICLE_DUNGEONS.find(d => d.id === id) || CHRONICLE_DUNGEONS[0];
 
 // 난이도 — 이전 단계 보스를 쓰러뜨리면 다음 단계 개방
+// ===== 보스 공략 기믹 (1.237.0 PM 결정 — 화력이 아니라 조합으로 공략) =====
+// 사냥터·던전 보스마다 기믹 1개. 수치는 CHRONICLE_TUNING.bossMech 한 곳
+export const BOSS_MECHS = {
+  ward: { name: '호위 결계', icon: '🛡', desc: '수호 호위 2기가 살아 있는 동안 보스는 피해를 받지 않는다', tip: '호위부터 — 광역 공격·맹공 사역마(연격)가 유리' },
+  ritual: { name: '재생 의식', icon: '✚', desc: '의식 사제가 매 턴 보스의 체력을 크게 회복한다', tip: '사제를 먼저 쓰러뜨려라 — 맹공 사역마가 사제를 우선 노린다' },
+  storm: { name: '광역 폭풍', icon: '🌪', desc: '3턴마다 아군 전체를 강하게 휩쓰는 폭풍을 일으킨다', tip: '버티는 싸움 — 치유 사역마·보호막·재생이 유리' },
+  execute: { name: '처형 표식', icon: '⚔', desc: '체력이 35% 아래로 떨어진 주인공에게 3배 위력의 처형을 내린다', tip: '처형을 대신 맞아 줄 수호 사역마가 유리' },
+  reflect: { name: '반사 갑주', icon: '🔁', desc: '4턴마다 2턴 동안 직접 공격 피해의 30%를 되돌려준다 (1회 최대 HP 8%)', tip: '지속 피해(화상·독)는 반사되지 않는다 — 지속 피해·치유 동행이 유리' },
+  enrage: { name: '광폭 타이머', icon: '⏳', desc: '8라운드가 지나면 매 라운드 공격력이 25%씩 오른다', tip: '짧게 끝내라 — 딜 특성 + 맹공 사역마로 빠르게 정리' },
+};
+export const BOSS_MECH_OF = {
+  field: { 1: 'ward', 2: 'ritual', 3: 'reflect', 4: 'execute', 5: 'storm', 6: 'ritual', 7: 'ward', 8: 'execute', 9: 'storm', 10: 'enrage', 11: 'reflect', 12: 'enrage' },
+  dungeon: { frostTomb: 'ward', forestHeart: 'ritual', frostAbyss: 'storm', sanctumVault: 'reflect', riftHeart: 'execute', dawnGarden: 'enrage' },
+};
+
 export const DUNGEON_TIERS = [
 // expMult (1.234.1) — 경험치는 HP 배율이 아니라 이 고정 보너스로 (전설 HP ×2.6이 경험치 ×2.6이 되던 문제)
   { id: 'normal', label: '일반', color: '#a89a88', lv: 0, hp: 1, atk: 1, epicMult: 1, shardMult: 1, keyCost: 1, expMult: 1 },
