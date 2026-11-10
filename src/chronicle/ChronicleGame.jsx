@@ -207,6 +207,7 @@ function BattleCard({ u, art, hp, sh, acting, fx, h, enemy = false, border, chil
       <div className="relative overflow-hidden" style={{ height: h, borderRadius: 12, border: `1.5px solid ${acting ? accent : border}`, boxShadow: acting ? `0 0 12px ${accent}66` : 'none', transition: 'box-shadow .2s, border-color .2s' }}>
         <img src={art} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ objectPosition: enemy ? '50% 40%' : '50% 22%', filter: dead ? 'grayscale(1)' : 'none' }} draggable={false} />
         <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, transparent 45%, #000d)' }} />
+        {enemy && u.erole ? <div className="absolute top-1 right-1 px-1.5" style={{ fontSize: 10.5, borderRadius: 6, background: '#000a', color: u.erole === 'tank' ? '#9cc4e4' : '#8fe08a', border: `1px solid ${u.erole === 'tank' ? '#9cc4e4' : '#8fe08a'}66` }}>{u.erole === 'tank' ? '🛡 수호' : '✚ 치유'}</div> : null}
         {enemy && u.intim ? <div className="absolute top-1 left-1 px-1.5" style={{ fontSize: 10.5, borderRadius: 6, background: u.intim >= 4 ? '#7a0d0dee' : '#3a1a1acc', color: u.intim >= 4 ? '#ffd0d0' : '#ff9a8a', border: '1px solid #ff6a5a88' }}>{u.intim >= 4 ? '☠ 절대 위압' : `☗ 위압 ${u.intim}`}</div> : null}
         <div className="absolute bottom-1 left-1.5 right-1.5">
           {h < 150 ? (
@@ -716,6 +717,25 @@ function TownView({ save, acc, go, onExit, onSwitchChar }) {
 }
 
 // ===== 사냥터 (1.213.0 — 지역당 6스테이지 · 처치 목표 + 관문 강적 → 보스) =====
+// 특성 갈래 ↔ 동행 사역마 시너지 안내 (1.236.0)
+const SYN_ROLE = { tank: ['🛡', '수호'], healer: ['✚', '치유'], dps: ['🗡', '맹공'] };
+function FamSynergyNote({ tree, pts }) {
+  const role = TL.TREE_FAM[tree.id];
+  if (!role) return null;
+  const fx = E.famSynergyFx(role, Math.max(pts, 0));
+  const full = E.famSynergyFx(role, 35);
+  const pct = (v) => `${Math.round(v * 1000) / 10}%`;
+  const line = (f) => role === 'tank' ? `대신 맞기 확률 +${pct(f.guard || 0)}p`
+    : role === 'healer' ? `회복력 +${pct(f.healPower || 0)} · 회복 시작 HP +${pct(f.healBelow || 0)}p · 회복량의 ${pct(f.healShield || 0)} 보호막`
+    : `연격 확률 +${pct(f.chain || 0)}p · 공격력 +${pct(f.atk || 0)}`;
+  const [ic, nm] = SYN_ROLE[role];
+  return (
+    <div className="mt-1.5 px-2 py-1.5" style={{ fontSize: 11.5, borderRadius: 8, background: `${tree.color}14`, border: `1px solid ${tree.color}44`, color: PALETTE.text }}>
+      <b style={{ color: tree.color }}>{ic} 짝 동행: {nm} 사역마</b> — 이 갈래에 찍은 포인트만큼 {nm} 사역마가 강해짐
+      <div style={{ color: PALETTE.textDim }}>현재 {pts}점: {pts > 0 ? line(fx) : '효과 없음'} · 갈래 완성(35점): {line(full)}</div>
+    </div>
+  );
+}
 // 위압 안내 (1.235.0) — 적이 나보다 레벨이 높아 강화될 때만 표시
 function IntimNote({ heroLv, lv, what }) {
   const n = E.intimidateLevel(heroLv, lv);
@@ -1015,6 +1035,7 @@ function TalentPanel({ save, setSave, cid }) {
         })}
       </div>
       <div className="mt-2" style={{ fontSize: 11.5, color: PALETTE.textDim }}>{tree.desc}</div>
+      <FamSynergyNote tree={tree} pts={pts} />
       {tree.tiers.map((row, ti) => {
         const open = TL.tierUnlocked(u, tree.id, ti);
         return (

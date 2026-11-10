@@ -8,7 +8,7 @@ import { levelCap, globalBuffFx } from './roster.js';
 import { talentFx, canLearnTalent, talentNode, talentResetCost, talentTrees, tierUnlocked } from './talents.js';
 import { fieldStages, FIELD_STAGES, STAGE_TUNING, BOOST, BAG_EXPAND, SALVAGE, SALVAGE_ICON, REBIRTH, REBIRTH_BRANCHES, expNeedFor } from './data.js';
 import { TOWER, TOWER_SHOP, towerUnlocked, isTowerBoss, towerEnemyLv, towerArea, towerFloorPicks, kstWeekKey } from './tower.js';
-import { famCombatant, famSubFx, famOwnFx, famBondFx, rollFamShards, gainFamExp, FAM_AI, FAM_TUNING, summonFamiliars, enhanceFamiliar, evolveFamiliar } from './familiar.js';
+import { famCombatant, famRole, famSubFx, famOwnFx, famBondFx, rollFamShards, gainFamExp, FAM_AI, FAM_TUNING, summonFamiliars, enhanceFamiliar, evolveFamiliar } from './familiar.js';
 import {
   CHRONICLE_TUNING as T, CHRONICLE_CLASSES, CHRONICLE_SKILLS, CHRONICLE_FIELDS, CHRONICLE_DUNGEON, CHRONICLE_DUNGEONS, DUNGEON_TIERS, dungeonDef,
   STAT_KEYS, SKILL_MAX_LV, MASTERY_PCT, BOSS_DAILY_LIMIT, DUNGEON_KEYS, GRADES, gradeIdx, SLOTS, CLASS_SLOTS, FORGE, DROP_TABLE,
@@ -255,7 +255,7 @@ function passiveFx(u) {
 // 전투 능력치 (2.0 — 장비 옵션·유니크 효과 합산)
 const PASS_KEYS = ['counterDouble', 'tauntReduce', 'critAfterCounter', 'emergencyHeal', 'dotTurnsMult', 'openInferno', 'skillShield', 'resetEvery',
   'overhealShield', 'missingHpAtk', 'rageDouble', 'multiHitsAdd', 'spiritArrow', 'dodgeHeal', 'firstCrit', 'revive', 'shieldReduce', 'blessMult', 'blessTurns',
-  'execute', 'chain', 'holyDmg', 'regenPct', 'counterDmg', 'skillDmg', 'dotDmg', 'expPct', 'goldPct', 'dropPct', 'famPct'];
+  'execute', 'chain', 'holyDmg', 'regenPct', 'counterDmg', 'skillDmg', 'dotDmg', 'expPct', 'goldPct', 'dropPct', 'famPct', 'fam_tank', 'fam_healer', 'fam_dps'];
 const MULT_KEYS = ['dotTurnsMult', 'blessMult'];
 export function deriveUnit(save, classId) {
   const u = save.units[classId];
@@ -709,6 +709,21 @@ export function setFamTeam(save0, slot, key) {
 }
 
 // ===== 전투 준비 =====
+// 특성 갈래 → 짝 동행 사역마 기능 강화 (1.236.0 PM: 특성 테크에 따라 최적 동행이 바뀌도록)
+//   pts = 그 역할과 짝인 갈래에 찍은 포인트 (talents.js TREE_FAM) — 능력치가 아니라 역할 기능을 키운다
+export function famSynergyFx(role, pts) {
+  const S = T.famSynergy?.[role]; if (!S || !pts) return {};
+  return Object.fromEntries(Object.entries(S).map(([k, v]) => [k, v * pts]));
+}
+function applyFamSynergy(fam, role, pts) {
+  const fx = famSynergyFx(role, pts);
+  if (fx.guard) fam.guardian = Math.min(0.85, (fam.guardian || 0) + fx.guard);
+  if (fx.healPower) fam.healPower = Math.round(fam.healPower * (1 + fx.healPower));
+  if (fx.healBelow) fam.healBelowAdd = fx.healBelow;
+  if (fx.healShield) fam.healShield = fx.healShield;
+  if (fx.chain) fam.chain = (fam.chain || 0) + fx.chain;
+  if (fx.atk) fam.atk = Math.round(fam.atk * (1 + fx.atk));
+}
 export function partyCombatants(save, hpMap = null) {
   const list = save.party.map(cid => {
     const d = deriveUnit(save, cid);
@@ -719,6 +734,7 @@ export function partyCombatants(save, hpMap = null) {
   if (mk) {
     const hero = list.find(u => u.leader) || list[0];
     const fam = famCombatant(mk, save.fams[mk], hero, hero.famPct || 0);
+    applyFamSynergy(fam, famRole(mk), hero[`fam_${famRole(mk)}`] || 0);
     // 던전 층 사이: 쓰러진 사역마는 다음 층에서 HP 30%로 일어난다
     if (hpMap && hpMap.fam != null) fam.hp = Math.max(Math.round(fam.maxHp * 0.3), Math.min(fam.maxHp, hpMap.fam));
     list.push(fam);
@@ -766,7 +782,9 @@ export function autoProgressStep(save, field) {
 export function rollGateEncounter(field, stageIdx, rng) {
   const lv = fieldStages(field)[stageIdx].lv + STAGE_TUNING.gateLvAdd;
   const area = { hpMult: field.area.hpMult * STAGE_TUNING.gateEliteMult, atkMult: field.area.atkMult };
-  return { type: 'gate', enemies: [buildChronicleEnemy(field.elites[stageIdx % field.elites.length], lv, 'e0', area), buildChronicleEnemy(pick(rng, field.normals), lv - 1, 'e1', field.area)] };
+  const list = [buildChronicleEnemy(field.elites[stageIdx % field.elites.length], lv, 'e0', area), buildChronicleEnemy(pick(rng, field.normals), lv - 1, 'e1', field.area)];
+  if (T.enemyParty?.on) { list.push(buildChronicleEnemy(pick(rng, field.normals), lv - 1, 'e2', field.area)); return { type: 'gate', enemies: packOf(rng, list) }; }
+  return { type: 'gate', enemies: list };
 }
 
 // ===== ×4 배속 이용권 (계정 공유, boostUntil = 만료 시각 ms) =====
@@ -782,8 +800,36 @@ export function buyBoost(save0, now = Date.now()) {
 }
 
 // stage: 스테이지 번호(0~5) — 주면 몹 레벨을 그 스테이지로 고정 (강적은 +1)
+// ===== 적 파티 (1.236.0) — 역할(erole) 부여: tank = 도발 · healer = 아군 회복 =====
+export function roleEnemy(e, role, mult = null) {
+  const R = T.enemyParty?.roles?.[role] || {};
+  const hm = (R.hp || 1) * (mult?.hp || 1); const am = (R.atk || 1) * (mult?.atk || 1);
+  return { ...e, erole: role === 'dps' ? undefined : role, hp: Math.round(e.hp * hm), maxHp: Math.round(e.maxHp * hm), atk: Math.round(e.atk * am), def: Math.round((e.def || 0) * (R.def || 1)) };
+}
+// 무리 3마리 — 역할은 마리마다 완전 랜덤 (수호 3마리·맹공 3마리도 나올 수 있다, PM 1.236.0)
+function packOf(rng, list) {
+  const P = T.enemyParty; const W = P.roleWeights;
+  const tot = W.tank + W.healer + W.dps;
+  return list.map(e => {
+    const x = rng() * tot;
+    const role = x < W.tank ? 'tank' : x < W.tank + W.healer ? 'healer' : 'dps';
+    const r = roleEnemy(e, role, e.tier === 'normal' ? P.packMult : null);
+    // 보상도 마리당 줄여 전투 1회 보상은 예전(평균 1.8마리)과 같게
+    return e.tier === 'normal' ? { ...r, rewardMult: (e.rewardMult || 1) * P.packReward, goldMult: P.packReward } : r;
+  });
+}
 export function rollFieldEncounter(field, rng, boss = false, partyLv = null, stage = null) {
+  const EP = T.enemyParty?.on;
   if (boss) return { type: 'boss', enemies: [buildChronicleEnemy(field.boss, field.bossLv, 'e0', field.area)] };
+  if (EP && stage != null) {
+    const slv = fieldStages(field)[stage].lv;
+    if (rng() < T.eliteChance && field.elites.length) {
+      const list = [buildChronicleEnemy(pick(rng, field.elites), slv + 1, 'e0', field.area), buildChronicleEnemy(pick(rng, field.normals), slv, 'e1', field.area), buildChronicleEnemy(pick(rng, field.normals), slv, 'e2', field.area)];
+      return { type: 'elite', enemies: packOf(rng, list), stage };
+    }
+    const list = Array.from({ length: T.enemyParty.packSize }, (_, i) => buildChronicleEnemy(pick(rng, field.normals), slv, `e${i}`, field.area));
+    return { type: 'normal', stage, enemies: packOf(rng, list) };
+  }
   if (stage != null) {
     const slv = fieldStages(field)[stage].lv;
     if (rng() < T.eliteChance && field.elites.length) {
@@ -956,6 +1002,10 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
     }
     const own = foes.find(f => f.sealOf === u.classId);
     if (own) return own;
+    // 적 파티 (1.236.0) — 적 수호가 도발 중이면 그쪽으로 · 맹공 사역마는 적 치유를 먼저 노린다
+    const tk = foes.find(f => f.erole === 'tank' && f.taunt > 0);
+    if (tk && rng() < (T.enemyParty?.roles?.tank?.tauntPull || 0.8)) return tk;
+    if (u.famRole === 'dps') { const hl = foes.find(f => f.erole === 'healer'); if (hl) return hl; }
     const ok = foes.filter(f => !immuneTo(u, f));
     return (ok.length ? ok : foes).slice().sort((a, b) => a.hp - b.hp)[0];
   };
@@ -977,7 +1027,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
     const foes = alive('enemy').filter(f => !immuneTo(u, f));
     const has = (k) => ready.find(x => x.s.kind === k);
     // 1.227.1 PM: 사역마는 덜 놀게 — 치유 HP 75% 미만(주인공은 55% 그대로) · 보호막은 주인공 보호막이 최대 HP 10% 미만이면 다시
-    const lowAlly = allies.find(a => a.hp < a.maxHp * (u.fam ? FAM_AI.healBelow : 0.55));
+    const lowAlly = allies.find(a => a.hp < a.maxHp * (u.fam ? FAM_AI.healBelow + (u.healBelowAdd || 0) : 0.55));
     const hurt = allies.filter(a => a.hp < a.maxHp * 0.7).length;
     // 사역마 고유 스킬 (1.218.0) — 조건이 맞으면 최우선
     for (const sig of ready.filter(x => x.s.sig || SPECIAL_KINDS.has(x.s.kind))) {
@@ -1027,6 +1077,22 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
       }
       const foes = alive('party');
       if (!foes.length) return;
+      const ER = T.enemyParty?.roles || {};
+      if (u.erole === 'tank' && (u.turn - 1) % ER.tank.tauntEvery === 0) {
+        u.taunt = ER.tank.tauntTurns + 1; // 자기 턴 끝에 1 감소
+        push({ a: u.id, n: '도발', k: 'taunt', skill: true, hits: [{ t: u.id, buff: true }] });
+        return;
+      }
+      if (u.erole === 'healer' && !(u.cds.eheal > 0)) {
+        const al = alive('enemy').filter(x => x.hp < x.maxHp * ER.healer.below).sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];
+        if (al) {
+          const h = Math.round(al.maxHp * ER.healer.heal);
+          const before = al.hp; al.hp = Math.min(al.maxHp, al.hp + h);
+          u.cds.eheal = ER.healer.cd + 1;
+          push({ a: u.id, n: '치유', k: 'heal', skill: true, hits: [{ t: al.id, h: al.hp - before }] });
+          return;
+        }
+      }
       const bossAoe = u.tier === 'boss' && u.turn % 4 === 0;
       const heavy = (u.tier !== 'normal') && u.turn % 3 === 0;
       if (bossAoe) {
@@ -1109,7 +1175,8 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
         const t = allies.slice().sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];
         const h = Math.round(u.healPower * v);
         const eh = healUnit(t, h);
-        hits.push({ t: t.id, h, eh });
+        const es = u.healShield ? addShield(t, Math.round(h * u.healShield)) : 0; // 치유 시너지 (1.236.0)
+        hits.push({ t: t.id, h, eh, ...(es ? { es } : {}) });
         holyHit(u, h, hits);
         break;
       }
@@ -1153,7 +1220,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
       case 'bigHeal': case 'healShield': case 'healBuff': {
         const t = allies.slice().sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];
         const h = Math.round(u.healPower * v);
-        const eh = healUnit(t, h); hits.push({ t: t.id, h, eh });
+        const eh = healUnit(t, h); const es0 = u.healShield ? addShield(t, Math.round(h * u.healShield)) : 0; hits.push({ t: t.id, h, eh, ...(es0 ? { es: es0 } : {}) });
         if (s.kind === 'healShield') { const sh = Math.round(u.healPower * s.shieldV); const es = addShield(t, sh, 'max'); hits.push({ t: t.id, s: sh, es }); }
         if (s.kind === 'healBuff') for (const a of allies) { a.buffs.song = { v: s.buff, t: s.turns }; hits.push({ t: a.id, buff: true }); }
         break;
@@ -1249,7 +1316,7 @@ export function expGapMult(heroLv, enemyLv) {
 }
 export function battleRewards(enemies, type, rng, mods = {}) {
   const exp = enemies.reduce((s, e) => s + Math.round((6 + e.lv * 3) * (e.rewardMult || 1) * (T.expMult || 1) * (e.tier === 'boss' ? 10 : e.tier === 'elite' ? 3 : 1) * expGapMult(mods.heroLv, e.lv)), 0);
-  const gold = enemies.reduce((s, e) => s + Math.round((3 + e.lv * 2) * (e.tier === 'boss' ? 8 : e.tier === 'elite' ? 3 : 1) * (0.85 + rng() * 0.3)), 0);
+  const gold = enemies.reduce((s, e) => s + Math.round((3 + e.lv * 2) * (e.tier === 'boss' ? 8 : e.tier === 'elite' ? 3 : 1) * (e.goldMult || 1) * (0.85 + rng() * 0.3)), 0);
   const tableKey = type === 'normal' ? 'normal' : type;
   const base = DROP_TABLE[tableKey] || DROP_TABLE.normal;
   const tbl = { ...base, grades: { ...base.grades } };
