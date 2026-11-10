@@ -472,14 +472,25 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
       {/* 결과 */}
       {done && (
         <div className="relative flex-none px-3 pb-3">
-          <GlassPanel strong className="p-3">
-            <div className={`font-bold text-center ${sim.result === 'win' ? 'chr-win' : ''}`} style={{ fontSize: 17, color: sim.result === 'win' ? PALETTE.legendary : '#e06a5f', fontFamily: FONT_TITLE }}>
+          {/* 1.253.0 — 본편 스타일 (시안 ㉘) */}
+          <div className="overflow-y-auto" style={{ padding: '10px 12px 12px', border: `2px solid ${MS.red}`, background: '#150a0c', maxHeight: '58vh' }}>
+            <div className="text-center" style={{ fontSize: 10.5, letterSpacing: 6, color: MS.red }}>BATTLE RESULT</div>
+            <div className={`font-bold text-center ${sim.result === 'win' ? 'chr-win' : ''}`} style={{ fontSize: 22, letterSpacing: 6, lineHeight: 1.2, color: sim.result === 'win' ? MS.gold : '#e06a5f', fontFamily: FONT_TITLE }}>
               {sim.result === 'win' ? '승리' : '전멸'}
             </div>
+            <div className="text-center" style={{ fontSize: 11.5, color: PALETTE.textDim }}>{ctx.label} · {sim.rounds || round}라운드</div>
             {sim.result === 'win' ? (
               <div className="mt-1.5 flex flex-col gap-1" style={{ fontSize: 12.5, color: PALETTE.text }}>
-                {ctx.kind !== 'raid' && <div className="text-center">경험치 +<CountUp v={summary.exp} /> · 🪙 +<CountUp v={summary.gold} /> · ✦ +{summary.essence}{summary.shard ? ` · ◆ +${summary.shard}` : ''}</div>}
-                {xp && (xp.after.hero || xp.after.fam) && <div className="flex flex-col gap-1.5 mt-1 mb-0.5">
+                {ctx.kind !== 'raid' && <>
+                  <MainSecHead title="획 득" />
+                  <MainKvRows rows={[
+                    { l: '경험치', v: <>+<CountUp v={summary.exp} /></>, c: MS.gold }, { l: '골드', v: <>🪙 +<CountUp v={summary.gold} /></>, c: MS.gold },
+                    { l: '정수', v: `✦ +${summary.essence}` }, summary.shard ? { l: '파편', v: `◆ +${summary.shard}`, c: '#c79bff' } : { l: '장비', v: summary.items.length ? `${summary.items.length}개` : '—', c: summary.items.length ? '#7fa8d8' : PALETTE.textDim },
+                    ...(summary.shard ? [{ l: '장비', v: summary.items.length ? `${summary.items.length}개` : '—', c: summary.items.length ? '#7fa8d8' : PALETTE.textDim }] : []),
+                  ]} />
+                </>}
+                {xp && (xp.after.hero || xp.after.fam) && <MainSecHead title="성 장" />}
+                {xp && (xp.after.hero || xp.after.fam) && <div className="flex flex-col gap-1.5 mb-0.5">
                   <XpResultRow art={chronicleClass(save.hero).combatImage} name={chronicleClass(save.hero).name} before={xp.before.hero} after={xp.after.hero} />
                   {xp.after.fam && summary.famExp ? <XpResultRow fam art={chronicleEnemyArt(xp.after.fam.key)} name={F.famName(xp.after.fam.key)} before={xp.before.fam} after={xp.after.fam} /> : null}
                 </div>}
@@ -510,35 +521,36 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
                 {ctx.kind === 'raid' ? '원정대가 무너졌다 — 봉인의 주인이 쓰러지면 그 봉인은 깰 수 없다. 약한 캐릭터를 더 키워 다시 도전하자.' : ctx.kind === 'tower' ? `첨탑 ${summary.towerFell}층에서 쓰러졌다. 다음 도전은 체크포인트부터.` : ctx.kind === 'dungeon' ? '던전에서 쫓겨났다.' : `쓰러졌다 — 사냥터로 돌아간다.${summary.goldLost ? ` (골드 -${summary.goldLost})` : ''}`}
               </div>
             )}
-            <div className="flex gap-2 mt-2.5">
-              <button onClick={openStats} className="ui-press flex-1" style={{ height: 34, borderRadius: 10, fontSize: 12, border: '1px solid var(--ui-line-strong)', color: PALETTE.text, background: 'transparent' }}>📊 전투 집계</button>
-              {sessionReport && <button onClick={() => setStats(sessionReport)} className="ui-press flex-1" style={{ height: 34, borderRadius: 10, fontSize: 12, border: '1px solid #e8b04a88', color: PALETTE.legendary, background: 'transparent' }}>📋 사냥 보고서</button>}
-              {battle.runReport && <button onClick={() => setStats(battle.runReport)} className="ui-press flex-1" style={{ height: 34, borderRadius: 10, fontSize: 12, border: '1px solid #c08ae888', color: '#c08ae8', background: 'transparent' }}>{battle.runReport.kind === 'tower' ? '🗼 첨탑 도전 집계' : '🏰 던전 전체 집계'}</button>}
-            </div>
-            <div className="flex gap-2 mt-2">
-              {towerNext && (
-                <UIButton variant={towerAuto ? 'gold' : 'ghost'} style={{ height: 42 }} onClick={onToggleTowerAuto}>{towerAuto ? '자동 등반 중… (끄기)' : '자동 등반'}</UIButton>
-              )}
-              {dungeonNext && (
-                <UIButton variant={dungeonAuto ? 'gold' : 'ghost'} style={{ height: 42 }} onClick={onToggleDungeonAuto}>{dungeonAuto ? '연속 도전 중… (끄기)' : '연속 도전'}</UIButton>
-              )}
-              {autoProg && ctx.kind === 'field' && (
-                <UIButton variant="gold" style={{ height: 42 }} onClick={onStopAuto}>자동 진행 중… (끄기)</UIButton>
-              )}
-              {!autoProg && ctx.kind === 'field' && ctx.type !== 'boss' && sim.result === 'win' && (
-                <UIButton variant={repeat ? 'gold' : 'ghost'} style={{ height: 42 }} onClick={onToggleRepeat}>{repeat ? '반복 중… (끄기)' : '반복 사냥'}</UIButton>
-              )}
-              {(dungeonNext || towerNext)
-                ? <UIButton style={{ height: 42 }} onClick={onAgain}>다음 층으로 ▸</UIButton>
-                : <UIButton style={{ height: 42 }} onClick={onDone}>{ctx.kind === 'dungeon' ? '던전 목록으로' : ctx.kind === 'tower' ? '첨탑으로' : ctx.kind === 'raid' ? '레이드로' : '사냥터로'}</UIButton>}
-            </div>
-            {(dungeonNext || towerNext) && (
-              <button onClick={onDone} className="ui-press w-full mt-2" style={{ fontSize: 12.5, color: PALETTE.dawn, background: 'transparent', border: 'none', padding: 6 }}>잠시 멈추기 ({ctx.kind === 'dungeon' ? '던전 화면' : '첨탑 화면'}으로)</button>
-            )}
-            {ctx.kind === 'field' && sim.result === 'win' && ctx.type !== 'boss' && (
-              <button onClick={onAgain} className="ui-press w-full mt-2" style={{ fontSize: 12.5, color: PALETTE.dawn, background: 'transparent', border: 'none', padding: 6 }}>한 번 더 사냥</button>
-            )}
-          </GlassPanel>
+            {(() => {
+              const sq = (extra = {}) => ({ height: 44, fontSize: 13.5, fontWeight: 800, border: `1px solid ${MS.line}`, background: MS.box, color: PALETTE.text, ...extra });
+              const sm = (extra = {}) => ({ height: 36, fontSize: 12, border: `1px solid ${MS.line}`, background: MS.box, color: PALETTE.text, ...extra });
+              const hot = { border: `1px solid ${MS.red}`, background: 'rgba(224,87,76,0.2)', color: '#ff8a7e' };
+              const on = { border: `1px solid ${MS.gold}`, color: MS.gold, background: 'rgba(232,176,74,0.1)' };
+              const toggle = towerNext ? [towerAuto ? '⏫ 자동 등반 중 (끄기)' : '⏫ 자동 등반', towerAuto, onToggleTowerAuto]
+                : dungeonNext ? [dungeonAuto ? '▶ 연속 도전 중 (끄기)' : '▶ 연속 도전', dungeonAuto, onToggleDungeonAuto]
+                  : autoProg && ctx.kind === 'field' ? ['▶ 자동 진행 중 (끄기)', true, onStopAuto]
+                    : ctx.kind === 'field' && ctx.type !== 'boss' && sim.result === 'win' ? [repeat ? '🔁 반복 중 (끄기)' : '🔁 반복 사냥', repeat, onToggleRepeat] : null;
+              const next = dungeonNext || towerNext;
+              const back = ctx.kind === 'dungeon' ? '던전 목록으로' : ctx.kind === 'tower' ? '첨탑으로' : ctx.kind === 'raid' ? '레이드로' : '사냥터로';
+              const sub = [
+                ['📊 전투 집계', openStats, {}],
+                sessionReport && ['📋 사냥 보고서', () => setStats(sessionReport), { color: MS.gold }],
+                battle.runReport && [battle.runReport.kind === 'tower' ? '🗼 첨탑 집계' : '🏰 던전 집계', () => setStats(battle.runReport), { color: '#c08ae8' }],
+                next && [`⏸ 잠시 멈추기`, onDone, { color: PALETTE.textDim }],
+                !next && ctx.kind === 'field' && sim.result === 'win' && ctx.type !== 'boss' && ['⚔ 한 번 더', onAgain, {}],
+              ].filter(Boolean);
+              return <>
+                <div className="grid gap-1.5 mt-3" style={{ gridTemplateColumns: toggle ? '1fr 1fr' : '1fr' }}>
+                  {toggle && <button onClick={toggle[2]} className="ui-press" style={sq(toggle[1] ? on : {})}>{toggle[0]}</button>}
+                  {next ? <button onClick={onAgain} className="ui-press" style={sq(hot)}>다음 층으로 ▸</button>
+                    : <button onClick={onDone} className="ui-press" style={sq(hot)}>{back}</button>}
+                </div>
+                <div className="grid gap-1.5 mt-1.5" style={{ gridTemplateColumns: `repeat(${Math.min(sub.length, 3)}, 1fr)` }}>
+                  {sub.map(([l, fn, ex]) => <button key={l} onClick={fn} className="ui-press truncate" style={sm(ex)}>{l}</button>)}
+                </div>
+              </>;
+            })()}
+          </div>
         </div>
       )}
       {stats && <HuntReport report={stats} title={stats === battle.runReport ? (battle.runReport.kind === 'tower' ? '🗼 첨탑 도전 집계' : '🏰 던전 전체 집계') : stats === sessionReport ? '📋 사냥 보고서' : '📊 전투 집계'} onClose={() => setStats(null)} />}
@@ -949,6 +961,7 @@ function FieldView({ save, onBack, onFight, onAuto, playScene, sceneOpen }) {
 
 // ===== 던전 =====
 function DungeonView({ save, onBack, onEnter, onFight, onLeave, onBuyKey, dungeonAuto, onToggleDungeonAuto }) {
+  // 1.253.0 — 본편 스타일 (시안 ㉓)
   const d = save.dungeon;
   const opened = CHRONICLE_DUNGEONS.filter(x => E.dungeonUnlocked(save, x.id));
   const [selId, setSelId] = useState(d?.id || opened[opened.length - 1]?.id || 'frostTomb');
@@ -957,95 +970,110 @@ function DungeonView({ save, onBack, onEnter, onFight, onLeave, onBuyKey, dungeo
   const T = DUNGEON_TIERS[d ? d.tier || 0 : tier];
   const party = E.partyCombatants(save, d?.hp);
   const best = save.progress.dungeonTier?.[D.id];
+  const heroLv = save.units[save.hero].lv;
+  const mech = BOSS_MECHS[E.bossMechOf('dungeon', D.id)];
+  const partOf = (x) => x.part || 1;
+  const parts = [...new Set(CHRONICLE_DUNGEONS.map(partOf))];
+  const curPart = partOf(D);
+  const inPart = CHRONICLE_DUNGEONS.filter(x => partOf(x) === curPart);
+  const keys = E.keyCount(save);
+  const bossF = D.floors.find(f => f.boss) || D.floors[D.floors.length - 1];
+  const sq = (extra = {}) => ({ padding: '12px 0', fontSize: 14, fontWeight: 800, border: `1px solid ${MS.line}`, background: 'transparent', color: PALETTE.text, width: '100%', ...extra });
+  const hotBtn = { border: `1px solid ${MS.red}`, background: 'rgba(224,87,76,0.18)', color: '#ff8a7e' };
   return (
     <div className="absolute inset-0 flex flex-col">
-      <Header title={d ? `${D.name} · ${T.label}` : '던전'} onBack={d ? null : onBack} right={<div className="flex items-center gap-2"><span style={{ fontSize: 12, color: PALETTE.legendary }}>🗝{E.keyCount(save)}</span><Wallet save={save} /></div>} />
+      <Header title={d ? `${D.name} · ${T.label}` : '던전'} onBack={d ? null : onBack} right={<div className="flex items-center gap-2"><span style={{ fontSize: 12, color: MS.gold }}>🗝 {keys}</span><Wallet save={save} /></div>} />
       {!d && (
-        <div className="grid grid-cols-3 gap-1.5 px-3 pt-2 flex-none">
-          {CHRONICLE_DUNGEONS.map(x => {
-            const open = E.dungeonUnlocked(save, x.id);
-            return (
-              <button key={x.id} disabled={!open} onClick={() => { setSelId(x.id); setTier(0); }} className="ui-press" style={{ minHeight: 44, padding: '4px 6px', borderRadius: 10, fontSize: 11.5, lineHeight: 1.3, border: `1px solid ${selId === x.id ? x.color : 'var(--ui-line)'}`, color: open ? (selId === x.id ? x.color : PALETTE.text) : PALETTE.textDim, background: selId === x.id ? `${x.color}1c` : 'transparent', opacity: open ? 1 : 0.4 }}>
-                {open ? <>{x.name}<br /><span style={{ fontSize: 10.5, color: PALETTE.textDim }}>{x.part ? `${x.part}부` : '1부'} · Lv.{x.recLv}</span></> : <>🔒 {CHRONICLE_FIELDS[x.unlockField - 1].name}<br /><span style={{ fontSize: 10.5 }}>보스 후</span></>}
-              </button>
-            );
-          })}
+        <div className="px-3 flex-none">
+          <MainTabs size={12.5} value={curPart} onChange={(pid) => { const list = CHRONICLE_DUNGEONS.filter(x => partOf(x) === pid); const last = [...list].reverse().find(x => E.dungeonUnlocked(save, x.id)) || list[0]; setSelId(last.id); setTier(0); }}
+            items={parts.map(pid => { const open = CHRONICLE_DUNGEONS.some(x => partOf(x) === pid && E.dungeonUnlocked(save, x.id)); return [pid, open ? `${pid}부` : `🔒 ${pid}부`, false, !open]; })} />
+          <MainTabs size={11.5} value={D.id} onChange={(id) => { setSelId(id); setTier(0); }}
+            items={inPart.map(x => { const open = E.dungeonUnlocked(save, x.id); return [x.id, open ? x.name : `🔒 ${x.name}`, false, !open]; })} />
         </div>
       )}
-      <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
-        <div className="relative overflow-hidden" style={{ borderRadius: 16, aspectRatio: '16 / 9', border: `1px solid ${D.color}88` }}>
+      <div className="flex-1 overflow-y-auto px-4 pb-4 pt-2.5">
+        <div className="relative overflow-hidden" style={{ height: 150, border: `1px solid ${MS.line}` }}>
           <img src={chronicleEnemyArt(D.art)} alt="" className="absolute inset-0 w-full h-full object-cover" />
-          <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, transparent 40%, #0a0608)' }} />
-          <div className="absolute bottom-2 left-3 right-3" style={{ fontSize: 12, color: PALETTE.textDim }}>{D.desc}</div>
-        </div>
-        {!d && (
-          <div>
-            <div style={{ fontSize: 11.5, color: PALETTE.textDim, marginBottom: 6 }}>난이도 — 이전 단계 보스를 쓰러뜨리면 다음 단계가 열린다</div>
-            <div className="flex gap-1.5">
-              {DUNGEON_TIERS.map((t, i) => {
-                const open = E.dungeonTierUnlocked(save, D.id, i);
-                const cleared = best != null && best >= i;
-                return (
-                  <button key={t.id} disabled={!open} onClick={() => setTier(i)} className="ui-press flex-1" style={{ padding: '8px 0', borderRadius: 10, fontSize: 12.5, border: `1px solid ${tier === i ? t.color : 'var(--ui-line)'}`, color: open ? t.color : PALETTE.textDim, background: tier === i ? `${t.color}1c` : 'transparent', opacity: open ? 1 : 0.4 }}>
-                    {open ? t.label : `🔒 ${t.label}`}{cleared ? ' ✓' : ''}
-                  </button>
-                );
-              })}
-            </div>
+          <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, transparent 35%, #0b0708)' }} />
+          <div className="absolute left-3 right-3 bottom-2">
+            <div className="font-bold" style={{ fontSize: 19, color: PALETTE.text }}>{D.name} <span style={{ fontSize: 13, color: MS.gold }}>권장 Lv.{D.recLv + T.lv}</span></div>
+            <div style={{ fontSize: 12, color: PALETTE.textDim }}>{D.floors.length}층 · 보스 Lv.{bossF.lv + T.lv}{mech ? ` · 기믹 ${mech.icon} ${mech.name}` : ''}</div>
           </div>
-        )}
-        <div className="flex gap-1.5">
+        </div>
+        {!d && <>
+          <MainSecHead title="난 이 도" right={<span style={{ fontSize: 11, color: PALETTE.textDim }}>앞 단계 보스 처치 시 개방</span>} />
+          <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${DUNGEON_TIERS.length}, 1fr)` }}>
+            {DUNGEON_TIERS.map((t, i) => {
+              const open = E.dungeonTierUnlocked(save, D.id, i);
+              const cleared = best != null && best >= i;
+              const on = tier === i;
+              return (
+                <button key={t.id} disabled={!open} onClick={() => setTier(i)} className="ui-press" style={{ padding: '7px 0', fontSize: 12.5, fontWeight: on ? 800 : 500, border: `1px solid ${on ? MS.gold : MS.line}`, background: on ? 'rgba(232,176,74,0.1)' : MS.box, color: on ? MS.gold : PALETTE.text, opacity: open ? 1 : 0.45 }}>
+                  {open ? t.label : `🔒 ${t.label}`} <span style={{ fontWeight: 400, color: PALETTE.textDim }}>🗝{t.keyCost}</span>{cleared ? <span style={{ color: '#8fd08a' }}> ✓</span> : null}
+                </button>
+              );
+            })}
+          </div>
+        </>}
+        <MainSecHead title="층" right={d ? <span style={{ fontSize: 11, color: PALETTE.textDim }}>층 사이 최대 HP 25% 회복</span> : null} />
+        <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${D.floors.length}, 1fr)` }}>
           {D.floors.map((f, i) => {
-            const curF = d && d.floor === i;
-            const past = d && d.floor > i;
+            const curF = d && d.floor === i; const past = d && d.floor > i;
+            const lv = f.lv + T.lv; const intim = E.intimidateLevel(heroLv, lv);
             return (
-              <div key={i} className="flex-1 text-center" style={{ padding: '8px 0', borderRadius: 10, fontSize: 11.5, border: `1px solid ${curF ? D.color : 'var(--ui-line)'}`, color: past ? PALETTE.textDim : curF ? D.color : PALETTE.text, background: curF ? `${D.color}1c` : 'transparent' }}>
-                {f.boss ? '👑' : `${i + 1}층`}<br /><span style={{ fontSize: 10.5, color: E.intimidateLevel(save.units[save.hero].lv, f.lv + T.lv) ? '#ff7a6a' : undefined }}>Lv.{f.lv + T.lv}</span>
+              <div key={i} className="text-center" style={{ padding: '5px 0', fontSize: 11.5, border: `1px solid ${curF ? MS.gold : past ? '#8fd08a88' : MS.line}`, background: MS.box, color: past ? '#8fd08a' : curF ? MS.gold : f.boss ? MS.gold : PALETTE.text }}>
+                <b style={{ fontSize: 13, display: 'block' }}>{past ? '✓' : f.boss ? '👑' : i + 1}</b>
+                <span style={{ color: intim ? '#ff7a6a' : undefined }}>Lv.{lv}</span>
               </div>
             );
           })}
         </div>
-        <GlassPanel className="p-3 flex flex-col gap-2">
-          <div style={{ fontSize: 11.5, color: PALETTE.textDim }}>
-            {d ? '내 상태 — 층 사이 최대 HP의 25%만 회복' : `권장 Lv.${D.recLv + T.lv} · 적 HP ×${T.hp} · 공격 ×${T.atk} · 에픽 확률 ×${T.epicMult} · ◆ ×${T.shardMult} · 보스 유니크 ${Math.round(UNIQUE_CHANCE.dungeonBoss[d ? d.tier || 0 : tier] * 100)}%`}
+        {!d && (
+          <div className="mt-2"><MainKvRows rows={[
+            { l: '적 HP', v: `×${T.hp}` }, { l: '적 공격', v: `×${T.atk}` },
+            { l: '에픽 확률', v: `×${T.epicMult}` }, { l: '보스 유니크', v: `${Math.round(UNIQUE_CHANCE.dungeonBoss[tier] * 100)}%`, c: '#c79bff' },
+            { l: '◆ 파편', v: `×${T.shardMult}` }, { l: '입장 열쇠', v: `🗝 ${T.keyCost}`, c: MS.gold },
+          ]} /></div>
+        )}
+        <div className="mt-1.5"><IntimNote heroLv={heroLv} lv={Math.max(...D.floors.map(x => x.lv)) + T.lv} what="던전 최고층" /></div>
+        {mech && (
+          <div className="mt-1.5" style={{ padding: '8px 10px', border: `1px solid ${MS.line}`, background: MS.box, fontSize: 12.5, lineHeight: 1.55 }}>
+            <b style={{ color: MS.gold }}>{mech.icon} {mech.name}</b> <span style={{ color: PALETTE.text }}>— {mech.desc}</span>
+            <div style={{ color: '#8fd08a' }}>💡 공략: {mech.tip}</div>
           </div>
-          <IntimNote heroLv={save.units[save.hero].lv} lv={Math.max(...D.floors.map(x => x.lv)) + T.lv} what="던전 최고층" />
-          <BossMechNote mech={E.bossMechOf('dungeon', D.id)} compact={!!d && d.floor < D.floors.length - 1} />
+        )}
+        <MainSecHead title={d ? '내 상 태' : '파 티'} />
+        <div className="flex flex-col gap-1.5">
           {party.map(p => (
             <div key={p.id} className="flex items-center gap-2">
-              <UnitIcon u={p} size={30} dim={p.hp <= 0} />
-              <div className="flex-1"><Bar v={p.hp} max={p.maxHp} color="linear-gradient(90deg,#3d7a3a,#7fcf6a)" h={7} /></div>
-              <span style={{ fontSize: 11, color: PALETTE.textDim, width: 70, textAlign: 'right' }}>{p.hp}/{p.maxHp}</span>
+              <UnitIcon u={p} size={28} dim={p.hp <= 0} />
+              <div className="flex-1"><Bar v={p.hp} max={p.maxHp} color="linear-gradient(90deg,#3d7a3a,#7fcf6a)" h={6} /></div>
+              <span style={{ fontSize: 11, color: PALETTE.textDim, width: 74, textAlign: 'right' }}>{p.hp.toLocaleString()}/{p.maxHp.toLocaleString()}</span>
             </div>
           ))}
-        </GlassPanel>
-        {!d ? (
-          <>
-            <UIButton disabled={E.keyCount(save) < T.keyCost} onClick={() => onEnter(D.id, tier)}>
-              {E.keyCount(save) < T.keyCost ? `열쇠 부족 (🗝 ${T.keyCost}개 필요)` : `${D.name} · ${T.label} 입장 — 🗝 ${T.keyCost}개`}
-            </UIButton>
-            <GlassPanel className="p-3">
-              <div className="flex items-center justify-between" style={{ fontSize: 12.5, color: PALETTE.text }}>
-                <span>🗝 던전 열쇠 <b style={{ color: PALETTE.legendary }}>{E.keyCount(save)}</b> / {DUNGEON_KEYS.max}</span>
-                <button disabled={!E.canBuyKey(save)} onClick={onBuyKey} className="ui-press" style={{ fontSize: 12, padding: '6px 10px', borderRadius: 9, border: `1px solid ${E.canBuyKey(save) ? PALETTE.legendary : 'var(--ui-line)'}`, color: E.canBuyKey(save) ? PALETTE.legendary : PALETTE.textDim, background: 'transparent', opacity: E.canBuyKey(save) ? 1 : 0.5 }}>
-                  구매 🪙{DUNGEON_KEYS.shopPrice} (오늘 {E.keysBoughtToday(save)}/{DUNGEON_KEYS.shopDailyLimit})
-                </button>
-              </div>
-              <div className="mt-1.5" style={{ fontSize: 11, color: PALETTE.textDim, lineHeight: 1.55 }}>
-                매일 0시 3개까지 충전 · 사냥터 강적 처치 시 {Math.round(DUNGEON_KEYS.eliteDrop * 100)}% · 일부 의뢰 보상 · 입장 시 소모(후퇴·전멸해도 돌려받지 못함) — 일반 1 · 영웅 2 · 전설 3
-              </div>
-            </GlassPanel>
-          </>
-        ) : (
-          <>
-            <UIButton onClick={onFight}>{D.floors[d.floor].boss ? '보스와 싸운다' : `${d.floor + 1}층 전투`}{dungeonAuto && !D.floors[d.floor].boss ? ' → 보스까지 연속' : ''}</UIButton>
-            <button onClick={onToggleDungeonAuto} className="ui-press flex items-center gap-1.5 self-start" style={{ background: 'transparent', border: 'none', color: dungeonAuto ? PALETTE.legendary : PALETTE.textDim, padding: '4px 0', fontSize: 12.5 }}>
-              <span className="flex items-center justify-center" style={{ width: 18, height: 18, borderRadius: 5, border: `1.5px solid ${dungeonAuto ? PALETTE.legendary : 'var(--ui-line-strong)'}`, background: dungeonAuto ? `${PALETTE.legendary}33` : 'transparent', fontSize: 12 }}>{dungeonAuto ? '✓' : ''}</span>
-              연속 도전 — 승리하면 다음 층으로 자동 진행 (보스까지)
+        </div>
+        <div className="flex flex-col gap-1.5 mt-3">
+          {!d ? <>
+            <button disabled={keys < T.keyCost} onClick={() => onEnter(D.id, tier)} className="ui-press" style={sq(keys < T.keyCost ? { color: PALETTE.textDim } : hotBtn)}>
+              {keys < T.keyCost ? `열쇠 부족 (🗝 ${T.keyCost}개 필요)` : `입장 — ${T.label} · 🗝 ${T.keyCost}개`}
             </button>
-            <UIButton variant="ghost" onClick={onLeave}>후퇴 (마을로)</UIButton>
-          </>
-        )}
+            <button onClick={onToggleDungeonAuto} className="ui-press" style={sq({ fontSize: 13, border: `1px solid ${dungeonAuto ? MS.gold : MS.line}`, color: dungeonAuto ? MS.gold : PALETTE.textDim })}>▶ 연속 도전 {dungeonAuto ? '켜짐' : '꺼짐'} <span style={{ fontWeight: 400, fontSize: 11.5 }}>승리하면 보스까지 자동</span></button>
+          </> : <>
+            <button onClick={onFight} className="ui-press" style={sq(hotBtn)}>{D.floors[d.floor].boss ? '👑 보스와 싸운다' : `⚔ ${d.floor + 1}층 전투`}{dungeonAuto && !D.floors[d.floor].boss ? ' → 보스까지 연속' : ''}</button>
+            <button onClick={onToggleDungeonAuto} className="ui-press" style={sq({ fontSize: 13, border: `1px solid ${dungeonAuto ? MS.gold : MS.line}`, color: dungeonAuto ? MS.gold : PALETTE.textDim })}>▶ 연속 도전 {dungeonAuto ? '켜짐' : '꺼짐'}</button>
+            <button onClick={onLeave} className="ui-press" style={sq({ fontSize: 13, fontWeight: 500 })}>후퇴 (마을로)</button>
+          </>}
+        </div>
+        {!d && <>
+          <MainSecHead title="열 쇠" />
+          <div className="flex items-center justify-between gap-2" style={{ fontSize: 12.5 }}>
+            <span style={{ color: PALETTE.textDim }}>🗝 던전 열쇠 <b style={{ color: MS.gold, fontSize: 14 }}>{keys} / {DUNGEON_KEYS.max}</b></span>
+            <button disabled={!E.canBuyKey(save)} onClick={onBuyKey} className="ui-press" style={{ fontSize: 12, padding: '5px 10px', border: `1px solid ${E.canBuyKey(save) ? MS.gold : MS.line}`, color: E.canBuyKey(save) ? MS.gold : PALETTE.textDim, background: MS.box, opacity: E.canBuyKey(save) ? 1 : 0.55 }}>
+              구매 🪙{DUNGEON_KEYS.shopPrice} ({E.keysBoughtToday(save)}/{DUNGEON_KEYS.shopDailyLimit})
+            </button>
+          </div>
+          <div className="mt-1" style={{ fontSize: 11, color: PALETTE.textDim, lineHeight: 1.5 }}>매일 0시 3개까지 충전 · 사냥터 강적 처치 시 {Math.round(DUNGEON_KEYS.eliteDrop * 100)}% · 입장 시 소모(후퇴·전멸해도 돌려받지 못함)</div>
+        </>}
       </div>
     </div>
   );
@@ -2129,14 +2157,6 @@ function FamiliarView({ save, setSave, onBack, flash, onTrack = () => {} }) {
 }
 
 // ===== 무한 탑 「황혼의 첨탑」 (1.215.0) =====
-function TowerAutoToggle({ on, onToggle }) {
-  return (
-    <button onClick={onToggle} className="ui-press flex items-center gap-1.5 self-start" style={{ background: 'transparent', border: 'none', color: on ? PALETTE.legendary : PALETTE.textDim, padding: '4px 0', fontSize: 12.5 }}>
-      <span className="flex items-center justify-center" style={{ width: 18, height: 18, borderRadius: 5, border: `1.5px solid ${on ? PALETTE.legendary : 'var(--ui-line-strong)'}`, background: on ? `${PALETTE.legendary}33` : 'transparent', fontSize: 12 }}>{on ? '✓' : ''}</span>
-      자동 등반 — 승리하면 다음 층으로, 패배하면 멈춤
-    </button>
-  );
-}
 function TowerView({ save, setSave, onBack, onFight, flash, towerAuto = false, onToggleTowerAuto, onStartAuto }) {
   const [shop, setShop] = useState(false);
   const [pickUnique, setPickUnique] = useState(false);
@@ -2153,57 +2173,71 @@ function TowerView({ save, setSave, onBack, onFight, flash, towerAuto = false, o
   return (
     <div className="absolute inset-0 flex flex-col">
       <Header title={run ? `황혼의 첨탑 · ${run.floor}층` : '황혼의 첨탑'} onBack={run ? null : onBack} right={<span style={{ fontSize: 12.5, color: '#e8b04a' }}>✪ {coins}</span>} />
-      <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
-        <div className="relative overflow-hidden" style={{ borderRadius: 16, aspectRatio: '16 / 8', border: '1px solid #e8b04a88' }}>
-          <img src={chronicleEnemyArt('champ_dawn_boss4', 'combat')} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ opacity: 0.85 }} />
-          <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, transparent 30%, #0a0608)' }} />
+      {/* 1.253.0 — 본편 스타일 (시안 ㉔) */}
+      <div className="flex-1 overflow-y-auto px-4 pb-4 pt-2.5">
+        <div className="relative overflow-hidden" style={{ height: 150, border: `1px solid ${MS.line}` }}>
+          <img src={chronicleEnemyArt('champ_dawn_boss4', 'combat')} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ opacity: 0.9 }} />
+          <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, transparent 35%, #0b0708)' }} />
           <div className="absolute bottom-2 left-3 right-3">
-            <div className="font-bold" style={{ fontSize: 18, color: PALETTE.text }}>{nextFloor}층 {boss ? '👑 보스' : nextFloor % 5 === 0 ? '⚔ 강적' : ''}</div>
-            <div style={{ fontSize: 12, color: PALETTE.textDim }}>적 Lv.{E.towerEnemyLv(nextFloor)} · 다음 체크포인트 {nextCp}층{boss ? ` · 유니크 ${Math.round(E.TOWER.uniqueChance(nextFloor) * 100)}%` : ''}</div>
+            <div className="font-bold" style={{ fontSize: 19, color: PALETTE.text }}>{nextFloor}층 {boss ? <span style={{ color: MS.gold }}>👑 보스</span> : nextFloor % 5 === 0 ? <span style={{ color: '#ff8a7e' }}>⚔ 강적</span> : null} <span style={{ fontSize: 13, color: MS.gold }}>적 Lv.{E.towerEnemyLv(nextFloor)}</span></div>
+            <div style={{ fontSize: 12, color: PALETTE.textDim }}>다음 체크포인트 {nextCp}층 · {E.TOWER.bossEvery}층마다 보스{boss ? ` · 유니크 ${Math.round(E.TOWER.uniqueChance(nextFloor) * 100)}%` : ''}</div>
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-2">
-          {[['최고 층', `${t.best || 0}`], ['체크포인트', `${t.checkpoint || 0}`], ['이번 주', `${wk?.key && wk.key === E.towerWeekKeyNow() ? wk.best : 0}`]].map(([l, v]) => (
-            <GlassPanel key={l} className="p-2 text-center"><div style={{ fontSize: 11, color: PALETTE.textDim }}>{l}</div><div className="font-bold" style={{ fontSize: 17, color: PALETTE.legendary }}>{v}층</div></GlassPanel>
+        <div className="grid gap-1 mt-2" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+          {[['최고', t.best || 0, MS.gold], ['체크포인트', t.checkpoint || 0], ['이번 주', wk?.key && wk.key === E.towerWeekKeyNow() ? wk.best : 0]].map(([l, v, c]) => (
+            <div key={l} className="text-center" style={{ padding: '6px 0', border: `1px solid ${MS.line}`, background: MS.box }}>
+              <div style={{ fontSize: 11, color: PALETTE.textDim }}>{l}</div>
+              <b style={{ fontSize: 15, color: c || PALETTE.text }}>{v}층</b>
+            </div>
           ))}
         </div>
-        {run && (
-          <GlassPanel className="p-3 flex flex-col gap-2">
-            <div style={{ fontSize: 11.5, color: PALETTE.textDim }}>내 상태 — 층 사이 최대 HP의 25%만 회복</div>
+        {run && <>
+          <MainSecHead title="내 상 태" right={<span style={{ fontSize: 11, color: PALETTE.textDim }}>층 사이 최대 HP 25% 회복</span>} />
+          <div className="flex flex-col gap-1.5">
             {party.map(p => (
               <div key={p.id} className="flex items-center gap-2">
-                <UnitIcon u={p} size={30} dim={p.hp <= 0} />
-                <div className="flex-1"><Bar v={p.hp} max={p.maxHp} color="linear-gradient(90deg,#3d7a3a,#7fcf6a)" h={7} /></div>
-                <span style={{ fontSize: 11, color: PALETTE.textDim, width: 70, textAlign: 'right' }}>{p.hp}/{p.maxHp}</span>
+                <UnitIcon u={p} size={28} dim={p.hp <= 0} />
+                <div className="flex-1"><Bar v={p.hp} max={p.maxHp} color="linear-gradient(90deg,#3d7a3a,#7fcf6a)" h={6} /></div>
+                <span style={{ fontSize: 11, color: PALETTE.textDim, width: 74, textAlign: 'right' }}>{p.hp.toLocaleString()}/{p.maxHp.toLocaleString()}</span>
               </div>
             ))}
-          </GlassPanel>
-        )}
-        {run ? (
-          <>
-            <UIButton onClick={onFight}>{boss ? `👑 ${run.floor}층 보스와 싸운다` : `${run.floor}층 전투`}{towerAuto ? ' → 실패할 때까지 자동' : ''}</UIButton>
-            <TowerAutoToggle on={towerAuto} onToggle={onToggleTowerAuto} />
-            <UIButton variant="ghost" onClick={() => setSave(E.leaveTower(save))}>도전 종료 (체크포인트 {t.checkpoint || 0}층 유지)</UIButton>
-          </>
-        ) : (
-          <>
-            <UIButton onClick={() => setSave(E.startTower(save))}>🗼 {nextFloor}층부터 도전 (무료)</UIButton>
-            <UIButton variant="gold" onClick={onStartAuto}>⏫ {nextFloor}층부터 자동 등반 (실패할 때까지)</UIButton>
-          </>
-        )}
-        <UIButton variant="gold" onClick={() => setShop(true)}>✪ 첨탑 상점</UIButton>
-        <InfoSection icon="🗼" title="첨탑 규칙" color="#c79bff">
-          <InfoRow first label="층마다" value="적 레벨 +1" />
-          <InfoRow label="10층마다" value="보스 — 쓰러뜨리면 체크포인트" note="사냥터·던전 보스가 번갈아 나온다" />
-          <InfoRow label="쓰러지면" value="도전 종료 · 다음은 체크포인트 다음 층부터" />
-          <InfoRow label="층 사이 회복" value="최대 HP의 25%" />
-          <InfoRow label="입장" value="무료" color="#8fe08a" />
-        </InfoSection>
-        <InfoSection icon="✪" title="첨탑 주화" color="#e8b04a">
-          <InfoRow first label="일반 층" value={`층마다 ${E.TOWER.coins(1)}~`} />
-          <InfoRow label="보스 층" value={`×${E.TOWER.bossCoinMult}`} />
-          <InfoRow label="주간 보너스" value="처음 도달한 10층 단위마다 층×3" note="월요일 0시 초기화" />
-        </InfoSection>
+          </div>
+        </>}
+        {(() => {
+          const sq = (extra = {}) => ({ padding: '12px 0', fontSize: 14, fontWeight: 800, border: `1px solid ${MS.line}`, background: 'transparent', color: PALETTE.text, width: '100%', ...extra });
+          const hot = { border: `1px solid ${MS.red}`, background: 'rgba(224,87,76,0.18)', color: '#ff8a7e' };
+          const gold = { fontSize: 13, border: `1px solid ${MS.gold}`, color: MS.gold };
+          return (
+            <div className="flex flex-col gap-1.5 mt-3">
+              {run ? <>
+                <button onClick={onFight} className="ui-press" style={sq(hot)}>{boss ? `👑 ${run.floor}층 보스와 싸운다` : `⚔ ${run.floor}층 전투`}{towerAuto ? ' → 실패할 때까지' : ''}</button>
+                <button onClick={onToggleTowerAuto} className="ui-press" style={sq(towerAuto ? gold : { fontSize: 13, color: PALETTE.textDim })}>⏫ 자동 등반 {towerAuto ? '켜짐' : '꺼짐'} <span style={{ fontWeight: 400, fontSize: 11.5 }}>패배하면 멈춤</span></button>
+                <button onClick={() => setSave(E.leaveTower(save))} className="ui-press" style={sq({ fontSize: 13, fontWeight: 500 })}>도전 종료 (체크포인트 {t.checkpoint || 0}층 유지)</button>
+              </> : <>
+                <button onClick={() => setSave(E.startTower(save))} className="ui-press" style={sq(hot)}>🗼 {nextFloor}층부터 도전 (무료)</button>
+                <button onClick={onStartAuto} className="ui-press" style={sq(gold)}>⏫ 자동 등반 <span style={{ fontWeight: 400, fontSize: 11.5 }}>실패할 때까지</span></button>
+              </>}
+              <button onClick={() => setShop(true)} className="ui-press" style={sq({ fontSize: 13 })}>✪ 첨탑 상점 <span style={{ fontWeight: 400, fontSize: 11.5, color: MS.gold }}>보유 ✪ {coins}</span></button>
+            </div>
+          );
+        })()}
+        {(() => {
+          const sec = (title) => <div style={{ margin: '14px 0 4px', fontSize: 12.5, letterSpacing: 4, color: MS.red, fontWeight: 700 }}>◆ {title}</div>;
+          return <>
+            {sec('규칙')}
+            <MainKvRows rows={[
+              { l: '층마다', v: '적 Lv +1' }, { l: '층 사이', v: 'HP 25% 회복' },
+              { l: `${E.TOWER.bossEvery}층`, v: '보스·체크포인트' }, { l: '쓰러지면', v: '도전 종료' },
+              { l: '입장', v: '무료', c: '#8fe08a' }, { l: '보스', v: '사냥터·던전 번갈아' },
+            ]} />
+            {sec('주화')}
+            <MainKvRows rows={[
+              { l: '일반 층', v: `✪ ${E.TOWER.coins(1)}~`, c: MS.gold }, { l: '보스 층', v: `×${E.TOWER.bossCoinMult}`, c: MS.gold },
+              { l: '주간 보너스', v: '층 ×3', c: MS.gold }, { l: '초기화', v: '월요일 0시' },
+            ]} />
+            <div style={{ fontSize: 11, color: PALETTE.textDim, marginTop: 3 }}>주간 보너스 = 이번 주 처음 도달한 {E.TOWER.bossEvery}층 단위마다 층 × 3</div>
+          </>;
+        })()}
       </div>
       {shop && (
         <BottomSheet title={`✪ 첨탑 상점 — 보유 ✪ ${coins}`} onClose={() => setShop(false)} maxHeight="80%">
