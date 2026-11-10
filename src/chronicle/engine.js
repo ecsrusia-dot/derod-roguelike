@@ -1574,7 +1574,7 @@ function emptyDetail() {
     dmg: 0, hitDmg: 0, landed: 0, crits: 0, critDmg: 0, misses: 0, maxHit: 0,
     dotDmg: 0, counters: 0, counterDmg: 0, chains: 0, chainDmg: 0, holyDmg: 0, reflectDmg: 0, kills: 0,
     heal: 0, overheal: 0, hotHeal: 0, maxHeal: 0, shield: 0, buffs: 0, debuffs: 0,
-    taken: 0, timesHit: 0, maxTaken: 0, absorbed: 0, dodged: 0, coverHits: 0, coverDmg: 0, dotTaken: 0,
+    taken: 0, timesHit: 0, maxTaken: 0, absorbed: 0, dodged: 0, targeted: 0, incoming: 0, coverHits: 0, coverDmg: 0, dotTaken: 0,
     healRecv: 0, shieldRecv: 0, deaths: 0,
   };
 }
@@ -1643,10 +1643,15 @@ export function battleDetailStats(sim, party) {
           }
         } else if (toParty) {
           // 적의 공격 → 파티가 받은 피해
+          // 1.239.2: 피격 = HP가 닳았거나 보호막에 막힌 타격 (전부 막힌 타격도 맞은 것) · targeted = 회피 포함 공격 대상이 된 횟수
           const T = units[h.t];
+          if (!(h.d > 0 || h.ab > 0 || h.m)) continue;
+          T.targeted += 1;
           if (h.m) { T.dodged += 1; continue; }
+          const inc = (h.d || 0) + (h.ab || 0);
+          T.timesHit += 1; T.incoming += inc; T.maxTaken = Math.max(T.maxTaken, inc);
           if (h.d > 0) {
-            T.taken += h.d; T.timesHit += 1; T.maxTaken = Math.max(T.maxTaken, h.d);
+            T.taken += h.d;
             if (h.cover) { T.coverHits += 1; T.coverDmg += h.d; }
           }
           if (h.ab > 0) T.absorbed += h.ab;
