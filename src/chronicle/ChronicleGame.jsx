@@ -551,21 +551,16 @@ function RaidView({ save, onBack, onFight }) {
   const raid = save.raid || {};
   const today = E.kstDateKey();
   const doneToday = raid.daily?.date === today ? raid.daily.done || {} : {};
+  // 1.251.0 — 본편 스타일 (시안 ㉒)
+  const [rules, setRules] = useState(false);
   return (
     <div className="absolute inset-0 flex flex-col">
       <Header title="원정대 레이드" onBack={onBack} />
-      <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
-        <GlassPanel className="p-3" style={{ fontSize: 12, lineHeight: 1.65 }}>
-          <div className="font-semibold" style={{ fontSize: 14, color: '#ff8a80' }}>⚔ 다섯 봉인</div>
-          <div style={{ color: PALETTE.text }}>다섯 캐릭터가 함께 싸운다. 보스는 <b>직업별 봉인 5개</b>가 지키고 있다.</div>
-          <div style={{ color: PALETTE.textDim }}>
-            · 봉인은 <b style={{ color: PALETTE.text }}>그 직업만</b> 깰 수 있다 — 봉인이 하나라도 남으면 보스는 무적<br />
-            · 각 봉인은 <b style={{ color: PALETTE.text }}>자기 주인만</b> 계속 공격한다 (봉인의 반향)<br />
-            · 봉인의 주인이 쓰러지면 그 봉인은 영원히 못 깬다 → <b style={{ color: '#e06a5f' }}>즉시 실패</b><br />
-            · 입장 = 다섯 캐릭터 <b style={{ color: PALETTE.text }}>전원</b>이 조건 충족 · 앞 단계를 깨야 다음 단계<br />
-            · 보상은 단계마다 하루 1회 + 첫 클리어 보너스 (모든 캐릭터 공유) · 동행 사역마는 참가하지 않고 패시브만 적용
-          </div>
-        </GlassPanel>
+      <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <span style={{ fontSize: 12.5, letterSpacing: 4, color: MS.red, fontWeight: 700 }}>◆ 다섯 봉인</span>
+          <button onClick={() => setRules(true)} className="ui-press" style={{ fontSize: 12, padding: '4px 9px', border: `1px solid ${MS.line}`, background: MS.box, color: PALETTE.text }}>ⓘ 규칙</button>
+        </div>
         {RD.RAID_TIERS.map((t, i) => {
           const eligible = RD.raidEligible(roster, t);
           const unlocked = RD.raidUnlocked(roster, raid, i);
@@ -573,37 +568,51 @@ function RaidView({ save, onBack, onFight }) {
           const first = clears === 0;
           const rw = RD.raidReward(i, first);
           const prevOk = i === 0 || (raid.clears?.[RD.RAID_TIERS[i - 1].id] || 0) > 0;
+          const miss = CHRONICLE_CLASSES.filter(c => !RD.raidMemberOk(roster[c.id], t)).length;
           return (
-            <GlassPanel key={t.id} className="p-3" style={{ border: `1px solid ${unlocked ? '#e0574c88' : 'var(--ui-line)'}`, opacity: prevOk ? 1 : 0.55 }}>
+            <div key={t.id} style={{ padding: 10, border: `1px solid ${unlocked ? MS.red : MS.line}`, background: MS.box, opacity: prevOk ? 1 : 0.5 }}>
               <div className="flex gap-2.5">
-                <img src={chronicleEnemyArt(Object.keys(ENEMIES).find(k => ENEMIES[k].name === t.boss))} alt="" className="object-cover flex-none" style={{ width: 64, height: 64, borderRadius: 12, border: '1px solid #e0574c66', filter: unlocked ? 'none' : 'grayscale(.8) brightness(.6)' }} draggable={false} />
+                <img src={chronicleEnemyArt(Object.keys(ENEMIES).find(k => ENEMIES[k].name === t.boss))} alt="" className="object-cover flex-none" style={{ width: 64, height: 64, border: `1px solid ${MS.red}`, filter: unlocked ? 'none' : 'grayscale(.8) brightness(.6)' }} draggable={false} />
                 <div className="flex-1 min-w-0">
-                  <div className="font-semibold truncate" style={{ fontSize: 13.5, color: unlocked ? PALETTE.text : PALETTE.textDim }}>{i + 1}. {t.name}</div>
-                  <div className="truncate" style={{ fontSize: 11, color: PALETTE.textDim }}>{t.desc} — 보스 {t.boss}</div>
-                  <div style={{ fontSize: 11.5, color: '#e8b04a' }}>입장: 다섯 캐릭터 전원 {t.req.rebirth ? `전승 ${t.req.rebirth}회 이상 · ` : ''}Lv.{t.req.lv} 이상</div>
-                  <div style={{ fontSize: 11, color: PALETTE.textDim }}>{clears ? `클리어 ${clears}회${doneToday[t.id] ? ' · 오늘 보상 받음' : ''}` : '미클리어'}</div>
+                  <div className="truncate font-bold" style={{ fontSize: 14, color: unlocked ? PALETTE.text : PALETTE.textDim }}>{i + 1}. {t.name} <span style={{ fontSize: 11, fontWeight: 400, color: PALETTE.textDim }}>{clears ? `클리어 ${clears}회${doneToday[t.id] ? ' · 오늘 받음' : ''}` : '미클리어'}</span></div>
+                  <div className="truncate" style={{ fontSize: 11.5, color: MS.gold }}>입장: 전원 {t.req.rebirth ? `전승 ${t.req.rebirth}회 · ` : ''}Lv.{t.req.lv}{i ? ' · 앞 단계 클리어' : ''}</div>
+                  {prevOk && <div className="grid gap-1 mt-1" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
+                    {CHRONICLE_CLASSES.map(c => {
+                      const r = roster[c.id]; const ok = RD.raidMemberOk(r, t);
+                      return (
+                        <div key={c.id} className="text-center" style={{ minWidth: 0 }}>
+                          <img src={c.combatImage} alt="" className="w-full object-cover" style={{ height: 30, objectPosition: '50% 20%', border: `1px solid ${ok ? '#8fd08a' : MS.line}`, filter: ok ? 'none' : 'grayscale(1) brightness(.45)' }} />
+                          <div className="truncate" style={{ fontSize: 10.5, color: ok ? '#8fd08a' : '#e07a6a' }}>{r ? `${r.rebirth ? '✦' : ''}${r.lv}` : '없음'}</div>
+                        </div>
+                      );
+                    })}
+                  </div>}
                 </div>
               </div>
-              <div className="flex gap-1.5 mt-2">
-                {CHRONICLE_CLASSES.map(c => {
-                  const r = roster[c.id];
-                  const ok = RD.raidMemberOk(r, t);
-                  return (
-                    <div key={c.id} className="flex-1 flex flex-col items-center" style={{ minWidth: 0 }}>
-                      <Portrait cid={c.id} size={36} dim={!ok} />
-                      <span className="truncate w-full text-center" style={{ fontSize: 10.5, color: ok ? '#8fe08a' : '#e06a5f' }}>{r ? `${r.rebirth ? '✦' : ''}Lv.${r.lv}` : '없음'}</span>
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="mt-1.5" style={{ fontSize: 11.5, color: PALETTE.textDim }}>보상{first ? ' (첫 클리어)' : doneToday[t.id] ? ' — 오늘은 받음' : ''}: {R.rosterRewardText(rw)}</div>
-              <button disabled={!unlocked} onClick={() => onFight(t.id)} className="ui-press w-full mt-2 font-semibold" style={{ height: 40, borderRadius: 11, border: `1px solid ${unlocked ? '#e0574c' : 'var(--ui-line)'}`, background: unlocked ? '#e0574c' : 'transparent', color: unlocked ? '#fff' : PALETTE.textDim, fontSize: 13 }}>
-                {unlocked ? '⚔ 원정대 출격' : !prevOk ? '앞 단계를 먼저 클리어' : !eligible ? '조건 미달 — 붉은 캐릭터를 키우자' : '잠김'}
-              </button>
-            </GlassPanel>
+              {prevOk && <>
+                <div className="flex justify-between gap-2 mt-2" style={{ fontSize: 12 }}>
+                  <span className="flex-none" style={{ color: PALETTE.textDim }}>{first ? '첫 클리어' : doneToday[t.id] ? '오늘은 받음' : '오늘 보상'}</span>
+                  <b className="text-right" style={{ color: MS.gold }}>{R.rosterRewardText(rw)}</b>
+                </div>
+                <button disabled={!unlocked} onClick={() => onFight(t.id)} className="ui-press w-full mt-2 font-bold" style={{ height: 42, border: `1px solid ${unlocked ? MS.red : MS.line}`, background: unlocked ? 'rgba(224,87,76,0.2)' : 'transparent', color: unlocked ? '#ff8a7e' : PALETTE.textDim, fontSize: 13.5 }}>
+                  {unlocked ? '⚔ 원정대 출격' : !eligible ? `조건 미달 — ${miss}명 부족` : '잠김'}
+                </button>
+              </>}
+            </div>
           );
         })}
       </div>
+      {rules && (
+        <MainModal kicker="원 정 대 레 이 드" title="다섯 봉인 규칙" onClose={() => setRules(false)}>
+          <div style={{ fontSize: 12.5, color: PALETTE.text, lineHeight: 1.75 }}>
+            <div>◇ 보스는 <b style={{ color: MS.gold }}>직업별 봉인 5개</b>가 지킨다 — 하나라도 남으면 보스는 무적</div>
+            <div>◇ 봉인은 <b style={{ color: MS.gold }}>그 직업만</b> 깰 수 있고, 자기 주인만 계속 공격한다 (봉인의 반향)</div>
+            <div style={{ color: '#e07a6a' }}>◇ 봉인의 주인이 쓰러지면 그 봉인은 못 깬다 → 즉시 실패</div>
+            <div>◇ 입장 = 다섯 캐릭터 <b>전원</b>이 조건 충족 · 앞 단계를 깨야 다음 단계</div>
+            <div style={{ color: PALETTE.textDim }}>◇ 보상은 단계마다 하루 1회 + 첫 클리어 보너스 (모든 캐릭터 공유) · 동행 사역마는 참가하지 않고 패시브만 적용</div>
+          </div>
+        </MainModal>
+      )}
     </div>
   );
 }
@@ -619,87 +628,89 @@ function RosterView({ save, setSave, flash, onBack, onSwitchChar, onRaid }) {
   const qOrder = { done: 0, progress: 1, claimed: 2 };
   const qs = R.ROSTER_QUESTS.map(q => ({ q, st: R.rosterQuestState(save, q) })).sort((a, b) => (qOrder[a.st.status] ?? 1) - (qOrder[b.st.status] ?? 1));
   const buffSrc = CHRONICLE_CLASSES.filter(c => c.id !== save.hero && roster[c.id]).flatMap(c => R.ROSTER_MILESTONES.map((lv, i) => ({ lv, i })).filter(({ lv }) => roster[c.id].peak >= lv).map(({ lv, i }) => ({ key: `${c.id}${lv}`, name: c.name, lv, fx: R.GLOBAL_BUFFS[c.id].fx[i] })));
+  // 1.251.0 — 본편 스타일 (시안 ㉑)
+  const [detail, setDetail] = useState(null); // 직업별 버프 상세
+  const raidOk = RD.raidEligible(roster, RD.RAID_TIERS[0]);
   return (
     <div className="absolute inset-0 flex flex-col">
       <Header title="원정대" onBack={onBack} />
-      <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
-        <GlassPanel className="p-3" style={{ fontSize: 12, lineHeight: 1.6 }}>
-          <div className="flex items-center justify-between">
-            <span className="font-semibold" style={{ fontSize: 14, color: PALETTE.text }}>레벨 상한</span>
-            <span className="font-bold" style={{ fontSize: 18, color: cap >= CHRONICLE_TUNING.maxLevel ? PALETTE.legendary : '#e8b04a' }}>Lv.{cap}</span>
-          </div>
-          <div className="flex gap-1 mt-1">{[60, 70, 80, 90, 100].map(c => <span key={c} className="flex-1 text-center" style={{ fontSize: 10.5, padding: '3px 0', borderRadius: 6, background: cap >= c ? '#e8b04a33' : '#ffffff0d', color: cap >= c ? '#e8b04a' : PALETTE.textDim }}>{c}</span>)}</div>
-          <div className="mt-1.5" style={{ color: PALETTE.textDim }}>
-            기본 Lv.{R.ROSTER.baseCap} · 두 번째 캐릭터부터 Lv.{R.ROSTER.unlockLv}을 달성할 때마다 <b style={{ color: PALETTE.text }}>+{R.ROSTER.perChar}</b> (지금 Lv.{R.ROSTER.unlockLv} 달성 {n60}명)
-            {hint ? <><br />다음: 캐릭터 <b style={{ color: '#e8b04a' }}>{hint.need}명</b>이 Lv.{R.ROSTER.unlockLv}에 도달하면 상한 Lv.{hint.next}</> : <><br /><b style={{ color: PALETTE.legendary }}>모든 상한 해제 완료</b></>}
-          </div>
-        </GlassPanel>
+      <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col">
+        <div className="flex items-center justify-between" style={{ marginBottom: 7 }}>
+          <span style={{ fontSize: 12.5, letterSpacing: 4, color: MS.red, fontWeight: 700 }}>◆ 레벨 상한</span>
+          <b style={{ fontSize: 17, color: MS.gold }}>Lv.{cap}</b>
+        </div>
+        <div className="grid gap-1" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
+          {[60, 70, 80, 90, 100].map(c => <div key={c} className="text-center" style={{ padding: '6px 0', fontSize: 12, fontWeight: cap === c ? 800 : 500, border: `1px solid ${cap >= c ? MS.gold : MS.line}`, background: MS.box, color: cap >= c ? MS.gold : PALETTE.textDim }}>{c}</div>)}
+        </div>
+        <div className="mt-1.5" style={{ fontSize: 11.5, color: PALETTE.textDim }}>
+          {hint ? <>다음: 캐릭터 <b style={{ color: MS.gold }}>{hint.need}명</b>이 Lv.{R.ROSTER.unlockLv} → 상한 Lv.{hint.next}</> : <b style={{ color: MS.gold }}>모든 상한 해제 완료</b>} · 지금 Lv.{R.ROSTER.unlockLv} 달성 {n60}명
+        </div>
 
-        <button onClick={onRaid} className="ui-press w-full text-left" style={{ padding: 12, borderRadius: 14, border: `1.5px solid ${RD.raidEligible(roster, RD.RAID_TIERS[0]) ? '#e0574c' : 'var(--ui-line)'}`, background: RD.raidEligible(roster, RD.RAID_TIERS[0]) ? '#e0574c1a' : 'transparent' }}>
-          <div className="font-bold" style={{ fontSize: 14, color: RD.raidEligible(roster, RD.RAID_TIERS[0]) ? '#ff8a80' : PALETTE.textDim }}>⚔ 원정대 레이드 「다섯 봉인」</div>
-          <div style={{ fontSize: 11.5, color: PALETTE.textDim }}>{RD.raidEligible(roster, RD.RAID_TIERS[0]) ? '다섯 캐릭터가 함께 싸운다 — 각자 자기 봉인을 깨야 보스에 닿는다' : '다섯 캐릭터 모두 Lv.60이 되면 입장 — 눌러서 규칙 보기'}</div>
+        <MainSecHead title="원 정 대" right={<span style={{ fontSize: 11, color: PALETTE.textDim }}>누르면 주는 버프</span>} />
+        <div className="grid gap-1" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
+          {CHRONICLE_CLASSES.map(c => {
+            const r = roster[c.id]; const me = c.id === save.hero;
+            return (
+              <button key={c.id} onClick={() => setDetail(c.id)} className="ui-press text-center" style={{ background: 'transparent', border: 'none', padding: 0, minWidth: 0 }}>
+                <img src={c.combatImage} alt="" className="w-full object-cover" style={{ height: 42, objectPosition: '50% 20%', border: `1.5px solid ${me ? MS.gold : r ? MS.strong : MS.line}`, filter: r ? 'none' : 'grayscale(1) brightness(.45)' }} />
+                <div className="truncate" style={{ fontSize: 10.5, color: me ? MS.gold : r ? PALETTE.text : PALETTE.textDim }}>{r ? `${r.rebirth ? '✦' : ''}Lv.${r.lv}` : '없음'}</div>
+              </button>
+            );
+          })}
+        </div>
+
+        <button onClick={onRaid} className="ui-press w-full text-left mt-3" style={{ padding: '9px 10px', border: `1px solid ${raidOk ? MS.red : MS.line}`, background: MS.box }}>
+          <div className="font-bold" style={{ fontSize: 13.5, color: raidOk ? '#ff8a7e' : PALETTE.textDim }}>⚔ 원정대 레이드 「다섯 봉인」 ›</div>
+          <div style={{ fontSize: 11.5, color: PALETTE.textDim }}>{raidOk ? '다섯 캐릭터가 함께 싸운다 — 각자 자기 봉인을 깨야 보스에 닿는다' : '다섯 캐릭터 모두 Lv.60이 되면 입장'}</div>
         </button>
 
-        <InfoSection icon="✦" title={`${chronicleClass(save.hero).name}가 받는 전역 버프`} color="#8fe08a" right="다른 캐릭터에게서">
-          {buffSrc.length ? buffSrc.map((x, i) => <InfoRow key={x.key} first={i === 0} label={R.rosterFxText(x.fx)} value={<span style={{ fontWeight: 400, color: PALETTE.textDim }}>{x.name} Lv.{x.lv}</span>} />)
-            : <InfoRow first label="아직 없음" value="다른 캐릭터를 Lv.20 이상 키우면 생긴다" color={PALETTE.textDim} />}
-          {buffSrc.length > 0 && <InfoRow label="합계" value={R.rosterFxText(got)} color="#8fe08a" />}
-          <div style={{ fontSize: 11, color: PALETTE.textDim, marginTop: 3 }}>각 캐릭터가 Lv.20 · 40 · 60 · 80 · 100에 도달할 때마다 「다른」 캐릭터 전원에게 영구 버프 (전승해도 최고 레벨 기준 유지)</div>
-        </InfoSection>
+        <MainSecHead title={`${chronicleClass(save.hero).name.split('').join(' ')} 가 받 는 전 역 버 프`} />
+        {buffSrc.length ? <>
+          <MainKvRows rows={buffSrc.map(x => ({ l: `${x.name} Lv.${x.lv}`, v: R.rosterFxText(x.fx), c: '#8fd08a' }))} />
+          <div className="mt-1" style={{ padding: '7px 10px', border: `1px solid ${MS.line}`, background: MS.box, fontSize: 12.5 }}><b style={{ color: MS.red }}>◇ 합계</b> <span style={{ color: '#8fd08a' }}>{R.rosterFxText(got)}</span></div>
+        </> : <div style={{ padding: '8px 10px', border: `1px solid ${MS.line}`, background: MS.box, fontSize: 12, color: PALETTE.textDim }}>아직 없음 — 다른 캐릭터를 Lv.20 이상 키우면 생긴다</div>}
 
-        <div className="flex justify-between" style={{ fontSize: 12, fontWeight: 700, color: PALETTE.textDim }}>
-          <span>🏳 원정대 의뢰 <span style={{ fontWeight: 400 }}>— 보상은 모든 캐릭터 공유</span></span>
-          <span style={{ fontWeight: 400 }}>받기 {qs.filter(x => x.st.status === 'done').length} · 진행 {qs.filter(x => x.st.status === 'progress').length} · 완료 {qs.filter(x => x.st.status === 'claimed').length}</span>
+        <div className="flex items-center justify-between" style={{ margin: '14px 0 7px' }}>
+          <span style={{ fontSize: 12.5, letterSpacing: 4, color: MS.red, fontWeight: 700 }}>◆ 원정대 의뢰</span>
+          <span style={{ fontSize: 11.5, color: PALETTE.textDim }}>받기 {qs.filter(x => x.st.status === 'done').length} · 진행 {qs.filter(x => x.st.status === 'progress').length} · 완료 {qs.filter(x => x.st.status === 'claimed').length}</span>
         </div>
-        {qs.map(({ q, st }) => {
-          const done = st.status === 'done', claimed = st.status === 'claimed';
-          return (
-            <div key={q.id} style={{ borderRadius: 12, padding: 10, border: `1px solid ${done ? PALETTE.legendary : 'var(--ui-line)'}`, background: done ? `${PALETTE.legendary}12` : 'rgba(255,255,255,0.02)', opacity: claimed ? 0.5 : 1 }}>
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-bold" style={{ fontSize: 13, color: done ? PALETTE.legendary : PALETTE.text }}>{q.title}</span>
-                {done ? <button onClick={() => { setSave(R.claimRosterQuest(save, q.id)); flash(`원정대 의뢰 「${q.title}」 보상 — ${R.rosterRewardText(q.reward)}`); }} className="ui-press flex-none font-bold" style={{ height: 30, padding: '0 12px', borderRadius: 8, border: `1px solid ${PALETTE.legendary}`, color: '#1a1206', background: PALETTE.legendary, fontSize: 12 }}>받기</button>
-                  : claimed ? <span style={{ fontSize: 11, fontWeight: 700, color: '#c79bff' }}>✓ 받음</span>
-                    : <span style={{ fontSize: 11, color: PALETTE.textDim }}>{st.cur}/{q.need}</span>}
-              </div>
-              <div style={{ fontSize: 11.5, color: PALETTE.textDim }}>{q.desc}{done || claimed ? '' : ''}</div>
-              {!claimed && st.status === 'progress' && <div className="mt-1"><Bar v={st.cur} max={q.need} color={PALETTE.dawn} h={4} /></div>}
-              {!claimed && <div className="flex flex-wrap gap-1 mt-1">{R.rosterRewardText(q.reward).split(' · ').map((t, i) => <ValueChip key={i} label={t} />)}</div>}
-            </div>
-          );
-        })}
-
-
-
-        {CHRONICLE_CLASSES.map(c => {
-          const r = roster[c.id];
-          const buff = R.GLOBAL_BUFFS[c.id];
-          const me = c.id === save.hero;
-          return (
-            <GlassPanel key={c.id} className="p-3" style={{ border: `1px solid ${me ? c.color : 'var(--ui-line)'}` }}>
-              <div className="flex items-center gap-2.5">
-                <Portrait cid={c.id} size={44} dim={!r} />
-                <div className="flex-1 min-w-0">
-                  <div className="font-semibold truncate" style={{ fontSize: 13.5, color: r ? c.color : PALETTE.textDim }}>{c.name}{me ? ' (지금)' : ''}</div>
-                  <div style={{ fontSize: 11.5, color: PALETTE.textDim }}>{r ? <>Lv.{r.lv}{r.peak > r.lv ? ` · 최고 Lv.${r.peak}` : ''}{r.rebirth ? ` · ✦전승 ${r.rebirth}회` : ''}</> : '아직 만들지 않음 — 첫 화면에서 생성'}</div>
+        <div className="grid gap-1.5" style={{ gridTemplateColumns: '1fr 1fr' }}>
+          {qs.map(({ q, st }) => {
+            const done = st.status === 'done', claimed = st.status === 'claimed';
+            return (
+              <div key={q.id} style={{ padding: '7px 9px', border: `1px solid ${done ? MS.gold : MS.line}`, background: MS.box, opacity: claimed ? 0.45 : 1, minWidth: 0 }}>
+                <div className="truncate font-bold" style={{ fontSize: 12.5, color: done ? MS.gold : PALETTE.text }}>{q.title}</div>
+                <div className="truncate" style={{ fontSize: 11, color: PALETTE.textDim }}>{q.desc}</div>
+                <div className="my-1"><Bar v={claimed ? q.need : st.cur} max={q.need} color={MS.gold} h={4} /></div>
+                <div className="flex items-center justify-between gap-1" style={{ fontSize: 11 }}>
+                  <span style={{ color: PALETTE.textDim }}>{claimed ? '✓ 받음' : `${st.cur}/${q.need}`}</span>
+                  <span className="truncate" style={{ color: MS.gold }}>{R.rosterRewardText(q.reward).replace(/골드 |계약서 조각 /g, '')}</span>
                 </div>
-                {!me && <button onClick={onSwitchChar} className="ui-press flex-none" style={{ height: 32, padding: '0 10px', borderRadius: 9, border: '1px solid var(--ui-line-strong)', color: PALETTE.dawn, background: 'transparent', fontSize: 11.5 }}>{r ? '전환' : '생성'}</button>}
+                {done && <button onClick={() => { setSave(R.claimRosterQuest(save, q.id)); flash(`원정대 의뢰 「${q.title}」 보상 — ${R.rosterRewardText(q.reward)}`); }} className="ui-press w-full mt-1 font-bold" style={{ height: 28, border: `1px solid ${MS.gold}`, color: '#1a1206', background: MS.gold, fontSize: 12 }}>받기</button>}
               </div>
-              <div className="mt-2" style={{ fontSize: 11.5, color: PALETTE.textDim }}>「{buff.title}」 — 다른 캐릭터에게 주는 버프</div>
-              <div className="flex flex-col gap-0.5 mt-1">
-                {R.ROSTER_MILESTONES.map((lv, i) => {
-                  const on = r && r.peak >= lv;
-                  return (
-                    <div key={lv} className="flex items-center gap-2" style={{ fontSize: 11.5 }}>
-                      <span className="flex-none text-center font-semibold" style={{ width: 52, padding: '1px 0', borderRadius: 6, border: `1px solid ${on ? c.color : 'var(--ui-line)'}`, background: on ? `${c.color}1f` : 'transparent', color: on ? c.color : PALETTE.textDim }}>{on ? '✓ ' : ''}Lv.{lv}</span>
-                      <span style={{ color: on ? PALETTE.text : PALETTE.textDim }}>{R.rosterFxText(buff.fx[i])}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </GlassPanel>
-          );
-        })}
+            );
+          })}
+        </div>
+        <div className="mt-3" style={{ fontSize: 11, color: PALETTE.textDim }}>각 캐릭터가 Lv.20 · 40 · 60 · 80 · 100에 도달할 때마다 「다른」 캐릭터 전원에게 영구 버프 (전승해도 최고 레벨 기준 유지)</div>
       </div>
+      {detail && (() => {
+        const c = chronicleClass(detail); const r = roster[detail]; const buff = R.GLOBAL_BUFFS[detail]; const me = detail === save.hero;
+        return (
+          <MainModal img={c.combatImage} kicker="원 정 대" title={c.name} color={c.color} badge={r ? `Lv.${r.lv}` : '없음'} sub={r ? `${r.peak > r.lv ? `최고 Lv.${r.peak} · ` : ''}${r.rebirth ? `✦전승 ${r.rebirth}회 · ` : ''}「${buff.title}」` : '아직 만들지 않음'} onClose={() => setDetail(null)}
+            footer={!me && <button onClick={() => { setDetail(null); onSwitchChar(); }} className="ui-press" style={{ height: 42, border: `1px solid ${MS.gold}`, color: MS.gold, background: 'transparent', fontSize: 13 }}>{r ? '이 캐릭터로 전환' : '캐릭터 만들기'}</button>}>
+            <MainSecHead title="다 른 캐 릭 터 에 게 주 는 버 프" />
+            {R.ROSTER_MILESTONES.map((lv, i) => {
+              const on = r && r.peak >= lv;
+              return (
+                <div key={lv} className="flex items-baseline justify-between gap-2" style={{ padding: '4px 0', borderBottom: '1px dashed rgba(196,69,61,0.18)' }}>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: on ? MS.gold : PALETTE.textDim }}>{on ? '✓ ' : ''}Lv.{lv}</span>
+                  <span className="text-right" style={{ fontSize: 12.5, color: on ? '#8fd08a' : PALETTE.textDim }}>{R.rosterFxText(buff.fx[i])}</span>
+                </div>
+              );
+            })}
+          </MainModal>
+        );
+      })()}
     </div>
   );
 }
@@ -751,79 +762,68 @@ function TownView({ save, acc, go, onExit, onSwitchChar }) {
   ];
   const byId = Object.fromEntries(tiles.map(t => [t.id, t]));
   const GROUPS = [
-    { label: '⚔ 전투', ids: ['field', 'dungeon', 'tower'] },
-    { label: '🧭 성장', ids: ['party', 'fam', 'forge'] },
-    { label: '📜 의뢰 · 원정대', ids: ['quests', 'daily', 'roster'] },
-    { label: '📦 레이드 · 보관', ids: ['raid', 'bag', 'stash'] },
+    { label: '전 투', ids: ['field', 'dungeon', 'tower'] },
+    { label: '성 장', ids: ['party', 'fam', 'forge'] },
+    { label: '의 뢰 · 원 정 대', ids: ['quests', 'daily', 'roster'] },
+    { label: '레 이 드 · 보 관', ids: ['raid', 'bag', 'stash'] },
   ];
+  const fx = expSnap(save).fam;
+  const ff = fx && save.fams[fx.key];
+  // 1.251.0 — 본편 스타일 (시안 ⑲)
   return (
     <div className="absolute inset-0 flex flex-col">
-      <img src="./enemies/classic/chapter_2/twilightChild_intro.jpg" alt="" className="absolute inset-0 w-full h-full object-cover" style={{ opacity: 0.16 }} />
-      <div className="relative flex items-center gap-2 px-3 flex-none" style={{ minHeight: 54, borderBottom: '1px solid var(--ui-line)' }}>
+      <img src="./enemies/classic/chapter_2/twilightChild_intro.jpg" alt="" className="absolute inset-0 w-full h-full object-cover" style={{ opacity: 0.1 }} />
+      <div className="relative flex items-center gap-2 px-3 flex-none" style={{ minHeight: 54, borderBottom: `1px solid ${MS.line}` }}>
         <div className="flex-1">
           <div className="font-semibold" style={{ fontSize: 15, color: PALETTE.text }}>여명의 마을</div>
           <div style={{ fontSize: 11, color: PALETTE.textDim }}>{CHRONICLE_TITLE}</div>
         </div>
         <Wallet save={save} />
       </div>
-      <div className="relative flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
-        <GlassPanel className="p-3">
-          <div className="flex items-center gap-3">
-            <Portrait cid={save.hero} size={54} />
-            <div className="flex-1 min-w-0">
-              <div className="font-semibold" style={{ fontSize: 15, color: PALETTE.text }}>{cls.name} <span style={{ fontSize: 11.5, color: cls.color }}>{cls.role}</span></div>
-              <div style={{ fontSize: 12, color: PALETTE.legendary }}>Lv.{hero.lv} / {E.levelCapOf(save)} · 전투력 {E.unitPower(save, save.hero)}</div>
+      <div className="relative flex-1 overflow-y-auto px-4 py-3 flex flex-col">
+        <div className="flex gap-3 pb-3" style={{ borderBottom: `1px solid ${MS.line}` }}>
+          <img src={cls.combatImage} alt="" className="object-cover flex-none" style={{ width: 76, height: 76, borderRadius: 14, border: `1.5px solid ${MS.gold}`, objectPosition: '50% 25%' }} />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2">
+              <div style={{ fontSize: 10.5, letterSpacing: 4, color: MS.red }}>{CLASS_PATH[save.hero] || 'PATH'}</div>
+              <button onClick={onSwitchChar} className="ui-press flex-none" style={{ fontSize: 11.5, padding: '3px 8px', border: `1px solid ${MS.line}`, color: PALETTE.text, background: MS.box }}>⇄ 변경</button>
             </div>
-            <button onClick={onSwitchChar} className="ui-press flex-none" style={{ fontSize: 11.5, padding: '6px 10px', borderRadius: 9, border: '1px solid var(--ui-line-strong)', color: PALETTE.dawn, background: 'transparent' }}>캐릭터 변경</button>
-          </div>
-          <div className="mt-2" style={{ fontSize: 12, color: PALETTE.dawn }}>▶ {goal}</div>
-          <div className="mt-1.5 flex justify-between" style={{ fontSize: 11, color: PALETTE.textDim }}><span>⭐ 경험치</span><span>{hero.exp.toLocaleString()} / {expNeedFor(hero).toLocaleString()} ({Math.floor(hero.exp / Math.max(1, expNeedFor(hero)) * 100)}%)</span></div>
-          <Bar v={hero.exp} max={expNeedFor(hero)} color={XP_HERO} h={6} />
-          {(() => {
-            const fx = expSnap(save).fam;
-            if (!fx) return <button onClick={() => go('fam')} className="ui-press w-full text-left mt-2" style={{ fontSize: 11, color: PALETTE.textDim, background: 'transparent', border: 'none', padding: 0 }}>🐾 동행 사역마 없음 — 사역마에서 편성</button>;
-            const f = save.fams[fx.key];
-            return (
-              <div className="flex items-center gap-2 mt-2.5">
-                <img src={chronicleEnemyArt(fx.key)} alt="" className="object-cover flex-none" style={{ width: 30, height: 30, borderRadius: 8, border: '1px solid #d07ae8' }} />
-                <div className="flex-1 min-w-0">
-                  <div className="flex justify-between gap-2" style={{ fontSize: 11 }}>
-                    <span className="truncate" style={{ color: PALETTE.text }}>🐾 {F.famName(fx.key)} <b style={{ color: '#d07ae8' }}>Lv.{fx.lv}</b> <span style={{ color: PALETTE.textDim }}>· {F.famGrade(f.grade).label}{f.plus ? ` +${f.plus}` : ''}</span></span>
-                    <span className="flex-none" style={{ color: PALETTE.textDim }}>{fx.cap ? '주인공 레벨 도달' : `${fx.exp.toLocaleString()} / ${fx.need.toLocaleString()} (${Math.floor(xpPct(fx))}%)`}</span>
-                  </div>
-                  <Bar v={fx.cap ? 100 : fx.exp} max={fx.cap ? 100 : fx.need} color={XP_FAM} h={6} />
-                </div>
-              </div>
-            );
-          })()}
-          {expSnap(save).fam && <div className="mt-1" style={{ fontSize: 10.5, color: PALETTE.textDim }}>사역마는 주인공 레벨(Lv.{hero.lv})까지만 오른다 · 동행일 때 이기면 상승</div>}
-        </GlassPanel>
-        <GlassPanel className="p-3">
-          <div className="font-semibold mb-1.5" style={{ fontSize: 13, color: PALETTE.legendary }}>✦ 지금 할 일</div>
-          {todos.length ? todos.map((d, i) => (
-            <button key={i} onClick={() => go(d.id)} className="ui-press w-full flex items-center gap-2 text-left" style={{ minHeight: 40, padding: '6px 8px', borderRadius: 10, marginTop: i ? 4 : 0, background: 'rgba(232,176,74,0.07)', border: '1px solid rgba(232,176,74,0.22)' }}>
-              <span style={{ fontSize: 16, width: 22, textAlign: 'center' }}>{d.icon}</span>
-              <span className="flex-1" style={{ fontSize: 12.5, color: PALETTE.text }}>{d.t}</span>
-              <span style={{ fontSize: 13, color: PALETTE.legendary }}>›</span>
+            <div className="font-bold" style={{ fontSize: 19, color: PALETTE.text, lineHeight: 1.2 }}>{cls.name} <span style={{ fontSize: 14, color: MS.gold }}>Lv.{hero.lv}</span> <span style={{ fontSize: 11, fontWeight: 400, color: PALETTE.textDim }}>/ {E.levelCapOf(save)} · {cls.role}</span></div>
+            <div style={{ fontSize: 12.5, color: PALETTE.text }}>♡ {E.deriveUnit(save, save.hero).maxHp.toLocaleString()} · ⚔ 전투력 {E.unitPower(save, save.hero).toLocaleString()}</div>
+            <div className="mt-1"><Bar v={hero.exp} max={expNeedFor(hero)} color={XP_HERO} h={5} /></div>
+            <div className="truncate" style={{ fontSize: 10.5, color: PALETTE.textDim }}>경험치 {Math.floor(hero.exp / Math.max(1, expNeedFor(hero)) * 100)}% · ▶ {goal}</div>
+            <button onClick={() => go('fam')} className="ui-press w-full text-left mt-0.5 truncate" style={{ fontSize: 11, background: 'transparent', border: 'none', padding: 0, color: PALETTE.textDim }}>
+              {fx ? <>🐾 <span style={{ color: MS.violet }}>{F.famName(fx.key)} Lv.{fx.lv}</span> · {F.famGrade(ff.grade).label}{ff.plus ? ` +${ff.plus}` : ''} · {fx.cap ? '주인공 레벨 도달' : `경험치 ${Math.floor(xpPct(fx))}%`}</> : '🐾 동행 사역마 없음 — 눌러서 편성'}
             </button>
-          )) : <div style={{ fontSize: 12, color: PALETTE.textDim }}>당장 할 일은 모두 마쳤다 — 사냥으로 성장하자</div>}
-        </GlassPanel>
+          </div>
+        </div>
+        <div className="flex items-center justify-between" style={{ margin: '14px 0 7px' }}>
+          <span style={{ fontSize: 12.5, letterSpacing: 4, color: MS.red, fontWeight: 700 }}>◆ 지금 할 일</span>
+          <span style={{ fontSize: 11.5, color: PALETTE.textDim }}>{todos.length}</span>
+        </div>
+        {todos.length ? todos.map((d, i) => (
+          <button key={i} onClick={() => go(d.id)} className="ui-press w-full flex items-center gap-2 text-left" style={{ minHeight: 40, padding: '8px 10px', marginTop: i ? 5 : 0, background: MS.box, border: `1px solid ${MS.line}` }}>
+            <span style={{ fontSize: 15, width: 20, textAlign: 'center' }}>{d.icon}</span>
+            <span className="flex-1" style={{ fontSize: 12.5, color: PALETTE.text }}><HiNum text={d.t} color={MS.gold} /></span>
+            <span style={{ fontSize: 13, color: PALETTE.textDim }}>›</span>
+          </button>
+        )) : <div style={{ fontSize: 12, color: PALETTE.textDim }}>당장 할 일은 모두 마쳤다 — 사냥으로 성장하자</div>}
         {GROUPS.map(gp => (
           <div key={gp.label}>
-            <div className="mb-1.5" style={{ fontSize: 12, color: PALETTE.textDim, fontWeight: 600 }}>{gp.label}</div>
-            <div className="grid grid-cols-3 gap-2 ui-stagger">
+            <MainSecHead title={gp.label} />
+            <div className="grid grid-cols-3 gap-1.5 ui-stagger">
               {gp.ids.map(id => byId[id]).map(t => (
-                <button key={t.id} disabled={t.locked} onClick={() => (t.id === 'exit' ? onExit() : go(t.id))} aria-label={t.label} className="ui-press relative text-left" style={{ padding: '10px 10px 9px', borderRadius: 14, background: 'rgba(255,255,255,0.035)', border: '1px solid var(--ui-line-strong)', opacity: t.locked ? 0.45 : 1, minHeight: 82 }}>
-                  <div style={{ fontSize: 20 }}>{t.icon}</div>
-                  <div className="font-semibold mt-0.5" style={{ fontSize: 13, color: PALETTE.text }}>{t.label}</div>
-                  <div style={{ fontSize: 11, color: PALETTE.textDim, lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{t.sub}</div>
-                  {t.badge && <span className="absolute" style={{ top: 8, right: 8, width: 9, height: 9, borderRadius: 999, background: '#e06a5f' }} />}
+                <button key={t.id} disabled={t.locked} onClick={() => (t.id === 'exit' ? onExit() : go(t.id))} aria-label={t.label} className="ui-press relative text-left" style={{ padding: '9px 8px', borderRadius: 12, background: MS.box, border: `1px solid ${MS.line}`, opacity: t.locked ? 0.45 : 1, minHeight: 78 }}>
+                  <div style={{ fontSize: 18 }}>{t.icon}</div>
+                  <div className="font-bold mt-0.5" style={{ fontSize: 13, color: PALETTE.text }}>{t.label}</div>
+                  <div style={{ fontSize: 10.5, color: PALETTE.textDim, lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{t.sub}</div>
+                  {t.badge && <span className="absolute" style={{ top: 7, right: 8, width: 7, height: 7, borderRadius: 999, background: MS.gold }} />}
                 </button>
               ))}
             </div>
           </div>
         ))}
-        <button onClick={onExit} className="ui-press w-full" style={{ height: 42, borderRadius: 12, background: 'transparent', border: '1px dashed var(--ui-line-strong)', fontSize: 12.5, color: PALETTE.dawn }}>⇄ 게임 선택으로 <span style={{ color: PALETTE.textDim, fontSize: 11 }}>(진행은 자동 저장)</span></button>
+        <button onClick={onExit} className="ui-press w-full mt-4" style={{ height: 42, background: 'transparent', border: `1px dashed ${MS.line}`, fontSize: 12.5, color: PALETTE.dawn }}>⇄ 게임 선택으로 <span style={{ color: PALETTE.textDim, fontSize: 11 }}>(진행은 자동 저장)</span></button>
       </div>
     </div>
   );
@@ -885,98 +885,62 @@ function FieldView({ save, onBack, onFight, onAuto, playScene, sceneOpen }) {
   const gateEnemy = f.elites[stage % f.elites.length];
   const heroLv = save.units[save.hero].lv;
   const lvColor = (lv) => (lv > heroLv + 2 ? '#e06a5f' : lv > heroLv ? '#e8b04a' : '#8fe08a');
+  // 1.251.0 — 본편 스타일 (시안 ⑳)
+  const left = E.bossAttemptsLeft(save, f.id);
+  const bossName = ENEMIES[f.boss]?.name;
+  const sq = (extra = {}) => ({ padding: '11px 0', fontSize: 13, fontWeight: 800, border: `1px solid ${MS.line}`, background: 'transparent', color: PALETTE.textDim, ...extra });
   return (
     <div className="absolute inset-0 flex flex-col">
       <Header title="사냥터" onBack={onBack} right={<Wallet save={save} />} />
-      <div className="flex gap-1.5 px-3 pt-2 flex-none">
-        {CHRONICLE_PARTS.map(p => {
-          const open = E.fieldUnlocked(save, p.fields[0]);
-          const on = p.id === part.id;
-          const last = [...p.fields].reverse().find(id => E.fieldUnlocked(save, id)) || p.fields[0];
-          return (
-            <button key={p.id} disabled={!open} onClick={() => setSel(last)} className="ui-press flex-1" style={{ height: 34, borderRadius: 10, fontSize: 12, fontWeight: 600, border: `1px solid ${on ? PALETTE.legendary : 'var(--ui-line)'}`, color: open ? (on ? PALETTE.legendary : PALETTE.text) : PALETTE.textDim, background: on ? 'rgba(232,176,74,0.10)' : 'transparent', opacity: open ? 1 : 0.4 }}>
-              {open ? p.name : p.reqRebirth ? `🔒 ${p.name.split(' · ')[0]} — 전승 후` : `🔒 ${p.name.split(' · ')[0]} — ${CHRONICLE_FIELDS[p.fields[0] - 2].name} 보스 후`}
-            </button>
-          );
-        })}
+      <div className="flex-none px-4 pt-1">
+        <MainTabs size={12.5} value={part.id} onChange={(id) => { const p = CHRONICLE_PARTS.find(x => x.id === id); const last = [...p.fields].reverse().find(fid => E.fieldUnlocked(save, fid)) || p.fields[0]; setSel(last); }}
+          items={CHRONICLE_PARTS.map(p => { const open = E.fieldUnlocked(save, p.fields[0]); return [p.id, open ? (p.id === part.id ? p.name : p.name.split(' · ')[0]) : `🔒 ${p.name.split(' · ')[0]}`, false, !open]; })} />
+        <MainTabs size={12.5} value={sel} onChange={setSel}
+          items={CHRONICLE_FIELDS.filter(x => part.fields.includes(x.id)).map(x => { const open = E.fieldUnlocked(save, x.id); return [x.id, open ? `${x.id} ${x.name.split(' ').pop()}` : `🔒 ${x.id}`, false, !open]; })} />
       </div>
-      <div className="flex gap-1.5 px-3 pt-1.5 flex-none">
-        {CHRONICLE_FIELDS.filter(x => part.fields.includes(x.id)).map(x => {
-          const open = E.fieldUnlocked(save, x.id);
-          return (
-            <button key={x.id} disabled={!open} onClick={() => setSel(x.id)} className="ui-press flex-1" style={{ height: 40, borderRadius: 10, fontSize: 12, border: `1px solid ${sel === x.id ? x.color : 'var(--ui-line)'}`, color: open ? (sel === x.id ? x.color : PALETTE.text) : PALETTE.textDim, background: sel === x.id ? `${x.color}1c` : 'transparent', opacity: open ? 1 : 0.4 }}>
-              {open ? `${x.id}. ${x.name.split(' ').pop()}` : `🔒 ${x.id}`}
-            </button>
-          );
-        })}
-      </div>
-      <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
-        <div className="relative overflow-hidden" style={{ borderRadius: 16, aspectRatio: '16 / 7', border: `1px solid ${f.color}88` }}>
+      <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2">
+        <div className="relative overflow-hidden" style={{ aspectRatio: '16 / 7', border: `1px solid ${MS.strong}` }}>
           <img src={chronicleEnemyArt(f.normals[Math.min(stage, f.normals.length - 1)])} alt="" className="absolute inset-0 w-full h-full object-cover" />
-          <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, transparent 35%, #0a0608)' }} />
+          <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, transparent 38%, #0b0708)' }} />
           <div className="absolute bottom-2 left-3 right-3">
-            <div className="font-bold" style={{ fontSize: 17, color: PALETTE.text }}>{f.name} <span style={{ fontSize: 13, color: f.color }}>· 스테이지 {stage + 1}</span></div>
-            <div style={{ fontSize: 12, color: PALETTE.textDim }}>몹 <b style={{ color: lvColor(S.lv) }}>Lv.{S.lv}</b> · 강적 Lv.{S.lv + 1} · 보스 Lv.{f.bossLv}</div>
+            <div className="font-bold" style={{ fontSize: 18, color: PALETTE.text }}>{f.name} <span style={{ fontSize: 13, color: MS.gold }}>스테이지 {stage + 1}</span></div>
+            <div style={{ fontSize: 12, color: PALETTE.textDim }}>몹 <b style={{ color: lvColor(S.lv) }}>Lv.{S.lv}</b> · 강적 Lv.{S.lv + 1} · 보스 Lv.{f.bossLv}{BOSS_MECHS[E.bossMechOf('field', f.id)] ? ` · ◇ ${BOSS_MECHS[E.bossMechOf('field', f.id)].name}` : ''}</div>
             <IntimNote heroLv={heroLv} lv={S.lv} what="몹" />
           </div>
         </div>
-
-        {/* 스테이지 지도 — 이전 스테이지 관문을 넘으면 다음 스테이지 개방 */}
-        <div className="flex items-center gap-1">
+        <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${stages.length + 1}, 1fr)` }}>
           {stages.map((x, i) => {
-            const open = E.stageUnlocked(save, f.id, i);
-            const done = st.cleared > i;
-            const on = stage === i;
+            const open = E.stageUnlocked(save, f.id, i); const done = st.cleared > i; const on = stage === i;
             return (
-              <React.Fragment key={i}>
-                <button disabled={!open} onClick={() => setStage(i)} className="ui-press flex-1 flex flex-col items-center justify-center" style={{ height: 52, borderRadius: 10, border: `1.5px solid ${on ? f.color : done ? `${f.color}66` : 'var(--ui-line)'}`, background: on ? `${f.color}22` : done ? `${f.color}0d` : 'transparent', opacity: open ? 1 : 0.35 }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: on ? f.color : PALETTE.text }}>{open ? (done ? '✓' : i + 1) : '🔒'}</span>
-                  <span style={{ fontSize: 10.5, color: open ? lvColor(x.lv) : PALETTE.textDim }}>Lv.{x.lv}</span>
-                </button>
-                {i < stages.length - 1 && <span style={{ color: PALETTE.textDim, fontSize: 10 }}>›</span>}
-              </React.Fragment>
+              <button key={i} disabled={!open} onClick={() => setStage(i)} className="ui-press text-center" style={{ padding: '5px 0', border: `1px solid ${on ? MS.gold : done ? '#8fd08a88' : MS.line}`, background: MS.box, opacity: open ? 1 : 0.4 }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: on ? MS.gold : done ? '#8fd08a' : PALETTE.text }}>{open ? (done ? '✓' : i + 1) : '🔒'}</div>
+                <div style={{ fontSize: 10.5, color: open ? lvColor(x.lv) : PALETTE.textDim }}>Lv.{x.lv}</div>
+              </button>
             );
           })}
-          <span style={{ color: PALETTE.textDim, fontSize: 10 }}>›</span>
-          <div className="flex-1 flex flex-col items-center justify-center" style={{ height: 52, borderRadius: 10, border: `1.5px solid ${bossOpen ? '#c4453d' : 'var(--ui-line)'}`, opacity: bossOpen ? 1 : 0.35 }}>
-            <span style={{ fontSize: 13 }}>👑</span>
-            <span style={{ fontSize: 10.5, color: PALETTE.textDim }}>Lv.{f.bossLv}</span>
+          <div className="text-center" style={{ padding: '5px 0', border: `1px solid ${bossOpen ? MS.red : MS.line}`, background: MS.box, opacity: bossOpen ? 1 : 0.4 }}>
+            <div style={{ fontSize: 13 }}>👑</div><div style={{ fontSize: 10.5, color: PALETTE.textDim }}>Lv.{f.bossLv}</div>
           </div>
         </div>
-
-        <GlassPanel className="p-3">
-          <div className="flex justify-between" style={{ fontSize: 12.5, color: PALETTE.text }}>
-            <span>스테이지 {stage + 1} 처치 목표</span><span className="font-semibold">{sKills}/{S.kills}</span>
-          </div>
-          <div className="mt-1"><Bar v={sKills} max={S.kills} color={f.color} h={6} /></div>
-          <div className="mt-2" style={{ fontSize: 11.5, color: PALETTE.textDim, lineHeight: 1.5 }}>
-            {gateDone ? '관문 통과 — 이 스테이지는 자유롭게 사냥할 수 있다'
-              : gateOk ? `처치 목표 달성! 관문 강적 「${ENEMIES[gateEnemy]?.name}」(Lv.${S.lv + 1})을 쓰러뜨리면 ${stage + 1 < FIELD_STAGES ? `스테이지 ${stage + 2}` : '보스'} 개방`
-                : `처치 목표를 채우면 관문 강적이 나타난다 · 강적 ${Math.round(CHRONICLE_TUNING.eliteChance * 100)}% 확률로 출몰`}
-            {cleared && <><br />보스 처치 완료 — 재도전은 하루 {BOSS_DAILY_LIMIT}회</>}
-          </div>
-        </GlassPanel>
-        <UIButton variant="gold" onClick={() => onAuto(f)} style={{ background: 'linear-gradient(90deg, #8a5a1c, #c9922e)' }}>▶ 자동 진행 <span style={{ fontSize: 11.5, fontWeight: 400 }}>— 사냥 → 관문 → 다음 스테이지 → 보스 (패배하면 멈춤)</span></UIButton>
-        <UIButton onClick={() => onFight(f, 'hunt', stage)}>스테이지 {stage + 1} 사냥 (Lv.{S.lv})</UIButton>
-        {!gateDone && (
-          <UIButton variant="gold" disabled={!gateOk} onClick={() => onFight(f, 'gate', stage)}>
-            {gateOk ? `⚔ 관문 도전 — ${ENEMIES[gateEnemy]?.name} Lv.${S.lv + 1}` : `관문 잠김 (처치 ${S.kills - sKills} 남음)`}
-          </UIButton>
-        )}
-        {(() => {
-          const left = E.bossAttemptsLeft(save, f.id);
-          const bossName = ENEMIES[f.boss]?.name;
-          if (!bossOpen) return <UIButton variant="ghost" disabled>{`👑 보스 — 스테이지 ${FIELD_STAGES} 관문을 넘으면 개방`}</UIButton>;
-          if (cleared && left <= 0) return <UIButton variant="gold" disabled>보스 재도전 — 오늘 횟수 소진 (0시 초기화)</UIButton>;
-          return (
-            <>
-            <BossMechNote mech={E.bossMechOf('field', f.id)} />
-            <UIButton variant="gold" onClick={() => onFight(f, 'boss', null)}>
-              {cleared ? `👑 보스 재도전 — ${bossName} (오늘 ${left}/${BOSS_DAILY_LIMIT})` : `👑 보스 도전 — ${bossName} Lv.${f.bossLv}`}
-            </UIButton>
-            </>
-          );
-        })()}
+        <MainSecHead title="처 치 목 표" />
+        <div className="flex justify-between" style={{ fontSize: 12.5, color: PALETTE.text }}><span>스테이지 {stage + 1}</span><b>{sKills} / {S.kills}</b></div>
+        <Bar v={sKills} max={S.kills} color={MS.gold} h={5} />
+        <div style={{ fontSize: 11.5, color: PALETTE.textDim, lineHeight: 1.5 }}>
+          {gateDone ? '관문 통과 — 이 스테이지는 자유롭게 사냥할 수 있다'
+            : gateOk ? `처치 목표 달성! 관문 강적 「${ENEMIES[gateEnemy]?.name}」(Lv.${S.lv + 1})을 쓰러뜨리면 ${stage + 1 < FIELD_STAGES ? `스테이지 ${stage + 2}` : '보스'} 개방`
+              : `채우면 관문 강적 등장 · 강적 ${Math.round(CHRONICLE_TUNING.eliteChance * 100)}% 확률로 출몰`}
+          {cleared && <> · 보스 재도전은 하루 {BOSS_DAILY_LIMIT}회</>}
+        </div>
+        <button onClick={() => onFight(f, 'hunt', stage)} className="ui-press mt-1" style={sq({ padding: '13px 0', fontSize: 14, border: `1px solid ${MS.red}`, background: 'rgba(224,87,76,0.18)', color: '#ff8a7e' })}>⚔ 스테이지 {stage + 1} 사냥 (Lv.{S.lv})</button>
+        <button onClick={() => onAuto(f)} className="ui-press" style={sq({ border: `1px solid ${MS.gold}`, color: MS.gold })}>▶ 자동 진행 <span style={{ fontWeight: 400, fontSize: 11.5 }}>사냥 → 관문 → 다음 스테이지 → 보스</span></button>
+        {bossOpen && <BossMechNote mech={E.bossMechOf('field', f.id)} compact />}
+        <div className="grid gap-1.5" style={{ gridTemplateColumns: '1fr 1fr' }}>
+          {gateDone ? <div className="text-center" style={sq({ color: '#8fd08a', fontSize: 12.5 })}>✓ 관문 통과</div>
+            : <button disabled={!gateOk} onClick={() => onFight(f, 'gate', stage)} className="ui-press" style={sq(gateOk ? { border: `1px solid ${MS.gold}`, color: MS.gold, fontSize: 12.5 } : { fontSize: 12.5 })}>{gateOk ? `⚔ 관문 — ${ENEMIES[gateEnemy]?.name}` : `🔒 관문 (처치 ${S.kills - sKills} 남음)`}</button>}
+          {!bossOpen ? <div className="text-center" style={sq({ fontSize: 12.5 })}>👑 보스 ({FIELD_STAGES} 관문 뒤)</div>
+            : cleared && left <= 0 ? <div className="text-center" style={sq({ fontSize: 12 })}>👑 오늘 횟수 소진</div>
+              : <button onClick={() => onFight(f, 'boss', null)} className="ui-press" style={sq({ border: `1px solid ${MS.red}`, color: '#ff8a7e', fontSize: 12.5 })}>{cleared ? `👑 재도전 (${left}/${BOSS_DAILY_LIMIT})` : `👑 ${bossName}`}</button>}
+        </div>
       </div>
     </div>
   );
@@ -2349,8 +2313,8 @@ function forgeShort(save, cost) {
 function MainTabs({ items, value, onChange, size = 13 }) {
   return (
     <div className="grid" style={{ gridTemplateColumns: `repeat(${items.length}, 1fr)`, borderBottom: `1px solid ${MS.line}` }}>
-      {items.map(([id, label, dot]) => (
-        <button key={id} onClick={() => onChange(id)} className="ui-press relative" style={{ height: 38, background: 'transparent', border: 'none', borderBottom: `2px solid ${value === id ? MS.red : 'transparent'}`, color: value === id ? MS.red : PALETTE.textDim, fontSize: size, fontWeight: value === id ? 800 : 500 }}>
+      {items.map(([id, label, dot, locked]) => (
+        <button key={id} disabled={locked} onClick={() => onChange(id)} className="ui-press relative truncate" style={{ height: 38, background: 'transparent', border: 'none', borderBottom: `2px solid ${value === id ? MS.red : 'transparent'}`, color: value === id ? MS.red : PALETTE.textDim, fontSize: size, fontWeight: value === id ? 800 : 500, opacity: locked ? 0.45 : 1, padding: '0 2px' }}>
           {label}{dot && <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: 3, background: MS.gold, marginLeft: 3, verticalAlign: 6 }} />}
         </button>
       ))}
