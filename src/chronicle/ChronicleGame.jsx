@@ -2560,7 +2560,7 @@ function huntRecord(sim, party, enc, summary, speed = 2, label = '') {
   return {
     win: sim.result === 'win', type: enc.type, rounds: dmg.rounds,
     kills: sim.result === 'win' ? enc.enemies.reduce((m, e) => ({ ...m, [e.tier]: (m[e.tier] || 0) + 1 }), {}) : {},
-    units, skills: dmg.bySkill,
+    units, skills: dmg.bySkill, detail: E.battleDetailStats(sim, party),
     exp: summary.exp || 0, gold: summary.gold || 0, essence: summary.essence || 0, famShards: summary.famShards || 0, talentScroll: summary.talentScroll || 0,
     shard: summary.shard || 0, keys: summary.keys || 0, famExp: summary.famExp?.gained || 0, salv,
     salvaged: (summary.autoSalvaged || 0) + (summary.autoDismantled || 0),
@@ -2570,7 +2570,7 @@ function huntRecord(sim, party, enc, summary, speed = 2, label = '') {
   };
 }
 function newHuntStats() {
-  return { battles: 0, wins: 0, losses: 0, rounds: 0, types: {}, kills: {}, units: {}, skills: {}, exp: 0, gold: 0, essence: 0, famShards: 0, talentScroll: 0, shard: 0, keys: 0, famExp: 0, salv: {}, salvaged: 0, items: {}, levelUps: 0, ms: 0, speeds: {}, places: {}, setup: null, startedAt: Date.now() };
+  return { battles: 0, wins: 0, losses: 0, rounds: 0, types: {}, kills: {}, units: {}, skills: {}, detail: { units: {}, skills: {} }, exp: 0, gold: 0, essence: 0, famShards: 0, talentScroll: 0, shard: 0, keys: 0, famExp: 0, salv: {}, salvaged: 0, items: {}, levelUps: 0, ms: 0, speeds: {}, places: {}, setup: null, startedAt: Date.now() };
 }
 function addHuntRecord(st, r) {
   st.battles += 1; if (r.win) st.wins += 1; else st.losses += 1;
@@ -2582,6 +2582,15 @@ function addHuntRecord(st, r) {
     const cur = st.units[key] || { ...u, dmg: 0, heal: 0, shield: 0, taken: 0, rounds: 0 };
     cur.dmg += u.dmg; cur.heal = (cur.heal || 0) + (u.heal || 0); cur.shield = (cur.shield || 0) + (u.shield || 0); cur.taken = (cur.taken || 0) + (u.taken || 0); cur.rounds += r.rounds;
     st.units[key] = cur;
+  }
+  // 상세 통계 (1.238.0) — 유닛 키를 사역마 종류 기준(fam:키)으로 바꿔 합친다
+  if (r.detail) {
+    const ukey = (id) => { const u = r.units[id]; return u?.fam ? `fam:${u.famKey}` : id; };
+    const d = {
+      units: Object.fromEntries(Object.entries(r.detail.units).map(([id, v]) => [ukey(id), v])),
+      skills: Object.fromEntries(Object.entries(r.detail.skills).map(([k, v]) => { const [id, sn] = k.split('|'); return [`${ukey(id)}|${sn}`, v]; })),
+    };
+    st.detail = E.mergeDetailStats(st.detail, d);
   }
   for (const [k, v] of Object.entries(r.skills)) {
     const [id, sn] = k.split('|');
@@ -2605,10 +2614,18 @@ function HuntReport({ report: r, onClose, title = '📊 사냥 보고서' }) {
   const skills = Object.entries(r.skills).map(([k, v]) => { const [uk, sn] = k.split('|'); return { uk, sn, v }; }).sort((a, b) => b.v - a.v).slice(0, 6);
   const ms = r.ms || Math.max(60000, (r.endedAt || Date.now()) - r.startedAt);
   const [effOpen, setEffOpen] = useState(false);
+  const [tab, setTab] = useState(() => { try { return localStorage.getItem('chronicleReportTab') || 'sum'; } catch { return 'sum'; } });
+  const pickTab = (t) => { setTab(t); try { localStorage.setItem('chronicleReportTab', t); } catch { /* */ } };
   const row = { display: 'flex', justifyContent: 'space-between', fontSize: 12.5, color: PALETTE.text, padding: '3px 0' };
+  const hasDetail = !!r.detail && Object.keys(r.detail.units || {}).length > 0;
   return (
     <BottomSheet title={title} onClose={onClose} maxHeight="85%">
-      <div className="flex flex-col gap-3">
+      {hasDetail && <div className="flex gap-1.5 mb-3">
+        {[['sum', '📊 요약'], ['detail', '📈 상세 통계']].map(([id, label]) => (
+          <button key={id} onClick={() => pickTab(id)} className="ui-press flex-1" style={{ height: 36, borderRadius: 10, fontSize: 13, fontWeight: 600, border: `1px solid ${tab === id ? PALETTE.legendary : 'var(--ui-line)'}`, color: tab === id ? PALETTE.legendary : PALETTE.textDim, background: tab === id ? 'rgba(232,176,74,0.1)' : 'transparent' }}>{label}</button>
+        ))}
+      </div>}
+      {hasDetail && tab === 'detail' ? <DetailReport r={r} onClose={onClose} /> : <div className="flex flex-col gap-3">
         <GlassPanel className="p-3">
           <div className="font-semibold mb-1" style={{ fontSize: 13, color: PALETTE.legendary }}>
             {r.battles === 1 ? <>{r.wins ? '승리' : '패배'} <span style={{ color: PALETTE.textDim, fontWeight: 400 }}>· {r.rounds}라운드 · {fmtDur(ms)}</span></> : <>전투 {r.battles}회 · 승리 {r.wins} · 패배 {r.losses} <span style={{ color: PALETTE.textDim, fontWeight: 400 }}>· {r.rounds}라운드 · {fmtDur(ms)}</span></>}
@@ -2670,9 +2687,105 @@ function HuntReport({ report: r, onClose, title = '📊 사냥 보고서' }) {
         </GlassPanel>}
         <UIButton variant="ghost" style={{ height: 40 }} onClick={() => setEffOpen(true)}>📈 효율 기록 비교</UIButton>
         <UIButton onClick={onClose}>확인</UIButton>
-      </div>
+      </div>}
       {effOpen && <EfficiencyLog onClose={() => setEffOpen(false)} />}
     </BottomSheet>
+  );
+}
+
+// ===== 상세 통계 탭 (1.238.0) — engine battleDetailStats 집계를 유닛별·스킬별로 =====
+const pctTxt = (a, b) => (b > 0 ? `${Math.round(a / b * 1000) / 10}%` : '-');
+function detailSections(d, rounds) {
+  const hitTry = d.landed + d.misses;
+  const defTry = d.timesHit + d.dodged;
+  return [
+    { title: '⚔ 공격', color: PALETTE.legendary, rows: [
+      ['총 피해', d.dmg, true], ['라운드당 피해', d.dmg / Math.max(1, rounds), true, 'r'], ['최대 일격', d.maxHit, true, 'x'],
+      ['적중', d.landed], ['치명타', d.crits, true, '', `치명률 ${pctTxt(d.crits, d.landed)}`], ['치명타 피해', d.critDmg, false, '', `전체의 ${pctTxt(d.critDmg, d.dmg)}`],
+      ['빗나감', d.misses, true, '', `명중률 ${pctTxt(d.landed, hitTry)}`],
+      ['반격', d.counters, false, '', d.counterDmg ? `피해 ${fmtNum(d.counterDmg)}` : ''], ['추가타', d.chains, false, '', d.chainDmg ? `피해 ${fmtNum(d.chainDmg)}` : ''],
+      ['지속 피해', d.dotDmg], ['신성 피해', d.holyDmg], ['반사 피해', d.reflectDmg], ['처치', d.kills, true],
+    ] },
+    { title: '🎯 행동', color: '#d0c8b8', rows: [
+      ['행동', d.acts, true], ['스킬 사용', d.skillUses, true, '', `스킬 비중 ${pctTxt(d.skillUses, d.acts)}`], ['기본 공격', d.basicUses, true],
+      ['강화 부여', d.buffs], ['약화 부여', d.debuffs],
+    ] },
+    { title: '✚ 지원', color: '#8fe08a', rows: [
+      ['회복', d.heal, false, '', d.overheal ? `초과 회복 ${fmtNum(d.overheal)} (낭비 ${pctTxt(d.overheal, d.heal + d.overheal)})` : ''],
+      ['지속 회복', d.hotHeal], ['최대 1회 회복', d.maxHeal, false, 'x'], ['보호막 부여', d.shield],
+    ] },
+    { title: '🛡 방어', color: '#e8b04a', rows: [
+      ['받은 피해', d.taken, true], ['피격', d.timesHit, true], ['회피', d.dodged, true, '', `회피율 ${pctTxt(d.dodged, defTry)}`],
+      ['최대 피격', d.maxTaken, false, 'x'], ['보호막 흡수', d.absorbed, false, '', d.absorbed ? `받은 피해의 ${pctTxt(d.absorbed, d.absorbed + d.taken)} 막음` : ''],
+      ['대신 맞기', d.coverHits, false, '', d.coverDmg ? `피해 ${fmtNum(d.coverDmg)}` : ''], ['지속 피해 받음', d.dotTaken],
+      ['받은 회복', d.healRecv], ['받은 보호막', d.shieldRecv], ['쓰러짐', d.deaths, true],
+    ] },
+  ];
+}
+function DetailReport({ r, onClose }) {
+  const units = Object.entries(r.units).map(([key, u]) => ({ key, ...u })).sort((a, b) => (a.fam ? 1 : 0) - (b.fam ? 1 : 0));
+  const [sel, setSel] = useState(units[0]?.key);
+  const u = units.find(x => x.key === sel) || units[0];
+  const d = r.detail.units[u?.key];
+  const n = Math.max(1, r.battles);
+  const rounds = u?.rounds || r.rounds || 1;
+  const skills = Object.entries(r.detail.skills)
+    .filter(([k]) => k.split('|')[0] === u?.key)
+    .map(([k, v]) => ({ sn: k.split('|').slice(1).join('|'), ...v }))
+    .sort((a, b) => (b.dmg + b.heal + b.shield) - (a.dmg + a.heal + a.shield) || b.uses - a.uses);
+  const cell = { fontSize: 12, color: PALETTE.text, textAlign: 'right' };
+  const head = { fontSize: 10.5, color: PALETTE.textDim, textAlign: 'right' };
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex gap-1.5 flex-wrap">
+        {units.map(x => (
+          <button key={x.key} onClick={() => setSel(x.key)} className="ui-press flex items-center gap-1.5" style={{ height: 40, padding: '0 10px', borderRadius: 10, fontSize: 12.5, border: `1px solid ${x.key === u?.key ? (x.fam ? '#d07ae8' : PALETTE.legendary) : 'var(--ui-line)'}`, color: x.key === u?.key ? PALETTE.text : PALETTE.textDim, background: 'transparent' }}>
+            <UnitIcon u={x} size={26} />{x.fam ? `🐾 ${x.name}` : x.name}
+          </button>
+        ))}
+      </div>
+      <div style={{ fontSize: 11, color: PALETTE.textDim }}>전투 {r.battles}회 · {rounds}라운드 집계{n > 1 ? ' · 오른쪽 칸 = 전투당 평균' : ''}</div>
+      {d ? detailSections(d, rounds).map(sec => {
+        const rows = sec.rows.filter(([, v, always]) => always || v > 0);
+        if (!rows.length) return null;
+        return (
+          <GlassPanel key={sec.title} className="p-3">
+            <div className="font-semibold mb-1.5" style={{ fontSize: 13, color: sec.color }}>{sec.title}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', columnGap: 12, rowGap: 3, alignItems: 'baseline' }}>
+              {n > 1 && <><span /><span style={head}>합계</span><span style={head}>전투당</span></>}
+              {rows.map(([label, v, , kind, note]) => (
+                <React.Fragment key={label}>
+                  <span style={{ fontSize: 12.5, color: PALETTE.text }}>{label}{note ? <span style={{ fontSize: 10.5, color: PALETTE.textDim }}> · {note}</span> : null}</span>
+                  <b style={cell}>{fmtNum(v)}</b>
+                  <span style={{ ...cell, color: PALETTE.textDim }}>{kind || n === 1 ? '' : fmtNum(v / n)}</span>
+                </React.Fragment>
+              ))}
+            </div>
+          </GlassPanel>
+        );
+      }) : <GlassPanel className="p-3"><div style={{ fontSize: 12, color: PALETTE.textDim }}>기록 없음</div></GlassPanel>}
+      {skills.length > 0 && <GlassPanel className="p-3">
+        <div className="font-semibold mb-1.5" style={{ fontSize: 13, color: PALETTE.text }}>✦ 스킬별</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto auto', columnGap: 9, rowGap: 4, alignItems: 'baseline' }}>
+          <span style={{ ...head, textAlign: 'left' }}>스킬</span><span style={head}>사용</span><span style={head}>피해</span><span style={head}>1회 평균</span><span style={head}>치명률</span>
+          {skills.map(x => {
+            const main = x.dmg || x.heal || x.shield;
+            const tag = x.dmg ? '' : x.heal ? '✚' : x.shield ? '◈' : '';
+            return (
+              <React.Fragment key={x.sn}>
+                <span style={{ fontSize: 12, color: PALETTE.text }} className="truncate">{x.sn}{(x.dmg && (x.heal || x.shield)) ? <span style={{ fontSize: 10.5, color: '#8fe08a' }}> ✚{fmtNum(x.heal + x.shield)}</span> : null}</span>
+                <span style={cell}>{x.uses || '-'}</span>
+                <b style={cell}>{main ? `${tag}${fmtNum(main)}` : '-'}</b>
+                <span style={{ ...cell, color: PALETTE.textDim }}>{main && x.uses ? fmtNum(main / x.uses) : '-'}</span>
+                <span style={{ ...cell, color: PALETTE.textDim }}>{x.hits ? pctTxt(x.crits, x.hits) : '-'}</span>
+              </React.Fragment>
+            );
+          })}
+        </div>
+        <div style={{ fontSize: 10.5, color: PALETTE.textDim, marginTop: 6, lineHeight: 1.5 }}>피해 칸의 ✚ = 회복량 · ◈ = 보호막 (피해 없는 스킬) · 추가타·지속 피해는 스킬 이름 옆에 따로 표시 · 사용 횟수가 없는 줄 = 지속 피해·추가타처럼 다른 행동에서 따라 나온 피해</div>
+      </GlassPanel>}
+      <UIButton onClick={onClose}>확인</UIButton>
+    </div>
   );
 }
 
