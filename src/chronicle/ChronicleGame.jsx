@@ -9,7 +9,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, Coins } from 'lucide-react';
 import { PALETTE } from '../utils/helpers.js';
 import { GlassPanel, UIButton, BottomSheet } from '../components/ui/CommonUI.jsx';
-import { InfoSection, InfoRow, StatTiles, ValueChip, HiNum } from '../components/ui/InfoBlocks.jsx';
+import { InfoSection, InfoRow, StatTiles, HiNum } from '../components/ui/InfoBlocks.jsx';
 import UpdateButton from '../components/ui/UpdateButton.jsx';
 import { GAME_VERSION } from '../data/version.js';
 import {
@@ -58,16 +58,6 @@ function statLine(st) {
 // 장비 소속 표시 — 직업 전용 / 공용
 const clsTag = (item) => (item.cls === 'common' ? '공용' : `${chronicleClass(item.cls).name} 전용`);
 // 특수 효과 한 줄 (유니크 고유 효과 · 에픽 장신구 옵션)
-function ItemSpecial({ item, center = false }) {
-  const ud = E.uniqueDef(item);
-  const eo = E.epicOptOf(item);
-  if (!ud && !eo) return null;
-  return (
-    <div className={center ? 'text-center mt-1' : 'truncate'} style={{ fontSize: center ? 12.5 : 11, color: ud ? '#f0a86a' : '#d7a8ff' }}>
-      ✦ {ud ? `고유 효과 — ${ud.desc}` : `「${eo.name}」 ${eo.desc}`}
-    </div>
-  );
-}
 function Header({ title, onBack, right }) {
   return (
     <div className="flex items-center gap-2 px-3 flex-none" style={{ minHeight: 54, borderBottom: '1px solid var(--ui-line)' }}>
@@ -183,65 +173,9 @@ function XpResultRow({ art, name, before, after, fam = false }) {
 }
 
 // 장비 비교 (1.213.1) — 새 장비 vs 지금 착용 중인 같은 부위 장비
-const STAT_ORDER = ['atk', 'def', 'hp', 'spd'];
-function itemDiff(item, cur) {
-  const a = E.itemStats(item); const b = cur ? E.itemStats(cur) : {};
-  const keys = [...new Set([...Object.keys(a), ...Object.keys(b)])]
-    .sort((x, y) => (STAT_ORDER.indexOf(x) + 1 || 99) - (STAT_ORDER.indexOf(y) + 1 || 99));
-  return keys.map(k => ({ k, d: +((a[k] || 0) - (b[k] || 0)).toFixed(3) })).filter(x => x.d !== 0);
-}
-const powerDiff = (item, cur) => E.itemPower(item) - (cur ? E.itemPower(cur) : 0);
-function DiffLine({ item, cur, compact = false }) {
-  const pd = powerDiff(item, cur);
-  const lines = itemDiff(item, cur);
-  const col = (d) => (d > 0 ? '#8fe08a' : '#e06a5f');
-  const fmt = (k, d) => { const t = E.statLabel(k, Math.abs(d)); return `${d > 0 ? '▲' : '▼'} ${t.replace(/[+-](?=\d)/, '')}`; };
-  if (compact) {
-    return (
-      <div className="truncate" style={{ fontSize: 11 }}>
-        <b style={{ color: pd > 0 ? '#8fe08a' : pd < 0 ? '#e06a5f' : PALETTE.textDim }}>{pd > 0 ? `▲${pd}` : pd < 0 ? `▼${-pd}` : '='}</b>
-        {lines.slice(0, 3).map(x => <span key={x.k} style={{ color: col(x.d), marginLeft: 6 }}>{fmt(x.k, x.d)}</span>)}
-      </div>
-    );
-  }
-  return (
-    <div className="mt-2" style={{ padding: '8px 10px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--ui-line)' }}>
-      <div className="flex justify-between" style={{ fontSize: 12, color: PALETTE.textDim }}>
-        <span>{cur ? `착용 중: ${E.itemName(cur)}${cur.plus ? ` +${cur.plus}` : ''}` : '이 부위 비어 있음'}</span>
-        <b style={{ color: pd > 0 ? '#8fe08a' : pd < 0 ? '#e06a5f' : PALETTE.textDim }}>전투력 {pd > 0 ? `▲ ${pd}` : pd < 0 ? `▼ ${-pd}` : '변화 없음'}</b>
-      </div>
-      <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1" style={{ fontSize: 12 }}>
-        {lines.map(x => <span key={x.k} style={{ color: col(x.d) }}>{fmt(x.k, x.d)}</span>)}
-        {!lines.length && <span style={{ color: PALETTE.textDim }}>능력치 차이 없음</span>}
-      </div>
-      {(E.uniqueDef(cur) || E.epicOptOf(cur)) && <div className="mt-1" style={{ fontSize: 11, color: PALETTE.textDim }}>※ 교체하면 착용 중 장비의 특수 효과를 잃습니다</div>}
-    </div>
-  );
-}
 // 장비 상세 본문 (1.245.0) — 기본 능력치 / 추가 옵션 / 특수 효과 / 강화 구획 + 착용 비교
 const BASE_STATS = ['atk', 'def', 'hp', 'spd'];
 const BASE_LABEL = { atk: '공격', def: '방어', hp: 'HP', spd: '속도' };
-function ItemRow({ save, item, onClick, right }) {
-  const g = gradeOf(item.grade);
-  const by = save.inventory.some(i => i.uid === item.uid) ? E.equippedBy(save, item.uid) : null;
-  const usable = E.itemUsable(item, save.hero);
-  const slot = SLOTS.find(s => s.id === item.slot);
-  return (
-    <button onClick={onClick} className="ui-press w-full flex items-center gap-2.5 text-left" style={{ padding: '8px 10px', borderRadius: 12, background: `${g.color}10`, border: `1px solid ${g.color}55` }}>
-      <div className="flex-none flex items-center justify-center" style={{ width: 36, height: 36, borderRadius: 10, background: '#000', fontSize: 17, border: `1px solid ${g.color}88` }}>{slot?.icon}</div>
-      <div className="flex-1 min-w-0">
-        <div className="truncate font-semibold" style={{ fontSize: 13, color: g.color }}>
-          {E.itemName(item)}{item.plus ? ` +${item.plus}` : ''} <span style={{ fontSize: 11, color: PALETTE.textDim, fontWeight: 400 }}>{g.label} · Lv.{item.ilv}</span>
-        </div>
-        <div className="truncate" style={{ fontSize: 11, color: usable ? PALETTE.textDim : '#e06a5f' }}>{usable ? clsTag(item) : `🔒 ${clsTag(item)} — 창고에 보관해 두세요`}</div>
-        {usable && !E.canWear(item, save.units[save.hero]) && <div className="truncate" style={{ fontSize: 11, color: '#e06a5f' }}>🔒 착용 레벨 부족 — 내 레벨 {item.ilv} 이상 필요{by ? ' (착용 중이지만 효과 없음)' : ''}</div>}
-        <div className="truncate" style={{ fontSize: 11.5, color: PALETTE.textDim }}>{statLine(E.itemStats(item))}</div>
-        <ItemSpecial item={item} />
-      </div>
-      {right ?? (by && <span className="flex-none" style={{ fontSize: 11, color: PALETTE.dawn }}>착용 중</span>)}
-    </button>
-  );
-}
 // 전투·던전 유닛 아이콘 — 사역마는 원본 적 그림
 function UnitIcon({ u, size = 38, dim = false }) {
   if (!u.fam) return <Portrait cid={u.classId} size={size} dim={dim} />;
@@ -1357,28 +1291,27 @@ function PartyView({ save, setSave, onBack, onForge }) {
             </div>} />
         );
       })()}
-      {slotPick && (
-        <BottomSheet title={`${SLOTS.find(s => s.id === slotPick).label} 장착`} onClose={() => setSlotPick(null)}>
-          <div className="flex flex-col gap-2">
-            {u.equip[slotPick] != null && (
-              <UIButton variant="ghost" style={{ height: 40 }} onClick={() => { setSave(E.unequipItem(save, cid, slotPick)); setSlotPick(null); }}>장착 해제</UIButton>
-            )}
-            {save.inventory.filter(i => i.slot === slotPick && i.uid !== u.equip[slotPick] && E.itemUsable(i, cid) && E.canWear(i, u))
-              .sort((a, b) => E.itemPower(b) - E.itemPower(a))
-              .map(it => {
-                const cur = save.inventory.find(i => i.uid === u.equip[slotPick]);
-                return (
-                  <div key={it.uid}>
-                    <ItemRow save={save} item={it} onClick={() => { setSave(E.equipItem(save, cid, it.uid)); setSlotPick(null); }} />
-                    <div className="px-2 pt-0.5"><DiffLine item={it} cur={cur} compact /></div>
-                  </div>
-                );
-              })}
-            {!save.inventory.some(i => i.slot === slotPick && i.uid !== u.equip[slotPick] && E.itemUsable(i, cid)) && <div className="text-center py-4" style={{ fontSize: 12.5, color: PALETTE.textDim }}>가방에 착용할 수 있는 장비가 없습니다{slotPick === 'accessory' ? '' : ` (${cls.name} 전용)`}</div>}
-            <UIButton variant="ghost" style={{ height: 40 }} onClick={() => setSlotPick(null)}>닫기</UIButton>
-          </div>
-        </BottomSheet>
-      )}
+      {slotPick && (() => {
+        // 1.254.0 — 장비 카드 + 비교 (시안 ㉜)
+        const cur = save.inventory.find(i => i.uid === u.equip[slotPick]);
+        const sl = SLOTS.find(x => x.id === slotPick);
+        const cands = save.inventory.filter(i => i.slot === slotPick && i.uid !== u.equip[slotPick] && E.itemUsable(i, cid) && E.canWear(i, u)).sort((a, b) => E.itemPower(b) - E.itemPower(a));
+        const locked = save.inventory.filter(i => i.slot === slotPick && i.uid !== u.equip[slotPick] && E.itemUsable(i, cid) && !E.canWear(i, u));
+        return (
+          <MainModal kicker={`${sl.label} 장 착`} title={cur ? `지금: ${E.itemName(cur)}${cur.plus ? ` +${cur.plus}` : ''}` : `${sl.label} 비어 있음`} badge={cur ? `⚔ ${E.itemPower(cur).toLocaleString()}` : null} onClose={() => setSlotPick(null)}
+            footer={cur ? <button onClick={() => { setSave(E.unequipItem(save, cid, slotPick)); setSlotPick(null); }} className="ui-press" style={{ height: 40, fontSize: 13, border: `1px solid ${MS.line}`, background: 'transparent', color: PALETTE.text }}>착용 해제</button> : null}>
+            <div className="flex flex-col gap-1.5">
+              {cands.map(it => (
+                <MainGearCard key={it.uid} it={it} onClick={() => { setSave(E.equipItem(save, cid, it.uid)); setSlotPick(null); }}
+                  footer={<GearCmpFooter it={it} cur={cur} right={<span className="flex-none" style={{ padding: '1px 10px', fontWeight: 800, border: `1px solid ${MS.gold}`, color: MS.gold }}>장착</span>} />} />
+              ))}
+              {locked.map(it => <MainGearCard key={it.uid} it={it} dim note={`Lv.${it.ilv}부터 착용`} onClick={() => {}} />)}
+              {!cands.length && !locked.length && <div className="text-center py-4" style={{ fontSize: 12.5, color: PALETTE.textDim }}>가방에 착용할 수 있는 장비가 없습니다{slotPick === 'accessory' ? '' : ` (${cls.name} 전용)`}</div>}
+              <div style={{ fontSize: 11, color: PALETTE.textDim }}>카드를 누르면 바로 장착 · 창고에 있는 장비는 먼저 가방으로 꺼내야 한다</div>
+            </div>
+          </MainModal>
+        );
+      })()}
       {skillInfo && (
         <MainSkillModal s={skillInfo} lv={u.skills[skillInfo.id] || 0} u={u} d={d} sp={u.sp} can={E.canLearn(u, skillInfo)}
           onLearn={() => setSave(E.learnSkill(save, cid, skillInfo.id))} onClose={() => setSkillInfo(null)} />
@@ -1499,23 +1432,13 @@ function BagView({ save, setSave, onBack, flash, onForge }) {
         </div>
       </div>
       <div className="flex-1 overflow-y-auto px-4 pb-3">
-        <div className="grid gap-2" style={{ gridTemplateColumns: '1fr 1fr' }}>
+        <div className="flex flex-col gap-1.5">
           {bagList.map(it => {
-            const g = gradeOf(it.grade);
             const usable = E.itemUsable(it, hero);
             const cur = usable ? save.inventory.find(x => x.uid === save.units[hero].equip[it.slot]) : null;
-            const pd = usable ? E.itemPower(it) - (cur ? E.itemPower(cur) : 0) : 0;
-            const slot = SLOTS.find(s => s.id === it.slot);
-            const on = picked.has(it.uid);
-            return (
-              <button key={it.uid} onClick={() => (picking ? togglePick(it.uid) : setSel(it.uid))} className="ui-press relative text-left" style={{ padding: '7px 9px 7px 11px', borderRadius: 10, background: on ? 'rgba(224,106,95,0.16)' : MS.box, border: `1px solid ${on ? '#e06a5f' : MS.line}`, borderLeft: `3px solid ${g.color}`, minWidth: 0, opacity: usable ? 1 : 0.7 }}>
-                {picking ? <span className="absolute flex items-center justify-center" style={{ top: 6, right: 7, width: 18, height: 18, borderRadius: 5, border: `1.5px solid ${on ? '#e06a5f' : MS.line}`, color: '#e06a5f', fontSize: 12 }}>{on ? '✓' : ''}</span>
-                  : pd > 0 ? <span className="absolute" style={{ top: 6, right: 8, fontSize: 11, fontWeight: 800, color: '#8fd08a' }}>▲ {pd}</span> : null}
-                <div className="truncate font-bold" style={{ fontSize: 13, color: g.color, paddingRight: 36 }}>{E.itemName(it)}{it.plus ? ` +${it.plus}` : ''}</div>
-                <div className="truncate" style={{ fontSize: 11, color: PALETTE.textDim }}>{g.label} · Lv.{it.ilv} · {usable ? slot?.label : clsTag(it)}</div>
-                <div style={{ fontSize: 12.5, fontWeight: 800, color: MS.gold }}>⚔ {E.itemPower(it)}{(E.uniqueDef(it) || E.epicOptOf(it)) && <span style={{ fontSize: 10.5, marginLeft: 5, color: '#c79bff' }}>★특수</span>}</div>
-              </button>
-            );
+            return <MainGearCard key={it.uid} it={it} dim={!usable} note={usable ? null : clsTag(it)} picked={picking ? picked.has(it.uid) : null}
+              onClick={() => (picking ? togglePick(it.uid) : setSel(it.uid))}
+              footer={usable ? <GearCmpFooter it={it} cur={cur} /> : <span style={{ color: PALETTE.textDim }}>타직업 장비 — 창고로 보내면 {it.cls === 'common' ? '다른 캐릭터' : chronicleClass(it.cls).name}가 쓴다</span>} />;
           })}
         </div>
         {!bagList.length && <div className="text-center py-10" style={{ fontSize: 12.5, color: PALETTE.textDim }}>{list.length ? '보관 중인 장비가 없습니다 — 착용 장비만 있어요' : '비어 있습니다 — 사냥터에서 장비를 모아 보세요'}</div>}
@@ -1592,7 +1515,7 @@ function BagView({ save, setSave, onBack, flash, onForge }) {
 }
 
 // 장비 카드 — 성능 한눈에 (1.251.1 성장 정보 탭 → 1.252.0 공용 창고 공용)
-function MainGearCard({ it, onClick, note, dim = false }) {
+function MainGearCard({ it, onClick, note, dim = false, footer = null, tag = null, picked = null }) {
   const sl = SLOTS.find(x => x.id === it.slot);
   const g = gradeOf(it.grade); const st = E.itemStats(it); const ud = E.uniqueDef(it); const eo = E.epicOptOf(it);
   const rows = Object.keys(st).filter(k => st[k]).sort((x, y) => (BASE_STATS.indexOf(x) + 1 || 99) - (BASE_STATS.indexOf(y) + 1 || 99)).map(k => {
@@ -1600,10 +1523,11 @@ function MainGearCard({ it, onClick, note, dim = false }) {
     const t = E.statLabel(k, st[k]); const m = t.match(/^(.*?)\s*([+-]?[\d.]+.*)$/); return { k, l: m ? m[1] : t, v: m ? m[2] : '' };
   });
   return (
-    <button onClick={onClick} className="ui-press w-full text-left" style={{ opacity: dim ? 0.6 : 1, padding: '8px 10px 8px 12px', background: MS.box, border: `1px solid ${MS.line}`, borderLeft: `3px solid ${g.color}` }}>
+    <button onClick={onClick} className="ui-press w-full text-left" style={{ opacity: dim ? 0.6 : 1, padding: '8px 10px 8px 12px', background: picked ? 'rgba(224,106,95,0.16)' : MS.box, border: `1px solid ${picked ? '#e06a5f' : MS.line}`, borderLeft: `3px solid ${g.color}` }}>
       <div className="flex items-baseline justify-between gap-2">
-        <span className="truncate font-bold" style={{ fontSize: 13.5, color: g.color }}>{sl.icon} {E.itemName(it)}{it.plus ? ` +${it.plus}` : ''}</span>
-        <b className="flex-none" style={{ fontSize: 12.5, color: MS.gold }}>⚔ {E.itemPower(it).toLocaleString()}</b>
+        <span className="truncate font-bold" style={{ fontSize: 13.5, color: g.color }}>{sl.icon} {E.itemName(it)}{it.plus ? ` +${it.plus}` : ''}{tag}</span>
+        {picked != null ? <span className="flex-none flex items-center justify-center" style={{ width: 20, height: 20, border: `1.5px solid ${picked ? '#e06a5f' : MS.line}`, color: '#e06a5f', fontSize: 13 }}>{picked ? '✓' : ''}</span>
+          : <b className="flex-none" style={{ fontSize: 12.5, color: MS.gold }}>⚔ {E.itemPower(it).toLocaleString()}</b>}
       </div>
       <div style={{ fontSize: 11, color: PALETTE.textDim }}>{g.label} · Lv.{it.ilv} · {sl.label}{note ? <> · {note}</> : null}</div>
       <div className="grid mt-1" style={{ gridTemplateColumns: '1fr 1fr', columnGap: 12 }}>
@@ -1615,8 +1539,47 @@ function MainGearCard({ it, onClick, note, dim = false }) {
         ))}
       </div>
       {(ud || eo) && <div className="mt-1" style={{ fontSize: 11.5, color: '#c79bff', lineHeight: 1.45 }}>★ {(ud || eo).name} — <span style={{ color: PALETTE.text }}>{(ud || eo).desc}</span></div>}
+      {footer && <div className="flex items-center justify-between gap-2 mt-1.5 pt-1.5" style={{ borderTop: `1px dashed ${MS.line}`, fontSize: 11.5 }}>{footer}</div>}
     </button>
   );
+}
+// 카드 아래 줄 — 지금 착용과 비교 (1.254.0, 시안 ㉙㉜)
+const CMP_UP = '#8fd08a'; const CMP_DN = '#e07a6a';
+function gearCmpParts(it, cur) {
+  const pd = E.itemPower(it) - (cur ? E.itemPower(cur) : 0);
+  const a = E.itemStats(it); const b = cur ? E.itemStats(cur) : {};
+  const label = (k) => E.statLabel(k, 1).replace(/\s*[+-]?[\d.]+.*$/, '');
+  const gone = Object.keys(b).filter(k => !BASE_STATS.includes(k) && b[k] && !a[k]).map(label);
+  const add = Object.keys(a).filter(k => !BASE_STATS.includes(k) && a[k] && !b[k]).map(label);
+  const sp = (E.uniqueDef(it) || E.epicOptOf(it)) && !(cur && (E.uniqueDef(cur) || E.epicOptOf(cur)));
+  const spGone = cur && (E.uniqueDef(cur) || E.epicOptOf(cur)) && !(E.uniqueDef(it) || E.epicOptOf(it));
+  const ch = [];
+  if (add.length) ch.push({ t: `${add.slice(0, 3).join('·')} 생김`, c: CMP_UP });
+  if (gone.length) ch.push({ t: `${gone.slice(0, 3).join('·')} 사라짐`, c: CMP_DN });
+  if (sp) ch.push({ t: '★ 특수 효과 생김', c: '#c79bff' }); if (spGone) ch.push({ t: '★ 특수 효과 사라짐', c: CMP_DN });
+  return { pd, ch, pdText: pd > 0 ? `▲ +${pd.toLocaleString()}` : pd < 0 ? `▼ ${pd.toLocaleString()}` : '= 같음', color: pd > 0 ? CMP_UP : pd < 0 ? CMP_DN : PALETTE.textDim };
+}
+function GearCmpFooter({ it, cur, right = null }) {
+  const c = gearCmpParts(it, cur);
+  return <>
+    <div className="flex-1 min-w-0">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="min-w-0 truncate" style={{ color: PALETTE.textDim }}>{cur ? <>vs 착용 「{E.itemName(cur)}{cur.plus ? ` +${cur.plus}` : ''}」</> : '빈 칸에 장착'}</span>
+        <b className="flex-none" style={{ color: c.color }}>⚔ {c.pdText}</b>
+      </div>
+      {c.ch.length > 0 && <div style={{ fontSize: 11, lineHeight: 1.45 }}>{c.ch.map((x, i) => <span key={i} style={{ color: x.c }}>{i ? ' · ' : ''}{x.t}</span>)}</div>}
+    </div>
+    {right}
+  </>;
+}
+const forgeRateColor = (r) => (r == null ? PALETTE.textDim : r >= 1 ? '#8fd08a' : r >= 0.5 ? MS.gold : '#e07a6a');
+function ForgeFooter({ it }) {
+  const r = forgeNextRate(it); const ngi = E.nextGrade(it); const prr = ngi && E.promoteRisk(it);
+  const risk = r != null && r < 1 ? E.enhanceRisk(it) : null;
+  return <>
+    <span className="min-w-0 truncate">⚒ {r == null ? <b style={{ color: PALETTE.textDim }}>최대 강화</b> : <>+{it.plus || 0}→+{(it.plus || 0) + 1} <b style={{ color: forgeRateColor(r) }}>{Math.round(r * 100)}%</b>{risk ? <span style={{ color: CMP_DN }}> · {risk.breakChance ? `파괴 ${Math.round(risk.breakChance * 100)}%` : risk.drop ? '실패 시 하락' : ''}</span> : r >= 1 ? <span style={{ color: PALETTE.textDim }}> · 안전</span> : null}</>}</span>
+    <span className="flex-none">⬆ {ngi ? <>{gradeOf(ngi).label} <b style={{ color: MS.gold }}>{Math.round(prr.rate * 100)}%</b></> : <span style={{ color: PALETTE.textDim }}>—</span>}</span>
+  </>;
 }
 // 장비 정보창 — 본편 카드 모달 (1.249.0, PM 승인 시안 ⑭)
 function MainItemModal({ save, item, cur, by, usable, onClose, footer }) {
@@ -1717,66 +1680,7 @@ function FamSubTable({ k, gi }) {
   );
 }
 // 동행 칸 후보 — 지금 동행 대비 능력치 증감 (1.244.0)
-function FamMainDelta({ k, f, curK, curF, save }) {
-  const heroLv = save.units[save.hero]?.lv || 1;
-  const famPct = E.deriveUnit(save, save.hero).famPct || 0;
-  const a = F.famStats(k, f, heroLv, famPct);
-  const b = curF ? F.famStats(curK, curF, heroLv, famPct) : null;
-  const items = [['HP', 'maxHp'], ['공격', 'atk'], ['방어', 'def'], ['회복력', 'healPower']];
-  return (
-    <div className="flex flex-wrap gap-1 mt-1" style={{ paddingLeft: 4 }}>
-      {items.map(([l, key]) => {
-        const d = b ? a[key] - b[key] : 0;
-        return <ValueChip key={key} label={l} value={a[key].toLocaleString()} delta={b && d ? { kind: d > 0 ? 'up' : 'down', text: `${d > 0 ? '▲' : '▼'}${Math.abs(d).toLocaleString()}` } : null} />;
-      })}
-      {F.famGuard(k, f) > 0 && <ValueChip label="수호 태세" value={`${Math.round(F.famGuard(k, f) * 100)}%`} tone="#e8b04a" />}
-    </div>
-  );
-}
-// 편성 칸 배지 (1.244.0) — ★ 동행 / 보조 1·2 / 대기
-const FAM_SLOT_BADGE = {
-  main: { text: '★ 동행', color: '#e8b04a' },
-  sub1: { text: '보조 1', color: '#c79bff' },
-  sub2: { text: '보조 2', color: '#c79bff' },
-  wait: { text: '대기', color: null },
-};
-function FamSlotBadge({ slot, mark }) {
-  const b = FAM_SLOT_BADGE[slot || 'wait'];
-  return (
-    <span className="flex-none" style={{ fontSize: 11, fontWeight: 800, padding: '2px 7px', borderRadius: 6, whiteSpace: 'nowrap', color: b.color || PALETTE.textDim, background: b.color ? `${b.color}22` : 'rgba(255,255,255,0.04)', border: `1px solid ${b.color ? `${b.color}77` : 'var(--ui-line)'}` }}>{b.text}{mark ? ' ◀' : ''}</span>
-  );
-}
 // 보조 효과 칩 줄 — cur(지금 칸 값)를 주면 ▲▼ 비교
-function FamSubChips({ k, f, heroLv, cur }) {
-  const items = F.famSubItems(k, f, heroLv);
-  const vals = Object.fromEntries(items.map(it => [it.k, it.v]));
-  const gone = cur ? Object.keys(cur).filter(kk => !vals[kk]) : [];
-  return (
-    <div className="flex flex-wrap gap-1 mt-1">
-      {items.map(it => <ValueChip key={it.k} label={`${it.icon ? `${it.icon} ` : ''}${it.label}`} value={it.text} delta={F.famSubDelta(it.k, vals, cur)} />)}
-      {gone.map(kk => <ValueChip key={kk} label={F.famSubLabel(kk)} delta={F.famSubDelta(kk, vals, cur)} />)}
-    </div>
-  );
-}
-function FamCard({ k, f, onClick, right, size = 46, heroLv = 0, slot, mark, cur, dim = false, hideSub = false }) {
-  const g = F.famGrade(f.grade);
-  const role = F.FAM_ROLES[F.famRole(k)];
-  return (
-    <button onClick={onClick} className="ui-press w-full flex items-center gap-2.5 text-left" style={{ padding: '7px 10px', borderRadius: 12, background: `${g.color}12`, border: `1px solid ${mark ? '#c79bff' : `${g.color}66`}`, opacity: dim ? 0.72 : 1 }}>
-      <img src={chronicleEnemyArt(k)} alt="" className="object-cover flex-none self-start" style={{ width: size, height: size, borderRadius: 10, border: `1.5px solid ${g.color}` }} />
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5">
-          <div className="truncate font-semibold flex-1 min-w-0" style={{ fontSize: 13, color: g.color }}><span style={{ color: heroLv && F.famLv(f) < heroLv ? '#e8b04a' : PALETTE.legendary }}>Lv.{F.famLv(f)}</span> {F.famName(k)}{f.plus ? ` +${f.plus}` : ''}</div>
-          {slot !== undefined && <FamSlotBadge slot={slot} mark={mark} />}
-        </div>
-        <div style={{ fontSize: 11, color: PALETTE.textDim }}>{g.label} · <span style={{ color: role.color }}>{role.icon} {role.label}</span>{heroLv > 0 && F.famLv(f) < heroLv ? ` · 보조 효과 ${F.famSubPctOf(f, heroLv)}%` : ''}</div>
-        {!hideSub && <FamSubChips k={k} f={f} heroLv={heroLv} cur={cur} />}
-        {heroLv > 0 && F.famLv(f) < heroLv && <div className="mt-1"><Bar v={f.exp || 0} max={F.FAM_LEVEL.expNeed(F.famLv(f))} color="#e8b04a" h={3} /></div>}
-      </div>
-      {right}
-    </button>
-  );
-}
 // ===== 사역마 인연 (1.228.0) =====
 function FamBondView({ fams, onPick }) {
   const own = F.famOwnFx(fams);
@@ -1860,17 +1764,52 @@ function MainFamTeam({ save, onOpen, onPick }) {
     </div>
   );
 }
-function MainFamTile({ k, f, slot, heroLv, onClick }) {
+// 사역마 카드 — 장비 카드와 같은 형식 (1.254.0, 시안 ㉛)
+const FAM_STAT_ROWS = [['HP', 'maxHp'], ['공격력', 'atk'], ['방어', 'def'], ['회복력', 'healPower']];
+function MainFamCard({ k, f, heroLv, famPct = 0, slot, onClick, dim = false, hideSub = false, cmp = null, curSub = undefined, mark = false }) {
   const g = F.famGrade(f.grade); const role = F.FAM_ROLES[F.famRole(k)];
+  const st = F.famStats(k, f, heroLv, famPct);
+  const subs = F.famSubItems(k, f, heroLv);
+  const vals = Object.fromEntries(subs.map(it => [it.k, it.v]));
+  const gone = curSub ? Object.keys(curSub).filter(kk => !vals[kk]) : [];
+  const sig = F.famHasSignature(k, f) ? F.famSignature(k, f.grade) : null;
+  const pv = F.famPassive(k, f);
+  const lvLow = heroLv && F.famLv(f) < heroLv;
+  const dcol = { up: '#8fd08a', down: '#e07a6a', new: '#8fd08a', gone: '#e07a6a' };
   return (
-    <button onClick={onClick} className="ui-press relative flex items-center gap-2 text-left" style={{ padding: 6, borderRadius: 10, background: MS.box, border: `1px solid ${MS.line}`, borderLeft: `3px solid ${g.color}`, minWidth: 0 }}>
-      {slot && <span className="absolute" style={{ top: 4, right: 6, fontSize: 10.5, fontWeight: 800, color: slot === 'main' ? MS.gold : MS.violet }}>{FAM_SLOT_TAG[slot].replace(' ', '')}</span>}
-      <img src={chronicleEnemyArt(k)} alt="" className="flex-none object-cover" style={{ width: 44, height: 44, borderRadius: 8, border: `1px solid ${g.color}` }} />
-      <div className="min-w-0">
-        <div className="truncate font-bold" style={{ fontSize: 12.5, color: g.color, paddingRight: slot ? 30 : 0 }}>{F.famName(k)}{f.plus ? ` +${f.plus}` : ''}</div>
-        <div className="truncate" style={{ fontSize: 10.5, color: PALETTE.textDim }}>{g.label} · <span style={{ color: role.color }}>{role.icon}{role.label}</span></div>
-        <div style={{ fontSize: 11, color: heroLv && F.famLv(f) < heroLv ? MS.gold : PALETTE.text }}>Lv.{F.famLv(f)}</div>
+    <button onClick={onClick} className="ui-press w-full text-left" style={{ opacity: dim ? 0.7 : 1, padding: '8px 10px 8px 12px', background: MS.box, border: `1px solid ${mark ? MS.violet : MS.line}`, borderLeft: `3px solid ${g.color}` }}>
+      <div className="flex gap-2.5">
+        <img src={chronicleEnemyArt(k)} alt="" className="flex-none object-cover" style={{ width: 52, height: 52, borderRadius: 8, border: `1px solid ${g.color}` }} />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="truncate font-bold" style={{ fontSize: 13.5, color: g.color }}>{F.famName(k)}{f.plus ? ` +${f.plus}` : ''}{slot && <span style={{ marginLeft: 5, fontSize: 10.5, padding: '0 5px', border: `1px solid ${slot === 'main' ? MS.gold : MS.violet}`, color: slot === 'main' ? MS.gold : MS.violet }}>{FAM_SLOT_TAG[slot]}</span>}</span>
+            <b className="flex-none" style={{ fontSize: 12.5, color: MS.gold }}>Lv.{F.famLv(f)}</b>
+          </div>
+          <div style={{ fontSize: 11, color: PALETTE.textDim }}>{g.label} · <span style={{ color: role.color }}>{role.icon} {role.label}</span>{slot ? '' : ' · 대기'}{lvLow ? ` · 보조 효과 ${F.famSubPctOf(f, heroLv)}%` : ''}</div>
+          {lvLow ? <div className="mt-1"><Bar v={f.exp || 0} max={F.FAM_LEVEL.expNeed(F.famLv(f))} color={MS.gold} h={3} /></div> : null}
+        </div>
       </div>
+      <div className="grid mt-1.5" style={{ gridTemplateColumns: '1fr 1fr', columnGap: 12 }}>
+        {FAM_STAT_ROWS.map(([l, key]) => {
+          const d = cmp ? st[key] - cmp[key] : 0;
+          return (
+            <div key={key} className="flex items-baseline justify-between gap-1" style={{ padding: '1px 0' }}>
+              <span style={{ fontSize: 11.5, color: PALETTE.textDim }}>{l}</span>
+              <span style={{ fontSize: 12, fontWeight: 800, color: PALETTE.text }}>{st[key].toLocaleString()}{d ? <span style={{ fontSize: 10.5, marginLeft: 3, color: d > 0 ? '#8fd08a' : '#e07a6a' }}>{d > 0 ? '▲' : '▼'}{Math.abs(d).toLocaleString()}</span> : null}</span>
+            </div>
+          );
+        })}
+        {F.famGuard(k, f) > 0 && <div className="flex items-baseline justify-between gap-1" style={{ padding: '1px 0' }}><span style={{ fontSize: 11.5, color: PALETTE.textDim }}>수호 태세</span><span style={{ fontSize: 12, fontWeight: 800, color: MS.gold }}>{Math.round(F.famGuard(k, f) * 100)}%</span></div>}
+      </div>
+      {!hideSub && (subs.length || gone.length) ? (
+        <div className="mt-1" style={{ fontSize: 11.5, lineHeight: 1.5, color: PALETTE.text }}>
+          <span style={{ color: PALETTE.textDim }}>보조 효과 </span>
+          {subs.map((it, i) => { const dl = curSub !== undefined ? F.famSubDelta(it.k, vals, curSub) : null; return <span key={it.k}>{i ? ' · ' : ''}{it.icon ? `${it.icon} ` : ''}{it.label} <b style={{ color: MS.red }}>{it.text}</b>{dl ? <span style={{ fontSize: 10.5, color: dcol[dl.kind] }}> {dl.text}</span> : null}</span>; })}
+          {gone.map(kk => <span key={kk} style={{ color: '#e07a6a' }}> · {F.famSubLabel(kk)} 사라짐</span>)}
+        </div>
+      ) : null}
+      {sig && <div className="mt-0.5 truncate" style={{ fontSize: 11.5, color: '#c79bff' }}>★ {sig.name} <span style={{ color: PALETTE.textDim }}>({sig.type})</span></div>}
+      {pv && <div className="mt-0.5" style={{ fontSize: 11.5, color: '#e8b04a', lineHeight: 1.4 }}>◆ {pv.name} — <span style={{ color: PALETTE.text }}>{pv.desc}</span></div>}
     </button>
   );
 }
@@ -1957,6 +1896,7 @@ function FamiliarView({ save, setSave, onBack, flash, onTrack = () => {} }) {
   const shards = save.mats.famShard || 0;
   const souls = save.mats.famSoul || 0;
   const heroLv = save.units[save.hero]?.lv || 1;
+  const famPct = E.deriveUnit(save, save.hero).famPct || 0;
   const per = F.FAM_TUNING.shardsPerSummon;
   const pool = F.famPool(save.progress);
   const pity = save.famPity || { total: 0, sinceViolet: 0 };
@@ -2022,8 +1962,8 @@ function FamiliarView({ save, setSave, onBack, flash, onTrack = () => {} }) {
         {tab === 'list' && (
           <>
             <div className="flex justify-between" style={{ fontSize: 12, color: PALETTE.textDim }}><span>보관 <b style={{ color: PALETTE.text }}>{list.length}</b> · 정렬 <b style={{ color: MS.gold }}>등급</b></span><span>📜 {shards} · 🔮 {souls}</span></div>
-            <div className="grid gap-2" style={{ gridTemplateColumns: '1fr 1fr' }}>
-              {[...inTeam, ...waiting].map(([k, f]) => <MainFamTile key={k} k={k} f={f} slot={slotOf(k)} heroLv={heroLv} onClick={() => setSel(k)} />)}
+            <div className="flex flex-col gap-1.5">
+              {[...inTeam, ...waiting].map(([k, f]) => <MainFamCard key={k} k={k} f={f} slot={slotOf(k)} heroLv={heroLv} famPct={famPct} onClick={() => setSel(k)} />)}
             </div>
             {!list.length && <div className="text-center py-10" style={{ fontSize: 12.5, color: PALETTE.textDim }}>아직 사역마가 없습니다 — 계약서 조각을 모아 소환하세요</div>}
           </>
@@ -2037,7 +1977,7 @@ function FamiliarView({ save, setSave, onBack, flash, onTrack = () => {} }) {
             <div key={sl.id}>
               <div style={{ fontSize: 12, color: PALETTE.text, marginBottom: 4 }}><b>{sl.label}</b> <span style={{ color: PALETTE.textDim }}>— {sl.desc}</span></div>
               {!open ? <div style={{ padding: 12, borderRadius: 12, border: '1px dashed var(--ui-line)', color: PALETTE.textDim, fontSize: 12.5 }}>🔒 주인공 Lv.{F.FAM_TUNING.slotLv[sl.id]}에 개방</div>
-                : f ? <FamCard k={k} f={f} heroLv={heroLv} slot={sl.id} onClick={() => setPickSlot(sl.id)} right={<span className="flex-none" style={{ fontSize: 11, color: PALETTE.dawn }}>교체</span>} />
+                : f ? <MainFamCard k={k} f={f} heroLv={heroLv} famPct={famPct} slot={sl.id} hideSub={sl.id === 'main'} onClick={() => setPickSlot(sl.id)} />
                   : <button onClick={() => setPickSlot(sl.id)} className="ui-press w-full text-left" style={{ padding: 12, borderRadius: 12, border: '1px dashed var(--ui-line-strong)', background: 'transparent', color: PALETTE.textDim, fontSize: 12.5 }}>＋ 비어 있음 (눌러서 편성)</button>}
             </div>
           );
@@ -2125,8 +2065,7 @@ function FamiliarView({ save, setSave, onBack, flash, onTrack = () => {} }) {
         const row = ([k, f], others) => (
           <div key={k} className="flex items-stretch gap-1.5">
             <div className="flex-1 min-w-0">
-              <FamCard k={k} f={f} heroLv={heroLv} slot={slotOf(k)} cur={curVals} dim={others} hideSub={isMain} onClick={() => { setSave(E.setFamTeam(save, pickSlot, k)); setPickSlot(null); }} />
-              {isMain && <FamMainDelta k={k} f={f} curK={curK} curF={curF} save={save} />}
+              <MainFamCard k={k} f={f} heroLv={heroLv} famPct={famPct} slot={slotOf(k)} curSub={isMain ? undefined : curVals} cmp={isMain && curF ? F.famStats(curK, curF, heroLv, famPct) : null} dim={others} hideSub={isMain} onClick={() => { setSave(E.setFamTeam(save, pickSlot, k)); setPickSlot(null); }} />
             </div>
             <button onClick={() => setPreview({ after: E.setFamTeam(save, pickSlot, k), title: `🐾 ${slotLabel}: ${F.famName(k)}(으)로 바꾸면` })} className="ui-press flex-none" aria-label="효율 미리보기" style={{ width: 44, borderRadius: 12, border: `1px dashed ${PALETTE.legendary}88`, color: PALETTE.legendary, background: 'transparent', fontSize: 16 }}>📊</button>
           </div>
@@ -2136,9 +2075,9 @@ function FamiliarView({ save, setSave, onBack, flash, onTrack = () => {} }) {
         return (
           <BottomSheet title={`${slotLabel} 편성`} onClose={() => setPickSlot(null)} maxHeight="80%">
             <div className="flex flex-col gap-1.5">
-              <div style={{ fontSize: 11.5, color: PALETTE.textDim }}>{isMain ? '동행 칸 = 함께 싸운다 · 아래 숫자는 지금 동행과 비교한 능력치' : '보조 칸 = 효과만 준다 · ▲▼ = 지금 이 칸의 사역마와 비교'} · 📊 = 사냥 효율 미리보기</div>
+              <div style={{ fontSize: 11.5, color: PALETTE.textDim }}>{isMain ? '동행 칸 = 함께 싸운다 · ▲▼ = 지금 동행과 비교한 능력치' : '보조 칸 = 효과만 준다 · ▲▼ = 지금 이 칸의 사역마와 비교'} · 📊 = 사냥 효율 미리보기</div>
               {grpHead(`지금 ${slotLabel} 칸`)}
-              {curF ? <><FamCard k={curK} f={curF} heroLv={heroLv} slot={pickSlot} mark hideSub={isMain} onClick={() => setPickSlot(null)} />{isMain && <FamMainDelta k={curK} f={curF} curK={null} curF={null} save={save} />}</>
+              {curF ? <MainFamCard k={curK} f={curF} heroLv={heroLv} famPct={famPct} slot={pickSlot} mark hideSub={isMain} onClick={() => setPickSlot(null)} />
                 : <div style={{ padding: 10, borderRadius: 12, border: '1px dashed var(--ui-line-strong)', fontSize: 12, color: PALETTE.textDim }}>비어 있음</div>}
               {curF && <UIButton variant="ghost" style={{ height: 38 }} onClick={() => { setSave(E.setFamTeam(save, pickSlot, null)); setPickSlot(null); }}>편성 해제</UIButton>}
               {others.length > 0 && grpHead(`다른 칸에 편성 중 ${others.length}`, '고르면 그 칸은 비게 됨')}
@@ -2554,20 +2493,8 @@ function ForgeView({ save, setSave, onBack, flash, onTrack = () => {} }) {
         </div>
       </div>
       <div className="flex-1 overflow-y-auto px-4 pb-3">
-        <div className="grid gap-2" style={{ gridTemplateColumns: '1fr 1fr' }}>
-          {bagList.map(it => {
-            const g = gradeOf(it.grade); const r = forgeNextRate(it); const ngi = E.nextGrade(it); const prr = ngi && E.promoteRisk(it);
-            return (
-              <button key={it.uid} onClick={() => setSel(it.uid)} className="ui-press text-left" style={{ padding: '7px 9px 7px 11px', borderRadius: 10, background: MS.box, border: `1px solid ${MS.line}`, borderLeft: `3px solid ${g.color}`, minWidth: 0 }}>
-                <div className="truncate font-bold" style={{ fontSize: 13, color: g.color }}>{E.itemName(it)}{it.plus ? ` +${it.plus}` : ''}</div>
-                <div className="truncate" style={{ fontSize: 11, color: PALETTE.textDim }}>{g.label} · Lv.{it.ilv} · +{it.plus || 0}</div>
-                <div className="truncate" style={{ fontSize: 11 }}>
-                  <span style={{ color: PALETTE.textDim }}>⚒ </span><b style={{ color: r == null ? PALETTE.textDim : r >= 1 ? '#8fd08a' : r >= 0.5 ? MS.gold : '#e07a6a' }}>{r == null ? '최대' : `${Math.round(r * 100)}%`}</b>
-                  <span style={{ color: PALETTE.textDim }}> · ⬆ {ngi ? `${gradeOf(ngi).label} ${Math.round(prr.rate * 100)}%` : '불가'}</span>
-                </div>
-              </button>
-            );
-          })}
+        <div className="flex flex-col gap-1.5">
+          {bagList.map(it => <MainGearCard key={it.uid} it={it} onClick={() => setSel(it.uid)} footer={<ForgeFooter it={it} />} />)}
         </div>
         {!bagList.length && <div className="text-center py-10" style={{ fontSize: 12.5, color: PALETTE.textDim }}>{list.length ? '보관 중인 장비가 없습니다 — 착용 장비는 위 상자를 누르세요' : save.inventory.length ? '이 분류에 장비가 없습니다' : '가방에 장비가 없습니다'}</div>}
       </div>
