@@ -218,6 +218,78 @@ function DiffLine({ item, cur, compact = false }) {
     </div>
   );
 }
+// 장비 상세 본문 (1.245.0) — 기본 능력치 / 추가 옵션 / 특수 효과 / 강화 구획 + 착용 비교
+const BASE_STATS = ['atk', 'def', 'hp', 'spd'];
+const BASE_LABEL = { atk: '공격', def: '방어', hp: 'HP', spd: '속도' };
+function ItemDetailBody({ save, item, cur, by, usable }) {
+  const g = gradeOf(item.grade);
+  const slot = SLOTS.find(sl => sl.id === item.slot);
+  const st = E.itemStats(item);
+  const base = BASE_STATS.filter(k => st[k]);
+  const opts = Object.keys(st).filter(k => !BASE_STATS.includes(k) && st[k]);
+  const optCap = g.opts || 0;
+  const ud = E.uniqueDef(item); const eo = E.epicOptOf(item);
+  const maxPlus = FORGE.maxEnhance;
+  const risk = (item.plus || 0) < maxPlus ? E.enhanceRisk(item) : null;
+  const showCmp = usable && !by;
+  const cmp = (() => {
+    if (!showCmp) return null;
+    const b = cur ? E.itemStats(cur) : {};
+    const keys = [...new Set([...Object.keys(st), ...Object.keys(b)])].filter(k => st[k] || b[k])
+      .sort((x, y) => (BASE_STATS.indexOf(x) + 1 || 99) - (BASE_STATS.indexOf(y) + 1 || 99));
+    return keys.map(k => {
+      const a = st[k] || 0, c = b[k] || 0, d = +(a - c).toFixed(3);
+      const val = a ? E.statLabel(k, a).replace(/^[^\d+-]*(?=[+-]?\d)/, '') : '';
+      const name = BASE_LABEL[k] || E.statLabel(k, 1).replace(/\s*[+-]?[\d.]+.*$/, '');
+      let delta = null;
+      if (cur && a && !c) delta = { kind: 'new', text: '신규' };
+      else if (cur && !a && c) delta = { kind: 'gone', text: '사라짐' };
+      else if (d) delta = { kind: d > 0 ? 'up' : 'down', text: `${d > 0 ? '▲' : '▼'}${E.statLabel(k, Math.abs(d)).replace(/^[^\d]*/, '')}` };
+      return { k, name, val, delta };
+    });
+  })();
+  const pd = showCmp ? E.itemPower(item) - (cur ? E.itemPower(cur) : 0) : 0;
+  const DC = { up: '#8fe08a', new: '#8fe08a', down: '#e07a6a', gone: '#e07a6a' };
+  const Chip2 = ({ children, color }) => <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 7, border: `1px solid ${color ? `${color}66` : 'var(--ui-line)'}`, color: color || PALETTE.textDim, background: 'rgba(255,255,255,0.04)' }}>{children}</span>;
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-2.5" style={{ padding: 10, borderRadius: 14, border: `1px solid ${g.color}88`, background: `${g.color}12` }}>
+        <div className="flex-none flex items-center justify-center" style={{ width: 48, height: 48, borderRadius: 11, background: '#000', fontSize: 22, border: `1.5px solid ${g.color}` }}>{slot?.icon}</div>
+        <div className="flex-1 min-w-0">
+          <div className="font-bold" style={{ fontSize: 15, color: g.color }}>{E.itemName(item)}{item.plus ? ` +${item.plus}` : ''}</div>
+          <div className="flex flex-wrap gap-1 mt-1">
+            <Chip2 color={g.color}>{g.label}</Chip2><Chip2>Lv.{item.ilv}</Chip2><Chip2>{slot?.label}</Chip2><Chip2>{clsTag(item)}</Chip2>
+            {by ? <Chip2 color="#e8b04a">★ 착용 중</Chip2> : <Chip2>가방</Chip2>}
+          </div>
+        </div>
+      </div>
+      {showCmp && (
+        <InfoSection icon="⇄" title={cur ? `지금 착용(${E.itemName(cur)}${cur.plus ? ` +${cur.plus}` : ''})과 비교` : '이 부위 비어 있음'} color="#8fe08a"
+          right={<b style={{ color: pd > 0 ? '#8fe08a' : pd < 0 ? '#e07a6a' : PALETTE.textDim }}>전투력 {pd > 0 ? `▲${pd}` : pd < 0 ? `▼${-pd}` : '='}</b>}>
+          {cmp.map((r, i) => <InfoRow key={r.k} first={i === 0} label={r.name} value={<>{r.val}{r.delta && <b style={{ color: DC[r.delta.kind], marginLeft: 5 }}>{r.delta.text}</b>}</>} />)}
+          {(E.uniqueDef(cur) || E.epicOptOf(cur)) && <div style={{ fontSize: 11, color: '#e07a6a', marginTop: 3 }}>※ 교체하면 착용 중 장비의 특수 효과를 잃습니다</div>}
+        </InfoSection>
+      )}
+      <InfoSection icon="◆" title="기본 능력치" color="#e8b04a" right={item.plus ? `강화 +${item.plus} 반영` : null}>
+        <div className="mt-1"><StatTiles cols={2} items={[...base.map(k => ({ label: BASE_LABEL[k], value: (st[k] || 0).toLocaleString() })), { label: '전투력', value: `⚔${E.itemPower(item)}`, accent: '#e8b04a' }]} /></div>
+      </InfoSection>
+      <InfoSection icon="✦" title="추가 옵션" color={g.color} right={`${opts.length} / ${Math.max(optCap, opts.length)}칸`}>
+        {opts.length ? opts.map((k, i) => { const t = E.statLabel(k, st[k]); const m = t.match(/^(.*?)\s*([+-]?[\d.]+.*)$/); return <InfoRow key={k} first={i === 0} label={m ? m[1] : t} value={m ? m[2] : ''} />; })
+          : <InfoRow first label="옵션" value={optCap ? '없음' : '고급 등급부터'} color={PALETTE.textDim} />}
+      </InfoSection>
+      <InfoSection icon="★" title="특수 효과" color="#c79bff" dim={!ud && !eo}>
+        {ud ? <InfoRow first label="유니크 고유 효과" value={ud.name || ''} note={ud.desc} color="#f0a86a" />
+          : eo ? <InfoRow first label={`에픽 고유 — ${eo.name}`} value="" note={eo.desc} color="#d7a8ff" />
+            : <InfoRow first label="고유 효과" value="없음" note="에픽 장신구 · 유니크 장비만 가진다" color={PALETTE.textDim} />}
+      </InfoSection>
+      <InfoSection icon="⚒" title="강화" color="#e07a6a">
+        <InfoRow first label="현재" value={`+${item.plus || 0} / +${maxPlus}`} />
+        {risk ? <InfoRow label="다음 강화" value={`성공 ${Math.round(risk.rate * 100)}%`} note={risk.breakChance ? `실패 시 파괴 ${Math.round(risk.breakChance * 100)}%` : risk.drop ? '실패 시 강화 단계 하락' : '실패해도 단계 유지'} color={risk.breakChance ? '#e07a6a' : PALETTE.text} />
+          : <InfoRow label="다음 강화" value="최대 강화" color={PALETTE.textDim} />}
+      </InfoSection>
+    </div>
+  );
+}
 function ItemRow({ save, item, onClick, right }) {
   const g = gradeOf(item.grade);
   const by = save.inventory.some(i => i.uid === item.uid) ? E.equippedBy(save, item.uid) : null;
@@ -1202,6 +1274,7 @@ function PartyView({ save, setSave, onBack }) {
   const cid = save.hero;
   const [slotPick, setSlotPick] = useState(null);
   const [skillInfo, setSkillInfo] = useState(null);
+  const [rulesOpen, setRulesOpen] = useState(false); // 자동 사용 규칙 펼치기 (1.245.0)
   const [rebirthOpen, setRebirthOpen] = useState(false);
   const u = save.units[cid];
   const cls = chronicleClass(cid);
@@ -1244,14 +1317,14 @@ function PartyView({ save, setSave, onBack }) {
             </div>
           ))}
           {u.points > 0 && <button onClick={() => setSave(E.autoAllocate(save, cid))} className="ui-press w-full mt-2" style={{ height: 36, borderRadius: 10, border: '1px dashed var(--ui-line-strong)', color: PALETTE.dawn, background: 'transparent', fontSize: 12.5 }}>추천 배분 ({cls.role} 기준)</button>}
-          <table className="w-full mt-2" style={{ fontSize: 12, color: PALETTE.text }}>
-            <tbody>
-              <tr><td style={{ color: PALETTE.textDim }}>HP</td><td className="text-right">{d.maxHp}</td><td style={{ color: PALETTE.textDim, paddingLeft: 12 }}>공격력</td><td className="text-right">{d.atk}</td></tr>
-              <tr><td style={{ color: PALETTE.textDim }}>방어</td><td className="text-right">{d.def}</td><td style={{ color: PALETTE.textDim, paddingLeft: 12 }}>속도</td><td className="text-right">{d.spd}</td></tr>
-              <tr><td style={{ color: PALETTE.textDim }}>치명</td><td className="text-right">{Math.round(d.crit * 100)}%</td><td style={{ color: PALETTE.textDim, paddingLeft: 12 }}>회피</td><td className="text-right">{Math.round(d.dodge * 100)}%</td></tr>
-              {cid === 'priest' && <tr><td style={{ color: PALETTE.textDim }}>치유력</td><td className="text-right">{d.healPower}</td><td /><td /></tr>}
-            </tbody>
-          </table>
+          <div className="mt-2">
+            <div style={{ fontSize: 11.5, color: PALETTE.textDim, marginBottom: 4 }}>전투 능력치</div>
+            <StatTiles items={[
+              { label: 'HP', value: d.maxHp.toLocaleString() }, { label: '공격력', value: d.atk.toLocaleString() }, { label: '방어', value: d.def.toLocaleString() },
+              { label: '속도', value: d.spd }, { label: '치명', value: `${Math.round(d.crit * 100)}%` }, { label: '회피', value: `${Math.round(d.dodge * 100)}%` },
+              ...(cid === 'priest' ? [{ label: '치유력', value: d.healPower.toLocaleString(), accent: '#8fe08a' }] : []),
+            ]} />
+          </div>
           <DetailStats d={d} cid={cid} />
         </GlassPanel>
 
@@ -1266,22 +1339,34 @@ function PartyView({ save, setSave, onBack }) {
             const locked = s.reqLv > u.lv;
             const can = E.canLearn(u, s);
             return (
-              <div key={s.id} className="flex items-center gap-2 mt-2">
-                <button onClick={() => setSkillInfo(s)} className="flex-1 min-w-0 text-left ui-press" style={{ background: 'transparent', border: 'none', padding: 0, opacity: locked ? 0.45 : 1 }}>
-                  <div style={{ fontSize: 13, color: lv ? PALETTE.text : PALETTE.textDim }}>{s.branch ? <span style={{ color: REBIRTH_BRANCHES[s.branch].color }}>✦ </span> : null}{s.name} <span style={{ fontSize: 11, color: lv ? PALETTE.legendary : PALETTE.textDim }}>{lv ? `Lv.${lv}/${SKILL_MAX_LV}` : locked ? `Lv.${s.reqLv}부터` : '미습득'}</span> <CdChip s={s} cdr={d} /></div>
-                  <div className="truncate" style={{ fontSize: 11, color: PALETTE.textDim }}>{describeSkill(s, Math.max(1, lv))}</div>
+              <div key={s.id} className="flex items-stretch gap-2 mt-2" style={{ borderRadius: 12, padding: 9, border: '1px solid var(--ui-line)', background: 'rgba(255,255,255,0.02)', opacity: locked ? 0.5 : 1 }}>
+                <button onClick={() => setSkillInfo(s)} className="flex-1 min-w-0 text-left ui-press" style={{ background: 'transparent', border: 'none', padding: 0 }}>
+                  <div className="flex items-center justify-between gap-2">
+                    <span style={{ fontSize: 13.5, fontWeight: 800, color: lv ? PALETTE.legendary : PALETTE.textDim }}>{s.branch ? <span style={{ color: REBIRTH_BRANCHES[s.branch].color }}>✦ </span> : null}{s.name} <span style={{ fontSize: 11, fontWeight: 600 }}>{lv ? `Lv.${lv}/${SKILL_MAX_LV}` : locked ? `Lv.${s.reqLv}부터` : '미습득'}</span></span>
+                    <span className="flex-none" style={{ fontSize: 11, padding: '1px 7px', borderRadius: 7, border: '1px solid var(--ui-line)' }}>{s.kind === 'passive' ? <span style={{ color: PALETTE.textDim }}>패시브</span> : s.cd ? <CdChip s={s} cdr={d} /> : <span style={{ color: PALETTE.textDim }}>매 턴</span>}</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: PALETTE.textDim }}>{SKILL_KIND_LABEL[s.kind] || '스킬'} · <span style={{ letterSpacing: 1, color: PALETTE.legendary }}>{'●'.repeat(lv)}<span style={{ color: PALETTE.textDim }}>{'○'.repeat(Math.max(0, SKILL_MAX_LV - lv))}</span></span></div>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {skillParts(describeSkill(s, Math.max(1, lv))).map((t, i) => <span key={i} style={{ fontSize: 11.5, padding: '2px 7px', borderRadius: 7, background: 'rgba(111,168,220,0.1)', border: '1px solid rgba(111,168,220,0.3)', color: PALETTE.textDim }}><HiNum text={t} /></span>)}
+                  </div>
                 </button>
-                <button disabled={!can} onClick={() => setSave(E.learnSkill(save, cid, s.id))} className="ui-press flex-none" style={{ height: 34, padding: '0 10px', borderRadius: 9, border: `1px solid ${can ? PALETTE.legendary : 'var(--ui-line)'}`, color: can ? PALETTE.legendary : PALETTE.textDim, background: 'transparent', fontSize: 12, opacity: can ? 1 : 0.4 }}>
+                <button disabled={!can} onClick={() => setSave(E.learnSkill(save, cid, s.id))} className="ui-press flex-none self-center" style={{ height: 34, padding: '0 10px', borderRadius: 9, border: `1px solid ${can ? PALETTE.legendary : 'var(--ui-line)'}`, color: can ? PALETTE.legendary : PALETTE.textDim, background: 'transparent', fontSize: 12, opacity: can ? 1 : 0.4 }}>
                   {lv ? '강화' : '배우기'}
                 </button>
               </div>
             );
           })}
-          <div className="mt-2" style={{ fontSize: 11, color: PALETTE.textDim, lineHeight: 1.55 }}>
-            ⏱ = 재사용 대기 (쓴 뒤 내 차례 N번은 못 씀){d.cdr || d.skillCdr ? <> · <b style={{ color: '#7fd1c8' }}>재사용 단축 반영됨</b> (모든 스킬 = 유니크·특성 / 스킬 하나 = 일반 장비 옵션)</> : null}<br />
-            쓸 수 있는 스킬이 여럿이면 쿨타임이 아니라 <b style={{ color: PALETTE.text }}>상황 순서</b>로 고른다: 회복(위급) → 보호막 → 강화 → 도발(위급) → 광역(적 2명+) → 단일 중 가장 센 스킬 → 없으면 기본 공격<br />
-            스킬을 다 올리고 남은 포인트는 아래 <b style={{ color: PALETTE.legendary }}>특성</b>에 찍는다.
-          </div>
+          <button onClick={() => setRulesOpen(!rulesOpen)} className="ui-press w-full text-left mt-2" style={{ background: 'transparent', border: 'none', padding: 0 }}>
+            <InfoSection icon="ⓘ" title="자동 사용 규칙" color={PALETTE.dawn} right={rulesOpen ? '접기 ▴' : '펼치기 ▾'}>
+              {rulesOpen && (
+                <div style={{ fontSize: 11.5, color: PALETTE.textDim, lineHeight: 1.6 }}>
+                  ⏱ = 재사용 대기 (쓴 뒤 내 차례 N번은 못 씀){d.cdr || d.skillCdr ? <> · <b style={{ color: '#7fd1c8' }}>재사용 단축 반영됨</b> (모든 스킬 = 유니크·특성 / 스킬 하나 = 일반 장비 옵션)</> : null}<br />
+                  쓸 수 있는 스킬이 여럿이면 쿨타임이 아니라 <b style={{ color: PALETTE.text }}>상황 순서</b>로 고른다: 회복(위급) → 보호막 → 강화 → 도발(위급) → 광역(적 2명+) → 단일 중 가장 센 스킬 → 없으면 기본 공격<br />
+                  스킬을 다 올리고 남은 포인트는 아래 <b style={{ color: PALETTE.legendary }}>특성</b>에 찍는다.
+                </div>
+              )}
+            </InfoSection>
+          </button>
         </GlassPanel>
 
         {/* 특성 트리 (1.224.0) */}
@@ -1326,14 +1411,8 @@ function PartyView({ save, setSave, onBack }) {
         </BottomSheet>
       )}
       {skillInfo && (
-        <BottomSheet title={skillInfo.name} onClose={() => setSkillInfo(null)} maxHeight="60%">
-          <div className="flex flex-col gap-1.5" style={{ fontSize: 12.5, color: PALETTE.text }}>
-            <div style={{ color: PALETTE.textDim }}>배울 수 있는 레벨 Lv.{skillInfo.reqLv}</div>
-            <CdDetail s={skillInfo} cdr={d} />
-            {[1, 2, 3, 4, 5].map(l => (
-              <div key={l} style={{ color: (u.skills[skillInfo.id] || 0) === l ? PALETTE.legendary : PALETTE.text }}>Lv.{l} — {describeSkill(skillInfo, l)}</div>
-            ))}
-          </div>
+        <BottomSheet title={skillInfo.name} onClose={() => setSkillInfo(null)} maxHeight="75%">
+          <SkillInfoBody s={skillInfo} lv={u.skills[skillInfo.id] || 0} d={d} />
           <div className="mt-4"><UIButton variant="ghost" onClick={() => setSkillInfo(null)}>닫기</UIButton></div>
         </BottomSheet>
       )}
@@ -1479,11 +1558,8 @@ function BagView({ save, setSave, onBack, flash }) {
         const cur = save.inventory.find(i => i.uid === save.units[hero].equip[item.slot]);
         const diff = E.itemPower(item) - (cur ? E.itemPower(cur) : 0);
         return (
-          <BottomSheet title={E.itemName(item) + (item.plus ? ` +${item.plus}` : '')} onClose={() => setSel(null)} maxHeight="72%">
-            <div style={{ fontSize: 12.5, color: gradeOf(item.grade).color }} className="text-center">{gradeOf(item.grade).label} · Lv.{item.ilv} · {SLOTS.find(s => s.id === item.slot).label} · {clsTag(item)}</div>
-            <div className="text-center mt-1" style={{ fontSize: 12.5, color: PALETTE.text, lineHeight: 1.6 }}>{statLine(E.itemStats(item))}</div>
-            <ItemSpecial item={item} center />
-            {usable && !by && <DiffLine item={item} cur={cur} />}
+          <BottomSheet title="장비 정보" onClose={() => setSel(null)} maxHeight="80%">
+            <ItemDetailBody save={save} item={item} cur={cur} by={by} usable={usable} />
             {usable && !by && E.canWear(item, save.units[hero]) && (
               <button onClick={() => setPreview({ after: E.equipItem(save, hero, item.uid), title: `⚔ ${E.itemName(item)}${item.plus ? ` +${item.plus}` : ''} 장착 시` })} className="ui-press w-full mt-2" style={{ height: 38, borderRadius: 10, border: `1px dashed ${PALETTE.legendary}88`, color: PALETTE.legendary, background: 'transparent', fontSize: 12.5 }}>📊 이걸 끼면? — 사냥 효율 미리보기</button>
             )}
@@ -1491,15 +1567,19 @@ function BagView({ save, setSave, onBack, flash }) {
             <div className="mt-3 flex flex-col gap-2">
               {usable && !by && (
                 <UIButton style={{ height: 42 }} onClick={() => { setSave(E.equipItem(save, hero, item.uid)); setSel(null); flash('장착'); }}>
-                  장착 {diff > 0 ? `(전투력 ▲ ${diff})` : diff < 0 ? `(전투력 ▼ ${-diff})` : ''}
+                  착용 {diff > 0 ? `(전투력 ▲ ${diff})` : diff < 0 ? `(전투력 ▼ ${-diff})` : ''}
                 </UIButton>
               )}
-              <div className="flex gap-2">
-                <UIButton variant="ghost" style={{ height: 42 }} disabled={!!by} onClick={() => { toStash([item.uid]); setSel(null); }}>{by ? '착용 중' : '창고로'}</UIButton>
-                <UIButton variant="ghost" style={{ height: 42 }} disabled={!!by} onClick={() => { const r = E.dismantleItems(save, [item.uid]); setSave(r.save); setSel(null); flash(`분해 → ${E.salvageText(r.salvage)}`); }}>
-                  {by ? '착용 중' : `분해 ${E.salvageText(E.salvageOf(item))}`}
-                </UIButton>
-              </div>
+              {by ? (
+                <UIButton variant="ghost" style={{ height: 42 }} onClick={() => { setSave(E.unequipItem(save, by, item.slot)); setSel(null); flash('착용 해제'); }}>착용 해제</UIButton>
+              ) : (
+                <div className="flex gap-2">
+                  <UIButton variant="ghost" style={{ height: 42 }} onClick={() => { toStash([item.uid]); setSel(null); }}>창고로</UIButton>
+                  <UIButton variant="ghost" style={{ height: 42, color: '#e07a6a' }} onClick={() => { const r = E.dismantleItems(save, [item.uid]); setSave(r.save); setSel(null); flash(`분해 → ${E.salvageText(r.salvage)}`); }}>
+                    분해 {E.salvageText(E.salvageOf(item))}
+                  </UIButton>
+                </div>
+              )}
               <UIButton variant="ghost" style={{ height: 40 }} onClick={() => setSel(null)}>닫기</UIButton>
             </div>
           </BottomSheet>
@@ -2610,6 +2690,50 @@ function QuestView({ save, setSave, onBack, flash, onReplay }) {
   );
 }
 
+// ===== 스킬 카드·정보 창 (1.245.0) =====
+const SKILL_KIND_LABEL = {
+  strike: '단일 공격', multi: '연속 공격', aoe: '광역 공격', dot: '지속 피해', lifesteal: '흡혈 공격', heal: '회복', healAll: '전체 회복', shield: '보호막',
+  buffAtk: '아군 강화', rage: '자기 강화', taunt: '도발', executeStrike: '처형', breakStrike: '방어 파괴', weakStrike: '공격 약화', markStrike: '취약 표식',
+  healShield: '회복 + 보호막', healBuff: '회복 + 강화', hot: '지속 회복', passive: '패시브 (상시)',
+};
+const SKILL_WHEN_TEXT = {
+  heal: 'HP가 낮은 아군이 위급할 때 (회복 우선)', healAll: '부상당한 아군이 2명 이상일 때', healShield: 'HP가 낮은 아군이 있을 때', healBuff: 'HP가 낮은 아군이 있을 때', hot: 'HP가 낮은 아군이 있을 때',
+  shield: '보호막이 없을 때', buffAtk: '강화 효과가 꺼져 있을 때', rage: '강화 효과가 꺼져 있을 때', taunt: '위급할 때 적의 공격을 끌어온다',
+  aoe: '살아 있는 적이 2명 이상일 때 (광역 우선)', passive: '항상 적용',
+};
+const skillTarget = (s) => (/heal|shield|buff|hot/i.test(s.kind) ? (s.kind === 'heal' || s.kind === 'hot' || s.kind === 'healShield' || s.kind === 'healBuff' ? '아군 1명' : '아군 전체') : s.kind === 'rage' || s.kind === 'taunt' ? '자신' : s.kind === 'passive' ? '자신' : s.kind === 'aoe' || (s.kind === 'dot' && s.all) ? '적 전체' : '적 1명');
+const skillParts = (t) => String(t).split(/, | — | \+ (?=\d+턴간|보호막|그 적|방어|받는)/).filter(Boolean);
+const skillPower = (s, lv) => (s.kind === 'passive' ? null : Math.round((s.base + s.perLv * (Math.max(1, lv) - 1)) * 100));
+function SkillInfoBody({ s, lv, d }) {
+  const cur = Math.max(1, lv);
+  const pw = skillPower(s, cur);
+  const w = cdWait(s, d); const cdr = cdOf(s, d);
+  const all = d?.cdr || 0; const own = d?.skillCdr?.[s.id] || 0;
+  return (
+    <div className="flex flex-col gap-2">
+      <div style={{ fontSize: 12, color: PALETTE.textDim }}>{SKILL_KIND_LABEL[s.kind] || '스킬'} · {lv ? `Lv.${lv}/${SKILL_MAX_LV}` : `미습득 (Lv.${s.reqLv}부터)`}</div>
+      <StatTiles items={[
+        { label: '위력', value: pw != null ? `${pw}%` : '상시' },
+        { label: '재사용', value: s.kind === 'passive' ? '—' : !s.cd ? '매 턴' : w ? `${w}턴` : '매 턴', accent: cdr ? '#7fd1c8' : null },
+        { label: '대상', value: skillTarget(s) },
+      ]} />
+      <InfoSection title="레벨별 효과" color={PALETTE.legendary}>
+        {[1, 2, 3, 4, 5].map((l, i) => <InfoRow key={l} first={i === 0} label={`Lv.${l}${lv === l ? ' ◀ 지금' : ''}`} value={<span style={{ fontWeight: lv === l ? 800 : 400, color: lv === l ? PALETTE.legendary : PALETTE.textDim }}>{skillPower(s, l) != null ? `${skillPower(s, l)}%` : ''}</span>} note={lv === l ? describeSkill(s, l) : null} />)}
+      </InfoSection>
+      {s.kind !== 'passive' && s.cd > 0 && (
+        <InfoSection title="재사용 계산" color="#9cc4e4">
+          <InfoRow first label="기본" value={`${s.cd}턴`} />
+          {all > 0 && <InfoRow label="모든 스킬 단축 (유니크·특성)" value={`-${all}턴`} />}
+          {own > 0 && <InfoRow label="이 스킬 전용 단축 (장비 옵션·시간의 모래)" value={`-${own}턴`} />}
+          {cdr > 0 && cdr < all + own && <InfoRow label={`합계 상한 ${E.CDR_CAP}턴`} value={`-${cdr}턴만 적용`} color={PALETTE.textDim} />}
+          <InfoRow label="실제 대기" value={w ? `${w}턴` : '매 턴 사용 가능'} color="#9cc4e4" note="쓴 뒤 내 차례 N번은 이 스킬을 쓸 수 없다" />
+        </InfoSection>
+      )}
+      <div style={{ fontSize: 11.5, color: PALETTE.textDim, background: 'rgba(0,0,0,0.25)', borderRadius: 8, padding: '6px 8px' }}>발동 ▸ {SKILL_WHEN_TEXT[s.kind] || '다른 조건이 맞지 않을 때 — 준비된 단일 공격 중 위력이 가장 높은 것'}</div>
+    </div>
+  );
+}
+
 // ===== 스킬 쿨타임 표시 (1.240.1) — 엔진 규칙: 쓴 뒤 대기 = max(0, 재사용 - 단축), 단축은 장비·특성 합산 최대 2 =====
 // 1.241.0: cdr 인자 = deriveUnit 결과(d) — 모든 스킬 단축 + 스킬별 단축을 합쳐 계산
 const cdOf = (s, d) => (d ? E.skillCdrOf(d, s.id) : 0);
@@ -2658,19 +2782,25 @@ const DETAIL_STATS = [
   ['famPct', '사역마 능력치', 'pct'], ['expPct', '경험치 획득', 'pct'], ['goldPct', '골드 획득', 'pct'], ['dropPct', '장비 획득률', 'pct'],
 ];
 const fmtDetail = (v, f) => (f === 'pct' ? `${Math.round(v * 1000) / 10}%` : f === 'pctMult' ? `${Math.round(v * 100)}%` : f === 'turn' ? `${v}턴` : f === 'x' ? `×${v}` : f === 'flag' ? '보유' : `+${v}`);
+// 1.245.0 — 성격별 4구획 (PM 승인 시안)
+const DETAIL_GROUPS = [
+  { id: 'atk', icon: '⚔', title: '공격', color: '#e07a6a', keys: ['critMult', 'counterPct', 'counterDmg', 'counterDouble', 'critAfterCounter', 'firstCrit', 'armorPen', 'lowHpDmg', 'missingHpAtk', 'execute', 'chain', 'skillDmg', 'dotDmg', 'dotTurnsMult', 'holyDmg', 'openInferno', 'rageDouble', 'multiHitsAdd', 'spiritArrow'] },
+  { id: 'surv', icon: '🛡', title: '생존', color: '#6aa6e0', keys: ['dmgReduce', 'tauntReduce', 'shieldReduce', 'lifesteal', 'thornsPct', 'startShieldPct', 'skillShield', 'overhealShield', 'regenPct', 'dodgeHeal', 'emergencyHeal', 'revive', 'guts', 'blessMult', 'blessTurns'] },
+  { id: 'skill', icon: '⏱', title: '스킬', color: '#9cc4e4', keys: ['cdr', 'resetEvery'] },
+  { id: 'gain', icon: '💰', title: '획득', color: '#8fe08a', keys: ['famPct', 'expPct', 'goldPct', 'dropPct'] },
+];
 function DetailStats({ d, cid }) {
-  const rows = DETAIL_STATS.filter(([k]) => d[k] || (k === 'counterPct' && cid === 'wanderer') || k === 'critMult');
+  const show = (k) => d[k] || (k === 'counterPct' && cid === 'wanderer') || k === 'critMult';
+  const byKey = Object.fromEntries(DETAIL_STATS.map(r => [r[0], r]));
+  const groups = DETAIL_GROUPS.map(g => ({ ...g, rows: g.keys.filter(k => byKey[k] && show(k)).map(k => byKey[k]) })).filter(g => g.rows.length);
   return (
-    <div className="mt-2 pt-2" style={{ borderTop: '1px solid var(--ui-line)' }}>
-      <div style={{ fontSize: 11.5, color: PALETTE.textDim, marginBottom: 2 }}>세부 능력치 <span style={{ fontSize: 11 }}>— 장비·특성·사역마·원정대 버프·전승 합산</span></div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', columnGap: 10, rowGap: 2, fontSize: 12, color: PALETTE.text }}>
-        {rows.map(([k, label, f]) => (
-          <React.Fragment key={k}>
-            <span style={{ color: PALETTE.textDim }}>{label}</span>
-            <span className="text-right">{fmtDetail(d[k] || 0, f)}</span>
-          </React.Fragment>
-        ))}
-      </div>
+    <div className="mt-2 flex flex-col gap-2">
+      <div style={{ fontSize: 11.5, color: PALETTE.textDim }}>세부 능력치 <span style={{ fontSize: 11 }}>— 장비·특성·사역마·원정대 버프·전승 합산</span></div>
+      {groups.map(g => (
+        <InfoSection key={g.id} icon={g.icon} title={g.title} color={g.color}>
+          {g.rows.map(([k, label, f], i) => <InfoRow key={k} first={i === 0} label={label} value={fmtDetail(d[k] || 0, f)} />)}
+        </InfoSection>
+      ))}
     </div>
   );
 }
