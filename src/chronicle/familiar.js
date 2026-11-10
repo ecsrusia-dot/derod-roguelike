@@ -101,9 +101,9 @@ export function famEconId(key) {
 // atk/hp/def = 주인공 능력치 대비 비율 (× 등급 배율 × 강화)
 export const FAM_ROLES = {
   tank: {
-    label: '수호', icon: '🛡', color: '#9cc4e4', atk: 0.1, hp: 0.85, def: 1.3, tauntReduce: 0.2,
+    label: '수호', icon: '🛡', color: '#9cc4e4', atk: 0.1, hp: 0.7, def: 1.3, tauntReduce: 0.2,
     // 수호 태세 — 살아 있는 동안 적의 단일 공격이 이 확률로 사역마에게 향한다 (등급별)
-    guard: [0.35, 0.45, 0.55, 0.65, 0.75],
+    guard: [0.3, 0.35, 0.4, 0.45, 0.5], // 1.235.1: 0.35~0.75 → 0.3~0.5 (상시 도발과 겹쳐 피해의 74~90%를 대신 맞던 문제)
     desc: '도발로 적의 공격을 대신 받는다 — 딜은 강하지만 몸이 약한 직업에게',
     // 보조 패시브 — 등급별 값 (적·녹·청·남·자)
     sub: { dmgReduce: [0.02, 0.03, 0.045, 0.06, 0.08], shieldPct: [0, 0, 0.05, 0.08, 0.12] },
@@ -114,7 +114,7 @@ export const FAM_ROLES = {
     sub: { atkPct: [0.03, 0.045, 0.07, 0.1, 0.13], critDmg: [0, 0, 0.15, 0.25, 0.4] },
   },
   healer: {
-    label: '치유', icon: '✚', color: '#8fe08a', atk: 0.1, hp: 0.35, def: 0.6, heal: 0.2,
+    label: '치유', icon: '✚', color: '#8fe08a', atk: 0.1, hp: 0.45, def: 0.6, heal: 0.4, // 1.235.1: 회복력 0.2 → 0.4 · HP 0.35 → 0.45
     desc: '주인공을 회복하고 보호막을 씌운다 — 단단하지만 전투가 길어지는 직업에게',
     sub: { regenPct: [0.002, 0.0025, 0.003, 0.004, 0.005], healPct: [0.04, 0.06, 0.09, 0.12, 0.16], emergencyHeal: [0, 0, 0.08, 0.12, 0.18] },
   },
@@ -151,7 +151,7 @@ export const FAM_CLASS_TIP = {
 // 역할별 동행 스킬 (Lv = 등급 순서 1~5)
 const FS = (id, name, kind, cd, base, perLv, extra = {}) => ({ id, cls: 'fam', name, kind, reqLv: 1, cd, base, perLv, ...extra });
 export const FAM_SKILLS = {
-  tank: [FS('f_guard', '수호의 포효', 'taunt', 3, 0.3, 0.1, { turns: 3 }), FS('f_bash', '몸통 박치기', 'strike', 2, 1.0, 0.12)],
+  tank: [FS('f_guard', '수호의 포효', 'taunt', 3, 0.3, 0.1, { turns: 1 }), FS('f_bash', '몸통 박치기', 'strike', 2, 1.0, 0.12)],
   dps: [FS('f_bite', '물어뜯기', 'strike', 2, 1.6, 0.18), FS('f_frenzy', '난도질', 'multi', 3, 0.6, 0.08, { hits: 3 }), FS('f_blast', '마력 폭발', 'aoe', 4, 0.9, 0.12)],
   healer: [FS('f_mend', '치유의 숨결', 'heal', 3, 1.0, 0.12), FS('f_ward', '보호의 빛', 'shield', 4, 0.8, 0.12)],
 };
