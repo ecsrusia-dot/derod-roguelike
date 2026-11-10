@@ -605,10 +605,6 @@ export function regressionCombatExpedition(regionKey) {
   return { enemyHpMult: m.hp, enemyDmgMult: m.dmg, maxRelicSelect: REGRESSION_TUNING.relicSlots };
 }
 
-export function regressionClassFx(classId) {
-  return { ...(REGRESSION_TUNING.classFx[classId] || {}) };
-}
-
 // 1.179.0~ 전투 후 HP 비율 — hpBefore(절대값)에서 받은 피해 × 상처 비율만큼만 남는다
 export function regressionPostCombatHpPct(hpBefore, maxHp, damageTaken = 0, spire = false, woundCut = 0) {
   const w = spire ? REGRESSION_TUNING.spireWoundPct - woundCut : REGRESSION_TUNING.woundPct;

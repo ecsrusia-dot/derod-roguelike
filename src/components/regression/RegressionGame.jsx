@@ -28,7 +28,7 @@ import {
   settleRegression, setRegressionCarry, regressionCarrySlots, buildRegressionLoadout,
   describeRegressionRecord, getRegressionMemory,
   POTIONS, AUTO_SPEED_SKIP, rollRegressionLoot, applyRegressionLoot, describeRegressionLoot,
-  setRegressionLoadout, consumeRegressionPotions, regressionCombatExpedition, regressionBeltSlots, regressionClassFx, regressionPostCombatHpPct,
+  setRegressionLoadout, consumeRegressionPotions, regressionCombatExpedition, regressionBeltSlots, regressionPostCombatHpPct,
   REGRESSION_COMPANIONS, REGRESSION_ENDINGS, REGRESSION_SHOP, REGRESSION_EVENTS, regressionCompanionAt, regressionCompanionTier,
   aggregateRegressionCompanions, applyRegressionTalk, rollRegressionEvent, applyRegressionEvent, buyRegressionShop,
   regressionVictoryGold, regressionEndingFor, getRegressionCompanion, RELICS,
