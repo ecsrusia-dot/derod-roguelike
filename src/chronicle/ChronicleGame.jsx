@@ -1267,7 +1267,7 @@ function PartyView({ save, setSave, onBack }) {
             return (
               <div key={s.id} className="flex items-center gap-2 mt-2">
                 <button onClick={() => setSkillInfo(s)} className="flex-1 min-w-0 text-left ui-press" style={{ background: 'transparent', border: 'none', padding: 0, opacity: locked ? 0.45 : 1 }}>
-                  <div style={{ fontSize: 13, color: lv ? PALETTE.text : PALETTE.textDim }}>{s.branch ? <span style={{ color: REBIRTH_BRANCHES[s.branch].color }}>✦ </span> : null}{s.name} <span style={{ fontSize: 11, color: lv ? PALETTE.legendary : PALETTE.textDim }}>{lv ? `Lv.${lv}/${SKILL_MAX_LV}` : locked ? `Lv.${s.reqLv}부터` : '미습득'}</span> <CdChip s={s} cdr={d.cdr || 0} /></div>
+                  <div style={{ fontSize: 13, color: lv ? PALETTE.text : PALETTE.textDim }}>{s.branch ? <span style={{ color: REBIRTH_BRANCHES[s.branch].color }}>✦ </span> : null}{s.name} <span style={{ fontSize: 11, color: lv ? PALETTE.legendary : PALETTE.textDim }}>{lv ? `Lv.${lv}/${SKILL_MAX_LV}` : locked ? `Lv.${s.reqLv}부터` : '미습득'}</span> <CdChip s={s} cdr={d} /></div>
                   <div className="truncate" style={{ fontSize: 11, color: PALETTE.textDim }}>{describeSkill(s, Math.max(1, lv))}</div>
                 </button>
                 <button disabled={!can} onClick={() => setSave(E.learnSkill(save, cid, s.id))} className="ui-press flex-none" style={{ height: 34, padding: '0 10px', borderRadius: 9, border: `1px solid ${can ? PALETTE.legendary : 'var(--ui-line)'}`, color: can ? PALETTE.legendary : PALETTE.textDim, background: 'transparent', fontSize: 12, opacity: can ? 1 : 0.4 }}>
@@ -1277,7 +1277,7 @@ function PartyView({ save, setSave, onBack }) {
             );
           })}
           <div className="mt-2" style={{ fontSize: 11, color: PALETTE.textDim, lineHeight: 1.55 }}>
-            ⏱ = 재사용 대기 (쓴 뒤 내 차례 N번은 못 씀){d.cdr ? <> · 장비·특성 <b style={{ color: '#7fd1c8' }}>재사용 단축 -{d.cdr}턴</b> 반영됨</> : null}<br />
+            ⏱ = 재사용 대기 (쓴 뒤 내 차례 N번은 못 씀){d.cdr || d.skillCdr ? <> · <b style={{ color: '#7fd1c8' }}>재사용 단축 반영됨</b> (모든 스킬 = 유니크·특성 / 스킬 하나 = 일반 장비 옵션)</> : null}<br />
             쓸 수 있는 스킬이 여럿이면 쿨타임이 아니라 <b style={{ color: PALETTE.text }}>상황 순서</b>로 고른다: 회복(위급) → 보호막 → 강화 → 도발(위급) → 광역(적 2명+) → 단일 중 가장 센 스킬 → 없으면 기본 공격<br />
             스킬을 다 올리고 남은 포인트는 아래 <b style={{ color: PALETTE.legendary }}>특성</b>에 찍는다.
           </div>
@@ -1328,7 +1328,7 @@ function PartyView({ save, setSave, onBack }) {
         <BottomSheet title={skillInfo.name} onClose={() => setSkillInfo(null)} maxHeight="60%">
           <div className="flex flex-col gap-1.5" style={{ fontSize: 12.5, color: PALETTE.text }}>
             <div style={{ color: PALETTE.textDim }}>배울 수 있는 레벨 Lv.{skillInfo.reqLv}</div>
-            <CdDetail s={skillInfo} cdr={d.cdr || 0} />
+            <CdDetail s={skillInfo} cdr={d} />
             {[1, 2, 3, 4, 5].map(l => (
               <div key={l} style={{ color: (u.skills[skillInfo.id] || 0) === l ? PALETTE.legendary : PALETTE.text }}>Lv.{l} — {describeSkill(skillInfo, l)}</div>
             ))}
@@ -1601,7 +1601,8 @@ function FamBondView({ fams, onPick }) {
         <div><b style={{ color: '#c79bff' }}>보유 효과</b> <span style={{ color: PALETTE.textDim }}>(남령 이상 {ownN}마리)</span> — <span style={{ color: PALETTE.text }}>{F.famFxText(own) || '없음'}</span></div>
         <div><b style={{ color: PALETTE.legendary }}>인연</b> <span style={{ color: PALETTE.textDim }}>({F.FAM_BONDS.filter(b => F.bondTier(fams, b) > 0).length}/{F.FAM_BONDS.length})</span> — <span style={{ color: PALETTE.text }}>{F.famFxText(bondFx) || '없음'}</span></div>
         <div style={{ fontSize: 11, color: PALETTE.textDim }}>보유 효과 합계 상한: 공격·HP·방어 +30% · 치명타 피해 +60% · 받는 피해 감소 8% · 재생 1%</div>
-        <div style={{ fontSize: 11, color: PALETTE.textDim }}>인연 1단계 = 구성원 모두 보유 · 2단계 = 모두 지정 등급 이상 + 강화 +{F.BOND_TIER2_PLUS} 이상 (효과 2배)</div>
+        <div style={{ fontSize: 11, color: PALETTE.textDim }}>인연 <b style={{ color: '#c79bff' }}>1단계</b> = 구성원을 모두 보유 · <b style={{ color: PALETTE.legendary }}>2단계</b> = 구성원 <b>전원</b>을 지정 등급 이상으로 진화 + 강화 <b>+{F.BOND_TIER2_PLUS}</b> 이상 (효과 2배)</div>
+        <div style={{ fontSize: 11, color: PALETTE.textDim }}>지정 등급: 지역 인연 = <b style={{ color: F.famGrade('indigo').color }}>남령</b> · 사냥 무리 = <b style={{ color: F.famGrade('blue').color }}>청령</b> · 특별 인연 = <b style={{ color: F.famGrade('violet').color }}>자령</b> — 등급은 「진화」, 강화는 「강화」(사역마 상세에서). 아이콘 아래 ✓ = 2단계 조건을 채운 구성원</div>
       </GlassPanel>
       {groups.map(kind => (
         <div key={kind} className="flex flex-col gap-2">
@@ -1610,6 +1611,8 @@ function FamBondView({ fams, onPick }) {
             const t = F.bondTier(fams, b);
             const have = b.members.filter(k => fams[k]).length;
             const g2 = F.famGrade(b.tier2Grade);
+            const ok2 = (f) => !!f && F.famGradeIdx(f.grade) >= F.famGradeIdx(b.tier2Grade) && (f.plus || 0) >= F.BOND_TIER2_PLUS;
+            const done2 = b.members.filter(k => ok2(fams[k])).length;
             return (
               <GlassPanel key={b.id} className="p-2.5" style={{ border: `1px solid ${t === 2 ? PALETTE.legendary : t === 1 ? '#c79bff88' : 'var(--ui-line)'}` }}>
                 <div className="flex items-center justify-between gap-2">
@@ -1624,7 +1627,7 @@ function FamBondView({ fams, onPick }) {
                     return (
                       <button key={k} onClick={() => onPick(k)} className="ui-press flex flex-col items-center" style={{ width: 52, background: 'transparent', border: 'none', padding: 0 }}>
                         <img src={chronicleEnemyArt(k)} alt="" className="object-cover" style={{ width: 44, height: 44, borderRadius: 10, border: `1.5px solid ${g ? g.color : 'var(--ui-line)'}`, filter: f ? 'none' : 'grayscale(1) brightness(.45)' }} draggable={false} />
-                        <span className="truncate w-full text-center" style={{ fontSize: 10, color: g ? g.color : PALETTE.textDim }}>{g ? `${g.label}${f.plus ? `+${f.plus}` : ''}` : '미보유'}</span>
+                        <span className="truncate w-full text-center" style={{ fontSize: 10, color: g ? g.color : PALETTE.textDim }}>{g ? `${ok2(f) ? '✓ ' : ''}${g.label}${f.plus ? `+${f.plus}` : ''}` : '미보유'}</span>
                         <span className="truncate w-full text-center" style={{ fontSize: 10, color: PALETTE.textDim }}>{F.famName(k)}</span>
                       </button>
                     );
@@ -1633,7 +1636,7 @@ function FamBondView({ fams, onPick }) {
                 <div className="mt-1" style={{ fontSize: 11.5 }}>
                   <span style={{ color: t >= 1 ? '#c79bff' : PALETTE.textDim }}>1단계 {F.famFxText(b.fx)}</span>
                   <span style={{ color: PALETTE.textDim }}> · </span>
-                  <span style={{ color: t === 2 ? PALETTE.legendary : PALETTE.textDim }}>2단계 {F.famFxText(Object.fromEntries(Object.entries(b.fx).map(([k, v]) => [k, v * 2])))} <span style={{ fontSize: 10.5 }}>({g2.label} 이상·+{F.BOND_TIER2_PLUS})</span></span>
+                  <span style={{ color: t === 2 ? PALETTE.legendary : PALETTE.textDim }}>2단계 {F.famFxText(Object.fromEntries(Object.entries(b.fx).map(([k, v]) => [k, v * 2])))} <span style={{ fontSize: 10.5 }}>(전원 {g2.label} 이상·+{F.BOND_TIER2_PLUS} — {done2}/{b.members.length})</span></span>
                 </div>
               </GlassPanel>
             );
@@ -2467,25 +2470,31 @@ function QuestView({ save, setSave, onBack, flash, onReplay }) {
 }
 
 // ===== 스킬 쿨타임 표시 (1.240.1) — 엔진 규칙: 쓴 뒤 대기 = max(0, 재사용 - 단축), 단축은 장비·특성 합산 최대 2 =====
-const cdWait = (s, cdr) => Math.max(0, (s.cd || 0) - (cdr || 0));
-function CdChip({ s, cdr }) {
+// 1.241.0: cdr 인자 = deriveUnit 결과(d) — 모든 스킬 단축 + 스킬별 단축을 합쳐 계산
+const cdOf = (s, d) => (d ? E.skillCdrOf(d, s.id) : 0);
+const cdWait = (s, d) => Math.max(0, (s.cd || 0) - cdOf(s, d));
+function CdChip({ s, cdr: d }) {
   if (s.kind === 'passive') return <span style={{ fontSize: 10.5, color: PALETTE.textDim }}>· 패시브</span>;
   if (!s.cd) return null;
-  const w = cdWait(s, cdr);
+  const cdr = cdOf(s, d);
+  const w = cdWait(s, d);
   return (
     <span style={{ fontSize: 10.5, color: cdr ? '#7fd1c8' : PALETTE.textDim, whiteSpace: 'nowrap' }}>
       ⏱ {cdr ? <><s style={{ opacity: 0.6 }}>{s.cd}</s>→{w ? `${w}턴` : '매 턴'}</> : `${s.cd}턴`}
     </span>
   );
 }
-function CdDetail({ s, cdr }) {
+function CdDetail({ s, cdr: d }) {
   if (s.kind === 'passive') return <div style={{ color: PALETTE.textDim }}>패시브 — 쿨타임 없이 항상 적용</div>;
   if (!s.cd) return null;
-  const w = cdWait(s, cdr);
+  const cdr = cdOf(s, d);
+  const all = d?.cdr || 0; const own = d?.skillCdr?.[s.id] || 0;
+  const w = cdWait(s, d);
   return (
     <div style={{ color: PALETTE.textDim, lineHeight: 1.55 }}>
       ⏱ 재사용 대기 <b style={{ color: PALETTE.text }}>{s.cd}턴</b>
-      {cdr ? <> − 재사용 단축 <b style={{ color: '#7fd1c8' }}>{cdr}턴</b> (장비 옵션·유니크·특성 합산, 최대 2) = <b style={{ color: '#7fd1c8' }}>{w ? `${w}턴` : '매 턴 사용 가능'}</b></> : null}
+      {cdr ? <> − 재사용 단축 <b style={{ color: '#7fd1c8' }}>{cdr}턴</b> = <b style={{ color: '#7fd1c8' }}>{w ? `${w}턴` : '매 턴 사용 가능'}</b>
+        <br />단축 출처: {[all ? `모든 스킬 -${all} (유니크·특성)` : null, own ? `이 스킬 전용 -${own} (장비 옵션·시간의 모래)` : null].filter(Boolean).join(' · ')} — 합계 최대 {E.CDR_CAP}턴</> : null}
       <br />쓴 뒤 내 차례 {w}번은 이 스킬을 쓸 수 없고, 그 다음 차례부터 다시 쓸 수 있다
     </div>
   );
@@ -2502,7 +2511,7 @@ const DETAIL_STATS = [
   ['skillDmg', '스킬 피해', 'pct'], ['dotDmg', '지속 피해', 'pct'], ['dotTurnsMult', '지속 피해 시간', 'x'], ['holyDmg', '치유→신성 피해', 'pct'],
   ['startShieldPct', '시작 보호막', 'pct'], ['skillShield', '스킬 사용 시 보호막(공격력 대비)', 'pct'], ['overhealShield', '넘친 회복 → 보호막', 'flag'],
   ['regenPct', '매 턴 HP 재생', 'pct'], ['dodgeHeal', '회피 시 회복', 'pct'], ['emergencyHeal', '위기 회복(HP 30%↓, 1회)', 'pct'],
-  ['revive', '부활(1회) HP', 'pct'], ['guts', '불굴(1회 HP 1로 버팀)', 'flag'], ['cdr', '재사용 단축', 'turn'], ['resetEvery', '재사용 초기화 주기', 'turn'],
+  ['revive', '부활(1회) HP', 'pct'], ['guts', '불굴(1회 HP 1로 버팀)', 'flag'], ['cdr', '모든 스킬 재사용 단축', 'turn'], ['resetEvery', '재사용 초기화 주기', 'turn'],
   ['openInferno', '시작 시 적 전체 겁화', 'flag'], ['rageDouble', '분노 중 2회 행동', 'flag'], ['multiHitsAdd', '연속 화살 타수', 'num'], ['spiritArrow', '정령 화살 확률', 'pct'],
   ['blessMult', '축복 효과', 'x'], ['blessTurns', '축복 지속', 'turn'],
   ['famPct', '사역마 능력치', 'pct'], ['expPct', '경험치 획득', 'pct'], ['goldPct', '골드 획득', 'pct'], ['dropPct', '장비 획득률', 'pct'],

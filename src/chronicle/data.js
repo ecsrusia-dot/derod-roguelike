@@ -506,7 +506,8 @@ export const OPTION_DEFS = {
   counterDmg: { label: '반격 피해', pct: true, v: [0.10, 0.20] },
   dmgReduce: { label: '받는 피해 감소', pct: true, v: [0.02, 0.05] },
   skillDmg: { label: '스킬 피해', pct: true, v: [0.05, 0.10] },
-  cdr: { label: '재사용 단축', pct: false, v: [1, 1], unit: '턴', rare: true },
+  cdr: { label: '모든 스킬 재사용 단축', pct: false, v: [1, 1], unit: '턴', rare: true }, // 1.241.0~ 유니크 전용 (일반 장비 풀에서 제외)
+  scdr: { label: '스킬 재사용 단축', pct: false, v: [1, 1], unit: '턴' },             // 1.241.0~ 일반 장비 — 직업 스킬 1개만 (옵션에 sk 필드)
   dotDmg: { label: '지속 피해', pct: true, v: [0.10, 0.20] },
   shieldPct: { label: '시작 보호막', pct: true, v: [0.04, 0.08] },
   lifesteal: { label: '흡혈', pct: true, v: [0.01, 0.03] },
@@ -520,11 +521,11 @@ export const OPTION_DEFS = {
 };
 // 직업별 옵션 풀 (가중치) — 그 직업 장비에서만 뽑힌다
 export const OPTION_POOLS = {
-  wanderer: { defPct: 4, counterPct: 4, counterDmg: 3, dmgReduce: 3, hpPct: 2, atkPct: 2 },
-  sage: { skillDmg: 4, cdr: 1, dotDmg: 3, shieldPct: 3, critDmg: 2, atkPct: 2 },
-  demonblood: { lifesteal: 4, hpPct: 3, lowHpDmg: 3, atkPct: 3, thornsPct: 2 },
-  elf: { crit: 4, dodge: 3, spd: 3, chain: 3, critDmg: 2 },
-  priest: { healPct: 4, shieldPct: 3, dmgReduce: 3, hpPct: 2, holyDmg: 3 },
+  wanderer: { defPct: 4, counterPct: 4, counterDmg: 3, dmgReduce: 3, hpPct: 2, atkPct: 2, scdr: 2 },
+  sage: { skillDmg: 4, scdr: 2, dotDmg: 3, shieldPct: 3, critDmg: 2, atkPct: 2 },
+  demonblood: { lifesteal: 4, hpPct: 3, lowHpDmg: 3, atkPct: 3, thornsPct: 2, scdr: 2 },
+  elf: { crit: 4, dodge: 3, spd: 3, chain: 3, critDmg: 2, scdr: 2 },
+  priest: { healPct: 4, shieldPct: 3, dmgReduce: 3, hpPct: 2, holyDmg: 3, scdr: 2 },
   common: { hpPct: 3, atkPct: 3, spd: 2, critDmg: 2, expPct: 1, goldPct: 1 },
 };
 // 직업 보조 칸 기본 능력치 (등급 배율만 적용, 레벨 무관 % + 레벨 비례 수치)
@@ -550,7 +551,7 @@ export const EPIC_OPTIONS = {
   a_guts: { name: '불굴', desc: '전투당 1회, 쓰러질 피해를 HP 1로 버팀', fx: { guts: 1 } },
   c_haste: { name: '신속', desc: '속도 +25%', fx: { spdPct: 0.25 } },
   c_focus: { name: '집중', desc: '치명 +10% · 치명 피해 +30%', fx: { crit: 0.1, critDmg: 0.3 } },
-  c_time: { name: '시간의 모래', desc: '스킬 재사용 대기 -1턴', fx: { cdr: 1 } },
+  c_time: { name: '시간의 모래', desc: '재사용 대기가 가장 긴 스킬 -1턴', fx: { longCdr: 1 } }, // 1.241.0: 모든 스킬 → 가장 긴 스킬 1개
   c_fury: { name: '분노', desc: '공격력 +12%', fx: { atkPct: 0.12 } },
 };
 
@@ -560,23 +561,23 @@ export const UNIQUE_ITEMS = {
   u_w_blade: U('u_w_blade', 'wanderer', 'weapon', '눈먼 자의 칼', { counterDmg: 0.3, atkPct: 0.08 }, { counterDouble: 0.5 }, '반격이 50% 확률로 2회 연속'),
   u_w_oath: U('u_w_oath', 'wanderer', 'offhand', '부동의 맹세', { defPct: 0.15, counterPct: 0.08 }, { tauntReduce: 0.3 }, '도발 중 받는 피해 -30%'),
   u_w_cloak: U('u_w_cloak', 'wanderer', 'armor', '먼지 낀 망토', { dmgReduce: 0.06, hpPct: 0.10 }, { critAfterCounter: 1 }, '반격·회피 직후 다음 공격 치명 확정'),
-  u_w_beads: U('u_w_beads', 'wanderer', 'accessory', '스승의 염주', { hpPct: 0.10, defPct: 0.10 }, { emergencyHeal: 0.5 }, '전투당 1회, HP 30% 이하가 되면 HP 50% 회복'),
+  u_w_beads: U('u_w_beads', 'wanderer', 'accessory', '스승의 염주', { hpPct: 0.10, defPct: 0.10 }, { emergencyHeal: 0.5, cdr: 1 }, '전투당 1회, HP 30% 이하가 되면 HP 50% 회복 · 모든 스킬 재사용 -1턴'),
   u_s_staff: U('u_s_staff', 'sage', 'weapon', '영겁의 지팡이', { skillDmg: 0.12, dotDmg: 0.2 }, { dotTurnsMult: 2 }, '지속 피해가 2배 길게 지속'),
   u_s_pact: U('u_s_pact', 'sage', 'offhand', '이프리트의 계약서', { skillDmg: 0.10, atkPct: 0.08 }, { openInferno: 0.6 }, '전투 시작 시 적 전체에 「겁화」(3턴 지속 피해)'),
   u_s_robe: U('u_s_robe', 'sage', 'armor', '재의 로브', { shieldPct: 0.08, hpPct: 0.08 }, { skillShield: 0.2 }, '스킬 사용 시 공격력 20%만큼 보호막'),
-  u_s_glass: U('u_s_glass', 'sage', 'accessory', '시간의 모래시계', { atkPct: 0.08, critDmg: 0.2 }, { resetEvery: 3 }, '3턴마다 무작위 스킬 재사용 대기 초기화'),
+  u_s_glass: U('u_s_glass', 'sage', 'accessory', '시간의 모래시계', { atkPct: 0.08, critDmg: 0.2 }, { resetEvery: 3, cdr: 1 }, '3턴마다 무작위 스킬 재사용 대기 초기화 · 모든 스킬 재사용 -1턴'),
   u_d_thirst: U('u_d_thirst', 'demonblood', 'weapon', '피의 갈망', { atkPct: 0.10, hpPct: 0.08 }, { lifesteal: 0.15, overhealShield: 1 }, '흡혈 15%, 최대 HP를 넘는 회복은 보호막으로'),
   u_d_heart: U('u_d_heart', 'demonblood', 'offhand', '마왕의 심장 조각', { hpPct: 0.12, lowHpDmg: 0.1 }, { missingHpAtk: 0.06 }, '잃은 HP 10%마다 공격력 +6%'),
   u_d_scar: U('u_d_scar', 'demonblood', 'armor', '흉터 갑주', { hpPct: 0.12, dmgReduce: 0.04 }, { thornsPct: 0.15 }, '받은 피해 15% 반사'),
-  u_d_brand: U('u_d_brand', 'demonblood', 'accessory', '광기의 낙인', { atkPct: 0.10, lifesteal: 0.04 }, { rageDouble: 1 }, '광폭화 중 모든 공격 2회'),
+  u_d_brand: U('u_d_brand', 'demonblood', 'accessory', '광기의 낙인', { atkPct: 0.10, lifesteal: 0.04 }, { rageDouble: 1, cdr: 1 }, '광폭화 중 모든 공격 2회 · 모든 스킬 재사용 -1턴'),
   u_e_string: U('u_e_string', 'elf', 'weapon', '바람의 현', { crit: 0.06, chain: 0.08 }, { multiHitsAdd: 2 }, '「연속 화살」 타수 +2'),
   u_e_quiver: U('u_e_quiver', 'elf', 'offhand', '정령 화살통', { crit: 0.05, spd: 3 }, { spiritArrow: 0.2 }, '공격 시 20% 확률로 정령 화살(공격력 80%)'),
   u_e_leaf: U('u_e_leaf', 'elf', 'armor', '잎새 갑옷', { dodge: 0.05, hpPct: 0.08 }, { dodgeHeal: 0.05 }, '회피할 때마다 HP 5% 회복'),
-  u_e_hawk: U('u_e_hawk', 'elf', 'accessory', '매의 눈', { crit: 0.06, spd: 2 }, { critDmg: 0.6, firstCrit: 1 }, '치명 피해 +60%, 전투 첫 공격 치명 확정'),
+  u_e_hawk: U('u_e_hawk', 'elf', 'accessory', '매의 눈', { crit: 0.06, spd: 2 }, { critDmg: 0.6, firstCrit: 1, cdr: 1 }, '치명 피해 +60%, 전투 첫 공격 치명 확정 · 모든 스킬 재사용 -1턴'),
   u_p_scepter: U('u_p_scepter', 'priest', 'weapon', '여명의 홀', { healPct: 0.12, atkPct: 0.06 }, { holyDmg: 0.3 }, '회복량의 30%만큼 적에게 신성 피해'),
   u_p_grail: U('u_p_grail', 'priest', 'offhand', '순례자의 성배', { healPct: 0.10, hpPct: 0.08 }, { revive: 0.4 }, '전투당 1회, 쓰러지면 HP 40%로 부활'),
   u_p_vest: U('u_p_vest', 'priest', 'armor', '빛의 법의', { shieldPct: 0.08, dmgReduce: 0.05 }, { shieldReduce: 0.2 }, '보호막이 남아 있는 동안 받는 피해 -20%'),
-  u_p_rosary: U('u_p_rosary', 'priest', 'accessory', '축복의 묵주', { healPct: 0.10, hpPct: 0.08 }, { blessMult: 2, blessTurns: 2 }, '「축복」 효과 2배, 지속 +2턴'),
+  u_p_rosary: U('u_p_rosary', 'priest', 'accessory', '축복의 묵주', { healPct: 0.10, hpPct: 0.08 }, { blessMult: 2, blessTurns: 2, cdr: 1 }, '「축복」 효과 2배, 지속 +2턴 · 모든 스킬 재사용 -1턴'),
   u_c_ring: U('u_c_ring', 'common', 'accessory', '황혼의 반지', { hpPct: 0.06, atkPct: 0.06 }, { atkPct: 0.08, hpPct: 0.08, defPct: 0.08 }, '공격력·최대 HP·방어 +8%'),
   u_c_collar: U('u_c_collar', 'common', 'accessory', '사역마의 목걸이', { hpPct: 0.06, spd: 2 }, { famPct: 0.3 }, '동행 사역마의 공격력·HP +30%'),
   u_c_charm: U('u_c_charm', 'common', 'accessory', '여행자의 부적', { hpPct: 0.06, atkPct: 0.05 }, { expPct: 0.2 }, '경험치 +20%'),
