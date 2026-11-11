@@ -271,7 +271,7 @@ function FullBattleLog({ sim, party, unitOf, label, onClose }) {
 }
 const LOG_C = { dmg: '#ff8a80', crit: '#ffb347', heal: '#8fe08a', shield: '#9cc4e4', buff: '#e8c48a', debuff: '#c08ae8', miss: '#9a9a9a', holy: '#ffe9a8', skill: '#e8b04a' };
 const ROLE_KO = { tank: '수호', healer: '치유', dps: '맹공', boss: '보스' };
-const PRE_TONE = { shield: '#9cc4e4', buff: '#e8c48a', foe: '#ff8a80' };
+const PRE_TONE = { shield: '#9cc4e4', buff: '#e8c48a', foe: '#ff8a80', ready: '#b8f0c8' };
 function BattleLogLine({ e, latest, unitOf }) {
   // 전투 시작 연출 (1.259.0) — 전투 돌입 · 전투 전 효과
   if (e.k === 'pre' && e.pre === 'enter') {
@@ -291,7 +291,7 @@ function BattleLogLine({ e, latest, unitOf }) {
     return (
       <div className="flex gap-1.5" style={{ fontSize: 12, lineHeight: 1.5 }}>
         <span className="flex-none" style={{ width: 16, textAlign: 'center' }}>{e.icon}</span>
-        <span>{u ? <b style={{ color: nc, fontWeight: 600 }}>{u.fam ? '🐾' : ''}{u.name} </b> : <b style={{ color: nc, fontWeight: 600 }}>적 전체 </b>}<b style={{ color: PRE_TONE[e.tone] || PALETTE.text }}>{e.n}</b> <span style={{ color: PALETTE.textDim }}>— {e.v}</span></span>
+        <span>{u ? <b style={{ color: nc, fontWeight: 600 }}>{u.fam ? '🐾' : ''}{u.name} </b> : <b style={{ color: nc, fontWeight: 600 }}>적 전체 </b>}<b style={{ color: PRE_TONE[e.tone] || PALETTE.text }}>{e.n}</b> <span style={{ color: PALETTE.textDim }}>— {e.v}</span>{e.src && <span style={{ color: PALETTE.textDim, fontSize: 10.5 }}> ({e.src})</span>}</span>
       </div>
     );
   }
@@ -350,7 +350,7 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
     if (done) return undefined;
     const ev = sim.events[idx];
     // 1.259.0 — 전투 시작 연출: 돌입 · 낙인 · 1라운드는 길게 (반복·자동·×4에선 짧게)
-    const base = !brief && ev.k === 'pre' && ev.pre === 'enter' ? 1300 : !brief && ev.k === 'pre' ? 560 : !brief && ev.k === 'open' ? 1500 : !brief && ev.round === 1 ? 900
+    const base = !brief && ev.k === 'pre' && ev.pre === 'enter' ? 1300 : !brief && ev.k === 'pre' && ev.tone === 'ready' ? 1100 : !brief && ev.k === 'pre' ? 560 : !brief && ev.k === 'open' ? 1500 : !brief && ev.round === 1 ? 900
       : ev.k === 'pre' ? 160 : ev.round ? 160 : ev.k === 'dotTick' ? 380 : 620;
     const t = setTimeout(() => setIdx(i => i + 1), base / speed);
     return () => clearTimeout(t);
@@ -473,7 +473,18 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
           <div className="relative" style={{ fontSize: 24, fontWeight: 900, letterSpacing: 2, color: '#ffb070', textShadow: '0 0 16px #ff5a1a, 0 0 4px #000', fontFamily: FONT_TITLE }}>🔥 이프리트의 낙인</div>
           <div className="relative" style={{ fontSize: 12, color: '#ffe3c0', textShadow: '0 1px 3px #000' }}>적 전체 · 매 턴 {cur.brand.v.toLocaleString()} 피해 · {cur.brand.turns}턴</div>
         </div>
-      ) : cur.round === 1 ? (
+      ) : cur.k === 'pre' && cur.tone === 'ready' ? (() => {
+        // 1.260.0 — 대기형 효과 컷인 (직업색 띠): 선제 일격 · 위기 회복 · 버팀 · 부활 대기
+        const ru = unitOf(cur.a); const rc = ru && !ru.fam ? chronicleClass(ru.classId).color : '#c79bff';
+        return (
+          <div key={`ov-${idx}`} className="chr-banner absolute left-0 right-0 text-center pointer-events-none" style={{ zIndex: 6, top: '30%' }}>
+            <div className="absolute left-0 right-0" style={{ top: -6, height: cur.src ? 80 : 64, background: `linear-gradient(90deg, transparent, #0a0a0cee 18%, #0a0a0cee 82%, transparent)`, borderTop: `1px solid ${rc}99`, borderBottom: `1px solid ${rc}99`, boxShadow: `inset 0 0 24px ${rc}33` }} />
+            <div className="relative" style={{ fontSize: 22, fontWeight: 900, letterSpacing: 2, color: rc, textShadow: `0 0 14px ${rc}, 0 0 4px #000`, fontFamily: FONT_TITLE }}>{cur.icon} {cur.n}</div>
+            <div className="relative" style={{ fontSize: 12, color: PALETTE.text, textShadow: '0 1px 3px #000' }}>{ru?.name} · {cur.v}</div>
+            {cur.src && <div className="relative" style={{ fontSize: 10.5, color: PALETTE.textDim, textShadow: '0 1px 3px #000' }}>{cur.src}</div>}
+          </div>
+        );
+      })() : cur.round === 1 ? (
         <div key={`ov-${idx}`} className="chr-banner absolute left-0 right-0 text-center pointer-events-none" style={{ zIndex: 6, top: '30%' }}>
           <div className="absolute left-0 right-0" style={{ top: -6, height: 60, background: 'linear-gradient(90deg, transparent, #1a0e04ee 18%, #1a0e04ee 82%, transparent)', borderTop: '1px solid #e8b04a88', borderBottom: '1px solid #e8b04a88' }} />
           <div className="relative" style={{ fontSize: 22, fontWeight: 900, letterSpacing: 4, color: '#ffe3a0', textShadow: '0 0 14px #e8b04a', fontFamily: FONT_TITLE }}>⚔ 1라운드</div>
@@ -3222,7 +3233,7 @@ const DETAIL_DESC = {
   dmgReduce: '적에게 받는 피해를 이 비율만큼 줄인다.', lifesteal: '준 피해의 이 비율만큼 HP를 회복한다.', armorPen: '적 방어의 이 비율을 무시한다.',
   skillDmg: '스킬로 주는 피해가 이만큼 늘어난다.', dotDmg: '화상·출혈 같은 지속 피해가 이만큼 늘어난다.', regenPct: '매 턴 최대 HP의 이 비율만큼 회복한다.',
   cdr: '모든 스킬의 재사용 대기를 줄인다. 스킬별 단축과 합쳐 최대 2턴.', rageDouble: '광폭화가 켜진 동안 모든 공격이 2번 들어간다.',
-  rageTurnsAdd: '광폭화가 이 턴만큼 더 오래 유지된다 (광기의 낙인).', rageLifesteal: '광폭화가 켜진 동안 흡혈량이 2배가 된다 (광기의 낙인).',
+  rageTurnsAdd: '광폭화가 이 턴만큼 더 오래 유지된다 (광기의 혈인).', rageLifesteal: '광폭화가 켜진 동안 흡혈량이 2배가 된다 (광기의 혈인).',
   openInferno: '전투 시작 순간 적 전체에 거는 화상. 스킬 「겁화」와 별개로, 턴을 쓰지 않고 쿨타임과도 무관하다. 피해 = 매 턴 공격력 × 이 비율 × (1 + 지속 피해 %) · 3턴(지속 시간 배율 적용). 출처: 이프리트의 계약서 60% + 특성 「낙인의 불씨」 1점당 4%.',
   expPct: '전투 경험치가 이만큼 늘어난다.', goldPct: '전투 골드가 이만큼 늘어난다.', dropPct: '장비가 떨어질 확률이 이만큼 늘어난다.',
 };

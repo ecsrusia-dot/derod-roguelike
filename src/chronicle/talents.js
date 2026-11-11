@@ -58,7 +58,7 @@ export const TALENT_TREES = {
       [N('st_a3', '예리한 마력', 5, { crit: 0.01 }), N('st_a4', '파괴의 마력', 5, { critDmg: 0.05 })],
       [N('st_a5', '운석 숙련', 5, { sb_s_starfall: 0.06 }), N('st_a6', '폭풍 숙련', 5, { sb_s_meteor: 0.05 })],
       [N('st_a7', '선제 주문', 1, { firstCrit: 1 }), N('st_a8', '방벽 꿰뚫기', 3, { armorPen: 0.05 })],
-      [N('st_a9', '마력 폭주', 1, { skillDmg: 0.2, sb_s_surge: 0.5 })],
+      [N('st_a9', '극한 각성', 1, { skillDmg: 0.2, sb_s_surge: 0.5 })],
     ]),
     T('s_t_ward', '결계', '#c08ae8', '몸이 약한 술사의 방패 — HP·보호막·생존', [
       [N('st_w1', '단단한 정신', 5, { hpPct: 0.02 }), N('st_w2', '마력 방벽', 5, { shieldPct: 0.01 })],
