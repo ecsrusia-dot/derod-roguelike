@@ -210,22 +210,28 @@ function BossCard({ u, art, hp, sh, acting, fx, w, h, ward = false, children }) 
     </div>
   );
 }
-// 1.261.0 — 전투 결과 초상 (시안 ㊻): 적 일러 자리에 보스 카드 크기로 직업 승리/패배 일러
-function HeroResultCard({ hero, lv, win }) {
+// 1.265.0 — 전투 결과 전체 화면 일러 (시안 ㊼, 본편 VictoryScreen 방식): 직업 승리/패배 일러 → 정산 창은 뒤에 올라온다
+function ResultStage({ hero, lv, win, foe, rounds, revealed, onReveal }) {
   const cls = chronicleClass(hero);
   const art = (win ? cls.winImage : cls.lossImage) || cls.image;
+  const tone = win ? MS.gold : '#e0574c';
   return (
-    <div className="chr-result-in relative" style={{ height: 'calc(100% - 10px)', aspectRatio: '190 / 236', marginTop: 10 }}>
-      <div className={`chr-boss${win ? '' : ' lose'}`} style={{ height: '100%' }}>
-        <div className={`chr-boss-plate ${win ? 'win' : 'lose'}`}><span>{win ? 'VICTORY' : 'DEFEAT'}</span></div>
-        <div className="chr-boss-in">
-          <img src={art} onError={(e) => { if (cls.image && !e.currentTarget.src.endsWith(cls.image.slice(1))) e.currentTarget.src = cls.image; }} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ objectPosition: '50% 22%' }} draggable={false} />
-          {win && <div className="chr-boss-shine" />}
-          <div className="absolute left-0 right-0 bottom-0" style={{ padding: '22px 8px 8px', background: 'linear-gradient(transparent, #000e 60%)', zIndex: 2 }}>
-            <div className="text-center truncate font-bold" style={{ fontSize: 14, color: win ? '#ffe3a0' : '#c8c8d0', textShadow: '0 1px 2px #000' }}>Lv.{lv} {cls.name}</div>
-          </div>
+    <div className="absolute inset-0 overflow-hidden" style={{ zIndex: 1, cursor: revealed ? 'default' : 'pointer' }} onClick={revealed ? undefined : onReveal}>
+      <img src={art} onError={(e) => { if (cls.image && !e.currentTarget.src.endsWith(cls.image.slice(1))) e.currentTarget.src = cls.image; }} alt="" className="chr-result-in absolute inset-0 w-full h-full object-cover" style={{ objectPosition: '50% 20%', filter: win ? 'none' : 'saturate(.75)' }} draggable={false} />
+      <div className="absolute left-0 right-0 top-0" style={{ height: 70, background: 'linear-gradient(#000a, transparent)' }} />
+      {!revealed && <>
+        <div className="absolute left-0 right-0 bottom-0" style={{ height: '45%', background: `linear-gradient(transparent, ${PALETTE.bgDeep}e6 70%, ${PALETTE.bgDeep})` }} />
+        <div className="absolute left-0 right-0 text-center px-4" style={{ bottom: 64 }}>
+          <div className="chr-result-sub" style={{ fontSize: 11, letterSpacing: '0.5em', color: tone }}>━━ {win ? 'V I C T O R Y' : 'D E F E A T'} ━━</div>
+          <div className="chr-result-title font-bold" style={{ fontSize: 48, color: PALETTE.text, fontFamily: FONT_TITLE, textShadow: `0 0 24px ${tone}99, 0 2px 8px #000` }}>{win ? '승리' : '패배'}</div>
+          <div className="chr-result-sub truncate" style={{ fontSize: 12.5, color: PALETTE.textDim, textShadow: '0 1px 4px #000', animationDelay: '.5s' }}>Lv.{lv} {cls.name} · {foe ? (win ? `「${foe}」 처치` : `「${foe}」에게 쓰러짐`) : (win ? '적을 처치' : '쓰러졌다')} · {rounds}라운드</div>
         </div>
-      </div>
+        <div className="absolute left-0 right-0 text-center" style={{ bottom: 22, fontSize: 11.5, color: PALETTE.textDim, opacity: 0.8 }}>화면을 누르면 바로 정산</div>
+      </>}
+      {revealed && <div className="absolute left-0 right-0 text-center" style={{ top: 50 }}>
+        <div style={{ fontSize: 10, letterSpacing: '0.5em', color: tone, textShadow: '0 1px 3px #000' }}>{win ? 'V I C T O R Y' : 'D E F E A T'}</div>
+        <div className="font-bold" style={{ fontSize: 30, color: PALETTE.text, fontFamily: FONT_TITLE, textShadow: `0 0 18px ${tone}99, 0 2px 6px #000` }}>{win ? '승리' : '패배'}</div>
+      </div>}
     </div>
   );
 }
@@ -365,6 +371,13 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
   const done = idx >= sim.events.length;
   const brief = repeat || autoProg || towerAuto || dungeonAuto || speed >= 4; // 연출 짧게
   useEffect(() => { if (done) onReplayDone?.(); }, [done]); // eslint-disable-line react-hooks/exhaustive-deps
+  // 1.265.0 — 결과: 전체 화면 일러 먼저, 정산 창은 1.2초 뒤(반복·자동 중엔 0.3초) 또는 탭
+  const [revealed, setRevealed] = useState(false);
+  useEffect(() => {
+    if (!done || revealed) return undefined;
+    const t = setTimeout(() => setRevealed(true), brief ? 300 : 1200);
+    return () => clearTimeout(t);
+  }, [done, revealed, brief]);
   useEffect(() => {
     if (done) return undefined;
     const ev = sim.events[idx];
@@ -440,7 +453,7 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
   return (
     <div className="absolute inset-0 flex flex-col" style={{ background: PALETTE.bg }}>
       {bg && <img src={bg} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ opacity: 0.18 }} onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
-      <div className="relative flex items-center gap-2 px-3 pt-2 flex-none" style={{ minHeight: 44 }}>
+      <div className="relative flex items-center gap-2 px-3 pt-2 flex-none" style={{ minHeight: 44, zIndex: 5 }}>
         <span style={{ fontSize: 12, color: PALETTE.textDim }}>{ctx.label} · {round ? `${round}라운드` : '전투 준비'}{enemies[0]?.rebirthTier ? <span style={{ color: '#ff6ad5' }}> · ✦전승 {enemies[0].rebirthTier}단계</span> : null}{enemies[0]?.mech && BOSS_MECHS[enemies[0].mech] ? <span style={{ color: PALETTE.legendary }}> · {BOSS_MECHS[enemies[0].mech].icon}{BOSS_MECHS[enemies[0].mech].name}</span> : null}{maxIntim ? <span style={{ color: '#ff7a6a' }}> · {maxIntim >= 4 ? '☠절대 위압' : `☗위압 ${maxIntim}단계`}</span> : null}</span>
         <div className="flex-1" />
         {SPEEDS.map(s => {
@@ -456,10 +469,9 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
 
       {/* 적 — 전투가 끝나면 직업 승리/패배 일러 (1.261.0) */}
       {done ? (
-        // 1.261.0 PM 결정 「최대치 화면으로 프레임 고정」 — 일러 높이 40% 고정(PM 선택), 결과 창이 나머지를 채운다 (획득이 적으면 빈 공간)
-        <div className="relative flex justify-center px-3 pt-2 flex-none" style={{ height: '40vh' }}>
-          <HeroResultCard hero={party.find(p => !p.fam)?.classId || save.hero} lv={(xp?.after?.hero || xp?.before?.hero)?.lv || party.find(p => !p.fam)?.lv} win={sim.result === 'win'} />
-        </div>
+        <ResultStage hero={party.find(p => !p.fam)?.classId || save.hero} lv={(xp?.after?.hero || xp?.before?.hero)?.lv || party.find(p => !p.fam)?.lv}
+          win={sim.result === 'win'} foe={(enemies.find(e => e.tier === 'boss') || enemies.find(e => e.tier === 'elite') || enemies[0])?.name}
+          rounds={sim.rounds || round} revealed={revealed} onReveal={() => setRevealed(true)} />
       ) : (() => {
         // 1.257.0 — 보스가 있고 3마리 이하면 보스를 가운데 크게 (레이드처럼 많을 땐 기존 배열)
         const boss = enemies.length <= 3 ? enemies.find(e => e.tier === 'boss') : null;
@@ -551,16 +563,15 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
       </div>
 
       {/* 결과 */}
-      {done && (
-        <div className="relative flex flex-col min-h-0 px-3 pb-3 pt-3" style={{ flex: '1 1 0' }}>
+      {done && revealed && (
+        <div className="chr-result-panel absolute left-0 right-0 bottom-0 flex flex-col min-h-0 px-3 pb-3" style={{ zIndex: 4, height: brief ? 'auto' : '62%', maxHeight: '62%' }}>
           {/* 1.253.0 — 본편 스타일 (시안 ㉘) · 1.260.1 버튼은 스크롤 밖 하단 고정 (보상이 길면 버튼이 화면 밖으로 밀리던 문제) */}
           <div className="flex flex-col min-h-0 flex-1" style={{ border: `2px solid ${MS.red}`, background: '#150a0c' }}>
           <div className="overflow-y-auto min-h-0 flex-1" style={{ padding: '10px 12px 4px' }}>
-            <div className="text-center" style={{ fontSize: 10.5, letterSpacing: 6, color: MS.red }}>BATTLE RESULT</div>
-            <div className={`font-bold text-center ${sim.result === 'win' ? 'chr-win' : ''}`} style={{ fontSize: 22, letterSpacing: 6, lineHeight: 1.2, color: sim.result === 'win' ? MS.gold : '#e06a5f', fontFamily: FONT_TITLE }}>
-              {sim.result === 'win' ? '승리' : '전멸'}
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="font-bold" style={{ fontSize: 18, color: sim.result === 'win' ? PALETTE.text : '#e06a5f', fontFamily: FONT_TITLE }}>{sim.result === 'win' ? '전투 결과' : '전멸'}</span>
+              <span className="truncate" style={{ fontSize: 11, letterSpacing: 2, color: MS.gold }}>{ctx.label} · {sim.rounds || round}라운드</span>
             </div>
-            <div className="text-center" style={{ fontSize: 11.5, color: PALETTE.textDim }}>{ctx.label} · {sim.rounds || round}라운드</div>
             {sim.result === 'win' ? (
               <div className="mt-1.5 flex flex-col gap-1" style={{ fontSize: 12.5, color: PALETTE.text }}>
                 {ctx.kind !== 'raid' && <>
@@ -571,8 +582,8 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
                     ...(summary.shard ? [{ l: '장비', v: summary.items.length ? `${summary.items.length}개` : '—', c: summary.items.length ? '#7fa8d8' : PALETTE.textDim }] : []),
                   ]} />
                 </>}
-                {xp && (xp.after.hero || xp.after.fam) && <MainSecHead title="성 장" />}
-                {xp && (xp.after.hero || xp.after.fam) && <div className="flex flex-col gap-1.5 mb-0.5">
+                {!brief && xp && (xp.after.hero || xp.after.fam) && <MainSecHead title="성 장" />}
+                {!brief && xp && (xp.after.hero || xp.after.fam) && <div className="flex flex-col gap-1.5 mb-0.5">
                   <XpResultRow art={chronicleClass(save.hero).combatImage} name={chronicleClass(save.hero).name} before={xp.before.hero} after={xp.after.hero} />
                   {xp.after.fam && summary.famExp ? <XpResultRow fam art={chronicleEnemyArt(xp.after.fam.key)} name={F.famName(xp.after.fam.key)} before={xp.before.fam} after={xp.after.fam} /> : null}
                 </div>}

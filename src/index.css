@@ -799,5 +799,11 @@ body {
 .chr-boss-plate.lose{background:linear-gradient(#c8c8d0,#3a3a42)}
 .chr-boss-plate.lose span{background:linear-gradient(#5a5a62,#2a2a30 55%,#141418);color:#d8d8e0}
 .chr-result-in{animation:chr-banner .7s ease-out both}
-@media (prefers-reduced-motion: reduce){.chr-result-in{animation:none}}
+.chr-result-title{animation:chr-result-title 1.3s ease-out both}
+.chr-result-sub{animation:chr-result-sub 1s ease-out .3s both}
+.chr-result-panel{animation:chr-result-panel .45s cubic-bezier(.2,.8,.2,1) both}
+@keyframes chr-result-title{0%{opacity:0;transform:translateY(-14px) scale(.86);letter-spacing:.5em}60%{opacity:1;transform:scale(1.06)}100%{opacity:1;transform:none;letter-spacing:.1em}}
+@keyframes chr-result-sub{0%{opacity:0;transform:translateY(8px)}100%{opacity:1;transform:none}}
+@keyframes chr-result-panel{0%{opacity:0;transform:translateY(40px)}100%{opacity:1;transform:none}}
+@media (prefers-reduced-motion: reduce){.chr-result-in,.chr-result-title,.chr-result-sub,.chr-result-panel{animation:none}}
 .chr-chip{font-size:11px;line-height:1.35;padding:2px 7px;border:1px solid #ffffff22;background:#ffffff0a;text-align:center}
