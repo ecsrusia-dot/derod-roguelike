@@ -528,9 +528,10 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
 
       {/* 결과 */}
       {done && (
-        <div className="relative flex-none px-3 pb-3">
-          {/* 1.253.0 — 본편 스타일 (시안 ㉘) */}
-          <div className="overflow-y-auto" style={{ padding: '10px 12px 12px', border: `2px solid ${MS.red}`, background: '#150a0c', maxHeight: '58vh' }}>
+        <div className="relative flex flex-col min-h-0 px-3 pb-3" style={{ flex: '0 1 auto', maxHeight: '62%' }}>
+          {/* 1.253.0 — 본편 스타일 (시안 ㉘) · 1.260.1 버튼은 스크롤 밖 하단 고정 (보상이 길면 버튼이 화면 밖으로 밀리던 문제) */}
+          <div className="flex flex-col min-h-0" style={{ border: `2px solid ${MS.red}`, background: '#150a0c' }}>
+          <div className="overflow-y-auto min-h-0" style={{ padding: '10px 12px 4px' }}>
             <div className="text-center" style={{ fontSize: 10.5, letterSpacing: 6, color: MS.red }}>BATTLE RESULT</div>
             <div className={`font-bold text-center ${sim.result === 'win' ? 'chr-win' : ''}`} style={{ fontSize: 22, letterSpacing: 6, lineHeight: 1.2, color: sim.result === 'win' ? MS.gold : '#e06a5f', fontFamily: FONT_TITLE }}>
               {sim.result === 'win' ? '승리' : '전멸'}
@@ -578,6 +579,8 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
                 {ctx.kind === 'raid' ? '원정대가 무너졌다 — 봉인의 주인이 쓰러지면 그 봉인은 깰 수 없다. 약한 캐릭터를 더 키워 다시 도전하자.' : ctx.kind === 'tower' ? `첨탑 ${summary.towerFell}층에서 쓰러졌다. 다음 도전은 체크포인트부터.` : ctx.kind === 'dungeon' ? '던전에서 쫓겨났다.' : `쓰러졌다 — 사냥터로 돌아간다.${summary.goldLost ? ` (골드 -${summary.goldLost})` : ''}`}
               </div>
             )}
+          </div>
+          <div className="flex-none" style={{ padding: '0 12px 12px', borderTop: `1px solid ${MS.line}` }}>
             {(() => {
               const sq = (extra = {}) => ({ height: 44, fontSize: 13.5, fontWeight: 800, border: `1px solid ${MS.line}`, background: MS.box, color: PALETTE.text, ...extra });
               const sm = (extra = {}) => ({ height: 36, fontSize: 12, border: `1px solid ${MS.line}`, background: MS.box, color: PALETTE.text, ...extra });
@@ -607,6 +610,7 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
                 </div>
               </>;
             })()}
+          </div>
           </div>
         </div>
       )}
