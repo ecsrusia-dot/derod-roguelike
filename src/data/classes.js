@@ -1,3 +1,4 @@
+import { withArtRev } from './artRev.js';
 // =========== 직업 ===========
 // 5직업 모두 처음부터 사용 가능 (1.24.0~). 챔피언십에서는 해당 직업의
 // 수련의 길 클리어 시 사용 가능 (isChampionshipClassUnlocked로 판단).
@@ -12,11 +13,11 @@ export const CLASSES = [
     ultimateId: 'wanderer_shadowStrike',  // 직업 소울 스킬 (소울 게이지 100 발동)
     color: '#c4453d',
     locked: false,        // 항상 사용 가능 (시작 직업)
-    image: './classes/wanderer.jpg',
-    winImage: './classes/wandererwin.jpg',
-    lossImage: './classes/wandererloss.jpg',
-    startImage: './classes/wandererstart.jpg',
-    combatImage: './classes/combat/wanderer_combat.jpg',
+    image: withArtRev('./classes/wanderer.jpg'),
+    winImage: withArtRev('./classes/wandererwin.jpg'),
+    lossImage: withArtRev('./classes/wandererloss.jpg'),
+    startImage: withArtRev('./classes/wandererstart.jpg'),
+    combatImage: withArtRev('./classes/combat/wanderer_combat.jpg'),
   },
   {
     id: 'sage', name: '술법사', sub: 'Sorcerer of Tour',
@@ -28,11 +29,11 @@ export const CLASSES = [
     ultimateId: 'sage_eternalFlame',  // 직업 소울 스킬 (소울 게이지 100 발동)
     color: '#5c4a8c',
     locked: false,
-    image: './classes/sage.jpg',
-    winImage: './classes/sagewin.jpg',
-    lossImage: './classes/sageloss.jpg',
-    startImage: './classes/sagestart.jpg',
-    combatImage: './classes/combat/sage_combat.jpg',
+    image: withArtRev('./classes/sage.jpg'),
+    winImage: withArtRev('./classes/sagewin.jpg'),
+    lossImage: withArtRev('./classes/sageloss.jpg'),
+    startImage: withArtRev('./classes/sagestart.jpg'),
+    combatImage: withArtRev('./classes/combat/sage_combat.jpg'),
   },
   {
     id: 'demonblood', name: '혼혈 마족', sub: 'Demon Heritage',
@@ -44,11 +45,11 @@ export const CLASSES = [
     ultimateId: 'demonblood_bloodFury',  // 직업 소울 스킬 (소울 게이지 100 발동)
     color: '#8b1f1f',
     locked: false,
-    image: './classes/demonblood.jpg',
-    winImage: './classes/demonbloodwin.jpg',
-    lossImage: './classes/demonbloodloss.jpg',
-    startImage: './classes/demonbloodstart.jpg',
-    combatImage: './classes/combat/demonblood_combat.jpg',
+    image: withArtRev('./classes/demonblood.jpg'),
+    winImage: withArtRev('./classes/demonbloodwin.jpg'),
+    lossImage: withArtRev('./classes/demonbloodloss.jpg'),
+    startImage: withArtRev('./classes/demonbloodstart.jpg'),
+    combatImage: withArtRev('./classes/combat/demonblood_combat.jpg'),
   },
   {
     id: 'elf', name: '숲의 정령사', sub: 'Elf of Twilight',
@@ -60,11 +61,11 @@ export const CLASSES = [
     ultimateId: 'elf_skyArrows',  // 직업 소울 스킬 (소울 게이지 100 발동)
     color: '#7a9a5e',
     locked: false,
-    image: './classes/elf.jpg',
-    winImage: './classes/elfwin.jpg',
-    lossImage: './classes/elfloss.jpg',
-    startImage: './classes/elfstart.jpg',
-    combatImage: './classes/combat/elf_combat.jpg',
+    image: withArtRev('./classes/elf.jpg'),
+    winImage: withArtRev('./classes/elfwin.jpg'),
+    lossImage: withArtRev('./classes/elfloss.jpg'),
+    startImage: withArtRev('./classes/elfstart.jpg'),
+    combatImage: withArtRev('./classes/combat/elf_combat.jpg'),
   },
   {
     id: 'priest', name: '여명의 사제', sub: 'Priest of Dawn',
@@ -76,11 +77,11 @@ export const CLASSES = [
     ultimateId: 'priest_dawnDescent',  // 직업 소울 스킬 (소울 게이지 100 발동)
     color: '#d4a574',
     locked: false,
-    image: './classes/priest.jpg',
-    winImage: './classes/priestwin.jpg',
-    lossImage: './classes/priestloss.jpg',
-    startImage: './classes/prieststart.jpg',
-    combatImage: './classes/combat/priest_combat.jpg',
+    image: withArtRev('./classes/priest.jpg'),
+    winImage: withArtRev('./classes/priestwin.jpg'),
+    lossImage: withArtRev('./classes/priestloss.jpg'),
+    startImage: withArtRev('./classes/prieststart.jpg'),
+    combatImage: withArtRev('./classes/combat/priest_combat.jpg'),
   },
 ];
 

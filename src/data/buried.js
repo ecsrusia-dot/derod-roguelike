@@ -1,3 +1,4 @@
+import { withArtRev } from './artRev.js';
 // ============================================
 // data/buried.js — 무덤의 유산 (1.103.0)
 // ============================================
@@ -97,7 +98,7 @@ export const buriedAutoInfo = (slotId) => BURIED_AUTO_POOLS[slotPool(slotId)] ||
 export const BURIED_CLASSES = [
   {
     id: 'wanderer', name: '방랑검사', sub: 'Gravewalker Blade', color: '#c4453d',
-    image: './classes/wanderer.jpg',
+    image: withArtRev('./classes/wanderer.jpg'),
     desc: '어둠 속에서도 검을 뻗는 자. 반격으로 되갚는다.',
     lines: { weapon: 'sword', offhand: 'blade' },
     stats: { str: 12, dex: 9, int: 5, vit: 9 },
@@ -106,7 +107,7 @@ export const BURIED_CLASSES = [
   },
   {
     id: 'sage', name: '술법사', sub: 'Sorcerer of Ash', color: '#5c4a8c',
-    image: './classes/sage.jpg',
+    image: withArtRev('./classes/sage.jpg'),
     desc: '정념을 태우는 자. 불길은 꺼지지 않는다.',
     lines: { weapon: 'staff', offhand: 'tome' },
     stats: { str: 4, dex: 7, int: 14, vit: 8 },
@@ -115,7 +116,7 @@ export const BURIED_CLASSES = [
   },
   {
     id: 'demonblood', name: '혼혈 마족', sub: 'Demon Heritage', color: '#8b1f1f',
-    image: './classes/demonblood.jpg',
+    image: withArtRev('./classes/demonblood.jpg'),
     desc: '마왕의 피가 흐르는 자. 상처가 곧 힘이 된다.',
     lines: { weapon: 'axe', offhand: 'claw' },
     stats: { str: 13, dex: 6, int: 5, vit: 11 },
@@ -124,7 +125,7 @@ export const BURIED_CLASSES = [
   },
   {
     id: 'elf', name: '숲의 정령사', sub: 'Elf of Twilight', color: '#7a9a5e',
-    image: './classes/elf.jpg',
+    image: withArtRev('./classes/elf.jpg'),
     desc: '바람과 교감하는 자. 화살은 빗나가지 않는다.',
     lines: { weapon: 'bow', offhand: 'quiver' },
     stats: { str: 5, dex: 14, int: 8, vit: 7 },
@@ -133,7 +134,7 @@ export const BURIED_CLASSES = [
   },
   {
     id: 'priest', name: '여명의 사제', sub: 'Priest of Dawn', color: '#d4a574',
-    image: './classes/priest.jpg',
+    image: withArtRev('./classes/priest.jpg'),
     desc: '여명의 가호를 받은 자. 죽음을 거부한다.',
     lines: { weapon: 'mace', offhand: 'relic' },
     stats: { str: 5, dex: 6, int: 14, vit: 12 },
@@ -2786,7 +2787,7 @@ export const hasBuriedTrait = (char, id) => buriedTraitIds(char).includes(id);
 export const BURIED_ADVANCED_CLASSES = [
   {
     id: 'wanderer_adv', name: '무명검성', sub: 'Nameless Blade', color: '#e05a50', base: 'wanderer',
-    image: './classes/wanderer.jpg', advanced: true,
+    image: withArtRev('./classes/wanderer.jpg'), advanced: true,
     desc: '이름을 버린 검. 되돌아오는 칼날이 더 깊이 벤다.',
     lines: { weapon: 'sword', offhand: 'blade' },
     stats: { str: 16, dex: 12, int: 6, vit: 12 },
@@ -2794,7 +2795,7 @@ export const BURIED_ADVANCED_CLASSES = [
   },
   {
     id: 'sage_adv', name: '겁화술사', sub: 'Emberlord', color: '#7a5fb0', base: 'sage',
-    image: './classes/sage.jpg', advanced: true,
+    image: withArtRev('./classes/sage.jpg'), advanced: true,
     desc: '꺼지지 않는 불을 다루는 자. 태운 것은 되살아나지 않는다.',
     lines: { weapon: 'staff', offhand: 'tome' },
     stats: { str: 5, dex: 9, int: 19, vit: 9 },
@@ -2802,7 +2803,7 @@ export const BURIED_ADVANCED_CLASSES = [
   },
   {
     id: 'demonblood_adv', name: '마혈군주', sub: 'Blood Sovereign', color: '#b02626', base: 'demonblood',
-    image: './classes/demonblood.jpg', advanced: true,
+    image: withArtRev('./classes/demonblood.jpg'), advanced: true,
     desc: '피를 지배하는 자. 상처가 깊을수록 왕좌에 가깝다.',
     lines: { weapon: 'axe', offhand: 'claw' },
     stats: { str: 17, dex: 8, int: 6, vit: 15 },
@@ -2810,7 +2811,7 @@ export const BURIED_ADVANCED_CLASSES = [
   },
   {
     id: 'elf_adv', name: '바람의 대사수', sub: 'Galewarden', color: '#95bd72', base: 'elf',
-    image: './classes/elf.jpg', advanced: true,
+    image: withArtRev('./classes/elf.jpg'), advanced: true,
     desc: '바람을 다스리는 궁수. 화살은 두 번 꽂힌다.',
     lines: { weapon: 'bow', offhand: 'quiver' },
     stats: { str: 7, dex: 17, int: 10, vit: 11 },
@@ -2818,7 +2819,7 @@ export const BURIED_ADVANCED_CLASSES = [
   },
   {
     id: 'priest_adv', name: '여명의 대사제', sub: 'Highpriest of Dawn', color: '#e8c090', base: 'priest',
-    image: './classes/priest.jpg', advanced: true,
+    image: withArtRev('./classes/priest.jpg'), advanced: true,
     desc: '여명을 대리하는 자. 그 앞에서는 죽음도 물러선다.',
     lines: { weapon: 'mace', offhand: 'relic' },
     stats: { str: 6, dex: 8, int: 18, vit: 14 },
@@ -2830,7 +2831,7 @@ export const BURIED_ADVANCED_CLASSES = [
 export const BURIED_RANK_CLASSES = [
   {
     id: 'summiter', name: '등정자', sub: 'Summiter', color: '#ffd27a',
-    image: './classes/wanderer.jpg', rankOnly: true,
+    image: withArtRev('./classes/wanderer.jpg'), rankOnly: true,
     desc: '모든 무덤의 정상을 밟은 자. 오를수록 검이 예리해진다.',
     lines: { weapon: 'sword', offhand: 'relic' },
     stats: { str: 11, dex: 10, int: 7, vit: 9 },
@@ -4673,7 +4674,7 @@ export const BURIED_SKULL_ROOM = {
 export const BURIED_ENCOUNTER_CLASSES = [
   {
     id: 'magiblade', name: '마검사', sub: 'Spellblade', color: '#a8556e',
-    image: './classes/wanderer.jpg', encounter: true,
+    image: withArtRev('./classes/wanderer.jpg'), encounter: true,
     desc: '검과 마도서를 함께 쥔 자. 제 피를 태워 칼날을 벼린다.',
     lines: { weapon: 'sword', offhand: 'tome' },
     stats: { str: 11, dex: 6, int: 11, vit: 8 },
@@ -4682,7 +4683,7 @@ export const BURIED_ENCOUNTER_CLASSES = [
   },
   {
     id: 'vampire', name: '흡혈귀', sub: 'Cursed Blood', color: '#7d2b4a',
-    image: './classes/demonblood.jpg', encounter: true,
+    image: withArtRev('./classes/demonblood.jpg'), encounter: true,
     desc: '저주받은 혈족. 생명의 그릇은 작지만, 피는 마르지 않는다.',
     lines: { weapon: 'sword', offhand: 'claw' },
     stats: { str: 13, dex: 9, int: 6, vit: 10 },
@@ -4691,7 +4692,7 @@ export const BURIED_ENCOUNTER_CLASSES = [
   },
   {
     id: 'fairy', name: '페어리', sub: 'Twilight Fae', color: '#8fb8d8',
-    image: './classes/elf.jpg', encounter: true,
+    image: withArtRev('./classes/elf.jpg'), encounter: true,
     desc: '황혼의 요정. 몸은 유리처럼 여리지만, 날개가 칼날을 흘려낸다.',
     lines: { weapon: 'staff', offhand: 'relic' },
     stats: { str: 4, dex: 11, int: 15, vit: 5 },
@@ -4715,7 +4716,7 @@ export function checkBuriedEncounterUnlock(killsByEnemy, alreadyUnlocked) {
 export const BURIED_DEPTH_CLASSES = [
   {
     id: 'mazewarden', name: '미궁의 안내인', sub: 'Maze Warden', color: '#7ba3c4',
-    image: './classes/wanderer.jpg', depth: true,
+    image: withArtRev('./classes/wanderer.jpg'), depth: true,
     desc: '길을 전부 외운 자. 갈림길 앞에서 웃는다.',
     lines: { weapon: 'sword', offhand: 'tome' },
     stats: { str: 10, dex: 8, int: 10, vit: 9 },
@@ -4724,7 +4725,7 @@ export const BURIED_DEPTH_CLASSES = [
   },
   {
     id: 'plaguedoc', name: '역병 사제', sub: 'Plague Cleric', color: '#7a9a5e',
-    image: './classes/priest.jpg', depth: true,
+    image: withArtRev('./classes/priest.jpg'), depth: true,
     desc: '곪은 물에서 기도하는 자. 병이 곧 축복이다.',
     lines: { weapon: 'mace', offhand: 'relic' },
     stats: { str: 5, dex: 6, int: 13, vit: 10 },
@@ -4733,7 +4734,7 @@ export const BURIED_DEPTH_CLASSES = [
   },
   {
     id: 'chasmrager', name: '나락의 광전사', sub: 'Chasm Rager', color: '#c4453d',
-    image: './classes/demonblood.jpg', depth: true,
+    image: withArtRev('./classes/demonblood.jpg'), depth: true,
     desc: '떨어지며 강해진 자. 바닥이 없다는 걸 안다.',
     lines: { weapon: 'axe', offhand: 'claw' },
     stats: { str: 15, dex: 6, int: 4, vit: 10 },
@@ -4742,7 +4743,7 @@ export const BURIED_DEPTH_CLASSES = [
   },
   {
     id: 'voidwalker', name: '공허 감시자', sub: 'Void Watcher', color: '#5c4a8c',
-    image: './classes/elf.jpg', depth: true,
+    image: withArtRev('./classes/elf.jpg'), depth: true,
     desc: '어둠을 너무 오래 본 자. 이제 어둠이 그를 비켜 간다.',
     lines: { weapon: 'bow', offhand: 'blade' },
     stats: { str: 5, dex: 15, int: 8, vit: 8 },
@@ -4806,7 +4807,7 @@ export const BURIED_UNION_REWARDS = [
 export const BURIED_UNION_CLASSES = [
   {
     id: 'paladin', name: '성기사', sub: 'Paladin', color: '#e8d8a8',
-    image: './classes/priest.jpg', unionOnly: true,
+    image: withArtRev('./classes/priest.jpg'), unionOnly: true,
     desc: '봉인 감시단의 수호 기사. 빛과 강철로 벽이 된다.',
     lines: { weapon: 'mace', offhand: 'relic' },
     stats: { str: 10, dex: 5, int: 9, vit: 12 },
@@ -4815,7 +4816,7 @@ export const BURIED_UNION_CLASSES = [
   },
   {
     id: 'necroseer', name: '강령술사', sub: 'Necroseer', color: '#5e7a3e',
-    image: './classes/sage.jpg', unionOnly: true,
+    image: withArtRev('./classes/sage.jpg'), unionOnly: true,
     desc: '상조회가 거둔 망자의 목소리를 듣는 자. 병과 저주가 도구다.',
     lines: { weapon: 'staff', offhand: 'tome' },
     stats: { str: 4, dex: 6, int: 14, vit: 8 },
@@ -4824,7 +4825,7 @@ export const BURIED_UNION_CLASSES = [
   },
   {
     id: 'ronin', name: '떠돌이 사무라이', sub: 'Ronin', color: '#c9a86a',
-    image: './classes/wanderer.jpg', unionOnly: true,
+    image: withArtRev('./classes/wanderer.jpg'), unionOnly: true,
     desc: '암월상회의 해결사. 칼값은 선불이다.',
     lines: { weapon: 'sword', offhand: 'blade' },
     stats: { str: 12, dex: 11, int: 4, vit: 7 },
@@ -4833,7 +4834,7 @@ export const BURIED_UNION_CLASSES = [
   },
   {
     id: 'darkknight', name: '암흑기사', sub: 'Dark Knight', color: '#5c4a8c',
-    image: './classes/demonblood.jpg', unionOnly: true,
+    image: withArtRev('./classes/demonblood.jpg'), unionOnly: true,
     desc: '무저갱 교단의 성전 기사. 어둠을 갑주처럼 두른다.',
     lines: { weapon: 'axe', offhand: 'tome' },
     stats: { str: 13, dex: 5, int: 10, vit: 10 },
