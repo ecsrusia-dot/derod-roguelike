@@ -124,7 +124,7 @@ export const SCENES = [
     id: 'dungeon6_open', title: '여명의 정원', bg: './enemies/championship/dawn/champ_dawn_boss3_intro.jpg',
     when: (s, c) => !!s.progress.bossCleared[9] && c.at === 'town',
     lines: [
-      { sp: 'elder', t: '첨탑 아래 정원은 신이 쓰러진 뒤에도 빛나고 있다는군. 정원의 대천사가 아직 명령을 기다리고 있대.' },
+      { sp: 'elder', t: '첨탑 아래 정원은 신이 쓰러진 뒤에도 빛나고 있다는군. 정원의 마녀가 아직 명령을 기다리고 있대.' },
       { sp: 'hero', t: '그럼 이제 그만 쉬게 해 줘야겠네요.' },
     ],
   },
@@ -212,7 +212,7 @@ export const SCENES = [
     ],
   },
   {
-    id: 'f5_boss', title: '협곡의 한기룡', bg: './enemies/championship/frost/champ_frost_boss3_intro.jpg',
+    id: 'f5_boss', title: '협곡의 한기룡 스칼드라', bg: './enemies/championship/frost/champ_frost_boss3_intro.jpg',
     when: (s, c) => c.at === 'bossPre' && c.fieldId === 5,
     lines: [
       { sp: 'champ_frost_boss3', t: '나는 천 년을 잠들어 있었다. 빛이 나를 깨워 이렇게 속삭이더군 — 「흠 있는 것들을 얼려라」.' },
@@ -237,7 +237,7 @@ export const SCENES = [
     ],
   },
   {
-    id: 'f6_boss', title: '광기의 마녀', bg: './enemies/championship/forest/chapter3/champ_forest_witch_intro.jpg',
+    id: 'f6_boss', title: '광기의 마녀 벨라도나', bg: './enemies/championship/forest/chapter3/champ_forest_witch_intro.jpg',
     when: (s, c) => c.at === 'bossPre' && c.fieldId === 6,
     lines: [
       { sp: 'champ_forest_witch', t: '밤이 오지 않아. 밤이 오지 않아. 노래를 멈출 수가 없어.' },
@@ -262,7 +262,7 @@ export const SCENES = [
     ],
   },
   {
-    id: 'f7_boss', title: '절대봉인의 군주', bg: './enemies/championship/sanctum/champ_sanctum_boss4_intro.jpg',
+    id: 'f7_boss', title: '절대봉인의 군주 아르케온', bg: './enemies/championship/sanctum/champ_sanctum_boss4_intro.jpg',
     when: (s, c) => c.at === 'bossPre' && c.fieldId === 7,
     lines: [
       { sp: 'champ_sanctum_boss4', t: '여기 잠든 자들은 모두 여명에 맞선 영웅이었다. 나는 그들을 지키는 것이 아니라 가두는 자다.' },
@@ -315,7 +315,7 @@ export const SCENES = [
     ],
   },
   {
-    id: 'f9_boss', title: '여명의 신', bg: './enemies/championship/dawn/champ_dawn_boss4_intro.jpg',
+    id: 'f9_boss', title: '여명의 신 솔라리온', bg: './enemies/championship/dawn/champ_dawn_boss4_intro.jpg',
     when: (s, c) => c.at === 'bossPre' && c.fieldId === 9,
     lines: [
       { sp: 'champ_dawn_boss4', t: '황혼은 오류다. 저무는 것, 늙는 것, 끝나는 것 — 나는 그것을 지우려 했을 뿐이다.' },
@@ -426,7 +426,7 @@ export const SCENES = [
     when: (s) => (s.progress.dungeonClears || 0) >= 1,
     lines: [
       { sp: 'champ_frost_boss4', t: '…왕의 무구를… 탐하는 자여… 그 냉기를… 견딜 수 있겠느냐…' },
-      { sp: 'narr', t: '절대영도의 군주가 무너지고, 무덤 깊은 곳의 관이 열렸다. 차가운 빛이 손끝을 타고 올라온다.' },
+      { sp: 'narr', t: '절대영도의 여제가 무너지고, 무덤 깊은 곳의 관이 열렸다. 차가운 빛이 손끝을 타고 올라온다.' },
     ],
   },
 ];
@@ -545,7 +545,7 @@ export const QUESTS = [
   { id: 'd6', kind: 'side', req: { field: 7 }, title: '심연의 왕좌', desc: '사냥꾼: "동굴의 빙왕을 쓰러뜨리면 동토가 다시 녹을지도 몰라."', goal: { type: 'dungeonTier', id: 'frostAbyss', tier: 0 }, reward: { gold: 4000, shard: 6, essence: 30, keys: 2 } },
   { id: 'd7', kind: 'side', req: { field: 8 }, title: '금고의 기록', desc: '학자: "성역의 금고에 무엇이 적혀 있는지 알아야 하네."', goal: { type: 'dungeonTier', id: 'sanctumVault', tier: 0 }, reward: { gold: 5500, shard: 8, essence: 40, keys: 2 } },
   { id: 'd8', kind: 'side', req: { field: 9 }, title: '두 번째 마왕', desc: '깨어난 영웅: "심장을 노리는 자를 막아야 한다. 그것이 마왕의 유언이었다."', goal: { type: 'dungeonTier', id: 'riftHeart', tier: 0 }, reward: { gold: 7000, shard: 10, item: { grade: 'epic' } } },
-  { id: 'd9', kind: 'side', req: { main: 'm9' }, title: '정원을 닫다', desc: '촌장: "정원의 대천사를 쉬게 해 주게. 그게 진짜 마지막 일일 걸세."', goal: { type: 'dungeonTier', id: 'dawnGarden', tier: 0 }, reward: { gold: 10000, shard: 15, item: { grade: 'epic' }, keys: 3 } },
+  { id: 'd9', kind: 'side', req: { main: 'm9' }, title: '정원을 닫다', desc: '촌장: "정원의 마녀를 쉬게 해 주게. 그게 진짜 마지막 일일 걸세."', goal: { type: 'dungeonTier', id: 'dawnGarden', tier: 0 }, reward: { gold: 10000, shard: 15, item: { grade: 'epic' }, keys: 3 } },
   { id: 'd10', kind: 'side', req: { main: 'm9' }, title: '여명보다 밝게', desc: '대장장이: "정원을 전설 난이도로 넘으면, 그건 대장장이도 못 만드는 전설이지."', goal: { type: 'dungeonTier', id: 'dawnGarden', tier: 2 }, reward: { gold: 20000, shard: 25, item: { grade: 'epic' } } },
   // ── 1.208.0 던전 확장
   { id: 'd3', kind: 'side', req: { main: 'm3' }, title: '광기의 심장', desc: '숲의 파수꾼: "숲 가장 깊은 곳에서 음악이 들린다네. 멈춰 주게."', goal: { type: 'dungeonTier', id: 'forestHeart', tier: 0 }, reward: { gold: 1500, shard: 4, essence: 20, keys: 2 } },

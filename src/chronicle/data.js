@@ -330,7 +330,7 @@ export const CHRONICLE_FIELDS = [
 export const CHRONICLE_DUNGEONS = [
   {
     id: 'frostTomb', name: '서리 왕의 무덤', unlockField: 2, recLv: 30, color: '#9cc4e4', area: { hpMult: 1, atkMult: 1 }, set: 'frost',
-    desc: '층마다 HP가 이어진다. 끝까지 내려가면 절대영도의 군주가 에픽 장비를 지키고 있다.',
+    desc: '층마다 HP가 이어진다. 끝까지 내려가면 절대영도의 여제가 에픽 장비를 지키고 있다.',
     art: 'champ_frost_boss4',
     floors: [
       { lv: 28, enemies: ['champ_frost_imp', 'champ_frost_wolf', 'champ_frost_shaman'] },
@@ -391,7 +391,7 @@ export const CHRONICLE_DUNGEONS = [
   },
   {
     id: 'dawnGarden', name: '여명의 정원', part: 2, unlockField: 9, recLv: 98, color: '#fff1c4', area: { hpMult: 1, atkMult: 1 }, set: 'dawn',
-    desc: '신이 쓰러진 뒤에도 꺼지지 않는 정원. 정원의 대천사가 마지막 빛을 지킨다.',
+    desc: '신이 쓰러진 뒤에도 꺼지지 않는 정원. 정원의 마녀가 마지막 빛을 지킨다.',
     art: 'champ_dawn_boss3',
     floors: [
       { lv: 94, enemies: ['champ_dawn_acolyte', 'champ_dawn_warrior', 'champ_dawn_seraph'] },

@@ -15,16 +15,16 @@ import { CENEMIES as ENEMIES } from './enemies.js';
 const keyByName = (name) => Object.keys(ENEMIES).find(k => ENEMIES[k].name === name);
 // hp/atk = 보스 배율 · seal = 봉인 HP 배율 (buildChronicleEnemy area) — 시뮬로 맞춘 값 (scratch raidcal.mjs)
 export const RAID_TIERS = [
-  { id: 'r60', name: '봉인의 문', desc: '서리 왕좌 아래 잠든 첫 번째 문', req: { lv: 60 }, lv: 60, boss: '절대영도의 군주', hp: 3.0, atk: 1.15, seal: 1.0, sealAtk: 1.2 },
-  { id: 'r80', name: '광기의 회랑', desc: '종말의 지휘봉이 울리는 회랑', req: { lv: 80 }, lv: 80, boss: '광기의 종말 마에스트로', hp: 3.0, atk: 1.15, seal: 1.0, sealAtk: 1.55 },
+  { id: 'r60', name: '봉인의 문', desc: '서리 왕좌 아래 잠든 첫 번째 문', req: { lv: 60 }, lv: 60, boss: '절대영도의 여제 세릴', hp: 3.0, atk: 1.15, seal: 1.0, sealAtk: 1.2 },
+  { id: 'r80', name: '광기의 회랑', desc: '종말의 지휘봉이 울리는 회랑', req: { lv: 80 }, lv: 80, boss: '종말의 마에스트로 오르페인', hp: 3.0, atk: 1.15, seal: 1.0, sealAtk: 1.55 },
   { id: 'r100', name: '심장의 제단', desc: '마왕의 심장이 뛰는 제단', req: { lv: 100 }, lv: 100, boss: '심장의 마왕', hp: 3.0, atk: 1.15, seal: 1.0, sealAtk: 2.0 },
-  { id: 'a20', name: '각성 · 천상의 정원', desc: '전승한 자만 들어서는 정원', req: { lv: 20, rebirth: 1 }, lv: 20, boss: '정원의 대천사', hp: 3.0, atk: 1.15, seal: 1.0, sealAtk: 0.95 },
-  { id: 'a40', name: '각성 · 봉인의 심처', desc: '봉인자가 숨은 가장 깊은 곳', req: { lv: 40, rebirth: 1 }, lv: 40, boss: '심처의 봉인자', hp: 3.0, atk: 1.15, seal: 1.0, sealAtk: 1.05 },
+  { id: 'a20', name: '각성 · 천상의 정원', desc: '전승한 자만 들어서는 정원', req: { lv: 20, rebirth: 1 }, lv: 20, boss: '정원의 마녀 루미엘', hp: 3.0, atk: 1.15, seal: 1.0, sealAtk: 0.95 },
+  { id: 'a40', name: '각성 · 봉인의 심처', desc: '봉인자가 숨은 가장 깊은 곳', req: { lv: 40, rebirth: 1 }, lv: 40, boss: '심처의 봉인자 카탈', hp: 3.0, atk: 1.15, seal: 1.0, sealAtk: 1.05 },
   { id: 'a60', name: '각성 · 기억의 왕좌', desc: '잊힌 시대의 군주', req: { lv: 60, rebirth: 1 }, lv: 60, boss: '기억의 군주 므네메', hp: 3.0, atk: 1.15, seal: 1.0, sealAtk: 1.4 },
   { id: 'a80', name: '각성 · 공허의 문', desc: '세계 바깥을 지키는 문지기', req: { lv: 80, rebirth: 1 }, lv: 80, boss: '공허의 문지기 네하르', hp: 3.0, atk: 1.15, seal: 1.0, sealAtk: 1.8 },
   { id: 'a100', name: '각성 · 황혼의 근원', desc: '모든 황혼이 시작된 곳', req: { lv: 100, rebirth: 1 }, lv: 100, boss: '황혼의 근원 아이온', hp: 3.0, atk: 1.15, seal: 1.0, sealAtk: 2.3 },
 ];
-export const RAID_SEAL_ART = '봉인의 화신';
+export const RAID_SEAL_ART = '살아 있는 봉인 갑주';
 const RAID_SEAL_SHORT = { wanderer: '검사', sage: '술사', demonblood: '마족', elf: '정령', priest: '사제' };
 // 직업별 봉인 HP — 직업 화력 차이 보정 (모두 비슷한 라운드에 깨지도록, 시뮬 측정값)
 export const RAID_SEAL_CLASS_HP = { wanderer: 0.55, sage: 1.7, demonblood: 1.25, elf: 2.0, priest: 0.3 };
