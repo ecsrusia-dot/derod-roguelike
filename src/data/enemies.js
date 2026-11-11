@@ -320,7 +320,7 @@ export const ENEMIES = {
     drop: { gold: [40, 60] },
   },
   champ_frost_brute: {
-    name: '얼음 광전사', hp: 115, color: '#3d6a8a',
+    name: '극광의 광전사', hp: 115, color: '#3d6a8a',
     desc: '냉기로 단련된 야만 전사',
     tier: 'elite', chapter: 'frost_1',
     patterns: [
@@ -331,7 +331,7 @@ export const ENEMIES = {
     drop: { gold: [70, 100], gem: [1, 2] },
   },
   champ_frost_boss1: {
-    name: '눈보라의 군주', hp: 220, color: '#7ba3c4',
+    name: '눈보라의 군주 하르발드', hp: 220, color: '#7ba3c4',
     desc: '눈보라를 부리는 변경의 지배자',
     isBoss: true, tier: 'boss', chapter: 'frost_1',
     patterns: [
@@ -367,7 +367,7 @@ export const ENEMIES = {
     drop: { gold: [55, 80] },
   },
   champ_frost_elite2: {
-    name: '심연의 빙룡', hp: 180, color: '#3d6a8a',
+    name: '서리숨결 비룡', hp: 180, color: '#3d6a8a',
     desc: '동굴 깊은 곳의 작은 용족',
     tier: 'elite', chapter: 'frost_2',
     patterns: [
@@ -378,7 +378,7 @@ export const ENEMIES = {
     drop: { gold: [90, 130], gem: [2, 3] },
   },
   champ_frost_boss2: {
-    name: '동굴의 빙왕', hp: 360, color: '#5c8eb8',
+    name: '동굴의 빙왕 이스몬드', hp: 360, color: '#5c8eb8',
     desc: '동굴 가장 깊은 곳에 잠든 한기의 군주',
     isBoss: true, tier: 'boss', chapter: 'frost_2',
     patterns: [
@@ -414,7 +414,7 @@ export const ENEMIES = {
     drop: { gold: [60, 90] },
   },
   champ_frost_elite3: {
-    name: '빙하 폭군', hp: 230, color: '#3d6a8a',
+    name: '서릿창의 사냥여왕', hp: 230, color: '#3d6a8a',
     desc: '협곡을 지배하는 한기의 화신',
     tier: 'elite', chapter: 'frost_3',
     patterns: [
@@ -425,7 +425,7 @@ export const ENEMIES = {
     drop: { gold: [110, 160], gem: [3, 5] },
   },
   champ_frost_boss3: {
-    name: '협곡의 한기룡', hp: 440, color: '#3d6a8a',
+    name: '협곡의 한기룡 스칼드라', hp: 440, color: '#3d6a8a',
     desc: '빙하 협곡 깊은 곳에 잠든 고대 용족',
     isBoss: true, tier: 'boss', chapter: 'frost_3',
     patterns: [
@@ -450,7 +450,7 @@ export const ENEMIES = {
     drop: { gold: [80, 120] },
   },
   champ_frost_elite4: {
-    name: '서리의 대마법사', hp: 280, color: '#5c8eb8',
+    name: '서리 결계의 대현자', hp: 280, color: '#5c8eb8',
     desc: '한기의 모든 비술을 통달한 절대자',
     tier: 'elite', chapter: 'frost_4',
     patterns: [
@@ -461,7 +461,7 @@ export const ENEMIES = {
     drop: { gold: [140, 200], gem: [4, 6] },
   },
   champ_frost_boss4: {
-    name: '절대영도의 군주', hp: 540, color: '#9bc4e0',
+    name: '절대영도의 여제 세릴', hp: 540, color: '#9bc4e0',
     desc: '북부 극지대 가장 깊은 곳에 봉인된 한기의 신',
     isBoss: true, tier: 'boss', chapter: 'frost_4',
     patterns: [
@@ -518,7 +518,7 @@ export const ENEMIES = {
     drop: { gold: [40, 60] },
   },
   champ_forest_tiger: {
-    name: '광기의 호랑이', hp: 130, color: '#8a4e1e',
+    name: '백안의 광호', hp: 130, color: '#8a4e1e',
     desc: '숲의 정점에 군림하는 광기의 맹수',
     tier: 'elite', chapter: 'forest_1',
     berserkPerTurn: 4,  // 강적은 광폭 누적 빠름
@@ -530,7 +530,7 @@ export const ENEMIES = {
     drop: { gold: [70, 100], gem: [1, 2] },
   },
   champ_forest_boss1: {
-    name: '시든 자들의 어머니', hp: 240, color: '#7a9a5e',
+    name: '시든 자들의 어머니 모르웬', hp: 240, color: '#7a9a5e',
     desc: '숲의 광기를 퍼뜨리는 근원',
     isBoss: true, tier: 'boss', chapter: 'forest_1',
     berserkPerTurn: 5,
@@ -569,7 +569,7 @@ export const ENEMIES = {
     drop: { gold: [55, 80] },
   },
   champ_forest_elite2: {
-    name: '광기의 폭군', hp: 180, color: '#3d5a2c',
+    name: '가시껍질 창기사', hp: 180, color: '#3d5a2c',
     desc: '광기의 정점에 다다른 숲의 폭군',
     tier: 'elite', chapter: 'forest_2',
     berserkPerTurn: 6,
@@ -581,7 +581,7 @@ export const ENEMIES = {
     drop: { gold: [90, 130], gem: [2, 3] },
   },
   champ_forest_boss2: {
-    name: '망자의 군주', hp: 320, color: '#5e7a4a',
+    name: '망자의 군주 알드릭', hp: 320, color: '#5e7a4a',
     desc: '죽은 자들을 이끄는 숲의 어둠',
     isBoss: true, tier: 'boss', chapter: 'forest_2',
     berserkPerTurn: 7,
@@ -608,7 +608,7 @@ export const ENEMIES = {
     drop: { gold: [70, 100] },
   },
   champ_forest_witch: {
-    name: '광기의 마녀', hp: 400, color: '#2d4a1c',
+    name: '광기의 마녀 벨라도나', hp: 400, color: '#2d4a1c',
     desc: '광기의 정원 가장 깊은 곳에서 어둠의 비술을 완성한 마녀',
     isBoss: true, tier: 'boss', chapter: 'forest_3',
     berserkPerTurn: 9,
@@ -621,7 +621,7 @@ export const ENEMIES = {
     drop: { gold: [320, 420], gem: [7, 10] },
   },
   champ_forest_elite3: {
-    name: '광기의 화신', hp: 230, color: '#3d5a2c',
+    name: '광기의 낫 처형자', hp: 230, color: '#3d5a2c',
     desc: '광기 그 자체가 형상을 갖춘 존재',
     tier: 'elite', chapter: 'forest_3',
     berserkPerTurn: 8,  // Ch3 강적 가장 빠른 광폭
@@ -659,7 +659,7 @@ export const ENEMIES = {
     drop: { gold: [80, 120] },
   },
   champ_forest_elite4: {
-    name: '심부의 사도', hp: 270, color: '#3d5a2c',
+    name: '검은 숲의 사도', hp: 270, color: '#3d5a2c',
     desc: '광기의 폭군을 섬기는 어둠의 사도',
     tier: 'elite', chapter: 'forest_4',
     berserkPerTurn: 10,
@@ -671,7 +671,7 @@ export const ENEMIES = {
     drop: { gold: [140, 200], gem: [4, 6] },
   },
   champ_forest_boss4: {
-    name: '광기의 종말 마에스트로', hp: 500, color: '#8a6db8',
+    name: '종말의 마에스트로 오르페인', hp: 500, color: '#8a6db8',
     desc: '심부에 봉인된 광기의 종말 교향곡을 끊임없이 연주하는 광인 마에스트로',
     isBoss: true, tier: 'boss', chapter: 'forest_4',
     berserkPerTurn: 12,  // 최종 보스 — 매 턴 +12 누적
@@ -728,7 +728,7 @@ export const ENEMIES = {
     drop: { gold: [40, 60] },
   },
   champ_sanctum_brute1: {
-    name: '봉인된 거인', hp: 130, color: '#3a2a5c',
+    name: '갇힌 영웅의 석거인', hp: 130, color: '#3a2a5c',
     desc: '한 때 영웅이었던 봉인된 거대 전사',
     tier: 'elite', chapter: 'sanctum_1',
     patterns: [
@@ -739,7 +739,7 @@ export const ENEMIES = {
     drop: { gold: [70, 100], gem: [1, 2] },
   },
   champ_sanctum_boss1: {
-    name: '신전 대사제', hp: 240, color: '#5c4a8c',
+    name: '신전 대사제 아우렐리오', hp: 240, color: '#5c4a8c',
     desc: '신전의 봉인을 관장하는 최고 사제',
     isBoss: true, tier: 'boss', chapter: 'sanctum_1',
     patterns: [
@@ -775,7 +775,7 @@ export const ENEMIES = {
     drop: { gold: [55, 80] },
   },
   champ_sanctum_elite2: {
-    name: '봉인의 화신', hp: 180, color: '#3a2a5c',
+    name: '살아 있는 봉인 갑주', hp: 180, color: '#3a2a5c',
     desc: '봉인 그 자체가 형상을 갖춘 존재',
     tier: 'elite', chapter: 'sanctum_2',
     patterns: [
@@ -786,7 +786,7 @@ export const ENEMIES = {
     drop: { gold: [90, 130], gem: [2, 3] },
   },
   champ_sanctum_boss2: {
-    name: '봉인의 군주', hp: 320, color: '#4a3a6c',
+    name: '봉인의 군주 바르크론', hp: 320, color: '#4a3a6c',
     desc: '봉인된 회랑의 지배자',
     isBoss: true, tier: 'boss', chapter: 'sanctum_2',
     patterns: [
@@ -822,7 +822,7 @@ export const ENEMIES = {
     drop: { gold: [60, 90] },
   },
   champ_sanctum_elite3: {
-    name: '봉인의 폭군', hp: 230, color: '#3a2a5c',
+    name: '봉인 망치의 폭군', hp: 230, color: '#3a2a5c',
     desc: '봉인을 무기로 휘두르는 신전의 폭군',
     tier: 'elite', chapter: 'sanctum_3',
     patterns: [
@@ -833,7 +833,7 @@ export const ENEMIES = {
     drop: { gold: [110, 160], gem: [3, 5] },
   },
   champ_sanctum_boss3: {
-    name: '심처의 봉인자', hp: 400, color: '#5c4a8c',
+    name: '심처의 봉인자 카탈', hp: 400, color: '#5c4a8c',
     desc: '신전 가장 깊은 곳의 봉인을 담당하는 자',
     isBoss: true, tier: 'boss', chapter: 'sanctum_3',
     patterns: [
@@ -858,7 +858,7 @@ export const ENEMIES = {
     drop: { gold: [80, 120] },
   },
   champ_sanctum_elite4: {
-    name: '절대봉인의 사도', hp: 270, color: '#3a2a5c',
+    name: '검은 도끼의 사도', hp: 270, color: '#3a2a5c',
     desc: '절대봉인의 군주를 섬기는 어둠의 사도',
     tier: 'elite', chapter: 'sanctum_4',
     patterns: [
@@ -869,7 +869,7 @@ export const ENEMIES = {
     drop: { gold: [140, 200], gem: [4, 6] },
   },
   champ_sanctum_boss4: {
-    name: '절대봉인의 군주', hp: 500, color: '#3a2a5c',
+    name: '절대봉인의 군주 아르케온', hp: 500, color: '#3a2a5c',
     desc: '봉인된 신전 가장 깊은 곳에 봉인된 봉인의 신',
     isBoss: true, tier: 'boss', chapter: 'sanctum_4',
     patterns: [
@@ -1123,7 +1123,7 @@ export const ENEMIES = {
     drop: { gold: [40, 60] },
   },
   champ_dawn_brute1: {
-    name: '여명의 거인', hp: 130, color: '#a08040',
+    name: '후광 망치의 사제', hp: 130, color: '#a08040',
     desc: '여명의 회랑을 수호하는 신성한 거인',
     tier: 'elite', chapter: 'dawn_1',
     regen: 8,  // 강적은 회복 빠름
@@ -1135,7 +1135,7 @@ export const ENEMIES = {
     drop: { gold: [70, 100], gem: [1, 2] },
   },
   champ_dawn_boss1: {
-    name: '여명의 대천사', hp: 240, color: '#d4a574',
+    name: '타락한 견습 천사 리엘', hp: 240, color: '#d4a574',
     desc: '여명의 빛을 다루는 최고 천사',
     isBoss: true, tier: 'boss', chapter: 'dawn_1',
     regen: 10,
@@ -1186,7 +1186,7 @@ export const ENEMIES = {
     drop: { gold: [50, 75] },
   },
   champ_dawn_elite2: {
-    name: '천사의 화신', hp: 180, color: '#a08040',
+    name: '광휘의 대마법사', hp: 180, color: '#a08040',
     desc: '빛 그 자체가 형상을 갖춘 존재',
     tier: 'elite', chapter: 'dawn_2',
     regen: 12,
@@ -1198,7 +1198,7 @@ export const ENEMIES = {
     drop: { gold: [90, 130], gem: [2, 3] },
   },
   champ_dawn_boss2: {
-    name: '회랑의 수호 천사', hp: 320, color: '#c4a05c',
+    name: '육익의 군주 아스타리온', hp: 320, color: '#c4a05c',
     desc: '빛의 회랑을 지키는 최강 천사',
     isBoss: true, tier: 'boss', chapter: 'dawn_2',
     regen: 14,
@@ -1249,7 +1249,7 @@ export const ENEMIES = {
     drop: { gold: [65, 95] },
   },
   champ_dawn_elite3: {
-    name: '신성한 폭군', hp: 230, color: '#a08040',
+    name: '여명의 어머니', hp: 230, color: '#a08040',
     desc: '여명의 정원을 지배하는 폭군',
     tier: 'elite', chapter: 'dawn_3',
     regen: 16,
@@ -1261,7 +1261,7 @@ export const ENEMIES = {
     drop: { gold: [110, 160], gem: [3, 5] },
   },
   champ_dawn_boss3: {
-    name: '정원의 대천사', hp: 400, color: '#d4a574',
+    name: '정원의 마녀 루미엘', hp: 400, color: '#d4a574',
     desc: '여명의 정원에서 영원한 회복을 누리는 대천사',
     isBoss: true, tier: 'boss', chapter: 'dawn_3',
     regen: 18,
@@ -1312,7 +1312,7 @@ export const ENEMIES = {
     drop: { gold: [75, 110] },
   },
   champ_dawn_elite4: {
-    name: '빛의 사도', hp: 270, color: '#a08040',
+    name: '팔익의 광휘 화신', hp: 270, color: '#a08040',
     desc: '여명의 신을 섬기는 빛의 절대 사도',
     tier: 'elite', chapter: 'dawn_4',
     regen: 22,
@@ -1324,7 +1324,7 @@ export const ENEMIES = {
     drop: { gold: [140, 200], gem: [4, 6] },
   },
   champ_dawn_boss4: {
-    name: '여명의 신', hp: 540, color: '#d4a574',
+    name: '여명의 신 솔라리온', hp: 540, color: '#d4a574',
     desc: '여명의 회랑 가장 깊은 곳에 봉인된 빛의 신',
     isBoss: true, tier: 'boss', chapter: 'dawn_4',
     regen: 25,  // 최종 보스 매 턴 +25 회복
