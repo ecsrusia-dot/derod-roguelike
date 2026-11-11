@@ -98,7 +98,7 @@ const CLASS_EXTRA = {
   priest:     { role: '치유사', main: 'int', base: { str: 3, int: 10, agi: 4, vit: 8 }, auto: { int: 2, vit: 2 }, magic: true },
 };
 export const CHRONICLE_CLASSES = CLASSES.map(c => ({
-  id: c.id, name: c.name, color: c.color, image: c.image, combatImage: c.combatImage, winImage: c.winImage, lossImage: c.lossImage, quote: c.quote,
+  id: c.id, name: c.name, color: c.color, image: c.image, combatImage: c.combatImage, winImage: c.winImage, lossImage: c.lossImage, startImage: c.startImage, quote: c.quote,
   ...CLASS_EXTRA[c.id],
 }));
 export const chronicleClass = (id) => CHRONICLE_CLASSES.find(c => c.id === id) || CHRONICLE_CLASSES[0];

@@ -210,6 +210,34 @@ function BossCard({ u, art, hp, sh, acting, fx, w, h, ward = false, children }) 
     </div>
   );
 }
+// 1.266.0 — 캐릭터 선택 후 게임 진입 연출 (PM 결정: 크로니클 선택 → 캐릭터 선택 → 출정 일러 → 마을)
+function DepartView({ save, onDone }) {
+  const hero = save.hero;
+  const cls = chronicleClass(hero);
+  const u = save.units[hero];
+  const fk = save.famTeam?.main;
+  const fam = fk && save.fams?.[fk];
+  const art = cls.startImage || cls.image;
+  useEffect(() => { const t = setTimeout(onDone, 2200); return () => clearTimeout(t); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <div className="absolute inset-0 overflow-hidden" style={{ background: PALETTE.bgDeep, cursor: 'pointer', zIndex: 20 }} onClick={onDone}>
+      <img src={art} onError={(e) => { if (cls.image && !e.currentTarget.src.endsWith(cls.image.slice(1))) e.currentTarget.src = cls.image; }} alt="" className="chr-result-in absolute inset-0 w-full h-full object-cover" style={{ objectPosition: '50% 20%' }} draggable={false} />
+      <div className="absolute left-0 right-0 top-0" style={{ height: 70, background: 'linear-gradient(#000a, transparent)' }} />
+      <div className="absolute left-0 right-0 bottom-0" style={{ height: '50%', background: `linear-gradient(transparent, ${PALETTE.bgDeep}e6 70%, ${PALETTE.bgDeep})` }} />
+      <div className="absolute left-0 right-0 text-center px-4" style={{ bottom: 58 }}>
+        <div className="chr-result-sub" style={{ fontSize: 11, letterSpacing: '0.5em', color: MS.gold }}>━━ D E P A R T ━━</div>
+        <div className="chr-result-title font-bold" style={{ fontSize: 42, color: PALETTE.text, fontFamily: FONT_TITLE, textShadow: `0 0 22px ${MS.gold}88, 0 2px 8px #000` }}>출정</div>
+        <div className="mx-auto" style={{ height: 2, width: 200, margin: '6px auto 8px', background: `linear-gradient(90deg, transparent, ${MS.gold}, transparent)` }} />
+        {cls.quote && <div className="chr-result-sub italic" style={{ fontSize: 13, color: PALETTE.text, textShadow: '0 1px 4px #000', animationDelay: '.5s' }}>「{cls.quote}」</div>}
+        <div className="chr-result-sub flex flex-wrap justify-center gap-1.5 mt-2" style={{ animationDelay: '.7s' }}>
+          <span className="chr-chip" style={{ color: MS.gold, background: '#000a' }}>Lv.{u?.lv || 1} {cls.name}{u?.rebirth?.count ? ` · ✦전승 ${u.rebirth.count}` : ''}</span>
+          {fam ? <span className="chr-chip" style={{ color: '#d07ae8', background: '#000a' }}>🐾 {F.famName(fk)} Lv.{fam.lv || 1}</span> : null}
+        </div>
+      </div>
+      <div className="absolute left-0 right-0 text-center" style={{ bottom: 20, fontSize: 11.5, color: PALETTE.textDim, opacity: 0.8 }}>누르면 바로 시작</div>
+    </div>
+  );
+}
 // 1.265.0 — 전투 결과 전체 화면 일러 (시안 ㊼, 본편 VictoryScreen 방식): 직업 승리/패배 일러 → 정산 창은 뒤에 올라온다
 function ResultStage({ hero, lv, win, foe, rounds, revealed, onReveal }) {
   const cls = chronicleClass(hero);
@@ -4209,9 +4237,11 @@ export default function ChronicleGame({ onExit }) {
       <TitleView acc={acc} onExit={onExit} cloudApi={cloudApi}
         onImport={(a) => { setRepeat(false); setBattle(null); setScene(null); setAcc(a); flash('백업을 불러왔습니다'); }}
         onReset={() => { setRepeat(false); setBattle(null); setScene(null); setAcc(A.newAccount(false)); flash('황혼 연대기를 처음부터 시작합니다'); }}
-        onSelect={(cid) => { setRepeat(false); setAcc(a => A.selectCharacter(a, cid)); setView('town'); }}
-        onCreate={(cid) => { setRepeat(false); setAcc(a => A.createCharacter(a, cid)); setView('town'); }} />
+        onSelect={(cid) => { setRepeat(false); setAcc(a => A.selectCharacter(a, cid)); setView('depart'); }}
+        onCreate={(cid) => { setRepeat(false); setAcc(a => A.createCharacter(a, cid)); setView('depart'); }} />
     );
+  } else if (view === 'depart') {
+    content = <DepartView save={save} onDone={() => setView('town')} />;
   } else if (view === 'battle' && battle) {
     content = (
       <BattleView key={battle.key} battle={battle} save={save} onDone={afterBattle}
