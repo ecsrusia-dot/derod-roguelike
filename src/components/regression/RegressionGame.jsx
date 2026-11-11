@@ -9,7 +9,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Footprints, Tent, Swords, Skull, BookOpen, Sparkles, MapPin, Hourglass, ScrollText, HeartHandshake, Store, Coins } from 'lucide-react';
-import { PALETTE } from '../../utils/helpers.js';
+import { PALETTE, withArtRev } from '../../utils/helpers.js';
 import {
   CLASSES, CHAPTERS, ENEMIES, GAME_CONFIG,
   REGRESSION_TUNING, REGRESSION_REGIONS, REGRESSION_HUB, REGRESSION_RECORDS, REGRESSION_MEMORIES,
@@ -685,7 +685,7 @@ export default function RegressionGame({ reg, meta, onSave, onBack }) {
                 return (
                   <button key={id} onClick={() => setPickClass(id)} className="ui-press flex flex-col items-center"
                     style={{ borderRadius: 'var(--r-chip, 8px)', padding: 3, border: `1px solid ${on ? c.color || PALETTE.dawn : PALETTE.panelBorder}`, background: on ? `${c.color || PALETTE.dawn}22` : 'transparent' }}>
-                    <img src={`./classes/${id}.jpg`} alt="" className="w-full" style={{ aspectRatio: '1', objectFit: 'cover', borderRadius: 6, opacity: on ? 1 : 0.55 }} />
+                    <img src={withArtRev(`./classes/${id}.jpg`)} alt="" className="w-full" style={{ aspectRatio: '1', objectFit: 'cover', borderRadius: 6, opacity: on ? 1 : 0.55 }} />
                     <span className="text-[11px] mt-1 truncate w-full text-center" style={{ color: on ? PALETTE.text : PALETTE.textDim }}>{c.name}</span>
                   </button>
                 );

@@ -3033,7 +3033,7 @@ function SceneView({ save, scene, onEnd }) {
   const [i, setI] = useState(0);
   const line = scene.lines[i];
   const who = speakerOf(save, line.sp);
-  const bg = scene.id === 'ending' && save.hero !== 'priest' ? `./classes/${save.hero}win.jpg` : withArtRev(scene.bg);
+  const bg = scene.id === 'ending' && save.hero !== 'priest' ? withArtRev(`./classes/${save.hero}win.jpg`) : withArtRev(scene.bg);
   const next = () => (i + 1 < scene.lines.length ? setI(i + 1) : onEnd());
   return (
     <div className="absolute inset-0 z-40 flex flex-col" style={{ background: '#050304' }} onClick={next}>
