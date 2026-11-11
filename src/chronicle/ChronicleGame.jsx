@@ -250,6 +250,25 @@ function BattleCard({ u, art, hp, sh, acting, fx, h, enemy = false, border, chil
     </div>
   );
 }
+// 전체 화면 전투 기록 (1.258.0, 시안 ㊸-2) — 처음부터 끝까지 · 전체/아군/적/스킬
+function FullBattleLog({ sim, party, unitOf, label, onClose }) {
+  const [tab, setTab] = useState('all');
+  const mine = new Set(party.map(p => p.id));
+  const all = sim.events.filter(e => e.a || e.round);
+  const keep = (e) => tab === 'all' || (tab === 'party' ? mine.has(e.a) : tab === 'enemy' ? !mine.has(e.a) : (e.skill || e.k === 'open'));
+  const list = all.filter(e => e.round || keep(e)).filter((e, i, arr) => !e.round || (arr[i + 1] && !arr[i + 1].round));
+  const acts = all.filter(e => !e.round).length;
+  const win = sim.result === 'win';
+  return (
+    <MainModal full kicker="BATTLE LOG" title="전투 기록" badge={win ? '승리' : '패배'} color={win ? MS.red : '#e06a5f'} sub={`${label} · ${sim.rounds || 1}라운드 · 사건 ${acts}개`} onClose={onClose}>
+      <MainTabs value={tab} onChange={setTab} items={[['all', '전체'], ['party', '아군'], ['enemy', '적'], ['skill', '스킬']]} />
+      <div className="flex flex-col gap-1 mt-2" style={{ fontSize: 13 }}>
+        {list.map((e, i) => <BattleLogLine key={i} e={e} latest={false} unitOf={unitOf} />)}
+        {!list.length && <div className="text-center py-6" style={{ fontSize: 12.5, color: PALETTE.textDim }}>해당하는 기록이 없습니다</div>}
+      </div>
+    </MainModal>
+  );
+}
 const LOG_C = { dmg: '#ff8a80', crit: '#ffb347', heal: '#8fe08a', shield: '#9cc4e4', buff: '#e8c48a', debuff: '#c08ae8', miss: '#9a9a9a', holy: '#ffe9a8', skill: '#e8b04a' };
 function BattleLogLine({ e, latest, unitOf }) {
   if (e.round) {
@@ -350,6 +369,7 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
   // 로그 (1.227.0) — 지금까지의 사건 전부, 최신이 아래. 자동 스크롤
   const logEvents = sim.events.slice(Math.max(0, idx + 1 - 80), idx + 1).filter(e => e.a || e.round);
   const logRef = useRef(null);
+  const [logFull, setLogFull] = useState(false);
   useEffect(() => { const el = logRef.current; if (el) el.scrollTop = el.scrollHeight; }, [idx]);
 
   const Float = ({ id }) => hitFor(id).map((h, i) => {
@@ -423,7 +443,12 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
         <div ref={logRef} className="flex-1 min-h-0 overflow-y-auto px-2.5 py-2 flex flex-col gap-1">
           {logEvents.map((e, i) => <BattleLogLine key={`${idx - (logEvents.length - 1 - i)}-${i}`} e={e} latest={i === logEvents.length - 1 && !done} unitOf={unitOf} />)}
         </div>
+        {/* 1.258.0 — 전투가 끝나면 전체 화면 로그 (시안 ㊸) */}
+        {done && (
+          <button onClick={() => setLogFull(true)} aria-label="로그 크게 보기" className="ui-press absolute flex items-center justify-center" style={{ top: 6, right: 6, zIndex: 3, width: 32, height: 32, borderRadius: 6, border: `1px solid ${MS.gold}`, color: MS.gold, background: MS.box, boxShadow: '0 0 10px #e8b04a55', fontSize: 16 }}>⤢</button>
+        )}
       </div>
+      {logFull && <FullBattleLog sim={sim} party={party} unitOf={unitOf} label={ctx.label} onClose={() => setLogFull(false)} />}
 
       {/* 아군 — 적과 같은 카드 형식 */}
       <div className="relative flex gap-2 px-3 pb-2 flex-none">
@@ -3043,7 +3068,7 @@ const DETAIL_STATS = [
   ['startShieldPct', '시작 보호막', 'pct'], ['skillShield', '스킬 사용 시 보호막(공격력 대비)', 'pct'], ['overhealShield', '넘친 회복 → 보호막', 'flag'],
   ['regenPct', '매 턴 HP 재생', 'pct'], ['dodgeHeal', '회피 시 회복', 'pct'], ['emergencyHeal', '위기 회복(HP 30%↓, 1회)', 'pct'],
   ['revive', '부활(1회) HP', 'pct'], ['guts', '불굴(1회 HP 1로 버팀)', 'flag'], ['cdr', '모든 스킬 재사용 단축', 'turn'], ['resetEvery', '재사용 초기화 주기', 'turn'],
-  ['openInferno', '개전 겁화 (매 턴 공격력의)', 'pct'], ['rageDouble', '광폭화 중 모든 공격 2회', 'flag'], ['rageTurnsAdd', '광폭화 지속', 'turn'], ['rageLifesteal', '광폭화 중 흡혈 2배', 'flag'], ['multiHitsAdd', '연속 화살 타수', 'num'], ['spiritArrow', '정령 화살 확률', 'pct'],
+  ['openInferno', '이프리트의 낙인 (매 턴 공격력의)', 'pct'], ['rageDouble', '광폭화 중 모든 공격 2회', 'flag'], ['rageTurnsAdd', '광폭화 지속', 'turn'], ['rageLifesteal', '광폭화 중 흡혈 2배', 'flag'], ['multiHitsAdd', '연속 화살 타수', 'num'], ['spiritArrow', '정령 화살 확률', 'pct'],
   ['blessMult', '축복 효과', 'x'], ['blessTurns', '축복 지속', 'turn'],
   ['famPct', '사역마 능력치', 'pct'], ['expPct', '경험치 획득', 'pct'], ['goldPct', '골드 획득', 'pct'], ['dropPct', '장비 획득률', 'pct'],
 ];
@@ -3102,10 +3127,10 @@ function MainKvGrid({ rows, onPick }) {
   );
 }
 // 본편 카드 정보 모달 — 붉은 테두리 · 작은 머리말 + 큰 이름 · 닫기
-function MainModal({ kicker, title, badge, color = MS.red, onClose, children, footer, img, sub }) {
+function MainModal({ kicker, title, badge, color = MS.red, onClose, children, footer, img, sub, full = false }) {
   return (
-    <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: 45, background: 'rgba(0,0,0,0.72)', padding: 16 }} onClick={onClose}>
-      <div className="ui-screen-enter w-full flex flex-col" style={{ maxWidth: 420, maxHeight: '86%', borderRadius: 4, border: `2px solid ${color}`, background: '#150a0d', boxShadow: `0 0 28px ${color}55` }} onClick={e => e.stopPropagation()}>
+    <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: 45, background: 'rgba(0,0,0,0.72)', padding: full ? 8 : 16 }} onClick={onClose}>
+      <div className="ui-screen-enter w-full flex flex-col" style={{ maxWidth: 420, maxHeight: full ? '100%' : '86%', height: full ? '100%' : undefined, borderRadius: 4, border: `2px solid ${color}`, background: '#150a0d', boxShadow: `0 0 28px ${color}55` }} onClick={e => e.stopPropagation()}>
         <div className="flex items-start justify-between gap-2" style={{ padding: '12px 14px 10px', borderBottom: `1px solid ${MS.line}` }}>
           <div className="flex gap-2.5 min-w-0">
             {img && <img src={img} alt="" className="flex-none object-cover" style={{ width: 62, height: 62, border: `1.5px solid ${color}` }} />}
@@ -3117,7 +3142,7 @@ function MainModal({ kicker, title, badge, color = MS.red, onClose, children, fo
           </div>
           {badge && <span className="flex-none" style={{ fontSize: 12, padding: '3px 9px', border: `1px solid ${color}`, color }}>{badge}</span>}
         </div>
-        <div className="overflow-y-auto" style={{ padding: '12px 14px' }}>{children}</div>
+        <div className="overflow-y-auto flex-1 min-h-0" style={{ padding: '12px 14px' }}>{children}</div>
         <div className="flex flex-col gap-2" style={{ padding: '0 14px 14px' }}>
           {footer}
           <button onClick={onClose} className="ui-press" style={{ height: 40, border: `1px solid ${MS.line}`, background: 'transparent', color: PALETTE.textDim, letterSpacing: 6, fontSize: 13 }}>닫기</button>
