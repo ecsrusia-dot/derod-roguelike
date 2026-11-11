@@ -512,14 +512,24 @@ export function getIfritIgniteRate(skills, ultimates, activeSkills = null) {
 //     * 신규 컨셉(sanctum/rift/dawn)도 forest와 동일한 chapter 서브폴더 권장
 //
 // kind는 'combat'(전투 16:9) 또는 'intro'(보스 진입 9:16)
+// 1.264.2~ 일러 교체 판 번호 — 서비스 워커가 일러를 CacheFirst로 1년 보관하므로
+// 같은 파일 이름으로 덮어쓴 폴더는 여기 번호를 올려야 기기에서 새 그림이 보인다 (주소가 바뀌어 새로 받음).
+export const ART_REV = { sanctum: 2, dawn: 2 };
+export function withArtRev(src) {
+  if (!src || src.includes('?')) return src;
+  const m = src.match(/\/championship\/([a-z]+)\//);
+  const rev = m && ART_REV[m[1]];
+  return rev ? `${src}?v=${rev}` : src;
+}
+
 export function getEnemyImageSrc(enemyKey, enemy, kind = 'combat') {
   if (!enemy?.chapter) return null;
   if (typeof enemy.chapter === 'string') {
     const [concept, stage] = enemy.chapter.split('_');
     if (concept === 'forest') {
-      return `./enemies/championship/${concept}/chapter${stage}/${enemyKey}_${kind}.jpg`;
+      return withArtRev(`./enemies/championship/${concept}/chapter${stage}/${enemyKey}_${kind}.jpg`);
     }
-    return `./enemies/championship/${concept}/${enemyKey}_${kind}.jpg`;
+    return withArtRev(`./enemies/championship/${concept}/${enemyKey}_${kind}.jpg`);
   }
   return `./enemies/classic/chapter_${enemy.chapter}/${enemyKey}_${kind}.jpg`;
 }

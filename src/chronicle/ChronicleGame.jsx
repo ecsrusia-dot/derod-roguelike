@@ -7,7 +7,7 @@
 // ============================================
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, Coins } from 'lucide-react';
-import { PALETTE } from '../utils/helpers.js';
+import { PALETTE, withArtRev } from '../utils/helpers.js';
 import { GlassPanel, UIButton, BottomSheet } from '../components/ui/CommonUI.jsx';
 import { InfoSection, InfoRow, StatTiles, HiNum } from '../components/ui/InfoBlocks.jsx';
 import UpdateButton from '../components/ui/UpdateButton.jsx';
@@ -2994,7 +2994,7 @@ function SceneView({ save, scene, onEnd }) {
   const [i, setI] = useState(0);
   const line = scene.lines[i];
   const who = speakerOf(save, line.sp);
-  const bg = scene.id === 'ending' && save.hero !== 'priest' ? `./classes/${save.hero}win.jpg` : scene.bg;
+  const bg = scene.id === 'ending' && save.hero !== 'priest' ? `./classes/${save.hero}win.jpg` : withArtRev(scene.bg);
   const next = () => (i + 1 < scene.lines.length ? setI(i + 1) : onEnd());
   return (
     <div className="absolute inset-0 z-40 flex flex-col" style={{ background: '#050304' }} onClick={next}>
