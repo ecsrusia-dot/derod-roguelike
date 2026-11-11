@@ -1356,8 +1356,8 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
   for (const p of units.filter(x => x.side === 'party' && x.openInferno)) {
     const v = Math.max(1, Math.round(p.atk * p.openInferno * (1 + (p.dotDmg || 0)))); const turns = 3 * (p.dotTurnsMult || 1);
     const foes = units.filter(x => x.side === 'enemy' && !immuneTo(p, x));
-    for (const e of foes) e.dots.push({ v, t: turns, src: p.id, sn: '개전 겁화' });
-    push({ a: p.id, n: `개전 겁화 (매 턴 ${v.toLocaleString()} · ${turns}턴)`, k: 'open', hits: foes.map(e => ({ t: e.id, burn: true })) });
+    for (const e of foes) e.dots.push({ v, t: turns, src: p.id, sn: '이프리트의 낙인' });
+    push({ a: p.id, n: `이프리트의 낙인 (매 턴 ${v.toLocaleString()} · ${turns}턴)`, k: 'open', hits: foes.map(e => ({ t: e.id, burn: true })) });
   }
 
   let round = 0;
