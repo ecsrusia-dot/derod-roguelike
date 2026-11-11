@@ -395,9 +395,9 @@ export const CHRONICLE_DUNGEONS = [
     art: 'champ_dawn_boss3',
     floors: [
       { lv: 94, enemies: ['champ_dawn_acolyte', 'champ_dawn_warrior', 'champ_dawn_seraph'] },
-      { lv: 95, enemies: ['champ_dawn_priest', 'champ_dawn_paladin', 'champ_dawn_brute1'] },
-      { lv: 96, enemies: ['champ_dawn_high_seraph', 'champ_dawn_oracle', 'champ_dawn_elite2'] },
-      { lv: 97, enemies: ['champ_dawn_avatar', 'champ_dawn_elite3', 'champ_dawn_elite4'] },
+      { lv: 95, enemies: ['champ_dawn_priest', 'champ_dawn_paladin', 'champ_dawn_sixwing', 'champ_dawn_brute1'] },
+      { lv: 96, enemies: ['champ_dawn_high_seraph', 'champ_dawn_oracle', 'champ_dawn_vanguard', 'champ_dawn_elite2'] },
+      { lv: 97, enemies: ['champ_dawn_avatar', 'champ_dawn_eternal', 'champ_dawn_myriad', 'champ_dawn_elite3', 'champ_dawn_elite4'] },
       { lv: 100, enemies: ['champ_dawn_boss3'], boss: true },
     ],
   },
