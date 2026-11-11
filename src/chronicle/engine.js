@@ -1350,15 +1350,30 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
     t.hp = Math.max(0, t.hp - d);
     hits.push({ t: t.id, d, holy: true });
   }
+  // ===== 전투 시작 연출 (1.259.0, 시안 ㊹) — k 'pre' = 행동 아님 (통계 제외), UI가 「전투 돌입 → 전투 전 효과 → 1라운드」로 보여 준다 =====
+  const enterEv = { k: 'pre', pre: 'enter', foes: units.filter(x => x.side === 'enemy').length, roles: units.filter(x => x.side === 'enemy').map(x => (x.tier === 'boss' ? 'boss' : x.erole || 'dps')) };
+  push(enterEv);
+  for (const p of units.filter(x => x.side === 'party')) {
+    if (p.shield > 0) push({ k: 'pre', pre: 'fx', a: p.id, icon: '◈', n: '시작 보호막', v: `+${p.shield.toLocaleString()}`, tone: 'shield' });
+    if (p.guardian) push({ k: 'pre', pre: 'fx', a: p.id, icon: '🛡', n: '수호 태세', v: `공격 ${Math.round(p.guardian * 100)}% 대신 받음`, tone: 'buff' });
+    if (p.taunt > 0) push({ k: 'pre', pre: 'fx', a: p.id, icon: '📢', n: '도발', v: `${p.taunt}턴`, tone: 'buff' });
+    if (p.vGuard) push({ k: 'pre', pre: 'fx', a: p.id, icon: '✧', n: '수호신의 가호', v: '주인공이 쓰러질 피해를 1회 막는다', tone: 'buff' });
+  }
+  const foesAll = units.filter(x => x.side === 'enemy');
+  const im = Math.max(0, ...foesAll.map(x => x.intim || 0));
+  if (im) { const st = intimidateStep(im); push({ k: 'pre', pre: 'fx', icon: im >= 4 ? '☠' : '☗', n: im >= 4 ? '절대 위압' : `위압 ${im}단계`, v: `적 HP ×${st?.hp} · 공격 ×${st?.atk}`, tone: 'foe' }); }
+  const mb = foesAll.find(x => x.mech && BOSS_MECHS[x.mech]);
+  if (mb) push({ k: 'pre', pre: 'fx', a: mb.id, icon: BOSS_MECHS[mb.mech].icon, n: `보스 기믹 · ${BOSS_MECHS[mb.mech].name}`, v: BOSS_MECHS[mb.mech].desc, tone: 'foe' });
   // 전투 시작 효과 — 이프리트의 계약서
   // 1.252.0 — 시작 로그 추가(PM 「겁화가 적용 안 되는 것 같다」: 실제로는 걸렸지만 로그에 출처가 없어 안 보였음)
-  //   스킬 「겁화」와 별개 · 턴 소모 없음 · 쿨타임 무관 · 매 턴 공격력 × openInferno (유니크 60% + 특성 선제 화염 4%/점)
+  //   스킬 「겁화」와 별개 · 턴 소모 없음 · 쿨타임 무관 · 매 턴 공격력 × openInferno (유니크 60% + 특성 낙인의 불씨 4%/점)
   for (const p of units.filter(x => x.side === 'party' && x.openInferno)) {
     const v = Math.max(1, Math.round(p.atk * p.openInferno * (1 + (p.dotDmg || 0)))); const turns = 3 * (p.dotTurnsMult || 1);
     const foes = units.filter(x => x.side === 'enemy' && !immuneTo(p, x));
     for (const e of foes) e.dots.push({ v, t: turns, src: p.id, sn: '이프리트의 낙인' });
-    push({ a: p.id, n: `이프리트의 낙인 (매 턴 ${v.toLocaleString()} · ${turns}턴)`, k: 'open', hits: foes.map(e => ({ t: e.id, burn: true })) });
+    push({ a: p.id, n: `이프리트의 낙인 (매 턴 ${v.toLocaleString()} · ${turns}턴)`, k: 'open', brand: { v, turns }, hits: foes.map(e => ({ t: e.id, burn: true })) });
   }
+  enterEv.fx = events.filter(x => (x.k === 'pre' && x.pre === 'fx') || x.k === 'open').length;
 
   let round = 0;
   let result = null;
@@ -1663,7 +1678,7 @@ export function battleDetailStats(sim, party) {
         const S = sk(id, sn); S.dmg += d;
       }
       if (mine) { const d = e.hits?.[0]?.d || 0; U.dotTaken += d; U.taken += d; }
-    } else if (e.k === 'open') {
+    } else if (e.k === 'open' || e.k === 'pre') {
       // 개전 효과 — 행동 아님 (피해는 이후 dotTick으로 집계)
     } else if (e.k === 'hot') {
       for (const h of e.hits || []) {

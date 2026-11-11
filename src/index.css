@@ -782,3 +782,12 @@ body {
 .chr-boss-plate span{display:block;padding:3px 16px 2px;font-size:12px;font-weight:900;letter-spacing:5px;color:#ffe3a0;text-shadow:0 1px 0 #000;white-space:nowrap;
   background:linear-gradient(#e0574c,#8a1410 55%,#5a0a08);clip-path:polygon(10px 0,calc(100% - 10px) 0,100% 50%,calc(100% - 10px) 100%,10px 100%,0 50%)}
 @media (prefers-reduced-motion: reduce){.chr-boss{animation:none}}
+
+/* ===== 황혼 연대기 전투 시작 연출 (1.259.0) ===== */
+.chr-banner{animation:chr-banner .9s ease-out both}
+@keyframes chr-banner{0%{opacity:0;transform:scale(1.08)}25%{opacity:1;transform:scale(1)}100%{opacity:1}}
+.chr-fx-burn{position:relative}
+.chr-fx-burn:after{content:'';position:absolute;inset:0;border-radius:12px;pointer-events:none;z-index:2;
+  background:radial-gradient(ellipse at 50% 100%,#ff6a1acc,#ff3a0a55 45%,transparent 72%);mix-blend-mode:screen;animation:chr-burn 1.5s ease-out both}
+@keyframes chr-burn{0%{opacity:0}25%{opacity:1}100%{opacity:.35}}
+@media (prefers-reduced-motion: reduce){.chr-banner,.chr-fx-burn:after{animation:none}}

@@ -48,7 +48,7 @@ export const TALENT_TREES = {
   sage: [
     T('s_t_flame', '겁화', '#e8826a', '타오르는 불 — 지속 피해·전투 시작 겁화', [
       [N('st_f1', '불씨', 5, { dotDmg: 0.05 }), N('st_f2', '겁화 숙련', 5, { sb_s_inferno: 0.05 })],
-      [N('st_f3', '열기', 5, { skillDmg: 0.02 }), N('st_f4', '선제 화염', 5, { openInferno: 0.04 })],
+      [N('st_f3', '열기', 5, { skillDmg: 0.02 }), N('st_f4', '낙인의 불씨', 5, { openInferno: 0.04 })],
       [N('st_f5', '화염구 숙련', 5, { sb_s_fireball: 0.06 }), N('st_f6', '작열', 5, { critDmg: 0.04 })],
       [N('st_f7', '빠른 영창', 1, { cdr: 1 }), N('st_f8', '화염 폭풍 숙련', 3, { sb_s_meteor: 0.1 })],
       [N('st_f9', '영겁의 불길', 1, { dotTurnsMult: 2 })],
