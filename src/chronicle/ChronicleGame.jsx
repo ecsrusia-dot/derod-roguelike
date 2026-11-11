@@ -210,6 +210,25 @@ function BossCard({ u, art, hp, sh, acting, fx, w, h, ward = false, children }) 
     </div>
   );
 }
+// 1.261.0 — 전투 결과 초상 (시안 ㊻): 적 일러 자리에 보스 카드 크기로 직업 승리/패배 일러
+function HeroResultCard({ hero, lv, win }) {
+  const cls = chronicleClass(hero);
+  const art = (win ? cls.winImage : cls.lossImage) || cls.image;
+  return (
+    <div className="chr-result-in relative" style={{ height: 'calc(100% - 10px)', aspectRatio: '190 / 236', marginTop: 10 }}>
+      <div className={`chr-boss${win ? '' : ' lose'}`} style={{ height: '100%' }}>
+        <div className={`chr-boss-plate ${win ? 'win' : 'lose'}`}><span>{win ? 'VICTORY' : 'DEFEAT'}</span></div>
+        <div className="chr-boss-in">
+          <img src={art} onError={(e) => { if (cls.image && !e.currentTarget.src.endsWith(cls.image.slice(1))) e.currentTarget.src = cls.image; }} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ objectPosition: '50% 22%' }} draggable={false} />
+          {win && <div className="chr-boss-shine" />}
+          <div className="absolute left-0 right-0 bottom-0" style={{ padding: '22px 8px 8px', background: 'linear-gradient(transparent, #000e 60%)', zIndex: 2 }}>
+            <div className="text-center truncate font-bold" style={{ fontSize: 14, color: win ? '#ffe3a0' : '#c8c8d0', textShadow: '0 1px 2px #000' }}>Lv.{lv} {cls.name}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 function BattleCard({ u, art, hp, sh, acting, fx, h, enemy = false, border, children, xp = null, w = null }) {
   const dead = hp <= 0;
   const accent = enemy ? '#ff8a80' : u.fam ? '#d07ae8' : chronicleClass(u.classId).color;
@@ -435,8 +454,13 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
         {!done && <button onClick={() => setIdx(sim.events.length)} className="ui-press" style={{ fontSize: 12, padding: '4px 9px', borderRadius: 8, border: '1px solid var(--ui-line)', color: PALETTE.dawn, background: 'transparent' }}>⏩</button>}
       </div>
 
-      {/* 적 */}
-      {(() => {
+      {/* 적 — 전투가 끝나면 직업 승리/패배 일러 (1.261.0) */}
+      {done ? (
+        // 1.261.0 PM 결정 「최대치 화면으로 프레임 고정」 — 일러 높이 40% 고정(PM 선택), 결과 창이 나머지를 채운다 (획득이 적으면 빈 공간)
+        <div className="relative flex justify-center px-3 pt-2 flex-none" style={{ height: '40vh' }}>
+          <HeroResultCard hero={party.find(p => !p.fam)?.classId || save.hero} lv={(xp?.after?.hero || xp?.before?.hero)?.lv || party.find(p => !p.fam)?.lv} win={sim.result === 'win'} />
+        </div>
+      ) : (() => {
         // 1.257.0 — 보스가 있고 3마리 이하면 보스를 가운데 크게 (레이드처럼 많을 땐 기존 배열)
         const boss = enemies.length <= 3 ? enemies.find(e => e.tier === 'boss') : null;
         const card = (e, extra = {}) => (
@@ -492,8 +516,8 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
         </div>
       ) : null)}
 
-      {/* 전투 로그 — 적과 아군 사이 전체 */}
-      <div className="relative flex-1 min-h-0 mx-3 my-2 flex flex-col" style={{ borderRadius: 12, background: 'rgba(0,0,0,0.38)', border: '1px solid var(--ui-line)' }}>
+      {/* 전투 로그 — 적과 아군 사이 전체 (끝나면 숨김 — 「📜 전투 기록」 버튼으로 전체 화면) */}
+      <div className={`relative flex-1 min-h-0 mx-3 my-2 flex-col ${done ? 'hidden' : 'flex'}`} style={{ borderRadius: 12, background: 'rgba(0,0,0,0.38)', border: '1px solid var(--ui-line)' }}>
         {cur?.skill && !done && (
           <div key={`call-${idx}`} className="chr-skill-call absolute font-bold pointer-events-none text-center" style={{ left: '50%', top: '50%', zIndex: 4, fontSize: 22, color: PALETTE.legendary, fontFamily: FONT_TITLE, textShadow: '0 0 14px #e8b04acc, 0 2px 6px #000', whiteSpace: 'nowrap' }}>
             ✦ {cur.n}
@@ -510,8 +534,8 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
       </div>
       {logFull && <FullBattleLog sim={sim} party={party} unitOf={unitOf} label={ctx.label} onClose={() => setLogFull(false)} />}
 
-      {/* 아군 — 적과 같은 카드 형식 */}
-      <div className="relative flex gap-2 px-3 pb-2 flex-none">
+      {/* 아군 — 적과 같은 카드 형식 (끝나면 숨김 — 성장 줄에 경험치 표시) */}
+      <div className={`relative gap-2 px-3 pb-2 flex-none ${done ? 'hidden' : 'flex'}`}>
         {party.map(p => (
           <BattleCard key={p.id} u={p} art={p.fam ? chronicleEnemyArt(p.famKey) : chronicleClass(p.classId).combatImage} hp={hpOf(p)} sh={shOf(p)} acting={cur?.a === p.id} fx={fxClass(p.id)} h={cardH}
             border={p.fam ? '#d07ae888' : `${chronicleClass(p.classId).color}88`}
@@ -528,10 +552,10 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
 
       {/* 결과 */}
       {done && (
-        <div className="relative flex flex-col min-h-0 px-3 pb-3" style={{ flex: '0 1 auto', maxHeight: '62%' }}>
+        <div className="relative flex flex-col min-h-0 px-3 pb-3 pt-3" style={{ flex: '1 1 0' }}>
           {/* 1.253.0 — 본편 스타일 (시안 ㉘) · 1.260.1 버튼은 스크롤 밖 하단 고정 (보상이 길면 버튼이 화면 밖으로 밀리던 문제) */}
-          <div className="flex flex-col min-h-0" style={{ border: `2px solid ${MS.red}`, background: '#150a0c' }}>
-          <div className="overflow-y-auto min-h-0" style={{ padding: '10px 12px 4px' }}>
+          <div className="flex flex-col min-h-0 flex-1" style={{ border: `2px solid ${MS.red}`, background: '#150a0c' }}>
+          <div className="overflow-y-auto min-h-0 flex-1" style={{ padding: '10px 12px 4px' }}>
             <div className="text-center" style={{ fontSize: 10.5, letterSpacing: 6, color: MS.red }}>BATTLE RESULT</div>
             <div className={`font-bold text-center ${sim.result === 'win' ? 'chr-win' : ''}`} style={{ fontSize: 22, letterSpacing: 6, lineHeight: 1.2, color: sim.result === 'win' ? MS.gold : '#e06a5f', fontFamily: FONT_TITLE }}>
               {sim.result === 'win' ? '승리' : '전멸'}
@@ -552,27 +576,33 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
                   <XpResultRow art={chronicleClass(save.hero).combatImage} name={chronicleClass(save.hero).name} before={xp.before.hero} after={xp.after.hero} />
                   {xp.after.fam && summary.famExp ? <XpResultRow fam art={chronicleEnemyArt(xp.after.fam.key)} name={F.famName(xp.after.fam.key)} before={xp.before.fam} after={xp.after.fam} /> : null}
                 </div>}
+                {summary.items.length ? <div className="grid gap-1 mt-1.5" style={{ gridTemplateColumns: summary.items.length > 1 ? '1fr 1fr' : '1fr' }}>
+                  {summary.items.map(it => (
+                    <div key={it.uid} className={`truncate text-center ${gradeIdx(it.grade) >= gradeIdx('rare') ? 'chr-drop' : ''}`} style={{ '--g': gradeOf(it.grade).color, fontSize: 11.5, padding: '4px 6px', border: `1px solid ${gradeOf(it.grade).color}88`, background: MS.box, color: gradeOf(it.grade).color, fontWeight: it.grade === 'unique' || it.grade === 'mythic' ? 700 : 400 }}>
+                      {it.grade === 'mythic' ? '✦ ' : it.grade === 'unique' ? '★ ' : ''}{E.itemName(it)} <span style={{ opacity: 0.75 }}>({gradeOf(it.grade).label}{E.itemUsable(it, save.hero) ? '' : ` · ${clsTag(it)}`})</span>
+                    </div>
+                  ))}
+                </div> : null}
+                <div className="flex flex-wrap justify-center gap-1 mt-1.5">
                 {Object.entries(summary.levelUps).map(([cid, lv]) => (
-                  <div key={cid} className="text-center font-semibold chr-levelup" style={{ color: PALETTE.legendary }}>▲ 레벨 업! {chronicleClass(cid).name} Lv.{lv}</div>
+                  <div key={cid} className="chr-chip font-semibold chr-levelup" style={{ color: PALETTE.legendary }}>▲ 레벨 업! {chronicleClass(cid).name} Lv.{lv}</div>
                 ))}
-                {summary.items.map(it => (
-                  <div key={it.uid} className="text-center" style={{ color: gradeOf(it.grade).color, fontWeight: it.grade === 'unique' || it.grade === 'mythic' ? 700 : 400 }}><span className={gradeIdx(it.grade) >= gradeIdx('rare') ? 'chr-drop' : ''} style={{ '--g': gradeOf(it.grade).color }}>{it.grade === 'mythic' ? '✦ 전승 장비 획득: ' : it.grade === 'unique' ? '★ 유니크 획득: ' : '획득: '}{E.itemName(it)} ({gradeOf(it.grade).label}{E.itemUsable(it, save.hero) ? '' : ` · ${clsTag(it)}`})</span></div>
-                ))}
-                {summary.autoSalvaged ? <div className="text-center" style={{ color: PALETTE.textDim }}>♻ 자동 분해 {summary.autoSalvaged}개 → {E.salvageText(summary.autoSalvage || {})}</div> : null}
-                {summary.autoDismantled ? <div className="text-center" style={{ color: PALETTE.textDim }}>가방이 가득 차 {summary.autoDismantled}개 자동 분해</div> : null}
-                {summary.unlocks.map(u => <div key={u} className="text-center" style={{ color: '#9cc4e4' }}>🔓 {u} 개방</div>)}
-                {summary.dungeonClear && <div className="text-center font-semibold" style={{ color: '#c08ae8' }}>던전 정복!</div>}
-                {summary.towerCoins ? <div className="text-center" style={{ color: '#e8b04a' }}>✪ 첨탑 주화 +{summary.towerCoins}{summary.towerWeekly ? ` (주간 ${summary.towerFloor}층 첫 도달 +${summary.towerWeekly} 포함)` : ''}</div> : null}
-                {summary.towerCheckpoint ? <div className="text-center font-semibold" style={{ color: '#9cc4e4' }}>🚩 {summary.towerCheckpoint}층 체크포인트 저장 — 다음 도전은 {summary.towerCheckpoint + 1}층부터</div> : null}
-                {summary.gateOpen ? <div className="text-center font-semibold" style={{ color: PALETTE.legendary }}>⚔ 처치 목표 달성 — 관문 도전 가능!</div> : null}
-                {summary.stageClear ? <div className="text-center font-semibold" style={{ color: '#9cc4e4' }}>🔓 스테이지 {summary.stageClear} 관문 통과!</div> : null}
-                {summary.famShards || summary.famSouls ? <div className="text-center" style={{ color: '#d07ae8' }}>{summary.famShards ? `📜 계약서 조각 +${summary.famShards}` : ''}{summary.famShards && summary.famSouls ? ' · ' : ''}{summary.famSouls ? `🔮 사역혼 +${summary.famSouls}` : ''}</div> : null}
-                {summary.famExp?.ups ? <div className="text-center font-semibold" style={{ color: '#e8b04a' }}>🐾 {F.famName(summary.famExp.key)} Lv.{summary.famExp.lv} 달성!</div> : null}
-                {summary.keys ? <div className="text-center font-semibold" style={{ color: PALETTE.legendary }}>🗝 던전 열쇠 +{summary.keys}</div> : null}
-                {summary.talentScroll ? <div className="text-center font-semibold" style={{ color: '#7fd1c8' }}>📖 특성 초기화 주문서 +{summary.talentScroll}</div> : null}
-                {summary.raid?.reward ? <div className="text-center font-semibold" style={{ color: '#ff8a80' }}>⚔ 원정대 레이드 보상{summary.raid.first ? ' (첫 클리어!)' : ''} — {R.rosterRewardText(summary.raid.reward)}</div> : null}
-                {summary.raid?.noReward ? <div className="text-center" style={{ color: PALETTE.textDim }}>오늘 이 단계 보상은 이미 받았다 (KST 0시 초기화)</div> : null}
-                {(summary.questsDone || []).map(t => <div key={t} className="text-center font-semibold" style={{ color: PALETTE.dawn }}>📜 의뢰 완료: {t} — 게시판에서 보상</div>)}
+                {summary.autoSalvaged ? <div className="chr-chip" style={{ color: PALETTE.textDim }}>♻ 자동 분해 {summary.autoSalvaged}개 → {E.salvageText(summary.autoSalvage || {})}</div> : null}
+                {summary.autoDismantled ? <div className="chr-chip" style={{ color: PALETTE.textDim }}>가방이 가득 차 {summary.autoDismantled}개 자동 분해</div> : null}
+                {summary.unlocks.map(u => <div key={u} className="chr-chip" style={{ color: '#9cc4e4' }}>🔓 {u} 개방</div>)}
+                {summary.dungeonClear && <div className="chr-chip font-semibold" style={{ color: '#c08ae8' }}>던전 정복!</div>}
+                {summary.towerCoins ? <div className="chr-chip" style={{ color: '#e8b04a' }}>✪ 첨탑 주화 +{summary.towerCoins}{summary.towerWeekly ? ` (주간 ${summary.towerFloor}층 첫 도달 +${summary.towerWeekly} 포함)` : ''}</div> : null}
+                {summary.towerCheckpoint ? <div className="chr-chip font-semibold" style={{ color: '#9cc4e4' }}>🚩 {summary.towerCheckpoint}층 체크포인트 저장 — 다음 도전은 {summary.towerCheckpoint + 1}층부터</div> : null}
+                {summary.gateOpen ? <div className="chr-chip font-semibold" style={{ color: PALETTE.legendary }}>⚔ 처치 목표 달성 — 관문 도전 가능!</div> : null}
+                {summary.stageClear ? <div className="chr-chip font-semibold" style={{ color: '#9cc4e4' }}>🔓 스테이지 {summary.stageClear} 관문 통과!</div> : null}
+                {summary.famShards || summary.famSouls ? <div className="chr-chip" style={{ color: '#d07ae8' }}>{summary.famShards ? `📜 계약서 조각 +${summary.famShards}` : ''}{summary.famShards && summary.famSouls ? ' · ' : ''}{summary.famSouls ? `🔮 사역혼 +${summary.famSouls}` : ''}</div> : null}
+                {summary.famExp?.ups ? <div className="chr-chip font-semibold" style={{ color: '#e8b04a' }}>🐾 {F.famName(summary.famExp.key)} Lv.{summary.famExp.lv} 달성!</div> : null}
+                {summary.keys ? <div className="chr-chip font-semibold" style={{ color: PALETTE.legendary }}>🗝 던전 열쇠 +{summary.keys}</div> : null}
+                {summary.talentScroll ? <div className="chr-chip font-semibold" style={{ color: '#7fd1c8' }}>📖 특성 초기화 주문서 +{summary.talentScroll}</div> : null}
+                {summary.raid?.reward ? <div className="chr-chip font-semibold" style={{ color: '#ff8a80' }}>⚔ 원정대 레이드 보상{summary.raid.first ? ' (첫 클리어!)' : ''} — {R.rosterRewardText(summary.raid.reward)}</div> : null}
+                {summary.raid?.noReward ? <div className="chr-chip" style={{ color: PALETTE.textDim }}>오늘 이 단계 보상은 이미 받았다 (KST 0시 초기화)</div> : null}
+                {(summary.questsDone || []).map(t => <div key={t} className="chr-chip font-semibold" style={{ color: PALETTE.dawn }}>📜 의뢰 완료: {t} — 게시판에서 보상</div>)}
+                </div>
               </div>
             ) : (
               <div className="mt-1 text-center" style={{ fontSize: 12.5, color: PALETTE.textDim }}>
@@ -593,6 +623,7 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
               const next = dungeonNext || towerNext;
               const back = ctx.kind === 'dungeon' ? '던전 목록으로' : ctx.kind === 'tower' ? '첨탑으로' : ctx.kind === 'raid' ? '레이드로' : '사냥터로';
               const sub = [
+                ['📜 전투 기록', () => setLogFull(true), {}],
                 ['📊 전투 집계', openStats, {}],
                 sessionReport && ['📋 사냥 보고서', () => setStats(sessionReport), { color: MS.gold }],
                 battle.runReport && [battle.runReport.kind === 'tower' ? '🗼 첨탑 집계' : '🏰 던전 집계', () => setStats(battle.runReport), { color: '#c08ae8' }],
