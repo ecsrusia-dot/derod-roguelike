@@ -1173,6 +1173,18 @@ export const ENEMIES = {
     ],
     drop: { gold: [55, 80] },
   },
+  champ_dawn_sixwing: {
+    name: '6날개 사도', hp: 120, color: '#e8c79a',
+    desc: '여섯 날개로 회랑을 순찰하는 사도 (1.263.0)',
+    tier: 'normal', chapter: 'dawn_2',
+    regen: 9,
+    patterns: [
+      { name: '날개 베기', dmg: [15, 20], type: 'attack' },
+      { name: '육익 강림', dmg: [23, 29], type: 'attack', heavy: true },
+      { name: '날개 장막', dmg: [0, 0], type: 'defend', defense: 32 },
+    ],
+    drop: { gold: [50, 75] },
+  },
   champ_dawn_elite2: {
     name: '천사의 화신', hp: 180, color: '#a08040',
     desc: '빛 그 자체가 형상을 갖춘 존재',
@@ -1224,6 +1236,18 @@ export const ENEMIES = {
     ],
     drop: { gold: [60, 90] },
   },
+  champ_dawn_vanguard: {
+    name: '천사 정예', hp: 150, color: '#e8c79a',
+    desc: '정원의 문을 지키는 천사 정예병 (1.263.0)',
+    tier: 'normal', chapter: 'dawn_3',
+    regen: 13,
+    patterns: [
+      { name: '정예의 창격', dmg: [20, 26], type: 'attack' },
+      { name: '신성 돌격', dmg: [28, 36], type: 'attack', heavy: true },
+      { name: '정예 방진', dmg: [0, 0], type: 'defend', defense: 36 },
+    ],
+    drop: { gold: [65, 95] },
+  },
   champ_dawn_elite3: {
     name: '신성한 폭군', hp: 230, color: '#a08040',
     desc: '여명의 정원을 지배하는 폭군',
@@ -1262,6 +1286,30 @@ export const ENEMIES = {
       { name: '빛의 장막', dmg: [0, 0], type: 'defend', defense: 40 },
     ],
     drop: { gold: [80, 120] },
+  },
+  champ_dawn_eternal: {
+    name: '영원한 빛', hp: 175, color: '#e8c79a',
+    desc: '꺼지지 않는 등불을 든 옥좌의 수호자 (1.263.0)',
+    tier: 'normal', chapter: 'dawn_4',
+    regen: 17,
+    patterns: [
+      { name: '영원의 빛살', dmg: [21, 27], type: 'attack' },
+      { name: '불멸의 광휘', dmg: [29, 38], type: 'attack', heavy: true },
+      { name: '영원의 장막', dmg: [0, 0], type: 'defend', defense: 40 },
+    ],
+    drop: { gold: [75, 110] },
+  },
+  champ_dawn_myriad: {
+    name: '무수한 날개', hp: 160, color: '#e8c79a',
+    desc: '셀 수 없는 날개로 빛을 흩뿌리는 존재 (1.263.0)',
+    tier: 'normal', chapter: 'dawn_4',
+    regen: 16,
+    patterns: [
+      { name: '깃털 폭풍', dmg: [22, 28], type: 'attack' },
+      { name: '만익 낙하', dmg: [30, 40], type: 'attack', heavy: true },
+      { name: '날개 고치', dmg: [0, 0], type: 'defend', defense: 38 },
+    ],
+    drop: { gold: [75, 110] },
   },
   champ_dawn_elite4: {
     name: '빛의 사도', hp: 270, color: '#a08040',

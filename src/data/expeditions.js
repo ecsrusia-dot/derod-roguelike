@@ -398,21 +398,21 @@ export const CHAMPIONSHIP_CHAPTERS = {
   dawn_2: { name: '빛의 회랑', sub: 'Hall of Light', biome: 'holy', color: '#d4a574',
             nodeCount: 22,
             enemies: { 
-              normal: ['champ_dawn_priest', 'champ_dawn_paladin', 'champ_dawn_warrior'],
+              normal: ['champ_dawn_priest', 'champ_dawn_paladin', 'champ_dawn_sixwing'],
               elite: ['champ_dawn_elite2'],
               boss: 'champ_dawn_boss2' 
             } },
   dawn_3: { name: '신성한 정원', sub: 'Sacred Garden', biome: 'holy', color: '#d4a574',
             nodeCount: 24,
             enemies: { 
-              normal: ['champ_dawn_high_seraph', 'champ_dawn_oracle', 'champ_dawn_paladin'],
+              normal: ['champ_dawn_high_seraph', 'champ_dawn_oracle', 'champ_dawn_vanguard'],
               elite: ['champ_dawn_elite3'],
               boss: 'champ_dawn_boss3' 
             } },
   dawn_4: { name: '여명의 옥좌', sub: 'Throne of Dawn', biome: 'holy', color: '#d4a574',
             nodeCount: 26,
             enemies: { 
-              normal: ['champ_dawn_avatar', 'champ_dawn_high_seraph', 'champ_dawn_oracle'],
+              normal: ['champ_dawn_avatar', 'champ_dawn_eternal', 'champ_dawn_myriad'],
               elite: ['champ_dawn_elite4', 'champ_dawn_elite3'],
               boss: 'champ_dawn_boss4' 
             } },
