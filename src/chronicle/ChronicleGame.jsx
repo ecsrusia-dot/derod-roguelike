@@ -612,7 +612,7 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
                 </>}
                 {!brief && xp && (xp.after.hero || xp.after.fam) && <MainSecHead title="성 장" />}
                 {!brief && xp && (xp.after.hero || xp.after.fam) && <div className="flex flex-col gap-1.5 mb-0.5">
-                  <XpResultRow art={chronicleClass(save.hero).combatImage} name={chronicleClass(save.hero).name} before={xp.before.hero} after={xp.after.hero} />
+                  <XpResultRow art={chronicleClass(save.hero).image} name={chronicleClass(save.hero).name} before={xp.before.hero} after={xp.after.hero} />
                   {xp.after.fam && summary.famExp ? <XpResultRow fam art={chronicleEnemyArt(xp.after.fam.key)} name={F.famName(xp.after.fam.key)} before={xp.before.fam} after={xp.after.fam} /> : null}
                 </div>}
                 {summary.items.length ? <div className="grid gap-1 mt-1.5" style={{ gridTemplateColumns: summary.items.length > 1 ? '1fr 1fr' : '1fr' }}>
@@ -725,7 +725,7 @@ function RaidView({ save, onBack, onFight }) {
                       const r = roster[c.id]; const ok = RD.raidMemberOk(r, t);
                       return (
                         <div key={c.id} className="text-center" style={{ minWidth: 0 }}>
-                          <img src={c.combatImage} alt="" className="w-full object-cover" style={{ height: 30, objectPosition: '50% 20%', border: `1px solid ${ok ? '#8fd08a' : MS.line}`, filter: ok ? 'none' : 'grayscale(1) brightness(.45)' }} />
+                          <img src={c.image} alt="" className="w-full object-cover" style={{ height: 30, objectPosition: '50% 20%', border: `1px solid ${ok ? '#8fd08a' : MS.line}`, filter: ok ? 'none' : 'grayscale(1) brightness(.45)' }} />
                           <div className="truncate" style={{ fontSize: 10.5, color: ok ? '#8fd08a' : '#e07a6a' }}>{r ? `${r.rebirth ? '✦' : ''}${r.lv}` : '없음'}</div>
                         </div>
                       );
@@ -796,7 +796,7 @@ function RosterView({ save, setSave, flash, onBack, onSwitchChar, onRaid }) {
             const r = roster[c.id]; const me = c.id === save.hero;
             return (
               <button key={c.id} onClick={() => setDetail(c.id)} className="ui-press text-center" style={{ background: 'transparent', border: 'none', padding: 0, minWidth: 0 }}>
-                <img src={c.combatImage} alt="" className="w-full object-cover" style={{ height: 42, objectPosition: '50% 20%', border: `1.5px solid ${me ? MS.gold : r ? MS.strong : MS.line}`, filter: r ? 'none' : 'grayscale(1) brightness(.45)' }} />
+                <img src={c.image} alt="" className="w-full object-cover" style={{ height: 42, objectPosition: '50% 20%', border: `1.5px solid ${me ? MS.gold : r ? MS.strong : MS.line}`, filter: r ? 'none' : 'grayscale(1) brightness(.45)' }} />
                 <div className="truncate" style={{ fontSize: 10.5, color: me ? MS.gold : r ? PALETTE.text : PALETTE.textDim }}>{r ? `${r.rebirth ? '✦' : ''}Lv.${r.lv}` : '없음'}</div>
               </button>
             );
@@ -840,7 +840,7 @@ function RosterView({ save, setSave, flash, onBack, onSwitchChar, onRaid }) {
       {detail && (() => {
         const c = chronicleClass(detail); const r = roster[detail]; const buff = R.GLOBAL_BUFFS[detail]; const me = detail === save.hero;
         return (
-          <MainModal img={c.combatImage} kicker="원 정 대" title={c.name} color={c.color} badge={r ? `Lv.${r.lv}` : '없음'} sub={r ? `${r.peak > r.lv ? `최고 Lv.${r.peak} · ` : ''}${r.rebirth ? `✦전승 ${r.rebirth}회 · ` : ''}「${buff.title}」` : '아직 만들지 않음'} onClose={() => setDetail(null)}
+          <MainModal img={c.image} kicker="원 정 대" title={c.name} color={c.color} badge={r ? `Lv.${r.lv}` : '없음'} sub={r ? `${r.peak > r.lv ? `최고 Lv.${r.peak} · ` : ''}${r.rebirth ? `✦전승 ${r.rebirth}회 · ` : ''}「${buff.title}」` : '아직 만들지 않음'} onClose={() => setDetail(null)}
             footer={!me && <button onClick={() => { setDetail(null); onSwitchChar(); }} className="ui-press" style={{ height: 42, border: `1px solid ${MS.gold}`, color: MS.gold, background: 'transparent', fontSize: 13 }}>{r ? '이 캐릭터로 전환' : '캐릭터 만들기'}</button>}>
             <MainSecHead title="다 른 캐 릭 터 에 게 주 는 버 프" />
             {R.ROSTER_MILESTONES.map((lv, i) => {
@@ -926,7 +926,7 @@ function TownView({ save, acc, go, onExit, onSwitchChar }) {
       </div>
       <div className="relative flex-1 overflow-y-auto px-4 py-3 flex flex-col">
         <div className="flex gap-3 pb-3" style={{ borderBottom: `1px solid ${MS.line}` }}>
-          <img src={cls.combatImage} alt="" className="object-cover flex-none" style={{ width: 76, height: 76, borderRadius: 14, border: `1.5px solid ${MS.gold}`, objectPosition: '50% 25%' }} />
+          <img src={cls.image} alt="" className="object-cover flex-none" style={{ width: 76, height: 76, borderRadius: 14, border: `1.5px solid ${MS.gold}`, objectPosition: '50% 25%' }} />
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
               <div style={{ fontSize: 10.5, letterSpacing: 4, color: MS.red }}>{CLASS_PATH[save.hero] || 'PATH'}</div>
@@ -1365,7 +1365,7 @@ function PartyView({ save, setSave, onBack, onForge }) {
       {/* 1.248.0 PM 「육성 창을 정보·스킬·특성 3탭으로」 */}
       <div className="flex-none px-4 pt-3">
         <div className="flex items-center gap-3 pb-3">
-          <img src={cls.combatImage} alt="" className="object-cover flex-none" style={{ width: 84, height: 84, borderRadius: 14, border: `1.5px solid ${MS.gold}`, objectPosition: '50% 25%' }} />
+          <img src={cls.image} alt="" className="object-cover flex-none" style={{ width: 84, height: 84, borderRadius: 14, border: `1.5px solid ${MS.gold}`, objectPosition: '50% 25%' }} />
           <div className="flex-1 min-w-0">
             <div style={{ fontSize: 10.5, letterSpacing: 4, color: MS.red }}>{CLASS_PATH[cid] || 'PATH'}</div>
             <div className="font-bold" style={{ fontSize: 21, color: PALETTE.text, lineHeight: 1.2 }}>{cls.name} <span style={{ fontSize: 14, color: MS.gold }}>Lv.{u.lv}</span> <span style={{ fontSize: 11, fontWeight: 400, color: PALETTE.textDim }}>/ {E.levelCapOf(save)} · {cls.role}</span></div>
@@ -2921,7 +2921,7 @@ function TitleView({ acc, onSelect, onCreate, onExit, onReset, onImport, cloudAp
             ))}
           </div>
           <div className="relative overflow-hidden" style={{ borderRadius: 16, aspectRatio: '16 / 10', border: `1px solid ${cls.color}88` }}>
-            <img src={cls.combatImage} alt="" className="absolute inset-0 w-full h-full object-cover" />
+            <img src={cls.image} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ objectPosition: "50% 20%" }} />
             <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, transparent 45%, #0a0608)' }} />
             <div className="absolute bottom-2 left-3">
               <div className="font-bold" style={{ fontSize: 19, color: PALETTE.text }}>{cls.name} <span style={{ fontSize: 12.5, color: cls.color }}>{cls.role}</span></div>
@@ -3403,7 +3403,7 @@ function OfflineSheet({ pd, onClaim }) {
     </div>
   );
   return (
-    <MainModal img={cls.combatImage} kicker="OFFLINE" title="자리를 비운 사이" sub={`${iga(cls.name)} ${pd.place}에서 사냥했다`} onClose={onClaim}
+    <MainModal img={cls.image} kicker="OFFLINE" title="자리를 비운 사이" sub={`${iga(cls.name)} ${pd.place}에서 사냥했다`} onClose={onClaim}
       footer={<button onClick={onClaim} className="ui-press" style={{ height: 44, fontSize: 14, fontWeight: 800, border: `1px solid ${MS.red}`, background: 'rgba(224,87,76,0.2)', color: '#ff8a7e' }}>받기</button>}>
       <div className="grid gap-1" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
         {cell('비운 시간', O.fmtAway(pd.ms), MS.gold)}{cell('효율', `×1의 ${Math.round(O.OFFLINE.eff * 100)}%`)}{cell('승률', `${Math.round(pd.winRate * 100)}%`)}{cell('최대', `${O.OFFLINE.maxMs / 3600000}시간`)}
