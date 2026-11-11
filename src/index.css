@@ -766,3 +766,19 @@ body {
   .arc-float { animation-duration: .01s; }
   .arc-shake, .arc-pulse { animation: none; }
 }
+
+/* ===== 황혼 연대기 보스 카드 (1.257.0, 시안 ㊷-②) — 입체 금 테두리 + 진홍 안쪽 띠 + BOSS 명판 ===== */
+.chr-boss{position:relative;border-radius:6px;padding:7px;box-sizing:border-box;
+  background:linear-gradient(160deg,#fff3c4 0%,#e8b04a 20%,#8a5a12 45%,#f2c766 60%,#7a4a08 82%,#d9a440 100%);
+  box-shadow:0 0 0 1px #2a1602,0 0 0 2px #5a3a0a,0 10px 24px #000c,0 0 26px #e8b04a40;animation:chr-boss-pulse 2.6s ease-in-out infinite}
+.chr-boss.acting{box-shadow:0 0 0 1px #2a1602,0 0 0 2px #5a3a0a,0 10px 24px #000c,0 0 42px #ffd27a99}
+@keyframes chr-boss-pulse{50%{box-shadow:0 0 0 1px #2a1602,0 0 0 2px #5a3a0a,0 10px 24px #000c,0 0 38px #e8b04a70}}
+.chr-boss-in{position:relative;width:100%;height:100%;border-radius:3px;overflow:hidden;background:#000;
+  box-shadow:0 0 0 1px #2a1602,0 0 0 3px #8a1410,0 0 0 4px #ffcf6a,0 0 0 5px #3a0a06}
+.chr-boss-in:after{content:'';position:absolute;inset:0;box-shadow:inset 0 0 22px 4px #000d;pointer-events:none}
+.chr-boss-shine{position:absolute;inset:0;background:linear-gradient(115deg,transparent 30%,#ffffff1c 45%,transparent 55%);pointer-events:none}
+.chr-boss-plate{position:absolute;left:50%;top:0;transform:translate(-50%,-50%);z-index:3;padding:2px;
+  background:linear-gradient(#fff3c4,#8a5a12);clip-path:polygon(11px 0,calc(100% - 11px) 0,100% 50%,calc(100% - 11px) 100%,11px 100%,0 50%);filter:drop-shadow(0 3px 3px #000)}
+.chr-boss-plate span{display:block;padding:3px 16px 2px;font-size:12px;font-weight:900;letter-spacing:5px;color:#ffe3a0;text-shadow:0 1px 0 #000;white-space:nowrap;
+  background:linear-gradient(#e0574c,#8a1410 55%,#5a0a08);clip-path:polygon(10px 0,calc(100% - 10px) 0,100% 50%,calc(100% - 10px) 100%,10px 100%,0 50%)}
+@media (prefers-reduced-motion: reduce){.chr-boss{animation:none}}

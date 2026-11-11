@@ -7,7 +7,7 @@
 import { levelCap, globalBuffFx } from './roster.js';
 import { talentFx, canLearnTalent, talentNode, talentResetCost, talentTrees, tierUnlocked } from './talents.js';
 import { BOSS_MECHS, BOSS_MECH_OF, fieldStages, FIELD_STAGES, STAGE_TUNING, BOOST, BAG_EXPAND, SALVAGE, SALVAGE_ICON, REBIRTH, REBIRTH_BRANCHES, expNeedFor } from './data.js';
-import { TOWER, TOWER_SHOP, towerUnlocked, isTowerBoss, towerEnemyLv, towerArea, towerFloorPicks, kstWeekKey } from './tower.js';
+import { TOWER, TOWER_SHOP, towerUnlocked, isTowerBoss, towerEnemyLv, towerArea, towerFloorPicks, towerTheme, kstWeekKey } from './tower.js';
 import { famCombatant, famRole, famSubFx, famOwnFx, famBondFx, rollFamShards, rollFamSouls, gainFamExp, FAM_AI, FAM_TUNING, summonFamiliars, enhanceFamiliar, evolveFamiliar } from './familiar.js';
 import {
   CHRONICLE_TUNING as T, CHRONICLE_CLASSES, CHRONICLE_SKILLS, CHRONICLE_FIELDS, CHRONICLE_DUNGEON, CHRONICLE_DUNGEONS, DUNGEON_TIERS, dungeonDef,
@@ -840,15 +840,18 @@ export function roleEnemy(e, role, mult = null) {
   return { ...e, erole: role === 'dps' ? undefined : role, hp: Math.round(e.hp * hm), maxHp: Math.round(e.maxHp * hm), atk: Math.round(e.atk * am), def: Math.round((e.def || 0) * (R.def || 1)) };
 }
 // 무리 3마리 — 역할은 마리마다 완전 랜덤 (수호 3마리·맹공 3마리도 나올 수 있다, PM 1.236.0)
-function packOf(rng, list) {
+function packOf(rng, list, opt = null) {
   const P = T.enemyParty; const W = P.roleWeights;
   const tot = W.tank + W.healer + W.dps;
+  // opt (1.257.0 — 던전·첨탑 층): {mult, reward, all} — all이면 강적도 무리 배율 적용
+  const mult = opt?.mult || P.packMult; const reward = opt?.reward ?? P.packReward;
   return list.map(e => {
     const x = rng() * tot;
     const role = x < W.tank ? 'tank' : x < W.tank + W.healer ? 'healer' : 'dps';
-    const r = roleEnemy(e, role, e.tier === 'normal' ? P.packMult : null);
+    const scaled = e.tier === 'normal' || (opt?.all && e.tier !== 'boss');
+    const r = roleEnemy(e, role, scaled ? mult : null);
     // 보상도 마리당 줄여 전투 1회 보상은 예전(평균 1.8마리)과 같게
-    return e.tier === 'normal' ? { ...r, rewardMult: (e.rewardMult || 1) * P.packReward, goldMult: P.packReward } : r;
+    return scaled ? { ...r, rewardMult: (e.rewardMult || 1) * reward, goldMult: reward } : r;
   });
 }
 // ===== 보스 공략 기믹 (1.237.0) — boss = 보스 적 객체 · make(key, i, {hp, atk}) = 같은 조건의 수행원 생성 =====
@@ -923,6 +926,12 @@ export function dungeonEncounter(d, rng) {
     const pool = [...new Set(D.floors.filter(x => !x.boss).flatMap(x => x.enemies))];
     const make = (key, i, m) => ({ ...buildChronicleEnemy(key, lv - 2, `e${i}`, { hpMult: area.hpMult * (m.hp || 1) * 3, atkMult: area.atkMult * (m.atk || 1) * 1.6 }), rewardMult: rm });
     return { type: 'dungeonBoss', mech, enemies: withBossMech(mk(f.enemies[0], 0), mech, pool.length ? pool : f.enemies, make, rng) };
+  }
+  // 1.257.0 — 던전 층도 3마리 무리 (예전 평균 1.5마리 → 마리당 배율 T.floorPack로 총량 유지)
+  if (T.enemyParty?.on) {
+    const FP = T.floorPack;
+    const list = Array.from({ length: T.enemyParty.packSize }, (_, i) => mk(pick(rng, f.enemies), i));
+    return { type: 'dungeonFloor', enemies: packOf(rng, list, { mult: FP.mult, reward: FP.reward, all: true }) };
   }
   const [n0, n1] = T.dungeonFloorEnemies || [2, 3];
   const n = n0 + Math.floor(rng() * (n1 - n0 + 1));
@@ -1766,7 +1775,15 @@ export function towerEncounter(save, rng) {
   const { type, picks } = towerFloorPicks(floor, rng);
   const area = towerArea(floor);
   const lv = towerEnemyLv(floor);
-  return { type, floor, enemies: picks.map((k, i) => buildChronicleEnemy(k, lv + (i === 0 && type !== 'towerFloor' ? 1 : 0), `e${i}`, area)) };
+  const enemies = picks.map((k, i) => buildChronicleEnemy(k, lv + (i === 0 && type !== 'towerFloor' ? 1 : 0), `e${i}`, area));
+  // 1.257.0 — 첨탑 일반·강적 층도 3마리 무리 (보스 층은 그대로)
+  if (T.enemyParty?.on && type !== 'towerBoss') {
+    const th = towerTheme(floor);
+    while (enemies.length < T.enemyParty.packSize) enemies.push(buildChronicleEnemy(th.normals[Math.floor(rng() * th.normals.length)], lv, `e${enemies.length}`, area));
+    const FP = T.floorPack;
+    return { type, floor, enemies: packOf(rng, enemies, type === 'towerFloor' ? { mult: FP.mult, reward: FP.reward, all: true } : { mult: FP.mult, reward: FP.reward }) };
+  }
+  return { type, floor, enemies };
 }
 function towerAdvance(save, battle, summary) {
   const t = save.tower;

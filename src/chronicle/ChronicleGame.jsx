@@ -187,11 +187,34 @@ function Portrait({ cid, size = 44, dim = false }) {
 }
 
 // ===== 전투 카드 · 로그 (1.227.0) =====
-function BattleCard({ u, art, hp, sh, acting, fx, h, enemy = false, border, children, xp = null }) {
+// 보스 카드 (1.257.0, 시안 ㊷-②) — 가운데 크게 · 입체 금 테두리 + 진홍 띠 · BOSS 명판이 위 테두리에 절반 걸침
+function BossCard({ u, art, hp, sh, acting, fx, w, h, ward = false, children }) {
+  const dead = hp <= 0;
+  return (
+    <div className={`relative flex-none ${fx}`} style={{ width: w, opacity: dead ? 0.4 : 1, transition: 'opacity .3s', marginTop: 10 }}>
+      <div className={`chr-boss${acting ? ' acting' : ''}`} style={{ height: h }}>
+        <div className="chr-boss-plate"><span>BOSS</span></div>
+        <div className="chr-boss-in">
+          <img src={art} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ objectPosition: '50% 25%', filter: dead ? 'grayscale(1)' : 'none' }} draggable={false} />
+          <div className="chr-boss-shine" />
+          {ward && <div className="absolute px-1.5" style={{ top: 14, right: 6, zIndex: 2, fontSize: 10.5, border: '1px solid #7fa8d8', color: '#a8c8f0', background: '#000b' }}>🛡 결계</div>}
+          {u.intim ? <div className="absolute px-1.5" style={{ top: 14, left: 6, zIndex: 2, fontSize: 10.5, background: u.intim >= 4 ? '#7a0d0dee' : '#3a1a1acc', color: u.intim >= 4 ? '#ffd0d0' : '#ff9a8a', border: '1px solid #ff6a5a88' }}>{u.intim >= 4 ? '☠ 절대 위압' : `☗ 위압 ${u.intim}`}</div> : null}
+          <div className="absolute left-0 right-0 bottom-0" style={{ padding: '22px 8px 6px', background: 'linear-gradient(transparent, #000e 55%)', zIndex: 2 }}>
+            <div className="text-center truncate font-bold" style={{ fontSize: 13.5, color: '#ffe3a0', textShadow: '0 1px 2px #000' }}>Lv.{u.lv} {u.name}</div>
+            <div className="mt-1"><Bar v={hp} max={u.maxHp} shield={sh} color="linear-gradient(90deg,#b8261c,#ff8a6a)" h={7} /></div>
+            <div className="text-center" style={{ fontSize: 10.5, color: '#ddd', textShadow: '0 1px 2px #000' }}>{Math.max(0, hp).toLocaleString()} / {u.maxHp.toLocaleString()}{sh > 0 ? <span style={{ color: '#9cc4e4' }}> ◈{sh.toLocaleString()}</span> : null}</div>
+          </div>
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+}
+function BattleCard({ u, art, hp, sh, acting, fx, h, enemy = false, border, children, xp = null, w = null }) {
   const dead = hp <= 0;
   const accent = enemy ? '#ff8a80' : u.fam ? '#d07ae8' : chronicleClass(u.classId).color;
   return (
-    <div className={`relative flex-1 min-w-0 ${fx}`} style={{ opacity: dead ? 0.35 : 1, transition: 'opacity .3s' }}>
+    <div className={`relative ${w ? 'flex-none' : 'flex-1'} min-w-0 ${fx}`} style={{ width: w || undefined, opacity: dead ? 0.35 : 1, transition: 'opacity .3s' }}>
       <div className="relative overflow-hidden" style={{ height: h, borderRadius: 12, border: `1.5px solid ${acting ? accent : border}`, boxShadow: acting ? `0 0 12px ${accent}66` : 'none', transition: 'box-shadow .2s, border-color .2s' }}>
         <img src={art} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ objectPosition: enemy ? '50% 40%' : '50% 22%', filter: dead ? 'grayscale(1)' : 'none' }} draggable={false} />
         <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, transparent 45%, #000d)' }} />
@@ -365,14 +388,29 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
       </div>
 
       {/* 적 */}
-      <div className="relative flex gap-2 px-3 pt-1 flex-none">
-        {enemies.map(e => (
+      {(() => {
+        // 1.257.0 — 보스가 있고 3마리 이하면 보스를 가운데 크게 (레이드처럼 많을 땐 기존 배열)
+        const boss = enemies.length <= 3 ? enemies.find(e => e.tier === 'boss') : null;
+        const card = (e, extra = {}) => (
           <BattleCard key={e.id} u={e} art={chronicleEnemyArt(e.key)} hp={hpOf(e)} sh={shOf(e)} acting={cur?.a === e.id} fx={fxClass(e.id)} h={cardH} enemy
-            border={e.tier === 'boss' ? '#c4453d88' : e.tier === 'elite' ? '#e8b04a88' : 'var(--ui-line)'}>
+            border={e.tier === 'boss' ? '#c4453d88' : e.tier === 'elite' ? '#e8b04a88' : 'var(--ui-line)'} {...extra}>
             <Float id={e.id} />
           </BattleCard>
-        ))}
-      </div>
+        );
+        if (!boss) return <div className="relative flex gap-2 px-3 pt-1 flex-none">{enemies.map(e => card(e))}</div>;
+        const others = enemies.filter(e => e !== boss);
+        const ward = others.some(e => e.warden && hpOf(e) > 0);
+        const solo = !others.length;
+        return (
+          <div className="relative flex items-center justify-center gap-2 px-3 pt-2 flex-none">
+            {others[0] && card(others[0], { h: 140, w: 88 })}
+            <BossCard u={boss} art={chronicleEnemyArt(boss.key)} hp={hpOf(boss)} sh={shOf(boss)} acting={cur?.a === boss.id} fx={fxClass(boss.id)} w={solo ? 190 : 172} h={solo ? 236 : 222} ward={ward}>
+              <Float id={boss.id} />
+            </BossCard>
+            {others[1] && card(others[1], { h: 140, w: 88 })}
+          </div>
+        );
+      })()}
 
       {/* 전투 로그 — 적과 아군 사이 전체 */}
       <div className="relative flex-1 min-h-0 mx-3 my-2 flex flex-col" style={{ borderRadius: 12, background: 'rgba(0,0,0,0.38)', border: '1px solid var(--ui-line)' }}>
