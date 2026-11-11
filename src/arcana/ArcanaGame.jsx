@@ -639,7 +639,7 @@ function ClassSelectView({ records, onPick, onBack }) {
       </div>
       <div className="flex-1 overflow-y-auto px-4 pt-2">
         <div className="relative overflow-hidden" style={{ borderRadius: 18, aspectRatio: '16 / 10', border: `1px solid ${cls.color}88` }}>
-          <img src={cls.combatImage} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          <img src={cls.image} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ objectPosition: "50% 20%" }} />
           <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, transparent 40%, #0a0608 100%)' }} />
           <div className="absolute bottom-2 left-3 right-3">
             <div className="flex items-center gap-2">
