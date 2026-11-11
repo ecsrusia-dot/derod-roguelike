@@ -134,15 +134,15 @@ export const CHRONICLE_SKILLS = {
   p_light: S('p_light', 'priest', '신성 광선', 'strike', 8, 3, 1.9, 0.18),
   // ── 1.207.0 후반 스킬 (Lv.15 · Lv.25) — 남는 스킬 포인트 해소
   w_flash: S('w_flash', 'wanderer', '일섬', 'strike', 15, 3, 2.6, 0.25),
-  w_unyield: S('w_unyield', 'wanderer', '불굴', 'passive', 25, 0, 0, 0, { fx: (lv) => ({ hpPct: 0.05 * lv, defPct: 0.04 * lv }) }),
-  s_surge: S('s_surge', 'sage', '마력 폭주', 'rage', 15, 5, 0.35, 0.07, { turns: 3 }),
+  w_unyield: S('w_unyield', 'wanderer', '강철 육체', 'passive', 25, 0, 0, 0, { fx: (lv) => ({ hpPct: 0.05 * lv, defPct: 0.04 * lv }) }),
+  s_surge: S('s_surge', 'sage', '화염 각성', 'rage', 15, 5, 0.35, 0.07, { turns: 3 }),
   s_starfall: S('s_starfall', 'sage', '운석 낙하', 'aoe', 25, 6, 2.4, 0.25),
   d_moon: S('d_moon', 'demonblood', '혈월참', 'lifesteal', 15, 4, 2.4, 0.22, { steal: 0.15 }),
   d_undying: S('d_undying', 'demonblood', '불멸의 피', 'passive', 25, 0, 0, 0, { fx: (lv) => ({ hpPct: 0.02 * lv, lowHpDmg: 0.04 * lv }) }),
   e_spirits: S('e_spirits', 'elf', '정령 소환', 'dot', 15, 4, 0.6, 0.07, { turns: 3, all: true }),
   e_divine: S('e_divine', 'elf', '신궁', 'multi', 25, 4, 0.45, 0.05, { hits: 7 }),
   p_dawn: S('p_dawn', 'priest', '여명의 기도', 'healAll', 15, 4, 0.5, 0.07),
-  p_judge: S('p_judge', 'priest', '심판', 'aoe', 25, 4, 1.6, 0.15),
+  p_judge: S('p_judge', 'priest', '신성 폭발', 'aoe', 25, 4, 1.6, 0.15),
 };
 export const SKILL_MAX_LV = 5;
 // 마스터리 (1.207.0) — 1.224.0 폐지 (특성 트리 talents.js로 대체, 상수는 구 호환용으로만 남김)
@@ -192,7 +192,7 @@ Object.assign(CHRONICLE_SKILLS, {
   wp_aegis: B('w_paladin', 'wp_aegis', '성역의 방패', 'healShield', 30, 5, 0.7, 0.08, { shieldV: 0.9 }),
   // 대마도사
   sa_storm: B('s_arch', 'sa_storm', '천벌의 폭풍', 'aoe', 1, 3, 1.4, 0.14),
-  sa_mind: B('s_arch', 'sa_mind', '마력 공명', 'passive', 15, 0, 0, 0, { fx: (lv) => ({ atkPct: 0.04 * lv }) }),
+  sa_mind: B('s_arch', 'sa_mind', '비전 공명', 'passive', 15, 0, 0, 0, { fx: (lv) => ({ atkPct: 0.04 * lv }) }),
   sa_rain: B('s_arch', 'sa_rain', '유성우', 'multi', 30, 4, 0.7, 0.07, { hits: 5 }),
   // 저주술사
   sh_plague: B('s_hex', 'sh_plague', '역병의 저주', 'dot', 1, 4, 0.6, 0.07, { turns: 4, all: true }),
@@ -221,7 +221,7 @@ Object.assign(CHRONICLE_SKILLS, {
   // 심판관
   pi_verdict: B('p_inq', 'pi_verdict', '판결', 'weakStrike', 1, 3, 1.5, 0.14, { dv: 0.25, turns: 3 }),
   pi_zeal: B('p_inq', 'pi_zeal', '열의', 'passive', 15, 0, 0, 0, { fx: (lv) => ({ atkPct: 0.04 * lv }) }),
-  pi_brand: B('p_inq', 'pi_brand', '단죄의 낙인', 'markStrike', 30, 3, 1.4, 0.12, { dv: 0.3, turns: 3 }),
+  pi_brand: B('p_inq', 'pi_brand', '단죄의 인장', 'markStrike', 30, 3, 1.4, 0.12, { dv: 0.3, turns: 3 }),
 });
 export const rebirthBranches = (classId) => Object.entries(REBIRTH_BRANCHES).filter(([, b]) => b.cls === classId).map(([id, b]) => ({ id, ...b }));
 // 레벨업 필요 경험치 — 첫 전승 ×2, 이후 전승마다 +0.5 (1.221.0: 누적 ×2는 2회차부터 과도해 완화)
@@ -570,7 +570,7 @@ export const UNIQUE_ITEMS = {
   u_d_thirst: U('u_d_thirst', 'demonblood', 'weapon', '피의 갈망', { atkPct: 0.10, hpPct: 0.08 }, { lifesteal: 0.15, overhealShield: 1 }, '흡혈 15%, 최대 HP를 넘는 회복은 보호막으로'),
   u_d_heart: U('u_d_heart', 'demonblood', 'offhand', '마왕의 심장 조각', { hpPct: 0.12, lowHpDmg: 0.1 }, { missingHpAtk: 0.06 }, '잃은 HP 10%마다 공격력 +6%'),
   u_d_scar: U('u_d_scar', 'demonblood', 'armor', '흉터 갑주', { hpPct: 0.12, dmgReduce: 0.04 }, { thornsPct: 0.15 }, '받은 피해 15% 반사'),
-  u_d_brand: U('u_d_brand', 'demonblood', 'accessory', '광기의 낙인', { atkPct: 0.10, lifesteal: 0.04 }, { rageDouble: 1, cdr: 1 }, '광폭화 중 모든 공격 2회 · 모든 스킬 재사용 -1턴 · 특성 「피의 광란」과 겹치면 겹친 몫이 「광폭화 지속 +1턴 · 광폭화 중 흡혈 2배」로 바뀐다'),
+  u_d_brand: U('u_d_brand', 'demonblood', 'accessory', '광기의 혈인', { atkPct: 0.10, lifesteal: 0.04 }, { rageDouble: 1, cdr: 1 }, '광폭화 중 모든 공격 2회 · 모든 스킬 재사용 -1턴 · 특성 「피의 광란」과 겹치면 겹친 몫이 「광폭화 지속 +1턴 · 광폭화 중 흡혈 2배」로 바뀐다'),
   u_e_string: U('u_e_string', 'elf', 'weapon', '바람의 현', { crit: 0.06, chain: 0.08 }, { multiHitsAdd: 2 }, '「연속 화살」 타수 +2'),
   u_e_quiver: U('u_e_quiver', 'elf', 'offhand', '정령 화살통', { crit: 0.05, spd: 3 }, { spiritArrow: 0.2 }, '공격 시 20% 확률로 정령 화살(공격력 80%)'),
   u_e_leaf: U('u_e_leaf', 'elf', 'armor', '잎새 갑옷', { dodge: 0.05, hpPct: 0.08 }, { dodgeHeal: 0.05 }, '회피할 때마다 HP 5% 회복'),

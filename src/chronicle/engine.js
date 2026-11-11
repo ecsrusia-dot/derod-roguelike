@@ -273,6 +273,25 @@ function passiveFx(u) {
   return fx;
 }
 
+// 대기형 효과 출처 (1.260.0) — 전투 시작 연출에 「어디서 온 효과인지」 이름을 보여 준다 (전투 계산과 무관)
+export const STANDBY_KEYS = ['firstCrit', 'revive', 'guts', 'emergencyHeal'];
+function standbySources(save, u, br) {
+  const src = {};
+  const add = (fx, name) => { for (const k of STANDBY_KEYS) if (fx?.[k]) (src[k] ||= []).includes(name) || src[k].push(name); };
+  for (const slot of Object.keys(u.equip)) {
+    const uid = u.equip[slot];
+    const it = uid != null ? save.inventory.find(i => i.uid === uid) : null;
+    if (!it || !itemUsable(it, u.classId) || !canWear(it, u)) continue;
+    const ud = uniqueDef(it); if (ud) add(ud.fx, ud.name);
+    const eo = epicOptOf(it); if (eo) add(eo.fx, eo.name);
+  }
+  if (br) add(br.fx, br.name);
+  for (const [id, r] of Object.entries(u.talents || {})) { const n = r && talentNode(id); if (n) add(n.fx, n.name); }
+  add(famSubFx(save.fams, activeSubs(save), u.lv), '보조 사역마');
+  add(famOwnFx(save.fams), '사역마 보유 효과'); add(famBondFx(save.fams), '사역마 인연');
+  add(globalBuffFx(save.roster, u.classId), '원정대');
+  return src;
+}
 // 전투 능력치 (2.0 — 장비 옵션·유니크 효과 합산)
 const PASS_KEYS = ['counterDouble', 'tauntReduce', 'critAfterCounter', 'emergencyHeal', 'dotTurnsMult', 'openInferno', 'skillShield', 'resetEvery',
   'overhealShield', 'missingHpAtk', 'rageDouble', 'rageTurnsAdd', 'rageLifesteal', 'multiHitsAdd', 'spiritArrow', 'dodgeHeal', 'firstCrit', 'revive', 'shieldReduce', 'blessMult', 'blessTurns',
@@ -298,7 +317,7 @@ export function deriveUnit(save, classId) {
     else if (MULT_KEYS.includes(k)) g[k] = Math.max(g[k] || 0, v);
     else g[k] = (g[k] || 0) + v;
   }
-  // 1.247.0 PM 결정 「겹칠 때만 대체」 — 「광폭화 중 2회」가 두 출처(광기의 낙인 + 특성 피의 광란)에서 겹치면
+  // 1.247.0 PM 결정 「겹칠 때만 대체」 — 「광폭화 중 2회」가 두 출처(광기의 혈인 + 특성 피의 광란)에서 겹치면
   // 겹친 몫은 「광폭화 지속 +1턴 · 광폭화 중 흡혈 2배」로 바뀐다 (2회 공격은 2중첩이 없으므로)
   if ((g.rageDouble || 0) >= 2) { g.rageTurnsAdd = (g.rageTurnsAdd || 0) + 1; g.rageLifesteal = 1; }
   const rb = 1 + REBIRTH.bonusPct * (u.rebirth?.count || 0);
@@ -328,6 +347,7 @@ export function deriveUnit(save, classId) {
       .filter(x => x.s && x.lv > 0 && x.s.kind !== 'passive'),
   };
   for (const k of PASS_KEYS) if (G(k)) out[k] = G(k);
+  if (out.guts || out.revive || out.firstCrit || out.emergencyHeal) out.standbySrc = standbySources(save, u, br);
   if (out.rageDouble) out.rageDouble = 1; // 중첩 수가 아닌 보유 여부
   if (Object.keys(skillBoost).length) out.skillBoost = skillBoost;
   // 스킬별 재사용 단축 (1.241.0) — 일반 장비 「「스킬」 재사용 -1턴」 + 에픽 「시간의 모래」(가장 긴 스킬)
@@ -1239,7 +1259,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
         }
         spiritHit(u, hits);
         if (s.kind === 'lifesteal' && r.d > 0) {
-          const h = Math.round(r.d * s.steal * (u.rageLifesteal && u.buffs.rage?.t > 0 ? 2 : 1)); // 1.247.0 광기의 낙인
+          const h = Math.round(r.d * s.steal * (u.rageLifesteal && u.buffs.rage?.t > 0 ? 2 : 1)); // 1.247.0 광기의 혈인
           const before = u.hp;
           u.hp = Math.min(u.maxHp, u.hp + h);
           hits.push({ t: u.id, h, eh: u.hp - before });
@@ -1286,7 +1306,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
         for (const a of allies) { a.buffs.bless = { v: v * (u.blessMult || 1), t: s.turns + (u.blessTurns || 0) }; hits.push({ t: a.id, buff: true }); }
         break;
       case 'rage':
-        u.buffs.rage = { v, t: s.turns + (u.rageTurnsAdd || 0) }; hits.push({ t: u.id, buff: true }); // 1.247.0 광기의 낙인 — 광폭화 지속 +N
+        u.buffs.rage = { v, t: s.turns + (u.rageTurnsAdd || 0) }; hits.push({ t: u.id, buff: true }); // 1.247.0 광기의 혈인 — 광폭화 지속 +N
         break;
       case 'taunt':
         u.taunt = s.turns + 1; u.tauntDef = v; // 1.243.0 — 자기 턴 끝에 1 감소하므로 +1 (N턴 = 적이 N라운드 공격하는 동안)
@@ -1357,6 +1377,12 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
     if (p.shield > 0) push({ k: 'pre', pre: 'fx', a: p.id, icon: '◈', n: '시작 보호막', v: `+${p.shield.toLocaleString()}`, tone: 'shield' });
     if (p.guardian) push({ k: 'pre', pre: 'fx', a: p.id, icon: '🛡', n: '수호 태세', v: `공격 ${Math.round(p.guardian * 100)}% 대신 받음`, tone: 'buff' });
     if (p.taunt > 0) push({ k: 'pre', pre: 'fx', a: p.id, icon: '📢', n: '도발', v: `${p.taunt}턴`, tone: 'buff' });
+    // 대기형 효과 (1.260.0) — 발동 조건이 올 때까지 기다리는 효과. tone 'ready' = 직업색 컷인
+    const ss = p.standbySrc || {}; const by = (k) => (ss[k]?.length ? ss[k].join(' · ') : null);
+    if (p.firstCrit) push({ k: 'pre', pre: 'fx', a: p.id, icon: '✦', n: '선제 일격', v: '첫 공격 치명 확정', src: by('firstCrit'), tone: 'ready' });
+    if (p.emergencyHeal) push({ k: 'pre', pre: 'fx', a: p.id, icon: '✚', n: '위기 회복', v: `HP 30% 아래가 되면 1회 ${Math.round(p.emergencyHeal * 100)}% 회복`, src: by('emergencyHeal'), tone: 'ready' });
+    if (p.guts) push({ k: 'pre', pre: 'fx', a: p.id, icon: '⛨', n: '버팀', v: '쓰러질 피해를 1회 HP 1로 버팀', src: by('guts'), tone: 'ready' });
+    if (p.revive) push({ k: 'pre', pre: 'fx', a: p.id, icon: '✧', n: '부활 대기', v: `쓰러지면 1회 HP ${Math.round(p.revive * 100)}%로 부활`, src: by('revive'), tone: 'ready' });
     if (p.vGuard) push({ k: 'pre', pre: 'fx', a: p.id, icon: '✧', n: '수호신의 가호', v: '주인공이 쓰러질 피해를 1회 막는다', tone: 'buff' });
   }
   const foesAll = units.filter(x => x.side === 'enemy');
