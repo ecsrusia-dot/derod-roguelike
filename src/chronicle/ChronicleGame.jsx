@@ -254,10 +254,10 @@ function BattleCard({ u, art, hp, sh, acting, fx, h, enemy = false, border, chil
 function FullBattleLog({ sim, party, unitOf, label, onClose }) {
   const [tab, setTab] = useState('all');
   const mine = new Set(party.map(p => p.id));
-  const all = sim.events.filter(e => e.a || e.round);
-  const keep = (e) => tab === 'all' || (tab === 'party' ? mine.has(e.a) : tab === 'enemy' ? !mine.has(e.a) : (e.skill || e.k === 'open'));
+  const all = sim.events.filter(e => e.a || e.round || e.k === 'pre');
+  const keep = (e) => tab === 'all' || (tab === 'party' ? mine.has(e.a) : tab === 'enemy' ? !mine.has(e.a) : (e.skill || e.k === 'open' || e.k === 'pre'));
   const list = all.filter(e => e.round || keep(e)).filter((e, i, arr) => !e.round || (arr[i + 1] && !arr[i + 1].round));
-  const acts = all.filter(e => !e.round).length;
+  const acts = all.filter(e => !e.round && e.k !== 'pre').length;
   const win = sim.result === 'win';
   return (
     <MainModal full kicker="BATTLE LOG" title="전투 기록" badge={win ? '승리' : '패배'} color={win ? MS.red : '#e06a5f'} sub={`${label} · ${sim.rounds || 1}라운드 · 사건 ${acts}개`} onClose={onClose}>
@@ -270,7 +270,31 @@ function FullBattleLog({ sim, party, unitOf, label, onClose }) {
   );
 }
 const LOG_C = { dmg: '#ff8a80', crit: '#ffb347', heal: '#8fe08a', shield: '#9cc4e4', buff: '#e8c48a', debuff: '#c08ae8', miss: '#9a9a9a', holy: '#ffe9a8', skill: '#e8b04a' };
+const ROLE_KO = { tank: '수호', healer: '치유', dps: '맹공', boss: '보스' };
+const PRE_TONE = { shield: '#9cc4e4', buff: '#e8c48a', foe: '#ff8a80' };
 function BattleLogLine({ e, latest, unitOf }) {
+  // 전투 시작 연출 (1.259.0) — 전투 돌입 · 전투 전 효과
+  if (e.k === 'pre' && e.pre === 'enter') {
+    const cnt = {}; (e.roles || []).forEach(r => { cnt[r] = (cnt[r] || 0) + 1; });
+    const roles = Object.entries(cnt).map(([r, n]) => `${ROLE_KO[r] || r} ${n}`).join(' · ');
+    return (
+      <div className="text-center" style={{ padding: '2px 0' }}>
+        <div style={{ fontSize: 11.5, letterSpacing: 4, color: MS.gold, fontWeight: 700 }}>◆ 전투 돌입 ◆</div>
+        <div style={{ fontSize: 11, color: PALETTE.textDim }}>적 {e.foes}마리{roles ? ` (${roles})` : ''}</div>
+        {e.fx > 0 && <div className="flex items-center gap-2 mt-1" style={{ fontSize: 10.5, color: MS.gold }}><span className="flex-1" style={{ height: 1, background: 'var(--ui-line)' }} />전투 전 효과<span className="flex-1" style={{ height: 1, background: 'var(--ui-line)' }} /></div>}
+      </div>
+    );
+  }
+  if (e.k === 'pre' && e.pre === 'fx') {
+    const u = e.a ? unitOf(e.a) : null;
+    const nc = !u ? '#ff8a80' : u.side === 'enemy' ? '#ff7a5c' : u.fam ? '#c79bff' : chronicleClass(u.classId).color;
+    return (
+      <div className="flex gap-1.5" style={{ fontSize: 12, lineHeight: 1.5 }}>
+        <span className="flex-none" style={{ width: 16, textAlign: 'center' }}>{e.icon}</span>
+        <span>{u ? <b style={{ color: nc, fontWeight: 600 }}>{u.fam ? '🐾' : ''}{u.name} </b> : <b style={{ color: nc, fontWeight: 600 }}>적 전체 </b>}<b style={{ color: PRE_TONE[e.tone] || PALETTE.text }}>{e.n}</b> <span style={{ color: PALETTE.textDim }}>— {e.v}</span></span>
+      </div>
+    );
+  }
   if (e.round) {
     return <div className="flex items-center gap-2 my-0.5" style={{ fontSize: 10.5, color: PALETTE.textDim }}><span className="flex-1" style={{ height: 1, background: 'var(--ui-line)' }} />{e.round}라운드<span className="flex-1" style={{ height: 1, background: 'var(--ui-line)' }} /></div>;
   }
@@ -299,9 +323,9 @@ function BattleLogLine({ e, latest, unitOf }) {
     return null;
   };
   return (
-    <div className={latest ? 'chr-log-in' : ''} style={{ fontSize: 12, lineHeight: 1.5, padding: latest ? '3px 6px' : '0 6px', borderRadius: 8, background: latest ? 'rgba(232,176,74,0.10)' : 'transparent', borderLeft: `2px solid ${latest ? actColor : 'transparent'}`, color: PALETTE.textDim, opacity: latest ? 1 : 0.85 }}>
+    <div className={latest ? 'chr-log-in' : ''} style={{ fontSize: 12, lineHeight: 1.5, padding: latest || e.k === 'open' ? '3px 6px' : '0 6px', borderRadius: 8, background: e.k === 'open' ? 'linear-gradient(90deg, #5a1a0a99, transparent)' : latest ? 'rgba(232,176,74,0.10)' : 'transparent', borderLeft: `2px solid ${e.k === 'open' ? '#ff7a3a' : latest ? actColor : 'transparent'}`, color: PALETTE.textDim, opacity: latest || e.k === 'open' ? 1 : 0.85 }}>
       <span style={{ color: actColor }}>{icon} </span>
-      {e.k === 'dotTick' ? <><N id={e.a} /> <span style={{ color: LOG_C.debuff }}>지속 피해{e.dotSrc && Object.keys(e.dotSrc).length ? ` (${[...new Set(Object.keys(e.dotSrc).map(k => k.split('|')[1]))].join('·')})` : ''}</span></> : <><N id={e.a} /> <span style={{ color: actColor, fontWeight: e.skill ? 700 : 400 }}>{e.n}</span></>}
+      {e.k === 'dotTick' ? <><N id={e.a} /> <span style={{ color: LOG_C.debuff }}>지속 피해{e.dotSrc && Object.keys(e.dotSrc).length ? ` (${[...new Set(Object.keys(e.dotSrc).map(k => k.split('|')[1]))].join('·')})` : ''}</span></> : <><N id={e.a} /> <span style={{ color: e.k === 'open' ? '#ff9a5a' : actColor, fontWeight: e.skill || e.k === 'open' ? 700 : 400 }}>{e.n}</span></>}
       {(e.hits || []).map(chip)}
     </div>
   );
@@ -320,11 +344,14 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
   // ×4는 이용권이 있을 때만 (1.213.0) — 만료되면 ×2로
   const speed = speedPref === 4 && boostLeft <= 0 ? 2 : speedPref;
   const done = idx >= sim.events.length;
+  const brief = repeat || autoProg || towerAuto || dungeonAuto || speed >= 4; // 연출 짧게
   useEffect(() => { if (done) onReplayDone?.(); }, [done]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (done) return undefined;
     const ev = sim.events[idx];
-    const base = ev.round ? 160 : ev.k === 'dotTick' ? 380 : 620;
+    // 1.259.0 — 전투 시작 연출: 돌입 · 낙인 · 1라운드는 길게 (반복·자동·×4에선 짧게)
+    const base = !brief && ev.k === 'pre' && ev.pre === 'enter' ? 1300 : !brief && ev.k === 'pre' ? 560 : !brief && ev.k === 'open' ? 1500 : !brief && ev.round === 1 ? 900
+      : ev.k === 'pre' ? 160 : ev.round ? 160 : ev.k === 'dotTick' ? 380 : 620;
     const t = setTimeout(() => setIdx(i => i + 1), base / speed);
     return () => clearTimeout(t);
   }, [idx, speed, done, sim.events]);
@@ -363,11 +390,11 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
   const unitOf = (id) => [...party, ...enemies].find(u => u.id === id);
   const curHits = cur && cur.a ? cur.hits || [] : [];
   const hitFor = (id) => curHits.filter(h => h.t === id);
-  const round = (() => { for (let i = Math.min(idx, sim.events.length - 1); i >= 0; i--) if (sim.events[i].round) return sim.events[i].round; return 1; })();
+  const round = (() => { for (let i = Math.min(idx, sim.events.length - 1); i >= 0; i--) if (sim.events[i].round) return sim.events[i].round; return 0; })();
   const isBoss = ctx.type === 'boss' || ctx.type === 'dungeonBoss';
   const bg = isBoss ? chronicleEnemyArt(enemies[0].key, 'intro') : null;
   // 로그 (1.227.0) — 지금까지의 사건 전부, 최신이 아래. 자동 스크롤
-  const logEvents = sim.events.slice(Math.max(0, idx + 1 - 80), idx + 1).filter(e => e.a || e.round);
+  const logEvents = sim.events.slice(Math.max(0, idx + 1 - 80), idx + 1).filter(e => e.a || e.round || e.k === 'pre');
   const logRef = useRef(null);
   const [logFull, setLogFull] = useState(false);
   useEffect(() => { const el = logRef.current; if (el) el.scrollTop = el.scrollHeight; }, [idx]);
@@ -385,6 +412,7 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
     if (hs.some(h => h.d > 0)) return 'arc-shake';
     if (hs.some(h => h.h)) return 'chr-fx-heal';
     if (hs.some(h => h.s)) return 'chr-fx-shield';
+    if (hs.some(h => h.burn)) return 'chr-fx-burn';
     return '';
   };
   const cardH = enemies.length > 3 || party.length > 3 ? 118 : 150;
@@ -394,7 +422,7 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
     <div className="absolute inset-0 flex flex-col" style={{ background: PALETTE.bg }}>
       {bg && <img src={bg} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ opacity: 0.18 }} onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
       <div className="relative flex items-center gap-2 px-3 pt-2 flex-none" style={{ minHeight: 44 }}>
-        <span style={{ fontSize: 12, color: PALETTE.textDim }}>{ctx.label} · {round}라운드{enemies[0]?.rebirthTier ? <span style={{ color: '#ff6ad5' }}> · ✦전승 {enemies[0].rebirthTier}단계</span> : null}{enemies[0]?.mech && BOSS_MECHS[enemies[0].mech] ? <span style={{ color: PALETTE.legendary }}> · {BOSS_MECHS[enemies[0].mech].icon}{BOSS_MECHS[enemies[0].mech].name}</span> : null}{maxIntim ? <span style={{ color: '#ff7a6a' }}> · {maxIntim >= 4 ? '☠절대 위압' : `☗위압 ${maxIntim}단계`}</span> : null}</span>
+        <span style={{ fontSize: 12, color: PALETTE.textDim }}>{ctx.label} · {round ? `${round}라운드` : '전투 준비'}{enemies[0]?.rebirthTier ? <span style={{ color: '#ff6ad5' }}> · ✦전승 {enemies[0].rebirthTier}단계</span> : null}{enemies[0]?.mech && BOSS_MECHS[enemies[0].mech] ? <span style={{ color: PALETTE.legendary }}> · {BOSS_MECHS[enemies[0].mech].icon}{BOSS_MECHS[enemies[0].mech].name}</span> : null}{maxIntim ? <span style={{ color: '#ff7a6a' }}> · {maxIntim >= 4 ? '☠절대 위압' : `☗위압 ${maxIntim}단계`}</span> : null}</span>
         <div className="flex-1" />
         {SPEEDS.map(s => {
           const locked = s === 4 && boostLeft <= 0;
@@ -431,6 +459,27 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
           </div>
         );
       })()}
+
+      {/* 전투 시작 연출 (1.259.0, 시안 ㊹) — 돌입 배너 · 이프리트의 낙인 컷인 · 1라운드 배너 */}
+      {!brief && !done && cur && (cur.k === 'pre' && cur.pre === 'enter' ? (
+        <div key={`ov-${idx}`} className="chr-banner absolute inset-0 flex flex-col items-center justify-center pointer-events-none" style={{ zIndex: 6, background: 'radial-gradient(ellipse at center, #000c 0%, #0008 60%, transparent 100%)' }}>
+          <div style={{ fontSize: 30, fontWeight: 900, letterSpacing: 8, color: '#ffe3a0', textShadow: '0 0 18px #e8b04a, 0 2px 4px #000', fontFamily: FONT_TITLE }}>전투 돌입</div>
+          <div style={{ height: 2, width: 240, margin: '8px 0', background: 'linear-gradient(90deg, transparent, #e8b04a, transparent)' }} />
+          <div style={{ fontSize: 12.5, color: PALETTE.text, textShadow: '0 1px 3px #000' }}>{ctx.label} · 적 {cur.foes}마리</div>
+        </div>
+      ) : cur.k === 'open' && cur.brand ? (
+        <div key={`ov-${idx}`} className="chr-banner absolute left-0 right-0 text-center pointer-events-none" style={{ zIndex: 6, top: '30%' }}>
+          <div className="absolute left-0 right-0" style={{ top: -6, height: 66, background: 'linear-gradient(90deg, transparent, #3a0a04ee 18%, #3a0a04ee 82%, transparent)', borderTop: '1px solid #ff7a3a88', borderBottom: '1px solid #ff7a3a88' }} />
+          <div className="relative" style={{ fontSize: 24, fontWeight: 900, letterSpacing: 2, color: '#ffb070', textShadow: '0 0 16px #ff5a1a, 0 0 4px #000', fontFamily: FONT_TITLE }}>🔥 이프리트의 낙인</div>
+          <div className="relative" style={{ fontSize: 12, color: '#ffe3c0', textShadow: '0 1px 3px #000' }}>적 전체 · 매 턴 {cur.brand.v.toLocaleString()} 피해 · {cur.brand.turns}턴</div>
+        </div>
+      ) : cur.round === 1 ? (
+        <div key={`ov-${idx}`} className="chr-banner absolute left-0 right-0 text-center pointer-events-none" style={{ zIndex: 6, top: '30%' }}>
+          <div className="absolute left-0 right-0" style={{ top: -6, height: 60, background: 'linear-gradient(90deg, transparent, #1a0e04ee 18%, #1a0e04ee 82%, transparent)', borderTop: '1px solid #e8b04a88', borderBottom: '1px solid #e8b04a88' }} />
+          <div className="relative" style={{ fontSize: 22, fontWeight: 900, letterSpacing: 4, color: '#ffe3a0', textShadow: '0 0 14px #e8b04a', fontFamily: FONT_TITLE }}>⚔ 1라운드</div>
+          <div className="relative" style={{ fontSize: 12, color: PALETTE.text }}>턴 시작</div>
+        </div>
+      ) : null)}
 
       {/* 전투 로그 — 적과 아군 사이 전체 */}
       <div className="relative flex-1 min-h-0 mx-3 my-2 flex flex-col" style={{ borderRadius: 12, background: 'rgba(0,0,0,0.38)', border: '1px solid var(--ui-line)' }}>
@@ -3174,7 +3223,7 @@ const DETAIL_DESC = {
   skillDmg: '스킬로 주는 피해가 이만큼 늘어난다.', dotDmg: '화상·출혈 같은 지속 피해가 이만큼 늘어난다.', regenPct: '매 턴 최대 HP의 이 비율만큼 회복한다.',
   cdr: '모든 스킬의 재사용 대기를 줄인다. 스킬별 단축과 합쳐 최대 2턴.', rageDouble: '광폭화가 켜진 동안 모든 공격이 2번 들어간다.',
   rageTurnsAdd: '광폭화가 이 턴만큼 더 오래 유지된다 (광기의 낙인).', rageLifesteal: '광폭화가 켜진 동안 흡혈량이 2배가 된다 (광기의 낙인).',
-  openInferno: '전투 시작 순간 적 전체에 거는 화상. 스킬 「겁화」와 별개로, 턴을 쓰지 않고 쿨타임과도 무관하다. 피해 = 매 턴 공격력 × 이 비율 × (1 + 지속 피해 %) · 3턴(지속 시간 배율 적용). 출처: 이프리트의 계약서 60% + 특성 「선제 화염」 1점당 4%.',
+  openInferno: '전투 시작 순간 적 전체에 거는 화상. 스킬 「겁화」와 별개로, 턴을 쓰지 않고 쿨타임과도 무관하다. 피해 = 매 턴 공격력 × 이 비율 × (1 + 지속 피해 %) · 3턴(지속 시간 배율 적용). 출처: 이프리트의 계약서 60% + 특성 「낙인의 불씨」 1점당 4%.',
   expPct: '전투 경험치가 이만큼 늘어난다.', goldPct: '전투 골드가 이만큼 늘어난다.', dropPct: '장비가 떨어질 확률이 이만큼 늘어난다.',
 };
 const DETAIL_GREEN = ['regenPct', 'dodgeHeal', 'emergencyHeal', 'revive', 'guts', 'lifesteal', 'rageLifesteal', 'overhealShield', 'blessMult', 'blessTurns'];

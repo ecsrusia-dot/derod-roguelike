@@ -14,7 +14,7 @@ export const PREVIEW = { battles: 200, gapMs: 1800 };
 // 전투 1회 재생 시간 — BattleView 재생 공식 ÷ 배속 + 다음 전투 대기 1.8초 (분당 효율 계산용)
 export function battlePlayMs(sim, speed = 1) {
   let ms = 0;
-  for (const ev of sim.events) ms += ev.round ? 160 : ev.k === 'dotTick' ? 380 : 620;
+  for (const ev of sim.events) ms += ev.round || ev.k === 'pre' ? 160 : ev.k === 'dotTick' ? 380 : 620;
   return Math.round(ms / speed) + PREVIEW.gapMs;
 }
 
