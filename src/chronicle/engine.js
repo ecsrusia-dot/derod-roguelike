@@ -676,6 +676,26 @@ export function forgeEnhance(save0, uid, rng = Math.random) {
   if (r.drop) { it.plus = Math.max(0, (it.plus || 0) - 1); return { save, result: 'down' }; }
   return { save, result: 'fail' };
 }
+// 1.266.3 연속 강화 — 하락 위험이 없는 구간(+enhanceDropFrom 미만)만, 목표 또는 재료 부족까지 반복
+export const SAFE_ENHANCE_MAX = FORGE.enhanceDropFrom;
+export function forgeEnhanceTo(save0, uid, target, rng = Math.random) {
+  const goal = Math.min(target, SAFE_ENHANCE_MAX);
+  const it0 = save0.inventory.find(i => i.uid === uid);
+  const from = it0?.plus || 0;
+  let save = save0, tries = 0, gold = 0, essence = 0, fails = 0;
+  for (let guard = 0; guard < 200; guard++) {
+    const it = save.inventory.find(i => i.uid === uid);
+    if (!it || (it.plus || 0) >= goal) break;
+    if (!canEnhance(save, it)) break;
+    const c = enhanceCost(it);
+    const r = forgeEnhance(save, uid, rng);
+    if (!r.result) break;
+    save = r.save; tries++; gold += c.gold; essence += c.essence;
+    if (r.result !== 'success') fails++;
+  }
+  const to = save.inventory.find(i => i.uid === uid)?.plus || 0;
+  return { save, tries, fails, from, to, gold, essence, reached: to >= goal };
+}
 export function enhanceItem(save0, uid, rng = Math.random) { return forgeEnhance(save0, uid, rng).save; }
 export function nextGrade(item) {
   if (item.grade === 'unique') return null; // 유니크는 승급 불가
