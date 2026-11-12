@@ -4136,6 +4136,42 @@ const IDLE_MOTION = {
 };
 const IDLE_KIND_LABEL = { repeat: '반복 사냥 중', prog: '자동 진행 중', tower: '자동 등반 중', dungeon: '연속 도전 중' };
 const IDLE_DELAYS = [[30, '30초'], [60, '1분'], [180, '3분'], [0, '끄기']];
+// 대기화면 경험치 (1.272.1, PM 승인 시안 C) — 대기화면이 열린 뒤 얻은 경험치를 레벨을 넘어서도 누적
+// (렌더 중 ref 갱신 — 같은 값으로 두 번 그려도 차이가 0이라 StrictMode 이중 렌더에 안전)
+function useIdleXp(x, needAt) {
+  const ref = useRef({ prev: x, gain: 0, upAt: 0, upLv: 0 });
+  const r = ref.current;
+  if (x && r.prev && (x.key || '') !== (r.prev.key || '')) { r.gain = 0; r.upAt = 0; } // 동행 사역마가 바뀜
+  else if (x && r.prev && (x.lv !== r.prev.lv || x.exp !== r.prev.exp)) {
+    let g = 0;
+    if (x.lv === r.prev.lv) g = x.exp - r.prev.exp;
+    else if (x.lv > r.prev.lv) {
+      g = needAt(r.prev.lv) - r.prev.exp;
+      for (let L = r.prev.lv + 1; L < x.lv; L++) g += needAt(L);
+      g += x.exp; r.upAt = Date.now(); r.upLv = x.lv;
+    }
+    r.gain += Math.max(0, g);
+  }
+  r.prev = x;
+  return r;
+}
+function IdleXpRow({ name, x, st, now, fam = false }) {
+  if (!x) return null;
+  const pct = xpPct(x);
+  const up = st.upAt && now - st.upAt < 2500;
+  const c = fam ? '#c08ae8' : '#f5cf72';
+  return (
+    <div style={{ marginTop: fam ? 7 : 0 }}>
+      <div className="flex justify-between" style={{ fontSize: 11.5, color: '#d8c8b0', marginBottom: 3 }}>
+        <span className="truncate" style={{ marginRight: 8 }}>{fam ? '🐾 ' : ''}{name} Lv.{x.lv}{up ? <span key={st.upAt} className="chr-idle-lvup" style={{ color: c, fontWeight: 800, marginLeft: 6 }}>✦ LEVEL UP</span> : null}</span>
+        <span style={{ whiteSpace: 'nowrap' }}>{st.gain > 0 ? <b style={{ color: c }}>+{Math.round(st.gain).toLocaleString()}</b> : null}{st.gain > 0 ? ' · ' : ''}{x.cap ? (fam ? '주인공 레벨까지' : '레벨 상한') : `${pct.toFixed(1)}%`}</span>
+      </div>
+      <div key={up ? st.upAt : 'n'} className={up ? 'chr-idle-xpflash' : ''} style={{ height: 5, borderRadius: 3, background: 'rgba(255,255,255,.1)', overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${x.cap ? 100 : pct}%`, background: fam ? XP_FAM : XP_HERO, boxShadow: `0 0 8px ${c}`, transition: 'width .6s ease' }} />
+      </div>
+    </div>
+  );
+}
 function IdleScreen({ save, kind, label, startedAt, wakeOn, delay, onDelay, onExit }) {
   const hero = save.hero; const cls = chronicleClass(hero); const u = save.units[hero];
   const mo = IDLE_MOTION[hero] || IDLE_MOTION.sage;
@@ -4144,6 +4180,9 @@ function IdleScreen({ save, kind, label, startedAt, wakeOn, delay, onDelay, onEx
   const sec = Math.max(0, Math.floor((now - (startedAt || now)) / 1000));
   const el = `${Math.floor(sec / 3600) ? `${Math.floor(sec / 3600)}:` : ''}${String(Math.floor(sec / 60) % 60).padStart(Math.floor(sec / 3600) ? 2 : 1, '0')}:${String(sec % 60).padStart(2, '0')}`;
   const parts = useMemo(() => Array.from({ length: 14 }, (_, i) => ({ x: (i * 37 + 11) % 96 + 2, y: (i * 53 + 7) % 70 + 15, d: 5 + (i % 5) * 1.3, dl: -(i * 0.9) % 7, s: 3 + (i % 3) })), []);
+  const xs = expSnap(save);
+  const heroXp = useIdleXp(xs.hero, (L) => expNeedFor({ ...u, lv: L }));
+  const famXp = useIdleXp(xs.fam, (L) => F.FAM_LEVEL.expNeed(L));
   const wakeTxt = typeof navigator !== 'undefined' && !('wakeLock' in navigator) ? '⚠ 이 브라우저는 화면 유지 미지원 — 화면이 꺼지면 멈춥니다' : wakeOn ? '🔆 화면 꺼짐 방지 켜짐' : '🔅 화면 꺼짐 방지 대기 중';
   return (
     <div className="absolute inset-0 overflow-hidden chr-idle" style={{ zIndex: 60, background: '#070404' }} onClick={onExit}>
@@ -4158,7 +4197,11 @@ function IdleScreen({ save, kind, label, startedAt, wakeOn, delay, onDelay, onEx
         <div style={{ fontSize: 12, letterSpacing: 6, color: PALETTE.legendary, fontWeight: 700 }}>🌙 대기화면</div>
         <div style={{ fontSize: 24, fontWeight: 900, marginTop: 4, color: PALETTE.text }}>{IDLE_KIND_LABEL[kind] || '자동 진행 중'}</div>
         <div style={{ fontSize: 12.5, color: '#d8c8b0', marginTop: 4 }}><span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#8fd08a', boxShadow: '0 0 8px #8fd08a', marginRight: 5 }} />{label ? `${label} · ` : ''}Lv.{u.lv} {cls.name} · 경과 {el}</div>
-        <div style={{ fontSize: 11.5, color: '#b8a890', marginTop: 4 }}>{wakeTxt}</div>
+        <div style={{ margin: '9px 28px 0', textAlign: 'left' }}>
+          <IdleXpRow name={cls.name} x={xs.hero} st={heroXp} now={now} />
+          {xs.fam ? <IdleXpRow name={F.famName(xs.fam.key)} x={xs.fam} st={famXp} now={now} fam /> : null}
+        </div>
+        <div style={{ fontSize: 11.5, color: '#b8a890', marginTop: 7 }}>{wakeTxt}</div>
       </div>
       <div className="absolute flex items-center gap-1.5" style={{ left: 16, right: 16, bottom: 34 }} onClick={(e) => e.stopPropagation()}>
         <span style={{ fontSize: 11.5, color: '#9b8975', whiteSpace: 'nowrap', marginRight: 2 }}>자동 전환</span>
