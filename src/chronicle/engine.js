@@ -6,7 +6,7 @@
 // ============================================
 import { levelCap, globalBuffFx } from './roster.js';
 import { talentFx, canLearnTalent, talentNode, talentResetCost, talentTrees, tierUnlocked } from './talents.js';
-import { BOSS_MECHS, BOSS_MECH_OF, fieldStages, FIELD_STAGES, STAGE_TUNING, BOOST, BAG_EXPAND, SALVAGE, SALVAGE_ICON, REBIRTH, REBIRTH_BRANCHES, expNeedFor } from './data.js';
+import { BOSS_MECHS, BOSS_MECH_OF, fieldStages, FIELD_STAGES, STAGE_TUNING, BOOST, BAG_EXPAND, SALVAGE, SALVAGE_ICON, REBIRTH, REBIRTH_BRANCHES, expNeedFor, OPTION_LV_CURVE } from './data.js';
 import { TOWER, TOWER_SHOP, towerUnlocked, isTowerBoss, towerEnemyLv, towerArea, towerFloorPicks, towerTheme, kstWeekKey } from './tower.js';
 import { famCombatant, famRole, famSubFx, famOwnFx, famBondFx, rollFamShards, rollFamSouls, gainFamExp, FAM_AI, FAM_TUNING, summonFamiliars, enhanceFamiliar, evolveFamiliar } from './familiar.js';
 import {
@@ -169,11 +169,21 @@ export function rollUniqueItem(rng, ilv, heroCls) {
 export function rollItem(rng, grade, ilv, slot = null, set = 'field', heroCls = 'wanderer') {
   return rollGear(rng, grade, ilv, heroCls, set);
 }
+// 강화 누적 보너스 (1.268.0 — 고강화일수록 단계당 상승폭이 커진다)
+export const enhanceBonus = (plus) => FORGE.enhanceBonus[Math.max(0, Math.min(FORGE.maxEnhance, plus || 0))] || 0;
+// 옵션 레벨 배율 (1.268.0 — 저레벨 장비의 옵션이 고레벨 장비를 압도하지 않게)
+export function optionLvMult(ilv) {
+  const C = OPTION_LV_CURVE; const L = ilv || 1;
+  if (L <= C[0][0]) return C[0][1];
+  for (let i = 1; i < C.length; i++) if (L <= C[i][0]) { const [a, x] = C[i - 1]; const [b, y] = C[i]; return +(x + (y - x) * (L - a) / (b - a)).toFixed(4); }
+  const [a, x] = C[C.length - 2]; const [b, y] = C[C.length - 1];
+  return +(y + (y - x) / (b - a) * (L - b)).toFixed(4);
+}
 // 장비가 주는 수치 전부 (기본 능력치 + 옵션) — 고유 효과(fx)는 gearTotals에서 합산
 export function itemStats(item) {
   if (!item) return {};
   const g = GRADES[gradeIdx(item.grade)] || GRADES[0];
-  const gm = g.mult * (1 + FORGE.enhancePct * (item.plus || 0));
+  const gm = g.mult * (1 + enhanceBonus(item.plus));
   const m = gm * (item.roll || 1);
   const L = item.ilv;
   const out = {};
@@ -186,11 +196,11 @@ export function itemStats(item) {
     for (const [k, [a, per]] of Object.entries(b.flat)) add(k, k === 'spd' ? +((a + per * L) * m).toFixed(1) : Math.round((a + per * L) * m));
     for (const [k, v] of Object.entries(b.pct)) add(k, +(v * gm).toFixed(3));
   }
-  const optM = 1 + 0.5 * FORGE.enhancePct * (item.plus || 0);
+  const optM = (1 + 0.5 * enhanceBonus(item.plus)) * optionLvMult(L);
   for (const o0 of item.opts || []) {
     const o = normOpt(item, o0);
     if (o.k === 'scdr') { add(`scdr_${o.sk}`, o.v); continue; }
-    add(o.k, o.k === 'cdr' ? o.v : (OPTION_DEFS[o.k]?.pct ? +(o.v * optM).toFixed(3) : Math.round(o.v * optM)));
+    add(o.k, o.k === 'cdr' ? o.v : (OPTION_DEFS[o.k]?.pct ? +(o.v * optM).toFixed(3) : Math.max(1, Math.round(o.v * optM))));
   }
   return out;
 }
