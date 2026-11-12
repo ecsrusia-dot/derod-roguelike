@@ -835,3 +835,8 @@ body {
 .chr-idle-xpflash { animation: chr-idle-xpflash 1.2s ease-out 2; }
 .chr-idle-lvup { display: inline-block; animation: chr-idle-lvup 2.5s ease-out forwards; }
 @media (prefers-reduced-motion: reduce) { .chr-idle-xpflash, .chr-idle-lvup { animation: none; } }
+
+/* 대기화면 밀어서 해제 (1.273.3) */
+@keyframes chr-idle-slide { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+.chr-idle-slide-txt { animation: chr-idle-slide 2.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .chr-idle-slide-txt { animation: none; } }

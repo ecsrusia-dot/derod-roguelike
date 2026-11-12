@@ -3,6 +3,6 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.273.2';
+export const GAME_VERSION = '1.273.3';
 export const VERSION_DATE = '2026-11-12';
-export const VERSION_LABEL = '📈 레벨 미달 장비 효율';
+export const VERSION_LABEL = '🌙 밀어서 해제';

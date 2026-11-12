@@ -4177,6 +4177,25 @@ function IdleXpRow({ name, x, st, now, fam = false }) {
     </div>
   );
 }
+// 1.273.3 PM 「너무 쉽게 터치된다 → 밀어서 해제」 — 손잡이를 오른쪽 끝(85%)까지 밀어야 전투 화면으로
+function SlideUnlock({ onUnlock, color }) {
+  const trackRef = useRef(null);
+  const drag = useRef(null);
+  const [x, setX] = useState(0);
+  const KNOB = 44;
+  const maxX = () => Math.max(1, (trackRef.current?.clientWidth || 300) - KNOB - 4);
+  const down = (e) => { drag.current = { sx: e.clientX, x0: x }; e.currentTarget.setPointerCapture?.(e.pointerId); };
+  const move = (e) => { if (!drag.current) return; setX(Math.max(0, Math.min(maxX(), drag.current.x0 + e.clientX - drag.current.sx))); };
+  const up = () => { if (!drag.current) return; drag.current = null; if (x >= maxX() * 0.85) { setX(maxX()); onUnlock(); } else setX(0); };
+  const pct = x / maxX();
+  return (
+    <div ref={trackRef} className="absolute" style={{ left: 16, right: 16, bottom: 14, height: KNOB + 4, borderRadius: 26, background: 'rgba(20,10,10,.72)', border: `1px solid ${MS.line}`, touchAction: 'none' }}>
+      <div className="absolute inset-0 flex items-center justify-center" style={{ fontSize: 13, color: '#d8c8b0', letterSpacing: 2, opacity: 1 - pct, pointerEvents: 'none', paddingLeft: 40 }}><span className="chr-idle-slide-txt">밀어서 해제 ▸▸</span></div>
+      <div onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} aria-label="밀어서 해제" role="slider" aria-valuenow={Math.round(pct * 100)}
+        className="absolute flex items-center justify-center" style={{ left: 2 + x, top: 2, width: KNOB, height: KNOB, borderRadius: '50%', background: `radial-gradient(circle at 40% 35%, #fff, ${color})`, boxShadow: `0 0 14px ${color}`, transition: drag.current ? 'none' : 'left .25s ease', fontSize: 18, color: '#2a1410', cursor: 'grab' }}>🌙</div>
+    </div>
+  );
+}
 function IdleScreen({ save, kind, label, startedAt, wakeOn, delay, onDelay, onExit }) {
   const hero = save.hero; const cls = chronicleClass(hero); const u = save.units[hero];
   const mo = IDLE_MOTION[hero] || IDLE_MOTION.sage;
@@ -4190,7 +4209,7 @@ function IdleScreen({ save, kind, label, startedAt, wakeOn, delay, onDelay, onEx
   const famXp = useIdleXp(xs.fam, (L) => F.FAM_LEVEL.expNeed(L));
   const wakeTxt = typeof navigator !== 'undefined' && !('wakeLock' in navigator) ? '⚠ 이 브라우저는 화면 유지 미지원 — 화면이 꺼지면 멈춥니다' : wakeOn ? '🔆 화면 꺼짐 방지 켜짐' : '🔅 화면 꺼짐 방지 대기 중';
   return (
-    <div className="absolute inset-0 overflow-hidden chr-idle" style={{ zIndex: 60, background: '#070404' }} onClick={onExit}>
+    <div className="absolute inset-0 overflow-hidden chr-idle" style={{ zIndex: 60, background: '#070404' }}>
       <img src={cls.image} alt="" className="absolute inset-0 w-full h-full object-cover chr-idle-breathe" style={{ objectPosition: '50% 18%', filter: 'brightness(.62) saturate(.9)' }} />
       <div className="absolute chr-idle-glow" style={{ left: '50%', top: '45%', width: 320, height: 320, margin: -160, borderRadius: '50%', background: `radial-gradient(circle, ${mo.glow}, transparent 65%)` }} />
       <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(7,4,4,.25) 0%, rgba(7,4,4,0) 20%, rgba(7,4,4,0) 55%, rgba(7,4,4,.82) 76%, rgba(7,4,4,.96) 100%)' }} />
@@ -4198,7 +4217,7 @@ function IdleScreen({ save, kind, label, startedAt, wakeOn, delay, onDelay, onEx
       {parts.map((q, i) => (
         <span key={i} className={`absolute chr-idle-p chr-idle-${mo.kind}`} style={{ left: `${q.x}%`, top: `${q.y}%`, width: mo.kind === 'slash' ? 46 : q.s, height: mo.kind === 'slash' ? 1.5 : q.s, borderRadius: mo.kind === 'slash' ? 1 : '50%', background: mo.p, boxShadow: `0 0 8px ${mo.p}`, animationDuration: `${q.d}s`, animationDelay: `${q.dl}s` }} />
       ))}
-      <div className="absolute left-0 right-0 text-center" style={{ bottom: 92 }}>
+      <div className="absolute left-0 right-0 text-center" style={{ bottom: 116 }}>
         <div style={{ fontSize: 12, letterSpacing: 6, color: PALETTE.legendary, fontWeight: 700 }}>🌙 대기화면</div>
         <div style={{ fontSize: 24, fontWeight: 900, marginTop: 4, color: PALETTE.text }}>{IDLE_KIND_LABEL[kind] || '자동 진행 중'}</div>
         <div style={{ fontSize: 12.5, color: '#d8c8b0', marginTop: 4 }}><span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#8fd08a', boxShadow: '0 0 8px #8fd08a', marginRight: 5 }} />{label ? `${label} · ` : ''}Lv.{u.lv} {cls.name} · 경과 {el}</div>
@@ -4208,11 +4227,11 @@ function IdleScreen({ save, kind, label, startedAt, wakeOn, delay, onDelay, onEx
         </div>
         <div style={{ fontSize: 11.5, color: '#b8a890', marginTop: 7 }}>{wakeTxt}</div>
       </div>
-      <div className="absolute flex items-center gap-1.5" style={{ left: 16, right: 16, bottom: 34 }} onClick={(e) => e.stopPropagation()}>
+      <div className="absolute flex items-center gap-1.5" style={{ left: 16, right: 16, bottom: 72 }}>
         <span style={{ fontSize: 11.5, color: '#9b8975', whiteSpace: 'nowrap', marginRight: 2 }}>자동 전환</span>
         {IDLE_DELAYS.map(([v, l]) => <button key={v} onClick={() => onDelay(v)} className="ui-press flex-1" style={{ height: 30, fontSize: 12, border: `1px solid ${delay === v ? MS.gold : MS.line}`, color: delay === v ? MS.gold : '#9b8975', background: delay === v ? 'rgba(232,176,74,.12)' : 'rgba(20,10,10,.6)' }}>{l}</button>)}
       </div>
-      <div className="absolute left-0 right-0 text-center" style={{ bottom: 12, fontSize: 11, color: '#7d6c5a' }}>누르면 전투 화면으로</div>
+      <SlideUnlock onUnlock={onExit} color={mo.p} />
     </div>
   );
 }
