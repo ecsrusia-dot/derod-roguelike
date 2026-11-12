@@ -86,7 +86,7 @@ function run(classId, seed) {
   return { log, battles, lv: save.units[classId].lv, wr, hpLoss: avg(hpLoss), summons: save.famPity?.total || 0, famCount: fams.length, best, mainFam: save.famTeam?.main && save.fams[save.famTeam.main] };
 }
 
-for (const c of CHRONICLE_CLASSES) {
+for (const c of CHRONICLE_CLASSES.filter(x => !process.env.CLS || process.env.CLS.split(",").includes(x.id))) {
   const rs = []; for (let i = 0; i < N; i++) rs.push(run(c.id, i * 97 + 3));
   const med = (f) => { const v = rs.map(f).filter(x => x != null).sort((a, b) => a - b); return v.length ? v[Math.floor(v.length / 2)] : '-'; };
   const rate = (t) => { const w = rs.reduce((s, r) => s + r.wr[t][0], 0); const n = rs.reduce((s, r) => s + r.wr[t][1], 0); return n ? Math.round(w / n * 100) + '%' : '-'; };

@@ -1402,11 +1402,14 @@ function PartyView({ save, setSave, onBack, onForge }) {
               <button key={k} onClick={() => setStatPick(k)} className="ui-press text-center" style={{ padding: '7px 0', borderRadius: 12, border: `1.5px solid ${k === cls.main ? MS.gold : MS.line}`, background: MS.box }}>
                 <div style={{ fontSize: 12, color: PALETTE.textDim }}>{STAT_META[k].label}</div>
                 <div className="font-bold" style={{ fontSize: 20, color: k === cls.main ? MS.gold : PALETTE.text, lineHeight: 1.2 }}>{u.stats[k]}</div>
+                {u.stats[k] > E.statSoftCap(u) && <div style={{ fontSize: 10.5, color: '#e07a6a' }}>효율 감소</div>}
               </button>
             ))}
           </div>
           <div className="text-center mt-1.5" style={{ fontSize: 11.5, color: PALETTE.textDim }}>능력치를 누르면 효과와 포인트 배분 · 남은 포인트 <b style={{ color: u.points ? MS.gold : PALETTE.textDim }}>{u.points}</b></div>
-          {u.points > 0 && <button onClick={() => setSave(E.autoAllocate(save, cid))} className="ui-press w-full mt-2" style={{ height: 36, borderRadius: 10, border: `1px dashed ${MS.gold}`, color: MS.gold, background: 'transparent', fontSize: 12.5 }}>추천 배분 ({cls.role} 기준) — {u.points}포인트</button>}
+          <div className="text-center" style={{ fontSize: 11, color: PALETTE.textDim }}>한 능력치가 <b style={{ color: PALETTE.text }}>{E.statSoftCap(u)}</b>(레벨 × 1.5)을 넘으면 넘친 몫은 효과 30% — 여러 능력치에 나눠 찍는 게 유리</div>
+          {E.canResetStats(save, cid) && <button onClick={() => setSave(E.resetStats(save, cid))} className="ui-press w-full mt-2" style={{ height: 34, borderRadius: 10, border: `1px solid ${MS.line}`, color: PALETTE.text, background: 'transparent', fontSize: 12.5 }}>↺ 능력치 재분배 — {E.statResetCost(u) ? `🪙${E.statResetCost(u).toLocaleString()}` : '첫 1회 무료'}</button>}
+          {u.points > 0 && <button onClick={() => setSave(E.autoAllocate(save, cid))} className="ui-press w-full mt-2" style={{ height: 36, borderRadius: 10, border: `1px dashed ${MS.gold}`, color: MS.gold, background: 'transparent', fontSize: 12.5 }}>추천 배분 ({Object.entries(cls.auto || {}).map(([k, v]) => `${STAT_META[k].label} ${v}`).join(' : ')}) — {u.points}포인트</button>}
 
           <MainSecHead title="전 투 수 치" />
           <MainKvGrid onPick={setRowInfo} rows={[

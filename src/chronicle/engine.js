@@ -44,13 +44,14 @@ export function autoGrowUnit(u0) {
   const ratio = cls.auto;
   const keys = Object.keys(ratio);
   const sum = keys.reduce((s, k) => s + ratio[k], 0);
-  let i = 0;
+  // 1.270.0 — 지금까지 찍은 양 기준으로 목표 비율에 가장 모자란 능력치부터 1점씩 (레벨마다 4점이어도 비율이 정확히 맞는다)
+  const base = cls.base || {};
   while (u.points > 0) {
-    // 비율대로 순환 배분
-    const k = keys[i % keys.length];
-    const share = Math.max(1, Math.round((ratio[k] / sum) * T.pointsPerLevel));
-    const n = Math.min(share, u.points);
-    u.stats[k] += n; u.points -= n; i++;
+    const spent = (k) => (u.stats[k] || 0) - (base[k] || 0);
+    const total = keys.reduce((t, k) => t + Math.max(0, spent(k)), 0) + 1;
+    let best = keys[0], gap = -Infinity;
+    for (const k of keys) { const g = (ratio[k] / sum) * total - spent(k); if (g > gap) { gap = g; best = k; } }
+    u.stats[best] += 1; u.points -= 1;
   }
   let guard = 0;
   while (u.sp > 0 && guard++ < 50) {
@@ -346,9 +347,20 @@ export function deriveUnit(save, classId) {
   const rb = 1 + REBIRTH.bonusPct * (u.rebirth?.count || 0);
   const G = (k) => g[k] || 0;
   const fx = passiveFx(u);
-  const st = u.stats;
+  // 1.270.0 효율 감소 구간 — 한 능력치가 레벨×softPerLv를 넘으면 넘친 몫은 softMult배 (몰빵 방지)
+  const SK0 = T.stat || {};
+  const softCap = Math.max(SK0.softMin || 0, u.lv * (SK0.softPerLv || 1e9));
+  const effStat = (v) => (v <= softCap ? v : softCap + (v - softCap) * (SK0.softMult ?? 1));
+  const st = { str: effStat(u.stats.str), int: effStat(u.stats.int), agi: effStat(u.stats.agi), vit: effStat(u.stats.vit) };
   const main = cls.main === 'int' ? st.int : cls.main === 'agi' ? st.agi : st.str;
   const mast = 0; // 마스터리 폐지 (1.224.0 — 특성 트리로 환급)
+  // 1.270.0 비주 능력치 보조 효과 — 힘 = 방어 관통 · 지능 = 스킬 피해 (모든 직업 공통)
+  const SK = T.stat || { strPen: 0, intSkill: 0, agiCrit: 0.004, agiDodge: 0.002, critOverflow: 0 };
+  g.armorPen = (g.armorPen || 0) + st.str * SK.strPen;
+  g.skillDmg = (g.skillDmg || 0) + st.int * SK.intSkill;
+  g.dmgReduce = (g.dmgReduce || 0) + st.str * (SK.strReduce || 0);
+  g.chain = (g.chain || 0) + st.agi * (SK.agiChain || 0);
+  const critRaw = 0.05 + st.agi * SK.agiCrit + (fx.critAdd || 0) + G('crit');
   const atk = (main * 2.2 + u.lv * 1.5 + G('atk')) * (1 + (fx.atkPct || 0) + G('atkPct') + mast) * rb;
   const out = {
     id: classId, classId, name: cls.name, side: 'party', lv: u.lv, magic: cls.magic,
@@ -357,9 +369,9 @@ export function deriveUnit(save, classId) {
     healPower: Math.round(Math.max(st.int * 2.2 + u.lv * 1.5 + G('atk') * 0.5, atk * G('healFromAtk')) * (1 + G('healPct'))),
     def: Math.round((st.vit * 0.8 + G('def')) * (1 + (fx.defPct || 0) + G('defPct'))),
     spd: +((8 + st.agi * 0.6 + G('spd')) * (1 + G('spdPct'))).toFixed(1),
-    crit: Math.min(0.6, 0.05 + st.agi * 0.004 + (fx.critAdd || 0) + G('crit')),
-    critMult: T.critMult + G('critDmg'),
-    dodge: Math.min(0.35, st.agi * 0.002 + (fx.dodgeAdd || 0) + G('dodge')),
+    crit: Math.min(0.6, critRaw),
+    critMult: T.critMult + G('critDmg') + Math.max(0, critRaw - 0.6) * (SK.critOverflow || 0), // 상한 초과분 → 치명 피해 (1.270.0)
+    dodge: Math.min(0.35, st.agi * SK.agiDodge + (fx.dodgeAdd || 0) + G('dodge')),
     counterPct: (fx.counterPct || 0) + G('counterPct'),
     lowHpDmg: (fx.lowHpDmg || 0) + G('lowHpDmg'),
     lifesteal: Math.min(T.lifestealCap || 1, G('lifesteal')), thornsPct: G('thornsPct'), armorPen: Math.min(0.8, G('armorPen')),
@@ -398,6 +410,29 @@ export function addStat(save0, classId, key, n = 1) {
   u.stats[key] += n; u.points -= n;
   return save;
 }
+// 능력치 재분배 (1.270.0) — 찍은 포인트를 전부 돌려받는다. 캐릭터당 첫 1회 무료, 이후 골드 (레벨 × statResetGold)
+export function statResetCost(u) { return u?.statResetUsed ? Math.round((u.lv || 1) * (T.statResetGold || 300)) : 0; }
+export function canResetStats(save, classId) {
+  const u = save.units[classId];
+  if (!u) return false;
+  const base = chronicleClass(classId).base || {};
+  const spent = STAT_KEYS.reduce((t, k) => t + Math.max(0, (u.stats[k] || 0) - (base[k] || 0)), 0);
+  return spent > 0 && save.gold >= statResetCost(u);
+}
+export function resetStats(save0, classId) {
+  if (!canResetStats(save0, classId)) return save0;
+  const save = clone(save0);
+  const u = save.units[classId];
+  const base = chronicleClass(classId).base || {};
+  const cost = statResetCost(u);
+  let back = 0;
+  for (const k of STAT_KEYS) { const extra = Math.max(0, (u.stats[k] || 0) - (base[k] || 0)); back += extra; u.stats[k] -= extra; }
+  u.points = (u.points || 0) + back; u.statResetUsed = true;
+  save.gold -= cost;
+  return save;
+}
+// 효율 감소 기준 (1.270.0) — 이 값을 넘는 능력치는 1점당 효과가 줄어든다
+export function statSoftCap(u) { const S = T.stat || {}; return Math.round(Math.max(S.softMin || 0, (u?.lv || 1) * (S.softPerLv || 1e9))); }
 export function autoAllocate(save0, classId) {
   const save = clone(save0);
   const u = save.units[classId];
