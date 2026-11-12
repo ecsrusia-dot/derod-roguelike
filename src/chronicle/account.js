@@ -9,7 +9,9 @@
 import { DUNGEON_KEYS, CLASS_SLOTS, CHRONICLE_TUNING as T } from './data.js';
 import * as E from './engine.js';
 import { ensureQuestFields } from './quest.js';
-import { buildRoster, peakOf } from './roster.js';
+import { buildRoster, peakOf, claimAllRosterQuests, rosterQuestBadge } from './roster.js';
+import { claimAllQuests, acceptAllQuests, questList } from './quest.js';
+import { claimAllMissions, dailyBadge, weeklyBadge } from './daily.js';
 
 const clone = (o) => (typeof structuredClone === 'function' ? structuredClone(o) : JSON.parse(JSON.stringify(o)));
 
@@ -92,6 +94,35 @@ export function raidParty(acc) {
     const d = E.deriveUnit(v, cid);
     return { ...d, hp: d.maxHp };
   });
+}
+
+// 받을 보상 수 (1.275.0) — 의뢰 · 일일 · 주간 · 원정대 의뢰 (현재 캐릭터 기준)
+export function pendingRewards(acc) {
+  const v = toView(acc);
+  if (!v) return { quests: 0, missions: 0, roster: 0, total: 0 };
+  const quests = questList(v).filter(x => x.status === 'done').length;
+  const missions = dailyBadge(acc) + weeklyBadge(acc);
+  const roster = rosterQuestBadge(v);
+  return { quests, missions, roster, total: quests + missions + roster };
+}
+// 보상 한 번에 받기 (1.275.0) → { acc, quests, missions, roster, total, items }
+export function claimEverything(acc0, rng = Math.random) {
+  const m = claimAllMissions(acc0);
+  const v = toView(m.acc);
+  if (!v) return { acc: acc0, quests: 0, missions: 0, roster: 0, total: 0, items: [] };
+  const q = claimAllQuests(v, rng);
+  const r = claimAllRosterQuests(q.save);
+  const total = m.n + q.n + r.n;
+  return { acc: total ? fromView(m.acc, r.save) : acc0, quests: q.n, missions: m.n, roster: r.n, total, items: q.items };
+}
+// 의뢰 자동 수락 (1.275.0) — 계정 설정 autoAccept (없으면 켬) → { acc, n }
+export const autoAcceptOn = (acc) => acc?.autoAccept !== false;
+export function autoAcceptQuests(acc) {
+  if (!autoAcceptOn(acc)) return { acc, n: 0 };
+  const v = toView(acc);
+  if (!v) return { acc, n: 0 };
+  const r = acceptAllQuests(v);
+  return r.n ? { acc: fromView(acc, r.save), n: r.n } : { acc, n: 0 };
 }
 
 export function charSummary(acc, classId) {

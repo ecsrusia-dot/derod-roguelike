@@ -823,6 +823,7 @@ function RosterView({ save, setSave, flash, onBack, onSwitchChar, onRaid }) {
 
         <div className="flex items-center justify-between" style={{ margin: '14px 0 7px' }}>
           <span style={{ fontSize: 12.5, letterSpacing: 4, color: MS.red, fontWeight: 700 }}>◆ 원정대 의뢰</span>
+          {qs.some(x => x.st.status === 'done') && <button onClick={() => { const r = R.claimAllRosterQuests(save); if (r.n) { setSave(r.save); flash(`원정대 의뢰 보상 ${r.n}건 수령`); } }} className="ui-press" style={{ fontSize: 12, padding: '3px 11px', fontWeight: 800, border: `1px solid ${MS.red}`, background: 'rgba(224,87,76,0.22)', color: '#ff8a7e' }}>모두 받기 {qs.filter(x => x.st.status === 'done').length}</button>}
           <span style={{ fontSize: 11.5, color: PALETTE.textDim }}>받기 {qs.filter(x => x.st.status === 'done').length} · 진행 {qs.filter(x => x.st.status === 'progress').length} · 완료 {qs.filter(x => x.st.status === 'claimed').length}</span>
         </div>
         <div className="grid gap-1.5" style={{ gridTemplateColumns: '1fr 1fr' }}>
@@ -867,7 +868,8 @@ function RosterView({ save, setSave, flash, onBack, onSwitchChar, onRaid }) {
 }
 
 // ===== 마을 =====
-function TownView({ save, acc, go, onExit, onSwitchChar }) {
+function TownView({ save, acc, go, onExit, onSwitchChar, onClaimAll }) {
+  const pend = A.pendingRewards(acc);
   const hero = save.units[save.hero];
   const alertParty = hero.points > 0 || hero.sp > 0;
   const cls = chronicleClass(save.hero);
@@ -950,7 +952,9 @@ function TownView({ save, acc, go, onExit, onSwitchChar }) {
         </div>
         <div className="flex items-center justify-between" style={{ margin: '14px 0 7px' }}>
           <span style={{ fontSize: 12.5, letterSpacing: 4, color: MS.red, fontWeight: 700 }}>◆ 지금 할 일</span>
-          <span style={{ fontSize: 11.5, color: PALETTE.textDim }}>{todos.length}</span>
+          {pend.total > 0
+            ? <button onClick={onClaimAll} className="ui-press" style={{ fontSize: 12, padding: '4px 11px', fontWeight: 800, border: `1px solid ${MS.red}`, background: 'rgba(224,87,76,0.22)', color: '#ff8a7e' }}>🎁 보상 한 번에 받기 {pend.total}</button>
+            : <span style={{ fontSize: 11.5, color: PALETTE.textDim }}>{todos.length}</span>}
         </div>
         {todos.length ? todos.map((d, i) => (
           <button key={i} onClick={() => go(d.id)} className="ui-press w-full flex items-center gap-2 text-left" style={{ minHeight: 40, padding: '8px 10px', marginTop: i ? 5 : 0, background: MS.box, border: `1px solid ${MS.line}` }}>
@@ -3274,7 +3278,7 @@ function QuestCard({ save, item, onAccept, onClaim, onAbandon }) {
     </div>
   );
 }
-function QuestView({ save, setSave, onBack, flash, onReplay }) {
+function QuestView({ save, setSave, onBack, flash, onReplay, autoAccept, onAutoAccept }) {
   const [tab, setTab] = useState('board');
   const list = Q.questList(save);
   const mainFirst = (a, b) => (a.q.kind === 'main' ? -1 : 0) - (b.q.kind === 'main' ? -1 : 0);
@@ -3325,8 +3329,11 @@ function QuestView({ save, setSave, onBack, flash, onReplay }) {
           {done.length > 0 && <>{sec('보상 받기', done.length, bulk(`전체 받기 ${done.length}`, claimAll, true))}{done.map(card)}</>}
           {sec('진행 중', active.length)}
           {active.length ? active.map(card) : <div style={{ fontSize: 12, color: PALETTE.textDim }}>수락한 의뢰가 없다</div>}
-          {sec('받을 수 있는 의뢰', avail.length, avail.length > 0 ? bulk(`전체 수락 ${avail.length}`, acceptAll) : null)}
-          {avail.length ? avail.map(card) : <div style={{ fontSize: 12, color: PALETTE.textDim }}>지금 받을 수 있는 의뢰가 없다 — 새 지역을 열면 의뢰가 붙는다</div>}
+          {sec('받을 수 있는 의뢰', avail.length, <span className="flex items-center gap-1.5">
+            <button onClick={() => onAutoAccept(!autoAccept)} className="ui-press" aria-pressed={autoAccept} style={{ fontSize: 12, padding: '3px 10px', border: `1px solid ${autoAccept ? MS.gold : MS.line}`, background: autoAccept ? 'rgba(232,176,74,0.12)' : 'transparent', color: autoAccept ? MS.gold : PALETTE.textDim }}>자동 수락 {autoAccept ? '켬' : '끔'}</button>
+            {avail.length > 0 && bulk(`전체 수락 ${avail.length}`, acceptAll)}
+          </span>)}
+          {avail.length ? avail.map(card) : <div style={{ fontSize: 12, color: PALETTE.textDim }}>{autoAccept ? '새 의뢰는 뜨는 즉시 자동으로 수락된다' : '지금 받을 수 있는 의뢰가 없다 — 새 지역을 열면 의뢰가 붙는다'}</div>}
         </>}
         {tab === 'done' && <div className="pt-2 flex flex-col gap-1.5">{claimed.map(item => <QuestCard key={item.q.id} save={save} item={item} />)}</div>}
         {tab === 'done' && !claimed.length && <div className="text-center py-10" style={{ fontSize: 12.5, color: PALETTE.textDim }}>아직 끝낸 의뢰가 없습니다</div>}
@@ -4533,6 +4540,22 @@ export default function ChronicleGame({ onExit }) {
     if (pd) flash(`오프라인 보상 — 🪙 +${pd.gold.toLocaleString()} · ✦ +${pd.essence}`);
   };
   const flash = (msg) => { setToast(msg); setTimeout(() => setToast(t => (t === msg ? null : t)), 1600); };
+  // 의뢰 자동 수락 (1.275.0) — 받을 수 있는 의뢰가 생기면 바로 수락 (계정 설정 autoAccept, 기본 켬)
+  useEffect(() => {
+    if (!acc?.active || !A.autoAcceptOn(acc)) return;
+    const r = A.autoAcceptQuests(acc);
+    if (!r.n) return;
+    setAcc(a => A.autoAcceptQuests(a).acc);
+    if (view === 'town' || view === 'quests') flash(`새 의뢰 ${r.n}건 자동 수락`);
+  }, [acc]); // eslint-disable-line react-hooks/exhaustive-deps
+  // 보상 한 번에 받기 (1.275.0) — 의뢰 + 일일·주간 임무 + 원정대 의뢰
+  const claimEverything = () => {
+    const r = A.claimEverything(acc, Math.random);
+    if (!r.total) return;
+    setAcc(r.acc);
+    const parts = [r.quests && `의뢰 ${r.quests}`, r.missions && `임무 ${r.missions}`, r.roster && `원정대 ${r.roster}`].filter(Boolean).join(' · ');
+    flash(`보상 ${r.total}건 수령 (${parts})${r.items.length ? ` — 장비 ${r.items.length}개` : ''}`);
+  };
 
   // 이야기 — 조건에 맞는 장면이 있으면 띄우고 true
   const playScene = (ctx, after = null) => {
@@ -4733,7 +4756,7 @@ export default function ChronicleGame({ onExit }) {
   } else if (view === 'field') {
     content = <FieldView save={save} onBack={() => { setRepeat(false); setView('town'); }} onFight={fightField} onAuto={startAuto} playScene={playScene} sceneOpen={!!scene} />;
   } else if (view === 'quests') {
-    content = <QuestView save={save} setSave={setSave} onBack={() => setView('town')} flash={flash} onReplay={(sc) => setScene({ scene: sc, replay: true })} />;
+    content = <QuestView save={save} setSave={setSave} onBack={() => setView('town')} flash={flash} onReplay={(sc) => setScene({ scene: sc, replay: true })} autoAccept={A.autoAcceptOn(acc)} onAutoAccept={(on) => setAcc(a => ({ ...a, autoAccept: on }))} />;
   } else if (view === 'dungeon') {
     content = (
       <DungeonView save={save} onBack={() => setView('town')}
@@ -4762,7 +4785,7 @@ export default function ChronicleGame({ onExit }) {
   } else if (view === 'forge') {
     content = <ForgeView save={save} setSave={setSave} onBack={() => setView('town')} flash={flash} onTrack={trackDaily} />;
   } else {
-    content = <TownView save={save} acc={acc} go={(v) => setView(v === 'dungeon' && save.dungeon ? 'dungeon' : v)} onExit={onExit} onSwitchChar={() => setView('title')} />;
+    content = <TownView save={save} acc={acc} go={(v) => setView(v === 'dungeon' && save.dungeon ? 'dungeon' : v)} onExit={onExit} onSwitchChar={() => setView('title')} onClaimAll={claimEverything} />;
   }
 
   return (
