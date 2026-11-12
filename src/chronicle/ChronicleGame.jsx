@@ -387,7 +387,7 @@ function BattleLogLine({ e, latest, unitOf }) {
 
 // ===== 전투 재생 =====
 const SPEEDS = [1, 2, 4];
-function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boostLeft = 0, onAskBoost, dungeonAuto = false, onToggleDungeonAuto, autoProg = false, onStopAuto, onReplayDone, sessionReport = null, holdAuto = false, towerAuto = false, onToggleTowerAuto }) {
+function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boostLeft = 0, onAskBoost, dungeonAuto = false, onToggleDungeonAuto, autoProg = false, onStopAuto, onReplayDone, sessionReport = null, holdAuto = false, towerAuto = false, onToggleTowerAuto, onIdle = null }) {
   const { sim, enemies, party, summary, ctx, xp } = battle;
   const [idx, setIdx] = useState(0);
   const [stats, setStats] = useState(null); // 전투 집계 (1.215.1)
@@ -494,6 +494,7 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
           );
         })}
         {!done && <button onClick={() => setIdx(sim.events.length)} className="ui-press" style={{ fontSize: 12, padding: '4px 9px', borderRadius: 8, border: '1px solid var(--ui-line)', color: PALETTE.dawn, background: 'transparent' }}>⏩</button>}
+        {onIdle && <button onClick={onIdle} aria-label="대기화면" className="ui-press" style={{ fontSize: 12, padding: '4px 9px', borderRadius: 8, border: `1px solid ${PALETTE.legendary}88`, color: PALETTE.legendary, background: 'transparent' }}>🌙</button>}
       </div>
 
       {/* 적 — 전투가 끝나면 직업 승리/패배 일러 (1.261.0) */}
@@ -4123,6 +4124,49 @@ function BoostSheet({ save, onClose, onBuy }) {
 }
 
 // ===== 메인 =====
+// ===== 대기화면 (1.271.0, PM 승인 시안) — 직업 일러 전체 + 숨쉬기 + 직업별 입자, 문구·설정은 하단 =====
+const IDLE_MOTION = {
+  wanderer: { glow: 'rgba(220,90,70,.30)', p: '#ffd2c4', kind: 'slash' },
+  sage: { glow: 'rgba(255,130,60,.30)', p: '#ffb347', kind: 'rise' },
+  demonblood: { glow: 'rgba(170,30,40,.34)', p: '#ff4d5a', kind: 'mist' },
+  elf: { glow: 'rgba(120,190,110,.28)', p: '#a8f0a0', kind: 'drift' },
+  priest: { glow: 'rgba(255,220,140,.30)', p: '#fff0b0', kind: 'fall' },
+};
+const IDLE_KIND_LABEL = { repeat: '반복 사냥 중', prog: '자동 진행 중', tower: '자동 등반 중', dungeon: '연속 도전 중' };
+const IDLE_DELAYS = [[30, '30초'], [60, '1분'], [180, '3분'], [0, '끄기']];
+function IdleScreen({ save, kind, label, startedAt, wakeOn, delay, onDelay, onExit }) {
+  const hero = save.hero; const cls = chronicleClass(hero); const u = save.units[hero];
+  const mo = IDLE_MOTION[hero] || IDLE_MOTION.sage;
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
+  const sec = Math.max(0, Math.floor((now - (startedAt || now)) / 1000));
+  const el = `${Math.floor(sec / 3600) ? `${Math.floor(sec / 3600)}:` : ''}${String(Math.floor(sec / 60) % 60).padStart(Math.floor(sec / 3600) ? 2 : 1, '0')}:${String(sec % 60).padStart(2, '0')}`;
+  const parts = useMemo(() => Array.from({ length: 14 }, (_, i) => ({ x: (i * 37 + 11) % 96 + 2, y: (i * 53 + 7) % 70 + 15, d: 5 + (i % 5) * 1.3, dl: -(i * 0.9) % 7, s: 3 + (i % 3) })), []);
+  const wakeTxt = typeof navigator !== 'undefined' && !('wakeLock' in navigator) ? '⚠ 이 브라우저는 화면 유지 미지원 — 화면이 꺼지면 멈춥니다' : wakeOn ? '🔆 화면 꺼짐 방지 켜짐' : '🔅 화면 꺼짐 방지 대기 중';
+  return (
+    <div className="absolute inset-0 overflow-hidden chr-idle" style={{ zIndex: 60, background: '#070404' }} onClick={onExit}>
+      <img src={cls.image} alt="" className="absolute inset-0 w-full h-full object-cover chr-idle-breathe" style={{ objectPosition: '50% 18%', filter: 'brightness(.62) saturate(.9)' }} />
+      <div className="absolute chr-idle-glow" style={{ left: '50%', top: '45%', width: 320, height: 320, margin: -160, borderRadius: '50%', background: `radial-gradient(circle, ${mo.glow}, transparent 65%)` }} />
+      <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(7,4,4,.25) 0%, rgba(7,4,4,0) 20%, rgba(7,4,4,0) 55%, rgba(7,4,4,.82) 76%, rgba(7,4,4,.96) 100%)' }} />
+      {mo.kind === 'mist' && <div className="absolute inset-0 chr-idle-mist" style={{ background: `radial-gradient(60% 30% at 30% 70%, ${mo.glow}, transparent), radial-gradient(50% 25% at 75% 55%, ${mo.glow}, transparent)` }} />}
+      {parts.map((q, i) => (
+        <span key={i} className={`absolute chr-idle-p chr-idle-${mo.kind}`} style={{ left: `${q.x}%`, top: `${q.y}%`, width: mo.kind === 'slash' ? 46 : q.s, height: mo.kind === 'slash' ? 1.5 : q.s, borderRadius: mo.kind === 'slash' ? 1 : '50%', background: mo.p, boxShadow: `0 0 8px ${mo.p}`, animationDuration: `${q.d}s`, animationDelay: `${q.dl}s` }} />
+      ))}
+      <div className="absolute left-0 right-0 text-center" style={{ bottom: 92 }}>
+        <div style={{ fontSize: 12, letterSpacing: 6, color: PALETTE.legendary, fontWeight: 700 }}>🌙 대기화면</div>
+        <div style={{ fontSize: 24, fontWeight: 900, marginTop: 4, color: PALETTE.text }}>{IDLE_KIND_LABEL[kind] || '자동 진행 중'}</div>
+        <div style={{ fontSize: 12.5, color: '#d8c8b0', marginTop: 4 }}><span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#8fd08a', boxShadow: '0 0 8px #8fd08a', marginRight: 5 }} />{label ? `${label} · ` : ''}Lv.{u.lv} {cls.name} · 경과 {el}</div>
+        <div style={{ fontSize: 11.5, color: '#b8a890', marginTop: 4 }}>{wakeTxt}</div>
+      </div>
+      <div className="absolute flex items-center gap-1.5" style={{ left: 16, right: 16, bottom: 34 }} onClick={(e) => e.stopPropagation()}>
+        <span style={{ fontSize: 11.5, color: '#9b8975', whiteSpace: 'nowrap', marginRight: 2 }}>자동 전환</span>
+        {IDLE_DELAYS.map(([v, l]) => <button key={v} onClick={() => onDelay(v)} className="ui-press flex-1" style={{ height: 30, fontSize: 12, border: `1px solid ${delay === v ? MS.gold : MS.line}`, color: delay === v ? MS.gold : '#9b8975', background: delay === v ? 'rgba(232,176,74,.12)' : 'rgba(20,10,10,.6)' }}>{l}</button>)}
+      </div>
+      <div className="absolute left-0 right-0 text-center" style={{ bottom: 12, fontSize: 11, color: '#7d6c5a' }}>누르면 전투 화면으로</div>
+    </div>
+  );
+}
+
 export default function ChronicleGame({ onExit }) {
   const [acc, setAcc] = useState(loadAccount);
   const [loadNotice, setLoadNotice] = useState(() => (loadStatus.status === 'restored' || loadStatus.status === 'lost' ? loadStatus : null)); // 1.236.1 깨진 저장 안내
@@ -4190,6 +4234,44 @@ export default function ChronicleGame({ onExit }) {
     const t = setTimeout(() => { setReport(pendingReport.rep); setPendingReport(null); }, inBattle ? 900 : 0);
     return () => clearTimeout(t);
   }, [pendingReport, view, battle, replayDoneKey]);
+
+  // ===== 대기화면·화면 꺼짐 방지 (1.271.0) =====
+  // 자동 진행 중 = 반복 사냥 · 자동 진행 · (첨탑 전투 + 자동 등반) · (던전 전투 + 연속 도전)
+  const autoKind = view !== 'battle' || !battle ? null
+    : autoProg ? 'prog' : repeat ? 'repeat'
+      : battle.ctx.kind === 'tower' && towerAuto ? 'tower'
+        : battle.ctx.kind === 'dungeon' && dungeonAuto ? 'dungeon' : null;
+  const autoRunning = !!autoKind;
+  const [idle, setIdle] = useState(false);
+  const [idleDelay, setIdleDelayState] = useState(() => { try { const v = localStorage.getItem('chronicleIdleDelay'); return v == null ? 60 : +v; } catch { return 60; } });
+  const setIdleDelay = (v) => { setIdleDelayState(v); try { localStorage.setItem('chronicleIdleDelay', String(v)); } catch { /* */ } };
+  const autoStartRef = useRef(null);
+  useEffect(() => {
+    if (autoRunning) { if (!autoStartRef.current) autoStartRef.current = Date.now(); return; }
+    autoStartRef.current = null; setIdle(false); // 자동이 끝나면(패배·정지) 대기화면을 닫아 결과를 보여 준다
+  }, [autoRunning]);
+  // 손대지 않으면 idleDelay초 뒤 자동 전환 — 화면을 누르거나 키를 누르면 타이머 다시 시작
+  useEffect(() => {
+    if (!autoRunning || idle || !idleDelay) return undefined;
+    let t = setTimeout(() => setIdle(true), idleDelay * 1000);
+    const poke = () => { clearTimeout(t); t = setTimeout(() => setIdle(true), idleDelay * 1000); };
+    const evs = ['pointerdown', 'keydown', 'wheel', 'touchstart'];
+    evs.forEach(e => window.addEventListener(e, poke, { capture: true, passive: true }));
+    return () => { clearTimeout(t); evs.forEach(e => window.removeEventListener(e, poke, { capture: true })); };
+  }, [autoRunning, idle, idleDelay]);
+  // 화면 꺼짐 방지 — 자동 진행 중에만 (본편 1.88.0과 같은 방식). 다른 앱으로 나가면 OS가 풀어 버리므로 돌아오면 다시 요청
+  const [wakeOn, setWakeOn] = useState(false);
+  useEffect(() => {
+    if (!autoRunning || typeof navigator === 'undefined' || !('wakeLock' in navigator)) { setWakeOn(false); return undefined; }
+    let lock = null; let dead = false;
+    const acquire = async () => {
+      try { const l = await navigator.wakeLock.request('screen'); if (dead) { l.release(); return; } lock = l; setWakeOn(true); l.addEventListener?.('release', () => { if (!dead) setWakeOn(false); }); } catch { setWakeOn(false); }
+    };
+    const onVis = () => { if (document.visibilityState === 'visible') acquire(); };
+    acquire();
+    document.addEventListener('visibilitychange', onVis);
+    return () => { dead = true; document.removeEventListener('visibilitychange', onVis); try { lock?.release?.(); } catch { /* */ } setWakeOn(false); };
+  }, [autoRunning]);
 
   useEffect(() => { writeAccount(acc); }, [acc]);
   // ===== 클라우드 저장 (1.237.1) — 본편과 같은 Firebase 계정, 위치는 users/{uid}/chronicle/save =====
@@ -4430,6 +4512,7 @@ export default function ChronicleGame({ onExit }) {
         onAgain={() => (battle.ctx.kind === 'dungeon' ? fightDungeon() : battle.ctx.kind === 'tower' ? fightTower() : autoProg ? autoStep() : lastFieldRef.current && fightField(lastFieldRef.current.field, 'hunt', lastFieldRef.current.stage))}
         dungeonAuto={dungeonAuto} onToggleDungeonAuto={toggleDungeonAuto}
         towerAuto={towerAuto} onToggleTowerAuto={toggleTowerAuto}
+        onIdle={autoRunning ? () => setIdle(true) : null}
         boostLeft={E.boostLeftMs(save)} onAskBoost={() => setBoostSheet(true)} />
     );
   } else if (view === 'field') {
@@ -4470,6 +4553,10 @@ export default function ChronicleGame({ onExit }) {
   return (
     <div className="absolute inset-0" style={{ background: PALETTE.bg, fontFamily: '"Noto Serif KR", serif', color: PALETTE.text }}>
       <div key={view} className="ui-screen-enter absolute inset-0">{content}</div>
+      {idle && autoRunning && save && (
+        <IdleScreen save={save} kind={autoKind} label={battle?.ctx?.label} startedAt={autoStartRef.current} wakeOn={wakeOn}
+          delay={idleDelay} onDelay={setIdleDelay} onExit={() => setIdle(false)} />
+      )}
       {report && <HuntReport report={report} save={save} title={report.kind === 'tower' ? '🗼 첨탑 도전 집계' : report.kind === 'dungeon' ? '🏰 던전 전체 집계' : '📋 사냥 보고서'} onClose={() => setReport(null)} />}
       {boostSheet && save && <BoostSheet save={save} onClose={() => setBoostSheet(false)} onBuy={() => { const n = E.buyBoost(save); if (n === save) { flash(save.gold < E.boostCost(save) ? '골드가 부족합니다' : `최대 ${BOOST.maxStackMin / 60}시간까지 쌓을 수 있습니다`); return; } setSave(n); flash(`⏩ ×4 배속 +${BOOST.minutes}분`); }} />}
       {acc.giftNotice && view === 'title' && <GiftNotice acc={acc} onClose={() => setAcc(a => ({ ...a, giftNotice: false }))} />}
