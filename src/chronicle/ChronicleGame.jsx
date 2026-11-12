@@ -2547,6 +2547,7 @@ function TowerView({ save, setSave, onBack, onFight, flash, towerAuto = false, o
                         <span className="truncate" style={{ fontSize: 11.5, color: PALETTE.textDim }}>{m ? m[1] : t}</span><span style={{ fontSize: 12, fontWeight: 800, color: MS.red }}>{m ? m[2] : ''}</span>
                       </div>
                     ); })}
+                    <div className="flex items-baseline justify-between gap-1" style={{ padding: '1px 0' }}><span style={{ fontSize: 11.5, color: PALETTE.textDim }}>무작위 옵션</span><span style={{ fontSize: 12, fontWeight: 800, color: MS.red }}>+1</span></div>
                   </div>
                   <div className="mt-1" style={{ fontSize: 11.5, color: '#c79bff', lineHeight: 1.45 }}>★ <span style={{ color: PALETTE.text }}>{u.desc}</span></div>
                 </button>

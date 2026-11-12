@@ -12,7 +12,7 @@ import { famCombatant, famRole, famSubFx, famOwnFx, famBondFx, rollFamShards, ro
 import {
   CHRONICLE_TUNING as T, CHRONICLE_CLASSES, CHRONICLE_SKILLS, CHRONICLE_FIELDS, CHRONICLE_DUNGEON, CHRONICLE_DUNGEONS, DUNGEON_TIERS, dungeonDef,
   STAT_KEYS, SKILL_MAX_LV, MASTERY_PCT, BOSS_DAILY_LIMIT, DUNGEON_KEYS, GRADES, gradeIdx, SLOTS, CLASS_SLOTS, FORGE, DROP_TABLE,
-  CLASS_GEAR_NAMES, EPIC_PREFIX, OPTION_DEFS, OPTION_POOLS, OFFHAND_BASE, CLASS_DROP, EPIC_OPTIONS, UNIQUE_ITEMS, UNIQUE_CHANCE,
+  CLASS_GEAR_NAMES, EPIC_PREFIX, OPTION_DEFS, OPTION_POOLS, OFFHAND_BASE, CLASS_DROP, UNIQUE_DROP, EPIC_OPTIONS, UNIQUE_ITEMS, UNIQUE_CHANCE,
   chronicleClass, classSkills, buildChronicleEnemy,
 } from './data.js';
 
@@ -148,10 +148,10 @@ export function makeItem(rng, { cls, slot, grade, ilv, set = 'field', named = nu
   return it;
 }
 // 드랍 직업 분배 (현재 직업 70 / 다른 직업 25 / 공용 장신구 5)
-function rollDropClass(rng, heroCls) {
+function rollDropClass(rng, heroCls, D = CLASS_DROP) {
   const r = rng();
-  if (r < CLASS_DROP.common) return 'common';
-  if (r < CLASS_DROP.common + CLASS_DROP.own) return heroCls;
+  if (r < D.common) return 'common';
+  if (r < D.common + D.own) return heroCls;
   return pick(rng, CHRONICLE_CLASSES.map(c => c.id).filter(id => id !== heroCls));
 }
 export function rollGear(rng, grade, ilv, heroCls, set = 'field') {
@@ -160,7 +160,7 @@ export function rollGear(rng, grade, ilv, heroCls, set = 'field') {
   return makeItem(rng, { cls, slot, grade, ilv, set });
 }
 export function rollUniqueItem(rng, ilv, heroCls) {
-  const cls = rollDropClass(rng, heroCls);
+  const cls = rollDropClass(rng, heroCls, UNIQUE_DROP);
   const pool = Object.values(UNIQUE_ITEMS).filter(u => u.cls === cls && !u.disabled && !u.branch);
   if (!pool.length) return null;
   return makeItem(rng, { named: pick(rng, pool).id, ilv });
@@ -168,6 +168,17 @@ export function rollUniqueItem(rng, ilv, heroCls) {
 // 하위 호환 이름 (의뢰 보상 등)
 export function rollItem(rng, grade, ilv, slot = null, set = 'field', heroCls = 'wanderer') {
   return rollGear(rng, grade, ilv, heroCls, set);
+}
+// 유니크 3번째 옵션 (1.269.0 PM 결정) — 고정 옵션 2개 + 그 직업 풀에서 무작위 1개
+//   장비 번호(uid)로 고정 굴림 → 저장하지 않고 읽을 때 계산 (기존 유니크도 바로 생긴다)
+function uidRng(seed) { let a = seed | 0; return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+export function itemOpts(item) {
+  const base = item?.opts || [];
+  if (!item?.named || item.uid == null) return base;
+  const u = UNIQUE_ITEMS[item.named]; const want = GRADES[gradeIdx('unique')]?.opts || 0;
+  if (!u || base.length >= want) return base;
+  const o = rollOption(uidRng(item.uid * 9973 + 17), u.cls, 'unique', base);
+  return o ? [...base, o] : base;
 }
 // 강화 누적 보너스 (1.268.0 — 고강화일수록 단계당 상승폭이 커진다)
 export const enhanceBonus = (plus) => FORGE.enhanceBonus[Math.max(0, Math.min(FORGE.maxEnhance, plus || 0))] || 0;
@@ -197,7 +208,7 @@ export function itemStats(item) {
     for (const [k, v] of Object.entries(b.pct)) add(k, +(v * gm).toFixed(3));
   }
   const optM = (1 + 0.5 * enhanceBonus(item.plus)) * optionLvMult(L);
-  for (const o0 of item.opts || []) {
+  for (const o0 of itemOpts(item)) {
     const o = normOpt(item, o0);
     if (o.k === 'scdr') { add(`scdr_${o.sk}`, o.v); continue; }
     add(o.k, o.k === 'cdr' ? o.v : (OPTION_DEFS[o.k]?.pct ? +(o.v * optM).toFixed(3) : Math.max(1, Math.round(o.v * optM))));
