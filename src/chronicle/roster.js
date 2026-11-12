@@ -100,5 +100,14 @@ export function claimRosterQuest(save0, id) {
   }
   return save;
 }
+// 모두 받기 (1.275.0) → { save, n }
+export function claimAllRosterQuests(save0) {
+  let save = save0, n = 0;
+  for (const q of ROSTER_QUESTS) {
+    if (rosterQuestState(save, q).status !== 'done') continue;
+    save = claimRosterQuest(save, q.id); n += 1;
+  }
+  return { save, n };
+}
 const REWARD_LBL = { gold: ['🪙', '골드'], talentScroll: ['📖', '특성 주문서'], famShard: ['📜', '계약서 조각'], famSoul: ['🔮', '사역혼'] };
 export const rosterRewardText = (r) => Object.entries(r).map(([k, v]) => `${(REWARD_LBL[k] || ['', k])[0]} ${(REWARD_LBL[k] || ['', k])[1]} ${v.toLocaleString()}`).join(' · ');
