@@ -158,6 +158,31 @@ export function claimQuest(save0, id, rng = Math.random) {
   return { save, gained };
 }
 
+// 전체 수락 (1.274.0) → { save, n }
+export function acceptAllQuests(save0) {
+  const ids = QUESTS.filter(q => questStatus(save0, q) === 'available').map(q => q.id);
+  if (!ids.length) return { save: save0, n: 0 };
+  const save = clone(save0);
+  const base = counters(save);
+  for (const id of ids) save.quests[id] = { state: 'active', base: clone(base) };
+  return { save, n: ids.length };
+}
+// 전체 받기 (1.274.0) → { save, n, items, keys } — 받으면서 새로 완료되는 의뢰(레벨 달성 등)까지 이어서
+export function claimAllQuests(save0, rng = Math.random) {
+  let save = save0, n = 0, keys = 0; const items = [];
+  for (let guard = 0; guard < 5; guard++) {
+    const ids = QUESTS.filter(q => questStatus(save, q) === 'done').map(q => q.id);
+    if (!ids.length) break;
+    for (const id of ids) {
+      const r = claimQuest(save, id, rng);
+      if (!r.gained) continue;
+      save = r.save; n += 1; keys += r.gained.keysGot || 0;
+      if (r.gained.item) items.push(r.gained.item);
+    }
+  }
+  return { save, n, items, keys };
+}
+
 // 전투 전후 비교 — 새로 완료된 의뢰 이름
 export function newlyDoneQuests(before, after) {
   return QUESTS.filter(q => questStatus(before, q) !== 'done' && questStatus(after, q) === 'done').map(q => q.title);
