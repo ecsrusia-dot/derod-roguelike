@@ -735,14 +735,15 @@ export function forgeEnhance(save0, uid, rng = Math.random) {
   if (r.drop) { it.plus = Math.max(0, (it.plus || 0) - 1); return { save, result: 'down' }; }
   return { save, result: 'fail' };
 }
-// 1.266.3 연속 강화 — 하락 위험이 없는 구간(+enhanceDropFrom 미만)만, 목표 또는 재료 부족까지 반복
+// 1.266.3 연속 강화 → 1.270.2 최대 강화(+10)까지 — 목표 도달·재료 부족·파괴 중 먼저 오는 것에서 멈춤
+// +6부터 실패 시 1단계 하락(계속 시도), +8부터 실패 시 파괴 위험(파괴되면 즉시 종료)
 export const SAFE_ENHANCE_MAX = FORGE.enhanceDropFrom;
 export function forgeEnhanceTo(save0, uid, target, rng = Math.random) {
-  const goal = Math.min(target, SAFE_ENHANCE_MAX);
+  const goal = Math.min(target, FORGE.maxEnhance);
   const it0 = save0.inventory.find(i => i.uid === uid);
   const from = it0?.plus || 0;
-  let save = save0, tries = 0, gold = 0, essence = 0, fails = 0;
-  for (let guard = 0; guard < 200; guard++) {
+  let save = save0, tries = 0, gold = 0, essence = 0, fails = 0, drops = 0, destroyed = false, peak = from;
+  for (let guard = 0; guard < 1000; guard++) {
     const it = save.inventory.find(i => i.uid === uid);
     if (!it || (it.plus || 0) >= goal) break;
     if (!canEnhance(save, it)) break;
@@ -751,9 +752,36 @@ export function forgeEnhanceTo(save0, uid, target, rng = Math.random) {
     if (!r.result) break;
     save = r.save; tries++; gold += c.gold; essence += c.essence;
     if (r.result !== 'success') fails++;
+    if (r.result === 'down') drops++;
+    if (r.result === 'destroy') { destroyed = true; break; }
+    peak = Math.max(peak, save.inventory.find(i => i.uid === uid)?.plus || 0);
   }
-  const to = save.inventory.find(i => i.uid === uid)?.plus || 0;
-  return { save, tries, fails, from, to, gold, essence, reached: to >= goal };
+  const to = destroyed ? null : (save.inventory.find(i => i.uid === uid)?.plus || 0);
+  return { save, tries, fails, drops, destroyed, peak, from, to, gold, essence, reached: !destroyed && to >= goal };
+}
+// 1.270.2 연속 강화 전망 — 재료 무한 가정, 고정 시드 모의 n회: 파괴 확률·평균 시도·평균 재료
+const _outlookCache = new Map();
+export function enhanceOutlook(item, target, n = 2000) {
+  const goal = Math.min(target, FORGE.maxEnhance);
+  const from = item.plus || 0;
+  const key = `${item.grade}|${item.ilv}|${item.slot}|${from}|${goal}`;
+  if (_outlookCache.has(key)) return _outlookCache.get(key);
+  let seed = 12345; const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x80000000; };
+  const costAt = []; for (let p = 0; p <= FORGE.maxEnhance; p++) costAt[p] = enhanceCost({ ...item, plus: p });
+  let destroyed = 0, tries = 0, gold = 0, essence = 0;
+  for (let k = 0; k < n; k++) {
+    let p = from;
+    for (let g = 0; g < 1000 && p < goal; g++) {
+      const c = costAt[p]; tries++; gold += c.gold; essence += c.essence;
+      const r = enhanceRisk({ plus: p });
+      if (rnd() < r.rate) { p++; continue; }
+      if (r.breakChance && rnd() < r.breakChance) { destroyed++; break; }
+      if (r.drop) p = Math.max(0, p - 1);
+    }
+  }
+  const out = { destroyPct: destroyed / n, avgTries: tries / n, avgGold: Math.round(gold / n), avgEssence: Math.round(essence / n) };
+  _outlookCache.set(key, out);
+  return out;
 }
 export function enhanceItem(save0, uid, rng = Math.random) { return forgeEnhance(save0, uid, rng).save; }
 export function nextGrade(item) {

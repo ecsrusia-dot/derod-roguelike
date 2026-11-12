@@ -2812,14 +2812,31 @@ function ForgeView({ save, setSave, onBack, flash, onTrack = () => {} }) {
     else if (r.result === 'down') showPop('down', `강화 실패 — +${Math.max(0, (item.plus || 0) - 1)}로 하락`, E.itemName(item));
     else showPop('fail', '강화 실패', '재료만 잃었습니다');
   });
-  // 1.266.3 목표까지 연속 강화 — 하락 위험 없는 구간만 (+6 미만)
+  // 1.266.3 목표까지 연속 강화 → 1.270.2 최대 +10까지 (하락은 계속 시도, 파괴되면 종료)
   const [goal, setGoal] = useState(E.SAFE_ENHANCE_MAX);
-  const doEnhanceTo = (target) => {
+  const runEnhanceTo = (target) => {
     const r = E.forgeEnhanceTo(save, item.uid, target); if (!r.tries) return;
     setSave(r.save); onTrack({ forge: r.tries });
-    const sub = `시도 ${r.tries}회${r.fails ? ` (실패 ${r.fails})` : ''} · 🪙${r.gold.toLocaleString()} · ✦${r.essence}`;
-    if (r.reached) showPop('success', `연속 강화 +${r.from} → +${r.to}`, sub);
+    const sub = `시도 ${r.tries}회${r.fails ? ` (실패 ${r.fails}${r.drops ? ` · 하락 ${r.drops}` : ''})` : ''} · 🪙${r.gold.toLocaleString()} · ✦${r.essence}`;
+    if (r.destroyed) { setSel(null); showPop('destroy', `장비 파괴 — 최고 +${r.peak}까지 도달`, sub); }
+    else if (r.reached) showPop('success', `연속 강화 +${r.from} → +${r.to}`, sub);
     else showPop('fail', `재료 부족으로 +${r.to}에서 멈춤`, sub);
+  };
+  const doEnhanceTo = (target) => {
+    if (target <= E.SAFE_ENHANCE_MAX) { runEnhanceTo(target); return; }
+    // 하락·파괴 구간 — 「묻지 않기」 설정과 무관하게 항상 확인
+    const o = E.enhanceOutlook(item, target);
+    setConfirm({
+      title: `+${item.plus || 0} → +${target} 연속 강화`,
+      lines: [
+        { t: `+${FORGE.enhanceDropFrom}부터 실패하면 1단계 하락 — 하락해도 목표까지 계속 시도합니다`, color: '#e8b04a' },
+        ...(target > FORGE.enhanceBreakFrom ? [{ t: `+${FORGE.enhanceBreakFrom}부터 실패하면 ${Math.round(FORGE.enhanceBreakChance * 100)}% 확률로 장비 파괴 — 파괴되면 즉시 멈춥니다`, color: '#e06a5f' }] : []),
+        { t: `예상 (재료 충분 시): 파괴 확률 약 ${Math.round(o.destroyPct * 100)}% · 평균 시도 ${Math.round(o.avgTries)}회 · 🪙${o.avgGold.toLocaleString()} · ✦${o.avgEssence.toLocaleString()}` },
+        ...(by ? [{ t: '⚠ 착용 중인 장비입니다', color: '#e8b04a' }] : []),
+      ],
+      confirmLabel: `+${target}까지 강화한다`, danger: o.destroyPct > 0,
+      noSkip: true, onConfirm: () => { setConfirm(null); runEnhanceTo(target); },
+    });
   };
   const doPromote = () => guard(pr.breaks, {
     title: `${gradeOf(ng).label} 승급`,
@@ -2897,17 +2914,20 @@ function ForgeView({ save, setSave, onBack, flash, onTrack = () => {} }) {
                 <MainForgeCompare before={item} after={{ ...item, plus: (item.plus || 0) + 1 }} />
                 <MainForgeCost save={save} cost={ec} />
                 <MainForgeOdds outcomes={(() => { const f = 1 - er.rate; return er.drop ? [['성공', er.rate, '#8fd08a'], [`+${Math.max(0, (item.plus || 0) - 1)}로 하락`, f * (1 - er.breakChance), '#e8b04a'], ['파괴', f * er.breakChance, '#e07a6a']] : [['성공', er.rate, '#8fd08a'], ['실패 (재료만 잃음)', f, '#9b8975']]; })()} />
-                {(item.plus || 0) < E.SAFE_ENHANCE_MAX && (() => {
-                  const goals = []; for (let t = (item.plus || 0) + 1; t <= E.SAFE_ENHANCE_MAX; t++) goals.push(t);
-                  const g0 = goals.includes(goal) ? goal : goals[goals.length - 1];
+                {(item.plus || 0) < FORGE.maxEnhance && (() => {
+                  const goals = []; for (let t = (item.plus || 0) + 1; t <= FORGE.maxEnhance; t++) goals.push(t);
+                  const g0 = goals.includes(goal) ? goal : goals[0];
+                  const o = g0 > E.SAFE_ENHANCE_MAX ? E.enhanceOutlook(item, g0) : null;
+                  const zc = (t) => (t > FORGE.enhanceBreakFrom ? '#e07a6a' : t > FORGE.enhanceDropFrom ? '#e8b04a' : MS.gold);
                   return (
                     <div className="mt-2" style={{ padding: '8px 10px', border: `1px solid ${MS.gold}66`, background: 'rgba(232,176,74,0.06)' }}>
                       <div style={{ fontSize: 12.5, color: MS.gold, fontWeight: 700 }}>⏩ 목표까지 연속 강화</div>
-                      <div style={{ fontSize: 11.5, color: PALETTE.textDim, marginTop: 2 }}>+{E.SAFE_ENHANCE_MAX}까지는 실패해도 재료만 잃습니다. 목표 도달 또는 재료가 떨어질 때까지 자동으로 반복합니다.</div>
-                      <div className="flex gap-1.5 mt-2">
-                        {goals.map(t => <button key={t} onClick={() => setGoal(t)} className="ui-press flex-1" style={{ height: 34, fontSize: 12.5, border: `1px solid ${g0 === t ? MS.gold : MS.line}`, color: g0 === t ? MS.gold : PALETTE.textDim, background: g0 === t ? 'rgba(232,176,74,0.12)' : MS.box }}>+{t}</button>)}
+                      <div style={{ fontSize: 11.5, color: PALETTE.textDim, marginTop: 2 }}>목표 도달 · 재료 부족 · 장비 파괴 중 먼저 오는 것에서 멈춥니다. <span style={{ color: MS.gold }}>+{E.SAFE_ENHANCE_MAX}까지 안전</span> · <span style={{ color: '#e8b04a' }}>+{E.SAFE_ENHANCE_MAX + 1}~{FORGE.enhanceBreakFrom} 하락 위험</span> · <span style={{ color: '#e07a6a' }}>+{FORGE.enhanceBreakFrom + 1}~{FORGE.maxEnhance} 파괴 위험</span></div>
+                      <div className="grid gap-1.5 mt-2" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
+                        {goals.map(t => <button key={t} onClick={() => setGoal(t)} className="ui-press" style={{ height: 34, fontSize: 12.5, border: `1px solid ${g0 === t ? zc(t) : MS.line}`, color: g0 === t ? zc(t) : PALETTE.textDim, background: g0 === t ? 'rgba(232,176,74,0.12)' : MS.box }}>+{t}</button>)}
                       </div>
-                      <button disabled={!enhOk} onClick={() => doEnhanceTo(g0)} className="ui-press w-full mt-2" style={{ height: 40, fontSize: 13, fontWeight: 800, border: `1px solid ${enhOk ? MS.gold : MS.line}`, color: enhOk ? MS.gold : PALETTE.textDim, background: enhOk ? 'rgba(232,176,74,0.12)' : MS.box }}>⏩ +{g0}까지 연속 강화</button>
+                      {o && <div className="mt-1.5" style={{ fontSize: 11.5, color: PALETTE.text }}>예상 · 파괴 <b style={{ color: o.destroyPct > 0 ? '#e07a6a' : MS.gold }}>{Math.round(o.destroyPct * 100)}%</b> · 평균 시도 <b>{Math.round(o.avgTries)}회</b> · 🪙{o.avgGold.toLocaleString()} · ✦{o.avgEssence.toLocaleString()}</div>}
+                      <button disabled={!enhOk} onClick={() => doEnhanceTo(g0)} className="ui-press w-full mt-2" style={{ height: 40, fontSize: 13, fontWeight: 800, border: `1px solid ${enhOk ? zc(g0) : MS.line}`, color: enhOk ? zc(g0) : PALETTE.textDim, background: enhOk ? 'rgba(232,176,74,0.12)' : MS.box }}>⏩ +{g0}까지 연속 강화</button>
                     </div>
                   );
                 })()}
@@ -2926,7 +2946,7 @@ function ForgeView({ save, setSave, onBack, flash, onTrack = () => {} }) {
           </MainModal>
         );
       })()}
-      {confirm && <ConfirmSheet {...confirm} onCancel={() => setConfirm(null)} skipLabel="이번 접속 동안 다시 묻지 않기" skip={skipAsk} onSkipChange={setSkipAsk} />}
+      {confirm && <ConfirmSheet {...confirm} onCancel={() => setConfirm(null)} skipLabel={confirm.noSkip ? null : '이번 접속 동안 다시 묻지 않기'} skip={skipAsk} onSkipChange={setSkipAsk} />}
       {pop && <ForgePop pop={pop} onDone={() => setPop(null)} />}
     </div>
   );
