@@ -651,6 +651,7 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
               <div className="mt-1 text-center" style={{ fontSize: 12.5, color: PALETTE.textDim }}>
                 {ctx.kind === 'raid' ? '원정대가 무너졌다 — 봉인의 주인이 쓰러지면 그 봉인은 깰 수 없다. 약한 캐릭터를 더 키워 다시 도전하자.' : ctx.kind === 'tower' ? `첨탑 ${summary.towerFell}층에서 쓰러졌다. 다음 도전은 체크포인트부터.` : ctx.kind === 'dungeon' ? '던전에서 쫓겨났다.' : `쓰러졌다${summary.fallback ? '.' : ' — 사냥터로 돌아간다.'}${summary.goldLost ? ` (골드 -${summary.goldLost})` : ''}`}
                 {summary.fallback ? <div className="mt-2 font-semibold" style={{ color: MS.gold }}>↩ 직전 성공 맵 「{summary.fallback}」에서 반복 사냥을 이어간다</div> : null}
+                {summary.lossStop ? <div className="mt-2 font-semibold" style={{ color: '#ff8a7e' }}>⏹ {summary.lossStop}연속 패배 — 자동 사냥을 멈췄다. 장비·성장을 점검하자</div> : null}
               </div>
             )}
           </div>
@@ -4136,6 +4137,7 @@ const IDLE_MOTION = {
   elf: { glow: 'rgba(120,190,110,.28)', p: '#a8f0a0', kind: 'drift' },
   priest: { glow: 'rgba(255,220,140,.30)', p: '#fff0b0', kind: 'fall' },
 };
+const LOSS_STOP = 3; // 반복·자동 사냥이 연속으로 이만큼 지면 멈춤 (1.273.1)
 const IDLE_KIND_LABEL = { repeat: '반복 사냥 중', prog: '자동 진행 중', tower: '자동 등반 중', dungeon: '연속 도전 중' };
 const IDLE_DELAYS = [[30, '30초'], [60, '1분'], [180, '3분'], [0, '끄기']];
 // 대기화면 경험치 (1.272.1, PM 승인 시안 C) — 대기화면이 열린 뒤 얻은 경험치를 레벨을 넘어서도 누적
@@ -4231,6 +4233,7 @@ export default function ChronicleGame({ onExit }) {
   // 패배 시 직전 성공 맵으로 반복 사냥 (1.273.0) — 마지막으로 이긴 사냥 자리 · 패배한 자리(자동 상향이 다시 올라가지 않게)
   const lastWinHuntRef = useRef(null);
   const climbBlockRef = useRef(null);
+  const lossStreakRef = useRef(0); // 연속 패배 수 (1.273.1)
   const rng = Math.random;
   // 반복 사냥 보고서 (1.213.0)
   const repStatsRef = useRef(null);
@@ -4254,7 +4257,7 @@ export default function ChronicleGame({ onExit }) {
   const startTowerAuto = () => { const s0 = E.startTower(save); if (s0 === save) return; setSave(s0); if (!towerAuto) toggleTowerAuto(); fightTower(s0); };
   const towerRunRef = useRef(null); // 첨탑 한 번 도전 집계 (1.232.1)
   const toggleRepeat = () => {
-    if (!repeat) { setAutoProg(false); repStatsRef.current = newHuntStats(); if (lastRecRef.current) addHuntRecord(repStatsRef.current, lastRecRef.current); }
+    if (!repeat) { setAutoProg(false); lossStreakRef.current = 0; repStatsRef.current = newHuntStats(); if (lastRecRef.current) addHuntRecord(repStatsRef.current, lastRecRef.current); }
     setRepeat(r => !r);
   };
   // 자동 진행 (1.234.0) — 사냥 → 관문 → 다음 스테이지 → … → 보스 → 다음 지역. 보스 앞 이야기는 건너뜀, 패배하면 멈춤
@@ -4263,7 +4266,7 @@ export default function ChronicleGame({ onExit }) {
   const startAuto = (field) => {
     setRepeat(false);
     repStatsRef.current = newHuntStats();
-    lastWinHuntRef.current = null; climbBlockRef.current = null;
+    lastWinHuntRef.current = null; climbBlockRef.current = null; lossStreakRef.current = 0;
     autoFieldRef.current = field;
     setAutoProg(true);
     autoStep(field, true);
@@ -4484,11 +4487,21 @@ export default function ChronicleGame({ onExit }) {
     const prevWin = lastWinHuntRef.current;
     if (mode === 'hunt' && sim.result === 'win') lastWinHuntRef.current = { field, stage };
     let fb = null;
-    if (sim.result !== 'win' && (opts.auto || (mode === 'hunt' && repeat))) {
-      fb = prevWin && !(prevWin.field.id === field.id && prevWin.stage === stage) ? prevWin
-        : opts.auto && mode === 'gate' ? { field, stage }
-          : opts.auto && boss ? { field, stage: FIELD_STAGES - 1 }
-            : opts.auto && mode === 'hunt' && stage > 0 ? { field, stage: stage - 1 } : null;
+    // 1.273.1 같은 맵에서 져도 멈추지 않고 한 단계 아래로 — 연속 LOSS_STOP번 지면 그때 멈춤 (골드가 계속 새는 것 방지)
+    if (sim.result === 'win') lossStreakRef.current = 0;
+    else if (opts.auto || (mode === 'hunt' && repeat)) {
+      lossStreakRef.current += 1;
+      const lower = () => {
+        if (stage > 0) return { field, stage: stage - 1 };
+        const pf = CHRONICLE_FIELDS[field.id - 2];
+        return pf ? { field: pf, stage: FIELD_STAGES - 1 } : null;
+      };
+      if (lossStreakRef.current < LOSS_STOP) {
+        fb = prevWin && !(prevWin.field.id === field.id && prevWin.stage === stage) ? prevWin
+          : mode === 'gate' ? { field, stage }
+            : boss ? { field, stage: FIELD_STAGES - 1 }
+              : lower();
+      }
     }
     if (fb) {
       if (mode === 'hunt') climbBlockRef.current = { fieldId: field.id, stage };
@@ -4497,6 +4510,11 @@ export default function ChronicleGame({ onExit }) {
       if (opts.auto) setAutoProg(false);
       setRepeat(true);
       r.summary.fallback = `${fb.field.name} ${fb.stage + 1}`;
+    } else if (sim.result !== 'win' && lossStreakRef.current >= LOSS_STOP) {
+      lossStreakRef.current = 0;
+      setAutoProg(false); setRepeat(false);
+      r.summary.lossStop = LOSS_STOP;
+      flash(`${LOSS_STOP}연속 패배 — 자동 사냥을 멈췄습니다`);
     } else if (opts.auto && sim.result !== 'win') stopAuto(`자동 진행 중단 — ${ctx.label}에서 패배`);
     setBattle({ sim, enemies: enc.enemies, party, summary: r.summary, ctx, xp: { before: expSnap(save), after: expSnap(r.save) }, key: Date.now() });
     setView('battle');
