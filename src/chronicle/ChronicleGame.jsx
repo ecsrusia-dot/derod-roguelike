@@ -14,7 +14,7 @@ import UpdateButton from '../components/ui/UpdateButton.jsx';
 import { GAME_VERSION } from '../data/version.js';
 import {
   CHRONICLE_TITLE, CHRONICLE_SUB, CHRONICLE_PARTS, CHRONICLE_SAVE_KEY, CHRONICLE_SAVE_KEY_V1, CHRONICLE_TUNING, CHRONICLE_CLASSES, CHRONICLE_FIELDS,
-  CHRONICLE_SKILLS, CHRONICLE_DUNGEON, CHRONICLE_DUNGEONS, DUNGEON_TIERS, dungeonDef, STAT_META, STAT_KEYS, SKILL_MAX_LV, MASTERY_PCT, BOSS_DAILY_LIMIT, BOSS_MECHS, DUNGEON_KEYS, GRADES, gradeIdx, SLOTS, FORGE, UNIQUE_CHANCE, UNIQUE_ITEMS, fieldStages, FIELD_STAGES, BOOST, BAG_EXPAND,
+  CHRONICLE_SKILLS, CHRONICLE_DUNGEON, CHRONICLE_DUNGEONS, DUNGEON_TIERS, dungeonDef, STAT_META, STAT_KEYS, SKILL_MAX_LV, MASTERY_PCT, BOSS_DAILY_LIMIT, BOSS_MECHS, DUNGEON_KEYS, GRADES, gradeIdx, SLOTS, FORGE, UNIQUE_CHANCE, UNIQUE_ITEMS, fieldStages, FIELD_STAGES, AUTO_CLIMB, BOOST, BAG_EXPAND,
   chronicleClass, classSkills, describeSkill, chronicleEnemyArt, expNeedFor, rebirthExpMult, REBIRTH, REBIRTH_BRANCHES, rebirthBranches,
 } from './data.js';
 import * as E from './engine.js';
@@ -387,7 +387,7 @@ function BattleLogLine({ e, latest, unitOf }) {
 
 // ===== 전투 재생 =====
 const SPEEDS = [1, 2, 4];
-function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boostLeft = 0, onAskBoost, dungeonAuto = false, onToggleDungeonAuto, autoProg = false, onStopAuto, onReplayDone, sessionReport = null, holdAuto = false, towerAuto = false, onToggleTowerAuto, onIdle = null }) {
+function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boostLeft = 0, onAskBoost, dungeonAuto = false, onToggleDungeonAuto, autoProg = false, onStopAuto, onReplayDone, sessionReport = null, holdAuto = false, towerAuto = false, onToggleTowerAuto, onIdle = null, autoClimb = false, onToggleClimb }) {
   const { sim, enemies, party, summary, ctx, xp } = battle;
   const [idx, setIdx] = useState(0);
   const [stats, setStats] = useState(null); // 전투 집계 (1.215.1)
@@ -634,6 +634,7 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
                 {summary.dungeonClear && <div className="chr-chip font-semibold" style={{ color: '#c08ae8' }}>던전 정복!</div>}
                 {summary.towerCoins ? <div className="chr-chip" style={{ color: '#e8b04a' }}>✪ 첨탑 주화 +{summary.towerCoins}{summary.towerWeekly ? ` (주간 ${summary.towerFloor}층 첫 도달 +${summary.towerWeekly} 포함)` : ''}</div> : null}
                 {summary.towerCheckpoint ? <div className="chr-chip font-semibold" style={{ color: '#9cc4e4' }}>🚩 {summary.towerCheckpoint}층 체크포인트 저장 — 다음 도전은 {summary.towerCheckpoint + 1}층부터</div> : null}
+                {summary.climb ? <div className="chr-chip font-semibold" style={{ color: MS.gold }}>⏫ 다음 사냥 {summary.climb.label} (Lv.{summary.climb.lv}) — {summary.climb.why === 'low' ? '적 레벨이 낮아 한 단계 올림' : `${AUTO_CLIMB.easyStreak}연속 손쉬운 승리`}</div> : null}
                 {summary.gateOpen ? <div className="chr-chip font-semibold" style={{ color: PALETTE.legendary }}>⚔ 처치 목표 달성 — 관문 도전 가능!</div> : null}
                 {summary.stageClear ? <div className="chr-chip font-semibold" style={{ color: '#9cc4e4' }}>🔓 스테이지 {summary.stageClear} 관문 통과!</div> : null}
                 {summary.famShards || summary.famSouls ? <div className="chr-chip" style={{ color: '#d07ae8' }}>{summary.famShards ? `📜 계약서 조각 +${summary.famShards}` : ''}{summary.famShards && summary.famSouls ? ' · ' : ''}{summary.famSouls ? `🔮 사역혼 +${summary.famSouls}` : ''}</div> : null}
@@ -669,6 +670,7 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
                 sessionReport && ['📋 사냥 보고서', () => setStats(sessionReport), { color: MS.gold }],
                 battle.runReport && [battle.runReport.kind === 'tower' ? '🗼 첨탑 집계' : '🏰 던전 집계', () => setStats(battle.runReport), { color: '#c08ae8' }],
                 next && [`⏸ 잠시 멈추기`, onDone, { color: PALETTE.textDim }],
+                onToggleClimb && !autoProg && ctx.kind === 'field' && ctx.type !== 'boss' && [autoClimb ? '⏫ 자동 상향 켬' : '⏫ 자동 상향 끔', onToggleClimb, autoClimb ? { color: MS.gold } : { color: PALETTE.textDim }],
                 !next && ctx.kind === 'field' && sim.result === 'win' && ctx.type !== 'boss' && ['⚔ 한 번 더', onAgain, {}],
               ].filter(Boolean);
               return <>
@@ -4177,6 +4179,10 @@ export default function ChronicleGame({ onExit }) {
   const [toast, setToast] = useState(null);
   const [scene, setScene] = useState(null); // { scene, replay, after }
   const lastFieldRef = useRef(null);
+  // 반복 사냥 자동 상향 (1.272.0) — 기본 켬, 연속 「쉬운 승리」 수는 easyRef
+  const [autoClimb, setAutoClimb] = useState(() => { try { return localStorage.getItem('chronicleAutoClimb') !== '0'; } catch { return true; } });
+  const toggleClimb = () => { const v = !autoClimb; setAutoClimb(v); try { localStorage.setItem('chronicleAutoClimb', v ? '1' : '0'); } catch { /* */ } };
+  const easyRef = useRef(0);
   const rng = Math.random;
   // 반복 사냥 보고서 (1.213.0)
   const repStatsRef = useRef(null);
@@ -4396,6 +4402,7 @@ export default function ChronicleGame({ onExit }) {
       // 자동 진행: 보스 앞 이야기는 본 것으로 처리하고 바로 싸운다 (게시판 「이야기」에서 다시 볼 수 있음)
       for (let sc = Q.nextScene(save, { at: 'bossPre', fieldId: field.id }); sc; sc = Q.nextScene(save, { at: 'bossPre', fieldId: field.id })) save = Q.markSceneSeen(save, sc);
     } else if (boss && playScene({ at: 'bossPre', fieldId: field.id }, () => flash('준비되면 「보스 도전」을 누르세요'))) return; // 보스 앞 장면 먼저 (저장 반영 후 다시 도전)
+    if (mode === 'hunt' && (lastFieldRef.current?.field.id !== field.id || lastFieldRef.current?.stage !== stage)) easyRef.current = 0;
     if (mode === 'hunt') { lastFieldRef.current = { field, stage }; try { localStorage.setItem(LAST_HUNT_KEY, JSON.stringify({ hero: save.hero, fieldId: field.id, stage })); } catch { /* */ } }
     const enc = mode === 'gate' ? E.rollGateEncounter(field, stage, rng) : E.rollFieldEncounter(field, rng, boss, null, boss ? null : stage);
     enc.enemies = E.scaleEnemiesForRebirth(save, enc.enemies);
@@ -4405,6 +4412,17 @@ export default function ChronicleGame({ onExit }) {
     const r = E.applyBattle(save, ctx, sim, rng);
     r.summary.questsDone = Q.newlyDoneQuests(save, r.save);
     if (mode === 'hunt' && !E.gateReady(save, field.id, stage) && E.gateReady(r.save, field.id, stage)) r.summary.gateOpen = true;
+    // 반복 사냥 자동 상향 — 쉬우면 다음 「한 번 더」부터 한 단계 위에서
+    if (mode === 'hunt' && repeat && autoClimb && !opts.auto && sim.result === 'win') {
+      easyRef.current = E.isEasyWin(sim, party) ? easyRef.current + 1 : 0;
+      const up = E.autoClimbCheck(r.save, field, stage, easyRef.current);
+      if (up) {
+        lastFieldRef.current = { field: up.field, stage: up.stage };
+        easyRef.current = 0;
+        try { localStorage.setItem(LAST_HUNT_KEY, JSON.stringify({ hero: save.hero, fieldId: up.field.id, stage: up.stage })); } catch { /* */ }
+        r.summary.climb = { label: `${up.field.name} ${up.stage + 1}`, lv: up.lv, why: up.why };
+      }
+    }
     setSave(r.save);
     trackDaily(winDeltas(sim, enc.enemies));
     const rec = huntRecord(sim, party, enc, r.summary, readSpeedPref(E.boostLeftMs(save)), ctx.label);
@@ -4513,6 +4531,7 @@ export default function ChronicleGame({ onExit }) {
         dungeonAuto={dungeonAuto} onToggleDungeonAuto={toggleDungeonAuto}
         towerAuto={towerAuto} onToggleTowerAuto={toggleTowerAuto}
         onIdle={autoRunning ? () => setIdle(true) : null}
+        autoClimb={autoClimb} onToggleClimb={toggleClimb}
         boostLeft={E.boostLeftMs(save)} onAskBoost={() => setBoostSheet(true)} />
     );
   } else if (view === 'field') {

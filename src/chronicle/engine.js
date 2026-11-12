@@ -6,7 +6,7 @@
 // ============================================
 import { levelCap, globalBuffFx } from './roster.js';
 import { talentFx, canLearnTalent, talentNode, talentResetCost, talentTrees, tierUnlocked } from './talents.js';
-import { BOSS_MECHS, BOSS_MECH_OF, fieldStages, FIELD_STAGES, STAGE_TUNING, BOOST, BAG_EXPAND, SALVAGE, SALVAGE_ICON, REBIRTH, REBIRTH_BRANCHES, expNeedFor, OPTION_LV_CURVE } from './data.js';
+import { BOSS_MECHS, BOSS_MECH_OF, fieldStages, FIELD_STAGES, STAGE_TUNING, AUTO_CLIMB, BOOST, BAG_EXPAND, SALVAGE, SALVAGE_ICON, REBIRTH, REBIRTH_BRANCHES, expNeedFor, OPTION_LV_CURVE } from './data.js';
 import { TOWER, TOWER_SHOP, towerUnlocked, isTowerBoss, towerEnemyLv, towerArea, towerFloorPicks, towerTheme, kstWeekKey } from './tower.js';
 import { famCombatant, famRole, famSubFx, famOwnFx, famBondFx, rollFamShards, rollFamSouls, gainFamExp, FAM_AI, FAM_TUNING, summonFamiliars, enhanceFamiliar, evolveFamiliar } from './familiar.js';
 import {
@@ -938,6 +938,29 @@ export function autoProgressStep(save, field) {
   const i = st.cleared;
   return gateReady(save, f.id, i) ? { field: f, mode: 'gate', stage: i } : { field: f, mode: 'hunt', stage: i };
 }
+// 반복 사냥 자동 상향 (1.272.0) — 한 단계 위 사냥 자리. 막혔으면 { blocked: 'gate'|'field'|'end' }
+export function nextHuntStage(save, field, stage) {
+  if (stage + 1 < FIELD_STAGES) return stageUnlocked(save, field.id, stage + 1) ? { field, stage: stage + 1 } : { blocked: 'gate' };
+  const nf = CHRONICLE_FIELDS[field.id]; // id는 1부터 — 다음 지역
+  if (!nf) return { blocked: 'end' };
+  return fieldUnlocked(save, nf.id) ? { field: nf, stage: 0 } : { blocked: 'field' };
+}
+// easyStreak = 연속 「쉬운 승리」 수 → { field, stage, why: 'low'|'easy', lv } 또는 null
+export function autoClimbCheck(save, field, stage, easyStreak) {
+  const heroLv = save.units[save.hero]?.lv || 1;
+  const lv = fieldStages(field)[stage].lv;
+  const low = lv <= heroLv - AUTO_CLIMB.lowGap;
+  if (!low && easyStreak < AUTO_CLIMB.easyStreak) return null;
+  const nx = nextHuntStage(save, field, stage);
+  if (!nx.field) return null;
+  const nlv = fieldStages(nx.field)[nx.stage].lv;
+  if (nlv - heroLv >= AUTO_CLIMB.maxGap) return null;
+  return { ...nx, lv: nlv, why: low ? 'low' : 'easy' };
+}
+export const isEasyWin = (sim, party) => {
+  const h = party.find(u => u.leader) || party[0];
+  return sim.result === 'win' && sim.rounds <= AUTO_CLIMB.easyRounds && (sim.finalHp?.[h.id] || 0) >= h.maxHp * AUTO_CLIMB.easyHp;
+};
 // 관문 강적 — 그 스테이지 강적 1 + 일반 1, 레벨 +1
 export function rollGateEncounter(field, stageIdx, rng) {
   const lv = fieldStages(field)[stageIdx].lv + STAGE_TUNING.gateLvAdd;
