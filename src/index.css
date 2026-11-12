@@ -840,3 +840,17 @@ body {
 @keyframes chr-idle-slide { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
 .chr-idle-slide-txt { animation: chr-idle-slide 2.2s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .chr-idle-slide-txt { animation: none; } }
+
+/* 직업별 밀어서 해제 (1.273.4) */
+@keyframes chr-slide-spin { to { transform: rotate(360deg); } }
+@keyframes chr-slide-sheen { 0% { transform: translateX(-60%); } 100% { transform: translateX(60%); } }
+@keyframes chr-slide-chev { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+@keyframes chr-slide-float { 0%, 100% { translate: 0 0; } 50% { translate: 3px -3px; } }
+@keyframes chr-slide-burst { 0% { opacity: 0; transform: scale(.9); } 30% { opacity: 1; } 100% { opacity: 0; transform: scale(1.15); } }
+.chr-slide-ring { animation: chr-slide-spin 4s linear infinite; }
+.chr-slide-sheen { background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,.12) 50%, transparent 60%); animation: chr-slide-sheen 3.2s ease-in-out infinite; }
+.chr-slide-chev { opacity: .25; font-size: 16px; animation: chr-slide-chev 1.2s ease-in-out infinite; }
+.chr-slide-pt { display: block; animation: chr-slide-float 2s ease-in-out infinite; }
+.chr-slide-burst { animation: chr-slide-burst .4s ease-out forwards; }
+.chr-slide-border { -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; padding: 1.2px; }
+@media (prefers-reduced-motion: reduce) { .chr-slide-ring, .chr-slide-sheen, .chr-slide-chev, .chr-slide-pt, .chr-slide-burst { animation: none; } }
