@@ -1646,11 +1646,12 @@ function BagView({ save, setSave, onBack, flash, onForge }) {
           ))}
         </div>
         <div className="flex items-center gap-1.5 py-2" style={{ fontSize: 12 }}>
-          <span style={{ color: PALETTE.textDim }}>보관 <b style={{ color: PALETTE.text }}>{bagList.length}</b> · 정렬 <b style={{ color: MS.gold }}>{SORT_LABEL[sortBy] || '전투력'}</b>{ev.target ? <span style={{ display: 'block', fontSize: 11.5, whiteSpace: 'nowrap' }}>⚔ 효율 기준 <b style={{ color: PALETTE.text }}>{GE.evalTargetLabel(ev.target)}</b></span> : null}</span>
+          <span style={{ color: PALETTE.textDim }}>보관 <b style={{ color: PALETTE.text }}>{bagList.length}</b> · 정렬 <b style={{ color: MS.gold }}>{SORT_LABEL[sortBy] || '전투력'}</b></span>
           <div className="flex-1" />
           <button onClick={() => setManage(true)} className="ui-press" style={{ fontSize: 12, padding: '5px 10px', border: `1px solid ${MS.line}`, background: MS.box, color: PALETTE.text }}>⚙ 관리</button>
           <button onClick={() => (picking ? endPick() : setPicking(true))} className="ui-press" style={{ fontSize: 12, padding: '5px 10px', border: `1px solid ${picking ? MS.gold : MS.line}`, background: picking ? 'rgba(232,176,74,0.12)' : MS.box, color: picking ? MS.gold : PALETTE.text }}>{picking ? '선택 끝' : '☑ 선택'}</button>
         </div>
+        {ev.target && <div style={{ fontSize: 11.5, color: PALETTE.textDim, marginTop: -4, paddingBottom: 6 }}>⚔ 효율 기준 <b style={{ color: PALETTE.text }}>{GE.evalTargetLabel(ev.target)}</b></div>}
       </div>
       <div className="flex-1 overflow-y-auto px-4 pb-3">
         <div className="flex flex-col gap-1.5">
@@ -2866,10 +2867,11 @@ function ForgeView({ save, setSave, onBack, flash, onTrack = () => {} }) {
         <EquipBoxes save={save} hero={hero} onPick={(sl, it) => (it ? setSel(it.uid) : setFilter(sl.id))} sub={(it) => { const r = forgeNextRate(it); return `+${it.plus || 0} · ${r == null ? '최대' : `다음 ${Math.round(r * 100)}%`}`; }} />
         <div className="mt-2"><MainTabs items={[['all', '전체'], ...SLOTS.map(s => [s.id, s.label]), ['other', '타직업']]} value={filter} onChange={setFilter} size={12.5} /></div>
         <div className="flex items-center gap-1.5 py-2" style={{ fontSize: 12 }}>
-          <span style={{ color: PALETTE.textDim }}>보관 <b style={{ color: PALETTE.text }}>{bagList.length}</b> · 정렬 <b style={{ color: MS.gold }}>{SORT_LABEL[sortBy] || '전투력'}</b>{ev.target ? <span style={{ display: 'block', fontSize: 11.5, whiteSpace: 'nowrap' }}>⚔ 효율 기준 <b style={{ color: PALETTE.text }}>{GE.evalTargetLabel(ev.target)}</b></span> : null}</span>
+          <span style={{ color: PALETTE.textDim }}>보관 <b style={{ color: PALETTE.text }}>{bagList.length}</b> · 정렬 <b style={{ color: MS.gold }}>{SORT_LABEL[sortBy] || '전투력'}</b></span>
           <div className="flex-1" />
           <button onClick={() => setRulesOpen(true)} className="ui-press" style={{ fontSize: 12, padding: '5px 10px', border: `1px solid ${MS.line}`, background: MS.box, color: PALETTE.text }}>ⓘ 규칙 · 정렬</button>
         </div>
+        {ev.target && <div style={{ fontSize: 11.5, color: PALETTE.textDim, marginTop: -4, paddingBottom: 6 }}>⚔ 효율 기준 <b style={{ color: PALETTE.text }}>{GE.evalTargetLabel(ev.target)}</b></div>}
       </div>
       <div className="flex-1 overflow-y-auto px-4 pb-3">
         <div className="flex flex-col gap-1.5">
