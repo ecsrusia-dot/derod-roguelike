@@ -882,7 +882,7 @@ function TownView({ save, acc, go, onExit, onSwitchChar }) {
     const L = [];
     if (hero.points > 0 || hero.sp > 0) L.push({ id: 'party', icon: '🧭', t: `성장 포인트 사용${hero.points ? ` · 능력치 ${hero.points}` : ''}${hero.sp ? ` · 스킬 ${hero.sp}` : ''}` });
     if (qBadge > 0) L.push({ id: 'quests', icon: '📜', t: `의뢰 게시판 새 소식 ${qBadge}건` });
-    const dB = D.dailyBadge(acc); if (dB) L.push({ id: 'daily', icon: '📅', t: `일일 임무 보상 ${dB}건` });
+    const dB = D.dailyBadge(acc) + D.weeklyBadge(acc); if (dB) L.push({ id: 'daily', icon: '📅', t: `일일·주간 임무 보상 ${dB}건` });
     if (nextField && E.fieldUnlocked(save, nextField.id)) {
       const st = E.stageState(save, nextField.id);
       if (E.bossReady(save, nextField.id)) L.push({ id: 'field', icon: '👑', t: `${nextField.name} 보스 도전 가능` });
@@ -908,7 +908,7 @@ function TownView({ save, acc, go, onExit, onSwitchChar }) {
     { id: 'fam', icon: '🐾', label: '사역마', sub: E.famSlotOpen(save, 'main') ? `📜 ${save.mats.famShard || 0} · 보유 ${Object.keys(save.fams || {}).length}` : `Lv.${F.FAM_TUNING.slotLv.main}부터 동행`, badge: (save.mats.famShard || 0) >= F.FAM_TUNING.shardsPerSummon },
     { id: 'stash', icon: '🏛', label: '공용 창고', sub: `${(save.stash || []).length}/${A.STASH_MAX} · 모든 캐릭터 공유` },
     { id: 'forge', icon: '⚒', label: '대장간', sub: '강화 · 등급 승급' },
-    { id: 'daily', icon: '📅', label: '일일 임무', sub: (() => { const n = D.DAILY_MISSIONS.filter(m => D.missionState(acc, m).status !== 'progress').length; return `오늘 ${n}/${D.DAILY_MISSIONS.length} 달성`; })(), badge: D.dailyBadge(acc) > 0 },
+    { id: 'daily', icon: '📅', label: '일일 · 주간 임무', sub: (() => { const n = D.DAILY_MISSIONS.filter(m => D.missionState(acc, m).status !== 'progress').length; const w = D.WEEKLY_MISSIONS.filter(m => D.weeklyMissionState(acc, m).status !== 'progress').length; return `오늘 ${n}/${D.DAILY_MISSIONS.length} · 주간 ${w}/${D.WEEKLY_MISSIONS.length}`; })(), badge: D.dailyBadge(acc) + D.weeklyBadge(acc) > 0 },
     { id: 'exit', icon: '⇄', label: '게임 선택', sub: '진행은 자동 저장' },
   ];
   const byId = Object.fromEntries(tiles.map(t => [t.id, t]));
@@ -3293,12 +3293,27 @@ function QuestView({ save, setSave, onBack, flash, onReplay }) {
         flash(r.gained?.item ? `보상 수령 — ${E.itemName(r.gained.item)} 획득` : r.gained?.keysGot ? `보상 수령 — 🗝 열쇠 +${r.gained.keysGot}` : '보상 수령!');
       }} />
   );
-  const sec = (title, n) => (
+  const bulk = (label, onClick, hot) => (
+    <button onClick={onClick} className="ui-press" style={{ fontSize: 12, padding: '3px 11px', fontWeight: 800, border: `1px solid ${hot ? MS.red : MS.gold}`, background: hot ? 'rgba(224,87,76,0.22)' : 'rgba(232,176,74,0.12)', color: hot ? '#ff8a7e' : MS.gold }}>{label}</button>
+  );
+  const sec = (title, n, btn) => (
     <div className="flex items-center justify-between" style={{ margin: '10px 0 5px' }}>
-      <span style={{ fontSize: 12.5, letterSpacing: 4, color: MS.red, fontWeight: 700 }}>◆ {title}</span>
-      <span style={{ fontSize: 11.5, color: PALETTE.textDim }}>{n}</span>
+      <span style={{ fontSize: 12.5, letterSpacing: 4, color: MS.red, fontWeight: 700 }}>◆ {title} <span style={{ letterSpacing: 0, fontSize: 11.5, color: PALETTE.textDim, fontWeight: 400 }}>{n}</span></span>
+      {btn || null}
     </div>
   );
+  const claimAll = () => {
+    const r = Q.claimAllQuests(save, Math.random);
+    if (!r.n) return;
+    setSave(r.save);
+    flash(`의뢰 보상 ${r.n}건 수령${r.items.length ? ` — 장비 ${r.items.length}개` : ''}${r.keys ? ` · 🗝 열쇠 +${r.keys}` : ''}`);
+  };
+  const acceptAll = () => {
+    const r = Q.acceptAllQuests(save);
+    if (!r.n) return;
+    setSave(r.save);
+    flash(`의뢰 ${r.n}건 수락`);
+  };
   return (
     <div className="absolute inset-0 flex flex-col">
       <Header title="의뢰 게시판" onBack={onBack} right={<Wallet save={save} />} />
@@ -3307,10 +3322,10 @@ function QuestView({ save, setSave, onBack, flash, onReplay }) {
       </div>
       <div className="flex-1 overflow-y-auto px-3 pb-3 flex flex-col gap-1.5">
         {tab === 'board' && <>
-          {done.length > 0 && <>{sec('보상 받기', done.length)}{done.map(card)}</>}
+          {done.length > 0 && <>{sec('보상 받기', done.length, bulk(`전체 받기 ${done.length}`, claimAll, true))}{done.map(card)}</>}
           {sec('진행 중', active.length)}
           {active.length ? active.map(card) : <div style={{ fontSize: 12, color: PALETTE.textDim }}>수락한 의뢰가 없다</div>}
-          {sec('받을 수 있는 의뢰', avail.length)}
+          {sec('받을 수 있는 의뢰', avail.length, avail.length > 0 ? bulk(`전체 수락 ${avail.length}`, acceptAll) : null)}
           {avail.length ? avail.map(card) : <div style={{ fontSize: 12, color: PALETTE.textDim }}>지금 받을 수 있는 의뢰가 없다 — 새 지역을 열면 의뢰가 붙는다</div>}
         </>}
         {tab === 'done' && <div className="pt-2 flex flex-col gap-1.5">{claimed.map(item => <QuestCard key={item.q.id} save={save} item={item} />)}</div>}
@@ -3602,14 +3617,19 @@ function OfflineSheet({ pd, onClaim }) {
   );
 }
 
-// ===== 일일 임무 (1.233.0) =====
-function DailyView({ acc, onBack, onClaim, onBonus }) {
-  // 1.252.0 — 본편 스타일 (시안 ㉖)
-  const st = D.dailyState(acc);
-  const allClaimed = D.bonusReady(acc);
-  const states = D.DAILY_MISSIONS.map(m => ({ m, ms: D.missionState(acc, m) }));
+// ===== 일일 · 주간 임무 (1.233.0 · 1.274.0 캐릭터별 일일 + 주간 + 모두 받기) =====
+function DailyView({ acc, onBack, onAct, onSwitch }) {
+  const [tab, setTab] = useState('daily');
+  const weekly = tab === 'weekly';
+  const missions = weekly ? D.WEEKLY_MISSIONS : D.DAILY_MISSIONS;
+  const st = weekly ? D.weeklyState(acc) : D.dailyState(acc);
+  const bonusDef = weekly ? D.WEEKLY_BONUS : D.DAILY_BONUS;
+  const allClaimed = weekly ? D.weeklyBonusReady(acc) : D.bonusReady(acc);
+  const states = missions.map(m => ({ m, ms: weekly ? D.weeklyMissionState(acc, m) : D.missionState(acc, m) }));
   const fin = states.filter(x => x.ms.status !== 'progress').length;
   const left = states.filter(x => x.ms.status !== 'claimed').length;
+  const dB = D.dailyBadge(acc), wB = D.weeklyBadge(acc);
+  const ready = weekly ? wB : dB;
   const hot = { fontSize: 12, padding: '3px 12px', fontWeight: 800, border: `1px solid ${MS.red}`, background: 'rgba(224,87,76,0.22)', color: '#ff8a7e' };
   const sec = (title, right) => (
     <div className="flex items-center justify-between" style={{ margin: '12px 0 6px' }}>
@@ -3617,24 +3637,49 @@ function DailyView({ acc, onBack, onClaim, onBonus }) {
       <span style={{ fontSize: 11.5, color: PALETTE.textDim }}>{right}</span>
     </div>
   );
+  const chars = Object.keys(acc.chars || {});
   return (
     <div className="absolute inset-0 flex flex-col">
-      <Header title="일일 임무" onBack={onBack} right={<span style={{ fontSize: 11.5, color: PALETTE.textDim }}>매일 0시 초기화</span>} />
+      <Header title="임무" onBack={onBack} right={<span style={{ fontSize: 11.5, color: PALETTE.textDim }}>{weekly ? '매주 월요일 0시 초기화' : '매일 0시 초기화'}</span>} />
+      <div className="px-3 pt-1 flex-none">
+        <MainTabs value={tab} onChange={setTab} items={[['daily', '일일 임무', dB > 0], ['weekly', '주간 임무', wB > 0]]} />
+      </div>
       <div className="flex-1 overflow-y-auto px-4 pb-4">
-        {sec('오늘 진행', <b style={{ color: MS.gold, fontSize: 13 }}>{fin} / {states.length}</b>)}
+        {!weekly && chars.length > 1 && <>
+          {sec('캐릭터별 오늘 진행', '누르면 그 캐릭터로 전환')}
+          <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${chars.length}, 1fr)` }}>
+            {chars.map(cid => {
+              const cs = D.dailyCharSummary(acc, cid);
+              const on = cid === acc.active;
+              return (
+                <button key={cid} onClick={() => !on && onSwitch(cid)} className="ui-press flex flex-col items-center" style={{ padding: '6px 0 5px', border: `1px solid ${on ? MS.red : cs.bonus ? MS.gold : MS.line}`, background: on ? 'rgba(224,87,76,0.14)' : MS.box, position: 'relative' }}>
+                  <Portrait cid={cid} size={30} />
+                  <span style={{ fontSize: 11.5, marginTop: 3, fontWeight: 700, color: cs.bonus ? '#8fe08a' : cs.fin ? MS.gold : PALETTE.textDim }}>{cs.bonus ? '✔ 완주' : `${cs.fin}/${D.DAILY_MISSIONS.length}`}</span>
+                  {cs.ready > 0 && <span style={{ position: 'absolute', top: 3, right: 4, width: 7, height: 7, borderRadius: 4, background: MS.gold }} />}
+                </button>
+              );
+            })}
+          </div>
+        </>}
+        {sec(weekly ? '이번 주 진행' : '오늘 진행', <b style={{ color: MS.gold, fontSize: 13 }}>{fin} / {states.length}</b>)}
         <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${states.length}, 1fr)` }}>
           {states.map(({ m, ms }) => {
             const ok = ms.status !== 'progress';
             return <div key={m.id} className="text-center" style={{ padding: '6px 0', fontSize: 16, border: `1px solid ${ok ? MS.gold : MS.line}`, background: ok ? 'rgba(232,176,74,0.12)' : MS.box, opacity: ok ? 1 : 0.7 }}>{m.icon}</div>;
           })}
         </div>
-        {sec('임무', '어느 캐릭터로 해도 진행')}
+        <div className="flex items-center justify-between" style={{ margin: '12px 0 6px' }}>
+          <span style={{ fontSize: 12.5, letterSpacing: 4, color: MS.red, fontWeight: 700 }}>◆ 임무</span>
+          {ready > 0
+            ? <button onClick={() => onAct(weekly ? D.claimAllWeekly : D.claimAllDaily)} className="ui-press" style={hot}>모두 받기 {ready}</button>
+            : <span style={{ fontSize: 11.5, color: PALETTE.textDim }}>{weekly ? '모든 캐릭터의 기록을 합산' : '캐릭터마다 따로 진행'}</span>}
+        </div>
         <div className="flex flex-col gap-1.5">
           {states.map(({ m, ms }) => (
             <div key={m.id} style={{ padding: '9px 10px', background: MS.box, border: `1px solid ${ms.status === 'done' ? MS.gold : MS.line}`, opacity: ms.status === 'claimed' ? 0.6 : 1 }}>
               <div className="flex items-center justify-between gap-2">
                 <b style={{ fontSize: 13, color: PALETTE.text }}>{m.icon} {m.title}</b>
-                {ms.status === 'done' ? <button onClick={() => onClaim(m.id)} className="ui-press flex-none" style={hot}>받기</button>
+                {ms.status === 'done' ? <button onClick={() => onAct((a) => { const next = (weekly ? D.claimWeekly : D.claimDaily)(a, m.id); return { acc: next, n: next === a ? 0 : 1, reward: m.reward }; })} className="ui-press flex-none" style={hot}>받기</button>
                   : <span className="flex-none" style={{ fontSize: 12, color: ms.status === 'claimed' ? '#8fe08a' : PALETTE.textDim }}>{ms.status === 'claimed' ? '✔ 받음' : `${ms.cur}/${m.need}`}</span>}
               </div>
               <div style={{ margin: '5px 0 4px' }}><Bar v={ms.cur} max={m.need} color={ms.status === 'progress' ? '#7fa8d8' : MS.gold} h={4} /></div>
@@ -3642,8 +3687,8 @@ function DailyView({ acc, onBack, onClaim, onBonus }) {
             </div>
           ))}
         </div>
-        <button disabled={!allClaimed || st.bonus} onClick={onBonus} className="ui-press w-full mt-2" style={{ padding: '12px 0', fontSize: 13.5, fontWeight: 800, border: `1px solid ${allClaimed && !st.bonus ? MS.red : MS.line}`, background: allClaimed && !st.bonus ? 'rgba(224,87,76,0.2)' : 'transparent', color: st.bonus ? '#8fe08a' : allClaimed ? '#ff8a7e' : PALETTE.textDim }}>
-          🎁 모두 완료 보상 — {D.dailyRewardText(D.DAILY_BONUS.reward)} <span style={{ fontWeight: 400 }}>{st.bonus ? '(받음)' : allClaimed ? '' : `(${left}개 남음)`}</span>
+        <button disabled={!allClaimed || st.bonus} onClick={() => onAct((a) => { const next = (weekly ? D.claimWeeklyBonus : D.claimDailyBonus)(a); return { acc: next, n: next === a ? 0 : 1, reward: bonusDef.reward }; })} className="ui-press w-full mt-2" style={{ padding: '12px 0', fontSize: 13.5, fontWeight: 800, border: `1px solid ${allClaimed && !st.bonus ? MS.red : MS.line}`, background: allClaimed && !st.bonus ? 'rgba(224,87,76,0.2)' : 'transparent', color: st.bonus ? '#8fe08a' : allClaimed ? '#ff8a7e' : PALETTE.textDim }}>
+          🎁 모두 완료 보상 — {D.dailyRewardText(bonusDef.reward)} <span style={{ fontWeight: 400 }}>{st.bonus ? '(받음)' : allClaimed ? '' : `(${left}개 남음)`}</span>
         </button>
       </div>
     </div>
@@ -4713,7 +4758,7 @@ export default function ChronicleGame({ onExit }) {
   } else if (view === 'stash') {
     content = <StashView save={save} setSave={setSave} onBack={() => setView('town')} flash={flash} />;
   } else if (view === 'daily') {
-    content = <DailyView acc={acc} onBack={() => setView('town')} onClaim={(id) => { setAcc(a => D.claimDaily(a, id)); flash('일일 임무 보상 수령'); }} onBonus={() => { setAcc(a => D.claimDailyBonus(a)); flash(`오늘의 임무 완주 — ${D.dailyRewardText(D.DAILY_BONUS.reward)}`); }} />;
+    content = <DailyView acc={acc} onBack={() => setView('town')} onSwitch={(cid) => { setRepeat(false); setAcc(a => A.selectCharacter(a, cid)); }} onAct={(fn) => { const r = fn(acc); if (!r.n) return; setAcc(r.acc); flash(`임무 보상 ${r.n}건 수령 — ${D.dailyRewardText(r.reward)}`); }} />;
   } else if (view === 'forge') {
     content = <ForgeView save={save} setSave={setSave} onBack={() => setView('town')} flash={flash} onTrack={trackDaily} />;
   } else {
