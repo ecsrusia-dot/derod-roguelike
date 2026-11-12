@@ -1468,7 +1468,7 @@ function PartyView({ save, setSave, onBack, onForge }) {
               {rulesOpen && (
                 <div style={{ fontSize: 11.5, color: PALETTE.textDim, lineHeight: 1.6 }}>
                   ⏱ = 재사용 대기 (쓴 뒤 내 차례 N번은 못 씀){d.cdr || d.skillCdr ? <> · <b style={{ color: '#7fd1c8' }}>재사용 단축 반영됨</b> (모든 스킬 = 유니크·특성 / 스킬 하나 = 일반 장비 옵션)</> : null}<br />
-                  쓸 수 있는 스킬이 여럿이면 쿨타임이 아니라 <b style={{ color: PALETTE.text }}>상황 순서</b>로 고른다: 회복(위급) → 보호막 → 강화 → 도발(위급) → 광역(적 2명+) → 단일 중 가장 센 스킬 → 없으면 기본 공격<br />
+                  쓸 수 있는 스킬이 여럿이면 쿨타임이 아니라 <b style={{ color: PALETTE.text }}>상황 순서</b>로 고른다: 회복(위급) → 보호막 → 강화 → 도발(위급) → 지속 피해(안 걸린 적이 있을 때) → 광역(적 2명+) → 단일 중 가장 센 스킬 → 없으면 기본 공격<br />
                   스킬을 다 올리고 남은 포인트는 <b style={{ color: PALETTE.legendary }}>특성</b> 탭에서 찍는다.
                 </div>
               )}
@@ -3330,6 +3330,7 @@ const SKILL_WHEN_TEXT = {
   heal: 'HP가 낮은 아군이 위급할 때 (회복 우선)', healAll: '부상당한 아군이 2명 이상일 때', healShield: 'HP가 낮은 아군이 있을 때', healBuff: 'HP가 낮은 아군이 있을 때', hot: 'HP가 낮은 아군이 있을 때',
   shield: '보호막이 없을 때', buffAtk: '강화 효과가 꺼져 있을 때', rage: '강화 효과가 꺼져 있을 때', taunt: '위급할 때 적의 공격을 끌어온다',
   aoe: '살아 있는 적이 2명 이상일 때 (광역 우선)', passive: '항상 적용',
+  dot: '이 스킬의 지속 피해가 아직 안 걸린 적이 있을 때 (단일·광역 공격보다 먼저)',
 };
 const skillTarget = (s) => (/heal|shield|buff|hot/i.test(s.kind) ? (s.kind === 'heal' || s.kind === 'hot' || s.kind === 'healShield' || s.kind === 'healBuff' ? '아군 1명' : '아군 전체') : s.kind === 'rage' || s.kind === 'taunt' ? '자신' : s.kind === 'passive' ? '자신' : s.kind === 'aoe' || (s.kind === 'dot' && s.all) ? '적 전체' : '적 1명');
 const skillParts = (t) => String(t).split(/, | — | \+ (?=\d+턴간|보호막|그 적|방어|받는)/).filter(Boolean);
