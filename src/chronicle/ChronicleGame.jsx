@@ -1614,7 +1614,7 @@ function BagView({ save, setSave, onBack, flash, onForge }) {
   const bagList = sortBy === 'eff' ? effSort(bagList0, ev) : bagList0;
   // 1.267.0 자동 장착 — 실전 효율(+7 기준)이 착용보다 0.5% 이상 좋은 장비를 부위마다 1개씩
   const autoEquipEval = () => {
-    const cands = bagList0.filter(it => GE.canEvalItem(save, hero, it));
+    const cands = bagList0.filter(it => GE.canEvalItem(save, hero, it) && E.canWear(it, save.units[hero]));
     if (cands.some(it => ev.info(it).state === 'pending')) { flash('효율 계산 중입니다 — 잠시 뒤 다시 눌러 주세요'); return; }
     const best = {};
     for (const it of cands) { const inf = ev.info(it); if (inf.state !== 'ok') continue; const d = inf.full ? inf.full.delta : inf.delta; if (d < 0.005) continue; if (!best[it.slot] || d > best[it.slot].d) best[it.slot] = { it, d }; }
@@ -1759,23 +1759,24 @@ function useGearEval(save, items) {
   const itemsKey = items.map(i => `${i.uid}:${i.plus || 0}`).join(',');
   const fastKey = (it) => `${it.uid}:${it.plus || 0}|f`;
   const fullKey = (it) => `${it.uid}:${it.plus || 0}|F`;
-  const baseKey = (sl, full) => `base|${sl}|${full ? 'F' : 'f'}`;
+  const baseKey = (sl, full, lv = 0) => `base|${sl}|${full ? 'F' : 'f'}|${lv}`;
   const cands = items.filter(it => GE.canEvalItem(save, hero, it));
-  const deltaOf = (it) => { const b = cache.get(baseKey(it.slot)); const r = cache.get(fastKey(it)); return r && b ? GE.effDelta(r, b) : null; };
+  const lvOf = (it) => GE.evalLvOf(save, hero, it);
+  const deltaOf = (it) => { const b = cache.get(baseKey(it.slot, false, lvOf(it))); const r = cache.get(fastKey(it)); return r && b ? GE.effDelta(r, b) : null; };
   useEffect(() => {
     if (!target) return undefined;
     let alive = true; let id = null;
     const step = () => {
       if (!alive) return;
       const jobs = [];
-      for (const sl of [...new Set(cands.map(i => i.slot))]) jobs.push([baseKey(sl), () => GE.evalBaseline(save, hero, sl, target)]);
+      for (const sk of [...new Set(cands.map(i => `${i.slot}|${lvOf(i)}`))]) { const [sl, lv] = sk.split('|'); jobs.push([baseKey(sl, false, +lv), () => GE.evalBaseline(save, hero, sl, target, undefined, +lv)]); }
       for (const it of cands) jobs.push([fastKey(it), () => GE.evalCandidate(save, hero, it, target)]);
       let todo = jobs.filter(([k]) => !cache.has(k));
       if (!todo.length) {
         const top = cands.map(it => [it, deltaOf(it)]).filter(([, d]) => d != null && d > 0).sort((x, y) => y[1] - x[1]).slice(0, GE.GEAR_EVAL.topN).map(([it]) => it);
         const full = [];
         for (const it of top) {
-          full.push([baseKey(it.slot, true), () => GE.evalBaseline(save, hero, it.slot, target, GE.GEAR_EVAL.fullBattles)]);
+          full.push([baseKey(it.slot, true, lvOf(it)), () => GE.evalBaseline(save, hero, it.slot, target, GE.GEAR_EVAL.fullBattles, lvOf(it))]);
           full.push([fullKey(it), () => GE.evalCandidate(save, hero, it, target, GE.GEAR_EVAL.fullBattles)]);
         }
         todo = full.filter(([k]) => !cache.has(k));
@@ -1793,8 +1794,8 @@ function useGearEval(save, items) {
     if (!GE.canEvalItem(save, hero, it)) return { state: 'na' };
     const d = deltaOf(it);
     if (d == null) return { state: 'pending' };
-    const fb = cache.get(baseKey(it.slot, true)); const fr = cache.get(fullKey(it));
-    return { state: 'ok', delta: d, full: fr && fb ? { delta: GE.effDelta(fr, fb), win: fr.winRate, hp: fr.hpLeft, n: fr.battles } : null };
+    const fb = cache.get(baseKey(it.slot, true, lvOf(it))); const fr = cache.get(fullKey(it));
+    return { state: 'ok', atLv: lvOf(it) || 0, delta: d, full: fr && fb ? { delta: GE.effDelta(fr, fb), win: fr.winRate, hp: fr.hpLeft, n: fr.battles } : null };
   };
   return { target, info };
 }
@@ -1810,7 +1811,7 @@ function EvalChip({ info }) {
   if (info.state === 'pending') return <span style={{ fontSize: 11.5, color: PALETTE.textDim }}>효율 계산 중…</span>;
   const d = info.full ? info.full.delta : info.delta; const pct = Math.round(d * 1000) / 10;
   const c = pct >= 0.5 ? CMP_UP : pct <= -0.5 ? CMP_DN : PALETTE.textDim;
-  return <b style={{ fontSize: 12.5, color: c }}>효율 {pct >= 0.5 ? `▲${pct}%` : pct <= -0.5 ? `▼${Math.abs(pct)}%` : '= 비슷'}</b>;
+  return <b style={{ fontSize: 12.5, color: c }}>{info.atLv ? `Lv.${info.atLv} 시 ` : ''}효율 {pct >= 0.5 ? `▲${pct}%` : pct <= -0.5 ? `▼${Math.abs(pct)}%` : '= 비슷'}</b>;
 }
 // 1.267.1 PM 결정 「지금 기준 유지 + 설명」 — 각자 몇 강 기준으로 비교했는지 (+7 미만은 +7로 가정, 그 이상은 실제 단계)
 function EvalBasis({ it, cur }) {
