@@ -288,6 +288,11 @@ const champField = (id, name, concept, lv, bossLv, bossKills, color, boss) => ({
 // 처치 목표를 채우면 「관문 강적」 개방 → 이기면 다음 스테이지 · 6스테이지 관문 뒤에 지역 보스.
 export const FIELD_STAGES = 6;
 export const STAGE_TUNING = { gateLvAdd: 1, gateEliteMult: 1.0 };
+// 반복 사냥 자동 상향 (1.272.0 PM 요청) — 쉬우면 한 단계 위 스테이지(마지막이면 다음 지역 1스테이지)로
+//   lowGap: 스테이지 레벨이 내 레벨보다 이만큼 낮으면 즉시 (경험치 감쇠 시작점 expGap.free와 같음)
+//   easy*: 연속 easyStreak번 「남은 HP easyHp 이상 · easyRounds 라운드 이하」로 이기면
+//   maxGap: 다음 스테이지가 내 레벨보다 이만큼 높으면 올라가지 않음 (위압 1단계와 같음)
+export const AUTO_CLIMB = { lowGap: 5, easyStreak: 3, easyHp: 0.8, easyRounds: 4, maxGap: 3 };
 export function fieldStages(field) {
   const [a, b] = field.lv;
   const need = Math.ceil(field.bossKills / FIELD_STAGES);
