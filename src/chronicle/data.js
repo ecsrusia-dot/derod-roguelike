@@ -17,6 +17,11 @@ export const CHRONICLE_SAVE_KEY = 'dnt_chronicle_v2';    // 2.0 계정 저장
 
 export const CHRONICLE_TUNING = {
   pointsPerLevel: 4,          // 레벨업당 능력치 포인트
+  statResetGold: 300,         // 능력치 재분배 비용 (첫 1회 무료 · 이후 레벨 × 이 값) — 1.270.0
+  // 1.270.0 PM 결정 「4능력치 모두 쓸모 있게」 — 주 능력치 = 공격력(그대로), 비주 능력치 = 보조 효과
+  //   힘 = 방어 관통 · 지능 = 스킬 피해(+회복력) · 민첩 = 치명·회피(효율 절반)·속도 · 체력 = HP·방어
+  //   치명 상한(60%)을 넘는 몫은 치명 피해로 전환 (1%당 +critOverflow)
+  stat: { strPen: 0.004, strReduce: 0.001, intSkill: 0.004, agiCrit: 0.002, agiDodge: 0.001, agiChain: 0.0015, critOverflow: 1, softPerLv: 1.5, softMin: 30, softMult: 0.3 },
   spPerLevel: 1,              // 레벨업당 스킬 포인트
   maxLevel: 100,              // 1.211.0 2부 — 지역 9곳, 마지막 보스 Lv.100
   expNeed: (lv) => Math.round(60 * Math.pow(lv, 1.6)), // 1.219.0 ×2 (PM 결정)
@@ -83,20 +88,20 @@ export const CHRONICLE_TUNING = {
 
 // ===== 능력치 =====
 export const STAT_META = {
-  str: { label: '힘', desc: '물리 공격력 (검사·마족)' },
-  int: { label: '지능', desc: '마법 공격력·치유량 (술법사·사제)' },
-  agi: { label: '민첩', desc: '속도·치명타·회피 (정령사는 공격력)' },
-  vit: { label: '체력', desc: '최대 HP·방어' },
+  str: { label: '힘', desc: '공격력 (검사·마족 주 능력치) · 모든 직업: 방어 관통 +0.4%/점 · 받는 피해 -0.1%/점' },
+  int: { label: '지능', desc: '공격력 (술법사·사제 주 능력치) · 모든 직업: 스킬 피해 +0.4%/점 · 회복력' },
+  agi: { label: '민첩', desc: '공격력 (정령사 주 능력치) · 모든 직업: 치명 +0.2%/점 · 회피 +0.1%/점 · 추가 타격 +0.15%/점 · 속도 (치명 60%를 넘는 몫은 치명 피해로)' },
+  vit: { label: '체력', desc: '모든 직업: 최대 HP +10/점 · 방어 +0.8/점' },
 };
 export const STAT_KEYS = ['str', 'int', 'agi', 'vit'];
 
 // ===== 직업 =====
 const CLASS_EXTRA = {
-  wanderer:   { role: '탱커', main: 'str', base: { str: 14, int: 2, agi: 5, vit: 10 }, auto: { str: 2, vit: 2 }, magic: false },
-  sage:       { role: '광역 마법', main: 'int', base: { str: 2, int: 10, agi: 4, vit: 6 }, auto: { int: 2, vit: 2 }, magic: true },
-  demonblood: { role: '흡혈 전사', main: 'str', base: { str: 10, int: 2, agi: 4, vit: 5 }, auto: { str: 3, vit: 1 }, magic: false },
-  elf:        { role: '연사 딜러', main: 'agi', base: { str: 3, int: 4, agi: 10, vit: 5 }, auto: { agi: 3, vit: 1 }, magic: false },
-  priest:     { role: '치유사', main: 'int', base: { str: 3, int: 10, agi: 4, vit: 8 }, auto: { int: 2, vit: 2 }, magic: true },
+  wanderer:   { role: '탱커', main: 'str', base: { str: 14, int: 2, agi: 5, vit: 10 }, auto: { str: 2, agi: 1, vit: 2 }, magic: false },
+  sage:       { role: '광역 마법', main: 'int', base: { str: 2, int: 10, agi: 4, vit: 6 }, auto: { str: 1, int: 2, agi: 1, vit: 2 }, magic: true },
+  demonblood: { role: '흡혈 전사', main: 'str', base: { str: 10, int: 2, agi: 4, vit: 5 }, auto: { str: 5, int: 1, agi: 2, vit: 2 }, magic: false },
+  elf:        { role: '연사 딜러', main: 'agi', base: { str: 3, int: 4, agi: 10, vit: 5 }, auto: { str: 1, agi: 2, vit: 2 }, magic: false },
+  priest:     { role: '치유사', main: 'int', base: { str: 3, int: 10, agi: 4, vit: 8 }, auto: { str: 1, int: 5, agi: 1, vit: 3 }, magic: true },
 };
 export const CHRONICLE_CLASSES = CLASSES.map(c => ({
   id: c.id, name: c.name, color: c.color, image: c.image, combatImage: c.combatImage, winImage: c.winImage, lossImage: c.lossImage, startImage: c.startImage, quote: c.quote,
