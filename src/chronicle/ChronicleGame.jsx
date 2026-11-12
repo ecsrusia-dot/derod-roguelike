@@ -1643,7 +1643,7 @@ function BagView({ save, setSave, onBack, flash, onForge }) {
           ))}
         </div>
         <div className="flex items-center gap-1.5 py-2" style={{ fontSize: 12 }}>
-          <span style={{ color: PALETTE.textDim }}>보관 <b style={{ color: PALETTE.text }}>{bagList.length}</b> · 정렬 <b style={{ color: MS.gold }}>{SORT_LABEL[sortBy] || '전투력'}</b></span>
+          <span style={{ color: PALETTE.textDim }}>보관 <b style={{ color: PALETTE.text }}>{bagList.length}</b> · 정렬 <b style={{ color: MS.gold }}>{SORT_LABEL[sortBy] || '전투력'}</b>{ev.target ? <span style={{ display: 'block', fontSize: 11.5, whiteSpace: 'nowrap' }}>⚔ 효율 기준 <b style={{ color: PALETTE.text }}>{GE.evalTargetLabel(ev.target)}</b></span> : null}</span>
           <div className="flex-1" />
           <button onClick={() => setManage(true)} className="ui-press" style={{ fontSize: 12, padding: '5px 10px', border: `1px solid ${MS.line}`, background: MS.box, color: PALETTE.text }}>⚙ 관리</button>
           <button onClick={() => (picking ? endPick() : setPicking(true))} className="ui-press" style={{ fontSize: 12, padding: '5px 10px', border: `1px solid ${picking ? MS.gold : MS.line}`, background: picking ? 'rgba(232,176,74,0.12)' : MS.box, color: picking ? MS.gold : PALETTE.text }}>{picking ? '선택 끝' : '☑ 선택'}</button>
@@ -1741,7 +1741,7 @@ function BagView({ save, setSave, onBack, flash, onForge }) {
 // ⚠️ 결과는 저장 객체(save)별로 따로 둔다 — 계산 도중 저장이 바뀌면(사역마 경험치·보상 등) 기준과 후보가 다른 상태로 계산돼 같은 장비가 ▼로 보였다
 const gearEvalStore = new WeakMap();
 function useGearEval(save, items) {
-  const target = useMemo(() => P.previewTarget(save, readLastHunt()), [save]);
+  const target = useMemo(() => GE.evalTarget(save), [save]); // 1.268.0 다음 관문·지역 보스 기준
   const hero = save.hero;
   if (!gearEvalStore.has(save)) gearEvalStore.set(save, new Map());
   const cache = gearEvalStore.get(save);
@@ -2839,7 +2839,7 @@ function ForgeView({ save, setSave, onBack, flash, onTrack = () => {} }) {
         <EquipBoxes save={save} hero={hero} onPick={(sl, it) => (it ? setSel(it.uid) : setFilter(sl.id))} sub={(it) => { const r = forgeNextRate(it); return `+${it.plus || 0} · ${r == null ? '최대' : `다음 ${Math.round(r * 100)}%`}`; }} />
         <div className="mt-2"><MainTabs items={[['all', '전체'], ...SLOTS.map(s => [s.id, s.label]), ['other', '타직업']]} value={filter} onChange={setFilter} size={12.5} /></div>
         <div className="flex items-center gap-1.5 py-2" style={{ fontSize: 12 }}>
-          <span style={{ color: PALETTE.textDim }}>보관 <b style={{ color: PALETTE.text }}>{bagList.length}</b> · 정렬 <b style={{ color: MS.gold }}>{SORT_LABEL[sortBy] || '전투력'}</b></span>
+          <span style={{ color: PALETTE.textDim }}>보관 <b style={{ color: PALETTE.text }}>{bagList.length}</b> · 정렬 <b style={{ color: MS.gold }}>{SORT_LABEL[sortBy] || '전투력'}</b>{ev.target ? <span style={{ display: 'block', fontSize: 11.5, whiteSpace: 'nowrap' }}>⚔ 효율 기준 <b style={{ color: PALETTE.text }}>{GE.evalTargetLabel(ev.target)}</b></span> : null}</span>
           <div className="flex-1" />
           <button onClick={() => setRulesOpen(true)} className="ui-press" style={{ fontSize: 12, padding: '5px 10px', border: `1px solid ${MS.line}`, background: MS.box, color: PALETTE.text }}>ⓘ 규칙 · 정렬</button>
         </div>
@@ -2854,7 +2854,8 @@ function ForgeView({ save, setSave, onBack, flash, onTrack = () => {} }) {
       {rulesOpen && (
         <MainModal kicker="대 장 간" title="ⓘ 규칙 · 정렬" onClose={() => setRulesOpen(false)}>
           <div style={{ fontSize: 12.5, color: PALETTE.text, lineHeight: 1.7 }}>
-            <div>◇ 강화 +1당 능력치 <b style={{ color: MS.gold }}>+{Math.round(FORGE.enhancePct * 100)}%</b> · 최대 <b>+{FORGE.maxEnhance}</b></div>
+            <div>◇ 강화 능력치 <b style={{ color: MS.gold }}>+1~+7 단계당 +8%</b> · +8 <b>+12%</b> · +9 <b>+16%</b> · +10 <b>+22%</b> (누적 +{Math.round(FORGE.enhanceBonus[FORGE.maxEnhance] * 100)}%) · 옵션은 그 절반</div>
+            <div>◇ 옵션 수치는 장비 레벨 비례 — Lv.10 ×0.6 · Lv.60 ×1.0 · Lv.100 ×1.3</div>
             <div style={{ color: '#e07a6a' }}>◇ +3부터 실패 · +6부터 실패 시 하락 · +8부터 파괴 위험</div>
             <div>◇ 승급 = 다음 등급 + 옵션 1개 · 에픽 승급은 던전의 ◆ 고대 파편 필요</div>
             <div style={{ color: PALETTE.textDim }}>◇ 유니크·전승 장비는 승급 불가 (강화만)</div>

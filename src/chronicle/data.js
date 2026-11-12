@@ -520,6 +520,9 @@ export const OPTION_DEFS = {
   expPct: { label: '경험치', pct: true, v: [0.05, 0.10] },
   goldPct: { label: '골드', pct: true, v: [0.05, 0.10] },
 };
+// 1.268.0 PM 결정 「옵션도 장비 레벨 비례」 — 옵션 수치(%·속도) × 장비 레벨 배율
+//   [레벨, 배율] 점 사이는 직선 · Lv.10 이하 ×0.6 고정 · Lv.100 넘으면 같은 기울기로 계속
+export const OPTION_LV_CURVE = [[10, 0.6], [60, 1.0], [100, 1.3]];
 // 직업별 옵션 풀 (가중치) — 그 직업 장비에서만 뽑힌다
 export const OPTION_POOLS = {
   wanderer: { defPct: 4, counterPct: 4, counterDmg: 3, dmgReduce: 3, hpPct: 2, atkPct: 2, scdr: 2 },
@@ -602,7 +605,9 @@ export const UNIQUE_CHANCE = { boss: 0.005, dungeonBoss: [0.02, 0.05, 0.10] };
 
 export const FORGE = {
   maxEnhance: 10,
-  enhancePct: 0.08,                                    // +1당 능력치 +8%
+  enhancePct: 0.08,                                    // +1~+7 단계당 능력치 +8% (표시용 — 실제 계산은 enhanceBonus)
+  // 1.268.0 PM 결정 「고강화일수록 크게」 — 누적 보너스 (인덱스 = 강화 단계). +8 +12% · +9 +16% · +10 +22%
+  enhanceBonus: [0, 0.08, 0.16, 0.24, 0.32, 0.40, 0.48, 0.56, 0.68, 0.84, 1.06],
   enhanceCost: (n, ilv) => ({ gold: Math.round((20 + ilv * 4) * (n + 1)), essence: n + 1 }),
   // 등급 승급 (다음 등급으로)
   promoteCost: {

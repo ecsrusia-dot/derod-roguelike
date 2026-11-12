@@ -47,7 +47,8 @@ export function previewTarget(save, last) {
 
 // 한 상태로 N전 — encounters는 미리 굴린 조우 목록
 function runSide(save, target, encounters, seed, speed) {
-  let wins = 0, hpLeft = 0, ms = 0, exp = 0, gold = 0, essence = 0;
+  let wins = 0, hpLeft = 0, ms = 0, exp = 0, gold = 0, essence = 0, lossDmg = 0;
+  const noReward = target.mode === 'gate' || target.mode === 'boss'; // 장비 평가 (1.268.0) — 보상 계산 생략
   encounters.forEach((enc0, i) => {
     const enemies = E.scaleEnemiesForRebirth(save, enc0.enemies);
     const party = E.partyCombatants(save);
@@ -57,9 +58,16 @@ function runSide(save, target, encounters, seed, speed) {
     const last = [...sim.events].reverse().find(ev => ev.st && ev.st[hero.id]);
     const heroHp = last ? last.st[hero.id][0] : hero.hp;
     ms += battlePlayMs(sim, speed);
+    if (sim.result !== 'win') {
+      // 졌을 때 적에게 준 피해 비율 (적 전체 최대 HP 대비) — 보스처럼 아직 못 이기는 상대의 진척도
+      const tot = enemies.reduce((a, e) => a + (e.maxHp || e.hp || 0), 0);
+      const left = enemies.reduce((a, e) => { const ev = [...sim.events].reverse().find(x => x.st && x.st[e.id]); return a + Math.max(0, ev ? ev.st[e.id][0] : (e.hp || 0)); }, 0);
+      lossDmg += tot ? Math.max(0, 1 - left / tot) : 0;
+    }
     if (sim.result === 'win') {
       wins += 1;
       hpLeft += Math.max(0, heroHp) / hero.maxHp;
+      if (noReward) return;
       const ctx = { kind: 'field', fieldId: target.field.id, type: enc0.type, enemies, stage: target.stage };
       const r = E.applyBattle(save, ctx, sim, seededRng(seed + i * 104729 + 1));
       exp += r.summary.exp || 0;
@@ -70,7 +78,7 @@ function runSide(save, target, encounters, seed, speed) {
   const n = encounters.length;
   const perMin = (v) => (ms ? v * 60000 / ms : 0);
   return {
-    battles: n, winRate: wins / n, hpLeft: wins ? hpLeft / wins : 0, secPerBattle: ms / n / 1000,
+    battles: n, winRate: wins / n, hpLeft: wins ? hpLeft / wins : 0, secPerBattle: ms / n / 1000, lossDmg: n - wins ? lossDmg / (n - wins) : 0,
     expPerMin: perMin(exp), goldPerMin: perMin(gold), essencePerMin: perMin(essence),
   };
 }
@@ -78,7 +86,11 @@ function runSide(save, target, encounters, seed, speed) {
 // 지금(before) vs 바꾸면(after) — 같은 적·같은 난수
 export function previewCompare(before, after, target, { battles = PREVIEW.battles, speed = 2, seed = 12345 } = {}) {
   const encRng = seededRng(seed);
-  const encounters = Array.from({ length: battles }, () => E.rollFieldEncounter(target.field, encRng, false, null, target.stage));
+  // target.mode (1.268.0 장비 평가): 'gate' = 그 스테이지 관문 · 'boss' = 지역 보스 · 없으면 그 스테이지 사냥
+  const roll = target.mode === 'gate' ? () => E.rollGateEncounter(target.field, target.stage, encRng)
+    : target.mode === 'boss' ? () => E.rollFieldEncounter(target.field, encRng, true)
+      : () => E.rollFieldEncounter(target.field, encRng, false, null, target.stage);
+  const encounters = Array.from({ length: battles }, roll);
   return {
     before: runSide(before, target, encounters, seed + 1, speed),
     after: runSide(after, target, encounters, seed + 1, speed),
@@ -89,6 +101,10 @@ export function previewCompare(before, after, target, { battles = PREVIEW.battle
 // 한 상태의 효율만 (오프라인 보상 1.233.0)
 export function estimateRate(save, target, { battles = 40, speed = 1, seed = 777 } = {}) {
   const encRng = seededRng(seed);
-  const encounters = Array.from({ length: battles }, () => E.rollFieldEncounter(target.field, encRng, false, null, target.stage));
+  // target.mode (1.268.0 장비 평가): 'gate' = 그 스테이지 관문 · 'boss' = 지역 보스 · 없으면 그 스테이지 사냥
+  const roll = target.mode === 'gate' ? () => E.rollGateEncounter(target.field, target.stage, encRng)
+    : target.mode === 'boss' ? () => E.rollFieldEncounter(target.field, encRng, true)
+      : () => E.rollFieldEncounter(target.field, encRng, false, null, target.stage);
+  const encounters = Array.from({ length: battles }, roll);
   return runSide(save, target, encounters, seed + 1, speed);
 }
