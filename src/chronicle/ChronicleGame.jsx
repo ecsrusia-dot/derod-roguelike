@@ -25,6 +25,7 @@ import * as Q from './quest.js';
 import * as A from './account.js';
 import * as F from './familiar.js';
 import * as P from './preview.js';
+import * as GE from './gearEval.js';
 import * as O from './offline.js';
 import * as D from './daily.js';
 import * as BK from './backup.js';
@@ -1599,7 +1600,20 @@ function BagView({ save, setSave, onBack, flash, onForge }) {
   const [manage, setManage] = useState(false);
   const eqUids = Object.values(save.units[hero].equip).filter(v => v != null);
   const eqPower = eqUids.reduce((s, uid) => { const it = save.inventory.find(i => i.uid === uid); return s + (it ? E.itemPower(it) : 0); }, 0);
-  const bagList = list.filter(it => !E.equippedBy(save, it.uid));
+  const bagList0 = list.filter(it => !E.equippedBy(save, it.uid));
+  const ev = useGearEval(save, bagList0); // 1.267.0 실전 평가
+  const bagList = sortBy === 'eff' ? effSort(bagList0, ev) : bagList0;
+  // 1.267.0 자동 장착 — 실전 효율(+7 기준)이 착용보다 0.5% 이상 좋은 장비를 부위마다 1개씩
+  const autoEquipEval = () => {
+    const cands = bagList0.filter(it => GE.canEvalItem(save, hero, it));
+    if (cands.some(it => ev.info(it).state === 'pending')) { flash('효율 계산 중입니다 — 잠시 뒤 다시 눌러 주세요'); return; }
+    const best = {};
+    for (const it of cands) { const inf = ev.info(it); if (inf.state !== 'ok') continue; const d = inf.full ? inf.full.delta : inf.delta; if (d < 0.005) continue; if (!best[it.slot] || d > best[it.slot].d) best[it.slot] = { it, d }; }
+    const picks = Object.values(best);
+    if (!picks.length) { flash('지금 착용보다 효율이 좋은 장비가 없습니다'); return; }
+    let sv = save; for (const p of picks) sv = E.equipItem(sv, hero, p.it.uid);
+    setSave(sv); flash(`${picks.length}부위 교체 (실전 효율 기준)`);
+  };
   const mBtn = { height: 40, fontSize: 12.5, background: MS.box, border: `1px solid ${MS.line}`, color: PALETTE.text };
   const ec = E.bagExpandCost(save);
   return (
@@ -1629,7 +1643,7 @@ function BagView({ save, setSave, onBack, flash, onForge }) {
           ))}
         </div>
         <div className="flex items-center gap-1.5 py-2" style={{ fontSize: 12 }}>
-          <span style={{ color: PALETTE.textDim }}>보관 <b style={{ color: PALETTE.text }}>{bagList.length}</b> · 정렬 <b style={{ color: MS.gold }}>{sortBy === 'grade' ? '등급' : '전투력'}</b></span>
+          <span style={{ color: PALETTE.textDim }}>보관 <b style={{ color: PALETTE.text }}>{bagList.length}</b> · 정렬 <b style={{ color: MS.gold }}>{SORT_LABEL[sortBy] || '전투력'}</b></span>
           <div className="flex-1" />
           <button onClick={() => setManage(true)} className="ui-press" style={{ fontSize: 12, padding: '5px 10px', border: `1px solid ${MS.line}`, background: MS.box, color: PALETTE.text }}>⚙ 관리</button>
           <button onClick={() => (picking ? endPick() : setPicking(true))} className="ui-press" style={{ fontSize: 12, padding: '5px 10px', border: `1px solid ${picking ? MS.gold : MS.line}`, background: picking ? 'rgba(232,176,74,0.12)' : MS.box, color: picking ? MS.gold : PALETTE.text }}>{picking ? '선택 끝' : '☑ 선택'}</button>
@@ -1640,9 +1654,11 @@ function BagView({ save, setSave, onBack, flash, onForge }) {
           {bagList.map(it => {
             const usable = E.itemUsable(it, hero);
             const cur = usable ? save.inventory.find(x => x.uid === save.units[hero].equip[it.slot]) : null;
+            const wear = usable && E.canWear(it, save.units[hero]);
             return <MainGearCard key={it.uid} it={it} dim={!usable} note={usable ? null : clsTag(it)} picked={picking ? picked.has(it.uid) : null}
+              cmp={usable && !picking ? (cur || null) : undefined} evalInfo={usable && !picking ? ev.info(it) : null}
               onClick={() => (picking ? togglePick(it.uid) : setSel(it.uid))}
-              footer={usable ? <GearCmpFooter it={it} cur={cur} /> : <span style={{ color: PALETTE.textDim }}>타직업 장비 — 창고로 보내면 {it.cls === 'common' ? '다른 캐릭터' : chronicleClass(it.cls).name}가 쓴다</span>} />;
+              footer={usable ? <EvalFooter it={it} cur={cur} info={ev.info(it)} canWear={wear} needLv={it.ilv} onEquip={() => { setSave(E.equipItem(save, hero, it.uid)); flash(`${E.itemName(it)} 착용`); }} /> : <span style={{ color: PALETTE.textDim }}>타직업 장비 — 창고로 보내면 {it.cls === 'common' ? '다른 캐릭터' : chronicleClass(it.cls).name}가 쓴다</span>} />;
           })}
         </div>
         {!bagList.length && <div className="text-center py-10" style={{ fontSize: 12.5, color: PALETTE.textDim }}>{list.length ? '보관 중인 장비가 없습니다 — 착용 장비만 있어요' : '비어 있습니다 — 사냥터에서 장비를 모아 보세요'}</div>}
@@ -1665,7 +1681,7 @@ function BagView({ save, setSave, onBack, flash, onForge }) {
         <MainModal kicker="가 방 관 리" title="⚙ 관리" onClose={() => setManage(false)}>
           <MainSecHead title="정 리" />
           <div className="grid gap-1.5" style={{ gridTemplateColumns: '1fr 1fr' }}>
-            <button onClick={() => { setSave(E.autoEquip(save)); flash('더 강한 장비로 교체'); }} className="ui-press" style={{ ...mBtn, color: MS.gold, borderColor: `${MS.gold}88` }}>자동 장착</button>
+            <button onClick={autoEquipEval} className="ui-press" style={{ ...mBtn, color: MS.gold, borderColor: `${MS.gold}88` }}>자동 장착 (실전 효율)</button>
             <button disabled={!others.length} onClick={() => toStash(others.map(i => i.uid))} className="ui-press" style={{ ...mBtn, color: '#9cc4e4', opacity: others.length ? 1 : 0.45 }}>타직업 → 창고 ({others.length})</button>
             <button disabled={ec == null || save.gold < ec} onClick={() => { setSave(E.expandBag(save)); flash(`가방 +${BAG_EXPAND.step}칸`); }} className="ui-press" style={{ ...mBtn, gridColumn: 'span 2', opacity: ec == null || save.gold < ec ? 0.45 : 1 }}>{ec == null ? `가방 최대 확장 (${BAG_EXPAND.max}칸)` : `가방 +${BAG_EXPAND.step}칸 · 🪙 ${ec.toLocaleString()}`}</button>
           </div>
@@ -1685,8 +1701,8 @@ function BagView({ save, setSave, onBack, flash, onForge }) {
             분해·자동 분해에 타직업 장비 포함
           </button>
           <MainSecHead title="정 렬" />
-          <div className="grid gap-1.5" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
-            {[['power', '전투력 높은 순'], ['grade', '등급 높은 순'], ['level', '레벨 높은 순']].map(([v, l]) => <button key={v} onClick={() => pickSort(v)} className="ui-press" style={{ height: 36, fontSize: 12, border: `1px solid ${sortBy === v ? MS.gold : MS.line}`, color: sortBy === v ? MS.gold : PALETTE.textDim, background: sortBy === v ? 'rgba(232,176,74,0.12)' : MS.box }}>{l}</button>)}
+          <div className="grid gap-1.5" style={{ gridTemplateColumns: '1fr 1fr' }}>
+            {[['eff', '효율 높은 순 (실전)'], ['power', '전투력 높은 순'], ['grade', '등급 높은 순'], ['level', '레벨 높은 순']].map(([v, l]) => <button key={v} onClick={() => pickSort(v)} className="ui-press" style={{ height: 36, fontSize: 12, border: `1px solid ${sortBy === v ? MS.gold : MS.line}`, color: sortBy === v ? MS.gold : PALETTE.textDim, background: sortBy === v ? 'rgba(232,176,74,0.12)' : MS.box }}>{l}</button>)}
           </div>
         </MainModal>
       )}
@@ -1719,26 +1735,114 @@ function BagView({ save, setSave, onBack, flash, onForge }) {
 }
 
 // 장비 카드 — 성능 한눈에 (1.251.1 성장 정보 탭 → 1.252.0 공용 창고 공용)
-function MainGearCard({ it, onClick, note, dim = false, footer = null, tag = null, picked = null }) {
+// ===== 장비 실전 평가 (1.267.0) — PM 결정 「아이템 + 실전 시뮬 기준 · +7 강화 시로 비교」 =====
+// 1단계: 후보마다 짧은 시뮬(24전) → 지금 착용 대비 효율 % / 2단계: 착용보다 좋은 상위 3개만 80전으로 승률·남은 HP 확인
+// 화면을 막지 않도록 조금씩(setTimeout) 계산하고, 캐릭터 상태·사냥 기준이 같으면 결과를 재사용한다
+// ⚠️ 결과는 저장 객체(save)별로 따로 둔다 — 계산 도중 저장이 바뀌면(사역마 경험치·보상 등) 기준과 후보가 다른 상태로 계산돼 같은 장비가 ▼로 보였다
+const gearEvalStore = new WeakMap();
+function useGearEval(save, items) {
+  const target = useMemo(() => P.previewTarget(save, readLastHunt()), [save]);
+  const hero = save.hero;
+  if (!gearEvalStore.has(save)) gearEvalStore.set(save, new Map());
+  const cache = gearEvalStore.get(save);
+  const [, setTick] = useState(0);
+  const itemsKey = items.map(i => `${i.uid}:${i.plus || 0}`).join(',');
+  const fastKey = (it) => `${it.uid}:${it.plus || 0}|f`;
+  const fullKey = (it) => `${it.uid}:${it.plus || 0}|F`;
+  const baseKey = (sl, full) => `base|${sl}|${full ? 'F' : 'f'}`;
+  const cands = items.filter(it => GE.canEvalItem(save, hero, it));
+  const deltaOf = (it) => { const b = cache.get(baseKey(it.slot)); const r = cache.get(fastKey(it)); return r && b ? GE.effDelta(r, b) : null; };
+  useEffect(() => {
+    if (!target) return undefined;
+    let alive = true; let id = null;
+    const step = () => {
+      if (!alive) return;
+      const jobs = [];
+      for (const sl of [...new Set(cands.map(i => i.slot))]) jobs.push([baseKey(sl), () => GE.evalBaseline(save, hero, sl, target)]);
+      for (const it of cands) jobs.push([fastKey(it), () => GE.evalCandidate(save, hero, it, target)]);
+      let todo = jobs.filter(([k]) => !cache.has(k));
+      if (!todo.length) {
+        const top = cands.map(it => [it, deltaOf(it)]).filter(([, d]) => d != null && d > 0).sort((x, y) => y[1] - x[1]).slice(0, GE.GEAR_EVAL.topN).map(([it]) => it);
+        const full = [];
+        for (const it of top) {
+          full.push([baseKey(it.slot, true), () => GE.evalBaseline(save, hero, it.slot, target, GE.GEAR_EVAL.fullBattles)]);
+          full.push([fullKey(it), () => GE.evalCandidate(save, hero, it, target, GE.GEAR_EVAL.fullBattles)]);
+        }
+        todo = full.filter(([k]) => !cache.has(k));
+        if (!todo.length) return;
+      }
+      for (const [k, run] of todo.slice(0, 2)) cache.set(k, run());
+      setTick(t => t + 1);
+      id = setTimeout(step, 0);
+    };
+    id = setTimeout(step, 60);
+    return () => { alive = false; clearTimeout(id); };
+  }, [save, itemsKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const info = (it) => {
+    if (!target) return { state: 'none' };
+    if (!GE.canEvalItem(save, hero, it)) return { state: 'na' };
+    const d = deltaOf(it);
+    if (d == null) return { state: 'pending' };
+    const fb = cache.get(baseKey(it.slot, true)); const fr = cache.get(fullKey(it));
+    return { state: 'ok', delta: d, full: fr && fb ? { delta: GE.effDelta(fr, fb), win: fr.winRate, hp: fr.hpLeft, n: fr.battles } : null };
+  };
+  return { target, info };
+}
+const SORT_LABEL = { power: '전투력', grade: '등급', level: '레벨', eff: '효율' };
+function effSort(items, ev) {
+  const rank = (it) => { const i = ev.info(it); return i.state === 'ok' ? 3 : i.state === 'pending' ? 2 : 1; };
+  const val = (it) => { const i = ev.info(it); return i.state === 'ok' ? (i.full ? i.full.delta : i.delta) : 0; };
+  return items.slice().sort((a, b) => rank(b) - rank(a) || val(b) - val(a) || E.itemPower(b) - E.itemPower(a));
+}
+// 효율 칩 — 지금 착용 대비 (+7 기준 · 실전 시뮬)
+function EvalChip({ info }) {
+  if (!info || info.state === 'na' || info.state === 'none') return null;
+  if (info.state === 'pending') return <span style={{ fontSize: 11.5, color: PALETTE.textDim }}>효율 계산 중…</span>;
+  const d = info.full ? info.full.delta : info.delta; const pct = Math.round(d * 1000) / 10;
+  const c = pct >= 0.5 ? CMP_UP : pct <= -0.5 ? CMP_DN : PALETTE.textDim;
+  return <b style={{ fontSize: 12.5, color: c }}>효율 {pct >= 0.5 ? `▲${pct}%` : pct <= -0.5 ? `▼${Math.abs(pct)}%` : '= 비슷'}</b>;
+}
+// 카드 아래 줄 — 착용 비교 + 실전 결과 + 바로 착용 (가방)
+function EvalFooter({ it, cur, info, canWear, needLv, onEquip }) {
+  return <>
+    <div className="flex-1 min-w-0" style={{ lineHeight: 1.45 }}>
+      <div className="truncate" style={{ color: PALETTE.textDim }}>{cur ? <>vs 착용 「{E.itemName(cur)}{cur.plus ? ` +${cur.plus}` : ''}」 · 둘 다 +{GE.GEAR_EVAL.plusTarget} 기준</> : '빈 칸에 장착'}</div>
+      {info?.full && <div style={{ fontSize: 11, color: PALETTE.text }}>실전 {info.full.n}전 · 승률 <b>{Math.round(info.full.win * 100)}%</b> · 남은 HP <b>{Math.round(info.full.hp * 100)}%</b></div>}
+    </div>
+    {canWear
+      ? <span role="button" tabIndex={0} onClick={(e) => { e.stopPropagation(); onEquip(); }} className="ui-press flex-none" style={{ padding: '4px 14px', fontWeight: 800, fontSize: 12.5, border: `1px solid ${MS.gold}`, color: MS.gold }}>착용</span>
+      : <span className="flex-none" style={{ fontSize: 11.5, color: CMP_DN }}>Lv.{needLv} 필요</span>}
+  </>;
+}
+function MainGearCard({ it, onClick, note, dim = false, footer = null, tag = null, picked = null, cmp, evalInfo = null }) {
   const sl = SLOTS.find(x => x.id === it.slot);
-  const g = gradeOf(it.grade); const st = E.itemStats(it); const ud = E.uniqueDef(it); const eo = E.epicOptOf(it);
+  // 1.267.0 비교 모드(cmp !== undefined) — 양쪽 모두 +7 기준 능력치로 줄마다 ▲▼
+  const cmpMode = cmp !== undefined;
+  const itE = cmpMode ? GE.asEvalItem(it) : it;
+  const g = gradeOf(it.grade); const st = E.itemStats(itE); const ud = E.uniqueDef(it); const eo = E.epicOptOf(it);
+  const cst = cmpMode && cmp ? E.itemStats(GE.asEvalItem(cmp)) : {};
+  const fmtD = (k, d) => (BASE_STATS.includes(k) ? Math.round(Math.abs(d)).toLocaleString() : /%/.test(E.statLabel(k, 0.1)) ? `${Math.round(Math.abs(d) * 1000) / 10}` : `${Math.round(Math.abs(d) * 10) / 10}`);
+  const lbl = (k, v) => { if (BASE_STATS.includes(k)) return { l: BASE_LABEL[k] === '공격' ? '공격력' : BASE_LABEL[k], v: Math.round(v).toLocaleString(), base: true }; const t = E.statLabel(k, v); const m = t.match(/^(.*?)\s*([+-]?[\d.]+.*)$/); return { l: m ? m[1] : t, v: m ? m[2] : '' }; };
   const rows = Object.keys(st).filter(k => st[k]).sort((x, y) => (BASE_STATS.indexOf(x) + 1 || 99) - (BASE_STATS.indexOf(y) + 1 || 99)).map(k => {
-    if (BASE_STATS.includes(k)) return { k, l: BASE_LABEL[k] === '공격' ? '공격력' : BASE_LABEL[k], v: Math.round(st[k]).toLocaleString(), base: true };
-    const t = E.statLabel(k, st[k]); const m = t.match(/^(.*?)\s*([+-]?[\d.]+.*)$/); return { k, l: m ? m[1] : t, v: m ? m[2] : '' };
+    const r = { k, ...lbl(k, st[k]) };
+    if (cmpMode && cmp) { const d = st[k] - (cst[k] || 0); r.d = !cst[k] ? { t: '새 옵션', c: CMP_UP } : Math.abs(d) < 1e-6 ? null : { t: `${d > 0 ? '▲' : '▼'}${fmtD(k, d)}`, c: d > 0 ? CMP_UP : CMP_DN }; }
+    return r;
   });
+  if (cmpMode && cmp) for (const k of Object.keys(cst)) if (cst[k] && !st[k]) rows.push({ k, ...lbl(k, cst[k]), gone: true, d: { t: '▼ 사라짐', c: CMP_DN } });
   return (
     <button onClick={onClick} className="ui-press w-full text-left" style={{ opacity: dim ? 0.6 : 1, padding: '8px 10px 8px 12px', background: picked ? 'rgba(224,106,95,0.16)' : MS.box, border: `1px solid ${picked ? '#e06a5f' : MS.line}`, borderLeft: `3px solid ${g.color}` }}>
       <div className="flex items-baseline justify-between gap-2">
         <span className="truncate font-bold" style={{ fontSize: 13.5, color: g.color }}>{sl.icon} {E.itemName(it)}{it.plus ? ` +${it.plus}` : ''}{tag}</span>
         {picked != null ? <span className="flex-none flex items-center justify-center" style={{ width: 20, height: 20, border: `1.5px solid ${picked ? '#e06a5f' : MS.line}`, color: '#e06a5f', fontSize: 13 }}>{picked ? '✓' : ''}</span>
+          : evalInfo && evalInfo.state !== 'na' && evalInfo.state !== 'none' ? <span className="flex-none"><EvalChip info={evalInfo} /></span>
           : <b className="flex-none" style={{ fontSize: 12.5, color: MS.gold }}>⚔ {E.itemPower(it).toLocaleString()}</b>}
       </div>
-      <div style={{ fontSize: 11, color: PALETTE.textDim }}>{g.label} · Lv.{it.ilv} · {sl.label}{note ? <> · {note}</> : null}</div>
+      <div style={{ fontSize: 11, color: PALETTE.textDim }}>{g.label} · Lv.{it.ilv} · {sl.label}{cmpMode && (it.plus || 0) < GE.evalPlus(it) ? <> · <span style={{ color: MS.gold }}>+{GE.evalPlus(it)} 강화 시 능력치</span></> : null}{note ? <> · {note}</> : null}</div>
       <div className="grid mt-1" style={{ gridTemplateColumns: '1fr 1fr', columnGap: 12 }}>
         {rows.map(r => (
-          <div key={r.k} className="flex items-baseline justify-between gap-1" style={{ padding: '1px 0', minWidth: 0 }}>
-            <span className="truncate" style={{ fontSize: 11.5, color: PALETTE.textDim }}>{r.l}</span>
-            <span className="flex-none" style={{ fontSize: 12, fontWeight: 800, color: r.base ? PALETTE.text : MS.red }}>{r.v}</span>
+          <div key={r.k} className="flex items-baseline justify-between gap-1" style={{ padding: '1px 0', minWidth: 0, opacity: r.gone ? 0.7 : 1 }}>
+            <span className="truncate" style={{ fontSize: 11.5, color: PALETTE.textDim, textDecoration: r.gone ? 'line-through' : 'none' }}>{r.l}</span>
+            <span className="flex-none" style={{ fontSize: 12, fontWeight: 800, color: r.base ? PALETTE.text : MS.red, textDecoration: r.gone ? 'line-through' : 'none' }}>{r.v}{r.d && <span style={{ fontSize: 10.5, fontWeight: 700, marginLeft: 3, color: r.d.c, textDecoration: 'none', display: 'inline-block' }}>{r.d.t}</span>}</span>
           </div>
         ))}
       </div>
@@ -2672,7 +2776,9 @@ function ForgeView({ save, setSave, onBack, flash, onTrack = () => {} }) {
     setConfirm({ ...info, onConfirm: () => { forgeConfirmSkip = skipAsk; setConfirm(null); run(); } });
   };
   const hero = save.hero;
-  const bagList = list.filter(it => !E.equippedBy(save, it.uid));
+  const bagList0 = list.filter(it => !E.equippedBy(save, it.uid));
+  const ev = useGearEval(save, bagList0); // 1.267.0 실전 평가
+  const bagList = sortBy === 'eff' ? effSort(bagList0, ev) : bagList0;
   const by = item ? E.equippedBy(save, item.uid) : null;
   const maxed = item && (item.plus || 0) >= FORGE.maxEnhance;
   const doEnhance = () => guard(er.drop || er.breakChance > 0, {
@@ -2727,14 +2833,15 @@ function ForgeView({ save, setSave, onBack, flash, onTrack = () => {} }) {
         <EquipBoxes save={save} hero={hero} onPick={(sl, it) => (it ? setSel(it.uid) : setFilter(sl.id))} sub={(it) => { const r = forgeNextRate(it); return `+${it.plus || 0} · ${r == null ? '최대' : `다음 ${Math.round(r * 100)}%`}`; }} />
         <div className="mt-2"><MainTabs items={[['all', '전체'], ...SLOTS.map(s => [s.id, s.label]), ['other', '타직업']]} value={filter} onChange={setFilter} size={12.5} /></div>
         <div className="flex items-center gap-1.5 py-2" style={{ fontSize: 12 }}>
-          <span style={{ color: PALETTE.textDim }}>보관 <b style={{ color: PALETTE.text }}>{bagList.length}</b> · 정렬 <b style={{ color: MS.gold }}>{sortBy === 'grade' ? '등급' : '전투력'}</b></span>
+          <span style={{ color: PALETTE.textDim }}>보관 <b style={{ color: PALETTE.text }}>{bagList.length}</b> · 정렬 <b style={{ color: MS.gold }}>{SORT_LABEL[sortBy] || '전투력'}</b></span>
           <div className="flex-1" />
           <button onClick={() => setRulesOpen(true)} className="ui-press" style={{ fontSize: 12, padding: '5px 10px', border: `1px solid ${MS.line}`, background: MS.box, color: PALETTE.text }}>ⓘ 규칙 · 정렬</button>
         </div>
       </div>
       <div className="flex-1 overflow-y-auto px-4 pb-3">
         <div className="flex flex-col gap-1.5">
-          {bagList.map(it => <MainGearCard key={it.uid} it={it} onClick={() => setSel(it.uid)} footer={<ForgeFooter it={it} />} />)}
+          {bagList.map(it => { const usable = E.itemUsable(it, hero); const cur = usable ? save.inventory.find(x => x.uid === save.units[hero].equip[it.slot]) : null;
+            return <MainGearCard key={it.uid} it={it} onClick={() => setSel(it.uid)} cmp={usable ? (cur || null) : undefined} evalInfo={usable ? ev.info(it) : null} note={usable ? (cur ? `vs 착용 +${GE.evalPlus(cur)} 기준` : '빈 칸') : clsTag(it)} footer={<ForgeFooter it={it} />} />; })}
         </div>
         {!bagList.length && <div className="text-center py-10" style={{ fontSize: 12.5, color: PALETTE.textDim }}>{list.length ? '보관 중인 장비가 없습니다 — 착용 장비는 위 상자를 누르세요' : save.inventory.length ? '이 분류에 장비가 없습니다' : '가방에 장비가 없습니다'}</div>}
       </div>
@@ -2747,8 +2854,8 @@ function ForgeView({ save, setSave, onBack, flash, onTrack = () => {} }) {
             <div style={{ color: PALETTE.textDim }}>◇ 유니크·전승 장비는 승급 불가 (강화만)</div>
           </div>
           <MainSecHead title="정 렬" />
-          <div className="grid gap-1.5" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
-            {[['power', '전투력 높은 순'], ['grade', '등급 높은 순'], ['level', '레벨 높은 순']].map(([v, l]) => <button key={v} onClick={() => pickSort(v)} className="ui-press" style={{ height: 36, fontSize: 12, border: `1px solid ${sortBy === v ? MS.gold : MS.line}`, color: sortBy === v ? MS.gold : PALETTE.textDim, background: sortBy === v ? 'rgba(232,176,74,0.12)' : MS.box }}>{l}</button>)}
+          <div className="grid gap-1.5" style={{ gridTemplateColumns: '1fr 1fr' }}>
+            {[['eff', '효율 높은 순 (실전)'], ['power', '전투력 높은 순'], ['grade', '등급 높은 순'], ['level', '레벨 높은 순']].map(([v, l]) => <button key={v} onClick={() => pickSort(v)} className="ui-press" style={{ height: 36, fontSize: 12, border: `1px solid ${sortBy === v ? MS.gold : MS.line}`, color: sortBy === v ? MS.gold : PALETTE.textDim, background: sortBy === v ? 'rgba(232,176,74,0.12)' : MS.box }}>{l}</button>)}
           </div>
         </MainModal>
       )}
