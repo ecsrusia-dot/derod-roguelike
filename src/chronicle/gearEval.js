@@ -26,7 +26,8 @@ export function asEvalItem(it) {
 }
 
 // 평가용 저장 — 그 부위 착용 장비를 +7 기준으로 올리고, 후보가 있으면 후보를 끼운다
-function evalSave(save, hero, slot, candUid) {
+function evalSave(save, hero, slot, candUid, atLv = 0) {
+  if (atLv && save.units[hero] && atLv > save.units[hero].lv) save = { ...save, units: { ...save.units, [hero]: { ...save.units[hero], lv: atLv } } };
   const u = save.units[hero];
   const curUid = u?.equip?.[slot];
   const lift = new Set([curUid, candUid].filter(v => v != null));
@@ -35,9 +36,15 @@ function evalSave(save, hero, slot, candUid) {
 }
 
 // 평가 대상이 될 수 있는가 (이 직업 · 착용 레벨 충족 · 지금 착용 중 아님)
+// 1.273.2 PM 「유니크 효율 미표시」 — 레벨이 모자란 장비도 그 레벨에 도달했다고 가정하고 비교 (기준 장비도 같은 레벨)
+export function evalLvOf(save, hero, it) {
+  const u = save.units[hero];
+  if (!u || E.canWear(it, u)) return 0;
+  return E.canWear(it, { ...u, lv: it.ilv }) ? it.ilv : -1;
+}
 export function canEvalItem(save, hero, it) {
   const u = save.units[hero];
-  return !!u && E.itemUsable(it, hero) && E.canWear(it, u) && u.equip[it.slot] !== it.uid;
+  return !!u && E.itemUsable(it, hero) && evalLvOf(save, hero, it) >= 0 && u.equip[it.slot] !== it.uid;
 }
 
 // 평가 기준 전투
@@ -104,14 +111,14 @@ export const effOf = (r) => {
 };
 
 // 지금 착용 기준 (부위별) — 결과: estimateRate 객체
-export function evalBaseline(save, hero, slot, target, battles = GEAR_EVAL.fastBattles) {
+export function evalBaseline(save, hero, slot, target, battles = GEAR_EVAL.fastBattles, atLv = 0) {
   if (!target) return null;
-  return P.estimateRate(evalSave(save, hero, slot, null), target, { battles, speed: 2, seed: GEAR_EVAL.seed });
+  return P.estimateRate(evalSave(save, hero, slot, null, atLv), target, { battles, speed: 2, seed: GEAR_EVAL.seed });
 }
 // 후보 장비를 +7로 끼웠을 때
 export function evalCandidate(save, hero, it, target, battles = GEAR_EVAL.fastBattles) {
   if (!target || !canEvalItem(save, hero, it)) return null;
-  return P.estimateRate(evalSave(save, hero, it.slot, it.uid), target, { battles, speed: 2, seed: GEAR_EVAL.seed });
+  return P.estimateRate(evalSave(save, hero, it.slot, it.uid, evalLvOf(save, hero, it)), target, { battles, speed: 2, seed: GEAR_EVAL.seed });
 }
 // 진척도 — 승률(남은 HP 가산) + 졌을 때 적에게 준 피해 (아직 못 이기는 보스도 비교되게)
 export const progressOf = (r) => (!r ? 0 : (r.winRate || 0) * (0.8 + 0.2 * (r.hpLeft || 0)) + (1 - (r.winRate || 0)) * 0.6 * (r.lossDmg || 0));
