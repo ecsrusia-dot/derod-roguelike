@@ -644,6 +644,15 @@ export const FORGE = {
   // 유니크는 승급 불가 (드랍 전용) — 강화는 가능
 };
 
+// 옵션 재설정 (1.276.0 PM 결정 — 남는 정수의 소비처)
+//   옵션 1줄을 골라 다시 굴린다 → 새 옵션을 보고 「바꾸기 / 유지」 선택 (비용은 굴릴 때 소모)
+//   정수 = base[등급] × (1 + 장비 레벨 ÷ lvDiv) × (1 + growth × 그 장비를 굴린 횟수(최대 growthMax))
+//   골드 = 강화 1회 기본가 × goldMult × 같은 누적 배율
+export const REFORGE = {
+  base: { uncommon: 4, rare: 8, epic: 16, unique: 24, mythic: 24 },
+  lvDiv: 50, goldMult: 3, growth: 0.25, growthMax: 12,
+};
+
 export const DROP_TABLE = {
   normal: { itemChance: 0.18, grades: { common: 70, uncommon: 25, rare: 5 }, essence: [1, 2] },
   elite: { itemChance: 1, grades: { common: 25, uncommon: 50, rare: 25 }, essence: [3, 5] },
