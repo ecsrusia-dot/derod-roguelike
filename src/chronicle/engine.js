@@ -1259,6 +1259,10 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
     if (has('buffAtk') && !allies.some(a => a.buffs.bless?.t > 0)) return has('buffAtk');
     if (has('rage') && !(u.buffs.rage?.t > 0)) return has('rage');
     if (has('taunt') && !(u.taunt > 0) && (u.fam || u.hp < u.maxHp * 0.6)) return has('taunt'); // 솔로: 도발 = 방어 태세 (위급하거나 강적·보스전에서만)
+    // 1.270.4 PM 결정 「지속 피해 우선」 — 이 스킬의 지속 피해가 안 걸린 적이 있으면 먼저 건다
+    //   (이전엔 적이 1마리면 「위력 높은 단일기」 순이라 화염구가 겁화를 밀어냈고, 화염구 쿨감 옵션이 오히려 손해였다)
+    const dotSk = ready.find(x => x.s.kind === 'dot' && foes.some(f => !(f.dots || []).some(d => d.src === u.id && d.sn === x.s.name && d.t > 1)));
+    if (dotSk) return dotSk;
     if (foes.length >= 2) {
       const aoe = has('aoe') || ready.find(x => x.s.kind === 'dot' && x.s.all);
       if (aoe) return aoe;
