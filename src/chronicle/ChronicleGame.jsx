@@ -424,8 +424,9 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
   }, [done, autoProg, stats, sim.result, ctx, onAgain]);
   // 반복 사냥: 승리 후 자동 다음 전투
   useEffect(() => {
-    if (!done || !repeat || stats || holdAuto || sim.result !== 'win' || ctx.kind !== 'field' || ctx.type === 'boss') return undefined;
-    const t = setTimeout(onAgain, 1800);
+    const fb = !!battle.summary?.fallback; // 패배 → 직전 성공 맵으로 이어서 반복
+    if (!done || !repeat || stats || holdAuto || ctx.kind !== 'field' || (!fb && (sim.result !== 'win' || ctx.type === 'boss'))) return undefined;
+    const t = setTimeout(onAgain, fb ? 2600 : 1800);
     return () => clearTimeout(t);
   }, [done, repeat, stats, sim.result, ctx, onAgain]);
   // 던전 연속 도전 (1.215.1): 승리하면 다음 층 → 보스까지 자동 진행
@@ -648,7 +649,8 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
               </div>
             ) : (
               <div className="mt-1 text-center" style={{ fontSize: 12.5, color: PALETTE.textDim }}>
-                {ctx.kind === 'raid' ? '원정대가 무너졌다 — 봉인의 주인이 쓰러지면 그 봉인은 깰 수 없다. 약한 캐릭터를 더 키워 다시 도전하자.' : ctx.kind === 'tower' ? `첨탑 ${summary.towerFell}층에서 쓰러졌다. 다음 도전은 체크포인트부터.` : ctx.kind === 'dungeon' ? '던전에서 쫓겨났다.' : `쓰러졌다 — 사냥터로 돌아간다.${summary.goldLost ? ` (골드 -${summary.goldLost})` : ''}`}
+                {ctx.kind === 'raid' ? '원정대가 무너졌다 — 봉인의 주인이 쓰러지면 그 봉인은 깰 수 없다. 약한 캐릭터를 더 키워 다시 도전하자.' : ctx.kind === 'tower' ? `첨탑 ${summary.towerFell}층에서 쓰러졌다. 다음 도전은 체크포인트부터.` : ctx.kind === 'dungeon' ? '던전에서 쫓겨났다.' : `쓰러졌다${summary.fallback ? '.' : ' — 사냥터로 돌아간다.'}${summary.goldLost ? ` (골드 -${summary.goldLost})` : ''}`}
+                {summary.fallback ? <div className="mt-2 font-semibold" style={{ color: MS.gold }}>↩ 직전 성공 맵 「{summary.fallback}」에서 반복 사냥을 이어간다</div> : null}
               </div>
             )}
           </div>
@@ -661,7 +663,7 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
               const toggle = towerNext ? [towerAuto ? '⏫ 자동 등반 중 (끄기)' : '⏫ 자동 등반', towerAuto, onToggleTowerAuto]
                 : dungeonNext ? [dungeonAuto ? '▶ 연속 도전 중 (끄기)' : '▶ 연속 도전', dungeonAuto, onToggleDungeonAuto]
                   : autoProg && ctx.kind === 'field' ? ['▶ 자동 진행 중 (끄기)', true, onStopAuto]
-                    : ctx.kind === 'field' && ctx.type !== 'boss' && sim.result === 'win' ? [repeat ? '🔁 반복 중 (끄기)' : '🔁 반복 사냥', repeat, onToggleRepeat] : null;
+                    : ctx.kind === 'field' && ((ctx.type !== 'boss' && sim.result === 'win') || summary.fallback) ? [repeat ? '🔁 반복 중 (끄기)' : '🔁 반복 사냥', repeat, onToggleRepeat] : null;
               const next = dungeonNext || towerNext;
               const back = ctx.kind === 'dungeon' ? '던전 목록으로' : ctx.kind === 'tower' ? '첨탑으로' : ctx.kind === 'raid' ? '레이드로' : '사냥터로';
               const sub = [
@@ -4226,6 +4228,9 @@ export default function ChronicleGame({ onExit }) {
   const [autoClimb, setAutoClimb] = useState(() => { try { return localStorage.getItem('chronicleAutoClimb') !== '0'; } catch { return true; } });
   const toggleClimb = () => { const v = !autoClimb; setAutoClimb(v); try { localStorage.setItem('chronicleAutoClimb', v ? '1' : '0'); } catch { /* */ } };
   const easyRef = useRef(0);
+  // 패배 시 직전 성공 맵으로 반복 사냥 (1.273.0) — 마지막으로 이긴 사냥 자리 · 패배한 자리(자동 상향이 다시 올라가지 않게)
+  const lastWinHuntRef = useRef(null);
+  const climbBlockRef = useRef(null);
   const rng = Math.random;
   // 반복 사냥 보고서 (1.213.0)
   const repStatsRef = useRef(null);
@@ -4258,6 +4263,7 @@ export default function ChronicleGame({ onExit }) {
   const startAuto = (field) => {
     setRepeat(false);
     repStatsRef.current = newHuntStats();
+    lastWinHuntRef.current = null; climbBlockRef.current = null;
     autoFieldRef.current = field;
     setAutoProg(true);
     autoStep(field, true);
@@ -4459,7 +4465,8 @@ export default function ChronicleGame({ onExit }) {
     if (mode === 'hunt' && repeat && autoClimb && !opts.auto && sim.result === 'win') {
       easyRef.current = E.isEasyWin(sim, party) ? easyRef.current + 1 : 0;
       const up = E.autoClimbCheck(r.save, field, stage, easyRef.current);
-      if (up) {
+      const blocked = up && climbBlockRef.current && (up.field.id > climbBlockRef.current.fieldId || (up.field.id === climbBlockRef.current.fieldId && up.stage >= climbBlockRef.current.stage));
+      if (up && !blocked) {
         lastFieldRef.current = { field: up.field, stage: up.stage };
         easyRef.current = 0;
         try { localStorage.setItem(LAST_HUNT_KEY, JSON.stringify({ hero: save.hero, fieldId: up.field.id, stage: up.stage })); } catch { /* */ }
@@ -4473,7 +4480,24 @@ export default function ChronicleGame({ onExit }) {
     if (repStatsRef.current) addHuntRecord(repStatsRef.current, rec);
     // 반복 사냥은 사냥에서만 · 패배하면 반복·자동 진행 모두 멈춤 (1.234.0: 의뢰 완료로는 멈추지 않음)
     if (mode !== 'hunt' || sim.result !== 'win') setRepeat(false);
-    if (opts.auto && sim.result !== 'win') stopAuto(`자동 진행 중단 — ${ctx.label}에서 패배`);
+    // 1.273.0 PM 「자동 진행·반복 사냥이 지면 멈추지 말고 직전 성공 맵에서 반복 사냥」
+    const prevWin = lastWinHuntRef.current;
+    if (mode === 'hunt' && sim.result === 'win') lastWinHuntRef.current = { field, stage };
+    let fb = null;
+    if (sim.result !== 'win' && (opts.auto || (mode === 'hunt' && repeat))) {
+      fb = prevWin && !(prevWin.field.id === field.id && prevWin.stage === stage) ? prevWin
+        : opts.auto && mode === 'gate' ? { field, stage }
+          : opts.auto && boss ? { field, stage: FIELD_STAGES - 1 }
+            : opts.auto && mode === 'hunt' && stage > 0 ? { field, stage: stage - 1 } : null;
+    }
+    if (fb) {
+      if (mode === 'hunt') climbBlockRef.current = { fieldId: field.id, stage };
+      lastFieldRef.current = fb; easyRef.current = 0;
+      try { localStorage.setItem(LAST_HUNT_KEY, JSON.stringify({ hero: save.hero, fieldId: fb.field.id, stage: fb.stage })); } catch { /* */ }
+      if (opts.auto) setAutoProg(false);
+      setRepeat(true);
+      r.summary.fallback = `${fb.field.name} ${fb.stage + 1}`;
+    } else if (opts.auto && sim.result !== 'win') stopAuto(`자동 진행 중단 — ${ctx.label}에서 패배`);
     setBattle({ sim, enemies: enc.enemies, party, summary: r.summary, ctx, xp: { before: expSnap(save), after: expSnap(r.save) }, key: Date.now() });
     setView('battle');
   };
