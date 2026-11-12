@@ -1802,11 +1802,17 @@ function EvalChip({ info }) {
   const c = pct >= 0.5 ? CMP_UP : pct <= -0.5 ? CMP_DN : PALETTE.textDim;
   return <b style={{ fontSize: 12.5, color: c }}>효율 {pct >= 0.5 ? `▲${pct}%` : pct <= -0.5 ? `▼${Math.abs(pct)}%` : '= 비슷'}</b>;
 }
+// 1.267.1 PM 결정 「지금 기준 유지 + 설명」 — 각자 몇 강 기준으로 비교했는지 (+7 미만은 +7로 가정, 그 이상은 실제 단계)
+function EvalBasis({ it, cur }) {
+  const tag = (x) => { const p = x.plus || 0; const e = GE.evalPlus(x); return e > p ? <><b style={{ color: MS.gold }}>+{e}</b><span>(+{p}→강화 가정)</span></> : <b style={{ color: PALETTE.text }}>+{e}</b>; };
+  return cur ? <>이 장비 {tag(it)} vs 착용 {tag(cur)}</> : <>이 장비 {tag(it)} vs 빈 칸</>;
+}
 // 카드 아래 줄 — 착용 비교 + 실전 결과 + 바로 착용 (가방)
 function EvalFooter({ it, cur, info, canWear, needLv, onEquip }) {
   return <>
     <div className="flex-1 min-w-0" style={{ lineHeight: 1.45 }}>
-      <div className="truncate" style={{ color: PALETTE.textDim }}>{cur ? <>vs 착용 「{E.itemName(cur)}{cur.plus ? ` +${cur.plus}` : ''}」 · 둘 다 +{GE.GEAR_EVAL.plusTarget} 기준</> : '빈 칸에 장착'}</div>
+      <div className="truncate" style={{ color: PALETTE.textDim }}>{cur ? <>vs 착용 「{E.itemName(cur)}{cur.plus ? ` +${cur.plus}` : ''}」</> : '빈 칸에 장착'}</div>
+      <div style={{ fontSize: 11, color: PALETTE.textDim }}>효율 비교 = <EvalBasis it={it} cur={cur} /></div>
       {info?.full && <div style={{ fontSize: 11, color: PALETTE.text }}>실전 {info.full.n}전 · 승률 <b>{Math.round(info.full.win * 100)}%</b> · 남은 HP <b>{Math.round(info.full.hp * 100)}%</b></div>}
     </div>
     {canWear
@@ -2841,7 +2847,7 @@ function ForgeView({ save, setSave, onBack, flash, onTrack = () => {} }) {
       <div className="flex-1 overflow-y-auto px-4 pb-3">
         <div className="flex flex-col gap-1.5">
           {bagList.map(it => { const usable = E.itemUsable(it, hero); const cur = usable ? save.inventory.find(x => x.uid === save.units[hero].equip[it.slot]) : null;
-            return <MainGearCard key={it.uid} it={it} onClick={() => setSel(it.uid)} cmp={usable ? (cur || null) : undefined} evalInfo={usable ? ev.info(it) : null} note={usable ? (cur ? `vs 착용 +${GE.evalPlus(cur)} 기준` : '빈 칸') : clsTag(it)} footer={<ForgeFooter it={it} />} />; })}
+            return <MainGearCard key={it.uid} it={it} onClick={() => setSel(it.uid)} cmp={usable ? (cur || null) : undefined} evalInfo={usable ? ev.info(it) : null} note={usable ? <>효율 = <EvalBasis it={it} cur={cur} /></> : clsTag(it)} footer={<ForgeFooter it={it} />} />; })}
         </div>
         {!bagList.length && <div className="text-center py-10" style={{ fontSize: 12.5, color: PALETTE.textDim }}>{list.length ? '보관 중인 장비가 없습니다 — 착용 장비는 위 상자를 누르세요' : save.inventory.length ? '이 분류에 장비가 없습니다' : '가방에 장비가 없습니다'}</div>}
       </div>
