@@ -6,7 +6,7 @@
 // ============================================
 import { levelCap, globalBuffFx } from './roster.js';
 import { talentFx, canLearnTalent, talentNode, talentResetCost, talentTrees, tierUnlocked } from './talents.js';
-import { BOSS_MECHS, BOSS_MECH_OF, fieldStages, FIELD_STAGES, STAGE_TUNING, AUTO_CLIMB, BOOST, BAG_EXPAND, SALVAGE, SALVAGE_ICON, REBIRTH, REBIRTH_BRANCHES, expNeedFor, OPTION_LV_CURVE } from './data.js';
+import { BOSS_MECHS, BOSS_MECH_OF, fieldStages, FIELD_STAGES, STAGE_TUNING, AUTO_CLIMB, BOOST, BAG_EXPAND, SALVAGE, SALVAGE_ICON, REBIRTH, REBIRTH_BRANCHES, expNeedFor, OPTION_LV_CURVE, REFORGE } from './data.js';
 import { TOWER, TOWER_SHOP, towerUnlocked, isTowerBoss, towerEnemyLv, towerArea, towerFloorPicks, towerTheme, kstWeekKey } from './tower.js';
 import { famCombatant, famRole, famSubFx, famOwnFx, famBondFx, rollFamShards, rollFamSouls, gainFamExp, FAM_AI, FAM_TUNING, summonFamiliars, enhanceFamiliar, evolveFamiliar } from './familiar.js';
 import {
@@ -183,6 +183,77 @@ export function itemOpts(item) {
   const o = rollOption(uidRng(item.uid * 9973 + 17), u.cls, 'unique', base);
   return o ? [...base, o] : base;
 }
+// ===== 옵션 재설정 (1.276.0) =====
+// 유니크의 고정 옵션은 잠김 — 무작위로 붙는 줄만 다시 굴릴 수 있다
+const fixedOptCount = (item) => (item?.named ? Object.keys(UNIQUE_ITEMS[item.named]?.opts || {}).length : 0);
+const optPoolCls = (item) => (item?.named ? UNIQUE_ITEMS[item.named]?.cls : item?.cls) || 'common';
+export function reforgeLines(item) {
+  const fixed = fixedOptCount(item);
+  return itemOpts(item).map((o, i) => ({ i, o, locked: i < fixed }));
+}
+export function reforgeCost(item) {
+  const base = REFORGE.base[item?.grade];
+  if (!base || !itemOpts(item).length) return null;
+  const k = 1 + REFORGE.growth * Math.min(REFORGE.growthMax, item.rr || 0);
+  return {
+    gold: Math.round((20 + item.ilv * 4) * REFORGE.goldMult * k),
+    essence: Math.round(base * (1 + item.ilv / REFORGE.lvDiv) * k),
+  };
+}
+export function canReforge(save, item, idx) {
+  const c = item && reforgeCost(item);
+  const line = c && reforgeLines(item)[idx];
+  return !!line && !line.locked && save.gold >= c.gold && (save.mats.essence || 0) >= c.essence;
+}
+// 그 줄에 나올 수 있는 옵션과 확률 (다른 줄에 이미 있는 종류는 제외)
+export function reforgePool(item, idx) {
+  const pool = { ...(OPTION_POOLS[optPoolCls(item)] || OPTION_POOLS.common) };
+  itemOpts(item).forEach((o, i) => { if (i !== idx) delete pool[o.k]; });
+  if (!scdrSkillList(optPoolCls(item)).length) delete pool.scdr;
+  const tot = Object.values(pool).reduce((a, b) => a + b, 0) || 1;
+  return Object.entries(pool).map(([k, w]) => ({ k, label: OPTION_DEFS[k]?.label || k, p: w / tot })).sort((a, b) => b.p - a.p);
+}
+// 굴리기 → { save(비용 차감·횟수 +1), cand(새 옵션), cost } — 아직 장비는 안 바뀐다
+export function reforgeRoll(save0, uid, idx, rng = Math.random) {
+  const it0 = save0.inventory.find(i => i.uid === uid);
+  if (!canReforge(save0, it0, idx)) return { save: save0, cand: null, cost: null };
+  const cost = reforgeCost(it0);
+  const others = itemOpts(it0).filter((_, i) => i !== idx);
+  const cand = rollOption(rng, optPoolCls(it0), it0.grade, others);
+  if (!cand) return { save: save0, cand: null, cost: null };
+  const save = clone(save0);
+  const it = save.inventory.find(i => i.uid === uid);
+  save.gold -= cost.gold; save.mats.essence -= cost.essence;
+  it.rr = (it.rr || 0) + 1;
+  return { save, cand, cost };
+}
+// 바꾸기 — 굴려서 나온 옵션을 그 줄에 넣는다 (유니크의 계산형 3번째 줄은 이때부터 저장된다)
+export function reforgeApply(save0, uid, idx, cand) {
+  const it0 = save0.inventory.find(i => i.uid === uid);
+  const line = it0 && cand && reforgeLines(it0)[idx];
+  if (!line || line.locked) return save0;
+  const save = clone(save0);
+  const it = save.inventory.find(i => i.uid === uid);
+  const opts = itemOpts(it).map(o => ({ ...o }));
+  opts[idx] = { ...cand };
+  it.opts = opts;
+  return save;
+}
+// 옵션 한 줄 문구 (강화·레벨 배율 반영) · 수치 품질 0~1 (범위 안에서 어디쯤인지, 고정 수치 옵션은 null)
+export function optText(item, o0) {
+  const o = normOpt(item, o0);
+  if (o.k === 'scdr') return statLabel(`scdr_${o.sk}`, o.v);
+  const optM = (1 + 0.5 * enhanceBonus(item.plus)) * optionLvMult(item.ilv);
+  const v = o.k === 'cdr' ? o.v : (OPTION_DEFS[o.k]?.pct ? +(o.v * optM).toFixed(3) : Math.max(1, Math.round(o.v * optM)));
+  return statLabel(o.k, v);
+}
+export function optQuality(item, o) {
+  const d = OPTION_DEFS[o.k];
+  if (!d || d.v[1] === d.v[0]) return null;
+  const gm = GRADES[gradeIdx(item.grade)]?.optMult || 1;
+  return Math.max(0, Math.min(1, (o.v / gm - d.v[0]) / (d.v[1] - d.v[0])));
+}
+
 // 강화 누적 보너스 (1.268.0 — 고강화일수록 단계당 상승폭이 커진다)
 export const enhanceBonus = (plus) => FORGE.enhanceBonus[Math.max(0, Math.min(FORGE.maxEnhance, plus || 0))] || 0;
 // 옵션 레벨 배율 (1.268.0 — 저레벨 장비의 옵션이 고레벨 장비를 압도하지 않게)
