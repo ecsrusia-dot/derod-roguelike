@@ -828,3 +828,10 @@ body {
   .chr-idle-breathe, .chr-idle-glow, .chr-idle-p, .chr-idle-mist { animation: none !important; }
   .chr-idle-p { opacity: .5; }
 }
+
+/* 대기화면 경험치 레벨 업 (1.272.1) */
+@keyframes chr-idle-xpflash { 0% { filter: brightness(1); box-shadow: 0 0 0 rgba(245,207,114,0); } 25% { filter: brightness(2.2); box-shadow: 0 0 14px rgba(245,207,114,.9); } 100% { filter: brightness(1); box-shadow: 0 0 0 rgba(245,207,114,0); } }
+@keyframes chr-idle-lvup { 0% { opacity: 0; transform: translateY(4px); } 15% { opacity: 1; transform: none; } 80% { opacity: 1; } 100% { opacity: 0; } }
+.chr-idle-xpflash { animation: chr-idle-xpflash 1.2s ease-out 2; }
+.chr-idle-lvup { display: inline-block; animation: chr-idle-lvup 2.5s ease-out forwards; }
+@media (prefers-reduced-motion: reduce) { .chr-idle-xpflash, .chr-idle-lvup { animation: none; } }
