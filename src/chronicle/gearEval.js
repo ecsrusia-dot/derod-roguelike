@@ -6,7 +6,7 @@
 // PM 결정 「아이템 + 실전 시뮬 기준 · +7 강화 시로 비교」
 //   - 비교는 양쪽 모두 +7(이미 더 높으면 그 단계)로 올린 가상 장비로 한다 — +7까지는 파괴 위험이 없다
 //   - 1단계: 모든 후보를 짧은 시뮬(fast)로 → 지금 착용 대비 효율 %
-//   - 기준 전투 = evalTarget (1.268.0 — 다음 관문·지역 보스)
+//   - 기준 전투 = evalTarget (1.270.3 — 지금 승률 55%에 가장 가까운 관문·보스)
 //   - 2단계: 착용보다 좋아 보이는 상위 topN개만 긴 시뮬(full)로 승률·남은 HP까지 확인
 //   - 같은 적·같은 난수(previewCompare 방식)라 장비 차이만 남는다
 // 순수 함수 (engine·preview만 import) — 저장은 바꾸지 않는다
@@ -40,11 +40,13 @@ export function canEvalItem(save, hero, it) {
   return !!u && E.itemUsable(it, hero) && E.canWear(it, u) && u.equip[it.slot] !== it.uid;
 }
 
-// 평가 기준 전투 (1.268.0 PM 결정 「그 지역 보스·관문 기준」)
-//   마지막 사냥터는 적이 너무 빨리 죽어 장비 차이가 0~1%로만 보였다 → 지금 넘어야 할 가장 어려운 전투로 비교
-//   = 열린 지역 중 보스를 아직 못 잡은 첫 지역의 다음 관문 (관문을 다 넘었으면 그 지역 보스)
-//     모든 열린 지역의 보스를 잡았으면 열린 마지막 지역의 보스
-export function evalTarget(save) {
+// 평가 기준 전투
+//   1.268.0 — 보스를 못 잡은 첫 지역의 다음 관문(다 넘었으면 그 지역 보스)
+//   1.270.3 PM 결정 「승률 50~60% 지점」 — 다음 관문이 너무 쉬우면(승률 100% · 5라운드) 쿨감·생존 옵션 차이가
+//     0%로 보였고, 반대로 승률 0% 보스는 2~3라운드에 져서 모든 장비가 0%였다.
+//     → 다음 관문부터 앞으로 관문·보스를 차례로 짧게 시뮬해, 지금 장비 승률이 TARGET_WIN에 가장 가까운 곳을 고른다
+export const EVAL_TARGET = { win: 0.55, stopBelow: 0.3, maxSteps: 14, battles: 20, seed: 9191 };
+function evalTargetBase(save) {
   let last = null;
   for (const f of CHRONICLE_FIELDS) {
     if (!E.fieldUnlocked(save, f.id)) break;
@@ -56,7 +58,42 @@ export function evalTarget(save) {
   }
   return last ? { field: last, stage: null, mode: 'boss' } : null;
 }
-export const evalTargetLabel = (t) => (!t ? '' : t.mode === 'boss' ? `${t.field.name} 보스` : `${t.field.name} ${t.stage + 1} 관문`);
+// 다음 관문부터 앞으로 이어지는 전투 목록 (관문 → 보스 → 다음 지역 관문 …)
+function targetLadder(start) {
+  const out = [];
+  let fi = CHRONICLE_FIELDS.findIndex(f => f.id === start.field.id);
+  let stage = start.mode === 'boss' ? FIELD_STAGES : start.stage;
+  while (fi >= 0 && fi < CHRONICLE_FIELDS.length && out.length < EVAL_TARGET.maxSteps) {
+    const f = CHRONICLE_FIELDS[fi];
+    if (stage < FIELD_STAGES) { out.push({ field: f, stage, mode: 'gate' }); stage += 1; }
+    else { out.push({ field: f, stage: null, mode: 'boss' }); fi += 1; stage = 0; }
+  }
+  return out;
+}
+const _targetCache = new Map();
+function targetKey(save) {
+  const u = save.units[save.hero] || {};
+  const eq = Object.values(u.equip || {}).map(uid => { const it = save.inventory.find(i => i.uid === uid); return it ? `${it.uid}+${it.plus || 0}` : '-'; }).join(',');
+  return [save.hero, u.lv, JSON.stringify(u.stats || {}), JSON.stringify(u.skills || {}), eq, JSON.stringify(save.famTeam || {}), JSON.stringify(save.progress?.stages || {}), JSON.stringify(save.progress?.bossCleared || {})].join('|');
+}
+export function evalTarget(save) {
+  const start = evalTargetBase(save);
+  if (!start) return null;
+  const key = targetKey(save);
+  if (_targetCache.has(key)) return _targetCache.get(key);
+  let best = null;
+  for (const t of targetLadder(start)) {
+    const r = P.estimateRate(save, t, { battles: EVAL_TARGET.battles, speed: 2, seed: EVAL_TARGET.seed });
+    const cand = { ...t, winRate: r.winRate };
+    if (!best || Math.abs(r.winRate - EVAL_TARGET.win) < Math.abs(best.winRate - EVAL_TARGET.win)) best = cand;
+    if (r.winRate < EVAL_TARGET.stopBelow) break; // 이보다 어려운 곳은 더 멀어질 뿐
+  }
+  const res = best || start;
+  if (_targetCache.size > 50) _targetCache.clear();
+  _targetCache.set(key, res);
+  return res;
+}
+export const evalTargetLabel = (t) => (!t ? '' : `${t.mode === 'boss' ? `${t.field.name} 보스` : `${t.field.name} ${t.stage + 1} 관문`}${t.winRate != null ? ` (지금 승률 ${Math.round(t.winRate * 100)}%)` : ''}`);
 
 // 지표 — 「전투 속도 × 승률 × 생존」: 전투 시간(다음 전투 대기 제외)이 짧을수록, 이길수록, HP가 남을수록 높다
 //   분당 경험치는 대기 시간·보상 고정분에 묻혀 장비 차이가 1~2%로만 보여 쓰지 않는다
