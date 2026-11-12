@@ -1664,7 +1664,7 @@ function BagView({ save, setSave, onBack, flash, onForge }) {
               footer={usable ? <EvalFooter it={it} cur={cur} info={ev.info(it)} canWear={wear} needLv={it.ilv} onEquip={() => { setSave(E.equipItem(save, hero, it.uid)); flash(`${E.itemName(it)} 착용`); }} /> : <span style={{ color: PALETTE.textDim }}>타직업 장비 — 창고로 보내면 {it.cls === 'common' ? '다른 캐릭터' : chronicleClass(it.cls).name}가 쓴다</span>} />;
           })}
         </div>
-        {!bagList.length && <div className="text-center py-10" style={{ fontSize: 12.5, color: PALETTE.textDim }}>{list.length ? '보관 중인 장비가 없습니다 — 착용 장비만 있어요' : '비어 있습니다 — 사냥터에서 장비를 모아 보세요'}</div>}
+        {!bagList.length && <div className="text-center py-10" style={{ fontSize: 12.5, color: PALETTE.textDim }}>{list.length ? '보관 중인 장비가 없습니다 — 착용 장비만 있어요' : save.inventory.length ? (filter === 'other' ? '타직업 장비가 없습니다' : '이 분류에 내 직업 장비가 없습니다 — 다른 직업 장비는 「타직업」 탭에 있어요') : '비어 있습니다 — 사냥터에서 장비를 모아 보세요'}</div>}
       </div>
       {picking && (
         <div className="flex-none px-3 py-2 flex flex-col gap-1.5" style={{ borderTop: `1px solid ${MS.line}`, background: 'rgba(0,0,0,0.5)' }}>
@@ -1890,12 +1890,15 @@ function GearCmpFooter({ it, cur, right = null }) {
   </>;
 }
 const forgeRateColor = (r) => (r == null ? PALETTE.textDim : r >= 1 ? '#8fd08a' : r >= 0.5 ? MS.gold : '#e07a6a');
-function ForgeFooter({ it }) {
+function ForgeFooter({ it, onEquip = null, canWear = true }) {
   const r = forgeNextRate(it); const ngi = E.nextGrade(it); const prr = ngi && E.promoteRisk(it);
   const risk = r != null && r < 1 ? E.enhanceRisk(it) : null;
   return <>
     <span className="min-w-0 truncate">⚒ {r == null ? <b style={{ color: PALETTE.textDim }}>최대 강화</b> : <>+{it.plus || 0}→+{(it.plus || 0) + 1} <b style={{ color: forgeRateColor(r) }}>{Math.round(r * 100)}%</b>{risk ? <span style={{ color: CMP_DN }}> · {risk.breakChance ? `파괴 ${Math.round(risk.breakChance * 100)}%` : risk.drop ? '실패 시 하락' : ''}</span> : r >= 1 ? <span style={{ color: PALETTE.textDim }}> · 안전</span> : null}</>}</span>
     <span className="flex-none">⬆ {ngi ? <>{gradeOf(ngi).label} <b style={{ color: MS.gold }}>{Math.round(prr.rate * 100)}%</b></> : <span style={{ color: PALETTE.textDim }}>—</span>}</span>
+    {onEquip && (canWear
+      ? <span role="button" tabIndex={0} onClick={(e) => { e.stopPropagation(); onEquip(); }} className="ui-press flex-none" style={{ padding: '4px 12px', fontWeight: 800, fontSize: 12.5, border: `1px solid ${MS.gold}`, color: MS.gold }}>착용</span>
+      : <span className="flex-none" style={{ fontSize: 11.5, color: CMP_DN }}>Lv.{it.ilv} 필요</span>)}
   </>;
 }
 // 장비 정보창 — 본편 카드 모달 (1.249.0, PM 승인 시안 ⑭)
@@ -2654,7 +2657,8 @@ function sortItems(save, items, sortBy) {
       : E.itemPower(b) - E.itemPower(a) || gradeIdx(b.grade) - gradeIdx(a.grade)));
 }
 function filterItems(items, filter, hero) {
-  return items.filter(i => filter === 'all' || (filter === 'other' ? !E.itemUsable(i, hero) : i.slot === filter));
+  // 1.270.1 — 타직업 장비는 「타직업」 탭에서만 (전체·부위 탭은 내 직업이 쓸 수 있는 장비만)
+  return items.filter(i => (filter === 'other' ? !E.itemUsable(i, hero) : E.itemUsable(i, hero) && (filter === 'all' || i.slot === filter)));
 }
 function ItemFilterBar({ filter, setFilter }) {
   return (
@@ -2790,6 +2794,8 @@ function ForgeView({ save, setSave, onBack, flash, onTrack = () => {} }) {
   const ev = useGearEval(save, bagList0); // 1.267.0 실전 평가
   const bagList = sortBy === 'eff' ? effSort(bagList0, ev) : bagList0;
   const by = item ? E.equippedBy(save, item.uid) : null;
+  // 1.270.1 대장간에서 바로 착용·해제
+  const equipNow = (it) => { setSave(E.equipItem(save, hero, it.uid)); flash(`${E.itemName(it)} 착용`); };
   const maxed = item && (item.plus || 0) >= FORGE.maxEnhance;
   const doEnhance = () => guard(er.drop || er.breakChance > 0, {
     title: `강화 +${item.plus || 0} → +${(item.plus || 0) + 1}`,
@@ -2851,9 +2857,9 @@ function ForgeView({ save, setSave, onBack, flash, onTrack = () => {} }) {
       <div className="flex-1 overflow-y-auto px-4 pb-3">
         <div className="flex flex-col gap-1.5">
           {bagList.map(it => { const usable = E.itemUsable(it, hero); const cur = usable ? save.inventory.find(x => x.uid === save.units[hero].equip[it.slot]) : null;
-            return <MainGearCard key={it.uid} it={it} onClick={() => setSel(it.uid)} cmp={usable ? (cur || null) : undefined} evalInfo={usable ? ev.info(it) : null} note={usable ? <>효율 = <EvalBasis it={it} cur={cur} /></> : clsTag(it)} footer={<ForgeFooter it={it} />} />; })}
+            return <MainGearCard key={it.uid} it={it} onClick={() => setSel(it.uid)} cmp={usable ? (cur || null) : undefined} evalInfo={usable ? ev.info(it) : null} note={usable ? <>효율 = <EvalBasis it={it} cur={cur} /></> : clsTag(it)} footer={<ForgeFooter it={it} onEquip={usable ? () => equipNow(it) : null} canWear={usable && E.canWear(it, save.units[hero])} />} />; })}
         </div>
-        {!bagList.length && <div className="text-center py-10" style={{ fontSize: 12.5, color: PALETTE.textDim }}>{list.length ? '보관 중인 장비가 없습니다 — 착용 장비는 위 상자를 누르세요' : save.inventory.length ? '이 분류에 장비가 없습니다' : '가방에 장비가 없습니다'}</div>}
+        {!bagList.length && <div className="text-center py-10" style={{ fontSize: 12.5, color: PALETTE.textDim }}>{list.length ? '보관 중인 장비가 없습니다 — 착용 장비는 위 상자를 누르세요' : save.inventory.length ? (filter === 'other' ? '타직업 장비가 없습니다' : '이 분류에 내 직업 장비가 없습니다 — 다른 직업 장비는 「타직업」 탭') : '가방에 장비가 없습니다'}</div>}
       </div>
       {rulesOpen && (
         <MainModal kicker="대 장 간" title="ⓘ 규칙 · 정렬" onClose={() => setRulesOpen(false)}>
@@ -2879,6 +2885,11 @@ function ForgeView({ save, setSave, onBack, flash, onTrack = () => {} }) {
             footer={ftab === 'enhance'
               ? (maxed ? null : enhOk ? bigBtn(true, `⚒ 강화 +${item.plus || 0} → +${(item.plus || 0) + 1}`, doEnhance) : bigBtn(false, forgeShort(save, ec)))
               : (!ng ? null : proOk ? bigBtn(true, `⬆ ${gradeOf(ng).label} 승급`, doPromote, true) : bigBtn(false, forgeShort(save, pc)))}>
+            {by === hero
+              ? <button onClick={() => { setSave(E.unequipItem(save, hero, item.slot)); flash(`${E.itemName(item)} 착용 해제`); }} className="ui-press w-full mb-2" style={{ height: 36, fontSize: 12.5, border: `1px solid ${MS.line}`, background: MS.box, color: PALETTE.text }}>착용 해제</button>
+              : !by && E.itemUsable(item, hero) && (E.canWear(item, save.units[hero])
+                ? <button onClick={() => equipNow(item)} className="ui-press w-full mb-2" style={{ height: 36, fontSize: 12.5, fontWeight: 800, border: `1px solid ${MS.gold}`, background: 'rgba(232,176,74,0.10)', color: MS.gold }}>착용하기</button>
+                : <div className="mb-2 text-center" style={{ fontSize: 12, color: CMP_DN }}>Lv.{item.ilv}부터 착용 가능</div>)}
             <MainTabs items={[['enhance', maxed ? '⚒ 최대 강화' : `⚒ 강화 +${item.plus || 0} → +${(item.plus || 0) + 1}`], ['promote', ng ? `⬆ 승급 → ${gradeOf(ng).label}` : '⬆ 승급']]} value={ftab} onChange={setFtab} size={12.5} />
             {ftab === 'enhance' && (maxed
               ? <div className="mt-3" style={{ fontSize: 12.5, color: PALETTE.textDim }}>최대 강화 +{FORGE.maxEnhance}에 도달했습니다</div>
