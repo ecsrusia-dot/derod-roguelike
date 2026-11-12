@@ -36,6 +36,7 @@ export const CHRONICLE_TUNING = {
   ],
   // 던전 솔로 보정 (1.214.0) — 층 사이 회복이 없으므로 던전 적만 따로 낮춘다 · 층당 적 수
   holyCap: 0.2, // 치유→신성 피해 합계 상한 (1.216.0 — 사제 + 사역마 조합 독주 보정)
+  chainCap: 0.6, // 추가 타격 확률 합계 상한 (1.270.0 — 속도 옵션이 추가 타격으로 바뀌어 쌓이는 출처가 늘었다)
   shieldCap: 0.15, // 시작 보호막 합계 상한 (1.216.0)
   shieldMaxPct: 0.5,     // 1.226.2 PM: 보호막 총량 상한 = 최대 HP의 50% (모든 경로 합산 — 누적형 보호막 무한 증가 방지)
   lifestealCap: 0.07, // 장비·유니크 흡혈 합계 상한 (1.216.0 — 혼혈 마족 던전 독주 보정)
@@ -528,9 +529,9 @@ export const OPTION_POOLS = {
   wanderer: { defPct: 4, counterPct: 4, counterDmg: 3, dmgReduce: 3, hpPct: 2, atkPct: 2, scdr: 2 },
   sage: { skillDmg: 4, scdr: 2, dotDmg: 3, shieldPct: 3, critDmg: 2, atkPct: 2 },
   demonblood: { lifesteal: 4, hpPct: 3, lowHpDmg: 3, atkPct: 3, thornsPct: 2, scdr: 2 },
-  elf: { crit: 4, dodge: 3, spd: 3, chain: 3, critDmg: 2, scdr: 2 },
+  elf: { crit: 4, dodge: 3, chain: 5, critDmg: 2, scdr: 2 }, // 1.270.0 속도 옵션 → 추가 타격
   priest: { healPct: 4, shieldPct: 3, dmgReduce: 3, hpPct: 2, holyDmg: 3, scdr: 2 },
-  common: { hpPct: 3, atkPct: 3, spd: 2, critDmg: 2, expPct: 1, goldPct: 1 },
+  common: { hpPct: 3, atkPct: 3, chain: 2, critDmg: 2, expPct: 1, goldPct: 1 },
 };
 // 직업 보조 칸 기본 능력치 (등급 배율만 적용, 레벨 무관 % + 레벨 비례 수치)
 export const OFFHAND_BASE = {
@@ -555,7 +556,7 @@ export const EPIC_OPTIONS = {
   a_regen: { name: '재생', desc: '내 차례마다 최대 HP 4% 회복', fx: { regenPct: 0.04 } },
   a_bulwark: { name: '성채', desc: '전투 시작 시 최대 HP 15% 보호막', fx: { shieldPct: 0.15 } },
   a_guts: { name: '불굴', desc: '전투당 1회, 쓰러질 피해를 HP 1로 버팀', fx: { guts: 1 } },
-  c_haste: { name: '신속', desc: '속도 +25%', fx: { spdPct: 0.25 } },
+  c_haste: { name: '신속', desc: '단일 공격 뒤 추가 타격 확률 +20%', fx: { chain: 0.2 } }, // 1.270.0 속도 → 추가 타격
   c_focus: { name: '집중', desc: '치명 +10% · 치명 피해 +30%', fx: { crit: 0.1, critDmg: 0.3 } },
   c_time: { name: '시간의 모래', desc: '재사용 대기가 가장 긴 스킬 -1턴', fx: { longCdr: 1 } }, // 1.241.0: 모든 스킬 → 가장 긴 스킬 1개
   c_fury: { name: '분노', desc: '공격력 +12%', fx: { atkPct: 0.12 } },
@@ -579,19 +580,19 @@ export const UNIQUE_ITEMS = {
   u_e_string: U('u_e_string', 'elf', 'weapon', '바람의 현', { atkPct: 0.08, chain: 0.08 }, { multiHitsAdd: 2 }, '「연속 화살」 타수 +2'),
   u_e_quiver: U('u_e_quiver', 'elf', 'offhand', '정령 화살통', { critDmg: 0.2, chain: 0.06 }, { spiritArrow: 0.4, atkPct: 0.06 }, '공격 시 40% 확률로 정령 화살(공격력 80%) · 공격력 +6%'),
   u_e_leaf: U('u_e_leaf', 'elf', 'armor', '잎새 갑옷', { dodge: 0.05, hpPct: 0.08 }, { dodgeHeal: 0.05 }, '회피할 때마다 HP 5% 회복'),
-  u_e_hawk: U('u_e_hawk', 'elf', 'accessory', '매의 눈', { crit: 0.06, spd: 2 }, { critDmg: 0.6, atkPct: 0.1, chain: 0.1, firstCrit: 1, cdr: 1 }, '공격력 +10% · 치명 피해 +60% · 추가 타격 확률 +10% · 전투 첫 공격 치명 확정 · 모든 스킬 재사용 -1턴'),
+  u_e_hawk: U('u_e_hawk', 'elf', 'accessory', '매의 눈', { crit: 0.06, chain: 0.07 }, { critDmg: 0.6, atkPct: 0.1, chain: 0.1, firstCrit: 1, cdr: 1 }, '공격력 +10% · 치명 피해 +60% · 추가 타격 확률 +10% · 전투 첫 공격 치명 확정 · 모든 스킬 재사용 -1턴'),
   u_p_scepter: U('u_p_scepter', 'priest', 'weapon', '여명의 홀', { healPct: 0.12, atkPct: 0.06 }, { holyDmg: 0.3 }, '회복량의 30%만큼 적에게 신성 피해'),
   u_p_grail: U('u_p_grail', 'priest', 'offhand', '순례자의 성배', { healPct: 0.10, hpPct: 0.08 }, { revive: 0.6, atkPct: 0.12, dmgReduce: 0.06 }, '공격력 +12% · 받는 피해 -6% · 전투당 1회, 쓰러지면 HP 60%로 부활'),
   u_p_vest: U('u_p_vest', 'priest', 'armor', '빛의 법의', { shieldPct: 0.08, dmgReduce: 0.05 }, { shieldReduce: 0.3, shieldPct: 0.1, skillDmg: 0.12, dmgReduce: 0.05 }, '스킬 피해 +12% · 받는 피해 -5% · 전투 시작 보호막 +10% · 보호막이 남아 있는 동안 받는 피해 -30%'),
   u_p_rosary: U('u_p_rosary', 'priest', 'accessory', '축복의 묵주', { healPct: 0.10, hpPct: 0.08 }, { blessMult: 2, blessTurns: 2, cdr: 1 }, '「축복」 효과 2배, 지속 +2턴 · 모든 스킬 재사용 -1턴'),
   u_c_ring: U('u_c_ring', 'common', 'accessory', '황혼의 반지', { hpPct: 0.06, atkPct: 0.06 }, { atkPct: 0.08, hpPct: 0.08, defPct: 0.08 }, '공격력·최대 HP·방어 +8%'),
-  u_c_collar: U('u_c_collar', 'common', 'accessory', '사역마의 목걸이', { hpPct: 0.06, spd: 2 }, { famPct: 0.3 }, '동행 사역마의 공격력·HP +30%'),
+  u_c_collar: U('u_c_collar', 'common', 'accessory', '사역마의 목걸이', { hpPct: 0.06, chain: 0.07 }, { famPct: 0.3 }, '동행 사역마의 공격력·HP +30%'),
   u_c_charm: U('u_c_charm', 'common', 'accessory', '여행자의 부적', { hpPct: 0.06, atkPct: 0.05 }, { expPct: 0.2 }, '경험치 +20%'),
   u_c_coin: U('u_c_coin', 'common', 'accessory', '탐욕의 금화', { atkPct: 0.06, crit: 0.03 }, { goldPct: 0.4, dmgTakenUp: 0.1 }, '골드 +40%, 받는 피해 +10%'),
   // 1.269.0 PM 결정 「전투용 공용 반지 4종」 — 공격·생존·속도·치명 계열
   u_c_wrath: U('u_c_wrath', 'common', 'accessory', '분노의 인장', { atkPct: 0.08, hpPct: 0.05 }, { atkPct: 0.12, execute: 0.2 }, '공격력 +12% · HP 30% 미만의 적에게 피해 +20%'),
   u_c_ward: U('u_c_ward', 'common', 'accessory', '수호자의 반지', { hpPct: 0.08, defPct: 0.08 }, { hpPct: 0.12, dmgReduce: 0.06 }, '최대 HP +12% · 받는 피해 -6%'),
-  u_c_gale: U('u_c_gale', 'common', 'accessory', '질풍의 반지', { atkPct: 0.06, spd: 3 }, { spdPct: 0.15, chain: 0.15, atkPct: 0.06 }, '속도 +15% · 공격력 +6% · 단일 공격 뒤 추가 타격 확률 +15%'),
+  u_c_gale: U('u_c_gale', 'common', 'accessory', '질풍의 반지', { atkPct: 0.06, chain: 0.1 }, { chain: 0.25, atkPct: 0.06 }, '공격력 +6% · 단일 공격 뒤 추가 타격 확률 +25%'),
   u_c_edge: U('u_c_edge', 'common', 'accessory', '예리한 눈의 반지', { crit: 0.05, atkPct: 0.06 }, { crit: 0.1, critDmg: 0.4 }, '치명 +10% · 치명 피해 +40%'),
 };
 // 유니크 확률 — 장비 1개당 (설계서 5절)

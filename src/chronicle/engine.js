@@ -128,6 +128,8 @@ export function scdrSkillList(cls) {
 }
 // 구 장비의 「재사용 단축(모든 스킬)」 옵션 → 그 직업 스킬 1개 전용으로 읽는다 (장비 번호로 고정 — 매번 같은 스킬)
 function normOpt(item, o) {
+  // 1.270.0 PM 결정 — 장비 「속도」 옵션은 「추가 타격 확률」로 (속도 1~3 → 3.3~10%, 읽을 때 변환)
+  if (o.k === 'spd') return { k: 'chain', v: +(o.v / 3 * 0.1).toFixed(3) };
   if (o.k !== 'cdr' || item.named) return o;
   const list = scdrSkillList(item.cls);
   if (!list.length) return o;
@@ -368,6 +370,7 @@ export function deriveUnit(save, classId) {
       .filter(x => x.s && x.lv > 0 && x.s.kind !== 'passive'),
   };
   for (const k of PASS_KEYS) if (G(k)) out[k] = G(k);
+  if (out.chain) out.chain = Math.min(T.chainCap || 1, out.chain); // 추가 타격 확률 상한 (1.270.0)
   if (out.guts || out.revive || out.firstCrit || out.emergencyHeal) out.standbySrc = standbySources(save, u, br);
   if (out.rageDouble) out.rageDouble = 1; // 중첩 수가 아닌 보유 여부
   if (Object.keys(skillBoost).length) out.skillBoost = skillBoost;
