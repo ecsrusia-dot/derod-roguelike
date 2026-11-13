@@ -361,6 +361,10 @@ export function canWear(it, u) {
   // 1.225.0 PM: 장비 레벨이 내 레벨 이하일 때만 착용
   return (it.ilv || 1) <= (u?.lv || 1);
 }
+// 전승자 재성장 배율 (1.285.0) — Lv.100 미만에서만 전투 경험치 × REBIRTH.regrowExp
+export function regrowExpMult(u) {
+  return (u?.rebirth?.count || 0) > 0 && (u.lv || 1) < T.maxLevel ? (REBIRTH.regrowExp || 1) : 1;
+}
 // 레벨 맞춤이 걸리는 레벨 (0 = 원래 성능 그대로)
 export function wearSyncLv(it, u) {
   return (u?.rebirth?.count || 0) > 0 && (it?.ilv || 1) > (u?.lv || 1) ? (u.lv || 1) : 0;
@@ -1869,7 +1873,7 @@ export function applyBattle(save0, ctx, battle, rng = Math.random) {
   const r = battleRewards(ctx.enemies, ctx.type, rng, mods);
   // 장비 옵션 — 경험치·골드 % (주인공 기준)
   const hd = deriveUnit(save, save.hero);
-  r.exp = Math.round(r.exp * (1 + (hd.expPct || 0)));
+  r.exp = Math.round(r.exp * (1 + (hd.expPct || 0)) * regrowExpMult(save.units[save.hero]));
   r.gold = Math.round(r.gold * (1 + (hd.goldPct || 0)));
   if (r.talentScroll) { save.mats.talentScroll = (save.mats.talentScroll || 0) + r.talentScroll; summary.talentScroll = r.talentScroll; }
   summary.exp = r.exp; summary.gold = r.gold; summary.essence = r.essence; summary.shard = r.shard;

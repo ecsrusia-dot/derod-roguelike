@@ -33,7 +33,7 @@ function RebirthSheet({ save, cid, onClose, onRebirth }) {
         : <button onClick={() => onRebirth(pick)} className="ui-press" style={{ height: 44, fontSize: 14, fontWeight: 800, border: `1px solid ${MS.red}`, background: 'rgba(224,87,76,0.22)', color: '#ff8a7e' }}>정말 전승한다 — Lv.1로 돌아간다</button>}>
       <MainSecHead title="바 뀌 는 것" />
       <MainKvRows rows={[
-        { l: '레벨·스킬·특성', v: 'Lv.1 초기화', c: '#e06a5f' }, { l: '필요 경험치', v: 'Lv.99까지 그대로', c: '#8fd08a' },
+        { l: '레벨·스킬·특성', v: 'Lv.1 초기화', c: '#e06a5f' }, { l: '경험치 (Lv.100 미만)', v: `×${REBIRTH.regrowExp}`, c: '#8fd08a' },
         { l: '적 HP', v: `+${Math.round(REBIRTH.enemyHp * next * 100)}%`, c: '#ff6ad5' }, { l: '적 공격', v: `+${Math.round(REBIRTH.enemyAtk * next * 100)}%`, c: '#ff6ad5' },
         { l: '공격·HP·방어 영구', v: `+${Math.round(REBIRTH.bonusPct * next * 100)}%`, c: MS.gold }, { l: '장비', v: '레벨 맞춤 착용', c: '#8fd08a' },
         { l: '갈래 첫 스킬', v: '즉시 습득', c: '#8fd08a' }, { l: '사역마', v: '내 레벨까지 힘을 냄' },
@@ -196,7 +196,7 @@ export function PartyView({ save, setSave, onBack, onForge }) {
               <span className="chr-pill" style={{ color: MS.gold, borderColor: 'rgba(232,176,74,.45)' }}>⚔ {E.unitPower(save, cid).toLocaleString()}</span>
               <span className="chr-pill" style={{ color: PALETTE.textDim }}>{cls.role}</span>
             </div>
-            {u.rebirth?.count > 0 && <div style={{ fontSize: 11.5, color: REBIRTH_BRANCHES[u.rebirth.branch].color, fontWeight: 700 }}>✦ 전승 {u.rebirth.count}회 · {REBIRTH_BRANCHES[u.rebirth.branch].name} <span style={{ fontWeight: 400, color: PALETTE.textDim }}>({REBIRTH_BRANCHES[u.rebirth.branch].type} · 능력치 +{Math.round(REBIRTH.bonusPct * u.rebirth.count * 100)}%)</span></div>}
+            {u.rebirth?.count > 0 && <div style={{ fontSize: 11.5, color: REBIRTH_BRANCHES[u.rebirth.branch].color, fontWeight: 700 }}>✦ 전승 {u.rebirth.count}회 · {REBIRTH_BRANCHES[u.rebirth.branch].name} <span style={{ fontWeight: 400, color: PALETTE.textDim }}>({REBIRTH_BRANCHES[u.rebirth.branch].type} · 능력치 +{Math.round(REBIRTH.bonusPct * u.rebirth.count * 100)}%{E.regrowExpMult(u) > 1 ? ` · 경험치 ×${E.regrowExpMult(u)}` : ''})</span></div>}
             <Bar v={u.exp} max={expNeedFor(u)} color={XP_HERO} h={6} />
             <div className="flex justify-between" style={{ fontSize: 11, color: PALETTE.textDim, marginTop: 2 }}><span>{u.lv >= E.levelCapOf(save) && u.lv < CHRONICLE_TUNING.maxLevel ? <span style={{ color: '#e8b04a' }}>🔒 레벨 상한 — 다른 캐릭터 Lv.{R.ROSTER.unlockLv}에 +{R.ROSTER.perChar}</span> : '경험치'}</span><span>{u.exp.toLocaleString()} / {expNeedFor(u).toLocaleString()}</span></div>
           </div>
