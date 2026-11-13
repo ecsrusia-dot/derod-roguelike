@@ -51,6 +51,15 @@ for (const k of fx) if (k.startsWith('sb_') && !D.CHRONICLE_SKILLS[k.slice(3)]) 
 check('특성 스킬 강화 대상', badSb);
 check(`효과 키 엔진 연결 (${fx.size}종)`, [...fx].filter(k => !k.startsWith('sb_') && !k.startsWith('fam_') && !new RegExp('\\b' + k + '\\b').test(eng)));
 
+// 갈래 전용 유니크 (1.286.0) — 갈래당 개수 균등 · 스킬 강화는 그 갈래 스킬만 (PM 결정)
+const bDist = {}, badBu = [];
+for (const u of Object.values(D.UNIQUE_ITEMS)) { if (!u.branch) continue; bDist[u.branch] = (bDist[u.branch] || 0) + 1;
+  if (D.REBIRTH_BRANCHES[u.branch]?.cls !== u.cls) badBu.push(`${u.id}: 갈래·직업 불일치`);
+  for (const k of Object.keys(u.fx)) if (k.startsWith('sb_') && D.CHRONICLE_SKILLS[k.slice(3)]?.branch !== u.branch) badBu.push(`${u.id}: ${k}는 ${u.branch} 스킬이 아님`); }
+const bPer = Object.keys(D.REBIRTH_BRANCHES).map(b => bDist[b] || 0);
+if (Math.min(...bPer) !== Math.max(...bPer)) badBu.push('갈래별 개수가 다르다');
+check(`갈래 전용 유니크 (갈래당 ${bPer[0]}종)`, badBu);
+
 // ⑥ 유니크 분배
 const dist = {};
 for (const u of Object.values(D.UNIQUE_ITEMS)) { if (u.branch) continue; dist[u.cls] = (dist[u.cls] || 0) + 1; }
