@@ -295,7 +295,9 @@ const CLASS_SKILL_PRIO = {
   sage: ['이프리트', '마력', '신앙', '정밀', '재생', '잔혹', '강타', '회피'],
 };
 
-export default function App({ onSwitchGame = null } = {}) {
+export default function App({ onSwitchGame = null, entry = 'dnt' } = {}) {
+  // 1.281.0: 게임 선택 화면에서 「무덤의 유산」으로 들어오면 본편 타이틀 대신 무덤 로비가 첫 화면이 된다
+  const buriedEntry = entry === 'buried' && FEATURE_FLAGS.buried;
   const [screen, setScreen] = useState('title');
   const [selectedClass, setSelectedClass] = useState(0);
   // 원정 선택 후 출정 화면에서 사용 — start 화면 탭 시 실제 startExpedition 호출
@@ -1188,6 +1190,10 @@ export default function App({ onSwitchGame = null } = {}) {
     try { await saveCloudMeta(uid, safe); } catch (e) { console.warn('[Recovery] cloud save 지연:', e); }
   };
 
+  // 1.281.0: 무덤의 유산으로 들어온 경우 — 저장을 불러온 뒤 타이틀 자리를 무덤 로비로 바꾼다
+  useEffect(() => {
+    if (buriedEntry && authMode && metaLoaded && screen === 'title') setScreen('buried');
+  }, [buriedEntry, authMode, metaLoaded, screen]);
   // 메타 데이터 로드 (앱 시작 시 한 번, authMode가 이미 결정된 경우만)
   useEffect(() => {
     if (!authReady) return;  // Firebase 초기화 대기
@@ -3434,7 +3440,8 @@ export default function App({ onSwitchGame = null } = {}) {
               onSelectGoogle={handleSelectGoogle} 
               onSwitchGame={onSwitchGame}
             />}
-            {screen === 'title' && authMode && <TitleScreen meta={meta} onStart={() => setScreen('expeditionSelect')} onResume={resumeActiveRun} onAltar={enterAltar} onEngravings={() => setScreen('engraving')} onRaid={FEATURE_FLAGS.raid && raidUnlocked ? () => setScreen('raid') : null} onAchievements={() => { setPrevAchievementsBack('title'); setScreen('achievements'); }} onAutoStats={() => setScreen('autoStats')} onGamble={raidUnlocked ? () => { setGambleResult(null); setScreen('gamble'); } : null} onHof={FEATURE_FLAGS.hof && raidUnlocked ? () => setScreen('hof') : null} onBuried={FEATURE_FLAGS.buried ? () => setScreen('buried') : null} onExo={FEATURE_FLAGS.exo ? () => setScreen('exo') : null} onRegression={FEATURE_FLAGS.regression ? () => setScreen('regression') : null} onChangelog={() => setShowChangelog({ firstSeen: false })} onAccount={() => setScreen('account')} onSwitchGame={onSwitchGame} />}
+            {screen === 'title' && authMode && buriedEntry && <div className="absolute inset-0 flex items-center justify-center" style={{ color: PALETTE.textDim, fontSize: 13 }}>불러오는 중…</div>}
+            {screen === 'title' && authMode && !buriedEntry && <TitleScreen meta={meta} onStart={() => setScreen('expeditionSelect')} onResume={resumeActiveRun} onAltar={enterAltar} onEngravings={() => setScreen('engraving')} onRaid={FEATURE_FLAGS.raid && raidUnlocked ? () => setScreen('raid') : null} onAchievements={() => { setPrevAchievementsBack('title'); setScreen('achievements'); }} onAutoStats={() => setScreen('autoStats')} onGamble={raidUnlocked ? () => { setGambleResult(null); setScreen('gamble'); } : null} onHof={FEATURE_FLAGS.hof && raidUnlocked ? () => setScreen('hof') : null} onBuried={null} onExo={FEATURE_FLAGS.exo ? () => setScreen('exo') : null} onRegression={FEATURE_FLAGS.regression ? () => setScreen('regression') : null} onChangelog={() => setShowChangelog({ firstSeen: false })} onAccount={() => setScreen('account')} onSwitchGame={onSwitchGame} />}
             {FEATURE_FLAGS.hof && screen === 'hof' && <HofScreen meta={meta} onEnterStage={(stage) => { setHofStage(stage); setScreen('hofBattle'); }} onLevelUp={handleHofLevelUp} onSavePatterns={handleHofSavePatterns} onBack={() => setScreen('title')} />}
             {FEATURE_FLAGS.hof && screen === 'hofBattle' && hofStage && <HofBattleScreen meta={meta} stage={hofStage} onFinish={handleHofFinish} onRetreat={() => { setHofStage(null); setScreen('hof'); }} />}
             {FEATURE_FLAGS.regression && screen === 'regression' && <RegressionGame reg={getRegression(meta)} meta={meta}
@@ -3466,7 +3473,7 @@ export default function App({ onSwitchGame = null } = {}) {
               onBuyPart={handleBuriedBuyPart}
               onDetachParts={handleBuriedDetachParts}
               forgeNotice={buriedForgeNotice}
-              onBack={() => { setBuriedForgeNotice(null); setScreen('title'); }} />}
+              onBack={() => { setBuriedForgeNotice(null); if (buriedEntry && onSwitchGame) onSwitchGame(); else setScreen('title'); }} />}
             {FEATURE_FLAGS.buried && screen === 'buriedDungeon' && meta?.buried?.char && <BuriedDungeonScreen meta={meta}
               onUpdateChar={updateBuriedChar}
               onLogEvent={handleBuriedEventLog}

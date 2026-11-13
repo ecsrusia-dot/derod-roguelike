@@ -5,6 +5,7 @@
 //   - Dawn & Twilight (본편 App.jsx — 코드·세이브 변경 없음)
 //   - 트와일라잇 아르카나 (src/arcana — 덱빌딩 로그라이크, 세이브 분리)
 //   - 황혼 연대기 (src/chronicle — 정통 RPG, 1.205.0, 세이브 분리)
+//   - 무덤의 유산 (1.281.0 — 본편 App을 entry="buried"로 띄움: 저장은 본편 meta.buried 그대로)
 // 두 게임 모두 React.lazy로 불러서 고른 쪽만 내려받는다.
 // 마지막 선택은 localStorage에 기억해 「최근」 표시만 한다 (자동 진입 X — PM 결정: 런처 화면).
 // ============================================
@@ -30,17 +31,22 @@ const ALL_GAMES = [
     image: './classes/wanderer.jpg', color: PALETTE.accent,
   },
   {
+    id: 'chronicle', title: 'Twilight Chronicle', kr: '황혼 연대기',
+    desc: '정통 RPG — 레벨업·사역마·파밍·던전·장비 강화',
+    image: './enemies/championship/frost/champ_frost_boss4_intro.jpg', color: '#9cc4e4',
+  },
+  {
+    id: 'buried', title: 'Legacy of the Tomb', kr: '무덤의 유산', badge: 'NEW',
+    desc: '끝없는 무덤 탐험 — 장비가 곧 스킬, 죽으면 먼지만 남는다',
+    image: './enemies/championship/forest/chapter4/champ_forest_boss4_intro.jpg', color: '#d9a441',
+  },
+  {
     id: 'arcana', title: 'Twilight Arcana', kr: '트와일라잇 아르카나',
     desc: '카드로 싸우는 덱빌딩 로그라이크 — 4막 원정',
     image: './enemies/classic/chapter_3/oblivionSealer_intro.jpg', color: '#b48ce0',
   },
-  {
-    id: 'chronicle', title: 'Twilight Chronicle', kr: '황혼 연대기',
-    desc: '정통 RPG — 레벨업·동료·파밍·던전·장비 승급', badge: 'NEW',
-    image: './enemies/championship/frost/champ_frost_boss4_intro.jpg', color: '#9cc4e4',
-  },
 ];
-const GAMES = ALL_GAMES.filter(g => g.id !== 'arcana' || FEATURE_FLAGS.arcana);
+const GAMES = ALL_GAMES.filter(g => (g.id !== 'arcana' || FEATURE_FLAGS.arcana) && (g.id !== 'buried' || FEATURE_FLAGS.buried));
 
 // PC에서는 폰 프레임, 모바일은 전체 화면
 function Frame({ children }) {
@@ -110,6 +116,10 @@ export default function Launcher() {
   const back = () => setGame(null);
   if (game === 'dnt') {
     return <ErrorBoundary name="던앤트와일라잇" onExit={back}><Suspense fallback={<Loading />}><DntApp onSwitchGame={back} /></Suspense></ErrorBoundary>;
+  }
+  // 1.281.0: 무덤의 유산 — 본편과 같은 앱·같은 저장(meta.buried)을 쓰되 첫 화면만 무덤 로비
+  if (game === 'buried' && FEATURE_FLAGS.buried) {
+    return <ErrorBoundary name="무덤의 유산" onExit={back}><Suspense fallback={<Loading />}><DntApp key="buried" entry="buried" onSwitchGame={back} /></Suspense></ErrorBoundary>;
   }
   if (game === 'chronicle') {
     return (
