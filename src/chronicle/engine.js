@@ -466,6 +466,8 @@ export function deriveUnit(save, classId) {
     else if (MULT_KEYS.includes(k)) g[k] = Math.max(g[k] || 0, v);
     else g[k] = (g[k] || 0) + v;
   }
+  // 1.286.0 장비(갈래 유니크)의 sb_<스킬> — 특성과 같은 스킬 위력으로 합산
+  for (const k of Object.keys(g)) if (k.startsWith('sb_')) { skillBoost[k.slice(3)] = (skillBoost[k.slice(3)] || 0) + g[k]; delete g[k]; }
   // 1.247.0 PM 결정 「겹칠 때만 대체」 — 「광폭화 중 2회」가 두 출처(광기의 혈인 + 특성 피의 광란)에서 겹치면
   // 겹친 몫은 「광폭화 지속 +1턴 · 광폭화 중 흡혈 2배」로 바뀐다 (2회 공격은 2중첩이 없으므로)
   if ((g.rageDouble || 0) >= 2) { g.rageTurnsAdd = (g.rageTurnsAdd || 0) + 1; g.rageLifesteal = 1; }
