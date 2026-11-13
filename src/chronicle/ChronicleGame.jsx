@@ -1416,10 +1416,10 @@ function PartyView({ save, setSave, onBack, onForge }) {
               </button>
             ))}
           </div>
-          <div className="text-center mt-1.5" style={{ fontSize: 11.5, color: PALETTE.textDim }}>능력치를 누르면 효과와 포인트 배분 · 남은 포인트 <b style={{ color: u.points ? MS.gold : PALETTE.textDim }}>{u.points}</b></div>
+          <div className="text-center mt-1.5" style={{ fontSize: 11.5, color: PALETTE.textDim }}>능력치를 누르면 네 능력치를 한 번에 배분 · 남은 포인트 <b style={{ color: u.points ? MS.gold : PALETTE.textDim }}>{u.points}</b></div>
           <div className="text-center" style={{ fontSize: 11, color: PALETTE.textDim }}>한 능력치가 <b style={{ color: PALETTE.text }}>{E.statSoftCap(u)}</b>(레벨 × 1.5)을 넘으면 넘친 몫은 효과 30% — 여러 능력치에 나눠 찍는 게 유리</div>
           {E.canResetStats(save, cid) && <button onClick={() => setSave(E.resetStats(save, cid))} className="ui-press w-full mt-2" style={{ height: 34, borderRadius: 10, border: `1px solid ${MS.line}`, color: PALETTE.text, background: 'transparent', fontSize: 12.5 }}>↺ 능력치 재분배 — {E.statResetCost(u) ? `🪙${E.statResetCost(u).toLocaleString()}` : '첫 1회 무료'}</button>}
-          {u.points > 0 && <button onClick={() => setSave(E.autoAllocate(save, cid))} className="ui-press w-full mt-2" style={{ height: 36, borderRadius: 10, border: `1px dashed ${MS.gold}`, color: MS.gold, background: 'transparent', fontSize: 12.5 }}>추천 배분 ({Object.entries(cls.auto || {}).map(([k, v]) => `${STAT_META[k].label} ${v}`).join(' : ')}) — {u.points}포인트</button>}
+          {u.points > 0 && <button onClick={() => setStatPick(cls.main)} className="ui-press ui-sheen w-full mt-2" style={{ height: 40, borderRadius: 10, border: `1px solid ${MS.gold}`, color: MS.gold, background: 'rgba(232,176,74,0.10)', fontSize: 13, fontWeight: 800 }}>능력치 배분하기 — {u.points}포인트</button>}
 
           <MainSecHead title="전 투 수 치" />
           <MainKvGrid onPick={setRowInfo} rows={[
@@ -1534,22 +1534,7 @@ function PartyView({ save, setSave, onBack, onForge }) {
         <MainSkillModal s={skillInfo} lv={u.skills[skillInfo.id] || 0} u={u} d={d} sp={u.sp} can={E.canLearn(u, skillInfo)}
           onLearn={() => setSave(E.learnSkill(save, cid, skillInfo.id))} onClose={() => setSkillInfo(null)} />
       )}
-      {statPick && (
-        <MainModal kicker="능 력 치" title={STAT_META[statPick].label} color={statPick === cls.main ? MS.gold : MS.red} badge={statPick === cls.main ? '주 능력치' : null} onClose={() => setStatPick(null)}
-          footer={<div className="grid gap-2" style={{ gridTemplateColumns: '1fr 1fr' }}>
-            <button disabled={!u.points} onClick={() => setSave(E.addStat(save, cid, statPick, 1))} className="ui-press" style={{ height: 42, border: `1px solid ${u.points ? MS.gold : MS.line}`, color: u.points ? MS.gold : PALETTE.textDim, background: 'transparent', fontWeight: 800, opacity: u.points ? 1 : 0.5 }}>+1</button>
-            <button disabled={!u.points} onClick={() => setSave(E.addStat(save, cid, statPick, u.points))} className="ui-press" style={{ height: 42, border: `1px solid ${u.points ? MS.gold : MS.line}`, color: u.points ? MS.gold : PALETTE.textDim, background: 'transparent', fontWeight: 800, opacity: u.points ? 1 : 0.5 }}>전부 (+{u.points})</button>
-          </div>}>
-          <div className="grid gap-1.5" style={{ gridTemplateColumns: '1fr 1fr' }}>
-            <MainCell label="현재" value={u.stats[statPick]} color={MS.gold} />
-            <MainCell label="남은 포인트" value={u.points} />
-          </div>
-          <div className="mt-2" style={{ padding: '8px 10px', border: `1px solid ${MS.line}`, background: MS.box, fontSize: 12.5, color: PALETTE.text }}>
-            <b style={{ color: MS.red }}>◇ 효과</b> {STAT_META[statPick].desc}
-          </div>
-          <div className="mt-2" style={{ fontSize: 11.5, color: PALETTE.textDim }}>레벨업마다 포인트를 받는다. {cls.name}의 주 능력치는 <b style={{ color: MS.gold }}>{STAT_META[cls.main].label}</b>.</div>
-        </MainModal>
-      )}
+      {statPick && <StatAllocModal save={save} cid={cid} focus={statPick} onClose={() => setStatPick(null)} onApply={(plan) => { setSave(E.addStats(save, cid, plan)); setStatPick(null); }} />}
       {rowInfo && (
         <MainModal kicker="능 력 치 설 명" title={rowInfo.label} color={rowInfo.color || MS.red} badge={String(rowInfo.value)} onClose={() => setRowInfo(null)}>
           <div style={{ fontSize: 13, color: PALETTE.text, lineHeight: 1.6 }}>{rowInfo.desc || `${rowInfo.label} — 장비·특성·사역마·원정대 버프·전승을 모두 합산한 값.`}</div>
@@ -3757,6 +3742,70 @@ function DailyView({ acc, onBack, onAct, onSwitch }) {
         </button>
       </div>
     </div>
+  );
+}
+
+// ===== 능력치 한 번에 배분 (1.277.0) — 네 능력치를 모두 보여 주고 슬라이더·±버튼으로 계획한 뒤 한 번에 적용 =====
+const ALLOC_PREVIEW = [
+  ['maxHp', 'HP', 'n'], ['atk', '공격력', 'n'], ['def', '방어', 'n'], ['healPower', '치유력', 'n'], ['spd', '속도', 'n'],
+  ['crit', '치명', 'p'], ['critMult', '치명 피해', 'p'], ['dodge', '회피', 'p'], ['skillDmg', '스킬 피해', 'p'], ['armorPen', '방어 관통', 'p'], ['dmgReduce', '받는 피해 감소', 'p'], ['chain', '추가 타격', 'p'],
+];
+function StatAllocModal({ save, cid, focus, onClose, onApply }) {
+  const u = save.units[cid]; const cls = chronicleClass(cid);
+  const [plan, setPlan] = useState({});
+  const [open, setOpen] = useState(null); // 설명을 펼친 능력치 (누르면 전체 문구)
+  const used = STAT_KEYS.reduce((t, k) => t + (plan[k] || 0), 0);
+  const left = (u.points || 0) - used;
+  const cap = E.statSoftCap(u);
+  const set = (k, n) => setPlan(p => {
+    const others = STAT_KEYS.reduce((t, x) => t + (x === k ? 0 : (p[x] || 0)), 0);
+    return { ...p, [k]: Math.max(0, Math.min((u.points || 0) - others, Math.round(n))) };
+  });
+  const before = E.deriveUnit(save, cid);
+  const after = used ? E.deriveUnit(E.addStats(save, cid, plan), cid) : before;
+  const fmt = (v, t) => (t === 'p' ? `${Math.round((v || 0) * 1000) / 10}%` : Math.round(v || 0).toLocaleString());
+  const diffs = ALLOC_PREVIEW.filter(([k, , t]) => fmt(before[k], t) !== fmt(after[k], t));
+  const step = (k, d, label) => {
+    const on = d < 0 ? (plan[k] || 0) > 0 : left > 0;
+    return <button key={label} disabled={!on} onClick={() => set(k, (plan[k] || 0) + d)} className="ui-press" style={{ height: 30, fontSize: 12.5, fontWeight: 700, border: `1px solid ${on ? (d > 0 ? MS.gold : MS.line) : MS.line}`, color: on ? (d > 0 ? MS.gold : PALETTE.text) : PALETTE.textDim, background: MS.box, opacity: on ? 1 : 0.45 }}>{label}</button>;
+  };
+  const autoPlan = () => setPlan(E.autoAllocatePlan(save, cid));
+  return (
+    <MainModal kicker="능 력 치 배 분" title={`남은 포인트 ${left}`} color={MS.gold} badge={used ? `배분 ${used}` : `보유 ${u.points || 0}`} sub={`${cls.name} Lv.${u.lv} · 한 능력치가 ${cap}을 넘으면 넘친 몫은 효과 30%`} onClose={onClose}
+      footer={<div className="grid gap-2" style={{ gridTemplateColumns: '1fr 2fr' }}>
+        <button disabled={!used} onClick={() => setPlan({})} className="ui-press" style={{ height: 44, fontSize: 13, border: `1px solid ${MS.line}`, color: used ? PALETTE.text : PALETTE.textDim, background: 'transparent', opacity: used ? 1 : 0.5 }}>되돌리기</button>
+        <button disabled={!used} onClick={() => onApply(plan)} className="ui-press" style={{ height: 44, fontSize: 14, fontWeight: 800, border: `1px solid ${used ? MS.red : MS.line}`, color: used ? '#ff8a7e' : PALETTE.textDim, background: used ? 'rgba(224,87,76,0.18)' : 'transparent', opacity: used ? 1 : 0.5 }}>{used ? `${used}포인트 적용` : '배분할 능력치를 고르세요'}</button>
+      </div>}>
+      <div className="flex flex-col gap-1.5">
+        {STAT_KEYS.map(k => {
+          const add = plan[k] || 0; const now = u.stats[k]; const next = now + add; const main = k === cls.main;
+          return (
+            <div key={k} style={{ padding: '7px 10px 8px', border: `1px solid ${k === focus || add ? MS.gold : MS.line}`, background: MS.box }}>
+              <div className="flex items-baseline gap-2">
+                <b style={{ fontSize: 14, color: main ? MS.gold : PALETTE.text }}>{STAT_META[k].label}</b>
+                {main && <span style={{ fontSize: 10.5, padding: '0 5px', color: MS.gold, border: `1px solid ${MS.gold}88` }}>주 능력치</span>}
+                <div className="flex-1" />
+                <span style={{ fontSize: 13, color: PALETTE.textDim }}>{now}</span>
+                {add > 0 && <><span style={{ fontSize: 12, color: PALETTE.textDim }}>→</span><b style={{ fontSize: 17, color: MS.gold }}>{next}</b><span style={{ fontSize: 12, color: '#8fd08a' }}>+{add}</span></>}
+              </div>
+              <div className={open === k ? '' : 'truncate'} onClick={() => setOpen(o => (o === k ? null : k))} style={{ fontSize: 11.5, color: PALETTE.textDim, lineHeight: 1.4, marginTop: 1 }}>{STAT_META[k].desc}</div>
+              {next > cap && <div style={{ fontSize: 11, color: '#e07a6a', marginTop: 2 }}>⚠ {cap} 초과 {next - cap}점은 효과 30%만 적용</div>}
+              <input type="range" aria-label={`${STAT_META[k].label} 배분`} min={0} max={Math.max(1, add + left)} step={1} value={add} disabled={!(add + left)} onChange={e => set(k, +e.target.value)} className="w-full" style={{ accentColor: MS.gold, height: 24, marginTop: 2, touchAction: 'pan-y' }} />
+              <div className="grid gap-1" style={{ gridTemplateColumns: 'repeat(6, 1fr)' }}>
+                {step(k, -10, '−10')}{step(k, -1, '−1')}{step(k, 1, '+1')}{step(k, 10, '+10')}{step(k, 50, '+50')}{step(k, left, '전부')}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {u.points > 0 && <button onClick={autoPlan} className="ui-press w-full mt-2" style={{ height: 36, border: `1px dashed ${MS.gold}`, color: MS.gold, background: 'transparent', fontSize: 12.5 }}>추천 비율로 채우기 ({Object.entries(cls.auto || {}).map(([k, v]) => `${STAT_META[k].label} ${v}`).join(' : ')})</button>}
+      <MainSecHead title="적 용 하 면" />
+      {diffs.length
+        ? <div className="grid gap-x-3 gap-y-1" style={{ gridTemplateColumns: '1fr 1fr', fontSize: 12.5 }}>
+          {diffs.map(([k, l, t]) => <div key={k} className="flex justify-between gap-2"><span style={{ color: PALETTE.textDim }}>{l}</span><span><span style={{ color: PALETTE.textDim }}>{fmt(before[k], t)} → </span><b style={{ color: '#8fd08a' }}>{fmt(after[k], t)}</b></span></div>)}
+        </div>
+        : <div style={{ fontSize: 12, color: PALETTE.textDim }}>슬라이더를 밀거나 버튼을 누르면 바뀌는 전투 수치가 여기에 나온다</div>}
+    </MainModal>
   );
 }
 
