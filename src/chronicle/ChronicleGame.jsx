@@ -3831,9 +3831,15 @@ function StatAllocModal({ save, cid, focus, onClose, onApply }) {
     const on = d < 0 ? (plan[k] || 0) > 0 : left > 0;
     return <button key={label} disabled={!on} onClick={() => set(k, (plan[k] || 0) + d)} className="ui-press" style={{ height: 30, fontSize: 12.5, fontWeight: 700, border: `1px solid ${on ? (d > 0 ? MS.gold : MS.line) : MS.line}`, color: on ? (d > 0 ? MS.gold : PALETTE.text) : PALETTE.textDim, background: MS.box, borderRadius: MS.r, opacity: on ? 1 : 0.45 }}>{label}</button>;
   };
+  // 1.280.1 — 「상한」: 효율 감소가 시작되기 직전(레벨 × 1.5)까지 한 번에 맞춘다 (+50 버튼 대체). 포인트가 모자라면 있는 만큼
+  const capBtn = (k) => {
+    const want = Math.max(0, cap - u.stats[k]); const cur = plan[k] || 0;
+    const on = want !== cur && (want < cur || left > 0);
+    return <button key="cap" disabled={!on} onClick={() => set(k, want)} aria-label={`${STAT_META[k].label} 상한 ${cap}까지`} className="ui-press" style={{ height: 30, fontSize: 12.5, fontWeight: 700, border: `1px solid ${on ? '#e8b04a' : MS.line}`, color: on ? '#e8b04a' : PALETTE.textDim, background: on ? 'rgba(232,176,74,0.10)' : MS.box, borderRadius: MS.r, opacity: on ? 1 : 0.45, whiteSpace: 'nowrap' }}>상한</button>;
+  };
   const autoPlan = () => setPlan(E.autoAllocatePlan(save, cid));
   return (
-    <MainModal kicker="능 력 치 배 분" title={`남은 포인트 ${left}`} color={MS.gold} badge={used ? `배분 ${used}` : `보유 ${u.points || 0}`} sub={`${cls.name} Lv.${u.lv} · 한 능력치가 ${cap}을 넘으면 넘친 몫은 효과 30%`} onClose={onClose}
+    <MainModal kicker="능 력 치 배 분" title={`남은 포인트 ${left}`} color={MS.gold} badge={used ? `배분 ${used}` : `보유 ${u.points || 0}`} sub={`${cls.name} Lv.${u.lv} · 한 능력치가 ${cap}을 넘으면 넘친 몫은 효과 30% · 「상한」 = ${cap}까지 한 번에`} onClose={onClose}
       footer={<div className="grid gap-2" style={{ gridTemplateColumns: '1fr 2fr' }}>
         <button disabled={!used} onClick={() => setPlan({})} className="ui-press" style={{ height: 44, fontSize: 13, border: `1px solid ${MS.line}`, color: used ? PALETTE.text : PALETTE.textDim, background: 'transparent', opacity: used ? 1 : 0.5 }}>되돌리기</button>
         <button disabled={!used} onClick={() => onApply(plan)} className={`ui-press${used ? ' chr-btn-pri' : ''}`} style={{ height: 44, fontSize: 14, fontWeight: 800, border: `1px solid ${used ? MS.red : MS.line}`, color: used ? '#ff8a7e' : PALETTE.textDim, background: used ? 'rgba(224,87,76,0.18)' : 'transparent', opacity: used ? 1 : 0.5 }}>{used ? `${used}포인트 적용` : '배분할 능력치를 고르세요'}</button>
@@ -3854,7 +3860,7 @@ function StatAllocModal({ save, cid, focus, onClose, onApply }) {
               {next > cap && <div style={{ fontSize: 11, color: '#e07a6a', marginTop: 2 }}>⚠ {cap} 초과 {next - cap}점은 효과 30%만 적용</div>}
               <input type="range" aria-label={`${STAT_META[k].label} 배분`} min={0} max={Math.max(1, add + left)} step={1} value={add} disabled={!(add + left)} onChange={e => set(k, +e.target.value)} className="w-full" style={{ accentColor: MS.gold, height: 24, marginTop: 2, touchAction: 'pan-y' }} />
               <div className="grid gap-1" style={{ gridTemplateColumns: 'repeat(6, 1fr)' }}>
-                {step(k, -10, '−10')}{step(k, -1, '−1')}{step(k, 1, '+1')}{step(k, 10, '+10')}{step(k, 50, '+50')}{step(k, left, '전부')}
+                {step(k, -10, '−10')}{step(k, -1, '−1')}{step(k, 1, '+1')}{step(k, 10, '+10')}{capBtn(k)}{step(k, left, '전부')}
               </div>
             </div>
           );
