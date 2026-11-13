@@ -885,3 +885,11 @@ body {
 .chr-bar-fill { border-radius: 999px; box-shadow: 0 0 10px rgba(232,176,74,.35); }
 .chr-port { border-radius: 24px; padding: 2px; background: conic-gradient(from 0deg, #e8b04a, var(--edge, #e0574c), #5a221c, #e8b04a); box-shadow: 0 0 22px var(--glow, rgba(232,176,74,.3)); }
 @media (prefers-reduced-motion: reduce) { .chr-glass-sheen::after, .chr-btn-pri::after, .chr-pop-in { animation: none; } .chr-seg-thumb { transition: none; } }
+
+/* ===== 유리 스타일 2차 (1.277.1) — 구획 머리 · 전투 결과 창 · 아래에서 올라오는 창 · 작은 버튼·칩 ===== */
+.chr-head { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; letter-spacing: 4px; font-weight: 700; background: linear-gradient(92deg, #fff3d6, #e8b04a 60%, #e0864a); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.chr-head::before { content: ""; width: 7px; height: 7px; flex: none; transform: rotate(45deg); border-radius: 2px; background: linear-gradient(135deg, #fff0c8, #e8b04a); box-shadow: 0 0 8px rgba(232,176,74,.8); }
+.chr-root [role="button"] { border-radius: 10px; }
+.chr-root .chr-chip { border-radius: 999px; }
+.chr-root .z-50 { background: rgba(5,2,3,.66) !important; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.chr-root .z-50 > .ui-glass { background: linear-gradient(170deg, rgba(52,26,32,.94), rgba(20,10,13,.97)) !important; border: 1px solid rgba(232,176,74,.35) !important; border-bottom: none !important; box-shadow: 0 -14px 44px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.09); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); }
