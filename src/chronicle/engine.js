@@ -227,11 +227,54 @@ export function reforgeRoll(save0, uid, idx, rng = Math.random) {
   it.rr = (it.rr || 0) + 1;
   return { save, cand, cost };
 }
+// ===== 수치 재설정 (1.280.0) — 옵션 종류는 그대로, 수치만 그 등급 범위 [최저, 최고] 안에서 다시 굴린다 =====
+// 유니크의 고정 옵션(1·2번)도 가능 — PM 결정: 범위는 유니크 등급 범위 전체 (설계값보다 낮게 나올 수도 있다 → 유지/바꾸기 선택)
+export function tuneRange(item, o0) {
+  const o = normOpt(item, o0); const d = OPTION_DEFS[o.k];
+  if (!d || o.k === 'cdr' || o.k === 'scdr' || d.v[1] === d.v[0]) return null;
+  const gm = GRADES[gradeIdx(item.grade)]?.optMult || 1;
+  const fix = (v) => (d.pct ? +v.toFixed(3) : Math.max(1, Math.round(v)));
+  return { k: o.k, min: fix(d.v[0] * gm), max: fix(d.v[1] * gm), cur: o.v, pct: !!d.pct };
+}
+export function tuneCost(item) {
+  const base = REFORGE.tuneShard?.[item?.grade];
+  if (!base || !itemOpts(item).length) return null;
+  const k = 1 + REFORGE.growth * Math.min(REFORGE.growthMax, item.rr || 0);
+  return { gold: Math.round((20 + item.ilv * 4) * REFORGE.goldMult * k), shard: Math.max(1, Math.round(base * (1 + item.ilv / REFORGE.lvDiv) * k)) };
+}
+// 수치를 굴릴 수 있는 줄인가 (값이 하나뿐인 옵션·이미 최고치 이상인 줄은 불가)
+export function tuneLineState(item, idx) {
+  const line = item && reforgeLines(item)[idx];
+  if (!line) return { ok: false, why: '' };
+  const r = tuneRange(item, line.o);
+  if (!r) return { ok: false, why: '수치가 하나뿐인 옵션' };
+  if (r.cur >= r.max) return { ok: false, why: '이미 최고치', range: r };
+  return { ok: true, range: r };
+}
+export function canTune(save, item, idx) {
+  const c = item && tuneCost(item);
+  return !!c && tuneLineState(item, idx).ok && save.gold >= c.gold && (save.mats.shard || 0) >= c.shard;
+}
+export function tuneRoll(save0, uid, idx, rng = Math.random) {
+  const it0 = save0.inventory.find(i => i.uid === uid);
+  if (!canTune(save0, it0, idx)) return { save: save0, cand: null, cost: null };
+  const cost = tuneCost(it0);
+  const o = normOpt(it0, reforgeLines(it0)[idx].o); const r = tuneRange(it0, o);
+  const raw = r.min + rng() * (r.max - r.min);
+  const cand = { ...o, v: r.pct ? +raw.toFixed(3) : Math.max(1, Math.round(raw)) };
+  const save = clone(save0);
+  const it = save.inventory.find(i => i.uid === uid);
+  save.gold -= cost.gold; save.mats.shard -= cost.shard;
+  it.rr = (it.rr || 0) + 1;
+  return { save, cand, cost };
+}
 // 바꾸기 — 굴려서 나온 옵션을 그 줄에 넣는다 (유니크의 계산형 3번째 줄은 이때부터 저장된다)
-export function reforgeApply(save0, uid, idx, cand) {
+// mode 'value' (수치 재설정) = 잠긴 줄도 가능하지만 옵션 종류가 같아야 한다
+export function reforgeApply(save0, uid, idx, cand, mode = 'kind') {
   const it0 = save0.inventory.find(i => i.uid === uid);
   const line = it0 && cand && reforgeLines(it0)[idx];
-  if (!line || line.locked) return save0;
+  if (!line) return save0;
+  if (mode === 'value' ? normOpt(it0, line.o).k !== cand.k : line.locked) return save0;
   const save = clone(save0);
   const it = save.inventory.find(i => i.uid === uid);
   const opts = itemOpts(it).map(o => ({ ...o }));

@@ -699,6 +699,9 @@ export const FORGE = {
 export const REFORGE = {
   base: { uncommon: 4, rare: 8, epic: 16, unique: 24, mythic: 24 },
   lvDiv: 50, goldMult: 3, growth: 0.25, growthMax: 12,
+  // 수치 재설정 (1.280.0 PM 결정) — 옵션 종류는 그대로, 수치만 다시 굴린다. 고급 재화 ◆ 파편 · 유니크 고정 옵션도 가능
+  //   파편 = tuneShard[등급] × (1 + 장비 레벨 ÷ lvDiv) × 횟수 배율 (옵션 재설정과 횟수 공유)
+  tuneShard: { uncommon: 1, rare: 2, epic: 3, unique: 5, mythic: 5 },
 };
 
 export const DROP_TABLE = {

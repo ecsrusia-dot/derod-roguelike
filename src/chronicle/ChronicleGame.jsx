@@ -2818,7 +2818,8 @@ function ForgeView({ save, setSave, onBack, flash, onTrack = () => {} }) {
   const [rulesOpen, setRulesOpen] = useState(false);
   // 옵션 재설정 (1.276.0) — 줄 선택 → 굴리기(비용 소모) → 새 옵션을 보고 바꾸기/유지
   const [rfIdx, setRfIdx] = useState(null);
-  const [rfCand, setRfCand] = useState(null); // { uid, idx, opt }
+  const [rfCand, setRfCand] = useState(null); // { uid, idx, opt, mode }
+  const [rfMode, setRfMode] = useState('kind'); // 'kind' 옵션 재설정(✦) · 'value' 수치 재설정(◆) — 1.280.0
   useEffect(() => { setRfIdx(null); setRfCand(null); }, [sel]);
   const guard = (risky, info, run) => {
     if (!risky || forgeConfirmSkip) { run(); return; }
@@ -2888,17 +2889,19 @@ function ForgeView({ save, setSave, onBack, flash, onTrack = () => {} }) {
     const it2 = r.save.inventory.find(i => i.uid === item.uid); showPop('success', `${gradeOf(ng).label} 등급으로 승급!`, E.epicOptOf(it2) ? `에픽 효과 「${E.epicOptOf(it2).name}」` : E.itemName(it2));
   });
   const rfLines = item ? E.reforgeLines(item) : [];
-  const rfCost = item ? E.reforgeCost(item) : null;
-  const rfOpen = rfLines.filter(l => !l.locked);
+  const rfValue = rfMode === 'value';
+  const rfCost = item ? (rfValue ? E.tuneCost(item) : E.reforgeCost(item)) : null;
+  const rfTune = (i) => E.tuneLineState(item, i);
+  const rfOpen = rfLines.filter(l => (rfValue ? rfTune(l.i).ok : !l.locked));
   const rfSel = rfOpen.some(l => l.i === rfIdx) ? rfIdx : (rfOpen[0]?.i ?? null);
   const rfPending = rfCand && item && rfCand.uid === item.uid ? rfCand : null;
   const doReforge = () => {
-    const r = E.reforgeRoll(save, item.uid, rfSel, Math.random);
+    const r = rfValue ? E.tuneRoll(save, item.uid, rfSel, Math.random) : E.reforgeRoll(save, item.uid, rfSel, Math.random);
     if (!r.cand) return;
-    setSave(r.save); setRfCand({ uid: item.uid, idx: rfSel, opt: r.cand });
+    setSave(r.save); setRfCand({ uid: item.uid, idx: rfSel, opt: r.cand, mode: rfMode });
   };
   const rfDecide = (take) => {
-    if (take && rfPending) { setSave(E.reforgeApply(save, item.uid, rfPending.idx, rfPending.opt)); flash('옵션을 바꿨습니다'); }
+    if (take && rfPending) { setSave(E.reforgeApply(save, item.uid, rfPending.idx, rfPending.opt, rfPending.mode || 'kind')); flash(rfPending.mode === 'value' ? '수치를 바꿨습니다' : '옵션을 바꿨습니다'); }
     else flash('기존 옵션을 유지했습니다');
     setRfCand(null);
   };
@@ -2954,8 +2957,8 @@ function ForgeView({ save, setSave, onBack, flash, onTrack = () => {} }) {
           <MainModal kicker={`${g.label} · ${slot?.label || ''}${by ? ' · 착용 중' : ''}`.split('').join(' ').replace(/ {3}/g, '  ')} title={`${E.itemName(item)}${item.plus ? ` +${item.plus}` : ''}`} color={g.color} badge={`⚔ ${E.itemPower(item)}`} sub={`Lv.${item.ilv} · ${clsTag(item)} · 최대 +${FORGE.maxEnhance}`} onClose={() => setSel(null)}
             footer={ftab === 'reforge'
               ? (!rfCost || rfSel == null ? null : rfPending
-                ? <div className="grid gap-1.5" style={{ gridTemplateColumns: '1fr 1fr' }}>{bigBtn(true, '유지', () => rfDecide(false), true)}{bigBtn(true, '새 옵션으로 바꾸기', () => rfDecide(true))}</div>
-                : E.canReforge(save, item, rfSel) ? bigBtn(true, '🎲 선택한 옵션 다시 굴리기', doReforge) : bigBtn(false, forgeShort(save, rfCost)))
+                ? <div className="grid gap-1.5" style={{ gridTemplateColumns: '1fr 1fr' }}>{bigBtn(true, '유지', () => rfDecide(false), true)}{bigBtn(true, rfPending.mode === 'value' ? '새 수치로 바꾸기' : '새 옵션으로 바꾸기', () => rfDecide(true))}</div>
+                : (rfValue ? E.canTune(save, item, rfSel) : E.canReforge(save, item, rfSel)) ? bigBtn(true, rfValue ? '🎯 선택한 옵션의 수치 다시 굴리기' : '🎲 선택한 옵션 다시 굴리기', doReforge) : bigBtn(false, forgeShort(save, rfCost)))
               : ftab === 'enhance'
               ? (maxed ? null : enhOk ? bigBtn(true, `⚒ 강화 +${item.plus || 0} → +${(item.plus || 0) + 1}`, doEnhance) : bigBtn(false, forgeShort(save, ec)))
               : (!ng ? null : proOk ? bigBtn(true, `⬆ ${gradeOf(ng).label} 승급`, doPromote, true) : bigBtn(false, forgeShort(save, pc)))}>
@@ -2995,20 +2998,22 @@ function ForgeView({ save, setSave, onBack, flash, onTrack = () => {} }) {
             {ftab === 'reforge' && (!rfCost
               ? <div className="mt-3" style={{ fontSize: 12.5, color: PALETTE.textDim }}>옵션이 없는 장비입니다 — 고급 등급부터 옵션이 붙는다</div>
               : <>
+                <div className="mt-2"><MainTabs size={12.5} value={rfMode} onChange={(m) => { if (!rfPending) { setRfMode(m); setRfIdx(null); } }} items={[['kind', '🎲 옵션 재설정 · ✦'], ['value', '🎯 수치 재설정 · ◆']]} /></div>
+                <div className="mt-1" style={{ fontSize: 11.5, color: PALETTE.textDim, lineHeight: 1.5 }}>{rfValue ? '옵션 종류는 그대로 두고 수치만 다시 굴린다 — 유니크의 고정 옵션도 가능' : '옵션 종류와 수치를 함께 다시 굴린다'}</div>
                 <MainSecHead title="옵 션" />
                 <div className="flex flex-col gap-1.5">
-                  {rfLines.map(l => { const on = l.i === rfSel; return (
-                    <button key={l.i} disabled={l.locked || !!rfPending} onClick={() => setRfIdx(l.i)} className="ui-press text-left flex items-center gap-2" style={{ padding: '9px 10px', border: `1px solid ${on ? MS.gold : MS.line}`, background: on ? 'rgba(232,176,74,0.10)' : MS.box, opacity: l.locked ? 0.55 : 1 }}>
-                      <span style={{ fontSize: 13, color: on ? MS.gold : PALETTE.textDim }}>{l.locked ? '🔒' : on ? '◆' : '◇'}</span>
-                      <span className="flex-1" style={{ fontSize: 13, color: PALETTE.text }}>{E.optText(item, l.o)}{qTag(l.o)}</span>
-                      {l.locked && <span style={{ fontSize: 11, color: PALETTE.textDim }}>고정</span>}
+                  {rfLines.map(l => { const on = l.i === rfSel; const ts = rfValue ? rfTune(l.i) : null; const off = rfValue ? !ts.ok : l.locked; return (
+                    <button key={l.i} disabled={off || !!rfPending} onClick={() => setRfIdx(l.i)} className="ui-press text-left flex items-center gap-2" style={{ padding: '9px 10px', border: `1px solid ${on ? MS.gold : MS.line}`, background: on ? 'rgba(232,176,74,0.10)' : MS.box, opacity: off ? 0.55 : 1 }}>
+                      <span style={{ fontSize: 13, color: on ? MS.gold : PALETTE.textDim }}>{off ? '🔒' : on ? '◆' : '◇'}</span>
+                      <span className="flex-1" style={{ fontSize: 13, color: PALETTE.text }}>{E.optText(item, l.o)}{l.locked && !rfValue ? null : qTag(l.o)}</span>
+                      {rfValue ? (off ? <span style={{ fontSize: 11, color: PALETTE.textDim }}>{ts.why}</span> : l.locked ? <span style={{ fontSize: 11, color: MS.gold }}>고정 옵션</span> : null) : (l.locked && <span style={{ fontSize: 11, color: PALETTE.textDim }}>고정 · 수치만 가능</span>)}
                     </button>
                   ); })}
                 </div>
-                {rfSel == null && <div className="mt-2" style={{ fontSize: 12, color: PALETTE.textDim }}>다시 굴릴 수 있는 옵션이 없습니다</div>}
+                {rfSel == null && <div className="mt-2" style={{ fontSize: 12, color: PALETTE.textDim }}>{rfValue ? '수치를 다시 굴릴 수 있는 옵션이 없습니다' : '다시 굴릴 수 있는 옵션이 없습니다 — 「수치 재설정」을 확인하세요'}</div>}
                 {rfPending && (
-                  <div className="mt-2" style={{ padding: 10, border: `1px solid ${MS.red}`, background: "rgba(224,87,76,0.10)" }}>
-                    <div style={{ fontSize: 12, color: MS.red, fontWeight: 700, letterSpacing: 3 }}>◆ 새 옵션</div>
+                  <div className="mt-2" style={{ padding: 10, border: `1px solid ${MS.red}`, background: "rgba(224,87,76,0.10)", borderRadius: MS.r }}>
+                    <div style={{ fontSize: 12, color: MS.red, fontWeight: 700, letterSpacing: 3 }}>{rfPending.mode === 'value' ? '◆ 새 수치' : '◆ 새 옵션'}</div>
                     <div className="mt-1" style={{ fontSize: 12.5, color: PALETTE.textDim }}>지금 · <span style={{ color: PALETTE.text }}>{E.optText(item, rfLines[rfPending.idx].o)}</span>{qTag(rfLines[rfPending.idx].o)}</div>
                     <div className="mt-1" style={{ fontSize: 14, fontWeight: 800, color: MS.gold }}>새로 · {E.optText(item, rfPending.opt)}{qTag(rfPending.opt)}</div>
                     <div className="mt-1" style={{ fontSize: 11.5, color: PALETTE.textDim }}>아래에서 바꿀지 유지할지 고르세요 — 비용은 이미 냈습니다</div>
@@ -3016,13 +3021,23 @@ function ForgeView({ save, setSave, onBack, flash, onTrack = () => {} }) {
                 )}
                 {!rfPending && rfSel != null && <>
                   <MainForgeCost save={save} cost={rfCost} />
-                  <MainSecHead title="나 올 수 있 는 옵 션" />
-                  <div className="flex flex-wrap gap-1">
-                    {E.reforgePool(item, rfSel).map(x => <span key={x.k} style={{ fontSize: 11.5, padding: '2px 7px', border: `1px solid ${MS.line}`, background: MS.box, borderRadius: MS.r, color: PALETTE.text }}>{x.label} <b style={{ color: MS.gold }}>{Math.round(x.p * 100)}%</b></span>)}
-                  </div>
+                  {rfValue
+                    ? (() => { const r = rfTune(rfSel).range; const f = (v) => E.optText(item, { ...E.reforgeLines(item)[rfSel].o, k: r.k, v }); return (
+                      <>
+                        <MainSecHead title="나 올 수 있 는 수 치" />
+                        <MainKvRows rows={[{ l: '최저', v: f(r.min) }, { l: '지금', v: f(r.cur), c: MS.gold }, { l: '최고', v: f(r.max), c: '#8fd08a' }]} />
+                        <div className="mt-1" style={{ fontSize: 11.5, color: PALETTE.textDim }}>최저~최고 사이에서 고르게 나온다 — 지금보다 낮게 나오면 「유지」를 고르면 된다</div>
+                      </>
+                    ); })()
+                    : <>
+                      <MainSecHead title="나 올 수 있 는 옵 션" />
+                      <div className="flex flex-wrap gap-1">
+                        {E.reforgePool(item, rfSel).map(x => <span key={x.k} style={{ fontSize: 11.5, padding: '2px 7px', border: `1px solid ${MS.line}`, background: MS.box, borderRadius: MS.r, color: PALETTE.text }}>{x.label} <b style={{ color: MS.gold }}>{Math.round(x.p * 100)}%</b></span>)}
+                      </div>
+                    </>}
                 </>}
                 <div className="mt-2" style={{ padding: '8px 10px', border: `1px solid ${MS.line}`, background: MS.box, borderRadius: MS.r, fontSize: 12, color: PALETTE.text, lineHeight: 1.55 }}>
-                  <b style={{ color: MS.red }}>◇ 규칙</b> 옵션 1줄을 골라 다시 굴린다 · 나온 옵션을 보고 바꾸거나 유지 · 같은 장비는 굴릴수록 비싸진다 (이 장비 {item.rr || 0}회){item.named ? ' · 유니크의 고정 옵션은 못 바꾼다' : ''}
+                  <b style={{ color: MS.red }}>◇ 규칙</b> 옵션 1줄을 골라 다시 굴린다 · 나온 결과를 보고 바꾸거나 유지 · 같은 장비는 굴릴수록 비싸진다 (두 방식 합쳐 이 장비 {item.rr || 0}회){item.named ? ' · 유니크의 고정 옵션은 종류를 못 바꾸고 수치만 다시 굴릴 수 있다' : ''}
                 </div>
               </>)}
             {ftab === 'promote' && (ng
