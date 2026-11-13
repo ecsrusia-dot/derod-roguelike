@@ -609,7 +609,7 @@ export function learnTalent(save0, classId, nodeId) {
 // 자동 배분 (봇·동료용) — 가장 많이 찍은 갈래를 먼저 채우고, 단이 막히면 다른 갈래
 export function autoSpendTalents(u) {
   u.talents = u.talents || {};
-  const trees = talentTrees(u.classId);
+  const trees = talentTrees(u.classId, u.rebirth?.branch);
   let guard = 0;
   while (u.sp > 0 && guard++ < 200) {
     let picked = null;

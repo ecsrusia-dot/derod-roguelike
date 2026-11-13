@@ -68,7 +68,7 @@ function RebirthSheet({ save, cid, onClose, onRebirth }) {
 // ===== 특성 트리 (1.224.0 — 갈래 3개 × 5단) =====
 function TalentPanel({ save, setSave, cid }) {
   const u = save.units[cid];
-  const trees = TL.talentTrees(cid);
+  const trees = TL.talentTrees(cid, u.rebirth?.branch);
   const [tab, setTab] = useState(() => {
     let best = 0; trees.forEach((t, i) => { if (TL.treePoints(u, t.id) > TL.treePoints(u, trees[best].id)) best = i; });
     return best;
@@ -89,12 +89,12 @@ function TalentPanel({ save, setSave, cid }) {
         <span className="font-semibold" style={{ fontSize: 13.5, color: PALETTE.text }}>특성 <span style={{ fontSize: 11, color: PALETTE.textDim, fontWeight: 400 }}>— 투자 {spent}</span></span>
         <span style={{ fontSize: 12, color: u.sp ? PALETTE.legendary : PALETTE.textDim }}>스킬 포인트 {u.sp}</span>
       </div>
-      <div className="grid grid-cols-3 gap-1.5 mt-2">
+      <div className="grid gap-1.5 mt-2" style={{ gridTemplateColumns: `repeat(${trees.length}, minmax(0, 1fr))` }}>
         {trees.map((t, i) => {
           const on = i === tab;
           return (
             <button key={t.id} onClick={() => setTab(i)} className="ui-press" style={{ padding: '7px 4px', borderRadius: 10, border: `1.5px solid ${on ? t.color : 'var(--ui-line)'}`, background: on ? `${t.color}22` : 'transparent', color: on ? t.color : PALETTE.textDim }}>
-              <div className="font-semibold" style={{ fontSize: 13 }}>{t.name}</div>
+              <div className="font-semibold truncate" style={{ fontSize: trees.length > 3 ? 12 : 13 }}>{t.branch ? '✦ ' : ''}{t.name}</div>
               <div style={{ fontSize: 11 }}>{TL.treePoints(u, t.id)}점</div>
             </button>
           );

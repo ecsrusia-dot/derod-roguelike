@@ -139,8 +139,34 @@ export const TALENT_TREES = {
   ],
 };
 
+// ===== 갈래 전용 특성 (1.283.0 PM 결정) — 전승하면 4번째 트리가 열린다 =====
+//   전승 스킬(갈래당 3개)을 키우는 노드 + 갈래 고유 효과. 구조·단 개방 규칙은 기본 트리와 같다
+//   키 = 갈래 id (data.js REBIRTH_BRANCHES) · cls = 그 갈래의 직업 · 다른 갈래 캐릭터는 찍을 수 없다
+const BT = (branch, cls, name, color, desc, tiers) => ({ id: `bt_${branch}`, branch, cls, name, color, desc, tiers });
+export const BRANCH_TREES = {
+  s_arch: BT('s_arch', 'sage', '대마도사', '#9cc4e4', '하늘을 가르는 광역 주문 — 천벌의 폭풍·유성우', [
+    [N('ba_s1', '천벌 숙련', 5, { sb_sa_storm: 0.08 }), N('ba_s2', '비전 집중', 5, { skillDmg: 0.015 })],
+    [N('ba_s3', '폭풍의 눈', 5, { crit: 0.01 }), N('ba_s4', '유성 숙련', 5, { sb_sa_rain: 0.08 })],
+    [N('ba_s5', '마력 과부하', 5, { critDmg: 0.05 }), N('ba_s6', '비전 방벽', 5, { skillShield: 0.02 })],
+    [N('ba_s7', '연쇄 영창', 1, { cdr: 1 }), N('ba_s8', '꿰뚫는 별빛', 3, { armorPen: 0.05 })],
+    [N('ba_s9', '대마도사의 권능', 1, { sb_sa_storm: 0.5, sb_sa_rain: 0.5 })],
+  ]),
+  s_hex: BT('s_hex', 'sage', '저주술사', '#c08ae8', '썩어 가는 저주 — 역병의 저주·파멸의 표식', [
+    [N('bh_s1', '역병 숙련', 5, { sb_sh_plague: 0.08 }), N('bh_s2', '썩은 피', 5, { dotDmg: 0.05 })],
+    [N('bh_s3', '부패의 갑주', 5, { hpPct: 0.02 }), N('bh_s4', '표식 숙련', 5, { sb_sh_mark: 0.08 })],
+    [N('bh_s5', '저주의 무게', 5, { dmgReduce: 0.006 }), N('bh_s6', '생기 흡수', 5, { regenPct: 0.002 })],
+    [N('bh_s7', '빠른 저주', 1, { cdr: 1 }), N('bh_s8', '약점 간파', 3, { armorPen: 0.05 })],
+    [N('bh_s9', '파멸의 군주', 1, { sb_sh_plague: 0.5, sb_sh_mark: 0.5 })],
+  ]),
+};
+
 // ===== 조회 =====
-export const talentTrees = (classId) => TALENT_TREES[classId] || [];
+// branch를 주면 그 갈래 전용 트리를 뒤에 붙인다 (전승자만)
+export const talentTrees = (classId, branch = null) => {
+  const base = TALENT_TREES[classId] || [];
+  const bt = branch && BRANCH_TREES[branch];
+  return bt && bt.cls === classId ? [...base, bt] : base;
+};
 // 갈래 → 짝 동행 역할 (1.236.0 PM: 특성 테크에 따라 최적 동행이 바뀌도록)
 //   딜 갈래 = 수호(내가 때리는 동안 막아 줌) · 생존 갈래 = 맹공(내가 버티는 동안 정리) · 지속·반격 갈래 = 치유(긴 전투)
 export const TREE_FAM = {
@@ -149,10 +175,15 @@ export const TREE_FAM = {
   d_t_blood: 'healer', d_t_undying: 'dps', d_t_carnage: 'tank',
   e_t_wind: 'dps', e_t_spirit: 'healer', e_t_marks: 'tank',
   p_t_heal: 'dps', p_t_bless: 'tank', p_t_judge: 'healer',
+  // 갈래 전용 트리
+  bt_s_arch: 'tank', bt_s_hex: 'healer',
 };
 const NODE_INDEX = {};
 for (const [cid, trees] of Object.entries(TALENT_TREES)) {
   trees.forEach(tree => tree.tiers.forEach((row, ti) => row.forEach(n => { NODE_INDEX[n.id] = { ...n, cls: cid, tree: tree.id, tier: ti }; })));
+}
+for (const bt of Object.values(BRANCH_TREES)) {
+  bt.tiers.forEach((row, ti) => row.forEach(n => { NODE_INDEX[n.id] = { ...n, cls: bt.cls, tree: bt.id, tier: ti, branch: bt.branch }; }));
 }
 export const talentNode = (id) => NODE_INDEX[id] || null;
 export function treePoints(u, treeId) {
@@ -165,6 +196,7 @@ export const tierUnlocked = (u, treeId, tier) => treePoints(u, treeId) >= tier *
 export function canLearnTalent(u, nodeId) {
   const n = NODE_INDEX[nodeId];
   if (!n || n.cls !== u.classId || u.sp <= 0) return false;
+  if (n.branch && u.rebirth?.branch !== n.branch) return false; // 갈래 전용 특성은 그 갈래 전승자만
   if ((u.talents?.[nodeId] || 0) >= n.max) return false;
   return tierUnlocked(u, n.tree, n.tier);
 }
