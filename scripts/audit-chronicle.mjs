@@ -30,7 +30,7 @@ check('보스 등장 일러 파일', [...bosses].filter(k => EN[k] && !exists(ge
 const ids = QUESTS.map(q => q.id);
 check(`의뢰 id 중복 (${QUESTS.length}개 · 장면 ${SCENES.length}개)`, ids.filter((id, i) => ids.indexOf(id) !== i));
 check('의뢰 처치 대상', QUESTS.filter(q => q.goal?.type === 'killKey' && !EN[q.goal.key]).map(q => q.id));
-check('의뢰 던전 대상', QUESTS.filter(q => q.goal?.dungeon && !D.CHRONICLE_DUNGEONS.some(d => d.id === q.goal.dungeon)).map(q => q.id));
+check('의뢰 던전 대상', QUESTS.filter(q => q.goal?.type === 'dungeonTier' && (!D.CHRONICLE_DUNGEONS.some(d => d.id === q.goal.id) || !D.DUNGEON_TIERS[q.goal.tier])).map(q => q.id));
 
 // ④⑤ 효과 키
 const fx = new Set(), badSb = [];

@@ -387,7 +387,7 @@ function BattleLogLine({ e, latest, unitOf }) {
 
 // ===== 전투 재생 =====
 const SPEEDS = [1, 2, 4];
-function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boostLeft = 0, onAskBoost, dungeonAuto = false, onToggleDungeonAuto, autoProg = false, onStopAuto, onReplayDone, sessionReport = null, holdAuto = false, towerAuto = false, onToggleTowerAuto, onIdle = null, autoClimb = false, onToggleClimb }) {
+function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boostLeft = 0, onAskBoost, dungeonAuto = false, onToggleDungeonAuto, autoProg = false, onStopAuto, onReplayDone, sessionReport = null, holdAuto = false, towerAuto = false, onToggleTowerAuto, onIdle = null, idleDelay = 60, autoClimb = false, onToggleClimb }) {
   const { sim, enemies, party, summary, ctx, xp } = battle;
   const [idx, setIdx] = useState(0);
   const [stats, setStats] = useState(null); // 전투 집계 (1.215.1)
@@ -495,7 +495,7 @@ function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAgain, boo
           );
         })}
         {!done && <button onClick={() => setIdx(sim.events.length)} className="ui-press" style={{ fontSize: 12, padding: '4px 9px', borderRadius: 8, border: '1px solid var(--ui-line)', color: PALETTE.dawn, background: 'transparent' }}>⏩</button>}
-        {onIdle && <button onClick={onIdle} aria-label="대기화면" className="ui-press" style={{ fontSize: 12, padding: '4px 9px', borderRadius: 8, border: `1px solid ${PALETTE.legendary}88`, color: PALETTE.legendary, background: 'transparent' }}>🌙</button>}
+        {onIdle && <button onClick={onIdle} aria-label="대기화면" className="ui-press" style={{ fontSize: 12, padding: '4px 9px', borderRadius: 8, border: `1px solid ${PALETTE.legendary}88`, color: PALETTE.legendary, background: 'transparent', whiteSpace: 'nowrap' }}>🌙{idleDelay ? '' : <span style={{ fontSize: 10.5, marginLeft: 3, color: PALETTE.textDim }}>수동</span>}</button>}
       </div>
 
       {/* 적 — 전투가 끝나면 직업 승리/패배 일러 (1.261.0) */}
@@ -4573,21 +4573,38 @@ export default function ChronicleGame({ onExit }) {
         : battle.ctx.kind === 'dungeon' && dungeonAuto ? 'dungeon' : null;
   const autoRunning = !!autoKind;
   const [idle, setIdle] = useState(false);
-  const [idleDelay, setIdleDelayState] = useState(() => { try { const v = localStorage.getItem('chronicleIdleDelay'); return v == null ? 60 : +v; } catch { return 60; } });
-  const setIdleDelay = (v) => { setIdleDelayState(v); try { localStorage.setItem('chronicleIdleDelay', String(v)); } catch { /* */ } };
+  // 1.279.1 — 「끄기」가 실수로 저장된 기기 복구: 이 버전에서 한 번만 1분으로 되돌린다 (이후 끄기는 그대로 존중)
+  const [idleDelay, setIdleDelayState] = useState(() => { try {
+    const v = localStorage.getItem('chronicleIdleDelay');
+    if (v === '0' && !localStorage.getItem('chronicleIdleOffAck')) { localStorage.setItem('chronicleIdleOffAck', '1'); localStorage.setItem('chronicleIdleDelay', '60'); return 60; }
+    localStorage.setItem('chronicleIdleOffAck', '1');
+    const n = v == null ? 60 : +v; return Number.isFinite(n) && n >= 0 ? n : 60;
+  } catch { return 60; } });
+  const setIdleDelay = (v) => {
+    setIdleDelayState(v); try { localStorage.setItem('chronicleIdleDelay', String(v)); } catch { /* */ }
+    flash(v ? `대기화면 자동 전환 — ${v >= 60 ? `${v / 60}분` : `${v}초`} 뒤` : '대기화면 자동 전환 끔 — 전투 화면의 🌙 버튼으로만 전환');
+  };
   const autoStartRef = useRef(null);
   useEffect(() => {
-    if (autoRunning) { if (!autoStartRef.current) autoStartRef.current = Date.now(); return; }
-    autoStartRef.current = null; setIdle(false); // 자동이 끝나면(패배·정지) 대기화면을 닫아 결과를 보여 준다
+    if (autoRunning) { if (!autoStartRef.current) autoStartRef.current = Date.now(); return undefined; }
+    // 자동이 끝나면(패배·정지) 대기화면을 닫아 결과를 보여 준다 — 전투가 바뀌는 사이 잠깐 끊긴 것은 무시 (1.279.1)
+    const t = setTimeout(() => { autoStartRef.current = null; setIdle(false); }, 1500);
+    return () => clearTimeout(t);
   }, [autoRunning]);
-  // 손대지 않으면 idleDelay초 뒤 자동 전환 — 화면을 누르거나 키를 누르면 타이머 다시 시작
+  // 손대지 않으면 idleDelay초 뒤 자동 전환 — 화면을 누르거나 키를 누르면 다시 센다
+  // 1.279.1 — 「마지막 조작 시각」을 기록하고 1초마다 확인한다. 예전 방식(setTimeout 1개)은 자동 상태가 잠깐이라도 끊기면 처음부터 다시 세었다
+  const lastActRef = useRef(Date.now());
   useEffect(() => {
-    if (!autoRunning || idle || !idleDelay) return undefined;
-    let t = setTimeout(() => setIdle(true), idleDelay * 1000);
-    const poke = () => { clearTimeout(t); t = setTimeout(() => setIdle(true), idleDelay * 1000); };
+    const poke = () => { lastActRef.current = Date.now(); };
     const evs = ['pointerdown', 'keydown', 'wheel', 'touchstart'];
     evs.forEach(e => window.addEventListener(e, poke, { capture: true, passive: true }));
-    return () => { clearTimeout(t); evs.forEach(e => window.removeEventListener(e, poke, { capture: true })); };
+    return () => evs.forEach(e => window.removeEventListener(e, poke, { capture: true }));
+  }, []);
+  useEffect(() => { if (!idle) lastActRef.current = Date.now(); }, [idle]); // 대기화면을 닫은 순간부터 다시 센다
+  useEffect(() => {
+    if (!autoRunning || idle || !idleDelay) return undefined;
+    const t = setInterval(() => { if (Date.now() - lastActRef.current >= idleDelay * 1000) setIdle(true); }, 1000);
+    return () => clearInterval(t);
   }, [autoRunning, idle, idleDelay]);
   // 화면 꺼짐 방지 — 자동 진행 중에만 (본편 1.88.0과 같은 방식). 다른 앱으로 나가면 OS가 풀어 버리므로 돌아오면 다시 요청
   const [wakeOn, setWakeOn] = useState(false);
@@ -4903,7 +4920,7 @@ export default function ChronicleGame({ onExit }) {
         onAgain={() => (battle.ctx.kind === 'dungeon' ? fightDungeon() : battle.ctx.kind === 'tower' ? fightTower() : autoProg ? autoStep() : lastFieldRef.current && fightField(lastFieldRef.current.field, 'hunt', lastFieldRef.current.stage))}
         dungeonAuto={dungeonAuto} onToggleDungeonAuto={toggleDungeonAuto}
         towerAuto={towerAuto} onToggleTowerAuto={toggleTowerAuto}
-        onIdle={autoRunning ? () => setIdle(true) : null}
+        onIdle={autoRunning ? () => setIdle(true) : null} idleDelay={idleDelay}
         autoClimb={autoClimb} onToggleClimb={toggleClimb}
         boostLeft={E.boostLeftMs(save)} onAskBoost={() => setBoostSheet(true)} />
     );
@@ -4945,8 +4962,8 @@ export default function ChronicleGame({ onExit }) {
   return (
     <div className="absolute inset-0 chr-root" style={{ background: `radial-gradient(120% 60% at 50% 0%, #2a1318 0%, #120a0d 45%, ${PALETTE.bg} 100%)`, fontFamily: '"Noto Serif KR", serif', color: PALETTE.text }}>
       <div key={view} className="ui-screen-enter absolute inset-0">{content}</div>
-      {idle && autoRunning && save && (
-        <IdleScreen save={save} kind={autoKind} label={battle?.ctx?.label} startedAt={autoStartRef.current} wakeOn={wakeOn}
+      {idle && save && autoStartRef.current && (
+        <IdleScreen save={save} kind={autoKind || 'repeat'} label={battle?.ctx?.label} startedAt={autoStartRef.current} wakeOn={wakeOn}
           delay={idleDelay} onDelay={setIdleDelay} onExit={() => setIdle(false)} />
       )}
       {report && <HuntReport report={report} save={save} title={report.kind === 'tower' ? '🗼 첨탑 도전 집계' : report.kind === 'dungeon' ? '🏰 던전 전체 집계' : '📋 사냥 보고서'} onClose={() => setReport(null)} />}
