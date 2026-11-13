@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "audit:chronicle": "node scripts/audit-chronicle.mjs",
     "deploy": "npm run build && gh-pages -d dist"
   },
   "dependencies": {
