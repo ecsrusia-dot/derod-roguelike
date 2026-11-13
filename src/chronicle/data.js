@@ -177,6 +177,8 @@ export const REBIRTH = { reqLevel: 100, max: 5,
   expMult: 2, expMultStep: 0.5, wearMargin: 5,
   // 1.282.0 PM 결정 — 전승 1회당 공격·HP·방어 +10% (이전 5%)
   bonusPct: 0.10,
+  // 1.285.0 PM 결정 — 전승자는 Lv.100 미만에서 전투 경험치 ×1.5 (다시 올리는 구간을 짧게)
+  regrowExp: 1.5,
   // 1.221.0 전승 단계 — 전승 횟수마다 모든 적(사냥터·던전·탑) HP·공격 증가
   enemyHp: 0.25, enemyAtk: 0.15,
   // 전승 등급 장비 드랍 확률 (전승 캐릭터만) · 갈래 유니크 확률
