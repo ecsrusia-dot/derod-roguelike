@@ -128,6 +128,35 @@ export const SCENES = [
       { sp: 'hero', t: '그럼 이제 그만 쉬게 해 줘야겠네요.' },
     ],
   },
+  // ── 3부 던전 개방 (1.279.1)
+  {
+    id: 'dungeon7_open', title: '잊힌 왕의 서고', bg: './enemies/championship/memory/p3_m_keeper_intro.jpg',
+    when: (s, c) => !!s.progress.bossCleared[10] && c.at === 'town',
+    lines: [
+      { sp: 'elder', t: '므네메가 쓰러진 자리 아래로 계단이 드러났다네. 서고라더군 — 폐허가 폐허가 되기 전의 기록이 전부 거기 있대.' },
+      { sp: 'herald', t: '조심해라. 그곳의 관리자는 칼보다 먼저 네 기억을 노린다. 가장 믿는 기술부터 잊게 될 것이다.' },
+      { sp: 'hero', t: '그럼 잊어도 되는 것부터 꺼내 들죠.' },
+    ],
+  },
+  {
+    id: 'dungeon8_open', title: '틈새의 밑바닥', bg: './enemies/championship/void/p3_v_heart_intro.jpg',
+    when: (s, c) => !!s.progress.bossCleared[11] && c.at === 'town',
+    lines: [
+      { sp: 'herald', t: '문지기가 지키던 것은 문이 아니었다. 그 아래, 회랑이 꺼져 내리는 밑바닥이다.' },
+      { sp: 'elder', t: '내려갔다 온 사냥꾼이 그러더군. 오래 있을수록 손끝부터 흐려진다고.' },
+      { sp: 'hero', t: '그럼 오래 있지 않으면 되겠네요.' },
+    ],
+  },
+  {
+    id: 'dungeon9_open', title: '최초의 황혼', bg: './enemies/championship/origin/p3_o_first_intro.jpg',
+    when: (s, c) => !!s.progress.bossCleared[12] && c.at === 'town',
+    lines: [
+      { sp: 'narr', t: '아이온이 쓰러진 뒤에도 하늘은 붉었다.' },
+      { sp: 'herald', t: '근원보다 먼저 저문 것이 있다. 모든 황혼이 그것을 흉내 냈을 뿐이다.' },
+      { sp: 'herald', t: '절반쯤 쓰러뜨렸다고 마음을 놓지 마라. 그때부터가 진짜 모습이다.' },
+      { sp: 'hero', t: '…끝을 보러 갑니다.' },
+    ],
+  },
   {
     id: 'f3_enter', title: '봉인된 신전', bg: './enemies/classic/chapter_3/timeKeeper_combat.jpg',
     when: (s, c) => c.at === 'field' && c.fieldId === 3,
@@ -520,6 +549,22 @@ export const QUESTS = [
   { id: 's10a', kind: 'side', req: { field: 10, rebirth: 1 }, title: '메아리를 잠재우다', desc: '여명의 전령: "폐허의 늑대들은 울음을 멈추지 않는다. 그건 누군가의 기억이다."', goal: { type: 'killKey', key: 'p3_m_wolf', n: 30 }, reward: { gold: 8000, exp: 400000, essence: 60 } },
   { id: 's11a', kind: 'side', req: { field: 11, rebirth: 1 }, title: '형체 없는 것들', desc: '여명의 전령: "회랑의 그림자는 베어도 돌아온다. 끝까지 베어라."', goal: { type: 'killKey', key: 'p3_v_shade', n: 30 }, reward: { gold: 10000, exp: 600000, shard: 10, keys: 2 } },
   { id: 's12a', kind: 'side', req: { field: 12, rebirth: 1 }, title: '근원의 파편', desc: '대장장이: "그 파편 하나면 전설을 벼를 수 있어. 아니, 전설보다 뜨거운 걸."', goal: { type: 'killKey', key: 'p3_o_shard', n: 30 }, reward: { gold: 15000, exp: 800000, shard: 20, essence: 100 } },
+  // ── 3부 의뢰 확장 (1.279.1) — 지역당 처치 2 · 강적 1 · 던전 1 + 던전 전설 3
+  { id: 's10b', kind: 'side', req: { field: 10, rebirth: 1 }, title: '녹슨 맹세', desc: '여명의 전령: "흐려진 기사들은 누구를 지키는지도 잊었다. 그 맹세를 풀어 줘라."', goal: { type: 'killKey', key: 'p3_m_knight', n: 30 }, reward: { gold: 9000, exp: 450000, essence: 60 } },
+  { id: 's10c', kind: 'side', req: { field: 10, rebirth: 1 }, title: '기억을 먹는 것', desc: '촌장: "자네, 어제 일을 기억하나? …포식자가 마을 가까이 왔다는 뜻이야."', goal: { type: 'killKey', key: 'p3_m_eater', n: 30 }, reward: { gold: 9000, exp: 450000, keys: 2 } },
+  { id: 's10d', kind: 'side', req: { field: 10, rebirth: 1 }, title: '폐허의 거상들', desc: '여명의 전령: "거상과 마녀가 폐허의 길목을 막고 있다. 강한 것부터 쓰러뜨려라."', goal: { type: 'elites', n: 12 }, reward: { gold: 12000, shard: 12, essence: 80 } },
+  { id: 'd11', kind: 'side', req: { field: 11, rebirth: 1 }, title: '지워진 기록', desc: '촌장: "폐허 아래 서고에 우리 마을의 첫 기록이 있다더군. 관리자가 그걸 지우기 전에 가 보게."', goal: { type: 'dungeonTier', id: 'memoryArchive', tier: 0 }, reward: { gold: 15000, shard: 15, essence: 100, keys: 2 } },
+  { id: 's11b', kind: 'side', req: { field: 11, rebirth: 1 }, title: '틈새의 주문', desc: '여명의 전령: "틈새 술사들이 회랑을 넓히고 있다. 주문이 끝나기 전에 끊어라."', goal: { type: 'killKey', key: 'p3_v_caster', n: 30 }, reward: { gold: 11000, exp: 650000, essence: 70 } },
+  { id: 's11c', kind: 'side', req: { field: 11, rebirth: 1 }, title: '보이지 않는 사냥', desc: '촌장: "발소리만 들리고 모습은 없다네. 무형의 사냥개라고들 하지."', goal: { type: 'killKey', key: 'p3_v_hound', n: 30 }, reward: { gold: 11000, exp: 650000, keys: 2 } },
+  { id: 's11d', kind: 'side', req: { field: 11, rebirth: 1 }, title: '회랑의 집행자들', desc: '여명의 전령: "집행자와 포식자는 문지기의 손발이다. 먼저 잘라 내라."', goal: { type: 'elites', n: 14 }, reward: { gold: 15000, shard: 15, essence: 100 } },
+  { id: 'd12', kind: 'side', req: { field: 12, rebirth: 1 }, title: '밑바닥에서 뛰는 것', desc: '여명의 전령: "회랑 아래에서 무언가 뛰고 있다. 공허에도 심장이 있다면, 멈춰야 한다."', goal: { type: 'dungeonTier', id: 'voidDepths', tier: 0 }, reward: { gold: 20000, shard: 20, essence: 120, keys: 2 } },
+  { id: 's12b', kind: 'side', req: { field: 12, rebirth: 1 }, title: '종말을 모는 자들', desc: '촌장: "기수들이 지나간 자리엔 저녁도 오지 않는다네. 낮도 밤도 아닌 채로."', goal: { type: 'killKey', key: 'p3_o_rider', n: 30 }, reward: { gold: 16000, exp: 850000, essence: 100 } },
+  { id: 's12c', kind: 'side', req: { field: 12, rebirth: 1 }, title: '황혼의 사도', desc: '여명의 전령: "사도들은 아직도 근원을 섬긴다. 섬길 것이 사라졌다는 걸 알려 줘라."', goal: { type: 'killKey', key: 'p3_o_apostle', n: 30 }, reward: { gold: 16000, exp: 850000, keys: 3 } },
+  { id: 's12d', kind: 'side', req: { field: 12, rebirth: 1 }, title: '근원의 눈', desc: '여명의 전령: "화신과 감시자가 너를 지켜보고 있다. 눈부터 감겨라."', goal: { type: 'elites', n: 16 }, reward: { gold: 20000, shard: 20, item: { grade: 'epic' } } },
+  { id: 'd13', kind: 'side', req: { field: 13, rebirth: 1 }, title: '첫 번째 저녁', desc: '여명의 전령: "아이온은 근원이 아니었다. 그보다 먼저 저문 것이 있다 — 최초의 황혼이다."', goal: { type: 'dungeonTier', id: 'firstDusk', tier: 0 }, reward: { gold: 30000, shard: 30, essence: 200, item: { grade: 'epic' } } },
+  { id: 'd14', kind: 'side', req: { field: 11, rebirth: 1 }, title: '봉인되지 않는 기억', desc: '촌장: "관리자가 가장 깊이 숨긴 기록이 있다더군." — 잊힌 왕의 서고 전설 클리어', goal: { type: 'dungeonTier', id: 'memoryArchive', tier: 2 }, reward: { gold: 40000, shard: 40, essence: 250, keys: 3 } },
+  { id: 'd15', kind: 'side', req: { field: 12, rebirth: 1 }, title: '지워지지 않는 몸', desc: '여명의 전령: "밑바닥 끝까지 내려가고도 돌아온 자는 없다." — 틈새의 밑바닥 전설 클리어', goal: { type: 'dungeonTier', id: 'voidDepths', tier: 2 }, reward: { gold: 55000, shard: 50, essence: 300, keys: 3 } },
+  { id: 'd16', kind: 'side', req: { field: 13, rebirth: 1 }, title: '황혼을 끝낸 자', desc: '여명의 전령: "진짜 모습을 드러낸 첫 황혼을 쓰러뜨려라. 그 뒤엔 아무도 가 보지 못했다." — 최초의 황혼 전설 클리어', goal: { type: 'dungeonTier', id: 'firstDusk', tier: 2 }, reward: { gold: 80000, shard: 80, essence: 500, item: { grade: 'epic' } } },
   // ── 2부 의뢰
   { id: 's5a', kind: 'side', req: { field: 5 }, title: '빛의 서리', desc: '양치기 노인: "다시 늑대가 내려왔어. 이번엔 눈이 하얗게 빛나."', goal: { type: 'killKey', key: 'champ_frost_wolf', n: 15 }, reward: { gold: 1500, exp: 20000, essence: 15 } },
   { id: 's5b', kind: 'side', req: { field: 5 }, title: '얼어붙은 망자', desc: '사냥꾼: "얼음 속에서 걸어 나오는 시체들… 내 형도 그 안에 있었어."', goal: { type: 'killKey', key: 'champ_frost_revenant', n: 15 }, reward: { gold: 1600, item: { grade: 'rare' }, keys: 1 } },
