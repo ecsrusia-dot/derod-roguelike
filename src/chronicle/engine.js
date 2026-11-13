@@ -481,6 +481,28 @@ export function addStat(save0, classId, key, n = 1) {
   u.stats[key] += n; u.points -= n;
   return save;
 }
+// 여러 능력치를 한 번에 배분 (1.277.0) — plan = { str: n, int: n, agi: n, vit: n }
+export function addStats(save0, classId, plan) {
+  const u0 = save0.units[classId];
+  if (!u0 || !plan) return save0;
+  const adds = STAT_KEYS.map(k => [k, Math.max(0, Math.floor(plan[k] || 0))]).filter(([, n]) => n > 0);
+  const total = adds.reduce((t, [, n]) => t + n, 0);
+  if (!total || total > (u0.points || 0)) return save0;
+  const save = clone(save0);
+  const u = save.units[classId];
+  for (const [k, n] of adds) u.stats[k] += n;
+  u.points -= total;
+  return save;
+}
+// 추천 배분이 찍을 포인트 (미리 보기용) → { str: n, ... }
+export function autoAllocatePlan(save, classId) {
+  const u = save.units[classId];
+  if (!u || !u.points) return {};
+  const after = autoAllocate(save, classId).units[classId];
+  const out = {};
+  for (const k of STAT_KEYS) out[k] = Math.max(0, (after.stats[k] || 0) - (u.stats[k] || 0));
+  return out;
+}
 // 능력치 재분배 (1.270.0) — 찍은 포인트를 전부 돌려받는다. 캐릭터당 첫 1회 무료, 이후 골드 (레벨 × statResetGold)
 export function statResetCost(u) { return u?.statResetUsed ? Math.round((u.lv || 1) * (T.statResetGold || 300)) : 0; }
 export function canResetStats(save, classId) {
