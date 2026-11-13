@@ -192,7 +192,7 @@ export function RosterView({ save, setSave, flash, onBack, onSwitchChar, onRaid 
 export function TownView({ save, acc, go, onExit, onSwitchChar, onClaimAll }) {
   const pend = A.pendingRewards(acc);
   const hero = save.units[save.hero];
-  const alertParty = hero.points > 0 || hero.sp > 0;
+  const alertParty = hero.points > 0 || hero.sp > 0 || (hero.rebirth?.count || 0) > (hero.rebirth?.perks || []).length;
   const cls = chronicleClass(save.hero);
   const nextField = CHRONICLE_FIELDS.find(f => !save.progress.bossCleared[f.id]);
   const main = Q.currentMainQuest(save);
@@ -203,6 +203,7 @@ export function TownView({ save, acc, go, onExit, onSwitchChar, onClaimAll }) {
   // 「지금 할 일」 (1.232.2) — 우선순위 순 최대 3개
   const todos = (() => {
     const L = [];
+    if ((hero.rebirth?.count || 0) > (hero.rebirth?.perks || []).length) L.push({ id: 'party', icon: '🎁', t: `전승 특전 선택 · ${(hero.rebirth.count) - (hero.rebirth.perks || []).length}개 남음` });
     if (hero.points > 0 || hero.sp > 0) L.push({ id: 'party', icon: '🧭', t: `성장 포인트 사용${hero.points ? ` · 능력치 ${hero.points}` : ''}${hero.sp ? ` · 스킬 ${hero.sp}` : ''}` });
     if (qBadge > 0) L.push({ id: 'quests', icon: '📜', t: `의뢰 게시판 새 소식 ${qBadge}건` });
     const dB = D.dailyBadge(acc) + D.weeklyBadge(acc); if (dB) L.push({ id: 'daily', icon: '📅', t: `일일·주간 임무 보상 ${dB}건` });
