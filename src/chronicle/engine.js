@@ -1424,6 +1424,28 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
         }
       }
       const BM = T.bossMech || {};
+      // ── 3부 던전 기믹 (1.279.0) — 보스의 턴을 쓰지 않는 선행 효과
+      if (u.mech === 'seal' && u.turn % BM.seal.every === 0) {
+        const L = foes.find(p => p.leader);
+        // 지금(또는 다음 턴) 쓸 수 있는 스킬 중 재사용이 가장 긴 것 — 같은 스킬만 계속 잠기지 않는다
+        const sk = L && L.skills.map(x => x.s).filter(s => s.cd >= 2 && !((L.cds[s.id] || 0) > 1)).sort((a, b) => b.cd - a.cd)[0];
+        if (sk) { L.cds[sk.id] = (L.cds[sk.id] || 0) + BM.seal.turns; push({ a: u.id, n: `기억 봉인 · 「${sk.name}」 ${BM.seal.turns}턴`, k: 'buff', skill: true, hits: [{ t: L.id, debuff: true }] }); }
+      }
+      if (u.mech === 'erode') {
+        const hits = [];
+        for (const p of foes) {
+          if (p.maxHp0 == null) p.maxHp0 = p.maxHp;
+          const nm = Math.max(Math.round(p.maxHp0 * BM.erode.floor), p.maxHp - Math.round(p.maxHp0 * BM.erode.pct));
+          if (nm < p.maxHp) { p.maxHp = nm; p.hp = Math.min(p.hp, nm); hits.push({ t: p.id, debuff: true }); }
+        }
+        if (hits.length) push({ a: u.id, n: `공허 잠식 · 최대 체력 -${Math.round(BM.erode.pct * 100)}%`, k: 'buff', skill: true, hits });
+      }
+      if (u.mech === 'phase' && !u.phased && u.hp <= u.maxHp * BM.phase.at) {
+        u.phased = true; u.dots = []; u.fx = {};
+        u.shield += Math.round(u.maxHp * BM.phase.shield);
+        u.buffs.phase = { v: BM.phase.atk, t: 999 };
+        push({ a: u.id, n: '황혼 동화 · 변신', k: 'buff', skill: true, hits: [{ t: u.id, buff: true }] });
+      }
       if (u.mech === 'reflect' && (u.turn - 1) % BM.reflect.every === 0) {
         u.fx.reflect = { v: BM.reflect.pct, t: BM.reflect.turns + 1 };
         push({ a: u.id, n: '반사 갑주', k: 'buff', skill: true, hits: [{ t: u.id, buff: true }] });
@@ -1662,6 +1684,8 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
         if (hits.length) push({ a: u.id, n: u.vName || '생명의 순환', k: 'hot', hits });
       }
       act(u);
+      // 황혼 동화 (1.279.0) — 변신한 보스는 한 턴에 여러 번 행동
+      if (u.phased) for (let i = 1; i < (T.bossMech?.phase?.acts || 1); i++) { const L = units.find(x => x.leader); if (u.hp > 0 && L && L.hp > 0) act(u); }
       for (const k of Object.keys(u.cds)) if (u.cds[k] > 0) u.cds[k] -= 1;
       if (u.resetEvery && u.turn % u.resetEvery === 0) { const ks = Object.keys(u.cds).filter(k => u.cds[k] > 0); if (ks.length) u.cds[pick(rng, ks)] = 0; }
       for (const b of Object.values(u.buffs)) if (b.t > 0) b.t -= 1;
