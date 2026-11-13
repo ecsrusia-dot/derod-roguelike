@@ -24,10 +24,10 @@ export function buildRoster(chars) {
 }
 export const reachedCount = (roster, lv) => Object.values(roster || {}).filter(r => r.peak >= lv).length;
 // 레벨 상한 — roster가 없으면(시뮬·구 뷰) 만렙
-export function levelCap(roster) {
-  if (!roster) return T.maxLevel;
-  const n = reachedCount(roster, ROSTER.unlockLv);
-  return Math.min(T.maxLevel, ROSTER.baseCap + ROSTER.perChar * Math.max(0, n - 1));
+// rebirthCount (1.278.0) — 전승자는 원정대 상한이 만렙(100)까지 풀려 있으면 REBIRTH.levelCap(120)까지 성장
+export function levelCap(roster, rebirthCount = 0) {
+  const base = roster ? Math.min(T.maxLevel, ROSTER.baseCap + ROSTER.perChar * Math.max(0, reachedCount(roster, ROSTER.unlockLv) - 1)) : T.maxLevel;
+  return rebirthCount > 0 && base >= T.maxLevel ? REBIRTH.levelCap : base;
 }
 // 다음 상한 해제까지 필요한 것 (UI)
 export function nextCapHint(roster) {
