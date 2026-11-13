@@ -131,7 +131,7 @@ export function claimQuest(save0, id, rng = Math.random) {
   save.mats.shard += r.shard || 0;
   if (r.keys) gained.keysGot = _addKeys(save, r.keys);
   if (r.exp) {
-    const cap = levelCap(save.roster); // 원정대 레벨 상한 (1.229.0)
+    const cap = levelCap(save.roster, save.units?.[save.hero]?.rebirth?.count || 0); // 원정대 레벨 상한 (1.229.0) · 전승자 120 (1.278.0)
     for (const cid of save.party) {
       const u = save.units[cid];
       if (u.lv >= cap) continue;

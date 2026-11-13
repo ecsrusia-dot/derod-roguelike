@@ -794,7 +794,7 @@ function RosterView({ save, setSave, flash, onBack, onSwitchChar, onRaid }) {
           {[60, 70, 80, 90, 100].map(c => <div key={c} className="text-center" style={{ padding: '6px 0', fontSize: 12, fontWeight: cap === c ? 800 : 500, border: `1px solid ${cap >= c ? MS.gold : MS.line}`, background: MS.box, borderRadius: MS.r, color: cap >= c ? MS.gold : PALETTE.textDim }}>{c}</div>)}
         </div>
         <div className="mt-1.5" style={{ fontSize: 11.5, color: PALETTE.textDim }}>
-          {hint ? <>다음: 캐릭터 <b style={{ color: MS.gold }}>{hint.need}명</b>이 Lv.{R.ROSTER.unlockLv} → 상한 Lv.{hint.next}</> : <b style={{ color: MS.gold }}>모든 상한 해제 완료</b>} · 지금 Lv.{R.ROSTER.unlockLv} 달성 {n60}명
+          {hint ? <>다음: 캐릭터 <b style={{ color: MS.gold }}>{hint.need}명</b>이 Lv.{R.ROSTER.unlockLv} → 상한 Lv.{hint.next}</> : <b style={{ color: MS.gold }}>모든 상한 해제 완료</b>} · 지금 Lv.{R.ROSTER.unlockLv} 달성 {n60}명{!hint && <> · 전승자는 <b style={{ color: MS.gold }}>Lv.{REBIRTH.levelCap}</b>까지</>}
         </div>
 
         <MainSecHead title="원 정 대" right={<span style={{ fontSize: 11, color: PALETTE.textDim }}>누르면 주는 버프</span>} />
@@ -1242,6 +1242,7 @@ function RebirthSheet({ save, cid, onClose, onRebirth }) {
         { l: '레벨·스킬·특성', v: 'Lv.1 초기화', c: '#e06a5f' }, { l: '필요 경험치', v: `×${rebirthExpMult(next)}` },
         { l: '적 HP', v: `+${Math.round(REBIRTH.enemyHp * next * 100)}%`, c: '#ff6ad5' }, { l: '적 공격', v: `+${Math.round(REBIRTH.enemyAtk * next * 100)}%`, c: '#ff6ad5' },
         { l: '공격·HP 영구', v: `+${Math.round(REBIRTH.bonusPct * 100)}%`, c: MS.gold }, { l: '장비·사역마', v: '그대로', c: '#8fd08a' },
+        { l: '레벨 상한', v: `Lv.${CHRONICLE_TUNING.maxLevel} → ${REBIRTH.levelCap}`, c: MS.gold },
       ]} />
       <div className="mt-1" style={{ fontSize: 11, color: PALETTE.textDim, lineHeight: 1.5 }}>장비는 <b style={{ color: PALETTE.text }}>장비 레벨 ≤ 내 레벨</b>일 때만 착용 효과 · 전승 장비·갈래 유니크가 떨어지기 시작한다</div>
       <MainSecHead title="갈 래 선 택" />

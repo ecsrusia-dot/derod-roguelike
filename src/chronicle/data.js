@@ -167,7 +167,10 @@ export const DUNGEON_KEYS = {
 // 만렙(Lv.100) 달성 시 직업별 2갈래 중 하나로 전승 → 레벨 1로 초기화(능력치·스킬·마스터리 포함),
 // 필요 경험치 ×2(전승 횟수마다 누적), 장비·사역마·재화 유지, 착용은 「장비 레벨 ≤ 내 레벨 + 5」만.
 // 갈래는 첫 전승 때 고정. 전승 1회마다 영구 공격력·최대 HP +5%
-export const REBIRTH = { reqLevel: 100, max: 5, expMult: 2, expMultStep: 0.5, wearMargin: 5, bonusPct: 0.05,
+export const REBIRTH = { reqLevel: 100, max: 5,
+  // 1.278.0 PM 결정 — 전승자는 Lv.100을 넘어 성장 (3부 적 Lv.100~118을 레벨로 넘는다). 100 이상 구간은 필요 경험치 × overExp
+  levelCap: 120, overExp: 2,
+  expMult: 2, expMultStep: 0.5, wearMargin: 5, bonusPct: 0.05,
   // 1.221.0 전승 단계 — 전승 횟수마다 모든 적(사냥터·던전·탑) HP·공격 증가
   enemyHp: 0.25, enemyAtk: 0.15,
   // 전승 등급 장비 드랍 확률 (전승 캐릭터만) · 갈래 유니크 확률
@@ -232,7 +235,7 @@ Object.assign(CHRONICLE_SKILLS, {
 export const rebirthBranches = (classId) => Object.entries(REBIRTH_BRANCHES).filter(([, b]) => b.cls === classId).map(([id, b]) => ({ id, ...b }));
 // 레벨업 필요 경험치 — 첫 전승 ×2, 이후 전승마다 +0.5 (1.221.0: 누적 ×2는 2회차부터 과도해 완화)
 export const rebirthExpMult = (count) => (count > 0 ? REBIRTH.expMult + REBIRTH.expMultStep * (count - 1) : 1);
-export const expNeedFor = (u) => Math.round(CHRONICLE_TUNING.expNeed(u.lv) * rebirthExpMult(u.rebirth?.count || 0));
+export const expNeedFor = (u) => Math.round(CHRONICLE_TUNING.expNeed(u.lv) * rebirthExpMult(u.rebirth?.count || 0) * (u.lv >= CHRONICLE_TUNING.maxLevel ? REBIRTH.overExp : 1));
 // branch를 주면 그 갈래 스킬까지 포함 (갈래 없는 유닛은 기본 스킬만)
 export const classSkills = (classId, branch = null) => Object.values(CHRONICLE_SKILLS).filter(s => s.cls === classId && (!s.branch || s.branch === branch));
 

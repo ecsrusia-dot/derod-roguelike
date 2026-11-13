@@ -648,7 +648,7 @@ export { addKeys as _addKeys };
 
 // 경험치 — 레벨업 횟수 반환
 // cap = 원정대 레벨 상한 (1.229.0) — 상한에 닿으면 경험치를 받지 않는다 (기존 고레벨 저장은 레벨 유지)
-export const levelCapOf = (save) => levelCap(save?.roster);
+export const levelCapOf = (save) => levelCap(save?.roster, save?.units?.[save?.hero]?.rebirth?.count || 0);
 function gainExp(u, n, cap = T.maxLevel) {
   let ups = 0;
   if (u.lv >= cap) return 0;

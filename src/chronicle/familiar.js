@@ -61,13 +61,17 @@ export const FAM_STAT_CURVE = [
   [25, 1126, 297, 92, 21], [30, 1400, 350, 115, 23.1], [40, 1984, 473, 156, 27.3], [50, 2353, 590, 196, 31.8], [60, 2833, 706, 237, 35.2],
   [70, 3380, 800, 287, 39.1], [80, 3890, 960, 335, 42.8], [90, 4676, 1071, 397, 46.6], [100, 4950, 1120, 420, 49],
 ];
+export const FAM_OVER_SLOPE = 0.03; // Lv.100 초과 1레벨당 HP·공격·방어 +3% (주인공 성장 폭에 맞춤 — sim-chronicle-part3로 확인)
 export function famBaseStats(lv) {
   const c = FAM_STAT_CURVE;
-  const L = Math.max(1, Math.min(c[c.length - 1][0], lv));
+  // 1.278.0 — 전승자 Lv.101~120: 표의 마지막 값에서 FAM_OVER_SLOPE(레벨당 비율)로 연장
+  const top = c[c.length - 1][0];
+  const L = Math.max(1, Math.min(top, lv));
   let i = 0;
   while (i < c.length - 2 && c[i + 1][0] < L) i++;
   const [l0, ...a] = c[i]; const [l1, ...b] = c[i + 1];
   const t = Math.max(0, Math.min(1, (L - l0) / (l1 - l0)));
+  if (lv > top) { const m = 1 + FAM_OVER_SLOPE * (lv - top); const z = c[c.length - 1]; return { hp: z[1] * m, atk: z[2] * m, def: z[3] * m, spd: z[4] }; }
   const v = a.map((x, k) => x + (b[k] - x) * t);
   return { hp: v[0], atk: v[1], def: v[2], spd: v[3] };
 }
