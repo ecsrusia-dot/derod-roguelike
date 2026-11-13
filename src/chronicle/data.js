@@ -174,7 +174,9 @@ export const DUNGEON_KEYS = {
 export const REBIRTH = { reqLevel: 100, max: 5,
   // 1.278.0 PM 결정 — 전승자는 Lv.100을 넘어 성장 (3부 적 Lv.100~118을 레벨로 넘는다). 100 이상 구간은 필요 경험치 × overExp
   levelCap: 120, overExp: 2,
-  expMult: 2, expMultStep: 0.5, wearMargin: 5, bonusPct: 0.05,
+  expMult: 2, expMultStep: 0.5, wearMargin: 5,
+  // 1.282.0 PM 결정 — 전승 1회당 공격·HP·방어 +10% (이전 5%)
+  bonusPct: 0.10,
   // 1.221.0 전승 단계 — 전승 횟수마다 모든 적(사냥터·던전·탑) HP·공격 증가
   enemyHp: 0.25, enemyAtk: 0.15,
   // 전승 등급 장비 드랍 확률 (전승 캐릭터만) · 갈래 유니크 확률
@@ -239,7 +241,10 @@ Object.assign(CHRONICLE_SKILLS, {
 export const rebirthBranches = (classId) => Object.entries(REBIRTH_BRANCHES).filter(([, b]) => b.cls === classId).map(([id, b]) => ({ id, ...b }));
 // 레벨업 필요 경험치 — 첫 전승 ×2, 이후 전승마다 +0.5 (1.221.0: 누적 ×2는 2회차부터 과도해 완화)
 export const rebirthExpMult = (count) => (count > 0 ? REBIRTH.expMult + REBIRTH.expMultStep * (count - 1) : 1);
-export const expNeedFor = (u) => Math.round(CHRONICLE_TUNING.expNeed(u.lv) * rebirthExpMult(u.rebirth?.count || 0) * (u.lv >= CHRONICLE_TUNING.maxLevel ? REBIRTH.overExp : 1));
+// 1.282.0 PM 결정 「빠른 재성장」 — 전승자의 Lv.1~99 필요 경험치 배율(×2~)을 없앴다. Lv.100 이상 구간은 이전과 같다 (전승 배율 × overExp — 3부 진행 속도 유지)
+// 전승자 표시 이름 — 갈래 이름 (없으면 기본 직업명)
+export const unitTitle = (u, classId) => (u?.rebirth?.branch && REBIRTH_BRANCHES[u.rebirth.branch]?.name) || chronicleClass(classId).name;
+export const expNeedFor = (u) => Math.round(CHRONICLE_TUNING.expNeed(u.lv) * (u.lv >= CHRONICLE_TUNING.maxLevel ? REBIRTH.overExp * rebirthExpMult(u.rebirth?.count || 0) : 1));
 // branch를 주면 그 갈래 스킬까지 포함 (갈래 없는 유닛은 기본 스킬만)
 export const classSkills = (classId, branch = null) => Object.values(CHRONICLE_SKILLS).filter(s => s.cls === classId && (!s.branch || s.branch === branch));
 

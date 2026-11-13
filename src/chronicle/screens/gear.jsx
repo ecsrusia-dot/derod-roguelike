@@ -104,12 +104,12 @@ export function EvalFooter({ it, cur, info, canWear, needLv, onEquip }) {
   </>;
 }
 
-export function MainGearCard({ it, onClick, note, dim = false, footer = null, tag = null, picked = null, cmp, evalInfo = null }) {
+export function MainGearCard({ it, onClick, note, dim = false, footer = null, tag = null, picked = null, cmp, evalInfo = null, syncLv = 0 }) {
   const sl = SLOTS.find(x => x.id === it.slot);
   // 1.267.0 비교 모드(cmp !== undefined) — 양쪽 모두 +7 기준 능력치로 줄마다 ▲▼
   const cmpMode = cmp !== undefined;
   const itE = cmpMode ? GE.asEvalItem(it) : it;
-  const g = gradeOf(it.grade); const st = E.itemStats(itE); const ud = E.uniqueDef(it); const eo = E.epicOptOf(it);
+  const g = gradeOf(it.grade); const st = E.itemStats(itE, cmpMode ? 0 : syncLv); const ud = E.uniqueDef(it); const eo = E.epicOptOf(it);
   const cst = cmpMode && cmp ? E.itemStats(GE.asEvalItem(cmp)) : {};
   const fmtD = (k, d) => (BASE_STATS.includes(k) ? Math.round(Math.abs(d)).toLocaleString() : /%/.test(E.statLabel(k, 0.1)) ? `${Math.round(Math.abs(d) * 1000) / 10}` : `${Math.round(Math.abs(d) * 10) / 10}`);
   const lbl = (k, v) => { if (BASE_STATS.includes(k)) return { l: BASE_LABEL[k] === '공격' ? '공격력' : BASE_LABEL[k], v: Math.round(v).toLocaleString(), base: true }; const t = E.statLabel(k, v); const m = t.match(/^(.*?)\s*([+-]?[\d.]+.*)$/); return { l: m ? m[1] : t, v: m ? m[2] : '' }; };
@@ -127,6 +127,7 @@ export function MainGearCard({ it, onClick, note, dim = false, footer = null, ta
           : evalInfo && evalInfo.state !== 'na' && evalInfo.state !== 'none' ? <span className="flex-none"><EvalChip info={evalInfo} /></span>
           : <b className="flex-none" style={{ fontSize: 12.5, color: MS.gold }}>⚔ {E.itemPower(it).toLocaleString()}</b>}
       </div>
+      {syncLv > 0 && !cmpMode && <div style={{ fontSize: 11, color: MS.gold }}>⚖ 레벨 맞춤 — 기본 능력치는 Lv.{syncLv} 수준으로 적용 (옵션·특수 효과는 그대로)</div>}
       <div style={{ fontSize: 11, color: PALETTE.textDim }}>{g.label} · Lv.{it.ilv} · {sl.label}{cmpMode && (it.plus || 0) < GE.evalPlus(it) ? <> · <span style={{ color: MS.gold }}>+{GE.evalPlus(it)} 강화 시 능력치</span></> : null}{note ? <> · {note}</> : null}</div>
       <div className="grid mt-1" style={{ gridTemplateColumns: '1fr 1fr', columnGap: 12 }}>
         {rows.map(r => (

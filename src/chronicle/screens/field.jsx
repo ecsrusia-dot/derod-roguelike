@@ -3,7 +3,7 @@
 // ============================================
 // 1.280.2 뒤 화면 파일 분할 — ChronicleGame.jsx에서 그대로 옮긴 코드 (동작 변화 없음).
 // ============================================
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { PALETTE } from '../../utils/helpers.js';
 import { CHRONICLE_PARTS, CHRONICLE_TUNING, CHRONICLE_FIELDS, CHRONICLE_DUNGEONS, DUNGEON_TIERS, dungeonDef, BOSS_DAILY_LIMIT, BOSS_MECHS, DUNGEON_KEYS, SLOTS, UNIQUE_CHANCE, UNIQUE_ITEMS, fieldStages, FIELD_STAGES, chronicleClass, chronicleEnemyArt } from '../data.js';
 import * as E from '../engine.js';
@@ -12,14 +12,17 @@ import { CENEMIES as ENEMIES } from '../enemies.js';
 import { Header, Wallet, Bar, UnitIcon, BossMechNote, IntimNote, MainKvRows, MainTabs, MS, MainSecHead, MainModal } from './common.jsx';
 
 export function FieldView({ save, onBack, onFight, onAuto, playScene, sceneOpen }) {
-  const [sel, setSel] = useState(() => [...CHRONICLE_FIELDS].reverse().find(f => E.fieldUnlocked(save, f.id))?.id || 1);
+  // 1.282.0 — 처음 열 때는 내 레벨에 맞는 자리 (전승 직후 Lv.1이 3부 앞에 서지 않게). 지역을 직접 바꾸면 그 지역의 진행 스테이지
+  const rec0 = useState(() => E.recommendedHunt(save))[0];
+  const [sel, setSel] = useState(() => rec0?.field.id || 1);
   useEffect(() => { if (!sceneOpen) playScene({ at: 'field', fieldId: sel }); }, [sel, sceneOpen]); // eslint-disable-line react-hooks/exhaustive-deps
   const f = CHRONICLE_FIELDS[sel - 1];
   const part = CHRONICLE_PARTS.find(p => p.fields.includes(sel)) || CHRONICLE_PARTS[0];
   const st = E.stageState(save, f.id);
   const stages = fieldStages(f);
-  const [stage, setStage] = useState(() => Math.min(st.cleared, FIELD_STAGES - 1));
-  useEffect(() => { setStage(Math.min(E.stageState(save, sel).cleared, FIELD_STAGES - 1)); }, [sel]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [stage, setStage] = useState(() => (rec0 ? rec0.stage : Math.min(st.cleared, FIELD_STAGES - 1)));
+  const firstSel = useRef(true);
+  useEffect(() => { if (firstSel.current) { firstSel.current = false; return; } const r = E.recommendedHunt(save); setStage(r && r.field.id === sel ? r.stage : Math.min(E.stageState(save, sel).cleared, FIELD_STAGES - 1)); }, [sel]); // eslint-disable-line react-hooks/exhaustive-deps
   const cleared = !!save.progress.bossCleared[f.id];
   const bossOpen = E.bossReady(save, f.id);
   const S = stages[stage];

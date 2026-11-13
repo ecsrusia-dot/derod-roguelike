@@ -35,6 +35,9 @@ export function previewTarget(save, last) {
   if (last && last.hero === save.hero && E.fieldUnlocked(save, last.fieldId) && E.stageUnlocked(save, last.fieldId, last.stage)) {
     return { field: CHRONICLE_FIELDS[last.fieldId - 1], stage: last.stage, fromLast: true };
   }
+  // 1.282.0 — 마지막 사냥 기록이 없으면 내 레벨에 맞는 자리 (전승 직후 최고 지역을 기준으로 잡지 않게)
+  const rec = E.recommendedHunt(save);
+  if (rec) return { field: rec.field, stage: rec.stage, fromLast: false };
   for (let i = CHRONICLE_FIELDS.length - 1; i >= 0; i--) {
     const f = CHRONICLE_FIELDS[i];
     if (!E.fieldUnlocked(save, f.id)) continue;

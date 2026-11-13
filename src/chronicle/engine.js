@@ -6,7 +6,7 @@
 // ============================================
 import { levelCap, globalBuffFx } from './roster.js';
 import { talentFx, canLearnTalent, talentNode, talentResetCost, talentTrees, tierUnlocked } from './talents.js';
-import { BOSS_MECHS, BOSS_MECH_OF, fieldStages, FIELD_STAGES, STAGE_TUNING, AUTO_CLIMB, BOOST, BAG_EXPAND, SALVAGE, SALVAGE_ICON, REBIRTH, REBIRTH_BRANCHES, expNeedFor, OPTION_LV_CURVE, REFORGE } from './data.js';
+import { BOSS_MECHS, BOSS_MECH_OF, fieldStages, FIELD_STAGES, STAGE_TUNING, AUTO_CLIMB, BOOST, BAG_EXPAND, SALVAGE, SALVAGE_ICON, REBIRTH, REBIRTH_BRANCHES, expNeedFor, OPTION_LV_CURVE, REFORGE , unitTitle } from './data.js';
 import { TOWER, TOWER_SHOP, towerUnlocked, isTowerBoss, towerEnemyLv, towerArea, towerFloorPicks, towerTheme, kstWeekKey } from './tower.js';
 import { famCombatant, famRole, famSubFx, famOwnFx, famBondFx, rollFamShards, rollFamSouls, gainFamExp, FAM_AI, FAM_TUNING, summonFamiliars, enhanceFamiliar, evolveFamiliar } from './familiar.js';
 import {
@@ -308,12 +308,13 @@ export function optionLvMult(ilv) {
   return +(y + (y - x) / (b - a) * (L - b)).toFixed(4);
 }
 // 장비가 주는 수치 전부 (기본 능력치 + 옵션) — 고유 효과(fx)는 gearTotals에서 합산
-export function itemStats(item) {
+// syncLv (1.282.0 레벨 맞춤) — 주어지면 기본 능력치(공격·방어·HP·보조 기본치)를 그 레벨 장비 수준으로 계산. 옵션·강화·특수 효과는 그대로
+export function itemStats(item, syncLv = 0) {
   if (!item) return {};
   const g = GRADES[gradeIdx(item.grade)] || GRADES[0];
   const gm = g.mult * (1 + enhanceBonus(item.plus));
   const m = gm * (item.roll || 1);
-  const L = item.ilv;
+  const L = syncLv > 0 ? Math.min(item.ilv, syncLv) : item.ilv;
   const out = {};
   const add = (k, v) => { out[k] = +((out[k] || 0) + v).toFixed(3); };
   if (item.slot === 'weapon') add('atk', Math.round((4 + L * 1.7) * m));
@@ -324,7 +325,7 @@ export function itemStats(item) {
     for (const [k, [a, per]] of Object.entries(b.flat)) add(k, k === 'spd' ? +((a + per * L) * m).toFixed(1) : Math.round((a + per * L) * m));
     for (const [k, v] of Object.entries(b.pct)) add(k, +(v * gm).toFixed(3));
   }
-  const optM = (1 + 0.5 * enhanceBonus(item.plus)) * optionLvMult(L);
+  const optM = (1 + 0.5 * enhanceBonus(item.plus)) * optionLvMult(item.ilv);
   for (const o0 of itemOpts(item)) {
     const o = normOpt(item, o0);
     if (o.k === 'scdr') { add(`scdr_${o.sk}`, o.v); continue; }
@@ -355,8 +356,14 @@ export function statLabel(k, v) {
 export function canWear(it, u) {
   const ub = it.named && UNIQUE_ITEMS[it.named]?.branch;
   if (ub && u?.rebirth?.branch !== ub) return false; // 갈래 유니크는 그 갈래만
-  // 1.225.0 PM: 장비 레벨이 내 레벨 이하일 때만 착용 (전승 여부 무관)
+  // 1.282.0 PM 결정 「레벨 맞춤 착용」 — 전승자는 레벨이 모자라도 착용하고, 기본 능력치만 내 레벨 수준으로 낮춰 받는다 (wearSyncLv)
+  if ((u?.rebirth?.count || 0) > 0) return true;
+  // 1.225.0 PM: 장비 레벨이 내 레벨 이하일 때만 착용
   return (it.ilv || 1) <= (u?.lv || 1);
+}
+// 레벨 맞춤이 걸리는 레벨 (0 = 원래 성능 그대로)
+export function wearSyncLv(it, u) {
+  return (u?.rebirth?.count || 0) > 0 && (it?.ilv || 1) > (u?.lv || 1) ? (u.lv || 1) : 0;
 }
 // 전승 단계 (1.221.0) — 전승 횟수만큼 적 강화. UI·시뮬이 조우 직후 호출
 export function rebirthCount(save) { return save.units[save.hero]?.rebirth?.count || 0; }
@@ -390,7 +397,7 @@ function gearTotals(save, u) {
     const uid = u.equip[slot];
     const it = uid != null ? save.inventory.find(i => i.uid === uid) : null;
     if (!it || !itemUsable(it, u.classId) || !canWear(it, u)) continue;
-    for (const [k, v] of Object.entries(itemStats(it))) add(k, v);
+    for (const [k, v] of Object.entries(itemStats(it, wearSyncLv(it, u)))) add(k, v);
     const ud = uniqueDef(it);
     if (ud) for (const [k, v] of Object.entries(ud.fx)) add(k, v);
     const eo = epicOptOf(it);
@@ -477,7 +484,7 @@ export function deriveUnit(save, classId) {
   const critRaw = 0.05 + st.agi * SK.agiCrit + (fx.critAdd || 0) + G('crit');
   const atk = (main * 2.2 + u.lv * 1.5 + G('atk')) * (1 + (fx.atkPct || 0) + G('atkPct') + mast) * rb;
   const out = {
-    id: classId, classId, name: cls.name, side: 'party', lv: u.lv, magic: cls.magic,
+    id: classId, classId, name: unitTitle(u, classId), side: 'party', lv: u.lv, magic: cls.magic,
     maxHp: Math.round((50 + st.vit * 10 + u.lv * 6 + G('hp')) * (1 + (fx.hpPct || 0) + G('hpPct') + mast) * rb),
     atk: Math.round(atk),
     healPower: Math.round(Math.max(st.int * 2.2 + u.lv * 1.5 + G('atk') * 0.5, atk * G('healFromAtk')) * (1 + G('healPct'))),
@@ -1060,7 +1067,33 @@ export function gateReady(save, fid, i) {
 export const bossReady = (save, fid) => stageState(save, fid).cleared >= FIELD_STAGES;
 // 자동 진행 다음 단계 (1.234.0) — { field, mode: 'hunt'|'gate'|'boss', stage } 또는 { field: null, reason }
 //   보스를 이미 잡은 지역이면 다음 지역으로 넘어간다 · 진행 중 스테이지 = 관문을 넘은 수(cleared)
+// 지금 레벨에 맞는 사냥 자리 (1.282.0) — 열린 스테이지 중 「레벨 ≤ 내 레벨 + 1」인 가장 높은 곳. 없으면 가장 낮은 곳
+//   전승 직후처럼 모든 지역이 열려 있어도 Lv.1이면 1지역 1스테이지를 가리킨다
+export function recommendedHunt(save) {
+  const lv = save.units[save.hero]?.lv || 1;
+  let best = null, low = null;
+  for (const f of CHRONICLE_FIELDS) {
+    if (!fieldUnlocked(save, f.id)) continue;
+    for (const s of fieldStages(f)) {
+      if (!stageUnlocked(save, f.id, s.idx)) continue;
+      const c = { field: f, stage: s.idx, lv: s.lv };
+      if (!low || s.lv < low.lv) low = c;
+      if (s.lv <= lv + 1 && (!best || s.lv >= best.lv)) best = c;
+    }
+  }
+  return best || low;
+}
 export function autoProgressStep(save, field) {
+  const t = autoProgressTarget(save, field);
+  // 다음 목표가 내 레벨보다 5 이상 높으면(위압 2단계~) 덤비지 않고 레벨에 맞는 자리에서 사냥한다 — 전승 직후 3부로 뛰어드는 문제
+  if (t.field) {
+    const lv = save.units[save.hero]?.lv || 1;
+    const tl = t.mode === 'boss' ? t.field.bossLv : fieldStages(t.field)[t.stage].lv + (t.mode === 'gate' ? 1 : 0);
+    if (tl - lv >= 5) { const r = recommendedHunt(save); if (r) return { field: r.field, mode: 'hunt', stage: r.stage, catchUp: true }; }
+  }
+  return t;
+}
+function autoProgressTarget(save, field) {
   let f = field;
   for (let guard = 0; f && save.progress.bossCleared[f.id] && guard < 30; guard++) {
     const next = CHRONICLE_FIELDS[f.id]; // id는 1부터 — 다음 지역
@@ -1244,6 +1277,9 @@ export function rebirth(save0, branchId, classId = save0.hero) {
   const cls = chronicleClass(classId);
   u.rebirth = { branch: branchId, count: (u0.rebirth?.count || 0) + 1 };
   u.lv = 1; u.exp = 0; u.points = 0; u.sp = 1; u.stats = { ...cls.base }; u.skills = {}; u.mastery = 0; u.talents = {};
+  // 1.282.0 PM 결정 — 갈래의 첫 스킬은 전승 즉시 배운 상태로 시작 (전승한 보람을 Lv.1부터)
+  const first = Object.values(CHRONICLE_SKILLS).filter(x => x.branch === branchId).sort((a, b) => (a.reqLv || 0) - (b.reqLv || 0))[0];
+  if (first) u.skills[first.id] = 1;
   save.stats.rebirths = (save.stats.rebirths || 0) + 1;
   return save;
 }
