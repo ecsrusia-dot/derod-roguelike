@@ -16,7 +16,7 @@ export const PREVIEW = { battles: 200, gapMs: 1800 };
 //   이것까지 세면 「낙인을 거는 장비」가 어차피 이기는 쉬운 전투에서 연출 시간만큼 느린 장비로 계산된다.
 export function battlePlayMs(sim, speed = 1, combatOnly = false) {
   let ms = 0;
-  for (const ev of sim.events) if (!(combatOnly && (ev.k === 'pre' || ev.k === 'open' || ev.k === 'dotTick'))) ms += ev.round || ev.k === 'pre' ? 160 : ev.k === 'dotTick' ? 380 : 620;
+  for (const ev of sim.events) if (!(combatOnly && (ev.k === 'pre' || ev.k === 'open' || ev.k === 'dotTick'))) ms += ev.round || ev.k === 'pre' ? 160 : (ev.k === 'dotTick' || ev.k === 'open') ? 80 : 620; // 반복·자동 사냥 재생 기준 (1.286.4 낙인·지속 피해 표시 단축)
   return Math.round(ms / speed) + PREVIEW.gapMs;
 }
 
