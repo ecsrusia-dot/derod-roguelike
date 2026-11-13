@@ -34,7 +34,7 @@ function RebirthSheet({ save, cid, onClose, onRebirth }) {
       <MainSecHead title="바 뀌 는 것" />
       <MainKvRows rows={[
         { l: '레벨·스킬·특성', v: 'Lv.1 초기화', c: '#e06a5f' }, { l: '경험치 (Lv.100 미만)', v: `×${REBIRTH.regrowExp}`, c: '#8fd08a' },
-        { l: '적 HP', v: `+${Math.round(REBIRTH.enemyHp * next * 100)}%`, c: '#ff6ad5' }, { l: '적 공격', v: `+${Math.round(REBIRTH.enemyAtk * next * 100)}%`, c: '#ff6ad5' },
+        { l: '던전 심연 등급', v: `심연 ${['Ⅰ', 'Ⅱ', 'Ⅲ', 'Ⅳ', 'Ⅴ'][next - 1]} 개방`, c: '#b06cff' }, { l: '기존 지역의 적', v: '강해지지 않음', c: '#8fd08a' },
         { l: '공격·HP·방어 영구', v: `+${Math.round(REBIRTH.bonusPct * next * 100)}%`, c: MS.gold }, { l: '장비', v: '레벨 맞춤 착용', c: '#8fd08a' },
         { l: '갈래 첫 스킬', v: '즉시 습득', c: '#8fd08a' }, { l: '사역마', v: '내 레벨까지 힘을 냄' },
         { l: '레벨 상한', v: `Lv.${CHRONICLE_TUNING.maxLevel} → ${REBIRTH.levelCap}`, c: MS.gold },
@@ -209,7 +209,7 @@ export function PartyView({ save, setSave, onBack, onForge }) {
         {E.canRebirth(save, cid) && (
           <button onClick={() => setRebirthOpen(true)} className="ui-press ui-sheen w-full text-left flex-none" style={{ padding: 12, borderRadius: 14, border: `1.5px solid ${PALETTE.legendary}`, background: `${PALETTE.legendary}18` }}>
             <div className="font-bold" style={{ fontSize: 14, color: PALETTE.legendary }}>{u.rebirth?.count ? `✦ ${u.rebirth.count + 1}차 전승 가능 (선택)` : `✦ 전승 가능 — Lv.${REBIRTH.reqLevel} 달성`}</div>
-            <div style={{ fontSize: 12, color: PALETTE.textDim }}>{u.rebirth?.branch ? `능력치 +${Math.round(REBIRTH.bonusPct * 100)}% 추가 · 적도 더 강해짐 · 레벨 1부터 다시 — 3부를 계속하려면 누르지 않아도 된다` : '두 갈래 중 하나를 골라 새로 태어난다 · 레벨 1부터 다시'}</div>
+            <div style={{ fontSize: 12, color: PALETTE.textDim }}>{u.rebirth?.branch ? `능력치 +${Math.round(REBIRTH.bonusPct * 100)}% 추가 · 던전 심연 ${['Ⅰ', 'Ⅱ', 'Ⅲ', 'Ⅳ', 'Ⅴ'][u.rebirth.count]} 개방 · 레벨 1부터 다시 — 3부를 계속하려면 누르지 않아도 된다` : '두 갈래 중 하나를 골라 새로 태어난다 · 레벨 1부터 다시'}</div>
           </button>
         )}
 
