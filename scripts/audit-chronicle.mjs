@@ -39,6 +39,14 @@ for (const u of Object.values(D.UNIQUE_ITEMS)) { addFx(u.fx); addFx(u.opts); }
 for (const o of Object.values(D.EPIC_OPTIONS)) addFx(o.fx);
 for (const b of Object.values(D.REBIRTH_BRANCHES)) addFx(b.fx);
 for (const trees of Object.values(T.TALENT_TREES)) for (const tr of trees) for (const n of (tr.tiers || []).flat()) addFx(n.fx);
+// 갈래 전용 트리 (1.283.0) — 갈래 id·직업 일치, 강화 대상은 그 갈래 스킬
+const badBt = [];
+for (const [bid, bt] of Object.entries(T.BRANCH_TREES || {})) {
+  const br = D.REBIRTH_BRANCHES[bid];
+  if (!br || br.cls !== bt.cls) badBt.push(`${bid}: 갈래·직업 불일치`);
+  for (const n of bt.tiers.flat()) { addFx(n.fx); for (const k of Object.keys(n.fx)) if (k.startsWith('sb_') && D.CHRONICLE_SKILLS[k.slice(3)]?.branch !== bid) badBt.push(`${n.id}: ${k}는 ${bid} 스킬이 아님`); }
+}
+check(`갈래 전용 특성 (${Object.keys(T.BRANCH_TREES || {}).length}/${Object.keys(D.REBIRTH_BRANCHES).length} 갈래)`, badBt);
 for (const k of fx) if (k.startsWith('sb_') && !D.CHRONICLE_SKILLS[k.slice(3)]) badSb.push(k);
 check('특성 스킬 강화 대상', badSb);
 check(`효과 키 엔진 연결 (${fx.size}종)`, [...fx].filter(k => !k.startsWith('sb_') && !k.startsWith('fam_') && !new RegExp('\\b' + k + '\\b').test(eng)));
