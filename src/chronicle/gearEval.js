@@ -52,7 +52,7 @@ export function canEvalItem(save, hero, it) {
 //   1.270.3 PM 결정 「승률 50~60% 지점」 — 다음 관문이 너무 쉬우면(승률 100% · 5라운드) 쿨감·생존 옵션 차이가
 //     0%로 보였고, 반대로 승률 0% 보스는 2~3라운드에 져서 모든 장비가 0%였다.
 //     → 다음 관문부터 앞으로 관문·보스를 차례로 짧게 시뮬해, 지금 장비 승률이 TARGET_WIN에 가장 가까운 곳을 고른다
-export const EVAL_TARGET = { win: 0.55, stopBelow: 0.3, maxSteps: 14, battles: 20, seed: 9191 };
+export const EVAL_TARGET = { win: 0.55, stopBelow: 0.3, maxSteps: 48, battles: 20, seed: 9191 };
 function evalTargetBase(save) {
   // 1.282.0 — 다음 목표가 내 레벨보다 5 이상 높으면(전승 직후 등) 내 레벨에 맞는 자리의 관문을 기준으로
   const base = evalTargetNext(save);
@@ -102,7 +102,7 @@ export function evalTarget(save) {
   for (const t of targetLadder(start)) {
     const r = P.estimateRate(save, t, { battles: EVAL_TARGET.battles, speed: 2, seed: EVAL_TARGET.seed });
     const cand = { ...t, winRate: r.winRate };
-    if (!best || Math.abs(r.winRate - EVAL_TARGET.win) < Math.abs(best.winRate - EVAL_TARGET.win)) best = cand;
+    if (!best || Math.abs(r.winRate - EVAL_TARGET.win) <= Math.abs(best.winRate - EVAL_TARGET.win)) best = cand; // 같으면 더 어려운 쪽 (1.286.3 — 전부 100%면 가장 쉬운 곳이 뽑혔다)
     if (r.winRate < EVAL_TARGET.stopBelow) break; // 이보다 어려운 곳은 더 멀어질 뿐
   }
   const res = best || start;
