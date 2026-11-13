@@ -225,7 +225,8 @@ export function TowerView({ save, setSave, onBack, onFight, flash, towerAuto = f
   const boss = E.isTowerBoss(nextFloor);
   const party = E.partyCombatants(save, run?.hp);
   const nextCp = Math.ceil(nextFloor / E.TOWER.bossEvery) * E.TOWER.bossEvery;
-  const myUniques = Object.values(UNIQUE_ITEMS).filter(u => !u.disabled && !u.branch && (u.cls === save.hero || u.cls === 'common'));
+  const myUniques = Object.values(UNIQUE_ITEMS).filter(u => !u.disabled && (u.branch ? u.branch === save.units[save.hero]?.rebirth?.branch : (u.cls === save.hero || u.cls === 'common')))
+    .sort((a, b) => (b.branch ? 1 : 0) - (a.branch ? 1 : 0)); // 1.286.2 내 갈래 전용 유니크 포함 (맨 위)
   const buy = (id, uid) => { const n = E.buyTowerItem(save, id, uid); if (n === save) { flash('구매할 수 없습니다'); return false; } setSave(n); flash('구매 완료'); return true; };
   return (
     <div className="absolute inset-0 flex flex-col">

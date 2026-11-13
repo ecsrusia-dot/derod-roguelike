@@ -207,9 +207,9 @@ export function PartyView({ save, setSave, onBack, onForge }) {
 
         {gtab === 'info' && <>
         {E.canRebirth(save, cid) && (
-          <button onClick={() => setRebirthOpen(true)} className="ui-press ui-sheen w-full text-left" style={{ padding: 12, borderRadius: 14, border: `1.5px solid ${PALETTE.legendary}`, background: `${PALETTE.legendary}18` }}>
-            <div className="font-bold" style={{ fontSize: 14, color: PALETTE.legendary }}>✦ 전승 가능 — Lv.{REBIRTH.reqLevel} 달성</div>
-            <div style={{ fontSize: 12, color: PALETTE.textDim }}>{u.rebirth?.branch ? `${REBIRTH_BRANCHES[u.rebirth.branch].name} ${u.rebirth.count + 1}차 전승` : '두 갈래 중 하나를 골라 새로 태어난다'} · 레벨 1부터 다시</div>
+          <button onClick={() => setRebirthOpen(true)} className="ui-press ui-sheen w-full text-left flex-none" style={{ padding: 12, borderRadius: 14, border: `1.5px solid ${PALETTE.legendary}`, background: `${PALETTE.legendary}18` }}>
+            <div className="font-bold" style={{ fontSize: 14, color: PALETTE.legendary }}>{u.rebirth?.count ? `✦ ${u.rebirth.count + 1}차 전승 가능 (선택)` : `✦ 전승 가능 — Lv.${REBIRTH.reqLevel} 달성`}</div>
+            <div style={{ fontSize: 12, color: PALETTE.textDim }}>{u.rebirth?.branch ? `능력치 +${Math.round(REBIRTH.bonusPct * 100)}% 추가 · 적도 더 강해짐 · 레벨 1부터 다시 — 3부를 계속하려면 누르지 않아도 된다` : '두 갈래 중 하나를 골라 새로 태어난다 · 레벨 1부터 다시'}</div>
           </button>
         )}
 
