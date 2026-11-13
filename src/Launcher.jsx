@@ -11,6 +11,7 @@
 import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { PALETTE } from './utils/helpers.js';
 import { GAME_VERSION } from './data/version.js';
+import { FEATURE_FLAGS } from './data/config.js';
 
 const DntApp = lazy(() => import('./App.jsx'));
 const ArcanaGame = lazy(() => import('./arcana/ArcanaGame.jsx'));
@@ -20,7 +21,8 @@ const LAST_KEY = 'dnt_launcher_last';
 const readLast = () => { try { return localStorage.getItem(LAST_KEY); } catch { return null; } };
 const writeLast = (v) => { try { localStorage.setItem(LAST_KEY, v); } catch { /* 무시 */ } };
 
-const GAMES = [
+// 1.277.2: 아르카나는 FEATURE_FLAGS.arcana가 켜질 때만 노출 (전면 재설계 대기 — 저장은 그대로 둔다)
+const ALL_GAMES = [
   {
     id: 'dnt', title: 'Dawn & Twilight', kr: '던앤트와일라잇',
     desc: '다크 판타지 텍스트 로그라이크 — 원정·챔피언십·레이드',
@@ -37,6 +39,7 @@ const GAMES = [
     image: './enemies/championship/frost/champ_frost_boss4_intro.jpg', color: '#9cc4e4',
   },
 ];
+const GAMES = ALL_GAMES.filter(g => g.id !== 'arcana' || FEATURE_FLAGS.arcana);
 
 // PC에서는 폰 프레임, 모바일은 전체 화면
 function Frame({ children }) {
@@ -114,7 +117,7 @@ export default function Launcher() {
       </Suspense>
     );
   }
-  if (game === 'arcana') {
+  if (game === 'arcana' && FEATURE_FLAGS.arcana) {
     return (
       <Suspense fallback={<Loading />}>
         <Frame><ArcanaGame onExit={back} /></Frame>
