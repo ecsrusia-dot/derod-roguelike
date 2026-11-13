@@ -71,6 +71,10 @@ export const CHRONICLE_TUNING = {
     execute: { below: 0.35, mult: 3 },
     reflect: { every: 4, turns: 2, pct: 0.3, capPct: 0.08 },   // 1회 반사 상한 = 공격자 최대 HP의 8%
     enrage: { after: 8, perRound: 0.25 },
+    // 3부 던전 전용 (1.279.0)
+    seal: { every: 3, turns: 3 },                       // 보스 3턴마다 · 봉인 3턴
+    erode: { pct: 0.04, floor: 0.5 },                   // 보스 턴마다 최대 HP -4% (원래 최대 HP 기준) · 최저 50%
+    phase: { at: 0.5, shield: 0.12, atk: 0.2, acts: 2 }, // HP 50% 변신 — 보호막 12% · 공격 +20% · 매 턴 2회 행동
   },
   // 특성 갈래 ↔ 동행 사역마 시너지 (1.236.0 PM — 갈래 1포인트당, 갈래 완성 35포인트 기준 괄호)
   //   딜 갈래 → 수호: 대신 맞기 확률 +0.8%p (+28%p)
@@ -415,6 +419,43 @@ export const CHRONICLE_DUNGEONS = [
       { lv: 100, enemies: ['champ_dawn_boss3'], boss: true },
     ],
   },
+  // ── 3부 던전 (1.279.0) — 전승자 Lv.100~120 구간. 보스는 지역 보스와 다른 전용 보스 + 3부 전용 기믹
+  {
+    id: 'memoryArchive', name: '잊힌 왕의 서고', part: 3, unlockField: 10, recLv: 108, color: '#a8d8d0', area: { hpMult: 1.2, atkMult: 1.1 }, set: 'memory',
+    desc: '폐허 아래 묻힌 서고. 기록 관리자는 침입자의 기억부터 지운다.',
+    art: 'p3_m_keeper',
+    floors: [
+      { lv: 103, enemies: ['p3_m_sentinel', 'p3_m_wolf', 'p3_m_eater'] },
+      { lv: 104, enemies: ['p3_m_knight', 'p3_m_eater', 'p3_m_sentinel', 'p3_m_colossus'] },
+      { lv: 105, enemies: ['p3_m_knight', 'p3_m_wolf', 'p3_m_witch', 'p3_m_scribe'] },
+      { lv: 106, enemies: ['p3_m_scribe', 'p3_m_colossus', 'p3_m_witch', 'p3_m_knight', 'p3_m_eater'] },
+      { lv: 109, enemies: ['p3_m_keeper'], boss: true },
+    ],
+  },
+  {
+    id: 'voidDepths', name: '틈새의 밑바닥', part: 3, unlockField: 11, recLv: 113, color: '#b48cff', area: { hpMult: 1.35, atkMult: 1.2 }, set: 'void',
+    desc: '회랑 아래로 끝없이 꺼지는 틈. 오래 머물수록 몸이 지워진다.',
+    art: 'p3_v_heart',
+    floors: [
+      { lv: 108, enemies: ['p3_v_creeper', 'p3_v_hound', 'p3_v_shade'] },
+      { lv: 109, enemies: ['p3_v_caster', 'p3_v_shade', 'p3_v_creeper', 'p3_v_executor'] },
+      { lv: 110, enemies: ['p3_v_caster', 'p3_v_hound', 'p3_v_devourer', 'p3_v_maw'] },
+      { lv: 111, enemies: ['p3_v_maw', 'p3_v_executor', 'p3_v_devourer', 'p3_v_caster', 'p3_v_shade'] },
+      { lv: 114, enemies: ['p3_v_heart'], boss: true },
+    ],
+  },
+  {
+    id: 'firstDusk', name: '최초의 황혼', part: 3, unlockField: 12, recLv: 118, color: '#ffb070', area: { hpMult: 1.5, atkMult: 1.3 }, set: 'origin',
+    desc: '모든 황혼이 시작된 자리. 첫 황혼은 절반쯤 쓰러졌을 때 진짜 모습을 드러낸다.',
+    art: 'p3_o_first',
+    floors: [
+      { lv: 113, enemies: ['p3_o_shard', 'p3_o_warden', 'p3_o_apostle'] },
+      { lv: 114, enemies: ['p3_o_rider', 'p3_o_apostle', 'p3_o_shard', 'p3_o_avatar'] },
+      { lv: 115, enemies: ['p3_o_rider', 'p3_o_warden', 'p3_o_watcher', 'p3_o_herald'] },
+      { lv: 116, enemies: ['p3_o_herald', 'p3_o_avatar', 'p3_o_watcher', 'p3_o_rider', 'p3_o_apostle'] },
+      { lv: 120, enemies: ['p3_o_first'], boss: true },
+    ],
+  },
 ];
 export const CHRONICLE_DUNGEON = CHRONICLE_DUNGEONS[0]; // 1.205~1.207 호환 (이야기·의뢰가 참조)
 export const dungeonDef = (id) => CHRONICLE_DUNGEONS.find(d => d.id === id) || CHRONICLE_DUNGEONS[0];
@@ -428,11 +469,15 @@ export const BOSS_MECHS = {
   storm: { name: '광역 폭풍', icon: '🌪', desc: '3턴마다 아군 전체를 강하게 휩쓰는 폭풍을 일으킨다', tip: '버티는 싸움 — 치유 사역마·보호막·재생이 유리' },
   execute: { name: '처형 표식', icon: '⚔', desc: '체력이 35% 아래로 떨어진 주인공에게 3배 위력의 처형을 내린다', tip: '처형을 대신 맞아 줄 수호 사역마가 유리' },
   reflect: { name: '반사 갑주', icon: '🔁', desc: '4턴마다 2턴 동안 직접 공격 피해의 30%를 되돌려준다 (1회 최대 HP 8%)', tip: '지속 피해(화상·독)는 반사되지 않는다 — 지속 피해·치유 동행이 유리' },
+  // 3부 던전 전용 (1.279.0)
+  seal: { name: '기억 봉인', icon: '🔒', desc: '3턴마다, 지금 쓸 수 있는 가장 강한 스킬 하나를 3턴 동안 봉인한다', tip: '한 스킬에 기대지 마라 — 스킬을 고르게 배우고 재사용 감소를 챙겨라' },
+  erode: { name: '공허 잠식', icon: '🕳', desc: '보스의 턴마다 아군 모두의 최대 체력이 4%씩 줄어든다 (최저 50%)', tip: '오래 끌수록 불리 — 딜 특성·맹공 동행으로 짧게, 보호막은 줄지 않는다' },
+  phase: { name: '황혼 동화', icon: '🌗', desc: '체력이 절반이 되면 변신 — 걸린 약화·지속 피해를 지우고 보호막을 두르며, 공격이 오르고 매 턴 두 번 행동한다', tip: '후반을 버틸 준비 — 치유·수호 동행과 보호막, 지속 피해는 변신 뒤에 다시 걸어라' },
   enrage: { name: '광폭 타이머', icon: '⏳', desc: '8라운드가 지나면 매 라운드 공격력이 25%씩 오른다', tip: '짧게 끝내라 — 딜 특성 + 맹공 사역마로 빠르게 정리' },
 };
 export const BOSS_MECH_OF = {
   field: { 1: 'ward', 2: 'ritual', 3: 'reflect', 4: 'execute', 5: 'storm', 6: 'ritual', 7: 'ward', 8: 'execute', 9: 'storm', 10: 'enrage', 11: 'reflect', 12: 'enrage' },
-  dungeon: { frostTomb: 'ward', forestHeart: 'ritual', frostAbyss: 'storm', sanctumVault: 'reflect', riftHeart: 'execute', dawnGarden: 'enrage' },
+  dungeon: { frostTomb: 'ward', forestHeart: 'ritual', frostAbyss: 'storm', sanctumVault: 'reflect', riftHeart: 'execute', dawnGarden: 'enrage', memoryArchive: 'seal', voidDepths: 'erode', firstDusk: 'phase' },
 };
 
 export const DUNGEON_TIERS = [
@@ -506,7 +551,7 @@ export const CLASS_GEAR_NAMES = {
   priest: { weapon: ['나무 홀', '은 홀', '여명의 홀', '균열의 홀'], offhand: ['순례 성물', '은 성물', '빛의 성물', '균열의 성물'], armor: ['수련 법의', '은사 법의', '빛의 법의', '균열의 법의'] },
   common: { accessory: ['낡은 반지', '은 목걸이', '룬 부적', '심연의 인장'] },
 };
-export const EPIC_PREFIX = { frost: '서리 왕의', forest: '광란의', field: '빛나는', abyss: '심연 빙왕의', sanctum: '봉인된', rift: '마왕의', dawn: '여명 정원의' };
+export const EPIC_PREFIX = { frost: '서리 왕의', forest: '광란의', field: '빛나는', abyss: '심연 빙왕의', sanctum: '봉인된', rift: '마왕의', dawn: '여명 정원의', memory: '잊힌 왕의', void: '공허의', origin: '근원의' };
 
 // 옵션 정의 — pct: % 표시 / v: 고급 기준 값 범위 [최소, 최대] (등급 optMult 곱)
 export const OPTION_DEFS = {

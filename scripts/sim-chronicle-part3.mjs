@@ -1,11 +1,12 @@
 // 황혼 연대기 3부 진행 시뮬 (1.278.0) — 전승자 Lv.100 → 120 성장과 3부 보스 3종
 // 사용: node scripts/sim-chronicle-part3.mjs [최대 전투 수=9000]
+//           DG=1 (3부 던전 클리어율도 측정 — 권장 레벨 도달 시점 저장으로 난이도 3단계 × DGR회, Lv.120까지 계속 진행)
 // 환경변수: OVER=3 (100↑ 필요 경험치 배율 시험)  CLS=sage (직업 하나만)  G=indigo P=5 (동행 등급·강화)  ROLE=tank|healer|dps (기본 = 직업별 추천)
 // 봇: 1·2부를 실제로 진행(사역마 없이) → 전승 → Lv.100으로 건너뜀(재육성 생략 — 그동안 얻을 장비는 없다고 보는 보수적 가정)
 //     → 3부: 주인공 레벨 +2 이하인 가장 높은 스테이지에서 사냥, 관문·보스는 레벨이 닿으면 도전(지면 1레벨 올린 뒤 재도전)
 //     강화는 +7까지만(파괴 구간 진입 안 함). 동행 사역마 레벨 = 주인공 레벨
 import * as E from '../src/chronicle/engine.js';
-import { CHRONICLE_FIELDS, CHRONICLE_CLASSES, CHRONICLE_SKILLS, REBIRTH, REBIRTH_BRANCHES, fieldStages } from '../src/chronicle/data.js';
+import { CHRONICLE_FIELDS, CHRONICLE_CLASSES, CHRONICLE_SKILLS, CHRONICLE_DUNGEONS, DUNGEON_TIERS, REBIRTH, REBIRTH_BRANCHES, fieldStages } from '../src/chronicle/data.js';
 import { CENEMIES as EN } from '../src/chronicle/enemies.js';
 function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const MAX = +process.argv[2] || 9000;
@@ -54,18 +55,30 @@ function run(c) {
   const setFam = (s) => { s.fams = { [FAMS[role]]: { grade: GRADE, base: GRADE, plus: PLUS, lv: s.units[cid].lv } }; s.famTeam = { main: FAMS[role] }; return s; };
   // ── 3부
   const out = { name: c.name, role, boss: {}, lvAt: {}, hunts: 0, huntWins: 0 }; const f3 = {}; let k = 0;
-  while (k++ < MAX && !save.progress.bossCleared[12]) {
+  const DG = !!process.env.DG; const snaps = {};
+  while (k++ < MAX && (!save.progress.bossCleared[12] || (DG && save.units[cid].lv < REBIRTH.levelCap))) {
     save = setFam(upkeep(save, rng, 7)); const lv = save.units[cid].lv;
     for (const L of [105, 110, 115, 120]) if (lv >= L && !out.lvAt[L]) out.lvAt[L] = k;
+    if (DG) for (const D of CHRONICLE_DUNGEONS) if (D.part === 3 && save.progress.bossCleared[D.unlockField]) { if (!snaps[D.id + ':open']) snaps[D.id + ':open'] = structuredClone(save); if (lv >= D.recLv && !snaps[D.id + ':rec']) snaps[D.id + ':rec'] = structuredClone(save); if (lv >= REBIRTH.levelCap && !snaps[D.id + ':max']) snaps[D.id + ':max'] = structuredClone(save); }
     const fid = CHRONICLE_FIELDS.map(f => f.id).reverse().find(f => E.fieldUnlocked(save, f)); const field = CHRONICLE_FIELDS[fid - 1];
     const st = E.stageState(save, fid); const si = Math.min(st.cleared, 5); const stages = fieldStages(field);
-    const boss = E.bossReady(save, fid) && lv >= field.bossLv - 4 && lv > (f3[fid] ?? -1);
+    const boss = !save.progress.bossCleared[fid] && E.bossReady(save, fid) && lv >= field.bossLv - 4 && lv > (f3[fid] ?? -1);
     const gate = !boss && E.gateReady(save, fid, si) && stages[si].lv + 1 <= lv + 4 && lv > (f3[fid + ':' + si] ?? -1);
     if (boss || gate) { const r = fight(save, field, boss ? 'boss' : 'gate', si, rng); save = r.save; if (!r.win) f3[boss ? fid : fid + ':' + si] = lv; else if (boss) out.boss[fid] = { k, lv }; continue; }
     // 사냥: 지금 스테이지가 레벨 +2 이하면 거기서, 아니면 열린 곳 중 레벨이 맞는 가장 높은 곳
     let hf = field, hs = si;
     if (stages[si].lv > lv + 2) { let best = null; for (const f of CHRONICLE_FIELDS) { if (!E.fieldUnlocked(save, f.id)) continue; const c0 = E.stageState(save, f.id).cleared; for (const s of fieldStages(f)) if (s.idx <= Math.min(c0, 5) && s.lv <= lv + 2 && (!best || s.lv > best.s.lv)) best = { f, s }; } if (best) { hf = best.f; hs = best.s.idx; } }
     const r = fight(save, hf, 'hunt', hs, rng); save = r.save; out.hunts++; if (r.win) out.huntWins++;
+  }
+  if (DG) {
+    if (save.units[cid].lv >= REBIRTH.levelCap) for (const D of CHRONICLE_DUNGEONS) if (D.part === 3) snaps[D.id + ':max'] = structuredClone(setFam(upkeep(save, rng, 7)));
+    const R = +(process.env.DGR || 30);
+    const runD = (sv, id, tier, r2) => { let s = structuredClone(sv); s.dungeon = { id, tier, floor: 0, hp: null };
+      for (let i = 0; i < 8; i++) { const d = s.dungeon; if (!d) return false; const enc = E.dungeonEncounter(d, r2); enc.enemies = E.scaleEnemiesForRebirth(s, enc.enemies);
+        const b = E.simulateChronicleBattle(E.partyCombatants(s, d.hp), enc.enemies, r2); const r = E.applyBattle(s, { kind: 'dungeon', type: enc.type, enemies: enc.enemies }, b, r2); s = r.save;
+        if (b.result !== 'win') return false; if (r.summary.dungeonClear) return true; } return false; };
+    out.dg = CHRONICLE_DUNGEONS.filter(D => D.part === 3).map(D => `${D.name}: ` + ['open', 'rec', 'max'].map(w => { const sv = snaps[D.id + ':' + w]; if (!sv) return `${w} -`; const r2 = mulberry(5);
+      return `${w} Lv${sv.units[cid].lv} ` + DUNGEON_TIERS.map((_, t) => { let w2 = 0; for (let i = 0; i < R; i++) if (runD(sv, D.id, t, r2)) w2++; return Math.round(w2 / R * 100); }).join('/'); }).join(' · '));
   }
   out.end = { k, lv: save.units[cid].lv, done: !!save.progress.bossCleared[12] };
   out.gear = Object.values(save.units[cid].equip).map(uid => { const it = save.inventory.find(i => i.uid === uid); return it ? `${it.grade[0]}${it.ilv}+${it.plus || 0}` : '-'; }).join(' ');
@@ -75,6 +88,7 @@ console.log(`3부 진행 · 동행 ${GRADE}+${PLUS} · 상한 Lv.${REBIRTH.level
 for (const c of CHRONICLE_CLASSES) {
   if (process.env.CLS && process.env.CLS !== c.id) continue;
   const o = run(c); if (o.fail) { console.log(c.name, o.fail); continue; }
+  if (o.dg) o.dg.forEach(x => console.log(`  [${o.name} ${KO[o.role]}] ${x}  (일반/영웅/전설 클리어율 %)`));
   const b = (f) => o.boss[f] ? `${o.boss[f].k}전 Lv${o.boss[f].lv}` : '-';
   console.log(`${o.name.padEnd(6)} ${KO[o.role]} | 보스10 ${b(10)} | 보스11 ${b(11)} | 보스12 ${b(12)} | Lv105 ${o.lvAt[105] ?? '-'} · 110 ${o.lvAt[110] ?? '-'} · 115 ${o.lvAt[115] ?? '-'} · 120 ${o.lvAt[120] ?? '-'} | 끝 ${o.end.k}전 Lv${o.end.lv} ${o.end.done ? '완주' : '미완'} | 사냥 승률 ${Math.round(o.huntWins / Math.max(1, o.hunts) * 100)}% | 장비 ${o.gear}`);
 }
