@@ -180,7 +180,8 @@ export const REBIRTH = { reqLevel: 100, max: 5,
   // 1.285.0 PM 결정 — 전승자는 Lv.100 미만에서 전투 경험치 ×1.5 (다시 올리는 구간을 짧게)
   regrowExp: 1.5,
   // 1.221.0 전승 단계 — 전승 횟수마다 모든 적(사냥터·던전·탑) HP·공격 증가
-  enemyHp: 0.25, enemyAtk: 0.15,
+  enemyHp: 0, enemyAtk: 0, // 1.287.0 PM 결정 「적 강화는 새 콘텐츠에만」 — 3부는 지역 배율에 구웠고(×1.25/×1.15), 그 위는 심연 등급이 맡는다
+  abyss: { mythic: 1, branchUnique: [0.2, 0.25, 0.3, 0.35, 0.4], unique: [0.13, 0.16, 0.19, 0.22, 0.25] }, // 심연 보스: 전승 장비 확정 · 갈래 유니크 · 일반 유니크
   // 전승 등급 장비 드랍 확률 (전승 캐릭터만) · 갈래 유니크 확률
   mythicDrop: { elite: 0.003, gate: 0.02, boss: 0.08, dungeonBoss: [0.1, 0.18, 0.3], towerElite: 0.02, towerBoss: 0.12 },
   branchUnique: { elite: 0.004, gate: 0.03, boss: 0.05, dungeonBoss: [0.05, 0.08, 0.12], towerBoss: 0.12 }, // 1.286.0 갈래당 3종 + 1·2부(강적·관문)에서도 드랍
@@ -347,9 +348,9 @@ export const CHRONICLE_FIELDS = [
   champField(8, '핏빛 균열', 'rift', [78, 88], 90, 130, '#e0574c', 'champ_rift_boss4'),
   champField(9, '여명의 첨탑', 'dawn', [88, 98], 100, 150, '#fff1c4', 'champ_dawn_boss4'),
   // ── 3부 「황혼 너머」 (1.222.0) — 전승 1회 이상 + 2부 종장 후. 적 레벨이 만렙(100)을 넘는다
-  { ...champField(10, '기억의 폐허', 'memory', [100, 105], 107, 160, '#a8d8d0', 'p3_m_boss'), part: 3, reqRebirth: 1, area: { hpMult: 1.2, atkMult: 1.1 } },
-  { ...champField(11, '공허의 회랑', 'void', [105, 110], 112, 170, '#b48cff', 'p3_v_boss'), part: 3, reqRebirth: 1, area: { hpMult: 1.35, atkMult: 1.2 } },
-  { ...champField(12, '황혼의 근원', 'origin', [110, 115], 118, 180, '#ffb070', 'p3_o_boss'), part: 3, reqRebirth: 1, area: { hpMult: 1.5, atkMult: 1.3 } },
+  { ...champField(10, '기억의 폐허', 'memory', [100, 105], 107, 160, '#a8d8d0', 'p3_m_boss'), part: 3, reqRebirth: 1, area: { hpMult: 1.5, atkMult: 1.265 } },
+  { ...champField(11, '공허의 회랑', 'void', [105, 110], 112, 170, '#b48cff', 'p3_v_boss'), part: 3, reqRebirth: 1, area: { hpMult: 1.69, atkMult: 1.38 } },
+  { ...champField(12, '황혼의 근원', 'origin', [110, 115], 118, 180, '#ffb070', 'p3_o_boss'), part: 3, reqRebirth: 1, area: { hpMult: 1.875, atkMult: 1.495 } },
 ];
 // 던전 (1.208.0 — 2곳 × 난이도 3단계). set = 에픽 장비 이름 세트
 export const CHRONICLE_DUNGEONS = [
@@ -428,7 +429,7 @@ export const CHRONICLE_DUNGEONS = [
   },
   // ── 3부 던전 (1.279.0) — 전승자 Lv.100~120 구간. 보스는 지역 보스와 다른 전용 보스 + 3부 전용 기믹
   {
-    id: 'memoryArchive', name: '잊힌 왕의 서고', part: 3, unlockField: 10, recLv: 108, color: '#a8d8d0', area: { hpMult: 1.2, atkMult: 1.1 }, set: 'memory',
+    id: 'memoryArchive', name: '잊힌 왕의 서고', part: 3, unlockField: 10, recLv: 108, color: '#a8d8d0', area: { hpMult: 1.5, atkMult: 1.265 }, set: 'memory',
     desc: '폐허 아래 묻힌 서고. 기록 관리자는 침입자의 기억부터 지운다.',
     art: 'p3_m_keeper',
     floors: [
@@ -440,7 +441,7 @@ export const CHRONICLE_DUNGEONS = [
     ],
   },
   {
-    id: 'voidDepths', name: '틈새의 밑바닥', part: 3, unlockField: 11, recLv: 113, color: '#b48cff', area: { hpMult: 1.35, atkMult: 1.2 }, set: 'void',
+    id: 'voidDepths', name: '틈새의 밑바닥', part: 3, unlockField: 11, recLv: 113, color: '#b48cff', area: { hpMult: 1.69, atkMult: 1.38 }, set: 'void',
     desc: '회랑 아래로 끝없이 꺼지는 틈. 오래 머물수록 몸이 지워진다.',
     art: 'p3_v_heart',
     floors: [
@@ -452,7 +453,7 @@ export const CHRONICLE_DUNGEONS = [
     ],
   },
   {
-    id: 'firstDusk', name: '최초의 황혼', part: 3, unlockField: 12, recLv: 118, color: '#ffb070', area: { hpMult: 1.5, atkMult: 1.3 }, set: 'origin',
+    id: 'firstDusk', name: '최초의 황혼', part: 3, unlockField: 12, recLv: 118, color: '#ffb070', area: { hpMult: 1.875, atkMult: 1.495 }, set: 'origin',
     desc: '모든 황혼이 시작된 자리. 첫 황혼은 절반쯤 쓰러졌을 때 진짜 모습을 드러낸다.',
     art: 'p3_o_first',
     floors: [
@@ -492,7 +493,18 @@ export const DUNGEON_TIERS = [
   { id: 'normal', label: '일반', color: '#a89a88', lv: 0, hp: 1, atk: 1, epicMult: 1, shardMult: 1, keyCost: 1, expMult: 1 },
   { id: 'heroic', label: '영웅', color: '#6aa6e0', lv: 3, hp: 1.5, atk: 1.25, epicMult: 1.6, shardMult: 2, keyCost: 2, expMult: 1.2 },
   { id: 'legend', label: '전설', color: '#e8b04a', lv: 6, hp: 2.6, atk: 1.8, epicMult: 2.4, shardMult: 3, keyCost: 3, expMult: 1.4 },
+  // 심연 Ⅰ~Ⅴ (1.287.0 PM 결정 「2차 전승부터 갈 곳」) — 전승 횟수 n 이상 + 앞 단계 클리어.
+  //   적 레벨은 던전과 무관하게 minLv 고정(보스 +2) → 1부 던전도 최종 콘텐츠가 된다. 드랍 장비 레벨 = 적 레벨.
+  //   배율 = 전설 × (HP 1.7 · 공격 1.35)^n — 예전 「전승할 때마다 모든 적 강화」를 여기로 옮겼다.
+//   시뮬 scripts/sim-chronicle-abyss.mjs (PM 저장 · Lv.120): 심연 Ⅳ(전승 4) 7~100% · 심연 Ⅴ(전승 5) 0~87%
+  ...[1, 2, 3, 4, 5].map(n => ({
+    id: `abyss${n}`, label: `심연 ${['Ⅰ', 'Ⅱ', 'Ⅲ', 'Ⅳ', 'Ⅴ'][n - 1]}`, color: '#b06cff', abyss: n, reqRebirth: n, minLv: 100 + 4 * n, lv: 6,
+    hp: +(2.6 * Math.pow(1.7, n)).toFixed(2), atk: +(1.8 * Math.pow(1.35, n)).toFixed(2),
+    epicMult: 3, shardMult: 3 + n, keyCost: 3, expMult: 1.4,
+  })),
 ];
+// 던전 한 층의 적 레벨 (심연은 던전과 무관하게 고정)
+export const dungeonFloorLv = (f, tier) => (tier?.abyss ? tier.minLv + (f.boss ? 2 : 0) : f.lv + (tier?.lv || 0));
 
 // 적 일러 경로 (본편 헬퍼와 같은 규칙, ./ 상대 경로)
 export function chronicleEnemyArt(key, kind = 'combat') {

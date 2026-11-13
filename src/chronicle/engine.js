@@ -10,7 +10,7 @@ import { BOSS_MECHS, BOSS_MECH_OF, fieldStages, FIELD_STAGES, STAGE_TUNING, AUTO
 import { TOWER, TOWER_SHOP, towerUnlocked, isTowerBoss, towerEnemyLv, towerArea, towerFloorPicks, towerTheme, kstWeekKey } from './tower.js';
 import { famCombatant, famRole, famSubFx, famOwnFx, famBondFx, rollFamShards, rollFamSouls, gainFamExp, FAM_AI, FAM_TUNING, summonFamiliars, enhanceFamiliar, evolveFamiliar } from './familiar.js';
 import {
-  CHRONICLE_TUNING as T, CHRONICLE_CLASSES, CHRONICLE_SKILLS, CHRONICLE_FIELDS, CHRONICLE_DUNGEON, CHRONICLE_DUNGEONS, DUNGEON_TIERS, dungeonDef,
+  CHRONICLE_TUNING as T, CHRONICLE_CLASSES, CHRONICLE_SKILLS, CHRONICLE_FIELDS, CHRONICLE_DUNGEON, CHRONICLE_DUNGEONS, DUNGEON_TIERS, dungeonDef, dungeonFloorLv,
   STAT_KEYS, SKILL_MAX_LV, MASTERY_PCT, BOSS_DAILY_LIMIT, DUNGEON_KEYS, GRADES, gradeIdx, SLOTS, CLASS_SLOTS, FORGE, DROP_TABLE,
   CLASS_GEAR_NAMES, EPIC_PREFIX, OPTION_DEFS, OPTION_POOLS, OFFHAND_BASE, CLASS_DROP, UNIQUE_DROP, EPIC_OPTIONS, UNIQUE_ITEMS, UNIQUE_CHANCE,
   chronicleClass, classSkills, buildChronicleEnemy,
@@ -92,6 +92,8 @@ export function dungeonUnlocked(save, id = null) {
 // 난이도 개방 — 0(일반)은 항상, 이후는 직전 단계 보스 처치
 export function dungeonTierUnlocked(save, id, tierIdx) {
   if (tierIdx <= 0) return true;
+  const need = DUNGEON_TIERS[tierIdx]?.reqRebirth || 0; // 심연 = 전승 횟수 (1.287.0)
+  if (need > (save.units?.[save.hero]?.rebirth?.count || 0)) return false;
   const best = save.progress.dungeonTier?.[id];
   return best != null && best >= tierIdx - 1;
 }
@@ -1242,7 +1244,7 @@ export function dungeonEncounter(d, rng) {
   const f = D.floors[d.floor];
   const ds = T.dungeonSolo || { hp: 1, atk: 1 };
   const area = { hpMult: D.area.hpMult * tier.hp * ds.hp, atkMult: D.area.atkMult * tier.atk * ds.atk };
-  const lv = f.lv + tier.lv;
+  const lv = dungeonFloorLv(f, tier);
   // 경험치 배율 (1.234.1) — 난이도 HP 배율 대신 고정 보너스 (일반 기준 = 지역 × 솔로 보정)
   const rm = D.area.hpMult * ds.hp * (tier.expMult || 1);
   const mk = (key, i) => ({ ...buildChronicleEnemy(key, lv, `e${i}`, area), rewardMult: rm });
@@ -1862,7 +1864,7 @@ export function applyBattle(save0, ctx, battle, rng = Math.random) {
   if (ctx.kind === 'dungeon' && save.dungeon) {
     const ti = save.dungeon.tier || 0;
     const tier = DUNGEON_TIERS[ti];
-    mods = { ...mods, epicMult: tier.epicMult, shardMult: tier.shardMult, set: dungeonDef(save.dungeon.id).set, uniqueChance: UNIQUE_CHANCE.dungeonBoss[ti] || 0 };
+    mods = { ...mods, epicMult: tier.epicMult, shardMult: tier.shardMult, set: dungeonDef(save.dungeon.id).set, uniqueChance: tier.abyss ? REBIRTH.abyss.unique[tier.abyss - 1] : UNIQUE_CHANCE.dungeonBoss[ti] || 0 };
   }
   if (ctx.kind === 'tower' && save.tower?.run) mods = { ...mods, uniqueChance: TOWER.uniqueChance(save.tower.run.floor) };
   // 📜 계약서 조각 (1.212.0 — 사역마 소환 재료, 계정 공유)
@@ -1900,7 +1902,11 @@ export function applyBattle(save0, ctx, battle, rng = Math.random) {
     const ilv = Math.max(...ctx.enemies.map(e => e.lv));
     if (rng() < pickC(REBIRTH.mythicDrop[ty])) r.items.push(rollGear(rng, 'mythic', ilv, save.hero));
     const bu = Object.values(UNIQUE_ITEMS).filter(x => x.branch === hu.rebirth.branch);
-    if (bu.length && rng() < pickC(REBIRTH.branchUnique[ty])) r.items.push(makeItem(rng, { named: pick(rng, bu).id, ilv }));
+    const ab = ctx.kind === 'dungeon' && ctx.type === 'dungeonBoss' ? DUNGEON_TIERS[tierI]?.abyss : 0;
+    if (ab) { // 심연 보스 (1.287.0) — 전승 장비 확정 + 갈래 유니크 확률 상향
+      for (let i = 0; i < REBIRTH.abyss.mythic; i++) r.items.push(rollGear(rng, 'mythic', ilv, save.hero));
+      if (bu.length && rng() < REBIRTH.abyss.branchUnique[ab - 1]) r.items.push(makeItem(rng, { named: pick(rng, bu).id, ilv }));
+    } else if (bu.length && rng() < pickC(REBIRTH.branchUnique[ty])) r.items.push(makeItem(rng, { named: pick(rng, bu).id, ilv }));
   }
   // 자동 분해 (1.231.2) — 설정 등급 이하 · 에픽 이상은 항상 보존 · 타직업은 other 설정일 때만
   const as = save.autoSalvage || { grade: -1 };
@@ -1948,7 +1954,7 @@ export function applyBattle(save0, ctx, battle, rng = Math.random) {
       const { id, tier = 0 } = save.dungeon;
       save.progress.dungeonTier = save.progress.dungeonTier || {};
       const prev = save.progress.dungeonTier[id];
-      if (prev == null || tier > prev) { save.progress.dungeonTier[id] = tier; if (tier < DUNGEON_TIERS.length - 1) summary.unlocks.push(`${dungeonDef(id).name} 「${DUNGEON_TIERS[tier + 1].label}」 난이도`); }
+      if (prev == null || tier > prev) { save.progress.dungeonTier[id] = tier; if (tier < DUNGEON_TIERS.length - 1 && dungeonTierUnlocked(save, id, tier + 1)) summary.unlocks.push(`${dungeonDef(id).name} 「${DUNGEON_TIERS[tier + 1].label}」 난이도`); }
       save.dungeon = null; save.progress.dungeonClears += 1; summary.dungeonClear = true;
     }
     else save.dungeon.floor += 1;

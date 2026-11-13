@@ -5,7 +5,7 @@
 // ============================================
 import React, { useEffect, useRef, useState } from 'react';
 import { PALETTE } from '../../utils/helpers.js';
-import { CHRONICLE_PARTS, CHRONICLE_TUNING, CHRONICLE_FIELDS, CHRONICLE_DUNGEONS, DUNGEON_TIERS, dungeonDef, BOSS_DAILY_LIMIT, BOSS_MECHS, DUNGEON_KEYS, SLOTS, UNIQUE_CHANCE, UNIQUE_ITEMS, fieldStages, FIELD_STAGES, chronicleClass, chronicleEnemyArt } from '../data.js';
+import { CHRONICLE_PARTS, CHRONICLE_TUNING, CHRONICLE_FIELDS, CHRONICLE_DUNGEONS, DUNGEON_TIERS, dungeonDef, dungeonFloorLv, REBIRTH, BOSS_DAILY_LIMIT, BOSS_MECHS, DUNGEON_KEYS, SLOTS, UNIQUE_CHANCE, UNIQUE_ITEMS, fieldStages, FIELD_STAGES, chronicleClass, chronicleEnemyArt } from '../data.js';
 import * as E from '../engine.js';
 import * as D from '../daily.js';
 import { CENEMIES as ENEMIES } from '../enemies.js';
@@ -105,6 +105,7 @@ export function DungeonView({ save, onBack, onEnter, onFight, onLeave, onBuyKey,
   const party = E.partyCombatants(save, d?.hp);
   const best = save.progress.dungeonTier?.[D.id];
   const heroLv = save.units[save.hero].lv;
+  const rbCount = save.units[save.hero].rebirth?.count || 0;
   const mech = BOSS_MECHS[E.bossMechOf('dungeon', D.id)];
   const partOf = (x) => x.part || 1;
   const parts = [...new Set(CHRONICLE_DUNGEONS.map(partOf))];
@@ -130,14 +131,32 @@ export function DungeonView({ save, onBack, onEnter, onFight, onLeave, onBuyKey,
           <img src={chronicleEnemyArt(D.art)} alt="" className="absolute inset-0 w-full h-full object-cover" />
           <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, transparent 35%, #0b0708)' }} />
           <div className="absolute left-3 right-3 bottom-2">
-            <div className="font-bold" style={{ fontSize: 19, color: PALETTE.text }}>{D.name} <span style={{ fontSize: 13, color: MS.gold }}>권장 Lv.{D.recLv + T.lv}</span></div>
-            <div style={{ fontSize: 12, color: PALETTE.textDim }}>{D.floors.length}층 · 보스 Lv.{bossF.lv + T.lv}{mech ? ` · 기믹 ${mech.icon} ${mech.name}` : ''}</div>
+            <div className="font-bold" style={{ fontSize: 19, color: PALETTE.text }}>{D.name} <span style={{ fontSize: 13, color: MS.gold }}>권장 Lv.{T.abyss ? T.minLv : D.recLv + T.lv}</span></div>
+            <div style={{ fontSize: 12, color: PALETTE.textDim }}>{D.floors.length}층 · 보스 Lv.{dungeonFloorLv(bossF, T)}{mech ? ` · 기믹 ${mech.icon} ${mech.name}` : ''}</div>
           </div>
         </div>
         {!d && <>
           <MainSecHead title="난 이 도" right={<span style={{ fontSize: 11, color: PALETTE.textDim }}>앞 단계 보스 처치 시 개방</span>} />
-          <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${DUNGEON_TIERS.length}, 1fr)` }}>
+          <div className="grid gap-1" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
             {DUNGEON_TIERS.map((t, i) => {
+              if (t.abyss) return null;
+              const open = E.dungeonTierUnlocked(save, D.id, i);
+              const cleared = best != null && best >= i;
+              const on = tier === i;
+              return (
+                <button key={t.id} disabled={!open} onClick={() => setTier(i)} className="ui-press" style={{ padding: '7px 0', fontSize: 12.5, fontWeight: on ? 800 : 500, border: `1px solid ${on ? MS.gold : MS.line}`, background: on ? 'rgba(232,176,74,0.1)' : MS.box, color: on ? MS.gold : PALETTE.text, opacity: open ? 1 : 0.45 }}>
+                  {open ? t.label : `🔒 ${t.label}`} <span style={{ fontWeight: 400, color: PALETTE.textDim }}>🗝{t.keyCost}</span>{cleared ? <span style={{ color: '#8fd08a' }}> ✓</span> : null}
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex items-center justify-between" style={{ fontSize: 11.5, color: '#b06cff', marginTop: 2 }}>
+            <span style={{ fontWeight: 700 }}>✦ 심연 등급</span>
+            <span style={{ color: PALETTE.textDim }}>{rbCount > 0 ? `전승 ${rbCount}회 — 심연 ${['Ⅰ', 'Ⅱ', 'Ⅲ', 'Ⅳ', 'Ⅴ'][Math.min(rbCount, 5) - 1]}까지 도전 가능` : '전승하면 열린다 (전승 1회마다 한 단계)'}</span>
+          </div>
+          <div className="grid gap-1" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
+            {DUNGEON_TIERS.map((t, i) => {
+              if (!t.abyss) return null;
               const open = E.dungeonTierUnlocked(save, D.id, i);
               const cleared = best != null && best >= i;
               const on = tier === i;
@@ -153,7 +172,7 @@ export function DungeonView({ save, onBack, onEnter, onFight, onLeave, onBuyKey,
         <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${D.floors.length}, 1fr)` }}>
           {D.floors.map((f, i) => {
             const curF = d && d.floor === i; const past = d && d.floor > i;
-            const lv = f.lv + T.lv; const intim = E.intimidateLevel(heroLv, lv);
+            const lv = dungeonFloorLv(f, T); const intim = E.intimidateLevel(heroLv, lv);
             return (
               <div key={i} className="text-center" style={{ padding: '5px 0', fontSize: 11.5, border: `1px solid ${curF ? MS.gold : past ? '#8fd08a88' : MS.line}`, background: MS.box, borderRadius: MS.r, color: past ? '#8fd08a' : curF ? MS.gold : f.boss ? MS.gold : PALETTE.text }}>
                 <b style={{ fontSize: 13, display: 'block' }}>{past ? '✓' : f.boss ? '👑' : i + 1}</b>
@@ -165,7 +184,8 @@ export function DungeonView({ save, onBack, onEnter, onFight, onLeave, onBuyKey,
         {!d && (
           <div className="mt-2"><MainKvRows rows={[
             { l: '적 HP', v: `×${T.hp}` }, { l: '적 공격', v: `×${T.atk}` },
-            { l: '에픽 확률', v: `×${T.epicMult}` }, { l: '보스 유니크', v: `${Math.round(UNIQUE_CHANCE.dungeonBoss[tier] * 100)}%`, c: '#c79bff' },
+            { l: '에픽 확률', v: `×${T.epicMult}` }, { l: '보스 유니크', v: `${Math.round((T.abyss ? REBIRTH.abyss.unique[T.abyss - 1] : UNIQUE_CHANCE.dungeonBoss[tier]) * 100)}%`, c: '#c79bff' },
+            ...(T.abyss ? [{ l: '보스 전승 장비', v: '확정 1개', c: '#b06cff' }, { l: '보스 갈래 유니크', v: `${Math.round(REBIRTH.abyss.branchUnique[T.abyss - 1] * 100)}%`, c: '#b06cff' }] : []),
             { l: '◆ 파편', v: `×${T.shardMult}` }, { l: '입장 열쇠', v: `🗝 ${T.keyCost}`, c: MS.gold },
           ]} /></div>
         )}
