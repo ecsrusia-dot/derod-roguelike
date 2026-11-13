@@ -217,7 +217,7 @@ export function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAga
     const ev = sim.events[idx];
     // 1.259.0 — 전투 시작 연출: 돌입 · 낙인 · 1라운드는 길게 (반복·자동·×4에선 짧게)
     const base = !brief && ev.k === 'pre' && ev.pre === 'enter' ? 1300 : !brief && ev.k === 'pre' && ev.tone === 'ready' ? 1100 : !brief && ev.k === 'pre' ? 560 : !brief && ev.k === 'open' ? 1500 : !brief && ev.round === 1 ? 900
-      : ev.k === 'pre' ? 160 : ev.round ? 160 : ev.k === 'dotTick' ? 380 : 620;
+      : ev.k === 'pre' ? 160 : ev.round ? 160 : ev.k === 'dotTick' ? (brief ? 80 : 380) : ev.k === 'open' ? (brief ? 80 : 620) : 620; // 1.286.4 반복·자동 중엔 낙인·지속 피해 표시를 짧게
     const t = setTimeout(() => setIdx(i => i + 1), base / speed);
     return () => clearTimeout(t);
   }, [idx, speed, done, sim.events]);
