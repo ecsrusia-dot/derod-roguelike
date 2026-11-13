@@ -2194,6 +2194,7 @@ export function buyTowerItem(save0, id, uniqueId = null) {
   if (id === 'unique') {
     const u = UNIQUE_ITEMS[uniqueId];
     if (!u || u.disabled || !(u.cls === save.hero || u.cls === 'common')) return save0;
+    if (u.branch && u.branch !== save.units[save.hero]?.rebirth?.branch) return save0; // 갈래 전용은 내 갈래만 (1.286.2)
     save.inventory.push({ ...makeItem(Math.random, { named: uniqueId, ilv: save.units[save.hero].lv }), uid: save.nextUid++ });
     save.stats.uniques = (save.stats.uniques || 0) + 1;
   } else if (id === 'shards') save.mats.famShard = (save.mats.famShard || 0) + 10;

@@ -183,7 +183,7 @@ export const REBIRTH = { reqLevel: 100, max: 5,
   enemyHp: 0.25, enemyAtk: 0.15,
   // 전승 등급 장비 드랍 확률 (전승 캐릭터만) · 갈래 유니크 확률
   mythicDrop: { elite: 0.003, gate: 0.02, boss: 0.08, dungeonBoss: [0.1, 0.18, 0.3], towerElite: 0.02, towerBoss: 0.12 },
-  branchUnique: { elite: 0.004, gate: 0.03, boss: 0.05, dungeonBoss: [0.05, 0.08, 0.12], towerBoss: 0.06 }, // 1.286.0 갈래당 3종 + 1·2부(강적·관문)에서도 드랍
+  branchUnique: { elite: 0.004, gate: 0.03, boss: 0.05, dungeonBoss: [0.05, 0.08, 0.12], towerBoss: 0.12 }, // 1.286.0 갈래당 3종 + 1·2부(강적·관문)에서도 드랍
 };
 export const REBIRTH_BRANCHES = {
   w_warlord: { cls: 'wanderer', name: '검귀', type: '탱딜', color: '#e8826a', desc: '반격과 베기로 버티며 적을 쓸어버린다 — 회복이 없으니 치유 사역마와 궁합', fx: { atkPct: 0.12, counterPct: 0.08, counterDmg: 0.3 } },
