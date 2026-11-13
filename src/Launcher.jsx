@@ -12,6 +12,7 @@ import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { PALETTE } from './utils/helpers.js';
 import { GAME_VERSION } from './data/version.js';
 import { FEATURE_FLAGS } from './data/config.js';
+import ErrorBoundary from './components/ui/ErrorBoundary.jsx';
 
 const DntApp = lazy(() => import('./App.jsx'));
 const ArcanaGame = lazy(() => import('./arcana/ArcanaGame.jsx'));
@@ -108,21 +109,21 @@ export default function Launcher() {
   const pick = (id) => { writeLast(id); setGame(id); };
   const back = () => setGame(null);
   if (game === 'dnt') {
-    return <Suspense fallback={<Loading />}><DntApp onSwitchGame={back} /></Suspense>;
+    return <ErrorBoundary name="던앤트와일라잇" onExit={back}><Suspense fallback={<Loading />}><DntApp onSwitchGame={back} /></Suspense></ErrorBoundary>;
   }
   if (game === 'chronicle') {
     return (
       <Suspense fallback={<Loading />}>
-        <Frame><ChronicleGame onExit={back} /></Frame>
+        <Frame><ErrorBoundary name="황혼 연대기" onExit={back}><ChronicleGame onExit={back} /></ErrorBoundary></Frame>
       </Suspense>
     );
   }
   if (game === 'arcana' && FEATURE_FLAGS.arcana) {
     return (
       <Suspense fallback={<Loading />}>
-        <Frame><ArcanaGame onExit={back} /></Frame>
+        <Frame><ErrorBoundary name="트와일라잇 아르카나" onExit={back}><ArcanaGame onExit={back} /></ErrorBoundary></Frame>
       </Suspense>
     );
   }
-  return <LauncherScreen onPick={pick} />;
+  return <ErrorBoundary name="게임 선택"><LauncherScreen onPick={pick} /></ErrorBoundary>;
 }
