@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import { PALETTE } from '../../utils/helpers.js';
 import { HiNum } from '../../components/ui/InfoBlocks.jsx';
-import { CHRONICLE_TITLE, CHRONICLE_CLASSES, CHRONICLE_FIELDS, CHRONICLE_DUNGEONS, dungeonDef, DUNGEON_KEYS, FIELD_STAGES, chronicleClass, chronicleEnemyArt, expNeedFor, REBIRTH } from '../data.js';
+import { CHRONICLE_TITLE, CHRONICLE_CLASSES, CHRONICLE_FIELDS, CHRONICLE_DUNGEONS, dungeonDef, DUNGEON_KEYS, FIELD_STAGES, chronicleClass, chronicleEnemyArt, expNeedFor, REBIRTH , unitTitle } from '../data.js';
 import * as E from '../engine.js';
 import * as R from '../roster.js';
 import * as RD from '../raid.js';
@@ -262,7 +262,7 @@ export function TownView({ save, acc, go, onExit, onSwitchChar, onClaimAll }) {
               <div style={{ fontSize: 11, letterSpacing: 4, color: cls.color }}>{CLASS_PATH[save.hero] || 'PATH'}</div>
               <button onClick={onSwitchChar} className="ui-press flex-none" style={{ fontSize: 11.5, padding: '3px 8px', border: `1px solid ${MS.line}`, color: PALETTE.text, background: MS.box, borderRadius: MS.r }}>⇄ 변경</button>
             </div>
-            <div className="font-bold" style={{ fontSize: 20, color: PALETTE.text, lineHeight: 1.2 }}><span className="chr-gtxt" style={{ '--tone': MS.gold, '--tone2': cls.color }}>{cls.name}</span> <span style={{ fontSize: 14, color: MS.gold }}>Lv.{hero.lv}</span> <span style={{ fontSize: 11, fontWeight: 400, color: PALETTE.textDim }}>/ {E.levelCapOf(save)} · {cls.role}</span></div>
+            <div className="font-bold" style={{ fontSize: 20, color: PALETTE.text, lineHeight: 1.2 }}><span className="chr-gtxt" style={{ '--tone': MS.gold, '--tone2': cls.color }}>{unitTitle(hero, save.hero)}</span> <span style={{ fontSize: 14, color: MS.gold }}>Lv.{hero.lv}</span> <span style={{ fontSize: 11, fontWeight: 400, color: PALETTE.textDim }}>/ {E.levelCapOf(save)} · {cls.role}</span></div>
             <div style={{ fontSize: 12.5, color: PALETTE.text }}>♡ {E.deriveUnit(save, save.hero).maxHp.toLocaleString()} · ⚔ 전투력 {E.unitPower(save, save.hero).toLocaleString()}</div>
             <div className="mt-1"><Bar v={hero.exp} max={expNeedFor(hero)} color={XP_HERO} h={5} /></div>
             <div className="truncate" style={{ fontSize: 11, color: PALETTE.textDim }}>경험치 {Math.floor(hero.exp / Math.max(1, expNeedFor(hero)) * 100)}% · ▶ {goal}</div>

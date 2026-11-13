@@ -7,7 +7,7 @@ import React, { useState } from 'react';
 import { PALETTE } from '../../utils/helpers.js';
 import { GlassPanel } from '../../components/ui/CommonUI.jsx';
 import { InfoSection, HiNum } from '../../components/ui/InfoBlocks.jsx';
-import { CHRONICLE_TUNING, CHRONICLE_SKILLS, STAT_META, STAT_KEYS, SKILL_MAX_LV, SLOTS, chronicleClass, classSkills, describeSkill, expNeedFor, rebirthExpMult, REBIRTH, REBIRTH_BRANCHES, rebirthBranches } from '../data.js';
+import { CHRONICLE_TUNING, CHRONICLE_SKILLS, STAT_META, STAT_KEYS, SKILL_MAX_LV, SLOTS, chronicleClass, classSkills, describeSkill, expNeedFor, rebirthExpMult, REBIRTH, REBIRTH_BRANCHES, rebirthBranches , unitTitle } from '../data.js';
 import * as E from '../engine.js';
 import * as TL from '../talents.js';
 import * as R from '../roster.js';
@@ -33,9 +33,10 @@ function RebirthSheet({ save, cid, onClose, onRebirth }) {
         : <button onClick={() => onRebirth(pick)} className="ui-press" style={{ height: 44, fontSize: 14, fontWeight: 800, border: `1px solid ${MS.red}`, background: 'rgba(224,87,76,0.22)', color: '#ff8a7e' }}>정말 전승한다 — Lv.1로 돌아간다</button>}>
       <MainSecHead title="바 뀌 는 것" />
       <MainKvRows rows={[
-        { l: '레벨·스킬·특성', v: 'Lv.1 초기화', c: '#e06a5f' }, { l: '필요 경험치', v: `×${rebirthExpMult(next)}` },
+        { l: '레벨·스킬·특성', v: 'Lv.1 초기화', c: '#e06a5f' }, { l: '필요 경험치', v: 'Lv.99까지 그대로', c: '#8fd08a' },
         { l: '적 HP', v: `+${Math.round(REBIRTH.enemyHp * next * 100)}%`, c: '#ff6ad5' }, { l: '적 공격', v: `+${Math.round(REBIRTH.enemyAtk * next * 100)}%`, c: '#ff6ad5' },
-        { l: '공격·HP 영구', v: `+${Math.round(REBIRTH.bonusPct * 100)}%`, c: MS.gold }, { l: '장비·사역마', v: '그대로', c: '#8fd08a' },
+        { l: '공격·HP·방어 영구', v: `+${Math.round(REBIRTH.bonusPct * next * 100)}%`, c: MS.gold }, { l: '장비', v: '레벨 맞춤 착용', c: '#8fd08a' },
+        { l: '갈래 첫 스킬', v: '즉시 습득', c: '#8fd08a' }, { l: '사역마', v: '내 레벨까지 힘을 냄' },
         { l: '레벨 상한', v: `Lv.${CHRONICLE_TUNING.maxLevel} → ${REBIRTH.levelCap}`, c: MS.gold },
       ]} />
       <div className="mt-1" style={{ fontSize: 11, color: PALETTE.textDim, lineHeight: 1.5 }}>장비는 <b style={{ color: PALETTE.text }}>장비 레벨 ≤ 내 레벨</b>일 때만 착용 효과 · 전승 장비·갈래 유니크가 떨어지기 시작한다</div>
@@ -189,13 +190,13 @@ export function PartyView({ save, setSave, onBack, onForge }) {
           <div className="chr-port flex-none" style={{ width: 84, height: 84, '--edge': cls.color, '--glow': `${cls.color}55` }}><img src={cls.image} alt="" className="w-full h-full object-cover" style={{ borderRadius: 22, objectPosition: '50% 25%' }} /></div>
           <div className="flex-1 min-w-0">
             <div style={{ fontSize: 11, letterSpacing: 4, color: cls.color }}>{CLASS_PATH[cid] || 'PATH'}</div>
-            <div className="font-bold" style={{ fontSize: 22, color: PALETTE.text, lineHeight: 1.2 }}><span className="chr-gtxt" style={{ '--tone': MS.gold, '--tone2': cls.color }}>{cls.name}</span> <span style={{ fontSize: 14, color: MS.gold }}>Lv.{u.lv}</span> <span style={{ fontSize: 11, fontWeight: 400, color: PALETTE.textDim }}>/ {E.levelCapOf(save)}</span></div>
+            <div className="font-bold" style={{ fontSize: 22, color: PALETTE.text, lineHeight: 1.2 }}><span className="chr-gtxt" style={{ '--tone': MS.gold, '--tone2': cls.color }}>{unitTitle(u, cid)}</span> <span style={{ fontSize: 14, color: MS.gold }}>Lv.{u.lv}</span> <span style={{ fontSize: 11, fontWeight: 400, color: PALETTE.textDim }}>/ {E.levelCapOf(save)}</span></div>
             <div className="flex flex-wrap gap-1" style={{ margin: '4px 0 5px', fontSize: 11.5 }}>
               <span className="chr-pill">♡ {d.maxHp.toLocaleString()}</span>
               <span className="chr-pill" style={{ color: MS.gold, borderColor: 'rgba(232,176,74,.45)' }}>⚔ {E.unitPower(save, cid).toLocaleString()}</span>
               <span className="chr-pill" style={{ color: PALETTE.textDim }}>{cls.role}</span>
             </div>
-            {u.rebirth?.count > 0 && <div style={{ fontSize: 11.5, color: REBIRTH_BRANCHES[u.rebirth.branch].color, fontWeight: 700 }}>✦ 전승 {u.rebirth.count}회 · {REBIRTH_BRANCHES[u.rebirth.branch].name} <span style={{ fontWeight: 400, color: PALETTE.textDim }}>({REBIRTH_BRANCHES[u.rebirth.branch].type} · 경험치 ×{rebirthExpMult(u.rebirth.count)})</span></div>}
+            {u.rebirth?.count > 0 && <div style={{ fontSize: 11.5, color: REBIRTH_BRANCHES[u.rebirth.branch].color, fontWeight: 700 }}>✦ 전승 {u.rebirth.count}회 · {REBIRTH_BRANCHES[u.rebirth.branch].name} <span style={{ fontWeight: 400, color: PALETTE.textDim }}>({REBIRTH_BRANCHES[u.rebirth.branch].type} · 능력치 +{Math.round(REBIRTH.bonusPct * u.rebirth.count * 100)}%)</span></div>}
             <Bar v={u.exp} max={expNeedFor(u)} color={XP_HERO} h={6} />
             <div className="flex justify-between" style={{ fontSize: 11, color: PALETTE.textDim, marginTop: 2 }}><span>{u.lv >= E.levelCapOf(save) && u.lv < CHRONICLE_TUNING.maxLevel ? <span style={{ color: '#e8b04a' }}>🔒 레벨 상한 — 다른 캐릭터 Lv.{R.ROSTER.unlockLv}에 +{R.ROSTER.perChar}</span> : '경험치'}</span><span>{u.exp.toLocaleString()} / {expNeedFor(u).toLocaleString()}</span></div>
           </div>
@@ -267,7 +268,7 @@ export function PartyView({ save, setSave, onBack, onForge }) {
                   {hint.n > 0 && <div style={{ fontSize: 11.5, color: MS.gold, marginTop: 2 }}>가방에 낄 수 있는 장비 {hint.n}개</div>}
                 </button>
               );
-              return <MainGearCard key={sl.id} it={it} onClick={() => setEqInfo(it.uid)} footer={swap} />;
+              return <MainGearCard key={sl.id} it={it} syncLv={E.wearSyncLv(it, u)} onClick={() => setEqInfo(it.uid)} footer={swap} />;
             })}
           </div>
           <div className="mt-2" style={{ fontSize: 11, color: PALETTE.textDim }}>장비를 누르면 정보 · 「교체」는 가방의 같은 부위 장비를 효율 순으로 보여 준다</div>

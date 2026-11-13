@@ -5,7 +5,7 @@
 // ============================================
 import React, { useEffect, useRef, useState } from 'react';
 import { PALETTE } from '../../utils/helpers.js';
-import { BOSS_MECHS, gradeIdx, AUTO_CLIMB, chronicleClass, chronicleEnemyArt } from '../data.js';
+import { BOSS_MECHS, gradeIdx, AUTO_CLIMB, chronicleClass, chronicleEnemyArt , unitTitle } from '../data.js';
 import * as E from '../engine.js';
 import * as R from '../roster.js';
 import * as F from '../familiar.js';
@@ -38,7 +38,7 @@ function BossCard({ u, art, hp, sh, acting, fx, w, h, ward = false, children }) 
 }
 
 // 1.265.0 — 전투 결과 전체 화면 일러 (시안 ㊼, 본편 VictoryScreen 방식): 직업 승리/패배 일러 → 정산 창은 뒤에 올라온다
-function ResultStage({ hero, lv, win, foe, rounds, revealed, onReveal }) {
+function ResultStage({ hero, title, lv, win, foe, rounds, revealed, onReveal }) {
   const cls = chronicleClass(hero);
   const art = (win ? cls.winImage : cls.lossImage) || cls.image;
   const tone = win ? MS.gold : '#e0574c';
@@ -51,7 +51,7 @@ function ResultStage({ hero, lv, win, foe, rounds, revealed, onReveal }) {
         <div className="absolute left-0 right-0 text-center px-4" style={{ bottom: 64 }}>
           <div className="chr-result-sub" style={{ fontSize: 11, letterSpacing: '0.5em', color: tone }}>━━ {win ? 'V I C T O R Y' : 'D E F E A T'} ━━</div>
           <div className="chr-result-title font-bold" style={{ fontSize: 48, color: PALETTE.text, fontFamily: FONT_TITLE, textShadow: `0 0 24px ${tone}99, 0 2px 8px #000` }}>{win ? '승리' : '패배'}</div>
-          <div className="chr-result-sub truncate" style={{ fontSize: 12.5, color: PALETTE.textDim, textShadow: '0 1px 4px #000', animationDelay: '.5s' }}>Lv.{lv} {cls.name} · {foe ? (win ? `「${foe}」 처치` : `「${foe}」에게 쓰러짐`) : (win ? '적을 처치' : '쓰러졌다')} · {rounds}라운드</div>
+          <div className="chr-result-sub truncate" style={{ fontSize: 12.5, color: PALETTE.textDim, textShadow: '0 1px 4px #000', animationDelay: '.5s' }}>Lv.{lv} {title || cls.name} · {foe ? (win ? `「${foe}」 처치` : `「${foe}」에게 쓰러짐`) : (win ? '적을 처치' : '쓰러졌다')} · {rounds}라운드</div>
         </div>
         <div className="absolute left-0 right-0 text-center" style={{ bottom: 22, fontSize: 11.5, color: PALETTE.textDim, opacity: 0.8 }}>화면을 누르면 바로 정산</div>
       </>}
@@ -305,7 +305,7 @@ export function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAga
 
       {/* 적 — 전투가 끝나면 직업 승리/패배 일러 (1.261.0) */}
       {done ? (
-        <ResultStage hero={party.find(p => !p.fam)?.classId || save.hero} lv={(xp?.after?.hero || xp?.before?.hero)?.lv || party.find(p => !p.fam)?.lv}
+        <ResultStage title={unitTitle(save.units[save.hero], save.hero)} hero={party.find(p => !p.fam)?.classId || save.hero} lv={(xp?.after?.hero || xp?.before?.hero)?.lv || party.find(p => !p.fam)?.lv}
           win={sim.result === 'win'} foe={(enemies.find(e => e.tier === 'boss') || enemies.find(e => e.tier === 'elite') || enemies[0])?.name}
           rounds={sim.rounds || round} revealed={revealed} onReveal={() => setRevealed(true)} />
       ) : (() => {
@@ -420,7 +420,7 @@ export function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAga
                 </>}
                 {!brief && xp && (xp.after.hero || xp.after.fam) && <MainSecHead title="성 장" />}
                 {!brief && xp && (xp.after.hero || xp.after.fam) && <div className="flex flex-col gap-1.5 mb-0.5">
-                  <XpResultRow art={chronicleClass(save.hero).image} name={chronicleClass(save.hero).name} before={xp.before.hero} after={xp.after.hero} />
+                  <XpResultRow art={chronicleClass(save.hero).image} name={unitTitle(save.units[save.hero], save.hero)} before={xp.before.hero} after={xp.after.hero} />
                   {xp.after.fam && summary.famExp ? <XpResultRow fam art={chronicleEnemyArt(xp.after.fam.key)} name={F.famName(xp.after.fam.key)} before={xp.before.fam} after={xp.after.fam} /> : null}
                 </div>}
                 {summary.items.length ? <div className="grid gap-1 mt-1.5" style={{ gridTemplateColumns: summary.items.length > 1 ? '1fr 1fr' : '1fr' }}>

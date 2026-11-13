@@ -13,7 +13,7 @@
 // ============================================
 import * as E from './engine.js';
 import * as P from './preview.js';
-import { FORGE, CHRONICLE_FIELDS, FIELD_STAGES } from './data.js';
+import { FORGE, CHRONICLE_FIELDS, FIELD_STAGES , fieldStages } from './data.js';
 
 export const GEAR_EVAL = { plusTarget: 7, fastBattles: 24, fullBattles: 80, topN: 3, seed: 4242 };
 
@@ -54,6 +54,16 @@ export function canEvalItem(save, hero, it) {
 //     → 다음 관문부터 앞으로 관문·보스를 차례로 짧게 시뮬해, 지금 장비 승률이 TARGET_WIN에 가장 가까운 곳을 고른다
 export const EVAL_TARGET = { win: 0.55, stopBelow: 0.3, maxSteps: 14, battles: 20, seed: 9191 };
 function evalTargetBase(save) {
+  // 1.282.0 — 다음 목표가 내 레벨보다 5 이상 높으면(전승 직후 등) 내 레벨에 맞는 자리의 관문을 기준으로
+  const base = evalTargetNext(save);
+  if (base) {
+    const lv = save.units[save.hero]?.lv || 1;
+    const tl = base.mode === 'boss' ? base.field.bossLv : fieldStages(base.field)[base.stage].lv;
+    if (tl - lv >= 5) { const r = E.recommendedHunt(save); if (r) return { field: r.field, stage: r.stage, mode: 'gate' }; }
+  }
+  return base;
+}
+function evalTargetNext(save) {
   let last = null;
   for (const f of CHRONICLE_FIELDS) {
     if (!E.fieldUnlocked(save, f.id)) break;

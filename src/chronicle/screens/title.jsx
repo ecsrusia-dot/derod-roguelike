@@ -8,7 +8,7 @@ import { PALETTE, withArtRev } from '../../utils/helpers.js';
 import { GlassPanel, UIButton, BottomSheet } from '../../components/ui/CommonUI.jsx';
 import UpdateButton from '../../components/ui/UpdateButton.jsx';
 import { GAME_VERSION } from '../../data/version.js';
-import { CHRONICLE_TITLE, CHRONICLE_SUB, CHRONICLE_TUNING, CHRONICLE_CLASSES, CHRONICLE_FIELDS, SLOTS, UNIQUE_ITEMS, chronicleClass, classSkills, describeSkill, chronicleEnemyArt } from '../data.js';
+import { CHRONICLE_TITLE, CHRONICLE_SUB, CHRONICLE_TUNING, CHRONICLE_CLASSES, CHRONICLE_FIELDS, SLOTS, UNIQUE_ITEMS, chronicleClass, classSkills, describeSkill, chronicleEnemyArt , unitTitle } from '../data.js';
 import * as A from '../account.js';
 import * as F from '../familiar.js';
 import * as O from '../offline.js';
@@ -37,7 +37,7 @@ export function DepartView({ save, onDone }) {
         <div className="mx-auto" style={{ height: 2, width: 200, margin: '6px auto 8px', background: `linear-gradient(90deg, transparent, ${MS.gold}, transparent)` }} />
         {cls.quote && <div className="chr-result-sub italic" style={{ fontSize: 13, color: PALETTE.text, textShadow: '0 1px 4px #000', animationDelay: '.5s' }}>「{cls.quote}」</div>}
         <div className="chr-result-sub flex flex-wrap justify-center gap-1.5 mt-2" style={{ animationDelay: '.7s' }}>
-          <span className="chr-chip" style={{ color: MS.gold, background: '#000a' }}>Lv.{u?.lv || 1} {cls.name}{u?.rebirth?.count ? ` · ✦전승 ${u.rebirth.count}` : ''}</span>
+          <span className="chr-chip" style={{ color: MS.gold, background: '#000a' }}>Lv.{u?.lv || 1} {unitTitle(u, hero)}{u?.rebirth?.count ? ` · ✦전승 ${u.rebirth.count}` : ''}</span>
           {fam ? <span className="chr-chip" style={{ color: '#d07ae8', background: '#000a' }}>🐾 {F.famName(fk)} Lv.{fam.lv || 1}</span> : null}
         </div>
       </div>
@@ -298,7 +298,7 @@ export function GiftNotice({ acc, onClose }) {
 // ===== 이야기 장면 =====
 function speakerOf(save, sp) {
   if (sp === 'narr') return { name: '', img: null, color: PALETTE.textDim };
-  if (sp === 'hero') { const c = chronicleClass(save.hero); return { name: c.name, img: c.image, color: c.color }; }
+  if (sp === 'hero') { const c = chronicleClass(save.hero); return { name: unitTitle(save.units[save.hero], save.hero), img: c.image, color: c.color }; }
   if (NPCS[sp]) return { name: NPCS[sp].name, icon: NPCS[sp].icon, color: NPCS[sp].color };
   if (CHRONICLE_CLASSES.some(c => c.id === sp)) { const c = chronicleClass(sp); return { name: c.name, img: c.image, color: c.color }; }
   if (ENEMIES[sp]) return { name: ENEMIES[sp].name, img: chronicleEnemyArt(sp), color: '#e06a5f' };

@@ -5,7 +5,7 @@
 // ============================================
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { PALETTE } from '../../utils/helpers.js';
-import { chronicleClass, expNeedFor } from '../data.js';
+import { chronicleClass, expNeedFor , unitTitle } from '../data.js';
 import * as F from '../familiar.js';
 import { XP_HERO, XP_FAM, expSnap, xpPct, MS } from './common.jsx';
 
@@ -159,7 +159,7 @@ export function IdleScreen({ save, kind, label, startedAt, wakeOn, delay, onDela
         <div style={{ fontSize: 24, fontWeight: 900, marginTop: 4, color: PALETTE.text }}>{IDLE_KIND_LABEL[kind] || '자동 진행 중'}</div>
         <div style={{ fontSize: 12.5, color: '#d8c8b0', marginTop: 4 }}><span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#8fd08a', boxShadow: '0 0 8px #8fd08a', marginRight: 5 }} />{label ? `${label} · ` : ''}Lv.{u.lv} {cls.name} · 경과 {el}</div>
         <div style={{ margin: '9px 28px 0', textAlign: 'left' }}>
-          <IdleXpRow name={cls.name} x={xs.hero} st={heroXp} now={now} />
+          <IdleXpRow name={unitTitle(u, hero)} x={xs.hero} st={heroXp} now={now} />
           {xs.fam ? <IdleXpRow name={F.famName(xs.fam.key)} x={xs.fam} st={famXp} now={now} fam /> : null}
         </div>
         <div style={{ fontSize: 11.5, color: '#b8a890', marginTop: 7 }}>{wakeTxt}</div>
