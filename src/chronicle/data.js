@@ -186,6 +186,18 @@ export const REBIRTH = { reqLevel: 100, max: 5,
   mythicDrop: { elite: 0.003, gate: 0.02, boss: 0.08, dungeonBoss: [0.1, 0.18, 0.3], towerElite: 0.02, towerBoss: 0.12 },
   branchUnique: { elite: 0.004, gate: 0.03, boss: 0.05, dungeonBoss: [0.05, 0.08, 0.12], towerBoss: 0.12 }, // 1.286.0 갈래당 3종 + 1·2부(강적·관문)에서도 드랍
 };
+// 1.288.0 전승 특전 — 전승할 때마다 1개 선택 (영구, 그 캐릭터). max = 고를 수 있는 횟수
+export const REBIRTH_PERKS = [
+  { id: 'talent', icon: '✦', name: '깨달음', desc: '특성 포인트 +5', max: 5, color: '#e8c15a', v: 5 },
+  { id: 'skill', icon: '⚔', name: '갈래의 극의', desc: '갈래 전승 스킬 3종 위력 +15%', max: 5, color: '#e8826a', v: 0.15 },
+  { id: 'famSub', icon: '🐾', name: '세 번째 계약', desc: '사역마 보조 칸 +1 (보조 3)', max: 1, color: '#b06cff', v: 1 },
+  { id: 'bag', icon: '🎒', name: '넓은 짐', desc: '가방 +20칸', max: 2, color: '#8fd08a', v: 20 },
+  { id: 'key', icon: '🗝', name: '던전 통행증', desc: '하루 열쇠 충전 +1 (계정 공유)', max: 2, color: '#9cc4e4', v: 1 },
+  { id: 'exp', icon: '📈', name: '빠른 성장', desc: 'Lv.100 미만 전투 경험치 +25%', max: 2, color: '#f0d27a', v: 0.25 },
+];
+export const rebirthPerkCount = (u, id) => (u?.rebirth?.perks || []).filter(x => x === id).length;
+export const rebirthPerkLeft = (u) => Math.max(0, (u?.rebirth?.count || 0) - (u?.rebirth?.perks || []).length);
+export const rebirthPerkOk = (u, id) => { const d = REBIRTH_PERKS.find(x => x.id === id); return !!d && rebirthPerkCount(u, id) < d.max; };
 export const REBIRTH_BRANCHES = {
   w_warlord: { cls: 'wanderer', name: '검귀', type: '탱딜', color: '#e8826a', desc: '반격과 베기로 버티며 적을 쓸어버린다 — 회복이 없으니 치유 사역마와 궁합', fx: { atkPct: 0.12, counterPct: 0.08, counterDmg: 0.3 } },
   w_paladin: { cls: 'wanderer', name: '성기사', type: '탱힐', color: '#f0d27a', desc: '스스로 회복하고 보호막을 두른다 — 딜이 부족하니 맹공 사역마와 궁합', fx: { defPct: 0.1, hpPct: 0.06, healFromAtk: 0.4 } },

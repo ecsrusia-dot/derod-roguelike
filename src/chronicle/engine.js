@@ -6,7 +6,7 @@
 // ============================================
 import { levelCap, globalBuffFx } from './roster.js';
 import { talentFx, canLearnTalent, talentNode, talentResetCost, talentTrees, tierUnlocked } from './talents.js';
-import { BOSS_MECHS, BOSS_MECH_OF, fieldStages, FIELD_STAGES, STAGE_TUNING, AUTO_CLIMB, BOOST, BAG_EXPAND, SALVAGE, SALVAGE_ICON, REBIRTH, REBIRTH_BRANCHES, expNeedFor, OPTION_LV_CURVE, REFORGE , unitTitle } from './data.js';
+import { BOSS_MECHS, BOSS_MECH_OF, fieldStages, FIELD_STAGES, STAGE_TUNING, AUTO_CLIMB, BOOST, BAG_EXPAND, SALVAGE, SALVAGE_ICON, REBIRTH, REBIRTH_BRANCHES, REBIRTH_PERKS, rebirthPerkCount, rebirthPerkLeft, rebirthPerkOk, expNeedFor, OPTION_LV_CURVE, REFORGE , unitTitle } from './data.js';
 import { TOWER, TOWER_SHOP, towerUnlocked, isTowerBoss, towerEnemyLv, towerArea, towerFloorPicks, towerTheme, kstWeekKey } from './tower.js';
 import { famCombatant, famRole, famSubFx, famOwnFx, famBondFx, rollFamShards, rollFamSouls, gainFamExp, FAM_AI, FAM_TUNING, summonFamiliars, enhanceFamiliar, evolveFamiliar } from './familiar.js';
 import {
@@ -365,7 +365,7 @@ export function canWear(it, u) {
 }
 // 전승자 재성장 배율 (1.285.0) — Lv.100 미만에서만 전투 경험치 × REBIRTH.regrowExp
 export function regrowExpMult(u) {
-  return (u?.rebirth?.count || 0) > 0 && (u.lv || 1) < T.maxLevel ? (REBIRTH.regrowExp || 1) : 1;
+  return (u?.rebirth?.count || 0) > 0 && (u.lv || 1) < T.maxLevel ? (REBIRTH.regrowExp || 1) + 0.25 * rebirthPerkCount(u, 'exp') : 1;
 }
 // 레벨 맞춤이 걸리는 레벨 (0 = 원래 성능 그대로)
 export function wearSyncLv(it, u) {
@@ -470,6 +470,8 @@ export function deriveUnit(save, classId) {
   }
   // 1.286.0 장비(갈래 유니크)의 sb_<스킬> — 특성과 같은 스킬 위력으로 합산
   for (const k of Object.keys(g)) if (k.startsWith('sb_')) { skillBoost[k.slice(3)] = (skillBoost[k.slice(3)] || 0) + g[k]; delete g[k]; }
+  // 1.288.0 전승 특전 「갈래의 극의」 — 갈래 전승 스킬 위력 +15% × 고른 횟수
+  { const n = rebirthPerkCount(u, 'skill'); if (n && u.rebirth?.branch) for (const sk of Object.values(CHRONICLE_SKILLS)) if (sk.branch === u.rebirth.branch) skillBoost[sk.id] = (skillBoost[sk.id] || 0) + 0.15 * n; }
   // 1.247.0 PM 결정 「겹칠 때만 대체」 — 「광폭화 중 2회」가 두 출처(광기의 혈인 + 특성 피의 광란)에서 겹치면
   // 겹친 몫은 「광폭화 지속 +1턴 · 광폭화 중 흡혈 2배」로 바뀐다 (2회 공격은 2중첩이 없으므로)
   if ((g.rageDouble || 0) >= 2) { g.rageTurnsAdd = (g.rageTurnsAdd || 0) + 1; g.rageLifesteal = 1; }
@@ -670,12 +672,16 @@ function useBossAttempt(save, fieldId, now = Date.now()) {
 
 // ===== 🗝 던전 열쇠 (1.209.0) =====
 // 날짜가 바뀌었으면 3개까지 채운다 (변경 없으면 같은 객체 반환)
+// 1.288.0 전승 특전 「던전 통행증」 — 계정의 모든 캐릭터가 고른 수만큼 하루 충전 +1 (뷰의 keyPerkOther = 다른 캐릭터 몫)
+export function keyDailyRefill(save) {
+  return DUNGEON_KEYS.dailyRefill + (save.keyPerkOther || 0) + rebirthPerkCount(save.units?.[save.hero], 'key');
+}
 export function refreshDungeonKeys(save0, now = Date.now()) {
   const today = kstDateKey(now);
   const k = save0.keys || { count: 0, refillDate: null, boughtDate: null, bought: 0 };
   if (save0.keys && k.refillDate === today) return save0;
   const save = clone(save0);
-  save.keys = { ...k, count: Math.max(k.count || 0, DUNGEON_KEYS.dailyRefill), refillDate: today };
+  save.keys = { ...k, count: Math.max(k.count || 0, Math.min(DUNGEON_KEYS.max, keyDailyRefill(save0))), refillDate: today };
   return save;
 }
 export function keyCount(save) { return save.keys?.count || 0; }
@@ -788,8 +794,8 @@ export function dismantleItems(save0, uids) {
   return { save, ...tot, essence: tot.essence || 0, shard: tot.shard || 0, salvage: tot };
 }
 // 가방 한도 (1.217.0) — 기본 + 확장
-export function bagMax(save) { return T.inventoryMax + BAG_EXPAND.step * (save.bagExpand || 0); }
-export function bagExpandCost(save) { return bagMax(save) >= BAG_EXPAND.max ? null : BAG_EXPAND.cost(save.bagExpand || 0); }
+export function bagMax(save) { return T.inventoryMax + BAG_EXPAND.step * (save.bagExpand || 0) + 20 * rebirthPerkCount(save.units?.[save.hero], 'bag'); }
+export function bagExpandCost(save) { return T.inventoryMax + BAG_EXPAND.step * (save.bagExpand || 0) >= BAG_EXPAND.max ? null : BAG_EXPAND.cost(save.bagExpand || 0); }
 export function expandBag(save0) {
   const c = bagExpandCost(save0);
   if (c == null || save0.gold < c) return save0;
@@ -972,13 +978,14 @@ export function forgePromote(save0, uid, rng = Math.random) {
 
 // ===== 사역마 편성 (1.212.0) — 칸은 주인공 레벨로 개방 =====
 export function famSlotOpen(save, slot) {
+  if (slot === 'sub3') return rebirthPerkCount(save.units[save.hero], 'famSub') > 0; // 1.288.0 전승 특전
   if (save.units[save.hero]?.rebirth?.count > 0) return true; // 전승자는 이미 개방한 칸 유지
   const lv = save.units[save.hero]?.lv || 1;
   return lv >= FAM_TUNING.slotLv[slot];
 }
 export function activeSubs(save) {
   const t = save.famTeam || {};
-  return [famSlotOpen(save, 'sub1') ? t.sub1 : null, famSlotOpen(save, 'sub2') ? t.sub2 : null].filter(k => k && save.fams?.[k]);
+  return [famSlotOpen(save, 'sub1') ? t.sub1 : null, famSlotOpen(save, 'sub2') ? t.sub2 : null, famSlotOpen(save, 'sub3') ? t.sub3 : null].filter(k => k && save.fams?.[k]);
 }
 export function activeMain(save) {
   const k = save.famTeam?.main;
@@ -1013,7 +1020,7 @@ export function evolveFam(save0, key, rng = Math.random) {
 export function setFamTeam(save0, slot, key) {
   const save = clone(save0);
   const t = { ...(save.famTeam || {}) };
-  for (const k of ['main', 'sub1', 'sub2']) if (key && t[k] === key) t[k] = null;
+  for (const k of ['main', 'sub1', 'sub2', 'sub3']) if (key && t[k] === key) t[k] = null;
   t[slot] = key || null;
   save.famTeam = t;
   return save;
@@ -1275,7 +1282,7 @@ export function canRebirth(save, classId = save.hero) {
   const u = save.units[classId];
   return !!u && u.lv >= REBIRTH.reqLevel && (u.rebirth?.count || 0) < REBIRTH.max;
 }
-export function rebirth(save0, branchId, classId = save0.hero) {
+export function rebirth(save0, branchId, classId = save0.hero, perkId = null) {
   const br = REBIRTH_BRANCHES[branchId];
   const u0 = save0.units[classId];
   if (!br || br.cls !== classId || !canRebirth(save0, classId)) return save0;
@@ -1283,12 +1290,24 @@ export function rebirth(save0, branchId, classId = save0.hero) {
   const save = clone(save0);
   const u = save.units[classId];
   const cls = chronicleClass(classId);
-  u.rebirth = { branch: branchId, count: (u0.rebirth?.count || 0) + 1 };
-  u.lv = 1; u.exp = 0; u.points = 0; u.sp = 1; u.stats = { ...cls.base }; u.skills = {}; u.mastery = 0; u.talents = {};
+  u.rebirth = { branch: branchId, count: (u0.rebirth?.count || 0) + 1, perks: [...(u0.rebirth?.perks || [])] };
+  if (perkId && rebirthPerkOk(u, perkId)) u.rebirth.perks.push(perkId);
+  u.lv = 1; u.exp = 0; u.points = 0; u.sp = 1 + 5 * rebirthPerkCount(u, 'talent'); u.stats = { ...cls.base }; u.skills = {}; u.mastery = 0; u.talents = {};
   // 1.282.0 PM 결정 — 갈래의 첫 스킬은 전승 즉시 배운 상태로 시작 (전승한 보람을 Lv.1부터)
   const first = Object.values(CHRONICLE_SKILLS).filter(x => x.branch === branchId).sort((a, b) => (a.reqLv || 0) - (b.reqLv || 0))[0];
   if (first) u.skills[first.id] = 1;
   save.stats.rebirths = (save.stats.rebirths || 0) + 1;
+  return save;
+}
+
+// 1.288.0 — 아직 고르지 않은 전승 특전 선택 (이전에 전승한 캐릭터도 횟수만큼 고른다)
+export function pickRebirthPerk(save0, perkId, classId = save0.hero) {
+  const u0 = save0.units[classId];
+  if (!u0 || rebirthPerkLeft(u0) <= 0 || !rebirthPerkOk(u0, perkId)) return save0;
+  const save = clone(save0);
+  const u = save.units[classId];
+  u.rebirth.perks = [...(u.rebirth.perks || []), perkId];
+  if (perkId === 'talent') u.sp = (u.sp || 0) + 5;
   return save;
 }
 

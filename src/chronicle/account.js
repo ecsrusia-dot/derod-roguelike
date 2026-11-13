@@ -65,6 +65,7 @@ export function toView(acc) {
     stash: acc.stash, inventory: c.bag, progress: c.progress, quests: c.quests, story: c.story,
     boostUntil: acc.boostUntil || 0, towerWeek: acc.towerWeek || null, tower: c.tower || { best: 0, checkpoint: 0, run: null }, bagExpand: c.bagExpand || 0, fams: acc.fams || {}, famPity: acc.famPity || { total: 0, sinceViolet: 0 }, famTeam: c.famTeam || {},
     dungeon: c.dungeon, stats: c.stats, createdAt: c.createdAt,
+    keyPerkOther: Object.entries(acc.chars || {}).reduce((n, [id, ch]) => n + (id === c.classId ? 0 : (ch?.unit?.rebirth?.perks || []).filter(x => x === 'key').length), 0), // 1.288.0 전승 특전 「던전 통행증」 (읽기 전용)
     roster: buildRoster(acc.chars), // 원정대 (1.229.0) — 레벨 상한·전역 버프 계산용, 읽기 전용
     rosterQuests: acc.rosterQuests || { claimed: {} }, // 원정대 의뢰 (1.230.0) — 계정 공유
     autoSalvage: acc.autoSalvage || { grade: -1, other: false }, // 획득 즉시 자동 분해 (1.231.2) — 계정 공유

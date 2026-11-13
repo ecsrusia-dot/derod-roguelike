@@ -7,13 +7,42 @@ import React, { useState } from 'react';
 import { PALETTE } from '../../utils/helpers.js';
 import { GlassPanel } from '../../components/ui/CommonUI.jsx';
 import { InfoSection, HiNum } from '../../components/ui/InfoBlocks.jsx';
-import { CHRONICLE_TUNING, CHRONICLE_SKILLS, STAT_META, STAT_KEYS, SKILL_MAX_LV, SLOTS, chronicleClass, classSkills, describeSkill, expNeedFor, rebirthExpMult, REBIRTH, REBIRTH_BRANCHES, rebirthBranches , unitTitle } from '../data.js';
+import { CHRONICLE_TUNING, CHRONICLE_SKILLS, STAT_META, STAT_KEYS, SKILL_MAX_LV, SLOTS, chronicleClass, classSkills, describeSkill, expNeedFor, rebirthExpMult, REBIRTH, REBIRTH_BRANCHES, REBIRTH_PERKS, rebirthPerkCount, rebirthPerkLeft, rebirthBranches , unitTitle } from '../data.js';
 import * as E from '../engine.js';
 import * as TL from '../talents.js';
 import * as R from '../roster.js';
 import * as GE from '../gearEval.js';
 import { statLine, Header, Wallet, Bar, XP_HERO, FamSynergyNote, MainKvRows, MainTabs, MS, CLASS_PATH, MainSecHead, MainKvGrid, MainModal, MainCell } from './common.jsx';
 import { useGearEval, effSort, EvalFooter, MainGearCard, CMP_UP, MainItemModal } from './gear.jsx';
+
+// ===== 전승 특전 (1.288.0) — 전승할 때마다 1개 =====
+function PerkList({ u, pick, onPick }) {
+  return (
+    <div className="grid gap-1.5 mt-1" style={{ gridTemplateColumns: '1fr 1fr' }}>
+      {REBIRTH_PERKS.map(d => {
+        const n = rebirthPerkCount(u, d.id); const full = n >= d.max; const on = pick === d.id;
+        return (
+          <button key={d.id} disabled={full} onClick={() => onPick(d.id)} className="ui-press text-left" style={{ padding: 9, borderRadius: 12, border: `1.5px solid ${on ? d.color : MS.line}`, background: on ? `${d.color}1c` : MS.box, opacity: full ? 0.4 : 1 }}>
+            <div className="flex items-baseline justify-between gap-1"><b style={{ fontSize: 13, color: d.color }}>{d.icon} {d.name}</b><span style={{ fontSize: 11, color: PALETTE.textDim }}>{n}/{d.max}</span></div>
+            <div style={{ fontSize: 11.5, color: PALETTE.text, lineHeight: 1.4 }}>{d.desc}</div>
+            {on && <div style={{ fontSize: 11, color: d.color }}>✓ 선택</div>}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+function PerkSheet({ save, cid, onClose, onPick }) {
+  const u = save.units[cid];
+  const [pick, setPick] = useState(null);
+  const left = rebirthPerkLeft(u);
+  return (
+    <MainModal kicker="REBIRTH PERK" title="전승 특전 선택" color={MS.gold} badge={`남은 선택 ${left}`} sub="전승 1회마다 1개 · 한 번 고르면 바꿀 수 없다" onClose={onClose}
+      footer={<button disabled={!pick} onClick={() => { onPick(pick); setPick(null); }} className="ui-press chr-btn-pri" style={{ height: 44, fontSize: 14, fontWeight: 800, opacity: pick ? 1 : 0.45 }}>{pick ? `「${REBIRTH_PERKS.find(x => x.id === pick).name}」 받기` : '특전을 고르세요'}</button>}>
+      <PerkList u={u} pick={pick} onPick={setPick} />
+    </MainModal>
+  );
+}
 
 // ===== 전승 (1.220.0) =====
 function RebirthSheet({ save, cid, onClose, onRebirth }) {
@@ -22,6 +51,7 @@ function RebirthSheet({ save, cid, onClose, onRebirth }) {
   const fixed = u.rebirth?.branch;
   const [pick, setPick] = useState(fixed || null);
   const [confirm, setConfirm] = useState(false);
+  const [perk, setPerk] = useState(null);
   const EXTRA = { healFromAtk: (v) => `공격력의 ${Math.round(v * 100)}%를 회복력으로`, armorPen: (v) => `방어 관통 +${Math.round(v * 100)}%`, spdPct: (v) => `속도 +${Math.round(v * 100)}%` };
   const fxText = (fx) => Object.entries(fx).map(([k, v]) => (EXTRA[k] ? EXTRA[k](v) : statLine({ [k]: v }))).join(' · ');
   const next = (u.rebirth?.count || 0) + 1;
@@ -29,8 +59,8 @@ function RebirthSheet({ save, cid, onClose, onRebirth }) {
   return (
     <MainModal kicker="REBIRTH" title={`${next}차 전승`} color={MS.gold} badge={`Lv.${u.lv}`} sub={fixed ? '갈래는 첫 전승 때 고정되어 바꿀 수 없다' : '갈래는 한 번 고르면 바꿀 수 없다'} onClose={onClose}
       footer={!confirm
-        ? <button disabled={!pick} onClick={() => setConfirm(true)} className="ui-press" style={{ height: 44, fontSize: 14, fontWeight: 800, border: `1px solid ${pick ? MS.gold : MS.line}`, background: 'transparent', color: pick ? MS.gold : PALETTE.textDim }}>{pb ? `${pb.name}(으)로 전승` : '갈래를 고르세요'}</button>
-        : <button onClick={() => onRebirth(pick)} className="ui-press" style={{ height: 44, fontSize: 14, fontWeight: 800, border: `1px solid ${MS.red}`, background: 'rgba(224,87,76,0.22)', color: '#ff8a7e' }}>정말 전승한다 — Lv.1로 돌아간다</button>}>
+        ? <button disabled={!pick || !perk} onClick={() => setConfirm(true)} className="ui-press" style={{ height: 44, fontSize: 14, fontWeight: 800, border: `1px solid ${pick ? MS.gold : MS.line}`, background: 'transparent', color: pick ? MS.gold : PALETTE.textDim }}>{pb ? `${pb.name}(으)로 전승` : '갈래를 고르세요'}</button>
+        : <button onClick={() => onRebirth(pick, perk)} className="ui-press" style={{ height: 44, fontSize: 14, fontWeight: 800, border: `1px solid ${MS.red}`, background: 'rgba(224,87,76,0.22)', color: '#ff8a7e' }}>정말 전승한다 — Lv.1로 돌아간다</button>}>
       <MainSecHead title="바 뀌 는 것" />
       <MainKvRows rows={[
         { l: '레벨·스킬·특성', v: 'Lv.1 초기화', c: '#e06a5f' }, { l: '경험치 (Lv.100 미만)', v: `×${REBIRTH.regrowExp}`, c: '#8fd08a' },
@@ -61,6 +91,8 @@ function RebirthSheet({ save, cid, onClose, onRebirth }) {
           );
         })}
       </div>
+      <MainSecHead title="전 승 특 전 (1개)" />
+      <PerkList u={u} pick={perk} onPick={(id) => { setPerk(id); setConfirm(false); }} />
     </MainModal>
   );
 }
@@ -178,6 +210,7 @@ export function PartyView({ save, setSave, onBack, onForge }) {
   const pickGtab = (t) => { setGtab(t); try { localStorage.setItem('chronicleGrowthTab', t); } catch { /* */ } };
   const [rowInfo, setRowInfo] = useState(null);   // 수치 줄 설명 (1.247.0)
   const [rebirthOpen, setRebirthOpen] = useState(false);
+  const [perkOpen, setPerkOpen] = useState(false);
   const u = save.units[cid];
   const cls = chronicleClass(cid);
   const d = E.deriveUnit(save, cid);
@@ -201,11 +234,20 @@ export function PartyView({ save, setSave, onBack, onForge }) {
             <div className="flex justify-between" style={{ fontSize: 11, color: PALETTE.textDim, marginTop: 2 }}><span>{u.lv >= E.levelCapOf(save) && u.lv < CHRONICLE_TUNING.maxLevel ? <span style={{ color: '#e8b04a' }}>🔒 레벨 상한 — 다른 캐릭터 Lv.{R.ROSTER.unlockLv}에 +{R.ROSTER.perChar}</span> : '경험치'}</span><span>{u.exp.toLocaleString()} / {expNeedFor(u).toLocaleString()}</span></div>
           </div>
         </div>
-        <MainTabs value={gtab} onChange={pickGtab} size={13.5} items={[['info', '정보', u.points > 0], ['gear', '장비', gearBetter > 0], ['skill', '스킬', classSkills(cid, u.rebirth?.branch).some(x => E.canLearn(u, x))], ['talent', '특성', u.sp > 0]]} />
+        <MainTabs value={gtab} onChange={pickGtab} size={13.5} items={[['info', '정보', u.points > 0 || rebirthPerkLeft(u) > 0], ['gear', '장비', gearBetter > 0], ['skill', '스킬', classSkills(cid, u.rebirth?.branch).some(x => E.canLearn(u, x))], ['talent', '특성', u.sp > 0]]} />
       </div>
       <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
 
         {gtab === 'info' && <>
+        {rebirthPerkLeft(u) > 0 && (
+          <button onClick={() => setPerkOpen(true)} className="ui-press ui-sheen w-full text-left flex-none" style={{ padding: 12, borderRadius: 14, border: `1.5px solid ${MS.gold}`, background: 'rgba(232,193,90,0.12)' }}>
+            <div className="font-bold" style={{ fontSize: 14, color: MS.gold }}>🎁 전승 특전 선택 — {rebirthPerkLeft(u)}개 남음</div>
+            <div style={{ fontSize: 12, color: PALETTE.textDim }}>전승 1회마다 영구 특전 1개 (특성 포인트 · 전승 스킬 강화 · 사역마 보조 칸 · 가방 · 열쇠 · 경험치)</div>
+          </button>
+        )}
+        {(u.rebirth?.perks || []).length > 0 && (
+          <div className="flex flex-wrap gap-1 flex-none">{REBIRTH_PERKS.filter(d => rebirthPerkCount(u, d.id) > 0).map(d => <span key={d.id} className="chr-pill" style={{ fontSize: 11.5, color: d.color }}>{d.icon} {d.name}{rebirthPerkCount(u, d.id) > 1 ? ` ×${rebirthPerkCount(u, d.id)}` : ''}</span>)}</div>
+        )}
         {E.canRebirth(save, cid) && (
           <button onClick={() => setRebirthOpen(true)} className="ui-press ui-sheen w-full text-left flex-none" style={{ padding: 12, borderRadius: 14, border: `1.5px solid ${PALETTE.legendary}`, background: `${PALETTE.legendary}18` }}>
             <div className="font-bold" style={{ fontSize: 14, color: PALETTE.legendary }}>{u.rebirth?.count ? `✦ ${u.rebirth.count + 1}차 전승 가능 (선택)` : `✦ 전승 가능 — Lv.${REBIRTH.reqLevel} 달성`}</div>
@@ -322,7 +364,8 @@ export function PartyView({ save, setSave, onBack, onForge }) {
           </>
         )}
       </div>
-      {rebirthOpen && <RebirthSheet save={save} cid={cid} onClose={() => setRebirthOpen(false)} onRebirth={(b) => { setSave(E.rebirth(save, b, cid)); setRebirthOpen(false); }} />}
+      {rebirthOpen && <RebirthSheet save={save} cid={cid} onClose={() => setRebirthOpen(false)} onRebirth={(b, pk) => { setSave(E.rebirth(save, b, cid, pk)); setRebirthOpen(false); }} />}
+      {perkOpen && rebirthPerkLeft(u) > 0 && <PerkSheet save={save} cid={cid} onClose={() => setPerkOpen(false)} onPick={(pk) => setSave(E.pickRebirthPerk(save, pk, cid))} />}
       {eqInfo != null && (() => {
         const it = save.inventory.find(i => i.uid === eqInfo); if (!it) return null;
         const fb = (extra = {}) => ({ height: 42, fontSize: 13, background: 'transparent', border: `1px solid ${MS.line}`, color: PALETTE.text, ...extra });

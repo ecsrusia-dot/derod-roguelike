@@ -120,13 +120,14 @@ function FamBondView({ fams, onPick }) {
 }
 
 // ===== 사역마 본편 스타일 (1.250.0, 시안 ⑮ ⑯-B) =====
-const FAM_SLOT_TAG = { main: '★ 동행', sub1: '보조 1', sub2: '보조 2' };
+const FAM_SLOT_TAG = { main: '★ 동행', sub1: '보조 1', sub2: '보조 2', sub3: '보조 3' };
+const famSlots = (save) => (E.famSlotOpen(save, 'sub3') ? ['main', 'sub1', 'sub2', 'sub3'] : ['main', 'sub1', 'sub2']); // 1.288.0 전승 특전
 
 function MainFamTeam({ save, onOpen, onPick }) {
   const team = save.famTeam || {}; const fams = save.fams || {};
   return (
-    <div className="grid gap-1.5" style={{ gridTemplateColumns: '1.3fr 1fr 1fr' }}>
-      {['main', 'sub1', 'sub2'].map(sl => {
+    <div className="grid gap-1.5" style={{ gridTemplateColumns: famSlots(save).length > 3 ? '1.3fr 1fr 1fr 1fr' : '1.3fr 1fr 1fr' }}>
+      {famSlots(save).map(sl => {
         const open = E.famSlotOpen(save, sl); const k = team[sl]; const f = k && fams[k]; const g = f ? F.famGrade(f.grade) : null;
         const role = f ? F.FAM_ROLES[F.famRole(k)] : null;
         return (
@@ -284,9 +285,10 @@ export function FamiliarView({ save, setSave, onBack, flash, onTrack = () => {} 
     { id: 'main', label: '동행', desc: '전투에 함께 싸운다' },
     { id: 'sub1', label: '보조 1', desc: '패시브 효과만' },
     { id: 'sub2', label: '보조 2', desc: '패시브 효과만' },
+    ...(E.famSlotOpen(save, 'sub3') ? [{ id: 'sub3', label: '보조 3', desc: '패시브 효과만 (전승 특전)' }] : []),
   ];
   const selF = sel && fams[sel];
-  const slotOf = (k) => ['main', 'sub1', 'sub2'].find(sl => team[sl] === k) || null;
+  const slotOf = (k) => ['main', 'sub1', 'sub2', 'sub3'].find(sl => team[sl] === k) || null;
   const inTeam = list.filter(([k]) => slotOf(k));
   const waiting = list.filter(([k]) => !slotOf(k));
   const grpHead = (left, right) => <div className="flex justify-between" style={{ fontSize: 11.5, fontWeight: 700, color: PALETTE.textDim, marginTop: 2 }}><span>{left}</span>{right && <span style={{ fontWeight: 400 }}>{right}</span>}</div>;
@@ -406,7 +408,7 @@ export function FamiliarView({ save, setSave, onBack, flash, onTrack = () => {} 
             footer={<div className="grid gap-1.5" style={{ gridTemplateColumns: '1fr 1fr' }}>
               {slotOf(sel) ? <button onClick={() => { setSave(E.setFamTeam(save, slotOf(sel), null)); flash('편성 해제'); }} className="ui-press" style={{ height: 42, border: `1px solid ${MS.gold}`, color: MS.gold, background: 'transparent', fontSize: 13, gridColumn: 'span 2' }}>편성 해제</button> : <>
                 <button disabled={!E.famSlotOpen(save, 'main')} onClick={() => { setSave(E.setFamTeam(save, 'main', sel)); flash('동행으로 편성'); }} className="ui-press" style={{ height: 42, border: `1px solid ${MS.gold}`, color: MS.gold, background: 'transparent', fontSize: 13, fontWeight: 800 }}>★ 동행으로</button>
-                {(() => { const sl = ['sub1', 'sub2'].find(x => E.famSlotOpen(save, x) && !team[x]) || (E.famSlotOpen(save, 'sub1') ? 'sub1' : null); return <button disabled={!sl} onClick={() => { setSave(E.setFamTeam(save, sl, sel)); flash(`${FAM_SLOT_TAG[sl]}에 편성`); }} className="ui-press" style={{ height: 42, border: `1px solid ${MS.line}`, color: sl ? MS.violet : PALETTE.textDim, background: 'transparent', fontSize: 13 }}>{sl ? `${FAM_SLOT_TAG[sl]}에 편성` : '보조 칸 잠김'}</button>; })()}
+                {(() => { const sl = ['sub1', 'sub2', 'sub3'].find(x => E.famSlotOpen(save, x) && !team[x]) || (E.famSlotOpen(save, 'sub1') ? 'sub1' : null); return <button disabled={!sl} onClick={() => { setSave(E.setFamTeam(save, sl, sel)); flash(`${FAM_SLOT_TAG[sl]}에 편성`); }} className="ui-press" style={{ height: 42, border: `1px solid ${MS.line}`, color: sl ? MS.violet : PALETTE.textDim, background: 'transparent', fontSize: 13 }}>{sl ? `${FAM_SLOT_TAG[sl]}에 편성` : '보조 칸 잠김'}</button>; })()}
               </>}
             </div>}>
             <MainTabs items={[['fx', '효과'], ['skill', '능력치·스킬'], ['grow', '성장', !maxed ? souls >= ec : !last && souls >= vc]]} value={selTab} onChange={setSelTab} />
