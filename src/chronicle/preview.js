@@ -12,9 +12,11 @@ import { CHRONICLE_FIELDS, fieldStages } from './data.js';
 export const PREVIEW = { battles: 200, gapMs: 1800 };
 
 // 전투 1회 재생 시간 — BattleView 재생 공식 ÷ 배속 + 다음 전투 대기 1.8초 (분당 효율 계산용)
-export function battlePlayMs(sim, speed = 1) {
+//   combatOnly (1.286.3): 연출 사건(전투 시작 연출 · 이프리트의 낙인 컷인 · 지속 피해 틱)은 세지 않는다 — 장비 비교용.
+//   이것까지 세면 「낙인을 거는 장비」가 어차피 이기는 쉬운 전투에서 연출 시간만큼 느린 장비로 계산된다.
+export function battlePlayMs(sim, speed = 1, combatOnly = false) {
   let ms = 0;
-  for (const ev of sim.events) ms += ev.round || ev.k === 'pre' ? 160 : ev.k === 'dotTick' ? 380 : 620;
+  for (const ev of sim.events) if (!(combatOnly && (ev.k === 'pre' || ev.k === 'open' || ev.k === 'dotTick'))) ms += ev.round || ev.k === 'pre' ? 160 : ev.k === 'dotTick' ? 380 : 620;
   return Math.round(ms / speed) + PREVIEW.gapMs;
 }
 
@@ -60,7 +62,7 @@ function runSide(save, target, encounters, seed, speed) {
     const hero = party.find(u => u.leader) || party[0];
     const last = [...sim.events].reverse().find(ev => ev.st && ev.st[hero.id]);
     const heroHp = last ? last.st[hero.id][0] : hero.hp;
-    ms += battlePlayMs(sim, speed);
+    ms += battlePlayMs(sim, speed, !!target.mode); // 장비 평가(관문·보스 기준)는 연출 시간 제외
     if (sim.result !== 'win') {
       // 졌을 때 적에게 준 피해 비율 (적 전체 최대 HP 대비) — 보스처럼 아직 못 이기는 상대의 진척도
       const tot = enemies.reduce((a, e) => a + (e.maxHp || e.hp || 0), 0);
