@@ -6,7 +6,7 @@
 // ============================================
 import { levelCap, globalBuffFx } from './roster.js';
 import { talentFx, canLearnTalent, talentNode, talentResetCost, talentTrees, tierUnlocked } from './talents.js';
-import { BOSS_MECHS, BOSS_MECH_OF, fieldStages, FIELD_STAGES, STAGE_TUNING, AUTO_CLIMB, BOOST, BAG_EXPAND, SALVAGE, SALVAGE_ICON, REBIRTH, REBIRTH_BRANCHES, REBIRTH_PERKS, rebirthPerkCount, rebirthPerkLeft, rebirthPerkOk, expNeedFor, OPTION_LV_CURVE, REFORGE , unitTitle } from './data.js';
+import { BOSS_MECHS, BOSS_MECH_OF, fieldStages, FIELD_STAGES, STAGE_TUNING, AUTO_CLIMB, BOOST, BAG_EXPAND, SALVAGE, SALVAGE_ICON, REBIRTH, REBIRTH_BRANCHES, DUEL, REBIRTH_PERKS, rebirthPerkCount, rebirthPerkLeft, rebirthPerkOk, expNeedFor, OPTION_LV_CURVE, REFORGE , unitTitle } from './data.js';
 import { TOWER, TOWER_SHOP, towerUnlocked, isTowerBoss, towerEnemyLv, towerArea, towerFloorPicks, towerTheme, kstWeekKey } from './tower.js';
 import { famCombatant, famRole, famSubFx, famOwnFx, famBondFx, rollFamShards, rollFamSouls, gainFamExp, FAM_AI, FAM_TUNING, summonFamiliars, enhanceFamiliar, evolveFamiliar, transcendFamiliar } from './familiar.js';
 import {
@@ -1062,6 +1062,25 @@ export function partyCombatants(save, hpMap = null) {
     list.push(fam);
   }
   return list;
+}
+// ===== 결투 편성 — 결투 보정(DUEL.mult)을 적용한 한쪽 편. enemy면 상대 편(pvp)으로 만든다 =====
+export function duelKey(save) { const u = save.units[save.hero]; return u?.rebirth?.branch || save.hero; }
+// 보정값 = 숫자 또는 [[레벨, 배율], …] 표 (사이 레벨은 직선 보간)
+export function duelMult(key, lv) {
+  const t = DUEL.mult[key];
+  if (!t) return 1;
+  if (typeof t === 'number') return t;
+  if (lv <= t[0][0]) return t[0][1];
+  for (let i = 1; i < t.length; i++) if (lv <= t[i][0]) { const [l0, m0] = t[i - 1], [l1, m1] = t[i]; return m0 + (m1 - m0) * (lv - l0) / (l1 - l0); }
+  return t[t.length - 1][1];
+}
+export function duelSide(save, enemy = false) {
+  const m = duelMult(duelKey(save), save.units[save.hero].lv);
+  return partyCombatants(save).map(u => {
+    const maxHp = Math.max(1, Math.round(u.maxHp * m));
+    const o = { ...u, maxHp, hp: maxHp, atk: Math.max(1, Math.round(u.atk * m)) };
+    return enemy ? { ...o, id: 'r_' + o.id, side: 'enemy', pvp: true } : o;
+  });
 }
 // partyLv: 파티 평균 레벨 — 몹 레벨은 그 근처(±1)에서 사냥터 범위 안으로 맞춘다
 export function partyLevel(save) {
