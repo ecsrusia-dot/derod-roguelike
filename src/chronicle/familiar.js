@@ -202,6 +202,151 @@ export const FAM_SKILLS = {
   healer: [FS('f_mend', '치유의 숨결', 'heal', 3, 1.0, 0.12), FS('f_ward', '보호의 빛', 'shield', 4, 0.8, 0.12)],
 };
 
+
+// ===== 자령 전용 키트 (1.292.0) — PM 「자령마다 스킬 1가지 빼곤 다 똑같다 → 갈래마다 최고 효율 자령 · 기본 스킬도 전부 다르게」 =====
+// PM 결정: 자령 17종 전부 · 짝 갈래일 때만 「공명」 추가 효과 · 고유 스킬 = 기본의 약 1.5배 + 부가 효과 · 능력치도 조금씩 다르게
+// 키 = 적 키. 자령으로 「소환된」 사역마(베이스 자령)만 쓴다 — 진화로 자령이 된 사역마는 역할 공통 스킬 그대로 (1.243.0 규칙)
+//   stat   역할 비율에 곱하는 값 (hp·atk·def·heal, 없으면 1)
+//   basics 기본 스킬 2종 · sig 고유 스킬 (수치는 자령 기준 고정값 — perLv 0)
+//   스킬 부가 효과: foeFx{k: vuln|weak|armorBreak, v, t, all} · teamBuff{v,t} · selfBuff{v,t} · selfHealPct
+//   passive.fx 사역마 유닛에 더하는 전투 값 (critAdd는 기본 치명 8%에 더함)
+//   reso   짝 갈래(branch)가 「동행」으로 데려갈 때만 — hero = 주인공 능력치 키 · fam = 사역마 배율(atk·hp·def) + guard(수호 태세 가산)
+// ⚠ 수치 조정은 이 표 한 곳. 바꾸면 scripts/sim-chronicle-kit.mjs 로 갈래 × 자령 승률을 다시 볼 것
+const KS = (id, name, kind, cd, base, extra = {}) => ({ id, cls: 'fam', name, kind, reqLv: 1, cd, base, perLv: 0, ...extra });
+const SG = (id, name, type, kind, cd, base, extra = {}) => ({ id, sigId: id, sig: true, kit: true, cls: 'fam', name, type, kind, reqLv: 1, cd, base, perLv: 0, ...extra });
+export const FAM_KITS = {
+  // ── 수호 ──
+  champ_frost_boss4: { // 절대영도의 여제 세릴 — 폭풍궁수
+    tag: '빙결 수호', stat: { def: 1.15 },
+    basics: [KS('k_seril_1', '서리 장막', 'taunt', 3, 0.6, { turns: 1 }), KS('k_seril_2', '빙결의 족쇄', 'weakStrike', 3, 1.2, { dv: 0.15, turns: 2 })],
+    sig: SG('k_seril_s', '절대영도 결계', '방어 강화 + 적 약화', 'fortify', 4, 0.85, { red: 0.15, turns: 4, foeFx: { k: 'weak', v: 0.15, t: 3, all: true } }),
+    passive: { name: '절대영도의 가호', desc: '전투당 1회 주인공이 쓰러질 피해를 막아 HP 25%로 버틴다 · 사역마를 때린 적에게 피해의 20% 반사', fx: { vGuard: 0.25, thornsPct: 0.2 } },
+    reso: { branch: 'e_storm', name: '눈보라의 궁수', desc: '추가 타격 확률 +45% · 공격력 +45% · 치명타 피해 +30% · 받는 피해 -12% · 세릴 공격력 2.6배', hero: { chain: 0.45, dmgReduce: 0.12, atkPct: 0.45, critDmg: 0.3 }, fam: { atk: 2.6 } },
+  },
+  champ_frost_boss2: { // 동굴의 빙왕 이스몬드 — 대마도사
+    tag: '광역 도발', stat: { hp: 1.15, def: 0.95 },
+    basics: [KS('k_ismond_1', '빙왕의 위압', 'taunt', 3, 0.5, { turns: 1 }), KS('k_ismond_2', '얼음 갑옷', 'shield', 4, 2.4)],
+    sig: SG('k_ismond_s', '빙왕의 포효', '광역 도발 + 취약', 'warcry', 4, 0.8, { turns: 3, foeFx: { k: 'vuln', v: 0.18, t: 3, all: true } }),
+    passive: { name: '빙왕의 수호', desc: '전투당 1회 주인공이 쓰러질 피해를 막아 HP 20%로 버틴다 · 수호 태세 +15%p', fx: { vGuard: 0.2, guardianAdd: 0.15 } },
+    reso: { branch: 's_arch', name: '얼음 성채의 마도사', desc: '스킬 피해 +50% · 공격력 +25% · 받는 피해 -25% · 매 턴 HP 4% 재생 · 이스몬드 공격력 2.5배', hero: { skillDmg: 0.5, atkPct: 0.25, dmgReduce: 0.25, regenPct: 0.04 }, fam: { atk: 2.5 } },
+  },
+  champ_sanctum_boss4: { // 절대봉인의 군주 아르케온 — 심판관
+    tag: '피해 분담', stat: { hp: 1.05, def: 1.1 },
+    basics: [KS('k_arkeon_1', '봉인의 사슬', 'taunt', 3, 0.6, { turns: 1 }), KS('k_arkeon_2', '단죄의 낙인', 'markStrike', 3, 1.2, { dv: 0.15, turns: 2 })],
+    sig: SG('k_arkeon_s', '봉인의 맹세', '보호 + 아군 강화', 'cover', 4, 0.75, { turns: 4, teamBuff: { v: 0.12, t: 4 } }),
+    passive: { name: '봉인의 성채', desc: '전투당 1회 주인공이 쓰러질 피해를 막아 HP 20%로 버틴다 · 사역마가 받는 피해 -15%', fx: { vGuard: 0.2, dmgReduce: 0.15 } },
+    reso: { branch: 'p_inq', name: '심판의 집행자', desc: '공격력 +40% · 스킬 피해 +20% · 회복량 +15%', hero: { atkPct: 0.4, skillDmg: 0.2, healPct: 0.15 } },
+  },
+  p3_v_boss: { // 공허의 문지기 네하르 — 범용
+    tag: '반격 수호', stat: { hp: 1.2, def: 0.9, atk: 2.2 },
+    basics: [KS('k_nehar_1', '공허의 문', 'taunt', 3, 0.5, { turns: 1 }), KS('k_nehar_2', '공허 흡수', 'lifesteal', 2, 2.0, { steal: 0.8 })],
+    sig: SG('k_nehar_s', '문 앞의 결투', '단일 도발 + 방어 파괴', 'duel', 4, 0.9, { turns: 4, foeFx: { k: 'armorBreak', v: 0.25, t: 4, forced: true } }),
+    passive: { name: '공허의 반향', desc: '맞으면 35% 확률로 반격 · 사역마를 때린 적에게 피해의 25% 반사', fx: { counterPct: 0.35, thornsPct: 0.25 } },
+  },
+  // ── 치유 ──
+  champ_forest_witch: { // 광기의 마녀 벨라도나 — 검귀
+    tag: '지속 회복', stat: { hp: 1.1 },
+    basics: [KS('k_bella_1', '광기의 연고', 'heal', 2, 1.1), KS('k_bella_2', '가시 덩굴', 'dot', 3, 1.2, { turns: 3 })],
+    sig: SG('k_bella_s', '광기의 영약', '지속 회복 + 공격 강화', 'hot', 5, 0.45, { turns: 5, teamBuff: { v: 0.15, t: 4 } }),
+    passive: { name: '광기의 순환', desc: '사역마 턴마다 아군 전원을 회복력 12%만큼 회복 · 주인공 HP 85% 미만부터 치유', fx: { vRegenAll: 0.12, healBelowAdd: 0.1 } },
+    reso: { branch: 'w_warlord', name: '광기에 물든 검', desc: '반격 피해 +80% · 반격 확률 +10% · 공격력 +22%', hero: { counterDmg: 0.8, counterPct: 0.1, atkPct: 0.22 } },
+  },
+  champ_sanctum_boss3: { // 심처의 봉인자 카탈 — 범용
+    tag: '보호막 특화', stat: { hp: 1.15, heal: 0.95 },
+    basics: [KS('k_katal_1', '봉인 결계', 'shield', 3, 1.5), KS('k_katal_2', '심연의 손길', 'heal', 3, 1.4)],
+    sig: SG('k_katal_s', '봉인 장막', '회복 + 큰 보호막', 'healShield', 5, 1.6, { shieldV: 1.8 }),
+    passive: { name: '심연의 맥동', desc: '사역마 턴마다 아군 전원을 회복력 10%만큼 회복 · 치유량의 30%만큼 보호막', fx: { vRegenAll: 0.1, healShield: 0.3 } },
+  },
+  champ_dawn_boss3: { // 정원의 마녀 루미엘 — 범용
+    tag: '즉시 대회복', stat: { hp: 0.9, heal: 1.15 },
+    basics: [KS('k_lumiel_1', '은총의 빛', 'heal', 2, 1.3), KS('k_lumiel_2', '정화의 노래', 'healAll', 4, 0.9)],
+    sig: SG('k_lumiel_s', '대천사의 손길', '즉시 대회복', 'bigHeal', 5, 2.6),
+    passive: { name: '대천사의 은총', desc: '사역마 턴마다 아군 전원을 회복력 15%만큼 회복', fx: { vRegenAll: 0.15 } },
+  },
+  champ_dawn_boss4: { // 여명의 신 솔라리온 — 범용
+    tag: '공격 강화', stat: { heal: 0.9, atk: 2.5 },
+    basics: [KS('k_solar_1', '여명의 빛', 'heal', 3, 1.3), KS('k_solar_2', '태양 창', 'strike', 2, 2.4)],
+    sig: SG('k_solar_s', '여명의 축복', '회복 + 큰 공격 강화', 'healBuff', 5, 1.2, { buff: 0.25, turns: 4 }),
+    passive: { name: '여명의 순환', desc: '사역마 턴마다 아군 전원을 회복력 10%만큼 회복 · 치명타 확률 +10%', fx: { vRegenAll: 0.1, critAdd: 0.1 } },
+  },
+  // ── 맹공 ──
+  champ_forest_boss4: { // 종말의 마에스트로 오르페인 — 저주술사
+    tag: '지속 피해', stat: { atk: 0.88 },
+    basics: [KS('k_orph_1', '불협화음', 'dot', 2, 0.7, { turns: 3 }), KS('k_orph_2', '광기의 선율', 'aoe', 3, 0.95)],
+    sig: SG('k_orph_s', '종말의 교향곡', '광역 지속 피해 + 취약', 'dot', 4, 0.7, { all: true, turns: 4, foeFx: { k: 'vuln', v: 0.08, t: 3, all: true } }),
+    passive: { name: '종말의 악보', desc: '사역마의 지속 피해 +20% · 방어 10% 무시', fx: { dotDmg: 0.2, armorPen: 0.1 } },
+    reso: { branch: 's_hex', name: '저주의 지휘자', desc: '지속 피해 +45% · 스킬 피해 +15% · 받는 피해 -25% · 매 턴 HP 4% 재생 · 오르페인이 적 공격의 60%를 대신 받는다 (체력 +80% · 방어 +50%)', hero: { dotDmg: 0.45, skillDmg: 0.15, dmgReduce: 0.25, regenPct: 0.04 }, fam: { guard: 0.6, hp: 1.8, def: 1.5, atk: 1.15 } },
+  },
+  champ_rift_boss3: { // 심장의 마왕 — 성기사
+    tag: '처형', stat: { atk: 1.1, hp: 0.9 },
+    basics: [KS('k_heart_1', '마왕의 손톱', 'strike', 2, 2.4), KS('k_heart_2', '심장 꿰뚫기', 'breakStrike', 3, 1.8, { dv: 0.2, turns: 2 })],
+    sig: SG('k_heart_s', '마왕의 처형', '처형', 'executeStrike', 4, 3.5),
+    passive: { name: '마왕의 안목', desc: '적 방어 30% 무시 · 치명타 확률 +15% · HP 30% 미만 적에게 피해 +30%', fx: { armorPen: 0.3, critAdd: 0.15, execute: 0.3 } },
+    reso: { branch: 'w_paladin', name: '성기사의 검', desc: '공격력 +30% · 사역마 공격력 +60%', hero: { atkPct: 0.3 }, fam: { atk: 1.6 } },
+  },
+  champ_frost_boss3: { // 협곡의 한기룡 스칼드라 — 혈귀
+    tag: '방어 파괴', stat: { hp: 1.1, atk: 0.95 },
+    basics: [KS('k_skal_1', '한기 발톱', 'multi', 2, 0.9, { hits: 3 }), KS('k_skal_2', '꼬리 휩쓸기', 'aoe', 3, 1.4)],
+    sig: SG('k_skal_s', '한기룡의 브레스', '광역 + 방어 파괴', 'aoe', 4, 2.1, { foeFx: { k: 'armorBreak', v: 0.4, t: 4, all: true } }),
+    passive: { name: '한기룡의 눈', desc: '치명타 확률 +20% · 치명타 피해 +50%', fx: { critAdd: 0.2, critMultAdd: 0.5 } },
+    reso: { branch: 'd_reaper', name: '피에 굶주린 용', desc: '치명타 피해 +80% · 방어 무시 +20%', hero: { critDmg: 0.8, armorPen: 0.2 } },
+  },
+  champ_rift_boss4: { // 마왕의 화신 — 역병기사
+    tag: '약화', stat: { hp: 1.15, atk: 0.9 },
+    basics: [KS('k_avatar_1', '공포의 시선', 'weakStrike', 3, 1.6, { dv: 0.2, turns: 2 }), KS('k_avatar_2', '암흑 파동', 'aoe', 3, 1.3)],
+    sig: SG('k_avatar_s', '화신의 공포', '광역 + 공격 약화', 'aoe', 4, 2.2, { foeFx: { k: 'weak', v: 0.35, t: 4, all: true } }),
+    passive: { name: '화신의 안목', desc: '적 방어 20% 무시 · 준 피해의 15%만큼 회복', fx: { armorPen: 0.2, lifesteal: 0.15 } },
+    reso: { branch: 'd_plague', name: '역병의 군주', desc: '지속 피해 +40% · 공격력 +10% · 받는 피해 -8%', hero: { dotDmg: 0.4, atkPct: 0.1, dmgReduce: 0.08 } },
+  },
+  p3_m_boss: { // 기억의 군주 므네메 — 저격수
+    tag: '취약 표식', stat: { atk: 1.05, hp: 0.95 },
+    basics: [KS('k_mneme_1', '기억의 화살', 'strike', 2, 2.3), KS('k_mneme_2', '망각의 가시', 'dot', 3, 0.7, { turns: 3 })],
+    sig: SG('k_mneme_s', '군주의 표식', '강타 + 취약 표식', 'markStrike', 3, 2.9, { dv: 0.4, turns: 4 }),
+    passive: { name: '기억의 각인', desc: '치명타 확률 +15% · HP 30% 미만 적에게 피해 +25%', fx: { critAdd: 0.15, execute: 0.25 } },
+    reso: { branch: 'e_sniper', name: '표식의 사수', desc: '치명타 피해 +60% · HP 30% 미만 적에게 피해 +30%', hero: { critDmg: 0.6, execute: 0.3 } },
+  },
+  p3_o_first: { // 최초의 황혼 오르페 — 대주교
+    tag: '폭딜', stat: { atk: 1.1, hp: 0.85 },
+    basics: [KS('k_orphe_1', '황혼 베기', 'strike', 2, 2.5), KS('k_orphe_2', '황혼의 춤', 'multi', 3, 1.0, { hits: 3 })],
+    sig: SG('k_orphe_s', '최초의 황혼', '일격 + 자기 강화', 'strike', 4, 3.7, { selfBuff: { v: 0.25, t: 3 } }),
+    passive: { name: '황혼의 계승', desc: '치명타 확률 +10% · 치명타 피해 +40% · 단일 공격 뒤 25% 확률로 추가 타격', fx: { critAdd: 0.1, critMultAdd: 0.4, chain: 0.25 } },
+    reso: { branch: 'p_arch', name: '축복받은 황혼', desc: '사역마 공격력 +90% · 회복량 +15%', hero: { healPct: 0.15 }, fam: { atk: 1.9 } },
+  },
+  p3_m_keeper: { // 기록 관리자 아르케 — 범용
+    tag: '광역 마법', stat: { hp: 0.95 },
+    basics: [KS('k_arche_1', '금서의 불길', 'aoe', 2, 1.2), KS('k_arche_2', '저주받은 문장', 'dot', 3, 0.6, { all: true, turns: 3 })],
+    sig: SG('k_arche_s', '기록 말소', '광역 대폭발', 'aoe', 4, 2.6),
+    passive: { name: '관리자의 권한', desc: '사역마 스킬 피해 +25%', fx: { skillDmg: 0.25 } },
+  },
+  p3_v_heart: { // 공허의 심장 에레보스 — 범용
+    tag: '흡혈', stat: { hp: 1.3, atk: 0.9 },
+    basics: [KS('k_ereb_1', '공허 포식', 'lifesteal', 2, 2.0, { steal: 0.6 }), KS('k_ereb_2', '심장 박동', 'aoe', 3, 1.2)],
+    sig: SG('k_ereb_s', '공허의 심장', '흡혈 일격 + 자기 강화', 'lifesteal', 4, 3.2, { steal: 1.0, selfBuff: { v: 0.2, t: 3 } }),
+    passive: { name: '공허의 맥동', desc: '준 피해의 20%만큼 회복 · 매 턴 HP 3% 재생', fx: { lifesteal: 0.2, regenPct: 0.03 } },
+  },
+  p3_o_boss: { // 황혼의 근원 아이온 — 범용
+    tag: '연타', stat: { atk: 1.05 },
+    basics: [KS('k_aion_1', '황혼 연격', 'multi', 2, 0.8, { hits: 4 }), KS('k_aion_2', '근원의 창', 'strike', 3, 2.6)],
+    sig: SG('k_aion_s', '근원의 붕괴', '6연타', 'multi', 4, 0.9, { hits: 6 }),
+    passive: { name: '근원의 맥', desc: '단일 공격 뒤 35% 확률로 추가 타격 · 치명타 확률 +10%', fx: { chain: 0.35, critAdd: 0.1 } },
+  },
+};
+// 키트는 「자령으로 소환된」 사역마만 (베이스 자령)
+export const famKit = (key, f) => (FAM_KITS[key] && famHasPassive(key, f) ? FAM_KITS[key] : null);
+// 공명 — 짝 갈래가 동행으로 데려갈 때만. → { name, desc, branch, hero, fam, on }
+export function famReso(key, f, branch) {
+  const k = famKit(key, f);
+  if (!k?.reso) return null;
+  return { ...k.reso, on: !!branch && branch === k.reso.branch };
+}
+// 주인공 쪽 공명 값 (engine deriveUnit) — 동행 칸의 자령만
+export function famResoHeroFx(fams, mainKey, branch) {
+  const r = mainKey && fams?.[mainKey] ? famReso(mainKey, fams[mainKey], branch) : null;
+  return r?.on ? r.hero || {} : {};
+}
+// 갈래 → 짝 자령 키
+export const famResoPartner = (branch) => Object.keys(FAM_KITS).find(k => FAM_KITS[k].reso?.branch === branch) || null;
+
 // 초월 스킬 — 초월 +5에서 열리는 세 번째 스킬 (역할별 · 기존 고유 스킬과 같은 발동 규칙)
 export const FAM_TRANS_SKILLS = {
   tank: { id: 'trans_tank', trans: true, sig: true, cls: 'fam', reqLv: 1, kind: 'fortify', name: '불멸의 맹세', type: '초월 · 방어 강화', cd: 5, base: 0.5, perLv: 0, red: 0.2, turns: 4 },
@@ -238,11 +383,14 @@ export function famSkillInfo(key, f) {
   const sig = famSignature(key, f.grade);
   const sigLocked = !famHasSignature(key, f);
   // 1.225.1 — 남령 미만은 고유 스킬을 목록에서 뺀다 (전투에서도 쓰지 않음 · 화면엔 안내 한 줄만)
-  return [...(famHasTransSkill(f) ? [famTransSkill(key)] : []), ...(sigLocked ? [] : [sig]), ...FAM_SKILLS[roleId]].map(s => {
+  const kit = famKit(key, f);
+  return [...(famHasTransSkill(f) ? [famTransSkill(key)] : []), ...(sigLocked ? [] : [sig]), ...(kit ? kit.basics : FAM_SKILLS[roleId])].map(s => {
     const sv = Math.max(lv, FAM_SIG_MIN_GRADE + 1);
     const v = s.base + s.perLv * ((s.sig ? sv : lv) - 1);
     let effect = '';
     switch (s.kind) {
+      case 'lifesteal': effect = `적 1명에게 공격력 ${pct(v)} 피해 — 준 피해의 ${pct(s.steal)}만큼 사역마 회복`; break;
+      case 'healAll': effect = `아군 전원 회복 — 사역마 회복력 ${pct(v)}`; break;
       case 'duel': effect = `가장 강한 적 1명을 ${s.turns}턴 동안 도발 — 그 적은 사역마만 공격. 그동안 사역마 방어 +${pct(v)}`; break;
       case 'warcry': effect = `적 전원을 ${s.turns}턴 동안 도발 — 모든 적이 사역마만 공격. 방어 +${pct(v)}`; break;
       case 'cover': effect = `${s.turns}턴 동안 주인공이 받는 피해의 ${pct(v)}를 사역마가 대신 받음`; break;
@@ -255,9 +403,9 @@ export function famSkillInfo(key, f) {
       case 'weakStrike': effect = `적 1명에게 공격력 ${pct(v)} 피해 + 그 적의 공격력 -${pct(s.dv)} (${s.turns}턴)`; break;
       case 'markStrike': effect = `적 1명에게 공격력 ${pct(v)} 피해 + 받는 피해 +${pct(s.dv)} (${s.turns}턴, 주인공 공격 포함)`; break;
       case 'executeStrike': effect = `적 1명에게 공격력 ${pct(v)} 피해 — 대상 HP 35% 미만이면 2배`; break;
-      case 'dot': if (s.sig) { effect = `적 전체에 ${s.turns}턴 동안 매 턴 공격력 ${pct(v)} 지속 피해`; break; }
+      case 'dot': if (s.all) { effect = `적 전체에 ${s.turns}턴 동안 매 턴 공격력 ${pct(v)} 지속 피해`; break; }
       // falls through
-      case 'strike': effect = `적 1명(HP가 가장 낮은 적)에게 사역마 공격력 ${pct(v)} 피해`; break;
+      case 'strike': effect = s.kind === 'dot' ? `적 1명에게 ${s.turns}턴 동안 매 턴 공격력 ${pct(v)} 지속 피해` : `적 1명(HP가 가장 낮은 적)에게 사역마 공격력 ${pct(v)} 피해`; break;
       case 'multi': effect = `적에게 ${s.hits}회 연속 공격, 1회당 공격력 ${pct(v)}`; break;
       case 'aoe': effect = `적 전체에게 공격력 ${pct(v)} 피해`; break;
       case 'taunt': effect = `${s.turns}턴 도발 — 적의 공격이 85% 확률로 사역마에게. 그동안 방어 +${pct(v)} · 받는 피해 -${pct(Math.min(0.5, (role.tauntReduce || 0) + 0.05 * (lv - 1)))}`; break;
@@ -265,11 +413,16 @@ export function famSkillInfo(key, f) {
       case 'shield': effect = `아군 전원에게 보호막 — 사역마 회복력 ${pct(v)}`; break;
       default: effect = s.kind;
     }
-    return { id: s.id, name: s.name, kind: s.kind, cd: s.cd, effect, when: FAM_SKILL_WHEN[s.sig && s.kind === 'dot' ? 'sigDot' : s.kind] || '', sig: !!s.sig, trans: !!s.trans, sigType: s.trans ? s.type : s.sig ? FAM_SIGS[s.sigId].type : null, locked: !!s.sig && !s.trans && sigLocked };
+    // 키트 부가 효과 (1.292.0)
+    const FXN = { vuln: '받는 피해 +', weak: '공격력 -', armorBreak: '방어 -' };
+    if (s.foeFx) effect += ` + ${s.foeFx.all ? '적 전원' : s.foeFx.forced ? '도발한 적' : '맞은 적'} ${FXN[s.foeFx.k]}${pct(s.foeFx.v)} (${s.foeFx.t}턴)`;
+    if (s.teamBuff) effect += ` + 아군 전원 공격력 +${pct(s.teamBuff.v)} (${s.teamBuff.t}턴)`;
+    if (s.selfBuff) effect += ` + 사역마 공격력 +${pct(s.selfBuff.v)} (${s.selfBuff.t}턴)`;
+    return { id: s.id, name: s.name, kind: s.kind, cd: s.cd, effect, when: FAM_SKILL_WHEN[s.sig && s.kind === 'dot' ? 'sigDot' : s.kind] || '', sig: !!s.sig, trans: !!s.trans, sigType: s.trans || s.kit ? s.type : s.sig ? FAM_SIGS[s.sigId].type : null, locked: !!s.sig && !s.trans && sigLocked };
   });
 }
 // 동행 능력치 (주인공 대비 비율 — 등급·강화 반영)
-export const famGuard = (key, f) => { const role = FAM_ROLES[famRole(key)]; return role.guard ? role.guard[famGradeIdx(f.grade)] : 0; };
+export const famGuard = (key, f) => { const role = FAM_ROLES[famRole(key)]; return role.guard ? role.guard[famGradeIdx(f.grade)] + (famKit(key, f)?.passive?.fx?.guardianAdd || 0) : 0; };
 
 // ===== 고유 스킬 (1.218.0 — 남령부터) =====
 // 같은 역할이라도 사역마마다 다른 고유 스킬. 자령은 지속 턴 +1
@@ -340,6 +493,8 @@ const BOSS_PASSIVE_NAMES = {
 };
 export function famPassive(key, f) {
   if (!famHasPassive(key, f)) return null;
+  const kit = FAM_KITS[key];
+  if (kit) return { name: kit.passive.name, desc: kit.passive.desc, kit: true, ...kit.passive.fx };
   const p = FAM_PASSIVES[famRole(key)];
   return { ...p, name: BOSS_PASSIVE_NAMES[ENEMIES[key]?.name] || p.name };
 }
@@ -352,6 +507,7 @@ export function famSignatureId(key) {
 }
 // 실제 전투용 고유 스킬 객체 (자령은 지속 턴 +1)
 export function famSignature(key, grade) {
+  if (famGradeIdx(grade) >= FAM_PASSIVE_MIN_GRADE && FAM_KITS[key]) return FAM_KITS[key].sig;
   const id = famSignatureId(key);
   const d = FAM_SIGS[id];
   const b = BOSS_SIGS[ENEMIES[key]?.name];
@@ -370,33 +526,43 @@ export function famStats(key, f, heroLv, famPct = 0) {
   const eff = famEffLv(f, heroLv);
   const b = famBaseStats(eff);
   const m = powerMult(f) * (1 + famPct);
+  const ks = famKit(key, f)?.stat || {}; // 자령 키트 — 같은 역할 안에서도 능력치가 조금씩 다르다 (1.292.0)
   return {
     lv: eff,
-    maxHp: Math.round(b.hp * role.hp * m),
-    atk: Math.round(b.atk * role.atk * m),
-    healPower: Math.round(b.atk * (role.heal || 0.15) * m),
-    def: Math.round(b.def * role.def * Math.sqrt(m)),
+    maxHp: Math.round(b.hp * role.hp * (ks.hp || 1) * m),
+    atk: Math.round(b.atk * role.atk * (ks.atk || 1) * m),
+    healPower: Math.round(b.atk * (role.heal || 0.15) * (ks.heal || 1) * m),
+    def: Math.round(b.def * role.def * (ks.def || 1) * Math.sqrt(m)),
     spd: +Math.max(5, b.spd - 2).toFixed(1),
   };
 }
 function passiveFields(key, f) {
   const p = famPassive(key, f);
   if (!p) return {};
+  if (p.kit) { const { name, desc, kit, critAdd, critMultAdd, guardianAdd, ...fx } = p; return { vName: name, ...fx, ...(critAdd ? { crit: 0.08 + critAdd } : {}), ...(critMultAdd ? { critMult: 1.5 + critMultAdd } : {}), ...(guardianAdd ? { guardianAdd } : {}) }; }
   return { vName: p.name, ...(p.vGuard ? { vGuard: p.vGuard } : {}), ...(p.vRegenAll ? { vRegenAll: p.vRegenAll } : {}), ...(p.armorPen ? { armorPen: p.armorPen } : {}), ...(p.crit ? { crit: 0.08 + p.crit } : {}) };
 }
-export function famCombatant(key, f, hero, famPct = 0) {
+export function famCombatant(key, f, hero, famPct = 0, branch = null) {
   const roleId = famRole(key);
   const role = FAM_ROLES[roleId];
   const st = famStats(key, f, hero.lv, famPct);
   const lv = famGradeIdx(f.grade) + 1;
+  const kit = famKit(key, f);
+  const reso = famReso(key, f, branch);
+  const rf = reso?.on ? reso.fam || {} : {};
+  const pf = passiveFields(key, f);
+  if (rf.atk) st.atk = Math.round(st.atk * rf.atk);
+  if (rf.hp) st.maxHp = Math.round(st.maxHp * rf.hp);
+  if (rf.def) st.def = Math.round(st.def * rf.def);
   return {
     id: 'fam', fam: true, famKey: key, famRole: roleId, classId: hero.classId, name: famName(key), side: 'party', lv: st.lv, magic: true,
     maxHp: st.maxHp, hp: st.maxHp, atk: st.atk, healPower: st.healPower,
     def: st.def, spd: st.spd, crit: 0.08, critMult: 1.5, dodge: 0.05,
     tauntReduce: role.tauntReduce ? Math.min(0.5, role.tauntReduce + 0.05 * (lv - 1)) : 0,
-    guardian: role.guard ? role.guard[lv - 1] : 0, startTaunt: role.guard ? 2 : 0,
-    skills: [...(famHasTransSkill(f) ? [{ s: famTransSkill(key), lv }] : []), ...(famHasSignature(key, f) ? [{ s: famSignature(key, f.grade), lv }] : []), ...FAM_SKILLS[roleId].map(s => ({ s, lv }))],
-    ...passiveFields(key, f),
+    guardian: (role.guard ? role.guard[lv - 1] + (pf.guardianAdd || 0) : 0) + (rf.guard || 0), startTaunt: role.guard ? 2 : 0,
+    skills: [...(famHasTransSkill(f) ? [{ s: famTransSkill(key), lv }] : []), ...(famHasSignature(key, f) ? [{ s: famSignature(key, f.grade), lv }] : []), ...(kit ? kit.basics : FAM_SKILLS[roleId]).map(s => ({ s, lv }))],
+    ...pf,
+    ...(reso?.on ? { resoName: reso.name, resoDesc: reso.desc } : {}),
   };
 }
 // 보조 사역마 → 주인공 패시브 합산 (등급별 값 × 강화 × 레벨 비례) + 재화 특성 1개 (1.225.0)
