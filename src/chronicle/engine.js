@@ -457,7 +457,7 @@ export function deriveUnit(save, classId) {
   // 사역마 보유 효과(남령+) · 인연 (1.228.0) — 가지고만 있으면 적용
   for (const fx of [famOwnFx(save.fams), famBondFx(save.fams)]) for (const [k, v] of Object.entries(fx)) g[k] = (g[k] || 0) + v;
   // 자령 공명 (1.292.0) — 짝 갈래가 그 자령을 「동행」으로 데려갈 때만
-  for (const [k, v] of Object.entries(famResoHeroFx(save.fams, activeMain(save), u.rebirth?.branch))) g[k] = (g[k] || 0) + v;
+  for (const [k, v] of Object.entries(famResoHeroFx(save.fams, activeMain(save), u.rebirth?.branch, classId))) g[k] = (g[k] || 0) + v;
   // 원정대 전역 버프 (1.229.0) — 다른 캐릭터들의 Lv.20/40/60/80/100 달성 보상
   for (const [k, v] of Object.entries(globalBuffFx(save.roster, classId))) g[k] = (g[k] || 0) + v;
   // 전승 갈래 기본 효과 (1.220.0)

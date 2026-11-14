@@ -333,15 +333,62 @@ export const FAM_KITS = {
 };
 // 키트는 「자령으로 소환된」 사역마만 (베이스 자령)
 export const famKit = (key, f) => (FAM_KITS[key] && famHasPassive(key, f) ? FAM_KITS[key] : null);
-// 공명 — 짝 갈래가 동행으로 데려갈 때만. → { name, desc, branch, hero, fam, on }
-export function famReso(key, f, branch) {
-  const k = famKit(key, f);
-  if (!k?.reso) return null;
-  return { ...k.reso, on: !!branch && branch === k.reso.branch };
+// ── 직업 공명 (1.293.0) — 청령·남령 출신 사역마는 「전승 전 직업」 하나에 특화. 그 직업(전승 갈래 포함)이 동행으로 데려갈 때만.
+// PM 결정: 등급별 차등은 확실하게 — 청령 ×1 · 남령 ×2.5 · (진화로) 자령 ×3.5. 자령 출신은 위의 갈래 공명(FAM_KITS).
+export const CLASS_RESO_TIER = { blue: 1, indigo: 2.5, violet: 3.5 };
+export const CLASS_RESO_ORDER = ['wanderer', 'sage', 'demonblood', 'elf', 'priest'];
+// 청령 기준 값 (hero = 주인공 합산 키 · famAtk = 사역마 공격력 가산 비율)
+export const CLASS_RESO = {
+  wanderer: { name: '검객의 벗', tank: { atkPct: 0.05, counterPct: 0.04 }, healer: { counterDmg: 0.12, atkPct: 0.04 }, dps: { atkPct: 0.05, counterDmg: 0.1 } },
+  sage: { name: '마도의 벗', tank: { skillDmg: 0.05, dmgReduce: 0.06 }, healer: { skillDmg: 0.05, regenPct: 0.01 }, dps: { skillDmg: 0.05, dotDmg: 0.08 } },
+  demonblood: { name: '피의 맹우', tank: { atkPct: 0.05, dmgReduce: 0.03 }, healer: { atkPct: 0.04, regenPct: 0.01 }, dps: { atkPct: 0.05, critDmg: 0.1 } },
+  elf: { name: '숲의 벗', tank: { atkPct: 0.05, dmgReduce: 0.04 }, healer: { atkPct: 0.05, regenPct: 0.01 }, dps: { chain: 0.05, critDmg: 0.1 } },
+  priest: { name: '여명의 벗', tank: { atkPct: 0.06, dmgReduce: 0.03 }, healer: { healPct: 0.08, atkPct: 0.04 }, dps: { atkPct: 0.06, famAtk: 0.1 } },
+};
+const CLASS_RESO_LABEL = { atkPct: ['공격력', '+'], skillDmg: ['스킬 피해', '+'], dotDmg: ['지속 피해', '+'], critDmg: ['치명타 피해', '+'], chain: ['추가 타격 확률', '+'], counterPct: ['반격 확률', '+'], counterDmg: ['반격 피해', '+'], healPct: ['회복량', '+'], dmgReduce: ['받는 피해', '-'], regenPct: ['매 턴 HP 재생', '+'], famAtk: ['사역마 공격력', '+'] };
+const CLASS_KO = { wanderer: '방랑검사', sage: '술법사', demonblood: '혼혈 마족', elf: '숲의 정령사', priest: '여명의 사제' };
+// 사역마 → 특화 직업 (저장 안 함). 출신 등급·역할 묶음 안에서 이름순으로 5직업에 고르게 나눈다.
+let _resoCls = null;
+export function famResoClass(key) {
+  if (!_resoCls) {
+    _resoCls = {};
+    const keys = new Set();
+    for (const f of CHRONICLE_FIELDS) { for (const k of f.elites || []) keys.add(k); keys.add(f.boss); }
+    const groups = {};
+    for (const k of [...keys].sort()) {
+      const g = famNaturalGrade(k);
+      if (!ENEMIES[k] || FAM_KITS[k] || (g !== 'blue' && g !== 'indigo')) continue;
+      (groups[`${g}|${famRole(k)}`] ||= []).push(k);
+    }
+    let off = 0;
+    for (const gk of Object.keys(groups).sort()) { groups[gk].forEach((k, i) => { _resoCls[k] = CLASS_RESO_ORDER[(i + off) % 5]; }); off += groups[gk].length; }
+  }
+  return _resoCls[key] || null;
 }
-// 주인공 쪽 공명 값 (engine deriveUnit) — 동행 칸의 자령만
-export function famResoHeroFx(fams, mainKey, branch) {
-  const r = mainKey && fams?.[mainKey] ? famReso(mainKey, fams[mainKey], branch) : null;
+function classReso(key, f, cls) {
+  const rc = famResoClass(key); const tier = CLASS_RESO_TIER[f?.grade];
+  if (!rc || !tier) return null;
+  const base = CLASS_RESO[rc][famRole(key)] || {};
+  const hero = {}; const fam = {}; const parts = [];
+  for (const [k, v0] of Object.entries(base)) {
+    const v = Math.round(v0 * tier * 1000) / 1000;
+    if (k === 'famAtk') fam.atk = 1 + v; else hero[k] = v;
+    const [l, sg] = CLASS_RESO_LABEL[k] || [k, '+'];
+    parts.push(`${l} ${sg}${Math.round(v * 1000) / 10}%`);
+  }
+  return { cls: rc, clsName: CLASS_KO[rc], name: CLASS_RESO[rc].name, desc: parts.join(' · '), hero, fam, tier, on: !!cls && cls === rc };
+}
+// 공명 → { name, desc, branch | cls, hero, fam, on }
+//   자령 출신 = 짝 갈래(branch) · 청령·남령 출신 = 전승 전 직업(cls — 그 직업의 전승 갈래도 포함)
+export function famReso(key, f, branch, cls = null) {
+  const k = famKit(key, f);
+  if (k?.reso) return { ...k.reso, on: !!branch && branch === k.reso.branch };
+  if (k) return null;
+  return classReso(key, f, cls);
+}
+// 주인공 쪽 공명 값 (engine deriveUnit) — 동행 칸의 사역마만
+export function famResoHeroFx(fams, mainKey, branch, cls = null) {
+  const r = mainKey && fams?.[mainKey] ? famReso(mainKey, fams[mainKey], branch, cls) : null;
   return r?.on ? r.hero || {} : {};
 }
 // 갈래 → 짝 자령 키
@@ -548,7 +595,7 @@ export function famCombatant(key, f, hero, famPct = 0, branch = null) {
   const st = famStats(key, f, hero.lv, famPct);
   const lv = famGradeIdx(f.grade) + 1;
   const kit = famKit(key, f);
-  const reso = famReso(key, f, branch);
+  const reso = famReso(key, f, branch, hero.classId);
   const rf = reso?.on ? reso.fam || {} : {};
   const pf = passiveFields(key, f);
   if (rf.atk) st.atk = Math.round(st.atk * rf.atk);

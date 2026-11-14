@@ -150,16 +150,17 @@ function MainFamTeam({ save, onOpen, onPick }) {
 // 공명 (1.292.0) — 자령마다 짝 갈래가 있고, 그 갈래가 동행으로 데려갈 때만 켜진다.
 // 지금 주인공의 갈래 (FamiliarView가 그릴 때마다 맞춘다)
 let heroBranch = null;
+let heroCls = null;
 function ResoLine({ k, f, box = false }) {
-  const r = F.famReso(k, f, heroBranch);
+  const r = F.famReso(k, f, heroBranch, heroCls);
   if (!r) return null;
-  const bn = REBIRTH_BRANCHES[r.branch]?.name || r.branch;
+  const bn = r.cls ? r.clsName : (REBIRTH_BRANCHES[r.branch]?.name || r.branch);
   const col = r.on ? '#7fe0c0' : PALETTE.textDim;
   if (box) return (
     <div className="mt-2" style={{ padding: '8px 10px', border: `1px solid ${r.on ? '#7fe0c0aa' : MS.line}`, background: MS.box, borderRadius: MS.r, fontSize: 12.5, lineHeight: 1.55 }}>
       <div className="flex justify-between gap-2"><b style={{ color: col }}>✦ 공명 「{r.name}」</b><span style={{ fontSize: 11, color: col }}>{r.on ? '켜짐' : `${bn} 전용`}</span></div>
       <div style={{ color: r.on ? PALETTE.text : PALETTE.textDim }}><HiNum text={r.desc} /></div>
-      <div style={{ fontSize: 11, color: PALETTE.textDim }}>{bn} 갈래가 이 자령을 동행 칸에 둘 때만 적용</div>
+      <div style={{ fontSize: 11, color: PALETTE.textDim }}>{r.cls ? `${bn}(전승 갈래 포함)이 동행 칸에 둘 때만 적용 · 청령 ×1 → 남령 ×2.5 → 진화 자령 ×3.5` : `${bn} 갈래가 이 자령을 동행 칸에 둘 때만 적용`}</div>
     </div>
   );
   return <div className="mt-0.5" style={{ fontSize: 11.5, lineHeight: 1.4, color: col }}>✦ 공명 [{bn}]{r.on ? ' 켜짐' : ''} — <span style={{ color: r.on ? PALETTE.text : PALETTE.textDim }}>{r.desc}</span></div>;
@@ -288,6 +289,7 @@ export function FamiliarView({ save, setSave, onBack, flash, onTrack = () => {} 
   const [preview, setPreview] = useState(null); // 효율 미리보기 (1.232.0)
   const fams = save.fams || {};
   heroBranch = save.units[save.hero]?.rebirth?.branch || null;
+  heroCls = save.hero;
   const shards = save.mats.famShard || 0;
   const souls = save.mats.famSoul || 0;
   const heroLv = save.units[save.hero]?.lv || 1;
