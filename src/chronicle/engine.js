@@ -672,16 +672,12 @@ function useBossAttempt(save, fieldId, now = Date.now()) {
 
 // ===== 🗝 던전 열쇠 (1.209.0) =====
 // 날짜가 바뀌었으면 3개까지 채운다 (변경 없으면 같은 객체 반환)
-// 1.288.0 전승 특전 「던전 통행증」 — 계정의 모든 캐릭터가 고른 수만큼 하루 충전 +1 (뷰의 keyPerkOther = 다른 캐릭터 몫)
-export function keyDailyRefill(save) {
-  return DUNGEON_KEYS.dailyRefill + (save.keyPerkOther || 0) + rebirthPerkCount(save.units?.[save.hero], 'key');
-}
 export function refreshDungeonKeys(save0, now = Date.now()) {
   const today = kstDateKey(now);
   const k = save0.keys || { count: 0, refillDate: null, boughtDate: null, bought: 0 };
   if (save0.keys && k.refillDate === today) return save0;
   const save = clone(save0);
-  save.keys = { ...k, count: Math.max(k.count || 0, Math.min(DUNGEON_KEYS.max, keyDailyRefill(save0))), refillDate: today };
+  save.keys = { ...k, count: Math.max(k.count || 0, DUNGEON_KEYS.dailyRefill), refillDate: today };
   return save;
 }
 export function keyCount(save) { return save.keys?.count || 0; }
@@ -794,8 +790,8 @@ export function dismantleItems(save0, uids) {
   return { save, ...tot, essence: tot.essence || 0, shard: tot.shard || 0, salvage: tot };
 }
 // 가방 한도 (1.217.0) — 기본 + 확장
-export function bagMax(save) { return T.inventoryMax + BAG_EXPAND.step * (save.bagExpand || 0) + 20 * rebirthPerkCount(save.units?.[save.hero], 'bag'); }
-export function bagExpandCost(save) { return T.inventoryMax + BAG_EXPAND.step * (save.bagExpand || 0) >= BAG_EXPAND.max ? null : BAG_EXPAND.cost(save.bagExpand || 0); }
+export function bagMax(save) { return T.inventoryMax + BAG_EXPAND.step * (save.bagExpand || 0); }
+export function bagExpandCost(save) { return bagMax(save) >= BAG_EXPAND.max ? null : BAG_EXPAND.cost(save.bagExpand || 0); }
 export function expandBag(save0) {
   const c = bagExpandCost(save0);
   if (c == null || save0.gold < c) return save0;
@@ -1290,7 +1286,7 @@ export function rebirth(save0, branchId, classId = save0.hero, perkId = null) {
   const save = clone(save0);
   const u = save.units[classId];
   const cls = chronicleClass(classId);
-  u.rebirth = { branch: branchId, count: (u0.rebirth?.count || 0) + 1, perks: [...(u0.rebirth?.perks || [])] };
+  u.rebirth = { branch: branchId, count: (u0.rebirth?.count || 0) + 1, perks: (u0.rebirth?.perks || []).filter(x => REBIRTH_PERKS.some(d => d.id === x)) };
   if (perkId && rebirthPerkOk(u, perkId)) u.rebirth.perks.push(perkId);
   u.lv = 1; u.exp = 0; u.points = 0; u.sp = 1 + 5 * rebirthPerkCount(u, 'talent'); u.stats = { ...cls.base }; u.skills = {}; u.mastery = 0; u.talents = {};
   // 1.282.0 PM 결정 — 갈래의 첫 스킬은 전승 즉시 배운 상태로 시작 (전승한 보람을 Lv.1부터)
@@ -1306,7 +1302,7 @@ export function pickRebirthPerk(save0, perkId, classId = save0.hero) {
   if (!u0 || rebirthPerkLeft(u0) <= 0 || !rebirthPerkOk(u0, perkId)) return save0;
   const save = clone(save0);
   const u = save.units[classId];
-  u.rebirth.perks = [...(u.rebirth.perks || []), perkId];
+  u.rebirth.perks = [...(u.rebirth.perks || []).filter(x => REBIRTH_PERKS.some(d => d.id === x)), perkId];
   if (perkId === 'talent') u.sp = (u.sp || 0) + 5;
   return save;
 }

@@ -188,16 +188,17 @@ export const REBIRTH = { reqLevel: 100, max: 5,
 };
 // 1.288.0 전승 특전 — 전승할 때마다 1개 선택 (영구, 그 캐릭터). max = 고를 수 있는 횟수
 export const REBIRTH_PERKS = [
-  { id: 'talent', icon: '✦', name: '깨달음', desc: '특성 포인트 +5', max: 5, color: '#e8c15a', v: 5 },
-  { id: 'skill', icon: '⚔', name: '갈래의 극의', desc: '갈래 전승 스킬 3종 위력 +15%', max: 5, color: '#e8826a', v: 0.15 },
+  // 1.288.1 PM 결정 — 4종 · 횟수 제한 없음(전승 횟수만큼). 보조 칸만 칸이 하나라 1회
+  { id: 'talent', icon: '✦', name: '깨달음', desc: '특성 포인트 +5', color: '#e8c15a', v: 5 },
+  { id: 'skill', icon: '⚔', name: '갈래의 극의', desc: '갈래 전승 스킬 3종 위력 +15%', color: '#e8826a', v: 0.15 },
   { id: 'famSub', icon: '🐾', name: '세 번째 계약', desc: '사역마 보조 칸 +1 (보조 3)', max: 1, color: '#b06cff', v: 1 },
-  { id: 'bag', icon: '🎒', name: '넓은 짐', desc: '가방 +20칸', max: 2, color: '#8fd08a', v: 20 },
-  { id: 'key', icon: '🗝', name: '던전 통행증', desc: '하루 열쇠 충전 +1 (계정 공유)', max: 2, color: '#9cc4e4', v: 1 },
-  { id: 'exp', icon: '📈', name: '빠른 성장', desc: 'Lv.100 미만 전투 경험치 +25%', max: 2, color: '#f0d27a', v: 0.25 },
+  { id: 'exp', icon: '📈', name: '빠른 성장', desc: 'Lv.100 미만 전투 경험치 +25%', color: '#f0d27a', v: 0.25 },
 ];
-export const rebirthPerkCount = (u, id) => (u?.rebirth?.perks || []).filter(x => x === id).length;
-export const rebirthPerkLeft = (u) => Math.max(0, (u?.rebirth?.count || 0) - (u?.rebirth?.perks || []).length);
-export const rebirthPerkOk = (u, id) => { const d = REBIRTH_PERKS.find(x => x.id === id); return !!d && rebirthPerkCount(u, id) < d.max; };
+// 없어진 특전(가방·열쇠)을 골랐던 저장은 세지 않는다 → 그만큼 다시 고를 수 있다
+const validPerks = (u) => (u?.rebirth?.perks || []).filter(x => REBIRTH_PERKS.some(d => d.id === x));
+export const rebirthPerkCount = (u, id) => validPerks(u).filter(x => x === id).length;
+export const rebirthPerkLeft = (u) => Math.max(0, (u?.rebirth?.count || 0) - validPerks(u).length);
+export const rebirthPerkOk = (u, id) => { const d = REBIRTH_PERKS.find(x => x.id === id); return !!d && (d.max == null || rebirthPerkCount(u, id) < d.max); };
 export const REBIRTH_BRANCHES = {
   w_warlord: { cls: 'wanderer', name: '검귀', type: '탱딜', color: '#e8826a', desc: '반격과 베기로 버티며 적을 쓸어버린다 — 회복이 없으니 치유 사역마와 궁합', fx: { atkPct: 0.12, counterPct: 0.08, counterDmg: 0.3 } },
   w_paladin: { cls: 'wanderer', name: '성기사', type: '탱힐', color: '#f0d27a', desc: '스스로 회복하고 보호막을 두른다 — 딜이 부족하니 맹공 사역마와 궁합', fx: { defPct: 0.1, hpPct: 0.06, healFromAtk: 0.4 } },
