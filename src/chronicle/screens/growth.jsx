@@ -7,7 +7,7 @@ import React, { useState } from 'react';
 import { PALETTE } from '../../utils/helpers.js';
 import { GlassPanel } from '../../components/ui/CommonUI.jsx';
 import { InfoSection, HiNum } from '../../components/ui/InfoBlocks.jsx';
-import { CHRONICLE_TUNING, CHRONICLE_SKILLS, STAT_META, STAT_KEYS, SKILL_MAX_LV, SLOTS, chronicleClass, classSkills, describeSkill, expNeedFor, rebirthExpMult, REBIRTH, REBIRTH_BRANCHES, REBIRTH_PERKS, rebirthPerkCount, rebirthPerkLeft, rebirthBranches , unitTitle } from '../data.js';
+import { CHRONICLE_TUNING, CHRONICLE_SKILLS, STAT_META, STAT_KEYS, SKILL_MAX_LV, SLOTS, chronicleClass, classSkills, describeSkill, expNeedFor, rebirthExpMult, REBIRTH, REBIRTH_BRANCHES, REBIRTH_PERKS, rebirthPerkCount, rebirthPerkLeft, rebirthBranches , unitTitle , rebirthLevelCap, rebirthReqLevel } from '../data.js';
 import * as E from '../engine.js';
 import * as TL from '../talents.js';
 import * as R from '../roster.js';
@@ -67,7 +67,9 @@ function RebirthSheet({ save, cid, onClose, onRebirth }) {
         { l: '던전 심연 등급', v: `심연 ${['Ⅰ', 'Ⅱ', 'Ⅲ', 'Ⅳ', 'Ⅴ'][next - 1]} 개방`, c: '#b06cff' }, { l: '기존 지역의 적', v: '강해지지 않음', c: '#8fd08a' },
         { l: '공격·HP·방어 영구', v: `+${Math.round(REBIRTH.bonusPct * next * 100)}%`, c: MS.gold }, { l: '장비', v: '레벨 맞춤 착용', c: '#8fd08a' },
         { l: '갈래 첫 스킬', v: '즉시 습득', c: '#8fd08a' }, { l: '사역마', v: '내 레벨까지 힘을 냄' },
-        { l: '레벨 상한', v: `Lv.${CHRONICLE_TUNING.maxLevel} → ${REBIRTH.levelCap}`, c: MS.gold },
+        { l: '레벨 상한', v: `Lv.${rebirthLevelCap(next - 1)} → ${rebirthLevelCap(next)}`, c: MS.gold },
+        { l: '사냥터', v: next >= 2 ? `심층 ${['Ⅰ', 'Ⅱ', 'Ⅲ', 'Ⅳ'][next - 2]} 개방` : '3부 개방', c: '#b06cff' },
+        { l: '다음 전승 조건', v: next >= REBIRTH.max ? '마지막 전승' : `Lv.${rebirthLevelCap(next)} 달성` },
       ]} />
       <div className="mt-1" style={{ fontSize: 11, color: PALETTE.textDim, lineHeight: 1.5 }}>장비는 <b style={{ color: PALETTE.text }}>장비 레벨 ≤ 내 레벨</b>일 때만 착용 효과 · 전승 장비·갈래 유니크가 떨어지기 시작한다</div>
       <MainSecHead title="갈 래 선 택" />
@@ -250,8 +252,8 @@ export function PartyView({ save, setSave, onBack, onForge }) {
         )}
         {E.canRebirth(save, cid) && (
           <button onClick={() => setRebirthOpen(true)} className="ui-press ui-sheen w-full text-left flex-none" style={{ padding: 12, borderRadius: 14, border: `1.5px solid ${PALETTE.legendary}`, background: `${PALETTE.legendary}18` }}>
-            <div className="font-bold" style={{ fontSize: 14, color: PALETTE.legendary }}>{u.rebirth?.count ? `✦ ${u.rebirth.count + 1}차 전승 가능 (선택)` : `✦ 전승 가능 — Lv.${REBIRTH.reqLevel} 달성`}</div>
-            <div style={{ fontSize: 12, color: PALETTE.textDim }}>{u.rebirth?.branch ? `능력치 +${Math.round(REBIRTH.bonusPct * 100)}% 추가 · 던전 심연 ${['Ⅰ', 'Ⅱ', 'Ⅲ', 'Ⅳ', 'Ⅴ'][u.rebirth.count]} 개방 · 레벨 1부터 다시 — 3부를 계속하려면 누르지 않아도 된다` : '두 갈래 중 하나를 골라 새로 태어난다 · 레벨 1부터 다시'}</div>
+            <div className="font-bold" style={{ fontSize: 14, color: PALETTE.legendary }}>{u.rebirth?.count ? `✦ ${u.rebirth.count + 1}차 전승 가능 — 만렙 Lv.${rebirthLevelCap(u.rebirth.count)} 달성` : `✦ 전승 가능 — Lv.${REBIRTH.reqLevel} 달성`}</div>
+            <div style={{ fontSize: 12, color: PALETTE.textDim }}>{u.rebirth?.branch ? `능력치 +${Math.round(REBIRTH.bonusPct * 100)}% 추가 · 던전 심연 ${['Ⅰ', 'Ⅱ', 'Ⅲ', 'Ⅳ', 'Ⅴ'][u.rebirth.count]} 개방 · 만렙 Lv.${rebirthLevelCap(u.rebirth.count + 1)} · 레벨 1부터 다시` : '두 갈래 중 하나를 골라 새로 태어난다 · 레벨 1부터 다시'}</div>
           </button>
         )}
 

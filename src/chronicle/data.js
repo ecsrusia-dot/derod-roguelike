@@ -174,6 +174,8 @@ export const DUNGEON_KEYS = {
 export const REBIRTH = { reqLevel: 100, max: 5,
   // 1.278.0 PM 결정 — 전승자는 Lv.100을 넘어 성장 (3부 적 Lv.100~118을 레벨로 넘는다). 100 이상 구간은 필요 경험치 × overExp
   levelCap: 120, overExp: 2,
+  // 1.294.0 PM 결정 — 전승 1회마다 만렙 +10 (1회 120 → 5회 160). 두 번째 전승부터는 그때의 만렙을 찍어야 전승할 수 있다.
+  capPerRebirth: 10, deepExp: 1.05, // deepExp = Lv.120 이상 필요 경험치 배율 (전승 횟수와 무관 — 10레벨 약 1,500전 목표)
   expMult: 2, expMultStep: 0.5, wearMargin: 5,
   // 1.282.0 PM 결정 — 전승 1회당 공격·HP·방어 +10% (이전 5%)
   bonusPct: 0.10,
@@ -282,7 +284,16 @@ export const rebirthExpMult = (count) => (count > 0 ? REBIRTH.expMult + REBIRTH.
 // 1.282.0 PM 결정 「빠른 재성장」 — 전승자의 Lv.1~99 필요 경험치 배율(×2~)을 없앴다. Lv.100 이상 구간은 이전과 같다 (전승 배율 × overExp — 3부 진행 속도 유지)
 // 전승자 표시 이름 — 갈래 이름 (없으면 기본 직업명)
 export const unitTitle = (u, classId) => (u?.rebirth?.branch && REBIRTH_BRANCHES[u.rebirth.branch]?.name) || chronicleClass(classId).name;
-export const expNeedFor = (u) => Math.round(CHRONICLE_TUNING.expNeed(u.lv) * (u.lv >= CHRONICLE_TUNING.maxLevel ? REBIRTH.overExp * rebirthExpMult(u.rebirth?.count || 0) : 1));
+// 전승 횟수 → 만렙 (0회 100 · 1회 120 · 2회 130 … 5회 160)
+export const rebirthLevelCap = (count = 0) => (count > 0 ? REBIRTH.levelCap + REBIRTH.capPerRebirth * (count - 1) : CHRONICLE_TUNING.maxLevel);
+// 전승에 필요한 레벨 — 첫 전승 100, 그 뒤로는 그때의 만렙
+export const rebirthReqLevel = (count = 0) => (count > 0 ? rebirthLevelCap(count) : REBIRTH.reqLevel);
+export const expNeedFor = (u) => {
+  const base = CHRONICLE_TUNING.expNeed(u.lv);
+  if (u.lv < CHRONICLE_TUNING.maxLevel) return Math.round(base);
+  if (u.lv >= REBIRTH.levelCap) return Math.round(base * REBIRTH.overExp * rebirthExpMult(1) * REBIRTH.deepExp); // 심층 구간 — 전승 횟수 무관
+  return Math.round(base * REBIRTH.overExp * rebirthExpMult(u.rebirth?.count || 0));
+};
 // branch를 주면 그 갈래 스킬까지 포함 (갈래 없는 유닛은 기본 스킬만)
 export const classSkills = (classId, branch = null) => Object.values(CHRONICLE_SKILLS).filter(s => s.cls === classId && (!s.branch || s.branch === branch));
 
@@ -366,12 +377,15 @@ export const SALVAGE = {
 };
 export const SALVAGE_ICON = { gold: '🪙', essence: '✦', shard: '◆', famShard: '📜', famSoul: '🔮' };
 
+export const DEEP_ROMAN = ['Ⅰ', 'Ⅱ', 'Ⅲ', 'Ⅳ'];
 export const CHRONICLE_PARTS = [
   { id: 1, name: '1부 · 끝나지 않는 황혼', fields: [1, 2, 3, 4] },
   { id: 2, name: '2부 · 여명의 배신', fields: [5, 6, 7, 8, 9] },
   { id: 3, name: '3부 · 황혼 너머', fields: [10, 11, 12], reqRebirth: 1 },
+  // 1.294.0 심층 — 3부 세 지역을 전승 횟수에 맞춰 +10레벨씩 다시 연다 (전승 n회 = 심층 n-1까지)
+  ...[1, 2, 3, 4].map(d => ({ id: 3 + d, name: `심층 ${DEEP_ROMAN[d - 1]} · Lv.${100 + 10 * d}~`, fields: [10 + 3 * d, 11 + 3 * d, 12 + 3 * d], reqRebirth: d + 1, depth: d })),
 ];
-export const CHRONICLE_FIELDS = [
+const BASE_FIELDS = [
   { id: 1, name: '북부 극지대', lv: [1, 12], bossLv: 14, bossKills: 30, area: { hpMult: 1, atkMult: 1 }, color: '#7ba3c4', normals: mob(1, 'normal'), elites: mob(1, 'elite'), boss: 'iceMage' },
   { id: 2, name: '죽은 자의 숲', lv: [12, 24], bossLv: 26, bossKills: 50, area: { hpMult: 1, atkMult: 1 }, color: '#7a9a5e', normals: mob(2, 'normal'), elites: mob(2, 'elite'), boss: 'twilightChild' },
   { id: 3, name: '봉인된 신전', lv: [24, 36], bossLv: 38, bossKills: 70, area: { hpMult: 1, atkMult: 1 }, color: '#d4a574', normals: mob(3, 'normal'), elites: mob(3, 'elite'), boss: 'oblivionSealer' },
@@ -387,6 +401,12 @@ export const CHRONICLE_FIELDS = [
   { ...champField(11, '공허의 회랑', 'void', [105, 110], 112, 170, '#b48cff', 'p3_v_boss'), part: 3, reqRebirth: 1, area: { hpMult: 1.69, atkMult: 1.38 } },
   { ...champField(12, '황혼의 근원', 'origin', [110, 115], 118, 180, '#ffb070', 'p3_o_boss'), part: 3, reqRebirth: 1, area: { hpMult: 1.875, atkMult: 1.495 } },
 ];
+// 심층 지역 (id 13~24) — 3부 지역 10·11·12를 그대로 두고 레벨만 +10×단계. 적·보스·그림·기믹은 원래 지역 것.
+const DEEP_FIELDS = [1, 2, 3, 4].flatMap(d => BASE_FIELDS.filter(f => f.part === 3).map(f => ({
+  ...f, id: f.id + 3 * d, base: f.id, depth: d, part: 3 + d, reqRebirth: d + 1,
+  lv: [f.lv[0] + 10 * d, f.lv[1] + 10 * d], bossLv: f.bossLv + 10 * d,
+})));
+export const CHRONICLE_FIELDS = [...BASE_FIELDS, ...DEEP_FIELDS];
 // 던전 (1.208.0 — 2곳 × 난이도 3단계). set = 에픽 장비 이름 세트
 export const CHRONICLE_DUNGEONS = [
   {
@@ -533,7 +553,7 @@ export const DUNGEON_TIERS = [
   //   배율 = 전설 × (HP 1.7 · 공격 1.35)^n — 예전 「전승할 때마다 모든 적 강화」를 여기로 옮겼다.
 //   시뮬 scripts/sim-chronicle-abyss.mjs (PM 저장 · Lv.120): 심연 Ⅳ(전승 4) 7~100% · 심연 Ⅴ(전승 5) 0~87%
   ...[1, 2, 3, 4, 5].map(n => ({
-    id: `abyss${n}`, label: `심연 ${['Ⅰ', 'Ⅱ', 'Ⅲ', 'Ⅳ', 'Ⅴ'][n - 1]}`, color: '#b06cff', abyss: n, reqRebirth: n, minLv: 100 + 4 * n, lv: 6,
+    id: `abyss${n}`, label: `심연 ${['Ⅰ', 'Ⅱ', 'Ⅲ', 'Ⅳ', 'Ⅴ'][n - 1]}`, color: '#b06cff', abyss: n, reqRebirth: n, minLv: 100 + 10 * n, lv: 6,
     hp: +(2.6 * Math.pow(1.7, n)).toFixed(2), atk: +(1.8 * Math.pow(1.35, n)).toFixed(2),
     epicMult: 3, shardMult: 3 + n, keyCost: 3, expMult: 1.4,
   })),

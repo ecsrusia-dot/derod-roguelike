@@ -7,7 +7,7 @@
 //   ② 내가 싸운 만큼만 세계가 흐른다 — 자리를 비워도 뒤처지지 않는다.
 //   ③ 경쟁자는 전투를 실제로 돌리지 않는다 — 봇 진행 시뮬에서 잰 「전투 수 → 레벨」 곡선을 따라간다.
 // ⚠ 밸런스 조정은 RIVAL_TUNING 한 곳.
-import { CHRONICLE_CLASSES, REBIRTH, REBIRTH_BRANCHES, chronicleClass } from './data.js';
+import { CHRONICLE_CLASSES, REBIRTH, REBIRTH_BRANCHES, chronicleClass, rebirthLevelCap } from './data.js';
 import { kstWeekKey } from './tower.js';
 import { famPool, grantFamiliar, famGradeIdx, FAM_GRADES } from './familiar.js';
 
@@ -20,6 +20,7 @@ export const RIVAL_TUNING = {
   firstCurve: [[0, 1], [103, 13], [272, 24], [549, 36], [907, 48], [1253, 58], [1638, 68], [2116, 79], [2507, 88], [3039, 99], [3150, 100]],
   regrowMult: 0.7,      // 전승 뒤 Lv.1→100은 첫 회차의 70% (레벨 맞춤 착용 + 경험치 1.5배)
   overBattles: 2300,    // Lv.100→120 (sim-chronicle-part3)
+  deepBattles: 1500,    // Lv.120 이후 10레벨마다 (1.294.0 — 전승마다 만렙 +10)
   overPow: 0.8,
   towerFrom: 48, towerPerLv: 1, towerPerRebirth: 6, towerSkill: [0.75, 1.2],
   scorePerRebirth: 120, towerDiv: 5,
@@ -38,11 +39,11 @@ function seeded(seed) {
   };
 }
 
-// 성향 — 전승 시점(goal 레벨)과 한 줄 소개
+// 성향 — 한 줄 소개 (1.294.0부터 전승 시점은 규칙으로 정해져 성향과 무관: 첫 전승 Lv.100 · 이후 그때의 만렙)
 export const RIVAL_STYLES = [
-  { id: 'rush', name: '전승 질주', goal: 100, desc: 'Lv.100이 되면 곧바로 전승한다' },
-  { id: 'steady', name: '꾸준한 등반', goal: 108, desc: '3부를 조금 밟고 전승한다' },
-  { id: 'deep', name: '끝까지 파는 쪽', goal: 120, desc: 'Lv.120을 찍고 나서야 전승한다' },
+  { id: 'rush', name: '전승 질주', goal: 100, desc: '만렙을 찍는 대로 곧바로 전승한다' },
+  { id: 'steady', name: '꾸준한 등반', goal: 108, desc: '쉬지 않고 꾸준히 레벨을 올린다' },
+  { id: 'deep', name: '끝까지 파는 쪽', goal: 120, desc: '한 캐릭터를 끝까지 판다' },
 ];
 export const RIVAL_BUILDS = ['공격 특화', '균형', '생존 특화'];
 export const RIVAL_FAMS = [['tank', '수호 동행'], ['healer', '치유 동행'], ['dps', '맹공 동행']];
@@ -99,20 +100,20 @@ export function rivalState(r, ticks) {
   const T = RIVAL_TUNING;
   let left = Math.max(0, ticks) * r.pace;
   const battles = Math.round(left);
-  const goal = (RIVAL_STYLES.find(s => s.id === r.style) || RIVAL_STYLES[0]).goal;
   const to100First = T.firstCurve[T.firstCurve.length - 1][0];
-  const overNeed = (g) => (g <= 100 ? 0 : T.overBattles * Math.pow((g - 100) / 20, 1 / T.overPow));
+  const overNeed = (g) => (g <= 100 ? 0 : g <= 120 ? T.overBattles * Math.pow((g - 100) / 20, 1 / T.overPow) : T.overBattles + (g - 120) / 10 * T.deepBattles);
   let rebirth = 0, lv = 1, peak = 1;
   for (let guard = 0; guard < 12; guard++) {
     const scale = rebirth === 0 ? 1 : T.regrowMult;
     const need100 = to100First * scale;
-    const cap = rebirth >= 1 ? REBIRTH.levelCap : 100; // 첫 회차는 Lv.100이 끝
-    const target = rebirth >= REBIRTH.max ? cap : Math.min(cap, Math.max(100, rebirth === 0 ? 100 : goal));
+    const cap = rebirthLevelCap(rebirth); // 첫 회차 100 · 전승 1회 120 · 이후 +10씩
+    // 1.294.0 — 첫 전승은 Lv.100(성향에 따라 더 올린 뒤), 두 번째부터는 그때의 만렙을 찍어야 전승
+    const target = rebirth === 0 ? 100 : cap;
     if (left < need100) { lv = Math.floor(lerpCurve(T.firstCurve, left / scale)); break; }
     left -= need100;
     const needOver = overNeed(target);
     if (left < needOver || rebirth >= REBIRTH.max) {
-      lv = Math.min(target, Math.floor(100 + 20 * Math.pow(Math.min(1, left / T.overBattles), T.overPow)));
+      lv = Math.min(target, left < T.overBattles ? Math.floor(100 + 20 * Math.pow(left / T.overBattles, T.overPow)) : 120 + Math.floor((left - T.overBattles) / T.deepBattles * 10));
       peak = Math.max(peak, lv);
       break;
     }

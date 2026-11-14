@@ -6,6 +6,7 @@
 // 데이터 + 순수 함수만 (engine.js가 import). 밸런스는 TOWER 한 곳.
 // ============================================
 import { CHRONICLE_FIELDS, CHRONICLE_DUNGEONS } from './data.js';
+const TOWER_FIELDS = CHRONICLE_FIELDS.filter(f => !f.depth); // 심층 지역(1.294.0)은 테마 순환에서 제외
 
 export const TOWER = {
   unlockField: 4,               // 마계의 균열 보스 처치 후 개방
@@ -40,11 +41,11 @@ export const towerArea = (floor) => {
 };
 
 // 적 풀 — 층 10개 단위로 사냥터 테마가 바뀐다 (1~10층 = 북부 극지대 … 순환)
-const FIELD_BOSSES = CHRONICLE_FIELDS.map(f => f.boss);
+const FIELD_BOSSES = TOWER_FIELDS.map(f => f.boss);
 const DUNGEON_BOSSES = CHRONICLE_DUNGEONS.map(d => d.floors[d.floors.length - 1].enemies[0]);
 export function towerTheme(floor) {
-  const i = Math.floor((floor - 1) / TOWER.bossEvery) % CHRONICLE_FIELDS.length;
-  return CHRONICLE_FIELDS[i];
+  const i = Math.floor((floor - 1) / TOWER.bossEvery) % TOWER_FIELDS.length;
+  return TOWER_FIELDS[i];
 }
 // 보스 순환: 사냥터 보스 → 던전 보스 번갈아
 export function towerBossKey(floor) {

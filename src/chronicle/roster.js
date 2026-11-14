@@ -9,7 +9,7 @@
 // roster = { [classId]: { lv, peak, rebirth } } — account.toView가 만들어 save 뷰에 넣는다
 // 데이터 + 순수 함수만 (engine·account가 이 파일을 쓴다)
 // ============================================
-import { CHRONICLE_TUNING as T, REBIRTH } from './data.js';
+import { CHRONICLE_TUNING as T, REBIRTH, rebirthLevelCap } from './data.js';
 
 export const ROSTER = { baseCap: 60, perChar: 10, unlockLv: 60 };
 export const ROSTER_MILESTONES = [20, 40, 60, 80, 100];
@@ -24,10 +24,10 @@ export function buildRoster(chars) {
 }
 export const reachedCount = (roster, lv) => Object.values(roster || {}).filter(r => r.peak >= lv).length;
 // 레벨 상한 — roster가 없으면(시뮬·구 뷰) 만렙
-// rebirthCount (1.278.0) — 전승자는 원정대 상한이 만렙(100)까지 풀려 있으면 REBIRTH.levelCap(120)까지 성장
+// rebirthCount (1.278.0) — 전승자는 원정대 상한이 만렙(100)까지 풀려 있으면 전승 횟수별 만렙(1회 120 · 이후 +10씩, rebirthLevelCap)까지 성장
 export function levelCap(roster, rebirthCount = 0) {
   const base = roster ? Math.min(T.maxLevel, ROSTER.baseCap + ROSTER.perChar * Math.max(0, reachedCount(roster, ROSTER.unlockLv) - 1)) : T.maxLevel;
-  return rebirthCount > 0 && base >= T.maxLevel ? REBIRTH.levelCap : base;
+  return rebirthCount > 0 && base >= T.maxLevel ? rebirthLevelCap(rebirthCount) : base;
 }
 // 다음 상한 해제까지 필요한 것 (UI)
 export function nextCapHint(roster) {
