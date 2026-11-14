@@ -20,10 +20,10 @@ function PerkList({ u, pick, onPick }) {
   return (
     <div className="grid gap-1.5 mt-1" style={{ gridTemplateColumns: '1fr 1fr' }}>
       {REBIRTH_PERKS.map(d => {
-        const n = rebirthPerkCount(u, d.id); const full = n >= d.max; const on = pick === d.id;
+        const n = rebirthPerkCount(u, d.id); const full = d.max != null && n >= d.max; const on = pick === d.id;
         return (
           <button key={d.id} disabled={full} onClick={() => onPick(d.id)} className="ui-press text-left" style={{ padding: 9, borderRadius: 12, border: `1.5px solid ${on ? d.color : MS.line}`, background: on ? `${d.color}1c` : MS.box, opacity: full ? 0.4 : 1 }}>
-            <div className="flex items-baseline justify-between gap-1"><b style={{ fontSize: 13, color: d.color }}>{d.icon} {d.name}</b><span style={{ fontSize: 11, color: PALETTE.textDim }}>{n}/{d.max}</span></div>
+            <div className="flex items-baseline justify-between gap-1"><b style={{ fontSize: 13, color: d.color }}>{d.icon} {d.name}</b><span style={{ fontSize: 11, color: PALETTE.textDim }}>{d.max != null ? (full ? '보유' : '1회만') : n > 0 ? `보유 ×${n}` : ''}</span></div>
             <div style={{ fontSize: 11.5, color: PALETTE.text, lineHeight: 1.4 }}>{d.desc}</div>
             {on && <div style={{ fontSize: 11, color: d.color }}>✓ 선택</div>}
           </button>
@@ -242,7 +242,7 @@ export function PartyView({ save, setSave, onBack, onForge }) {
         {rebirthPerkLeft(u) > 0 && (
           <button onClick={() => setPerkOpen(true)} className="ui-press ui-sheen w-full text-left flex-none" style={{ padding: 12, borderRadius: 14, border: `1.5px solid ${MS.gold}`, background: 'rgba(232,193,90,0.12)' }}>
             <div className="font-bold" style={{ fontSize: 14, color: MS.gold }}>🎁 전승 특전 선택 — {rebirthPerkLeft(u)}개 남음</div>
-            <div style={{ fontSize: 12, color: PALETTE.textDim }}>전승 1회마다 영구 특전 1개 (특성 포인트 · 전승 스킬 강화 · 사역마 보조 칸 · 가방 · 열쇠 · 경험치)</div>
+            <div style={{ fontSize: 12, color: PALETTE.textDim }}>전승 1회마다 영구 특전 1개 (특성 포인트 · 전승 스킬 강화 · 사역마 보조 칸 · 경험치)</div>
           </button>
         )}
         {(u.rebirth?.perks || []).length > 0 && (

@@ -30,5 +30,5 @@ for (const d of REBIRTH_PERKS) {
   if (s === base) { console.log(d.name, '선택 불가'); continue; }
   if (d.id === 'talent') s = { ...s, units: { ...s.units, [cid]: E.autoSpendTalents(structuredClone(s.units[cid])) || s.units[cid] } };
   const u = s.units[cid];
-  console.log(d.name.padEnd(8), winRate(s) + '%', `sp ${u.sp} · 가방 ${E.bagMax(s)} · 열쇠 충전 ${E.keyDailyRefill(s)} · 경험치 ×${E.regrowExpMult({ ...u, lv: 50 })} · 보조3 ${E.famSlotOpen(s, 'sub3')}`);
+  console.log(d.name.padEnd(8), winRate(s) + '%', `sp ${u.sp} · 경험치 ×${E.regrowExpMult({ ...u, lv: 50 })} · 보조3 ${E.famSlotOpen(s, 'sub3')}`);
 }
