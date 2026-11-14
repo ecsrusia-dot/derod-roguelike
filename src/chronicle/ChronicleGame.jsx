@@ -63,7 +63,7 @@ export default function ChronicleGame({ onExit }) {
   const lastFieldRef = useRef(null);
   // 반복 사냥 자동 상향 (1.272.0) — 기본 켬, 연속 「쉬운 승리」 수는 easyRef
   const [autoClimb, setAutoClimb] = useState(() => { try { return localStorage.getItem('chronicleAutoClimb') !== '0'; } catch { return true; } });
-  const toggleClimb = () => { const v = !autoClimb; setAutoClimb(v); try { localStorage.setItem('chronicleAutoClimb', v ? '1' : '0'); } catch { /* */ } };
+  const toggleClimb = () => { const v = !autoClimb; setAutoClimb(v); try { localStorage.setItem('chronicleAutoClimb', v ? '1' : '0'); } catch { /* */ } flash(v ? '⏫ 자동 상향 켬 — 쉬우면 다음 스테이지로 올라갑니다' : '자동 상향 끔 — 지금 스테이지에서만 반복합니다'); };
   const easyRef = useRef(0);
   // 패배 시 직전 성공 맵으로 반복 사냥 (1.273.0) — 마지막으로 이긴 사냥 자리 · 패배한 자리(자동 상향이 다시 올라가지 않게)
   const lastWinHuntRef = useRef(null);

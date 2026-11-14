@@ -481,7 +481,16 @@ export function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAga
                 sessionReport && ['📋 사냥 보고서', () => setStats(sessionReport), { color: MS.gold }],
                 battle.runReport && [battle.runReport.kind === 'tower' ? '🗼 첨탑 집계' : '🏰 던전 집계', () => setStats(battle.runReport), { color: '#c08ae8' }],
                 next && [`⏸ 잠시 멈추기`, onDone, { color: PALETTE.textDim }],
-                onToggleClimb && !autoProg && ctx.kind === 'field' && ctx.type !== 'boss' && [autoClimb ? '⏫ 자동 상향 켬' : '⏫ 자동 상향 끔', onToggleClimb, autoClimb ? { color: MS.gold } : { color: PALETTE.textDim }],
+                // 1.291.1 — 켬/끔이 한눈에 보이는 스위치 (켬 = 금색 채움 + 오른쪽 손잡이 / 끔 = 회색 + 왼쪽 손잡이)
+                onToggleClimb && !autoProg && ctx.kind === 'field' && ctx.type !== 'boss' && ['자동 상향', onToggleClimb,
+                  autoClimb ? { border: `1px solid ${MS.gold}`, background: 'rgba(232,176,74,0.2)', color: MS.gold, fontWeight: 800 } : { color: PALETTE.textDim, background: 'rgba(0,0,0,0.25)' },
+                  <span className="flex items-center justify-center gap-1.5" aria-label={`자동 상향 ${autoClimb ? '켬' : '끔'}`}>
+                    <span>자동 상향</span>
+                    <span style={{ position: 'relative', width: 38, height: 18, borderRadius: 9, flex: 'none', background: autoClimb ? MS.gold : 'rgba(255,255,255,0.16)', transition: 'background .18s' }}>
+                      <span style={{ position: 'absolute', top: 0, bottom: 0, left: autoClimb ? 6 : 'auto', right: autoClimb ? 'auto' : 6, fontSize: 11, lineHeight: '18px', fontWeight: 800, color: autoClimb ? '#2a1a08' : '#b8aea4' }}>{autoClimb ? '켬' : '끔'}</span>
+                      <span style={{ position: 'absolute', top: 3, left: autoClimb ? 23 : 3, width: 12, height: 12, borderRadius: 6, background: autoClimb ? '#2a1a08' : '#8a8078', transition: 'left .18s' }} />
+                    </span>
+                  </span>],
                 !next && ctx.kind === 'field' && sim.result === 'win' && ctx.type !== 'boss' && ['⚔ 한 번 더', onAgain, {}],
               ].filter(Boolean);
               return <>
@@ -491,7 +500,7 @@ export function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAga
                     : <button onClick={onDone} className="ui-press" style={sq(hot)}>{back}</button>}
                 </div>
                 <div className="grid gap-1.5 mt-1.5" style={{ gridTemplateColumns: `repeat(${Math.min(sub.length, 3)}, 1fr)` }}>
-                  {sub.map(([l, fn, ex]) => <button key={l} onClick={fn} className="ui-press truncate" style={sm(ex)}>{l}</button>)}
+                  {sub.map(([l, fn, ex, node]) => <button key={l} onClick={fn} className="ui-press truncate" style={sm(ex)}>{node || l}</button>)}
                 </div>
               </>;
             })()}
