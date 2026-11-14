@@ -14,6 +14,7 @@ import * as Q from '../quest.js';
 import * as A from '../account.js';
 import * as F from '../familiar.js';
 import * as D from '../daily.js';
+import * as RV from '../rival.js';
 import { CENEMIES as ENEMIES } from '../enemies.js';
 import { Header, Wallet, Bar, XP_HERO, expSnap, xpPct, MainKvRows, MS, CLASS_PATH, MainSecHead, MainModal } from './common.jsx';
 
@@ -233,14 +234,16 @@ export function TownView({ save, acc, go, onExit, onSwitchChar, onClaimAll }) {
     { id: 'stash', icon: '🏛', label: '공용 창고', sub: `${(save.stash || []).length}/${A.STASH_MAX} · 모든 캐릭터 공유` },
     { id: 'forge', icon: '⚒', label: '대장간', sub: '강화 · 등급 승급' },
     { id: 'daily', icon: '📅', label: '일일 · 주간 임무', sub: (() => { const n = D.DAILY_MISSIONS.filter(m => D.missionState(acc, m).status !== 'progress').length; const w = D.WEEKLY_MISSIONS.filter(m => D.weeklyMissionState(acc, m).status !== 'progress').length; return `오늘 ${n}/${D.DAILY_MISSIONS.length} · 주간 ${w}/${D.WEEKLY_MISSIONS.length}`; })(), badge: D.dailyBadge(acc) + D.weeklyBadge(acc) > 0 },
+    (() => { const b = RV.myBestRank(acc); const got = RV.rivalWeekClaimed(acc); return { id: 'rival', icon: '🏆', label: '경쟁자 순위', sub: b ? `${b.rank}위 / ${b.total}명${got ? '' : ' · 주간 보상'}` : '가상 경쟁자 100명', badge: !!b && !got }; })(),
     { id: 'exit', icon: '⇄', label: '게임 선택', sub: '진행은 자동 저장' },
   ];
   const byId = Object.fromEntries(tiles.map(t => [t.id, t]));
   const GROUPS = [
     { label: '전 투', ids: ['field', 'dungeon', 'tower'] },
     { label: '성 장', ids: ['party', 'fam', 'forge'] },
-    { label: '의 뢰 · 원 정 대', ids: ['quests', 'daily', 'roster'] },
-    { label: '레 이 드 · 보 관', ids: ['raid', 'bag', 'stash'] },
+    { label: '의 뢰 · 경 쟁', ids: ['quests', 'daily', 'rival'] },
+    { label: '원 정 대', ids: ['roster', 'raid'] },
+    { label: '보 관', ids: ['bag', 'stash'] },
   ];
   const fx = expSnap(save).fam;
   const ff = fx && save.fams[fx.key];
@@ -288,7 +291,7 @@ export function TownView({ save, acc, go, onExit, onSwitchChar, onClaimAll }) {
         {GROUPS.map(gp => (
           <div key={gp.label}>
             <MainSecHead title={gp.label} />
-            <div className="grid grid-cols-3 gap-1.5 ui-stagger">
+            <div className="grid gap-1.5 ui-stagger" style={{ gridTemplateColumns: `repeat(${Math.min(3, gp.ids.length)}, 1fr)` }}>
               {gp.ids.map(id => byId[id]).map(t => (
                 <button key={t.id} disabled={t.locked} onClick={() => (t.id === 'exit' ? onExit() : go(t.id))} aria-label={t.label} className="ui-press relative text-left" style={{ padding: '9px 8px', borderRadius: 12, background: MS.box, border: `1px solid ${MS.line}`, opacity: t.locked ? 0.45 : 1, minHeight: 78 }}>
                   <div style={{ fontSize: 18 }}>{t.icon}</div>

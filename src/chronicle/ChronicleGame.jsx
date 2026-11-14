@@ -23,6 +23,7 @@ import { expSnap } from './screens/common.jsx';
 import { BattleView } from './screens/battle.jsx';
 import { DepartView, fmtWhen, SummaryLine, TitleView, GiftNotice, SceneView, OfflineSheet } from './screens/title.jsx';
 import { RaidView, RosterView, TownView } from './screens/town.jsx';
+import { RivalView } from './screens/rival.jsx';
 import { FieldView, DungeonView, TowerView } from './screens/field.jsx';
 import { PartyView } from './screens/growth.jsx';
 import { BagView, StashView } from './screens/bag.jsx';
@@ -512,6 +513,8 @@ export default function ChronicleGame({ onExit }) {
     content = <StashView save={save} setSave={setSave} onBack={() => setView('town')} flash={flash} />;
   } else if (view === 'daily') {
     content = <DailyView acc={acc} onBack={() => setView('town')} onSwitch={(cid) => { setRepeat(false); setAcc(a => A.selectCharacter(a, cid)); }} onAct={(fn) => { const r = fn(acc); if (!r.n) return; setAcc(r.acc); flash(`임무 보상 ${r.n}건 수령 — ${D.dailyRewardText(r.reward)}`); }} />;
+  } else if (view === 'rival') {
+    content = <RivalView acc={acc} onBack={() => setView('town')} onAct={(fn) => { const r = fn(acc); if (!r.n) return; setAcc(r.acc); flash(`${r.rank}위 · 주간 순위 보상을 받았습니다`); }} />;
   } else if (view === 'forge') {
     content = <ForgeView save={save} setSave={setSave} onBack={() => setView('town')} flash={flash} onTrack={trackDaily} />;
   } else {
