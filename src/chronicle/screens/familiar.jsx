@@ -136,7 +136,7 @@ function MainFamTeam({ save, onOpen, onPick }) {
             {f ? <img src={chronicleEnemyArt(k)} alt="" className="w-full object-cover" style={{ height: 72, display: 'block' }} />
               : <div className="flex items-center justify-center" style={{ height: 72, fontSize: 22, color: PALETTE.textDim }}>{open ? '＋' : '🔒'}</div>}
             <div style={{ padding: '4px 6px' }}>
-              <div className="truncate font-bold" style={{ fontSize: 11.5, color: f ? g.color : PALETTE.textDim }}>{f ? `${F.famName(k)}${f.plus ? ` +${f.plus}` : ''}` : open ? '비어 있음' : `Lv.${F.FAM_TUNING.slotLv[sl]} 개방`}</div>
+              <div className="truncate font-bold" style={{ fontSize: 11.5, color: f ? g.color : PALETTE.textDim }}>{f ? `${F.famName(k)}${F.famPlusText(f)}` : open ? '비어 있음' : `Lv.${F.FAM_TUNING.slotLv[sl]} 개방`}</div>
               <div className="truncate" style={{ fontSize: 11, color: PALETTE.textDim }}>{f ? `${g.label} · ${role.icon}${role.label} · Lv.${F.famLv(f)}` : open ? '눌러서 편성' : '주인공 레벨'}</div>
             </div>
           </button>
@@ -165,7 +165,7 @@ function MainFamCard({ k, f, heroLv, famPct = 0, slot, onClick, dim = false, hid
         <img src={chronicleEnemyArt(k)} alt="" className="flex-none object-cover" style={{ width: 52, height: 52, borderRadius: 8, border: `1px solid ${g.color}` }} />
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline justify-between gap-2">
-            <span className="truncate font-bold" style={{ fontSize: 13.5, color: g.color }}>{F.famName(k)}{f.plus ? ` +${f.plus}` : ''}{slot && <span style={{ marginLeft: 5, fontSize: 11, padding: '0 5px', border: `1px solid ${slot === 'main' ? MS.gold : MS.violet}`, color: slot === 'main' ? MS.gold : MS.violet }}>{FAM_SLOT_TAG[slot]}</span>}</span>
+            <span className="truncate font-bold" style={{ fontSize: 13.5, color: g.color }}>{F.famName(k)}{F.famPlusText(f)}{slot && <span style={{ marginLeft: 5, fontSize: 11, padding: '0 5px', border: `1px solid ${slot === 'main' ? MS.gold : MS.violet}`, color: slot === 'main' ? MS.gold : MS.violet }}>{FAM_SLOT_TAG[slot]}</span>}</span>
             <b className="flex-none" style={{ fontSize: 12.5, color: MS.gold }}>Lv.{F.famLv(f)}</b>
           </div>
           <div style={{ fontSize: 11, color: PALETTE.textDim }}>{g.label} · <span style={{ color: role.color }}>{role.icon} {role.label}</span>{slot ? '' : ' · 대기'}{lvLow ? ` · 보조 효과 ${F.famSubPctOf(f, heroLv)}%` : ''}</div>
@@ -249,7 +249,7 @@ function MainFamSkill({ k, f, save }) {
       {pv && <div className="mt-2" style={{ padding: '8px 10px', border: '1px solid #c79bff88', background: MS.box, borderRadius: MS.r, fontSize: 12.5, lineHeight: 1.55 }}><b style={{ color: '#c79bff' }}>◇ 자령 고유 패시브 「{pv.name}」</b> <HiNum text={pv.desc} /></div>}
       {skills.map(sk => (
         <div key={sk.id} className="mt-2" style={{ padding: '8px 10px', border: `1px solid ${sk.sig ? '#d07ae888' : MS.line}`, background: MS.box, borderRadius: MS.r, fontSize: 12.5, lineHeight: 1.55 }}>
-          <div className="flex justify-between gap-2"><b style={{ color: sk.sig ? '#d07ae8' : MS.red }}>◇ {sk.sig ? '고유 스킬 ' : ''}「{sk.name}」</b><span style={{ fontSize: 11, color: PALETTE.textDim }}>⏱ {sk.cd}턴 · {sk.sig ? sk.sigType : FAM_KIND_LABEL[sk.kind] || sk.kind}</span></div>
+          <div className="flex justify-between gap-2"><b style={{ color: sk.sig ? '#d07ae8' : MS.red }}>◇ {sk.trans ? '초월 스킬 ' : sk.sig ? '고유 스킬 ' : ''}「{sk.name}」</b><span style={{ fontSize: 11, color: PALETTE.textDim }}>⏱ {sk.cd}턴 · {sk.sig ? sk.sigType : FAM_KIND_LABEL[sk.kind] || sk.kind}</span></div>
           <div style={{ color: PALETTE.text }}><HiNum text={sk.effect} /></div>
           {sk.when && <div style={{ fontSize: 11, color: PALETTE.textDim }}>발동: {sk.when}</div>}
         </div>
@@ -403,7 +403,7 @@ export function FamiliarView({ save, setSave, onBack, flash, onTrack = () => {} 
         const vc = F.FAM_TUNING.evolveCost(selF.grade);
         const last = gi >= F.FAM_GRADES.length - 1;
         return (
-          <MainModal img={chronicleEnemyArt(sel)} kicker={`${g.label} · ${F.FAM_ROLES[F.famRole(sel)].label}`.split('').join(' ').replace(/ {3}/g, '  ')} title={`${F.famName(sel)}${selF.plus ? ` +${selF.plus}` : ''}`} color={g.color} badge={`Lv.${F.famLv(selF)}`}
+          <MainModal img={chronicleEnemyArt(sel)} kicker={`${g.label} · ${F.FAM_ROLES[F.famRole(sel)].label}`.split('').join(' ').replace(/ {3}/g, '  ')} title={`${F.famName(sel)}${F.famPlusText(selF)}`} color={g.color} badge={`Lv.${F.famLv(selF)}`}
             sub={`Lv.${F.famLv(selF)} / ${heroLv}${slotOf(sel) ? ` · ${FAM_SLOT_TAG[slotOf(sel)]} 중` : ' · 대기'}`} onClose={() => setSel(null)}
             footer={<div className="grid gap-1.5" style={{ gridTemplateColumns: '1fr 1fr' }}>
               {slotOf(sel) ? <button onClick={() => { setSave(E.setFamTeam(save, slotOf(sel), null)); flash('편성 해제'); }} className="ui-press" style={{ height: 42, border: `1px solid ${MS.gold}`, color: MS.gold, background: 'transparent', fontSize: 13, gridColumn: 'span 2' }}>편성 해제</button> : <>
@@ -438,6 +438,28 @@ export function FamiliarView({ save, setSave, onBack, flash, onTrack = () => {} 
                   {last ? '최고 등급' : <>✦ 진화 → {F.FAM_GRADES[gi + 1].label}<br /><span style={{ fontSize: 11 }}>{maxed ? `🔮 ${vc} · ${Math.round(F.famEvolveRate(selF) * 100)}% (최대 ${F.famEvolveMaxTries(selF.grade)}회)` : `+${F.FAM_TUNING.maxPlus}에서 도전`}</span></>}
                 </button>
               </div>
+              {selF.grade === 'violet' && (() => {
+                const t = F.famTrans(selF); const full = t >= F.FAM_TRANS.max; const can = F.famCanTranscend(selF); const tc = F.famTransCost(selF); const ok = can && souls >= tc;
+                return (
+                  <div className="mt-2" style={{ padding: 10, borderRadius: MS.r, border: `1px solid ${MS.violet}`, background: 'rgba(208,122,232,0.08)' }}>
+                    <div className="flex items-center justify-between">
+                      <b style={{ fontSize: 13, color: MS.violet }}>◈ 초월 {t} / {F.FAM_TRANS.max}</b>
+                      <span className="flex gap-1">{Array.from({ length: F.FAM_TRANS.max }, (_, i) => <span key={i} style={{ width: 16, height: 6, borderRadius: 3, background: i < t ? MS.violet : '#ffffff1a' }} />)}</span>
+                    </div>
+                    <div className="mt-1" style={{ fontSize: 11.5, color: PALETTE.text, lineHeight: 1.5 }}>
+                      단계마다 능력치·보조 효과 <b style={{ color: MS.gold }}>+{Math.round(F.FAM_TRANS.statPct * 100)}%</b> (지금 +{Math.round(F.FAM_TRANS.statPct * t * 100)}%) · 초월 {F.FAM_TRANS.skillAt}에서 초월 스킬 <b style={{ color: MS.violet }}>「{F.famTransSkill(sel).name}」</b> {F.famHasTransSkill(selF) ? '개방됨' : '개방'}
+                    </div>
+                    <button disabled={!ok} onClick={() => {
+                      const r = E.transcendFam(save, sel); if (!r.result) return; setSave(r.save);
+                      const nf = r.save.fams[sel];
+                      flash(r.result === 'success' ? `초월 성공! ◈${F.famTrans(nf)}${F.famHasTransSkill(nf) && F.famTrans(nf) === F.FAM_TRANS.skillAt ? ` — 초월 스킬 「${F.famTransSkill(sel).name}」 개방` : ''}` : `초월 실패 — 잃은 것은 사역혼뿐 · 다음 성공률 ${Math.round(F.famTransRate(nf) * 100)}%`);
+                    }} className="ui-press w-full mt-2" style={{ height: 40, fontSize: 12.5, fontWeight: 800, border: `1px solid ${ok ? MS.violet : MS.line}`, background: ok ? 'rgba(208,122,232,0.18)' : 'transparent', color: ok ? MS.violet : PALETTE.textDim }}>
+                      {full ? '초월 완료' : !can ? `강화 +${F.FAM_TUNING.maxPlus}에서 초월 도전` : `◈ 초월 ${t}→${t + 1} · 🔮 ${tc} · 성공률 ${Math.round(F.famTransRate(selF) * 100)}%`}
+                    </button>
+                    {!full && <div className="mt-1" style={{ fontSize: 11, color: PALETTE.textDim }}>실패해도 강화·초월 단계는 그대로 · 실패할 때마다 다음 성공률 +{Math.round(F.FAM_TRANS.pityAdd * 100)}%p</div>}
+                  </div>
+                );
+              })()}
               <div className="mt-2" style={{ padding: '8px 10px', border: `1px solid ${MS.line}`, background: MS.box, borderRadius: MS.r, fontSize: 12, color: PALETTE.text, lineHeight: 1.55 }}>
                 <b style={{ color: MS.red }}>◇ 진화</b> 같은 사역마의 등급이 오른다 · 성공하면 강화 +0으로 · 실패하면 강화 -{F.famEvolveFailDrop(selF.grade)} · 실패할수록 다음 성공률 +{Math.round((F.FAM_TUNING.evolvePityAdd[selF.grade] || 0) * 100)}%p
               </div>
