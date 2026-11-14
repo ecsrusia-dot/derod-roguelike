@@ -3,13 +3,100 @@
 // ============================================
 import React, { useState, useMemo } from 'react';
 import { PALETTE } from '../../utils/helpers.js';
-import { chronicleClass, REBIRTH_BRANCHES } from '../data.js';
+import { chronicleClass, REBIRTH_BRANCHES, CHRONICLE_SKILLS, SLOTS } from '../data.js';
+import * as E from '../engine.js';
+import * as TL from '../talents.js';
+import { MainGearCard } from './gear.jsx';
 import * as RV from '../rival.js';
 import * as AR from '../arena.js';
 import * as D from '../daily.js';
 import * as F from '../familiar.js';
 import { chronicleEnemyArt } from '../data.js';
-import { Header, Portrait, MainTabs, MainModal, MainKvRows, MainSecHead, MS } from './common.jsx';
+import { Header, Portrait, MainTabs, MainModal, MainKvRows, MainSecHead, MainCell, MS } from './common.jsx';
+
+// 경쟁자 상세 (1.293.1) — 투기장에서 실제로 싸우는 캐릭터를 그대로 보여 준다 (AR.rivalSave가 조립한 것)
+const pct1 = (v) => `${Math.round((v || 0) * 1000) / 10}%`;
+const RIVAL_STAT_ROWS = [
+  ['치명타 확률', 'crit', pct1], ['치명타 피해', 'critMult', (v) => `×${Math.round(v * 100) / 100}`], ['회피', 'dodge', pct1],
+  ['받는 피해 감소', 'dmgReduce', pct1], ['방어 무시', 'armorPen', pct1], ['스킬 피해', 'skillDmg', (v) => `+${pct1(v)}`],
+  ['지속 피해', 'dotDmg', (v) => `+${pct1(v)}`], ['추가 타격', 'chain', pct1], ['반격 확률', 'counterPct', pct1],
+  ['반격 피해', 'counterDmg', (v) => `+${pct1(v)}`], ['흡혈', 'lifesteal', pct1], ['회복량', 'healPct', (v) => `+${pct1(v)}`],
+  ['매 턴 재생', 'regenPct', pct1], ['시작 보호막', 'startShieldPct', pct1], ['전체 재사용 감소', 'cdr', (v) => `-${v}턴`],
+];
+function RivalDetail({ def, st }) {
+  const [tab, setTab] = useState('stat');
+  const save = useMemo(() => AR.rivalSave(def, st), [def, st.lv, st.rebirth]);
+  const u = save.units[def.cls];
+  const d = useMemo(() => E.deriveUnit(save, def.cls), [save]);
+  const m = AR.ARENA.rivalMult;
+  const items = Object.keys(u.equip || {}).map(sl => save.inventory.find(it => it.uid === u.equip[sl])).filter(Boolean);
+  const skills = Object.entries(u.skills || {}).map(([id, lv]) => ({ s: CHRONICLE_SKILLS[id], lv })).filter(x => x.s);
+  const trees = TL.talentTrees(def.cls, u.rebirth?.branch || null).map(t => ({ t, pts: TL.treePoints(u, t.id), nodes: t.tiers.flat().filter(n => u.talents?.[n.id]) })).filter(x => x.pts > 0);
+  const fk = save.famTeam?.main; const ff = fk && save.fams?.[fk];
+  const famSt = ff ? F.famStats(fk, ff, u.lv, d.famPct || 0) : null;
+  const famReso = ff ? F.famReso(fk, ff, u.rebirth?.branch || null, def.cls) : null;
+  const famPv = ff ? F.famPassive(fk, ff) : null;
+  const box = { padding: '8px 10px', background: MS.box, border: `1px solid ${MS.line}`, borderRadius: MS.r, fontSize: 12.5, lineHeight: 1.55 };
+  return (
+    <>
+      <div className="mt-2"><MainTabs value={tab} onChange={setTab} items={[['stat', '능력치'], ['gear', '장비'], ['skill', '스킬·특성'], ['fam', '사역마']]} /></div>
+      {tab === 'stat' && <>
+        <div className="grid gap-1.5 mt-2" style={{ gridTemplateColumns: '1fr 1fr' }}>
+          <MainCell label="HP (투기장)" value={Math.round(d.maxHp * m).toLocaleString()} />
+          <MainCell label="공격력 (투기장)" value={Math.round(d.atk * m).toLocaleString()} color={MS.gold} />
+          <MainCell label="방어" value={d.def.toLocaleString()} color={MS.blue} />
+          <MainCell label="속도" value={d.spd} />
+        </div>
+        <div className="mt-1" style={{ fontSize: 11, color: PALETTE.textDim, lineHeight: 1.5 }}>투기장에서는 경쟁자의 HP·공격력에 ×{m}이 곱해진다 (경쟁자가 따로 갖추지 않는 보조 사역마·보유 효과·인연·원정대 몫). 장비만의 값은 HP {d.maxHp.toLocaleString()} · 공격력 {d.atk.toLocaleString()}.</div>
+        <MainSecHead title="기 본 능 력 치" />
+        <MainKvRows rows={[['힘', 'str'], ['지능', 'int'], ['민첩', 'agi'], ['체력', 'vit']].map(([l, k]) => ({ l, v: u.stats?.[k] || 0 }))} />
+        <MainSecHead title="전 투 수 치" />
+        <MainKvRows rows={RIVAL_STAT_ROWS.filter(([, k]) => d[k]).map(([l, k, f]) => ({ l, v: f(d[k]) }))} />
+      </>}
+      {tab === 'gear' && <div className="flex flex-col gap-1.5 mt-2">
+        {items.map(it => <MainGearCard key={it.uid} it={it} note={SLOTS.find(x => x.id === it.slot)?.label} />)}
+        {!items.length && <div style={{ fontSize: 12, color: PALETTE.textDim }}>착용 장비 없음</div>}
+      </div>}
+      {tab === 'skill' && <>
+        <MainSecHead title="스 킬" />
+        <MainKvRows rows={skills.map(({ s, lv }) => ({ l: `${s.branch ? '✦ ' : ''}${s.name}`, v: `Lv.${lv}${s.cd ? ` · ⏱${s.cd}턴` : ' · 패시브'}`, c: s.branch ? MS.gold : undefined }))} />
+        <MainSecHead title="특 성" />
+        {trees.length ? trees.map(({ t, pts, nodes }) => (
+          <div key={t.id} className="mt-1.5" style={box}>
+            <div className="flex justify-between"><b style={{ color: t.color || MS.gold }}>{t.branch ? '✦ ' : ''}{t.name}</b><span style={{ color: MS.gold, fontWeight: 800 }}>{pts}점</span></div>
+            <div style={{ fontSize: 11.5, color: PALETTE.textDim }}>{nodes.map(n => `${n.name} ${u.talents[n.id]}`).join(' · ')}</div>
+          </div>
+        )) : <div style={{ fontSize: 12, color: PALETTE.textDim }}>찍은 특성 없음</div>}
+        <MainSecHead title="전 승" />
+        <MainKvRows rows={[{ l: '전승 횟수', v: `${u.rebirth?.count || 0}회`, c: u.rebirth?.count ? MS.gold : undefined }, { l: '갈래', v: u.rebirth?.branch ? REBIRTH_BRANCHES[u.rebirth.branch]?.name : '전승 전', c: u.rebirth?.branch ? REBIRTH_BRANCHES[u.rebirth.branch]?.color : undefined }, { l: '전승 특전', v: '없음 (경쟁자는 특전을 고르지 않는다)' }]} />
+      </>}
+      {tab === 'fam' && (ff ? <>
+        <div className="flex gap-2.5 mt-2" style={box}>
+          <img src={chronicleEnemyArt(fk)} alt="" className="flex-none object-cover" style={{ width: 56, height: 56, borderRadius: 8, border: `1px solid ${F.famGrade(ff.grade).color}` }} />
+          <div className="flex-1 min-w-0">
+            <b style={{ fontSize: 13.5, color: F.famGrade(ff.grade).color }}>{F.famName(fk)}{F.famPlusText(ff)}</b>
+            <div style={{ fontSize: 11.5, color: PALETTE.textDim }}>{F.famGrade(ff.grade).label} · {F.FAM_ROLES[F.famRole(fk)].icon} {F.FAM_ROLES[F.famRole(fk)].label} · 동행 칸 · Lv.{F.famLv(ff)}</div>
+          </div>
+        </div>
+        <div className="grid gap-1.5 mt-2" style={{ gridTemplateColumns: '1fr 1fr' }}>
+          <MainCell label="HP (투기장)" value={Math.round(famSt.maxHp * m).toLocaleString()} />
+          <MainCell label="공격력 (투기장)" value={Math.round(famSt.atk * m).toLocaleString()} color={MS.gold} />
+          <MainCell label="방어" value={famSt.def.toLocaleString()} color={MS.blue} />
+          <MainCell label="회복력" value={famSt.healPower.toLocaleString()} color="#8fd08a" />
+        </div>
+        {famReso && <div className="mt-2" style={{ ...box, borderColor: famReso.on ? '#7fe0c0aa' : MS.line }}><b style={{ color: famReso.on ? '#7fe0c0' : PALETTE.textDim }}>✦ 공명 「{famReso.name}」 {famReso.on ? '켜짐' : '꺼짐'}</b><div style={{ color: famReso.on ? PALETTE.text : PALETTE.textDim }}>{famReso.desc}</div></div>}
+        {famPv && <div className="mt-2" style={box}><b style={{ color: '#c79bff' }}>◇ 고유 패시브 「{famPv.name}」</b> {famPv.desc}</div>}
+        {F.famSkillInfo(fk, ff).map(sk => (
+          <div key={sk.id} className="mt-2" style={box}>
+            <div className="flex justify-between gap-2"><b style={{ color: sk.sig ? '#d07ae8' : MS.red }}>◇ {sk.sig ? '고유 스킬 ' : ''}「{sk.name}」</b><span style={{ fontSize: 11, color: PALETTE.textDim }}>⏱ {sk.cd}턴</span></div>
+            <div>{sk.effect}</div>
+          </div>
+        ))}
+        <div className="mt-2" style={{ fontSize: 11, color: PALETTE.textDim }}>보조 칸 사역마는 없다 (경쟁자는 동행 1마리만 데리고 다닌다).</div>
+      </> : <div className="mt-2" style={{ fontSize: 12, color: PALETTE.textDim }}>사역마 없음 (Lv.20부터 동행)</div>)}
+    </>
+  );
+}
 
 const RANK_COLOR = (rank) => (rank === 1 ? '#f0d27a' : rank <= 3 ? '#e8b04a' : rank <= 10 ? '#9cc4e4' : PALETTE.textDim);
 const titleOf = (x) => (x.branch && x.rebirth > 0 ? REBIRTH_BRANCHES[x.branch]?.name : null) || chronicleClass(x.cls).name;
@@ -238,7 +325,11 @@ export function RivalView({ acc, onBack, onAct, top = 'rank', onTop, onFight, on
               { l: '육성', v: RV.RIVAL_BUILDS[selDef.build] }, { l: '사역마', v: RV.RIVAL_FAMS[selDef.fam][1] },
             ] : []),
           ]} />
-          {selDef && <div className="mt-2" style={{ fontSize: 12, color: PALETTE.textDim, lineHeight: 1.5 }}>{RV.RIVAL_STYLES.find(s => s.id === selDef.style).desc}. 내가 전투 100회를 하면 이 경쟁자는 약 <b style={{ color: PALETTE.text }}>{Math.round(selDef.pace * 100)}회</b>를 이 캐릭터에 쓴다.</div>}
+          {selDef && <div className="mt-2" style={{ padding: '8px 10px', background: MS.box, border: `1px solid ${MS.line}`, borderRadius: MS.r, fontSize: 12, color: PALETTE.textDim, lineHeight: 1.55 }}>
+            <b style={{ color: MS.gold }}>활동량 {Math.round(selDef.pace * 100)}%</b> — {RV.RIVAL_STYLES.find(s => s.id === selDef.style).desc}.<br />
+            경쟁자는 실제 사람이 아니라서, <b style={{ color: PALETTE.text }}>내 계정 전체 전투 수</b>에 맞춰 자란다. 내가 (어느 캐릭터로든) 전투 100회를 하면 이 경쟁자는 <b style={{ color: PALETTE.text }}>{Math.round(selDef.pace * 100)}회</b> 싸운 것으로 계산한다. 이 값은 경쟁자마다 {Math.round(RV.RIVAL_TUNING.paceMin * 100)}~{Math.round(RV.RIVAL_TUNING.paceMax * 100)}%로 달라서, 높을수록 빨리 크는 경쟁자다.
+          </div>}
+          {selDef && <RivalDetail def={selDef} st={RV.rivalState(selDef, ticks)} />}
         </MainModal>
       )}
     </div>
