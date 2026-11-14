@@ -11,6 +11,7 @@ import { GlassPanel, UIButton, BottomSheet } from '../components/ui/CommonUI.jsx
 import { CHRONICLE_SAVE_KEY_V1, CHRONICLE_FIELDS, DUNGEON_TIERS, dungeonDef, FIELD_STAGES, BOOST } from './data.js';
 import * as E from './engine.js';
 import * as RD from './raid.js';
+import * as AR from './arena.js';
 import * as Q from './quest.js';
 import * as A from './account.js';
 import * as P from './preview.js';
@@ -54,6 +55,7 @@ export default function ChronicleGame({ onExit }) {
   const [loadNotice, setLoadNotice] = useState(() => (loadStatus.status === 'restored' || loadStatus.status === 'lost' ? loadStatus : null)); // 1.236.1 깨진 저장 안내
   const save = useMemo(() => A.toView(acc), [acc]);
   const [view, setView] = useState('title');
+  const [rivalTab, setRivalTab] = useState('rank'); // 경쟁자 화면 탭 (성장 순위 / 투기장)
   const [battle, setBattle] = useState(null);
   const [repeat, setRepeat] = useState(false);
   const [toast, setToast] = useState(null);
@@ -448,12 +450,21 @@ export default function ChronicleGame({ onExit }) {
     setBattle({ sim, enemies, party, summary: r.summary, ctx: { kind: 'raid', type: 'raid', enemies, label: `원정대 레이드 · ${tier.name}`, tierId }, key: Date.now() });
     setView('battle');
   };
+  // 투기장 (경쟁 시리즈 3단계) — 경쟁자와 결투. 결과는 계산 즉시 계정에 반영한다
+  const fightArena = (rid) => {
+    const r = AR.arenaFight(acc, rid, rng);
+    if (!r) { flash('오늘 도전 횟수를 다 썼습니다'); return; }
+    setAcc(r.acc);
+    setBattle({ sim: r.sim, enemies: r.enemies, party: r.party, summary: r.summary, ctx: { kind: 'arena', type: 'arena', enemies: r.enemies, label: `투기장 · ${r.opp.name}` }, key: Date.now() });
+    setView('battle');
+  };
   const afterBattle = () => {
     const ctx = battle?.ctx;
     if (autoProg) stopAuto(); // 「계속」을 누르면 자동 진행도 멈춘다
     setBattle(null);
     // 1.247.0 — 끝난 콘텐츠의 화면으로 돌아간다 (던전 클리어·패배도 마을이 아니라 던전 목록, 사냥 패배도 사냥터)
     if (ctx?.kind === 'raid') setView('raid');
+    else if (ctx?.kind === 'arena') { setRivalTab('arena'); setView('rival'); }
     else if (ctx?.kind === 'dungeon') setView('dungeon');
     else if (ctx?.kind === 'tower') setView('tower');
     else setView('field');
@@ -515,7 +526,7 @@ export default function ChronicleGame({ onExit }) {
   } else if (view === 'daily') {
     content = <DailyView acc={acc} onBack={() => setView('town')} onSwitch={(cid) => { setRepeat(false); setAcc(a => A.selectCharacter(a, cid)); }} onAct={(fn) => { const r = fn(acc); if (!r.n) return; setAcc(r.acc); flash(`임무 보상 ${r.n}건 수령 — ${D.dailyRewardText(r.reward)}`); }} />;
   } else if (view === 'rival') {
-    content = <RivalView acc={acc} onBack={() => setView('town')} onAct={(fn) => { const r = fn(acc); if (!r.n) return; setAcc(r.acc); flash(r.month ? `월간 1위 — 자령 「${F.famName(r.fam.key)}」${r.fam.soul ? ' (보유 중 → 사역혼 100)' : ''}` : r.fam ? `${r.rank}위 보상 — ${F.famGrade(r.fam.grade).label} 「${F.famName(r.fam.key)}」${r.fam.soul ? ` (보유 중 → 사역혼 ${r.fam.soul})` : ''}` : `${r.rank}위 · 주간 순위 보상을 받았습니다`); }} />;
+    content = <RivalView acc={acc} top={rivalTab} onTop={setRivalTab} onFight={fightArena} onArena={(fn) => { const r = fn(acc); if (!r.n) return; setAcc(r.acc); if (r.item) flash(`${r.item.name} 구매`); }} onBack={() => setView('town')} onAct={(fn) => { const r = fn(acc); if (!r.n) return; setAcc(r.acc); flash(r.month ? `월간 1위 — 자령 「${F.famName(r.fam.key)}」${r.fam.soul ? ' (보유 중 → 사역혼 100)' : ''}` : r.fam ? `${r.rank}위 보상 — ${F.famGrade(r.fam.grade).label} 「${F.famName(r.fam.key)}」${r.fam.soul ? ` (보유 중 → 사역혼 ${r.fam.soul})` : ''}` : `${r.rank}위 · 주간 순위 보상을 받았습니다`); }} />;
   } else if (view === 'forge') {
     content = <ForgeView save={save} setSave={setSave} onBack={() => setView('town')} flash={flash} onTrack={trackDaily} />;
   } else {

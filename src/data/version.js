@@ -3,6 +3,6 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.290.1';
+export const GAME_VERSION = '1.291.0';
 export const VERSION_DATE = '2026-11-14';
-export const VERSION_LABEL = '남령 확대 — 3부 강적 9종';
+export const VERSION_LABEL = '🏟 투기장 — 경쟁자와 결투';

@@ -312,7 +312,7 @@ export function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAga
         // 1.257.0 — 보스가 있고 3마리 이하면 보스를 가운데 크게 (레이드처럼 많을 땐 기존 배열)
         const boss = enemies.length <= 3 ? enemies.find(e => e.tier === 'boss') : null;
         const card = (e, extra = {}) => (
-          <BattleCard key={e.id} u={e} art={chronicleEnemyArt(e.key)} hp={hpOf(e)} sh={shOf(e)} acting={cur?.a === e.id} fx={fxClass(e.id)} h={cardH} enemy
+          <BattleCard key={e.id} u={e} art={e.art || chronicleEnemyArt(e.key)} hp={hpOf(e)} sh={shOf(e)} acting={cur?.a === e.id} fx={fxClass(e.id)} h={cardH} enemy
             border={e.tier === 'boss' ? '#c4453d88' : e.tier === 'elite' ? '#e8b04a88' : 'var(--ui-line)'} {...extra}>
             <Float id={e.id} />
           </BattleCard>
@@ -405,12 +405,12 @@ export function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAga
           <div className="chr-glass flex flex-col min-h-0 flex-1" style={{ '--edge': sim.result === 'win' ? MS.gold : MS.red, '--glow': sim.result === 'win' ? 'rgba(232,176,74,.22)' : 'rgba(224,87,76,.22)' }}>
           <div className="overflow-y-auto min-h-0 flex-1" style={{ padding: '10px 12px 4px' }}>
             <div className="flex items-baseline justify-between gap-2">
-              <span className="font-bold" style={{ fontSize: 18, color: sim.result === 'win' ? PALETTE.text : '#e06a5f', fontFamily: FONT_TITLE }}>{sim.result === 'win' ? '전투 결과' : '전멸'}</span>
+              <span className="font-bold" style={{ fontSize: 18, color: sim.result === 'win' ? PALETTE.text : '#e06a5f', fontFamily: FONT_TITLE }}>{sim.result === 'win' ? (ctx.kind === 'arena' ? '결투 승리' : '전투 결과') : ctx.kind === 'arena' ? '결투 패배' : '전멸'}</span>
               <span className="truncate" style={{ fontSize: 11, letterSpacing: 2, color: MS.gold }}>{ctx.label} · {sim.rounds || round}라운드</span>
             </div>
             {sim.result === 'win' ? (
               <div className="mt-1.5 flex flex-col gap-1" style={{ fontSize: 12.5, color: PALETTE.text }}>
-                {ctx.kind !== 'raid' && <>
+                {ctx.kind !== 'raid' && ctx.kind !== 'arena' && <>
                   <MainSecHead title="획 득" />
                   <MainKvRows rows={[
                     { l: '경험치', v: <>+<CountUp v={summary.exp} /></>, c: MS.gold }, { l: '골드', v: <>🪙 +<CountUp v={summary.gold} /></>, c: MS.gold },
@@ -447,6 +447,9 @@ export function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAga
                 {summary.famExp?.ups ? <div className="chr-chip font-semibold" style={{ color: '#e8b04a' }}>🐾 {F.famName(summary.famExp.key)} Lv.{summary.famExp.lv} 달성!</div> : null}
                 {summary.keys ? <div className="chr-chip font-semibold" style={{ color: PALETTE.legendary }}>🗝 던전 열쇠 +{summary.keys}</div> : null}
                 {summary.talentScroll ? <div className="chr-chip font-semibold" style={{ color: '#7fd1c8' }}>📖 특성 초기화 주문서 +{summary.talentScroll}</div> : null}
+                {summary.arena ? <div className="chr-chip font-semibold" style={{ color: MS.gold }}>🏟 투기장 점수 {summary.arena.before} → {summary.arena.after} (+{summary.arena.delta}) · 주화 +{summary.arena.coin}{summary.arena.upset ? ' (강한 상대 보너스)' : ''}</div> : null}
+                {summary.arena?.timeout ? <div className="chr-chip" style={{ color: PALETTE.textDim }}>시간 초과 — 남은 체력 비율로 판정</div> : null}
+                {summary.arena ? <div className="chr-chip" style={{ color: PALETTE.textDim }}>오늘 남은 도전 {summary.arena.left}회</div> : null}
                 {summary.raid?.reward ? <div className="chr-chip font-semibold" style={{ color: '#ff8a80' }}>⚔ 원정대 레이드 보상{summary.raid.first ? ' (첫 클리어!)' : ''} — {R.rosterRewardText(summary.raid.reward)}</div> : null}
                 {summary.raid?.noReward ? <div className="chr-chip" style={{ color: PALETTE.textDim }}>오늘 이 단계 보상은 이미 받았다 (KST 0시 초기화)</div> : null}
                 {(summary.questsDone || []).map(t => <div key={t} className="chr-chip font-semibold" style={{ color: PALETTE.dawn }}>📜 의뢰 완료: {t} — 게시판에서 보상</div>)}
@@ -454,7 +457,7 @@ export function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAga
               </div>
             ) : (
               <div className="mt-1 text-center" style={{ fontSize: 12.5, color: PALETTE.textDim }}>
-                {ctx.kind === 'raid' ? '원정대가 무너졌다 — 봉인의 주인이 쓰러지면 그 봉인은 깰 수 없다. 약한 캐릭터를 더 키워 다시 도전하자.' : ctx.kind === 'tower' ? `첨탑 ${summary.towerFell}층에서 쓰러졌다. 다음 도전은 체크포인트부터.` : ctx.kind === 'dungeon' ? '던전에서 쫓겨났다.' : `쓰러졌다${summary.fallback ? '.' : ' — 사냥터로 돌아간다.'}${summary.goldLost ? ` (골드 -${summary.goldLost})` : ''}`}
+                {ctx.kind === 'arena' ? `「${summary.arena?.name}」에게 졌다 — 투기장 점수 ${summary.arena?.before} → ${summary.arena?.after} (${summary.arena?.delta}) · 주화 +${summary.arena?.coin}${summary.arena?.timeout ? ' · 시간 초과 판정' : ''} · 오늘 남은 도전 ${summary.arena?.left}회` : ctx.kind === 'raid' ? '원정대가 무너졌다 — 봉인의 주인이 쓰러지면 그 봉인은 깰 수 없다. 약한 캐릭터를 더 키워 다시 도전하자.' : ctx.kind === 'tower' ? `첨탑 ${summary.towerFell}층에서 쓰러졌다. 다음 도전은 체크포인트부터.` : ctx.kind === 'dungeon' ? '던전에서 쫓겨났다.' : `쓰러졌다${summary.fallback ? '.' : ' — 사냥터로 돌아간다.'}${summary.goldLost ? ` (골드 -${summary.goldLost})` : ''}`}
                 {summary.fallback ? <div className="mt-2 font-semibold" style={{ color: MS.gold }}>↩ 직전 성공 맵 「{summary.fallback}」에서 반복 사냥을 이어간다</div> : null}
                 {summary.lossStop ? <div className="mt-2 font-semibold" style={{ color: '#ff8a7e' }}>⏹ {summary.lossStop}연속 패배 — 자동 사냥을 멈췄다. 장비·성장을 점검하자</div> : null}
               </div>
@@ -471,7 +474,7 @@ export function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAga
                   : autoProg && ctx.kind === 'field' ? ['▶ 자동 진행 중 (끄기)', true, onStopAuto]
                     : ctx.kind === 'field' && ((ctx.type !== 'boss' && sim.result === 'win') || summary.fallback) ? [repeat ? '🔁 반복 중 (끄기)' : '🔁 반복 사냥', repeat, onToggleRepeat] : null;
               const next = dungeonNext || towerNext;
-              const back = ctx.kind === 'dungeon' ? '던전 목록으로' : ctx.kind === 'tower' ? '첨탑으로' : ctx.kind === 'raid' ? '레이드로' : '사냥터로';
+              const back = ctx.kind === 'dungeon' ? '던전 목록으로' : ctx.kind === 'tower' ? '첨탑으로' : ctx.kind === 'raid' ? '레이드로' : ctx.kind === 'arena' ? '투기장으로' : '사냥터로';
               const sub = [
                 ['📜 전투 기록', () => setLogFull(true), {}],
                 ['📊 전투 집계', openStats, {}],
