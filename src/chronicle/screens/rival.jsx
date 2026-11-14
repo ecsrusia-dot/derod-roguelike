@@ -54,7 +54,8 @@ function RivalDetail({ def, st }) {
         <MainKvRows rows={RIVAL_STAT_ROWS.filter(([, k]) => d[k]).map(([l, k, f]) => ({ l, v: f(d[k]) }))} />
       </>}
       {tab === 'gear' && <div className="flex flex-col gap-1.5 mt-2">
-        {items.map(it => <MainGearCard key={it.uid} it={it} note={SLOTS.find(x => x.id === it.slot)?.label} />)}
+        <div style={{ ...box, fontSize: 11.5, color: PALETTE.textDim }}>⚒ 경쟁자도 <b style={{ color: MS.gold }}>내 대장간과 같은 확률</b>로 강화합니다 (실패·하락·파괴 포함). 이 경쟁자의 목표는 <b style={{ color: MS.gold }}>+{AR.rivalForgeTarget(def)}</b>입니다.</div>
+        {items.map(it => { const e = AR.rivalEnhance(def, it.slot, st); return <MainGearCard key={it.uid} it={it} note={`${SLOTS.find(x => x.id === it.slot)?.label} · 강화 ${e.tries}회 시도${e.fails ? ` · 실패 ${e.fails}` : ''}${e.breaks ? ` · 파괴 ${e.breaks}` : ''}`} />; })}
         {!items.length && <div style={{ fontSize: 12, color: PALETTE.textDim }}>착용 장비 없음</div>}
       </div>}
       {tab === 'skill' && <>
