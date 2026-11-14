@@ -7,7 +7,7 @@ import React, { useState } from 'react';
 import { PALETTE } from '../../utils/helpers.js';
 import { GlassPanel, UIButton, BottomSheet } from '../../components/ui/CommonUI.jsx';
 import { HiNum } from '../../components/ui/InfoBlocks.jsx';
-import { chronicleClass, chronicleEnemyArt } from '../data.js';
+import { chronicleClass, chronicleEnemyArt, REBIRTH_BRANCHES } from '../data.js';
 import * as E from '../engine.js';
 import * as F from '../familiar.js';
 import { Header, Bar, MainKvRows, MainTabs, MS, MainSecHead, MainModal, MainCell } from './common.jsx';
@@ -147,6 +147,24 @@ function MainFamTeam({ save, onOpen, onPick }) {
 }
 
 // 사역마 카드 — 장비 카드와 같은 형식 (1.254.0, 시안 ㉛)
+// 공명 (1.292.0) — 자령마다 짝 갈래가 있고, 그 갈래가 동행으로 데려갈 때만 켜진다.
+// 지금 주인공의 갈래 (FamiliarView가 그릴 때마다 맞춘다)
+let heroBranch = null;
+function ResoLine({ k, f, box = false }) {
+  const r = F.famReso(k, f, heroBranch);
+  if (!r) return null;
+  const bn = REBIRTH_BRANCHES[r.branch]?.name || r.branch;
+  const col = r.on ? '#7fe0c0' : PALETTE.textDim;
+  if (box) return (
+    <div className="mt-2" style={{ padding: '8px 10px', border: `1px solid ${r.on ? '#7fe0c0aa' : MS.line}`, background: MS.box, borderRadius: MS.r, fontSize: 12.5, lineHeight: 1.55 }}>
+      <div className="flex justify-between gap-2"><b style={{ color: col }}>✦ 공명 「{r.name}」</b><span style={{ fontSize: 11, color: col }}>{r.on ? '켜짐' : `${bn} 전용`}</span></div>
+      <div style={{ color: r.on ? PALETTE.text : PALETTE.textDim }}><HiNum text={r.desc} /></div>
+      <div style={{ fontSize: 11, color: PALETTE.textDim }}>{bn} 갈래가 이 자령을 동행 칸에 둘 때만 적용</div>
+    </div>
+  );
+  return <div className="mt-0.5" style={{ fontSize: 11.5, lineHeight: 1.4, color: col }}>✦ 공명 [{bn}]{r.on ? ' 켜짐' : ''} — <span style={{ color: r.on ? PALETTE.text : PALETTE.textDim }}>{r.desc}</span></div>;
+}
+
 const FAM_STAT_ROWS = [['HP', 'maxHp'], ['공격력', 'atk'], ['방어', 'def'], ['회복력', 'healPower']];
 
 function MainFamCard({ k, f, heroLv, famPct = 0, slot, onClick, dim = false, hideSub = false, cmp = null, curSub = undefined, mark = false }) {
@@ -193,6 +211,7 @@ function MainFamCard({ k, f, heroLv, famPct = 0, slot, onClick, dim = false, hid
       ) : null}
       {sig && <div className="mt-0.5 truncate" style={{ fontSize: 11.5, color: '#c79bff' }}>★ {sig.name} <span style={{ color: PALETTE.textDim }}>({sig.type})</span></div>}
       {pv && <div className="mt-0.5" style={{ fontSize: 11.5, color: '#e8b04a', lineHeight: 1.4 }}>◆ {pv.name} — <span style={{ color: PALETTE.text }}>{pv.desc}</span></div>}
+      <ResoLine k={k} f={f} />
     </button>
   );
 }
@@ -210,12 +229,14 @@ function MainFamFx({ k, f, fams, heroLv, slot }) {
     <>
       <MainSecHead title={`동 행 효 과${slot === 'main' ? ' (사 용 중)' : ''}`} />
       <MainKvRows rows={[
-        ...(role.guard ? [{ l: '수호 태세', v: `${Math.round(role.guard[gi] * 100)}%`, c: MS.blue }] : []),
+        ...(role.guard ? [{ l: '수호 태세', v: `${Math.round(F.famGuard(k, f) * 100)}%`, c: MS.blue }] : []),
         { l: '역할', v: `${role.icon} ${role.label}`, c: role.color },
         { l: '★ 고유 스킬', v: sig ? sig.name : '없음', c: sig ? '#d07ae8' : PALETTE.textDim },
         { l: '◆ 고유 패시브', v: pv ? pv.name : '없음', c: pv ? '#c79bff' : PALETTE.textDim },
         { l: '베이스 등급', v: base.label, c: base.color },
+        ...(F.famKit(k, f) ? [{ l: '특화', v: F.famKit(k, f).tag, c: MS.gold }] : []),
       ]} />
+      <ResoLine k={k} f={f} box />
       <MainSecHead title={`보 조 칸 에 두 면 (${F.famSubPctOf(f, heroLv)}%)`} />
       <MainKvRows rows={subs.map(it => ({ l: `${it.icon ? `${it.icon} ` : ''}${it.label}`, v: it.k === 'shieldPct' ? `HP ${it.text}` : it.text, c: it.econ ? MS.gold : MS.blue }))} />
       <MainSecHead title="보 유 효 과 (편 성 무 관)" />
@@ -266,6 +287,7 @@ export function FamiliarView({ save, setSave, onBack, flash, onTrack = () => {} 
   const [selTab, setSelTab] = useState('fx'); // 설명창 탭 (1.244.0)
   const [preview, setPreview] = useState(null); // 효율 미리보기 (1.232.0)
   const fams = save.fams || {};
+  heroBranch = save.units[save.hero]?.rebirth?.branch || null;
   const shards = save.mats.famShard || 0;
   const souls = save.mats.famSoul || 0;
   const heroLv = save.units[save.hero]?.lv || 1;

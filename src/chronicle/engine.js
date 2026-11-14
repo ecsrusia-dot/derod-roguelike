@@ -8,7 +8,7 @@ import { levelCap, globalBuffFx } from './roster.js';
 import { talentFx, canLearnTalent, talentNode, talentResetCost, talentTrees, tierUnlocked } from './talents.js';
 import { BOSS_MECHS, BOSS_MECH_OF, fieldStages, FIELD_STAGES, STAGE_TUNING, AUTO_CLIMB, BOOST, BAG_EXPAND, SALVAGE, SALVAGE_ICON, REBIRTH, REBIRTH_BRANCHES, DUEL, REBIRTH_PERKS, rebirthPerkCount, rebirthPerkLeft, rebirthPerkOk, expNeedFor, OPTION_LV_CURVE, REFORGE , unitTitle } from './data.js';
 import { TOWER, TOWER_SHOP, towerUnlocked, isTowerBoss, towerEnemyLv, towerArea, towerFloorPicks, towerTheme, kstWeekKey } from './tower.js';
-import { famCombatant, famRole, famSubFx, famOwnFx, famBondFx, rollFamShards, rollFamSouls, gainFamExp, FAM_AI, FAM_TUNING, summonFamiliars, enhanceFamiliar, evolveFamiliar, transcendFamiliar } from './familiar.js';
+import { famCombatant, famRole, famSubFx, famOwnFx, famBondFx, famResoHeroFx, rollFamShards, rollFamSouls, gainFamExp, FAM_AI, FAM_TUNING, summonFamiliars, enhanceFamiliar, evolveFamiliar, transcendFamiliar } from './familiar.js';
 import {
   CHRONICLE_TUNING as T, CHRONICLE_CLASSES, CHRONICLE_SKILLS, CHRONICLE_FIELDS, CHRONICLE_DUNGEON, CHRONICLE_DUNGEONS, DUNGEON_TIERS, dungeonDef, dungeonFloorLv,
   STAT_KEYS, SKILL_MAX_LV, MASTERY_PCT, BOSS_DAILY_LIMIT, DUNGEON_KEYS, GRADES, gradeIdx, SLOTS, CLASS_SLOTS, FORGE, DROP_TABLE,
@@ -456,6 +456,8 @@ export function deriveUnit(save, classId) {
   for (const [k, v] of Object.entries(famSubFx(save.fams, activeSubs(save), u.lv))) g[k] = (g[k] || 0) + v;
   // 사역마 보유 효과(남령+) · 인연 (1.228.0) — 가지고만 있으면 적용
   for (const fx of [famOwnFx(save.fams), famBondFx(save.fams)]) for (const [k, v] of Object.entries(fx)) g[k] = (g[k] || 0) + v;
+  // 자령 공명 (1.292.0) — 짝 갈래가 그 자령을 「동행」으로 데려갈 때만
+  for (const [k, v] of Object.entries(famResoHeroFx(save.fams, activeMain(save), u.rebirth?.branch))) g[k] = (g[k] || 0) + v;
   // 원정대 전역 버프 (1.229.0) — 다른 캐릭터들의 Lv.20/40/60/80/100 달성 보상
   for (const [k, v] of Object.entries(globalBuffFx(save.roster, classId))) g[k] = (g[k] || 0) + v;
   // 전승 갈래 기본 효과 (1.220.0)
@@ -1041,7 +1043,7 @@ function applyFamSynergy(fam, role, pts) {
   const fx = famSynergyFx(role, pts);
   if (fx.guard) fam.guardian = Math.min(0.85, (fam.guardian || 0) + fx.guard);
   if (fx.healPower) fam.healPower = Math.round(fam.healPower * (1 + fx.healPower));
-  if (fx.healBelow) fam.healBelowAdd = fx.healBelow;
+  if (fx.healBelow) fam.healBelowAdd = (fam.healBelowAdd || 0) + fx.healBelow;
   if (fx.healShield) fam.healShield = fx.healShield;
   if (fx.chain) fam.chain = (fam.chain || 0) + fx.chain;
   if (fx.atk) fam.atk = Math.round(fam.atk * (1 + fx.atk));
@@ -1055,7 +1057,7 @@ export function partyCombatants(save, hpMap = null) {
   const mk = activeMain(save);
   if (mk) {
     const hero = list.find(u => u.leader) || list[0];
-    const fam = famCombatant(mk, save.fams[mk], hero, hero.famPct || 0);
+    const fam = famCombatant(mk, save.fams[mk], hero, hero.famPct || 0, save.units[save.hero]?.rebirth?.branch || null);
     applyFamSynergy(fam, famRole(mk), hero[`fam_${famRole(mk)}`] || 0);
     // 던전 층 사이: 쓰러진 사역마는 다음 층에서 HP 30%로 일어난다
     if (hpMap && hpMap.fam != null) fam.hp = Math.max(Math.round(fam.maxHp * 0.3), Math.min(fam.maxHp, hpMap.fam));
@@ -1742,6 +1744,13 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
       }
       default: break;
     }
+    // 자령 키트 부가 효과 (1.292.0) — foeFx(적 약화·취약·방어 파괴) · teamBuff(아군 공격 강화) · selfBuff
+    if (s.foeFx) {
+      const fxT = s.foeFx.all ? foes : s.foeFx.forced ? foes.filter(f => f.forced?.by === u.id && f.forced.t > 0) : foes.filter(f => hits.some(h => h.t === f.id && h.d > 0));
+      for (const f of fxT) if (f.hp > 0) { f.fx[s.foeFx.k] = { v: s.foeFx.v, t: s.foeFx.t }; hits.push({ t: f.id, debuff: true }); }
+    }
+    if (s.teamBuff) for (const a of allies) if (a.hp > 0) { a.buffs.kit = { v: s.teamBuff.v, t: s.teamBuff.t }; hits.push({ t: a.id, buff: true }); }
+    if (s.selfBuff) { u.buffs.kitSelf = { v: s.selfBuff.v, t: s.selfBuff.t + 1 }; hits.push({ t: u.id, buff: true }); }
     if (u.skillShield) addShield(u, Math.round(u.atk * u.skillShield));
     push({ a: u.id, n: s.name, k: s.kind, skill: true, hits });
   };
@@ -1767,7 +1776,8 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
     if (p.emergencyHeal) push({ k: 'pre', pre: 'fx', a: p.id, icon: '✚', n: '위기 회복', v: `HP 30% 아래가 되면 1회 ${Math.round(p.emergencyHeal * 100)}% 회복`, src: by('emergencyHeal'), tone: 'ready' });
     if (p.guts) push({ k: 'pre', pre: 'fx', a: p.id, icon: '⛨', n: '버팀', v: '쓰러질 피해를 1회 HP 1로 버팀', src: by('guts'), tone: 'ready' });
     if (p.revive) push({ k: 'pre', pre: 'fx', a: p.id, icon: '✧', n: '부활 대기', v: `쓰러지면 1회 HP ${Math.round(p.revive * 100)}%로 부활`, src: by('revive'), tone: 'ready' });
-    if (p.vGuard) push({ k: 'pre', pre: 'fx', a: p.id, icon: '✧', n: '수호신의 가호', v: '주인공이 쓰러질 피해를 1회 막는다', tone: 'buff' });
+    if (p.resoName) push({ k: 'pre', pre: 'fx', a: p.id, icon: '✦', n: `공명 · ${p.resoName}`, v: p.resoDesc, tone: 'buff' });
+    if (p.vGuard) push({ k: 'pre', pre: 'fx', a: p.id, icon: '✧', n: p.vName || '수호신의 가호', v: '주인공이 쓰러질 피해를 1회 막는다', tone: 'buff' });
   }
   const foesAll = units.filter(x => x.side === 'enemy');
   const im = Math.max(0, ...foesAll.map(x => x.intim || 0));
