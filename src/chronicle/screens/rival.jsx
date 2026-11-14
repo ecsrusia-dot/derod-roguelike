@@ -6,6 +6,8 @@ import { PALETTE } from '../../utils/helpers.js';
 import { chronicleClass, REBIRTH_BRANCHES } from '../data.js';
 import * as RV from '../rival.js';
 import * as D from '../daily.js';
+import * as F from '../familiar.js';
+import { chronicleEnemyArt } from '../data.js';
 import { Header, Portrait, MainTabs, MainModal, MainKvRows, MainSecHead, MS } from './common.jsx';
 
 const RANK_COLOR = (rank) => (rank === 1 ? '#f0d27a' : rank <= 3 ? '#e8b04a' : rank <= 10 ? '#9cc4e4' : PALETTE.textDim);
@@ -15,6 +17,9 @@ export function RivalView({ acc, onBack, onAct }) {
   const [tab, setTab] = useState('all');
   const [sel, setSel] = useState(null);
   const [whole, setWhole] = useState(false);
+  const [monthPick, setMonthPick] = useState(false);
+  const rewardText = (r) => [r.fam ? `🐾 ${RV.rivalFamLabel(r.fam)}` : null, D.dailyRewardText(r.reward)].filter(Boolean).join(' · ');
+  const monthDone = RV.rivalMonthClaimed(acc); const monthReady = RV.rivalMonthReady(acc);
   const myCls = acc.active;
   const rows = useMemo(() => RV.rivalBoard(acc, tab === 'cls' ? myCls : null), [acc, tab, myCls]);
   const best = useMemo(() => RV.myBestRank(acc), [acc]);
@@ -51,7 +56,10 @@ export function RivalView({ acc, onBack, onAct }) {
             <button disabled={claimed} onClick={() => onAct((a) => RV.claimRivalWeek(a))} className="ui-press w-full mt-2 chr-btn-pri" style={{ height: 40, fontSize: 13, fontWeight: 800, opacity: claimed ? 0.45 : 1 }}>
               {claimed ? '이번 주 순위 보상 받음 (월요일 0시 초기화)' : `이번 주 순위 보상 받기 — ${tier.label}`}
             </button>
-            {!claimed && <div className="mt-1" style={{ fontSize: 11.5, color: PALETTE.textDim }}>{D.dailyRewardText(tier.reward)} · 주 1회, 받는 순간의 순위 기준</div>}
+            {!claimed && <div className="mt-1" style={{ fontSize: 11.5, color: PALETTE.textDim }}>{rewardText(tier)} · 주 1회, 받는 순간의 순위 기준</div>}
+            <button disabled={!monthReady} onClick={() => setMonthPick(true)} className="ui-press w-full mt-2" style={{ height: 38, fontSize: 12.5, fontWeight: 800, border: `1px solid ${monthReady ? MS.violet : MS.line}`, background: monthReady ? 'rgba(208,122,232,0.16)' : 'transparent', color: monthReady ? MS.violet : PALETTE.textDim }}>
+              {monthDone ? '이번 달 1위 보상 받음' : monthReady ? '👑 월간 1위 보상 — 자령 고르기' : '👑 월간 1위 보상 — 통합 1위일 때 자령 선택권 (월 1회)'}
+            </button>
           </div>
         )}
         <div className="flex items-center justify-between flex-none" style={{ marginTop: 2 }}>
@@ -79,12 +87,30 @@ export function RivalView({ acc, onBack, onAct }) {
           })}
         </div>
         <MainSecHead title="순 위 보 상 (주 1회)" />
-        <MainKvRows rows={RV.RIVAL_REWARDS.map(r => ({ l: r.label, v: D.dailyRewardText(r.reward), c: tier && r.label === tier.label ? MS.gold : undefined }))} />
+        <MainKvRows rows={[...RV.RIVAL_REWARDS.map(r => ({ l: r.label, v: rewardText(r), c: tier && r.label === tier.label ? MS.gold : undefined })), { l: '월간 1위', v: '🐾 자령 선택권 1장', c: MS.violet }]} />
         <div className="flex-none" style={{ fontSize: 11.5, color: PALETTE.textDim, lineHeight: 1.6 }}>
           점수 = 전승 횟수 × {RV.RIVAL_TUNING.scorePerRebirth} + 레벨 + 첨탑 최고층 ÷ {RV.RIVAL_TUNING.towerDiv}<br />
           경쟁자 {RV.RIVALS.length}명은 <b style={{ color: PALETTE.text }}>내가 전투한 만큼만</b> 성장한다 — 쉬는 동안에는 순위가 바뀌지 않는다.
         </div>
       </div>
+      {monthPick && (
+        <MainModal kicker="MONTHLY No.1" title="자령 선택" color={MS.violet} sub="이번 달 1위 보상 — 원하는 자령 1마리 · 이미 가진 자령은 사역혼 100" onClose={() => setMonthPick(false)}>
+          <div className="grid gap-1.5" style={{ gridTemplateColumns: '1fr 1fr' }}>
+            {RV.rivalMonthChoices(acc).map(k => {
+              const have = acc.fams?.[k]; const role = F.FAM_ROLES[F.famRole(k)];
+              return (
+                <button key={k} onClick={() => { onAct((a) => RV.claimRivalMonth(a, k)); setMonthPick(false); }} className="ui-press text-left overflow-hidden" style={{ borderRadius: 12, border: `1.5px solid ${have?.grade === 'violet' ? MS.line : MS.violet}`, background: MS.box, padding: 0 }}>
+                  <img src={chronicleEnemyArt(k)} alt="" className="w-full object-cover" style={{ height: 64, display: 'block' }} />
+                  <div style={{ padding: '5px 8px' }}>
+                    <div className="truncate font-bold" style={{ fontSize: 12.5, color: MS.violet }}>{F.famName(k)}</div>
+                    <div style={{ fontSize: 11, color: PALETTE.textDim }}>{role.icon} {role.label}{have?.grade === 'violet' ? ' · 보유 (사역혼)' : have ? ' · 자령으로 승급' : ' · 새로 얻음'}</div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </MainModal>
+      )}
       {selRow && (
         <MainModal kicker={selRow.me ? 'MY CHARACTER' : 'RIVAL'} title={selRow.me ? selRow.name : selRow.name} badge={`${selRow.rank}위`} color={chronicleClass(selRow.cls).color} img={chronicleClass(selRow.cls).image} sub={`${titleOf(selRow)} · 점수 ${selRow.score}`} onClose={() => setSel(null)}>
           <MainKvRows rows={[

@@ -9,6 +9,7 @@
 // ⚠ 밸런스 조정은 RIVAL_TUNING 한 곳.
 import { CHRONICLE_CLASSES, REBIRTH, REBIRTH_BRANCHES, chronicleClass } from './data.js';
 import { kstWeekKey } from './tower.js';
+import { famPool, grantFamiliar, famGradeIdx, FAM_GRADES } from './familiar.js';
 
 export const RIVAL_TUNING = {
   count: 100,
@@ -158,24 +159,69 @@ export function myBestRank(acc) {
   return { rank: row.rank, total: rows.length, row, above, gap: above ? above.score - row.score : 0 };
 }
 
-// ===== 주간 순위 보상 — 주 1회, 받는 순간의 내 최고 순위 기준 =====
+// ===== 순위 보상 (1.290.0 PM 지시 — 상위권은 사역마를 건다) =====
+// 주간: 주 1회, 받는 순간의 내 최고 순위 기준. fam = 그 등급 사역마 1마리(무작위 · 안 가진 것 우선)
 export const RIVAL_REWARDS = [
-  { maxRank: 1, label: '1위', reward: { shard: 40, famShard: 150, famSoul: 150, gold: 60000 } },
-  { maxRank: 3, label: '2~3위', reward: { shard: 28, famShard: 110, famSoul: 100, gold: 45000 } },
-  { maxRank: 10, label: '4~10위', reward: { shard: 18, famShard: 80, famSoul: 60, gold: 30000 } },
+  { maxRank: 1, label: '1위', fam: 'violet', reward: { shard: 20, gold: 30000 } },
+  { maxRank: 3, label: '2~3위', fam: 'indigo', reward: { shard: 15, gold: 25000 } },
+  { maxRank: 10, label: '4~10위', fam: 'blue', reward: { shard: 12, famSoul: 60, gold: 20000 } },
   { maxRank: 30, label: '11~30위', reward: { shard: 10, famShard: 50, famSoul: 30, gold: 18000 } },
   { maxRank: 60, label: '31~60위', reward: { shard: 5, famShard: 30, famSoul: 15, gold: 10000 } },
   { maxRank: Infinity, label: '61위 아래', reward: { shard: 2, famShard: 20, gold: 5000 } },
 ];
 export const rivalRewardFor = (rank) => RIVAL_REWARDS.find(r => rank <= r.maxRank) || RIVAL_REWARDS[RIVAL_REWARDS.length - 1];
+export const rivalFamLabel = (gid) => `무작위 ${FAM_GRADES[famGradeIdx(gid)].label} 1마리`;
+// 계정의 모든 캐릭터 진행을 합친 사역마 풀 (등급 → 키 목록)
+export function accFamPool(acc) {
+  const out = { red: [], green: [], blue: [], indigo: [], violet: [] };
+  for (const c of Object.values(acc?.chars || {})) {
+    const p = famPool(c?.progress);
+    for (const g of Object.keys(out)) for (const k of p[g]) if (!out[g].includes(k)) out[g].push(k);
+  }
+  return out;
+}
+// 그 등급에서 1마리 — 풀이 비면 한 단계 아래. 안 가진 사역마를 먼저 준다
+function pickRewardFam(acc, gid, rng) {
+  const pool = accFamPool(acc);
+  for (let i = famGradeIdx(gid); i >= 0; i--) {
+    const g = FAM_GRADES[i].id;
+    if (!pool[g].length) continue;
+    const fresh = pool[g].filter(k => !acc.fams?.[k]);
+    const list = fresh.length ? fresh : pool[g];
+    return { key: list[Math.floor(rng() * list.length)], grade: g };
+  }
+  return null;
+}
+const giveMats = (out, reward) => {
+  for (const [k, v] of Object.entries(reward || {})) {
+    if (k === 'gold') out.gold = (out.gold || 0) + v; else out.mats[k] = (out.mats[k] || 0) + v;
+  }
+};
+const giveFam = (out, key, grade) => {
+  const r = grantFamiliar(out.fams || {}, key, grade);
+  out.fams = r.fams;
+  if (r.soul) out.mats.famSoul = (out.mats.famSoul || 0) + r.soul;
+  return r;
+};
 export const rivalWeekClaimed = (acc, now = Date.now()) => acc?.rivalWeek?.key === kstWeekKey(now) && !!acc.rivalWeek.claimed;
-export function claimRivalWeek(acc, now = Date.now()) {
+export function claimRivalWeek(acc, now = Date.now(), rng = Math.random) {
   const best = myBestRank(acc);
   if (!best || rivalWeekClaimed(acc, now)) return { acc, n: 0, reward: {} };
   const tier = rivalRewardFor(best.rank);
   const out = { ...acc, mats: { ...acc.mats }, rivalWeek: { key: kstWeekKey(now), claimed: true, rank: best.rank } };
-  for (const [k, v] of Object.entries(tier.reward)) {
-    if (k === 'gold') out.gold = (out.gold || 0) + v; else out.mats[k] = (out.mats[k] || 0) + v;
-  }
-  return { acc: out, n: 1, reward: tier.reward, rank: best.rank, label: tier.label };
+  giveMats(out, tier.reward);
+  let fam = null;
+  if (tier.fam) { const p = pickRewardFam(acc, tier.fam, rng); if (p) fam = giveFam(out, p.key, p.grade); }
+  return { acc: out, n: 1, reward: tier.reward, rank: best.rank, label: tier.label, fam };
+}
+// 월간: 달마다 1회, 받는 순간 통합 1위면 자령 1마리를 골라 받는다
+export const kstMonthKey = (now = Date.now()) => new Date(now + 9 * 3600 * 1000).toISOString().slice(0, 7);
+export const rivalMonthClaimed = (acc, now = Date.now()) => acc?.rivalMonth?.key === kstMonthKey(now) && !!acc.rivalMonth.claimed;
+export const rivalMonthReady = (acc, now = Date.now()) => !rivalMonthClaimed(acc, now) && myBestRank(acc)?.rank === 1;
+export const rivalMonthChoices = (acc) => accFamPool(acc).violet;
+export function claimRivalMonth(acc, key, now = Date.now()) {
+  if (!rivalMonthReady(acc, now) || !rivalMonthChoices(acc).includes(key)) return { acc, n: 0 };
+  const out = { ...acc, mats: { ...acc.mats }, rivalMonth: { key: kstMonthKey(now), claimed: true, fam: key } };
+  const fam = giveFam(out, key, 'violet');
+  return { acc: out, n: 1, fam, month: true };
 }

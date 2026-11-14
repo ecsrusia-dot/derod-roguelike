@@ -160,11 +160,56 @@ export const FAM_CLASS_TIP = {
 
 // 역할별 동행 스킬 (Lv = 등급 순서 1~5)
 const FS = (id, name, kind, cd, base, perLv, extra = {}) => ({ id, cls: 'fam', name, kind, reqLv: 1, cd, base, perLv, ...extra });
+// ===== 자령 초월 (1.290.0) — PM 지시: 자령 +10 뒤의 성장. 실패 패널티 없음 · 사역혼 많이 · 성공률 낮게 · +5에서 초월 스킬 =====
+// ⚠ 밸런스 조정은 FAM_TRANS 한 곳. 초월 1단계 = 능력치·보조 효과·보유 효과 +statPct (강화 배율과 곱)
+export const FAM_TRANS = {
+  max: 5,
+  cost: [200, 350, 550, 800, 1200],      // 🔮 사역혼 (n → n+1)
+  rate: [0.5, 0.4, 0.3, 0.2, 0.12],
+  pityAdd: 0.02,                         // 실패할 때마다 다음 성공률 +2%p (성공하면 초기화)
+  statPct: 0.08,
+  skillAt: 5,
+};
+export const famTrans = (f) => Math.max(0, Math.min(FAM_TRANS.max, f?.trans || 0));
+export const famCanTranscend = (f) => !!f && f.grade === 'violet' && (f.plus || 0) >= FAM_TUNING.maxPlus && famTrans(f) < FAM_TRANS.max;
+export const famTransCost = (f) => FAM_TRANS.cost[famTrans(f)] ?? null;
+export const famTransRate = (f) => Math.min(1, (FAM_TRANS.rate[famTrans(f)] || 0) + (f?.transFails || 0) * FAM_TRANS.pityAdd);
+// 초월 → { fams, souls, result: 'success'|'fail'|null } — 실패해도 잃는 것은 사역혼뿐
+export function transcendFamiliar(fams, souls, key, rng = Math.random) {
+  const f = fams[key];
+  if (!famCanTranscend(f)) return { fams, souls, result: null };
+  const c = famTransCost(f);
+  if (souls < c) return { fams, souls, result: null };
+  if (rng() < famTransRate(f)) return { fams: { ...fams, [key]: { ...f, trans: famTrans(f) + 1, transFails: 0 } }, souls: souls - c, result: 'success' };
+  return { fams: { ...fams, [key]: { ...f, transFails: (f.transFails || 0) + 1 } }, souls: souls - c, result: 'fail' };
+}
+export const famPlusText = (f) => `${f?.plus ? ` +${f.plus}` : ''}${famTrans(f) ? ` ◈${famTrans(f)}` : ''}`;
+// 사역마 지급 (순위 보상 등) — 소환과 같은 규칙: 없으면 새로, 더 높은 등급이면 승급, 같거나 낮으면 사역혼
+export function grantFamiliar(fams0, key, gid) {
+  const fams = { ...fams0 };
+  const have = fams[key];
+  const r = { key, grade: gid, isNew: !have, upgraded: false, soul: 0 };
+  if (!have) fams[key] = { grade: gid, base: gid, plus: 0, lv: 1, exp: 0 };
+  else if (famGradeIdx(gid) > famGradeIdx(have.grade)) { fams[key] = { ...have, grade: gid, base: gid }; r.upgraded = true; }
+  else if (famGradeIdx(gid) > famGradeIdx(famBaseGrade(key, have))) fams[key] = { ...have, base: gid };
+  else r.soul = famGrade(gid).dupSoul;
+  return { fams, ...r };
+}
+
 export const FAM_SKILLS = {
   tank: [FS('f_guard', '수호의 포효', 'taunt', 3, 0.3, 0.1, { turns: 1 }), FS('f_bash', '몸통 박치기', 'strike', 2, 1.0, 0.12)],
   dps: [FS('f_bite', '물어뜯기', 'strike', 2, 1.6, 0.18), FS('f_frenzy', '난도질', 'multi', 3, 0.6, 0.08, { hits: 3 }), FS('f_blast', '마력 폭발', 'aoe', 4, 0.9, 0.12)],
   healer: [FS('f_mend', '치유의 숨결', 'heal', 3, 1.0, 0.12), FS('f_ward', '보호의 빛', 'shield', 4, 0.8, 0.12)],
 };
+
+// 초월 스킬 — 초월 +5에서 열리는 세 번째 스킬 (역할별 · 기존 고유 스킬과 같은 발동 규칙)
+export const FAM_TRANS_SKILLS = {
+  tank: { id: 'trans_tank', trans: true, sig: true, cls: 'fam', reqLv: 1, kind: 'fortify', name: '불멸의 맹세', type: '초월 · 방어 강화', cd: 5, base: 0.5, perLv: 0, red: 0.2, turns: 4 },
+  healer: { id: 'trans_healer', trans: true, sig: true, cls: 'fam', reqLv: 1, kind: 'healShield', name: '윤회의 빛', type: '초월 · 회복 + 보호막', cd: 5, base: 0.9, perLv: 0, shieldV: 0.9 },
+  dps: { id: 'trans_dps', trans: true, sig: true, cls: 'fam', reqLv: 1, kind: 'executeStrike', name: '종언의 일격', type: '초월 · 처형', cd: 4, base: 2.8, perLv: 0 },
+};
+export const famHasTransSkill = (f) => f?.grade === 'violet' && famTrans(f) >= FAM_TRANS.skillAt;
+export const famTransSkill = (key) => FAM_TRANS_SKILLS[famRole(key)];
 
 // 동행 스킬 상세 (1.217.0) — 효과 · 재사용 · 발동 조건 (engine chooseSkill 순서와 같은 말로)
 const FAM_SKILL_WHEN = {
@@ -193,7 +238,7 @@ export function famSkillInfo(key, f) {
   const sig = famSignature(key, f.grade);
   const sigLocked = !famHasSignature(key, f);
   // 1.225.1 — 남령 미만은 고유 스킬을 목록에서 뺀다 (전투에서도 쓰지 않음 · 화면엔 안내 한 줄만)
-  return [...(sigLocked ? [] : [sig]), ...FAM_SKILLS[roleId]].map(s => {
+  return [...(famHasTransSkill(f) ? [famTransSkill(key)] : []), ...(sigLocked ? [] : [sig]), ...FAM_SKILLS[roleId]].map(s => {
     const sv = Math.max(lv, FAM_SIG_MIN_GRADE + 1);
     const v = s.base + s.perLv * ((s.sig ? sv : lv) - 1);
     let effect = '';
@@ -220,7 +265,7 @@ export function famSkillInfo(key, f) {
       case 'shield': effect = `아군 전원에게 보호막 — 사역마 회복력 ${pct(v)}`; break;
       default: effect = s.kind;
     }
-    return { id: s.id, name: s.name, kind: s.kind, cd: s.cd, effect, when: FAM_SKILL_WHEN[s.sig && s.kind === 'dot' ? 'sigDot' : s.kind] || '', sig: !!s.sig, sigType: s.sig ? FAM_SIGS[s.sigId].type : null, locked: !!s.sig && sigLocked };
+    return { id: s.id, name: s.name, kind: s.kind, cd: s.cd, effect, when: FAM_SKILL_WHEN[s.sig && s.kind === 'dot' ? 'sigDot' : s.kind] || '', sig: !!s.sig, trans: !!s.trans, sigType: s.trans ? s.type : s.sig ? FAM_SIGS[s.sigId].type : null, locked: !!s.sig && !s.trans && sigLocked };
   });
 }
 // 동행 능력치 (주인공 대비 비율 — 등급·강화 반영)
@@ -315,7 +360,7 @@ export function famSignature(key, grade) {
 }
 
 export const famName = (key) => ENEMIES[key]?.name || '사역마';
-const plusMult = (f) => 1 + FAM_TUNING.plusStatPct * (f.plus || 0);
+const plusMult = (f) => (1 + FAM_TUNING.plusStatPct * (f.plus || 0)) * (1 + FAM_TRANS.statPct * famTrans(f));
 const powerMult = (f) => famGrade(f.grade).mult * plusMult(f);
 
 // 동행 사역마의 실제 능력치 (1.226.0) — 사역마 실효 레벨의 기준 곡선 × 역할 × 등급·강화 × 사역마 장비 옵션(famPct)
@@ -350,7 +395,7 @@ export function famCombatant(key, f, hero, famPct = 0) {
     def: st.def, spd: st.spd, crit: 0.08, critMult: 1.5, dodge: 0.05,
     tauntReduce: role.tauntReduce ? Math.min(0.5, role.tauntReduce + 0.05 * (lv - 1)) : 0,
     guardian: role.guard ? role.guard[lv - 1] : 0, startTaunt: role.guard ? 2 : 0,
-    skills: [...(famHasSignature(key, f) ? [{ s: famSignature(key, f.grade), lv }] : []), ...FAM_SKILLS[roleId].map(s => ({ s, lv }))],
+    skills: [...(famHasTransSkill(f) ? [{ s: famTransSkill(key), lv }] : []), ...(famHasSignature(key, f) ? [{ s: famSignature(key, f.grade), lv }] : []), ...FAM_SKILLS[roleId].map(s => ({ s, lv }))],
     ...passiveFields(key, f),
   };
 }
