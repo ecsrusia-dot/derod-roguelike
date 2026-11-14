@@ -1319,8 +1319,14 @@ export function pickRebirthPerk(save0, perkId, classId = save0.hero) {
 export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
   const units = [
     ...party0.map(p => ({ ...p, buffs: {}, shield: Math.round((p.startShieldPct || 0) * p.maxHp), taunt: p.startTaunt || 0, tauntDef: 0, dots: [], cds: {}, fx: {}, hots: [], forced: null, cover: null, turn: 0, critNext: false, firstDone: false, reviveUsed: false, emergencyUsed: false })),
-    ...enemies0.map(e => ({ ...e, buffs: {}, shield: 0, taunt: 0, tauntDef: 0, dots: [], cds: {}, fx: {}, hots: [], forced: null, cover: null, turn: 0, skills: [] })),
+    // 결투 (pvp) — 적 편이지만 주인공·사역마처럼 스킬·특성을 쓰는 유닛. 일반 전투에는 없다 (pvp 플래그가 있을 때만 다르게 동작)
+    ...enemies0.map(e => (e.pvp
+      ? { ...e, buffs: {}, shield: Math.round((e.startShieldPct || 0) * e.maxHp), taunt: e.startTaunt || 0, tauntDef: 0, dots: [], cds: {}, fx: {}, hots: [], forced: null, cover: null, turn: 0, critNext: false, firstDone: false, reviveUsed: false, emergencyUsed: false }
+      : { ...e, buffs: {}, shield: 0, taunt: 0, tauntDef: 0, dots: [], cds: {}, fx: {}, hots: [], forced: null, cover: null, turn: 0, skills: [] })),
   ];
+  const duel = units.some(u => u.pvp);
+  const heroLike = (u) => u.side === 'party' || !!u.pvp;
+  const foeSide = (u) => (u.side === 'party' ? 'enemy' : 'party');
   const events = [];
   const alive = (side) => units.filter(u => u.side === side && u.hp > 0);
   const snap = () => Object.fromEntries(units.map(u => [u.id, [u.hp, u.shield]]));
@@ -1373,7 +1379,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
     let raw = att.atk * mult * atkMod(att) * (1 + (skill ? att.skillDmg || 0 : 0)) * (0.9 + rng() * 0.2) * (1 - fxv(att, 'weak'));
     if (att.execute && def.hp < def.maxHp * 0.3) raw *= 1 + att.execute;
     let crit = rng() < (att.crit || 0);
-    if (att.side === 'party' && (att.critNext || (att.firstCrit && !att.firstDone))) crit = true;
+    if (heroLike(att) && (att.critNext || (att.firstCrit && !att.firstDone))) crit = true;
     att.critNext = false; att.firstDone = true;
     if (crit) raw *= att.critMult || T.critMult;
     const defV = (def.def || 0) * (1 + (def.taunt > 0 ? def.tauntDef : 0) + fxv(def, 'guardDef')) * (1 - (att.armorPen || 0)) * (1 - fxv(def, 'armorBreak'));
@@ -1396,7 +1402,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
     if (att.lifesteal && d > 0 && att.hp > 0) healUnit(att, Math.round(d * att.lifesteal * (att.rageLifesteal && att.buffs?.rage?.t > 0 ? 2 : 1))); // 1.247.0 광폭화 중 흡혈 2배
     if (def.thornsPct && d > 0 && att.hp > 0 && !immuneTo(def, att)) att.hp = Math.max(0, att.hp - Math.max(1, Math.round(d * def.thornsPct)));
     // 반사 갑주 (1.237.0 보스 기믹) — 직접 공격 피해의 일부를 되돌린다 (지속 피해는 이 함수를 거치지 않아 반사 안 됨)
-    if (def.fx?.reflect?.t > 0 && att.side === 'party' && d > 0 && att.hp > 0) {
+    if (def.fx?.reflect?.t > 0 && heroLike(att) && d > 0 && att.hp > 0) {
       const rd = Math.max(1, Math.min(Math.round(d * def.fx.reflect.v), Math.round(att.maxHp * (T.bossMech?.reflect?.capPct || 1))));
       att.hp = Math.max(0, att.hp - rd); onHurt(att);
       push({ a: def.id, n: '반사', k: 'reflect', hits: [{ t: att.id, d: rd }] });
@@ -1420,7 +1426,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
   const pickEnemyTarget = (u) => {
     const foes = alive(u.side === 'party' ? 'enemy' : 'party');
     if (!foes.length) return null;
-    if (u.side === 'enemy') {
+    if (u.side === 'enemy' || duel) {
       // 결투·함성 도발 (고유 스킬) — 강제 대상
       if (u.forced && u.forced.t > 0) { const ft = foes.find(f => f.id === u.forced.by); if (ft) return ft; }
       const t = foes.find(f => f.taunt > 0);
@@ -1443,7 +1449,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
     return (ok.length ? ok : foes).slice().sort((a, b) => a.hp - b.hp)[0];
   };
   const counterCheck = (def, att, hits) => {
-    if (def.side !== 'party' || def.hp <= 0 || att.hp <= 0 || !def.counterPct) return;
+    if (!heroLike(def) || def.hp <= 0 || att.hp <= 0 || !def.counterPct) return;
     if (rng() < def.counterPct) {
       const times = def.counterDouble && rng() < def.counterDouble ? 2 : 1;
       for (let i = 0; i < times && att.hp > 0; i++) {
@@ -1456,8 +1462,8 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
 
   const chooseSkill = (u) => {
     const ready = u.skills.filter(x => !(u.cds[x.s.id] > 0));
-    const allies = alive('party');
-    const foes = alive('enemy').filter(f => !immuneTo(u, f));
+    const allies = alive(u.side);
+    const foes = alive(foeSide(u)).filter(f => !immuneTo(u, f));
     const has = (k) => ready.find(x => x.s.kind === k);
     // 1.227.1 PM: 사역마는 덜 놀게 — 치유 HP 75% 미만(주인공은 55% 그대로) · 보호막은 주인공 보호막이 최대 HP 10% 미만이면 다시
     const lowAlly = allies.find(a => a.hp < a.maxHp * (u.fam ? FAM_AI.healBelow + (u.healBelowAdd || 0) : 0.55));
@@ -1500,7 +1506,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
 
   const act = (u) => {
     u.turn += 1;
-    if (u.side === 'enemy') {
+    if (u.side === 'enemy' && !u.pvp) {
       if (u.passive) return; // 행동하지 않는 적
       // 봉인의 반향 (1.231.0) — 봉인은 자기 주인만 공격한다 (약한 캐릭터는 자기 봉인을 버티지 못한다)
       if (u.sealOf) {
@@ -1584,7 +1590,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
       push({ a: u.id, n: exec ? '처형' : heavy ? '강공격' : '공격', k: exec || heavy ? 'heavy' : 'attack', ...(exec ? { skill: true } : {}), hits });
       return;
     }
-    if (!alive('enemy').length) return;
+    if (!alive(foeSide(u)).length) return;
     const choice = chooseSkill(u);
     if (!choice) {
       const t = pickEnemyTarget(u);
@@ -1604,8 +1610,8 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
     const v = (s.base + s.perLv * (lv - 1)) * (1 + (u.skillBoost?.[s.id] || 0));
     u.cds[s.id] = Math.max(1, s.cd + 1 - skillCdrOf(u, s.id));
     const hits = [];
-    const foes = alive('enemy').filter(f => !immuneTo(u, f)); // 봉인 레이드: 깰 수 없는 대상 제외 (1.231.0)
-    const allies = alive('party');
+    const foes = alive(foeSide(u)).filter(f => !immuneTo(u, f)); // 봉인 레이드: 깰 수 없는 대상 제외 (1.231.0)
+    const allies = alive(u.side);
     switch (s.kind) {
       case 'strike': case 'lifesteal': {
         const t = pickEnemyTarget(u);
@@ -1732,7 +1738,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
   // ===== 전투 시작 연출 (1.259.0, 시안 ㊹) — k 'pre' = 행동 아님 (통계 제외), UI가 「전투 돌입 → 전투 전 효과 → 1라운드」로 보여 준다 =====
   const enterEv = { k: 'pre', pre: 'enter', foes: units.filter(x => x.side === 'enemy').length, roles: units.filter(x => x.side === 'enemy').map(x => (x.tier === 'boss' ? 'boss' : x.erole || 'dps')) };
   push(enterEv);
-  for (const p of units.filter(x => x.side === 'party')) {
+  for (const p of units.filter(heroLike)) {
     if (p.shield > 0) push({ k: 'pre', pre: 'fx', a: p.id, icon: '◈', n: '시작 보호막', v: `+${p.shield.toLocaleString()}`, tone: 'shield' });
     if (p.guardian) push({ k: 'pre', pre: 'fx', a: p.id, icon: '🛡', n: '수호 태세', v: `공격 ${Math.round(p.guardian * 100)}% 대신 받음`, tone: 'buff' });
     if (p.taunt > 0) push({ k: 'pre', pre: 'fx', a: p.id, icon: '📢', n: '도발', v: `${p.taunt}턴`, tone: 'buff' });
@@ -1752,9 +1758,9 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
   // 전투 시작 효과 — 이프리트의 계약서
   // 1.252.0 — 시작 로그 추가(PM 「겁화가 적용 안 되는 것 같다」: 실제로는 걸렸지만 로그에 출처가 없어 안 보였음)
   //   스킬 「겁화」와 별개 · 턴 소모 없음 · 쿨타임 무관 · 매 턴 공격력 × openInferno (유니크 60% + 특성 낙인의 불씨 4%/점)
-  for (const p of units.filter(x => x.side === 'party' && x.openInferno)) {
+  for (const p of units.filter(x => heroLike(x) && x.openInferno)) {
     const v = Math.max(1, Math.round(p.atk * p.openInferno * (1 + (p.dotDmg || 0)))); const turns = 3 * (p.dotTurnsMult || 1);
-    const foes = units.filter(x => x.side === 'enemy' && !immuneTo(p, x));
+    const foes = units.filter(x => x.side === foeSide(p) && !immuneTo(p, x));
     for (const e of foes) e.dots.push({ v, t: turns, src: p.id, sn: '이프리트의 낙인' });
     push({ a: p.id, n: `이프리트의 낙인 (매 턴 ${v.toLocaleString()} · ${turns}턴)`, k: 'open', brand: { v, turns }, hits: foes.map(e => ({ t: e.id, burn: true })) });
   }
@@ -1784,8 +1790,8 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
         u.hp = Math.max(0, u.hp - total);
         u.dots = u.dots.map(d => ({ ...d, t: d.t - 1 })).filter(d => d.t > 0);
         push({ a: u.id, n: '지속 피해', k: 'dotTick', hits: [{ t: u.id, d: total, dot: true }], dotSrc });
-        if (!alive('enemy').length) { result = 'win'; break; }
-        if (u.leader && u.hp <= 0) { result = 'lose'; break; }
+        if (!alive('enemy').length || (duel && u.leader && u.side === 'enemy' && u.hp <= 0)) { result = 'win'; break; }
+        if (u.leader && u.side === 'party' && u.hp <= 0) { result = 'lose'; break; }
         if (u.hp <= 0) continue;
       }
       // 자령 치유 고유 패시브 (1.243.0) — 자기 턴마다 아군 전원 소량 회복
@@ -1803,14 +1809,14 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
       for (const k of Object.keys(u.fx)) if (u.fx[k].t > 0) u.fx[k].t -= 1;
       if (u.forced && u.forced.t > 0) u.forced.t -= 1;
       if (u.cover && u.cover.t > 0) u.cover.t -= 1;
-      if (!alive('enemy').length) { result = 'win'; break; }
-      if (!alive('party').length || units.some(x => x.leader && x.hp <= 0)) { result = 'lose'; break; }
+      if (!alive('enemy').length || (duel && units.some(x => x.leader && x.side === 'enemy' && x.hp <= 0))) { result = 'win'; break; }
+      if (!alive('party').length || units.some(x => x.leader && x.side === 'party' && x.hp <= 0)) { result = 'lose'; break; }
       // 봉인 주인이 쓰러지면 그 봉인은 영원히 깰 수 없다 → 실패
       if (units.some(x => x.sealOf && x.hp > 0 && !units.some(p => p.side === 'party' && p.classId === x.sealOf && p.hp > 0))) { result = 'lose'; break; }
     }
     if (result) break;
   }
-  if (!result) result = 'lose';
+  if (!result) result = duel ? 'draw' : 'lose';
   const finalHp = Object.fromEntries(units.filter(u => u.side === 'party').map(u => [u.id, u.hp]));
   return { result, events, rounds: round, finalHp };
 }
