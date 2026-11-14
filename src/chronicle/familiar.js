@@ -827,8 +827,8 @@ const SPECIAL_BONDS = [
 ];
 const uniqKeys = (a) => [...new Set(a)].filter(k => k && ENEMIES[k]);
 export const FAM_BONDS = [
-  ...CHRONICLE_FIELDS.map(f => ({ id: `b_field${f.id}`, kind: 'region', name: `${f.name}의 주인들`, desc: `${f.name}의 보스와 강적`, members: uniqKeys([f.boss, ...f.elites]), fx: REGION_BOND_FX[f.id] || { hpPct: 0.02 }, tier2Grade: 'indigo' })),
-  ...CHRONICLE_FIELDS.filter(f => PACK_BOND_FX[f.id]).map(f => ({ id: `b_pack${f.id}`, kind: 'pack', name: `${f.name} 사냥 무리`, desc: `${f.name}의 일반 몹`, members: uniqKeys(f.normals), fx: PACK_BOND_FX[f.id], tier2Grade: 'blue' })),
+  ...CHRONICLE_FIELDS.filter(f => !f.depth).map(f => ({ id: `b_field${f.id}`, kind: 'region', name: `${f.name}의 주인들`, desc: `${f.name}의 보스와 강적`, members: uniqKeys([f.boss, ...f.elites]), fx: REGION_BOND_FX[f.id] || { hpPct: 0.02 }, tier2Grade: 'indigo' })),
+  ...CHRONICLE_FIELDS.filter(f => !f.depth && PACK_BOND_FX[f.id]).map(f => ({ id: `b_pack${f.id}`, kind: 'pack', name: `${f.name} 사냥 무리`, desc: `${f.name}의 일반 몹`, members: uniqKeys(f.normals), fx: PACK_BOND_FX[f.id], tier2Grade: 'blue' })),
   ...SPECIAL_BONDS.map(b => ({ ...b, kind: 'special', members: uniqKeys(b.names.map(keyByName)), tier2Grade: 'violet' })),
 ].filter(b => b.members.length >= 2);
 export const FAM_BOND_KIND = { region: '지역 인연', pack: '사냥 무리', special: '특별 인연' };

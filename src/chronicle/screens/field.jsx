@@ -5,7 +5,7 @@
 // ============================================
 import React, { useEffect, useRef, useState } from 'react';
 import { PALETTE } from '../../utils/helpers.js';
-import { CHRONICLE_PARTS, CHRONICLE_TUNING, CHRONICLE_FIELDS, CHRONICLE_DUNGEONS, DUNGEON_TIERS, dungeonDef, dungeonFloorLv, REBIRTH, BOSS_DAILY_LIMIT, BOSS_MECHS, DUNGEON_KEYS, SLOTS, UNIQUE_CHANCE, UNIQUE_ITEMS, fieldStages, FIELD_STAGES, chronicleClass, chronicleEnemyArt } from '../data.js';
+import { DEEP_ROMAN, CHRONICLE_PARTS, CHRONICLE_TUNING, CHRONICLE_FIELDS, CHRONICLE_DUNGEONS, DUNGEON_TIERS, dungeonDef, dungeonFloorLv, REBIRTH, BOSS_DAILY_LIMIT, BOSS_MECHS, DUNGEON_KEYS, SLOTS, UNIQUE_CHANCE, UNIQUE_ITEMS, fieldStages, FIELD_STAGES, chronicleClass, chronicleEnemyArt } from '../data.js';
 import * as E from '../engine.js';
 import * as D from '../daily.js';
 import { CENEMIES as ENEMIES } from '../enemies.js';
@@ -17,6 +17,7 @@ export function FieldView({ save, onBack, onFight, onAuto, playScene, sceneOpen 
   const [sel, setSel] = useState(() => rec0?.field.id || 1);
   useEffect(() => { if (!sceneOpen) playScene({ at: 'field', fieldId: sel }); }, [sel, sceneOpen]); // eslint-disable-line react-hooks/exhaustive-deps
   const f = CHRONICLE_FIELDS[sel - 1];
+  const rbCount = save.units[save.hero]?.rebirth?.count || 0;
   const part = CHRONICLE_PARTS.find(p => p.fields.includes(sel)) || CHRONICLE_PARTS[0];
   const st = E.stageState(save, f.id);
   const stages = fieldStages(f);
@@ -41,7 +42,7 @@ export function FieldView({ save, onBack, onFight, onAuto, playScene, sceneOpen 
       <Header title="사냥터" onBack={onBack} right={<Wallet save={save} />} />
       <div className="flex-none px-4 pt-1">
         <MainTabs size={12.5} value={part.id} onChange={(id) => { const p = CHRONICLE_PARTS.find(x => x.id === id); const last = [...p.fields].reverse().find(fid => E.fieldUnlocked(save, fid)) || p.fields[0]; setSel(last); }}
-          items={CHRONICLE_PARTS.map(p => { const open = E.fieldUnlocked(save, p.fields[0]); return [p.id, open ? (p.id === part.id ? p.name : p.name.split(' · ')[0]) : `🔒 ${p.name.split(' · ')[0]}`, false, !open]; })} />
+          items={CHRONICLE_PARTS.filter(p => !p.depth || p.reqRebirth <= rbCount + 1).map(p => { const open = E.fieldUnlocked(save, p.fields[0]); const short = p.depth ? `심층${DEEP_ROMAN[p.depth - 1]}` : p.name.split(' · ')[0]; return [p.id, open ? (p.id === part.id && !rbCount ? p.name : short) : `🔒${p.depth ? short : ` ${short}`}`, false, !open]; })} />
         <MainTabs size={12.5} value={sel} onChange={setSel}
           items={CHRONICLE_FIELDS.filter(x => part.fields.includes(x.id)).map(x => { const open = E.fieldUnlocked(save, x.id); return [x.id, open ? `${x.id} ${x.name.split(' ').pop()}` : `🔒 ${x.id}`, false, !open]; })} />
       </div>
@@ -50,7 +51,7 @@ export function FieldView({ save, onBack, onFight, onAuto, playScene, sceneOpen 
           <img src={chronicleEnemyArt(f.normals[Math.min(stage, f.normals.length - 1)])} alt="" className="absolute inset-0 w-full h-full object-cover" />
           <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, transparent 38%, #0b0708)' }} />
           <div className="absolute bottom-2 left-3 right-3">
-            <div className="font-bold" style={{ fontSize: 18, color: PALETTE.text }}>{f.name} <span style={{ fontSize: 13, color: MS.gold }}>스테이지 {stage + 1}</span></div>
+            <div className="font-bold" style={{ fontSize: 18, color: PALETTE.text }}>{f.depth ? <span style={{ color: '#b06cff' }}>심층 {DEEP_ROMAN[f.depth - 1]} · </span> : null}{f.name} <span style={{ fontSize: 13, color: MS.gold }}>스테이지 {stage + 1}</span></div>
             <div style={{ fontSize: 12, color: PALETTE.textDim }}>몹 <b style={{ color: lvColor(S.lv) }}>Lv.{S.lv}</b> · 강적 Lv.{S.lv + 1} · 보스 Lv.{f.bossLv}{BOSS_MECHS[E.bossMechOf('field', f.id)] ? ` · ◇ ${BOSS_MECHS[E.bossMechOf('field', f.id)].name}` : ''}</div>
             <IntimNote heroLv={heroLv} lv={S.lv} what="몹" />
           </div>

@@ -13,7 +13,7 @@ import {
   CHRONICLE_TUNING as T, CHRONICLE_CLASSES, CHRONICLE_SKILLS, CHRONICLE_FIELDS, CHRONICLE_DUNGEON, CHRONICLE_DUNGEONS, DUNGEON_TIERS, dungeonDef, dungeonFloorLv,
   STAT_KEYS, SKILL_MAX_LV, MASTERY_PCT, BOSS_DAILY_LIMIT, DUNGEON_KEYS, GRADES, gradeIdx, SLOTS, CLASS_SLOTS, FORGE, DROP_TABLE,
   CLASS_GEAR_NAMES, EPIC_PREFIX, OPTION_DEFS, OPTION_POOLS, OFFHAND_BASE, CLASS_DROP, UNIQUE_DROP, EPIC_OPTIONS, UNIQUE_ITEMS, UNIQUE_CHANCE,
-  chronicleClass, classSkills, buildChronicleEnemy,
+  chronicleClass, classSkills, buildChronicleEnemy, rebirthReqLevel,
 } from './data.js';
 
 const clone = (o) => (typeof structuredClone === 'function' ? structuredClone(o) : JSON.parse(JSON.stringify(o)));
@@ -1214,7 +1214,7 @@ function packOf(rng, list, opt = null) {
   });
 }
 // ===== 보스 공략 기믹 (1.237.0) — boss = 보스 적 객체 · make(key, i, {hp, atk}) = 같은 조건의 수행원 생성 =====
-export const bossMechOf = (kind, id) => BOSS_MECH_OF[kind]?.[id] || null;
+export const bossMechOf = (kind, id) => BOSS_MECH_OF[kind]?.[kind === 'field' ? (CHRONICLE_FIELDS[id - 1]?.base || id) : id] || null;
 export function withBossMech(boss, mechId, pool, make, rng) {
   const M = T.bossMech?.[mechId];
   if (!M || !BOSS_MECHS[mechId]) return [boss];
@@ -1305,7 +1305,7 @@ const SPECIAL_KINDS = new Set(['duel', 'warcry', 'cover', 'fortify', 'bigHeal', 
 // ===== 전승 (1.220.0) =====
 export function canRebirth(save, classId = save.hero) {
   const u = save.units[classId];
-  return !!u && u.lv >= REBIRTH.reqLevel && (u.rebirth?.count || 0) < REBIRTH.max;
+  return !!u && u.lv >= rebirthReqLevel(u.rebirth?.count || 0) && (u.rebirth?.count || 0) < REBIRTH.max;
 }
 export function rebirth(save0, branchId, classId = save0.hero, perkId = null) {
   const br = REBIRTH_BRANCHES[branchId];
