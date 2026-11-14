@@ -9,7 +9,7 @@
 // ⚠ 밸런스 조정은 ARENA 한 곳.
 import * as E from './engine.js';
 import * as F from './familiar.js';
-import { chronicleClass, chronicleEnemyArt, CHRONICLE_FIELDS, CHRONICLE_DUNGEONS, DUNGEON_KEYS } from './data.js';
+import { chronicleClass, chronicleEnemyArt, CHRONICLE_FIELDS, CHRONICLE_DUNGEONS, DUNGEON_KEYS, FORGE } from './data.js';
 import { RIVALS, RIVAL_FAMS, rivalState, rivalTicks } from './rival.js';
 import { toView } from './account.js';
 
@@ -60,18 +60,46 @@ function famCandidates(gid, role) {
   const same = list.filter(k => F.famRole(k) === role);
   return same.length ? same : list;
 }
+// 1.294.1 PM 결정 「실제 확률로 강화」 — 경쟁자도 내 대장간과 같은 성공·하락·파괴 확률로 강화한다.
+//   부위마다 따로 굴린다 (경쟁자·부위별 고정 난수 — 시도 횟수가 늘면 그 뒤를 이어서 굴리므로 결과가 뒤바뀌지 않는다)
+//   시도 횟수 = 최고 레벨 × tryPerLv + 전승 × tryPerRebirth (무기는 ×weaponTry)
+//   목표 = 경쟁자 성향 (+7 안전 / +8 / +9 / +10) — 목표에 닿으면 멈춘다. 파괴되면 새 장비(+0)로 다시 시작한다.
+export const RIVAL_FORGE = {
+  tryPerLv: 0.12, tryPerRebirth: 6, weaponTry: 1.3,
+  targets: [[7, 50], [8, 30], [9, 15], [10, 5]], // [목표 강화, 비중 %]
+};
+export function rivalForgeTarget(r) {
+  let x = hash(r.id + ':forge') % 100;
+  for (const [t, w] of RIVAL_FORGE.targets) { if (x < w) return t; x -= w; }
+  return 7;
+}
+// → { plus, tries, fails, drops, breaks, target }
+export function rivalEnhance(r, slot, st) {
+  const peak = st.peak || st.lv;
+  const tries = Math.floor((peak * RIVAL_FORGE.tryPerLv + st.rebirth * RIVAL_FORGE.tryPerRebirth) * (slot === 'weapon' ? RIVAL_FORGE.weaponTry : 1));
+  const target = rivalForgeTarget(r);
+  const rng = seeded(hash(r.id + ':' + slot));
+  let plus = 0, fails = 0, drops = 0, breaks = 0, used = 0;
+  for (let i = 0; i < tries && plus < target; i++) {
+    used++;
+    if (rng() < FORGE.enhanceRate[plus]) { plus++; continue; }
+    fails++;
+    if (plus >= FORGE.enhanceBreakFrom && rng() < FORGE.enhanceBreakChance) { breaks++; plus = 0; continue; }
+    if (plus >= FORGE.enhanceDropFrom) { drops++; plus--; }
+  }
+  return { plus, tries: used, fails, drops, breaks, target };
+}
 export function rivalGearPlan(st) {
   const peak = st.peak || st.lv;
   const grade = st.rebirth >= 3 ? 'mythic' : peak >= 50 ? 'epic' : peak >= 25 ? 'rare' : 'uncommon';
-  const plus = Math.min(9, 1 + Math.floor(peak / 20) + st.rebirth);
   const ilv = st.rebirth > 0 ? Math.max(100, peak) : st.lv;
   const famGrade = peak < 20 ? null : st.rebirth >= 3 ? 'violet' : (peak >= 80 || st.rebirth >= 1) ? 'indigo' : peak >= 60 ? 'blue' : peak >= 40 ? 'green' : 'red';
   const famPlus = Math.min(10, Math.floor(peak / 10) + st.rebirth);
-  return { grade, plus, ilv, famGrade, famPlus, unique: st.rebirth >= 1 };
+  return { grade, ilv, famGrade, famPlus, unique: st.rebirth >= 1 };
 }
 const SAVE_CACHE = new Map();
 export function rivalSave(r, st) {
-  const ck = `${r.id}|${st.rebirth}|${st.lv}`;
+  const ck = `${r.id}|${st.rebirth}|${st.lv}|${st.peak || st.lv}`;
   if (SAVE_CACHE.has(ck)) return SAVE_CACHE.get(ck);
   const rng = seeded(hash(r.id) + st.rebirth * 7919 + st.lv * 31);
   const plan = rivalGearPlan(st);
@@ -82,7 +110,7 @@ export function rivalSave(r, st) {
     let it = null;
     if (plan.unique && slot === 'weapon') it = E.rollUniqueItem(rng, plan.ilv, r.cls);
     if (!it || it.slot !== slot) it = E.rollItem(rng, plan.grade, plan.ilv, slot, 'field', r.cls);
-    it.uid = save.nextUid++; it.plus = plan.plus;
+    it.uid = save.nextUid++; it.plus = rivalEnhance(r, slot, st).plus;
     save.inventory.push(it); u.equip[slot] = it.uid;
   }
   u = E.autoGrowUnit(u);

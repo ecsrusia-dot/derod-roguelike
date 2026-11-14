@@ -3,6 +3,6 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.294.0';
+export const GAME_VERSION = '1.294.1';
 export const VERSION_DATE = '2026-11-14';
-export const VERSION_LABEL = '전승마다 만렙 +10 · 심층 지역';
+export const VERSION_LABEL = '경쟁자 강화 — 대장간과 같은 확률';
