@@ -311,7 +311,7 @@ export function famNaturalGrade(key) {
     const put = (k, g) => { if (k && famGradeIdx(g) > famGradeIdx(_natural[k] || 'red')) _natural[k] = g; };
     for (const f of CHRONICLE_FIELDS) {
       for (const k of f.normals || []) put(k, 'green');
-      for (const k of f.elites || []) put(k, 'blue');
+      for (const k of f.elites || []) put(k, f.part >= 3 ? 'indigo' : 'blue'); // 1.290.1 — 3부 강적은 남령
       put(f.boss, f.part >= 2 ? 'violet' : 'indigo');
     }
     for (const d of CHRONICLE_DUNGEONS) put(d.floors[d.floors.length - 1].enemies[0], 'violet');
@@ -462,8 +462,9 @@ export function famPool(progress) {
   return {
     red: uniq(open.flatMap(f => f.normals)),
     green: uniq(open.flatMap(f => f.normals)),
-    blue: uniq(open.flatMap(f => f.elites)),
-    indigo: uniq(CHRONICLE_FIELDS.filter(f => !f.part && cleared[f.id]).map(f => f.boss)),
+    blue: uniq(open.filter(f => !(f.part >= 3)).flatMap(f => f.elites)),
+    // 1.290.1 PM 결정 — 남령 = 처치한 1부 보스 + 열린 3부 지역의 강적 (4종 → 최대 13종)
+    indigo: uniq([...CHRONICLE_FIELDS.filter(f => !f.part && cleared[f.id]).map(f => f.boss), ...open.filter(f => f.part >= 3).flatMap(f => f.elites)]),
     violet: uniq([...dungeonBosses, ...p2Bosses]),
   };
 }
