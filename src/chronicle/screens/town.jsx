@@ -16,6 +16,7 @@ import * as F from '../familiar.js';
 import * as D from '../daily.js';
 import * as RV from '../rival.js';
 import * as AR from '../arena.js';
+import * as ASC from '../ascend.js';
 import { CENEMIES as ENEMIES } from '../enemies.js';
 import { Header, Wallet, Bar, XP_HERO, expSnap, xpPct, MainKvRows, MS, CLASS_PATH, MainSecHead, MainModal } from './common.jsx';
 
@@ -236,6 +237,7 @@ export function TownView({ save, acc, go, onExit, onSwitchChar, onClaimAll }) {
     { id: 'forge', icon: '⚒', label: '대장간', sub: '강화 · 등급 승급' },
     { id: 'daily', icon: '📅', label: '일일 · 주간 임무', sub: (() => { const n = D.DAILY_MISSIONS.filter(m => D.missionState(acc, m).status !== 'progress').length; const w = D.WEEKLY_MISSIONS.filter(m => D.weeklyMissionState(acc, m).status !== 'progress').length; return `오늘 ${n}/${D.DAILY_MISSIONS.length} · 주간 ${w}/${D.WEEKLY_MISSIONS.length}`; })(), badge: D.dailyBadge(acc) + D.weeklyBadge(acc) > 0 },
     (() => { const b = RV.myBestRank(acc); const got = RV.rivalWeekClaimed(acc); const left = AR.arenaLeft(acc); return { id: 'rival', icon: '🏆', label: '경쟁자 · 투기장', sub: b ? `${b.rank}위 / ${b.total}명 · 결투 ${left}회${got ? '' : ' · 주간 보상'}` : '가상 경쟁자 100명', badge: !!b && (!got || left > 0) }; })(),
+    { id: 'ascend', icon: '✶', label: '승천계', sub: `보관 ${ASC.ascFilled(acc)}/${ASC.ASC_SLOTS.length} · 승천 예정 ${ASC.ascEligibleCount(acc)}명` },
     { id: 'exit', icon: '⇄', label: '게임 선택', sub: '진행은 자동 저장' },
   ];
   const byId = Object.fromEntries(tiles.map(t => [t.id, t]));
@@ -243,7 +245,7 @@ export function TownView({ save, acc, go, onExit, onSwitchChar, onClaimAll }) {
     { label: '전 투', ids: ['field', 'dungeon', 'tower'] },
     { label: '성 장', ids: ['party', 'fam', 'forge'] },
     { label: '의 뢰 · 경 쟁', ids: ['quests', 'daily', 'rival'] },
-    { label: '원 정 대', ids: ['roster', 'raid'] },
+    { label: '원 정 대', ids: ['roster', 'raid', 'ascend'] },
     { label: '보 관', ids: ['bag', 'stash'] },
   ];
   const fx = expSnap(save).fam;

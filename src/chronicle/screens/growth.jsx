@@ -186,7 +186,7 @@ function TalentPanel({ save, setSave, cid }) {
 }
 
 // ===== 파티 · 성장 =====
-export function PartyView({ save, setSave, onBack, onForge }) {
+export function PartyView({ save, setSave, onBack, onForge, onRebirth }) {
   const cid = save.hero;
   const [slotPick, setSlotPick] = useState(null);
   const [eqInfo, setEqInfo] = useState(null); // 장비 정보 (1.252.0)
@@ -366,7 +366,7 @@ export function PartyView({ save, setSave, onBack, onForge }) {
           </>
         )}
       </div>
-      {rebirthOpen && <RebirthSheet save={save} cid={cid} onClose={() => setRebirthOpen(false)} onRebirth={(b, pk) => { setSave(E.rebirth(save, b, cid, pk)); setRebirthOpen(false); }} />}
+      {rebirthOpen && <RebirthSheet save={save} cid={cid} onClose={() => setRebirthOpen(false)} onRebirth={(b, pk) => { if (onRebirth) onRebirth(b, pk); else setSave(E.rebirth(save, b, cid, pk)); setRebirthOpen(false); }} />}
       {perkOpen && rebirthPerkLeft(u) > 0 && <PerkSheet save={save} cid={cid} onClose={() => setPerkOpen(false)} onPick={(pk) => setSave(E.pickRebirthPerk(save, pk, cid))} />}
       {eqInfo != null && (() => {
         const it = save.inventory.find(i => i.uid === eqInfo); if (!it) return null;
