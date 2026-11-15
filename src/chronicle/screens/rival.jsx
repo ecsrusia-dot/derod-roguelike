@@ -113,9 +113,10 @@ function RivalDetail({ def, st }) {
             { l: '보유 사역마', v: `${Object.keys(save.fams || {}).length}종` },
             { l: '강화 성공', v: `${log.enhance.toLocaleString()}회` },
             { l: '진화', v: `${log.evoTry}회 시도 · ${log.evoOk}회 성공`, c: log.evoOk ? '#d07ae8' : undefined },
+            ...(log.transTry ? [{ l: '초월', v: `${log.transTry}회 시도 · ${log.transOk}회 성공`, c: '#d07ae8' }] : []),
             { l: '번 사역혼 / 남은 사역혼', v: `🔮 ${log.soulsEarned.toLocaleString()} / ${log.soulsLeft.toLocaleString()}` },
           ]} />
-          <div className="mt-1.5" style={{ fontSize: 11, color: PALETTE.textDim }}>내 캐릭터와 같은 확률로 소환·강화·진화한 결과다 (약 25전에 소환 1회). 보유한 사역마 전부가 보유 효과·인연에 들어간다.</div>
+          <div className="mt-1.5" style={{ fontSize: 11, color: PALETTE.textDim }}>내 캐릭터와 같은 확률로 소환·강화·진화·초월한 결과다 (약 25전에 소환 1회). 보유한 사역마 전부가 보유 효과·인연에 들어간다.</div>
         </>}
       </> : <div className="mt-2" style={{ fontSize: 12, color: PALETTE.textDim }}>사역마 없음 (아직 소환을 한 번도 못 했다)</div>)}
     </>

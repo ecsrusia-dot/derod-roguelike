@@ -98,7 +98,7 @@ export function rivalFams(r, st) {
   if (FAM_CACHE.has(ck)) return FAM_CACHE.get(ck);
   const rng = seeded(hash(r.id + ':fam'));
   let fams = {}; let pity = {}; let souls = 0;
-  const log = { summons: 0, enhance: 0, evoTry: 0, evoOk: 0, soulsEarned: 0, soulsLeft: 0, byGrade: {} };
+  const log = { summons: 0, enhance: 0, evoTry: 0, evoOk: 0, transTry: 0, transOk: 0, soulsEarned: 0, soulsLeft: 0, byGrade: {} };
   const perBatch = R.battlesPerSummon * R.batch;
   const pr = { ...r, pace: 1 };
   for (let i = 1; i <= batches; i++) {
@@ -116,12 +116,14 @@ export function rivalFams(r, st) {
         const w = slot === 'main' ? R.mainWeight : 1;
         if ((f.plus || 0) < F.FAM_TUNING.maxPlus) acts.push({ k, kind: 'enh', cost: F.FAM_TUNING.enhanceCost(f.plus || 0, f.grade), w });
         else if (slot === 'main' && GI(f.grade) < F.FAM_GRADES.length - 1) acts.push({ k, kind: 'evo', cost: F.FAM_TUNING.evolveCost(f.grade), w });
+        else if (slot === 'main' && F.famCanTranscend(f)) acts.push({ k, kind: 'trans', cost: F.famTransCost(f), w }); // 자령 +10 → 초월 (1.299.1)
       }
       if (!acts.length) break;
       acts.sort((a, b) => a.cost * a.w - b.cost * b.w);
       const a = acts[0];
       if (souls < a.cost) break; // 모은다
       if (a.kind === 'enh') { const x = F.enhanceFamiliar(fams, souls, a.k); if (!x.ok) break; fams = x.fams; souls = x.souls; log.enhance += 1; }
+      else if (a.kind === 'trans') { const x = F.transcendFamiliar(fams, souls, a.k, rng); if (!x.result) break; fams = x.fams; souls = x.souls; log.transTry += 1; if (x.result === 'success') log.transOk += 1; }
       else { const x = F.evolveFamiliar(fams, souls, a.k, rng); if (!x.result) break; fams = x.fams; souls = x.souls; log.evoTry += 1; if (x.result === 'success') log.evoOk += 1; }
     }
   }
