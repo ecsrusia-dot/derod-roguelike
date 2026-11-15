@@ -112,6 +112,7 @@ function BackupSheet({ acc, onClose, onImport, cloudApi }) {
   const [pending, setPending] = useState(null); // 가져올 계정 (확인 대기)
   const fileRef = useRef(null);
   const auto = useMemo(() => BK.backupInfo(), []);
+  const pre = useMemo(() => BK.preSeasonInfo(), []); // 시즌 교체 직전 상태 (1.296.0)
   const download = () => {
     try {
       const blob = new Blob([BK.exportText(acc)], { type: 'application/json' });
@@ -170,6 +171,11 @@ function BackupSheet({ acc, onClose, onImport, cloudApi }) {
           <button onClick={() => setPending({ acc: auto.acc, at: auto.at })} className="ui-press mt-1.5" style={bkBtn()}>↺ 자동 백업으로 되돌리기</button>
         </>
       ) : <div style={{ fontSize: 12, color: PALETTE.textDim }}>아직 자동 백업이 없습니다 (10분 이상 플레이하면 생깁니다)</div>}
+      {pre && <>
+        <BkSec title="시즌 교체 직전" right={fmtWhen(pre.at)} />
+        <div style={{ fontSize: 12, color: PALETTE.textDim, lineHeight: 1.6 }}>마지막 시즌 교체가 일어나기 직전의 저장입니다. 되돌리면 그 뒤의 진행(이번 시즌)은 사라집니다.</div>
+        <button onClick={() => setPending({ acc: pre.acc, at: pre.at })} className="ui-press mt-1.5" style={bkBtn()}>↺ 시즌 교체 직전으로 되돌리기</button>
+      </>}
       {msg ? <div className="mt-2" style={{ fontSize: 12, color: PALETTE.dawn }}>{msg}</div> : null}
     </MainModal>
   );

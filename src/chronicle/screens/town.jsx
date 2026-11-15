@@ -17,6 +17,7 @@ import * as D from '../daily.js';
 import * as RV from '../rival.js';
 import * as AR from '../arena.js';
 import * as ASC from '../ascend.js';
+import * as SE from '../season.js';
 import { CENEMIES as ENEMIES } from '../enemies.js';
 import { Header, Wallet, Bar, XP_HERO, expSnap, xpPct, MainKvRows, MS, CLASS_PATH, MainSecHead, MainModal } from './common.jsx';
 
@@ -96,7 +97,7 @@ export function RaidView({ save, onBack, onFight }) {
 export function RosterView({ save, setSave, flash, onBack, onSwitchChar, onRaid }) {
   const roster = save.roster || {};
   const cap = E.levelCapOf(save);
-  const hint = R.nextCapHint(roster);
+  const hint = save.seasonOn ? null : R.nextCapHint(roster); // 시즌계는 레벨 상한 해제
   const got = R.globalBuffFx(roster, save.hero);
   const n60 = R.reachedCount(roster, R.ROSTER.unlockLv);
   // 1.246.0 — 의뢰 정렬(받기 → 진행 → 받음) · 받는 버프 출처
@@ -134,10 +135,10 @@ export function RosterView({ save, setSave, flash, onBack, onSwitchChar, onRaid 
           })}
         </div>
 
-        <button onClick={onRaid} className="ui-press w-full text-left mt-3" style={{ padding: '9px 10px', border: `1px solid ${raidOk ? MS.red : MS.line}`, background: MS.box, borderRadius: MS.r }}>
+        {!save.seasonOn && <button onClick={onRaid} className="ui-press w-full text-left mt-3" style={{ padding: '9px 10px', border: `1px solid ${raidOk ? MS.red : MS.line}`, background: MS.box, borderRadius: MS.r }}>
           <div className="font-bold" style={{ fontSize: 13.5, color: raidOk ? '#ff8a7e' : PALETTE.textDim }}>⚔ 원정대 레이드 「다섯 봉인」 ›</div>
           <div style={{ fontSize: 11.5, color: PALETTE.textDim }}>{raidOk ? '다섯 캐릭터가 함께 싸운다 — 각자 자기 봉인을 깨야 보스에 닿는다' : '다섯 캐릭터 모두 Lv.60이 되면 입장'}</div>
-        </button>
+        </button>}
 
         <MainSecHead title={`${chronicleClass(save.hero).name.split('').join(' ')} 가 받 는 전 역 버 프`} />
         {buffSrc.length ? <>
@@ -236,8 +237,8 @@ export function TownView({ save, acc, go, onExit, onSwitchChar, onClaimAll }) {
     { id: 'stash', icon: '🏛', label: '공용 창고', sub: `${(save.stash || []).length}/${A.STASH_MAX} · 모든 캐릭터 공유` },
     { id: 'forge', icon: '⚒', label: '대장간', sub: '강화 · 등급 승급' },
     { id: 'daily', icon: '📅', label: '일일 · 주간 임무', sub: (() => { const n = D.DAILY_MISSIONS.filter(m => D.missionState(acc, m).status !== 'progress').length; const w = D.WEEKLY_MISSIONS.filter(m => D.weeklyMissionState(acc, m).status !== 'progress').length; return `오늘 ${n}/${D.DAILY_MISSIONS.length} · 주간 ${w}/${D.WEEKLY_MISSIONS.length}`; })(), badge: D.dailyBadge(acc) + D.weeklyBadge(acc) > 0 },
-    (() => { const b = RV.myBestRank(acc); const got = RV.rivalWeekClaimed(acc); const left = AR.arenaLeft(acc); return { id: 'rival', icon: '🏆', label: '경쟁자 · 투기장', sub: b ? `${b.rank}위 / ${b.total}명 · 결투 ${left}회${got ? '' : ' · 주간 보상'}` : '가상 경쟁자 100명', badge: !!b && (!got || left > 0) }; })(),
-    { id: 'ascend', icon: '✶', label: '승천계', sub: `보관 ${ASC.ascFilled(acc)}/${ASC.ASC_SLOTS.length} · 승천 예정 ${ASC.ascEligibleCount(acc)}명` },
+    (() => { const b = RV.myBestRank(acc); const got = !!acc.season?.on || RV.rivalWeekClaimed(acc); /* 시즌 중엔 주간 보상 대신 시즌 종료 보상 */ const left = AR.arenaLeft(acc); return { id: 'rival', icon: '🏆', label: '경쟁자 · 투기장', sub: b ? `${b.rank}위 / ${b.total}명 · 결투 ${left}회${got ? '' : ' · 주간 보상'}` : '가상 경쟁자 100명', badge: !!b && (!got || left > 0) }; })(),
+    { id: 'ascend', icon: '✶', label: '승천계', sub: acc.season?.on ? `시즌 ${acc.season.n} · ${SE.fmtLeft(SE.seasonLeftMs(acc))} 남음 · 보관 ${ASC.ascFilled(acc)}/${ASC.ASC_SLOTS.length}` : `보관 ${ASC.ascFilled(acc)}/${ASC.ASC_SLOTS.length} · 승천 예정 ${ASC.ascEligibleCount(acc)}명${acc.season?.armed ? ' · 시작 예약됨' : ''}` },
     { id: 'exit', icon: '⇄', label: '게임 선택', sub: '진행은 자동 저장' },
   ];
   const byId = Object.fromEntries(tiles.map(t => [t.id, t]));
@@ -245,7 +246,7 @@ export function TownView({ save, acc, go, onExit, onSwitchChar, onClaimAll }) {
     { label: '전 투', ids: ['field', 'dungeon', 'tower'] },
     { label: '성 장', ids: ['party', 'fam', 'forge'] },
     { label: '의 뢰 · 경 쟁', ids: ['quests', 'daily', 'rival'] },
-    { label: '원 정 대', ids: ['roster', 'raid', 'ascend'] },
+    { label: '원 정 대', ids: acc.season?.on ? ['roster', 'ascend'] : ['roster', 'raid', 'ascend'] }, // 시즌계에서는 「다섯 봉인」 레이드가 없다 (승천계 신 토벌이 대신함)
     { label: '보 관', ids: ['bag', 'stash'] },
   ];
   const fx = expSnap(save).fam;

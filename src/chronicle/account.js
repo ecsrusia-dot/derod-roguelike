@@ -36,6 +36,8 @@ export function createCharacter(acc0, classId, rng = Math.random) {
     dungeon: null, stats: s.stats, createdAt: Date.now(),
   };
   acc.active = classId;
+  // 시즌제 (1.296.0) — 지난 시즌에 본 이야기는 다시 나오지 않는다
+  if (acc.asc?.storySeen) acc.chars[classId].story = { ...acc.chars[classId].story, seen: { ...acc.asc.storySeen } };
   // 시작 보상은 첫 캐릭터에게 한 번 — 희귀 상자 = 그 직업 희귀 장비
   if (acc.gift) {
     const g = acc.gift;
@@ -68,6 +70,7 @@ export function toView(acc) {
     roster: buildRoster(acc.chars), // 원정대 (1.229.0) — 레벨 상한·전역 버프 계산용, 읽기 전용
     rosterQuests: acc.rosterQuests || { claimed: {} }, // 원정대 의뢰 (1.230.0) — 계정 공유
     autoSalvage: acc.autoSalvage || { grade: -1, other: false }, // 획득 즉시 자동 분해 (1.231.2) — 계정 공유
+    seasonOn: !!acc.season?.on, // 시즌계 (1.296.0) — 경험치 ×1.5 · 원정대 레벨 상한 해제 (읽기 전용)
     raid: acc.raid || null, // 원정대 레이드 기록 (1.231.0) — 읽기 전용 (갱신은 raid.applyRaidResult가 계정에 직접)
   });
 }

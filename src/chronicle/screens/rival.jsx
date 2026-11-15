@@ -9,6 +9,7 @@ import * as TL from '../talents.js';
 import { MainGearCard } from './gear.jsx';
 import * as RV from '../rival.js';
 import * as AR from '../arena.js';
+import * as SE from '../season.js';
 import * as D from '../daily.js';
 import * as F from '../familiar.js';
 import { chronicleEnemyArt } from '../data.js';
@@ -234,7 +235,7 @@ export function RivalView({ acc, onBack, onAct, top = 'rank', onTop, onFight, on
     return rows.filter((_, i) => keep.has(i));
   }, [rows, whole]);
   const selRow = sel && rows.find(x => x.id === sel);
-  const selDef = selRow && !selRow.me ? RV.RIVALS.find(r => r.id === selRow.id) : null;
+  const selDef = selRow && !selRow.me ? RV.rivalDefs(acc).find(r => r.id === selRow.id) : null;
   let prevRank = 0;
   return (
     <div className="absolute inset-0 flex flex-col">
@@ -257,6 +258,9 @@ export function RivalView({ acc, onBack, onAct, top = 'rank', onTop, onFight, on
                 <div style={{ fontSize: 11.5, color: PALETTE.text }}>{best.above ? <>바로 위 「{best.above.name}」까지 <b style={{ color: MS.gold }}>{best.gap}점</b></> : '정상에 섰다'}</div>
               </div>
             </div>
+            {acc.season?.on
+              ? <div className="mt-2" style={{ padding: '8px 10px', border: `1px solid ${MS.strong}`, borderRadius: MS.r, background: MS.box, fontSize: 12, lineHeight: 1.55, color: PALETTE.textDim }}><b style={{ color: MS.gold }}>시즌 {acc.season.n}</b> · 남은 시간 <b style={{ color: PALETTE.text }}>{SE.fmtLeft(SE.seasonLeftMs(acc))}</b><br />월요일 0시에 순위가 확정되고 승천 인장으로 보상된다 (지금 순위면 ✶ {(SE.SEASON.growthSeals.find(([r]) => best.rank <= r) || [0, 0])[1]}).</div>
+              : <>
             <button disabled={claimed} onClick={() => onAct((a) => RV.claimRivalWeek(a))} className="ui-press w-full mt-2 chr-btn-pri" style={{ height: 40, fontSize: 13, fontWeight: 800, opacity: claimed ? 0.45 : 1 }}>
               {claimed ? '이번 주 순위 보상 받음 (월요일 0시 초기화)' : `이번 주 순위 보상 받기 — ${tier.label}`}
             </button>
@@ -264,6 +268,7 @@ export function RivalView({ acc, onBack, onAct, top = 'rank', onTop, onFight, on
             <button disabled={!monthReady} onClick={() => setMonthPick(true)} className="ui-press w-full mt-2" style={{ height: 38, fontSize: 12.5, fontWeight: 800, border: `1px solid ${monthReady ? MS.violet : MS.line}`, background: monthReady ? 'rgba(208,122,232,0.16)' : 'transparent', color: monthReady ? MS.violet : PALETTE.textDim }}>
               {monthDone ? '이번 달 1위 보상 받음' : monthReady ? '👑 월간 1위 보상 — 자령 고르기' : '👑 월간 1위 보상 — 통합 1위일 때 자령 선택권 (월 1회)'}
             </button>
+              </>}
           </div>
         )}
         <div className="flex items-center justify-between flex-none" style={{ marginTop: 2 }}>
@@ -294,7 +299,9 @@ export function RivalView({ acc, onBack, onAct, top = 'rank', onTop, onFight, on
         <MainKvRows rows={[...RV.RIVAL_REWARDS.map(r => ({ l: r.label, v: rewardText(r), c: tier && r.label === tier.label ? MS.gold : undefined })), { l: '월간 1위', v: '🐾 자령 선택권 1장', c: MS.violet }]} />
         <div className="flex-none" style={{ fontSize: 11.5, color: PALETTE.textDim, lineHeight: 1.6 }}>
           점수 = 전승 횟수 × {RV.RIVAL_TUNING.scorePerRebirth} + 레벨 + 첨탑 최고층 ÷ {RV.RIVAL_TUNING.towerDiv}<br />
-          경쟁자 {RV.RIVALS.length}명은 <b style={{ color: PALETTE.text }}>내가 전투한 만큼만</b> 성장한다 — 쉬는 동안에는 순위가 바뀌지 않는다.
+          {acc.season?.on
+            ? <>경쟁자 {RV.RIVALS.length}명도 이번 시즌을 Lv.1에서 시작했다. 내가 전투한 만큼 성장하고, <b style={{ color: PALETTE.text }}>내가 쉬어도 한 주에 {RV.RIVAL_TUNING.seasonMinTicks.toLocaleString()}전 분량</b>만큼은 자란다.</>
+            : <>경쟁자 {RV.RIVALS.length}명은 <b style={{ color: PALETTE.text }}>내가 전투한 만큼만</b> 성장한다 — 쉬는 동안에는 순위가 바뀌지 않는다.</>}
         </div>
       </div>}
       {monthPick && (

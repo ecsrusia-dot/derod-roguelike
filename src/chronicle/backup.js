@@ -93,3 +93,14 @@ export function parseImport(text) {
   if (!isValidAccount(acc)) return { error: '황혼 연대기 백업 파일이 아닙니다' };
   return { acc, at: o.at || null };
 }
+
+// 시즌 교체 직전 저장 (1.296.0) — 교체가 일어나기 직전의 계정을 따로 한 벌 남긴다 (다음 교체 때 덮어씀)
+export const PRE_SEASON_KEY = 'dnt_chronicle_v2_preseason';
+export function savePreSeason(acc) {
+  const s = ls(); if (!s) return false;
+  try { s.setItem(PRE_SEASON_KEY, JSON.stringify({ at: Date.now(), acc })); return true; } catch { return false; }
+}
+export function preSeasonInfo() {
+  const s = ls(); if (!s) return null;
+  try { const o = JSON.parse(s.getItem(PRE_SEASON_KEY) || 'null'); return o && isValidAccount(o.acc) ? { acc: o.acc, at: o.at || null, summary: accountSummary(o.acc) } : null; } catch { return null; }
+}

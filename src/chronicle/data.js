@@ -288,6 +288,8 @@ export const unitTitle = (u, classId) => (u?.rebirth?.branch && REBIRTH_BRANCHES
 export const rebirthLevelCap = (count = 0) => (count > 0 ? REBIRTH.levelCap + REBIRTH.capPerRebirth * (count - 1) : CHRONICLE_TUNING.maxLevel);
 // 전승에 필요한 레벨 — 첫 전승 100, 그 뒤로는 그때의 만렙
 export const rebirthReqLevel = (count = 0) => (count > 0 ? rebirthLevelCap(count) : REBIRTH.reqLevel);
+// 시즌제 (1.296.0 — docs/chronicle-season-design.md) — 시즌계에서만 적용되는 값
+export const SEASON_RULES = { expMult: 1.5 }; // PM 결정: 경험치 ×1.5
 export const expNeedFor = (u) => {
   const base = CHRONICLE_TUNING.expNeed(u.lv);
   if (u.lv < CHRONICLE_TUNING.maxLevel) return Math.round(base);

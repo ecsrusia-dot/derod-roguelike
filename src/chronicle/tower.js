@@ -64,6 +64,8 @@ export function towerFloorPicks(floor, rng) {
 }
 
 // 주간 키 — 한국 시간 월요일 0시 기준
+// 주간 키(월요일 날짜) → 그 주가 시작하는 시각 (한국 시간 월요일 0시)
+export const kstWeekStartMs = (key) => Date.parse(`${key}T00:00:00+09:00`);
 export function kstWeekKey(now = Date.now()) {
   const d = new Date(now + 9 * 3600 * 1000);
   const day = (d.getUTCDay() + 6) % 7; // 월=0

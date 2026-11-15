@@ -10,7 +10,7 @@
 import * as E from './engine.js';
 import * as F from './familiar.js';
 import { chronicleClass, chronicleEnemyArt, CHRONICLE_FIELDS, CHRONICLE_DUNGEONS, DUNGEON_KEYS, FORGE } from './data.js';
-import { RIVALS, RIVAL_FAMS, rivalState, rivalTicks } from './rival.js';
+import { RIVAL_FAMS, rivalState, rivalTicks, rivalDefs } from './rival.js';
 import { toView } from './account.js';
 
 export const ARENA = {
@@ -99,7 +99,7 @@ export function rivalGearPlan(st) {
 }
 const SAVE_CACHE = new Map();
 export function rivalSave(r, st) {
-  const ck = `${r.id}|${st.rebirth}|${st.lv}|${st.peak || st.lv}`;
+  const ck = `${r.id}|${r.branch}|${st.rebirth}|${st.lv}|${st.peak || st.lv}`;
   if (SAVE_CACHE.has(ck)) return SAVE_CACHE.get(ck);
   const rng = seeded(hash(r.id) + st.rebirth * 7919 + st.lv * 31);
   const plan = rivalGearPlan(st);
@@ -156,9 +156,9 @@ export function myArenaRating(acc, cid = acc?.active) {
   return baseRating(c.unit.rebirth?.count || 0, c.unit.lv || 1) + (arenaState(acc).my[cid] || 0);
 }
 // 순위표 — 경쟁자 100명 + 내 캐릭터들 (투기장 점수 순)
-export function arenaBoard(acc) {
-  const ticks = rivalTicks(acc); const s = arenaState(acc);
-  const rows = RIVALS.map(r => { const st = rivalState(r, ticks); return { ...r, ...st, rating: baseRating(st.rebirth, st.lv) + (s.rv[r.id] || 0) }; });
+export function arenaBoard(acc, now = Date.now()) {
+  const ticks = rivalTicks(acc, now); const s = arenaState(acc);
+  const rows = rivalDefs(acc).map(r => { const st = rivalState(r, ticks); return { ...r, ...st, rating: baseRating(st.rebirth, st.lv) + (s.rv[r.id] || 0) }; });
   for (const [cid, c] of Object.entries(acc?.chars || {})) {
     if (!c?.unit) continue;
     rows.push({ id: `me_${cid}`, me: true, cls: cid, branch: c.unit.rebirth?.branch || null, name: chronicleClass(cid).name, rebirth: c.unit.rebirth?.count || 0, lv: c.unit.lv || 1, rating: myArenaRating(acc, cid) });
@@ -194,7 +194,7 @@ function settle(sim, party, enemies) {
 }
 // 예상 승률 (같은 시드 → 같은 값)
 export function arenaOdds(acc, opp, cid = acc?.active) {
-  const r = RIVALS.find(x => x.id === opp.id); if (!r) return null;
+  const r = rivalDefs(acc).find(x => x.id === opp.id); if (!r) return null;
   const view = toView({ ...acc, active: cid }); if (!view) return null;
   const party = E.duelSide(view, false); const enemies = rivalSide(r, opp);
   let w = 0;
@@ -208,7 +208,7 @@ export function arenaOdds(acc, opp, cid = acc?.active) {
 // ===== 결투 =====
 export function arenaFight(acc0, rid, rng = Math.random) {
   const cid = acc0?.active;
-  const r = RIVALS.find(x => x.id === rid);
+  const r = rivalDefs(acc0).find(x => x.id === rid);
   const view = toView(acc0);
   if (!r || !view || arenaLeft(acc0, cid) <= 0) return null;
   const opp = arenaBoard(acc0).find(x => x.id === rid);

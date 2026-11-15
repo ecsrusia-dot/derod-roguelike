@@ -8,7 +8,7 @@
 //   ③ 경쟁자는 전투를 실제로 돌리지 않는다 — 봇 진행 시뮬에서 잰 「전투 수 → 레벨」 곡선을 따라간다.
 // ⚠ 밸런스 조정은 RIVAL_TUNING 한 곳.
 import { CHRONICLE_CLASSES, REBIRTH, REBIRTH_BRANCHES, chronicleClass, rebirthLevelCap } from './data.js';
-import { kstWeekKey } from './tower.js';
+import { kstWeekKey, kstWeekStartMs } from './tower.js';
 import { famPool, grantFamiliar, famGradeIdx, FAM_GRADES } from './familiar.js';
 
 export const RIVAL_TUNING = {
@@ -24,6 +24,8 @@ export const RIVAL_TUNING = {
   overPow: 0.8,
   towerFrom: 48, towerPerLv: 1, towerPerRebirth: 6, towerSkill: [0.75, 1.2],
   scorePerRebirth: 120, towerDiv: 5,
+  // 시즌제 (1.296.0) — 시즌 중 경쟁자 주간 최소 활동량(내 전투 수 환산) · 시즌 경험치 가속을 경쟁자 속도에도 반영
+  seasonMinTicks: 7000, seasonPaceMult: 1.5,
 };
 
 // 순위 점수 = 전승 × 120 + 레벨 + 첨탑 최고층 ÷ 5 (내 캐릭터·경쟁자 공통)
@@ -128,7 +130,26 @@ export function rivalState(r, ticks) {
 }
 
 // 내 계정 전체 전투 수 (시계)
-export const rivalTicks = (acc) => Object.values(acc?.chars || {}).reduce((n, c) => n + (c?.stats?.battles || 0), 0);
+// 시즌제(1.296.0) — 시즌 중에는 내가 쉬어도 경쟁자가 주당 seasonMinTicks만큼은 성장한다 (주가 지난 만큼 비례)
+export function rivalTicks(acc, now = Date.now()) {
+  const mine = Object.values(acc?.chars || {}).reduce((n, c) => n + (c?.stats?.battles || 0), 0);
+  const se = acc?.season;
+  if (!se?.on || !se.key) return mine;
+  const frac = Math.max(0, Math.min(1, (now - kstWeekStartMs(se.key)) / (7 * 86400000)));
+  return Math.max(mine, Math.floor(RIVAL_TUNING.seasonMinTicks * frac));
+}
+// 시즌별 경쟁자 — 사람(이름·속도·성향)은 같고, 시즌마다 키우는 갈래가 바뀐다 (첫 시즌은 원래 갈래, 이후 3칸씩 돌아 10시즌에 한 바퀴)
+const BRANCH_ORDER = Object.keys(REBIRTH_BRANCHES);
+export function seasonRival(r, n = 0) {
+  if (!(n > 1)) return r;
+  const branch = BRANCH_ORDER[(BRANCH_ORDER.indexOf(r.branch) + (n - 1) * 3) % BRANCH_ORDER.length];
+  return { ...r, branch, cls: REBIRTH_BRANCHES[branch].cls };
+}
+export function rivalDefs(acc) {
+  if (!acc?.season?.on) return RIVALS;
+  const n = acc.season.n || 1;
+  return RIVALS.map(r => { const d = seasonRival(r, n); return { ...d, pace: d.pace * RIVAL_TUNING.seasonPaceMult }; });
+}
 
 // 내 캐릭터 줄
 export function myEntries(acc) {
@@ -139,10 +160,10 @@ export function myEntries(acc) {
 }
 
 // 순위표 — cls를 주면 그 직업만. 동점은 내 캐릭터가 위.
-export function rivalBoard(acc, cls = null) {
-  const ticks = rivalTicks(acc);
+export function rivalBoard(acc, cls = null, now = Date.now()) {
+  const ticks = rivalTicks(acc, now);
   const rows = [
-    ...RIVALS.map(r => ({ ...r, ...rivalState(r, ticks) })),
+    ...rivalDefs(acc).map(r => ({ ...r, ...rivalState(r, ticks) })),
     ...myEntries(acc),
   ].filter(x => !cls || x.cls === cls);
   rows.sort((a, b) => b.score - a.score || (b.me ? 1 : 0) - (a.me ? 1 : 0) || b.lv - a.lv || (a.id < b.id ? -1 : 1));
