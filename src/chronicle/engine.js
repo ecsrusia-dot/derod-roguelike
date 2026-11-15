@@ -6,7 +6,7 @@
 // ============================================
 import { levelCap, globalBuffFx } from './roster.js';
 import { talentFx, canLearnTalent, talentNode, talentResetCost, talentTrees, tierUnlocked } from './talents.js';
-import { BOSS_MECHS, BOSS_MECH_OF, fieldStages, FIELD_STAGES, STAGE_TUNING, AUTO_CLIMB, BOOST, BAG_EXPAND, SALVAGE, SALVAGE_ICON, REBIRTH, REBIRTH_BRANCHES, DUEL, REBIRTH_PERKS, rebirthPerkCount, rebirthPerkLeft, rebirthPerkOk, expNeedFor, OPTION_LV_CURVE, REFORGE , unitTitle } from './data.js';
+import { BOSS_MECHS, BOSS_MECH_OF, fieldStages, FIELD_STAGES, STAGE_TUNING, AUTO_CLIMB, BOOST, BAG_EXPAND, SALVAGE, SALVAGE_ICON, REBIRTH, REBIRTH_BRANCHES, DUEL, REBIRTH_PERKS, rebirthPerkCount, rebirthPerkLeft, rebirthPerkOk, expNeedFor, OPTION_LV_CURVE, REFORGE , unitTitle, SEASON_RULES } from './data.js';
 import { TOWER, TOWER_SHOP, towerUnlocked, isTowerBoss, towerEnemyLv, towerArea, towerFloorPicks, towerTheme, kstWeekKey } from './tower.js';
 import { famCombatant, famRole, famSubFx, famOwnFx, famBondFx, famResoHeroFx, rollFamShards, rollFamSouls, gainFamExp, FAM_AI, FAM_TUNING, summonFamiliars, enhanceFamiliar, evolveFamiliar, transcendFamiliar } from './familiar.js';
 import {
@@ -710,7 +710,8 @@ export { addKeys as _addKeys };
 
 // 경험치 — 레벨업 횟수 반환
 // cap = 원정대 레벨 상한 (1.229.0) — 상한에 닿으면 경험치를 받지 않는다 (기존 고레벨 저장은 레벨 유지)
-export const levelCapOf = (save) => levelCap(save?.roster, save?.units?.[save?.hero]?.rebirth?.count || 0);
+// 시즌계(1.296.0)에서는 원정대 레벨 상한이 풀린다 (roster 없이 계산 = 만렙)
+export const levelCapOf = (save) => levelCap(save?.seasonOn ? null : save?.roster, save?.units?.[save?.hero]?.rebirth?.count || 0);
 function gainExp(u, n, cap = T.maxLevel) {
   let ups = 0;
   if (u.lv >= cap) return 0;
@@ -1935,7 +1936,7 @@ export function applyBattle(save0, ctx, battle, rng = Math.random) {
   const r = battleRewards(ctx.enemies, ctx.type, rng, mods);
   // 장비 옵션 — 경험치·골드 % (주인공 기준)
   const hd = deriveUnit(save, save.hero);
-  r.exp = Math.round(r.exp * (1 + (hd.expPct || 0)) * regrowExpMult(save.units[save.hero]));
+  r.exp = Math.round(r.exp * (1 + (hd.expPct || 0)) * regrowExpMult(save.units[save.hero]) * (save.seasonOn ? SEASON_RULES.expMult : 1));
   r.gold = Math.round(r.gold * (1 + (hd.goldPct || 0)));
   if (r.talentScroll) { save.mats.talentScroll = (save.mats.talentScroll || 0) + r.talentScroll; summary.talentScroll = r.talentScroll; }
   summary.exp = r.exp; summary.gold = r.gold; summary.essence = r.essence; summary.shard = r.shard;

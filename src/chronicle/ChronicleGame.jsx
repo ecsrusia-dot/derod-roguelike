@@ -25,7 +25,8 @@ import { BattleView } from './screens/battle.jsx';
 import { DepartView, fmtWhen, SummaryLine, TitleView, GiftNotice, SceneView, OfflineSheet } from './screens/title.jsx';
 import { RaidView, RosterView, TownView } from './screens/town.jsx';
 import { RivalView } from './screens/rival.jsx';
-import { AscendView } from './screens/ascend.jsx';
+import { AscendView, SeasonReportModal } from './screens/ascend.jsx';
+import * as SE from './season.js';
 import * as ASC from './ascend.js';
 import * as F from './familiar.js';
 import { FieldView, DungeonView, TowerView } from './screens/field.jsx';
@@ -191,6 +192,21 @@ export default function ChronicleGame({ onExit }) {
   const [cloudUser, setCloudUser] = useState(null);
   const [cloud, setCloud] = useState({ checkedUid: null, lastUp: null, busy: false, error: null, conflict: null });
   const accRef = useRef(acc); accRef.current = acc;
+  // 시즌 교체 (1.296.0) — 주가 바뀌면 결산 · 승천 · 초기화. 교체 직전 계정은 따로 한 벌 남긴다
+  useEffect(() => {
+    const roll = () => {
+      const a = accRef.current;
+      if (!SE.seasonDue(a)) return;
+      BK.savePreSeason(a);
+      setRepeat(false); setAutoProg(false); setBattle(null); setScene(null);
+      setAcc(SE.rollSeason(a)); setView('title');
+    };
+    roll();
+    const t = setInterval(roll, 30000);
+    const vis = () => { if (document.visibilityState === 'visible') roll(); };
+    document.addEventListener('visibilitychange', vis);
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', vis); };
+  }, []);
   const dirtyRef = useRef(false);
   useEffect(() => { dirtyRef.current = true; }, [acc]);
   useEffect(() => {
@@ -476,7 +492,7 @@ export default function ChronicleGame({ onExit }) {
   if (!save || view === 'title') {
     content = (
       <TitleView acc={acc} onExit={onExit} cloudApi={cloudApi}
-        onImport={(a) => { setRepeat(false); setBattle(null); setScene(null); setAcc(a); flash('백업을 불러왔습니다'); }}
+        onImport={(a) => { setRepeat(false); setBattle(null); setScene(null); setAcc(SE.holdSeason(a)); flash('백업을 불러왔습니다'); }}
         onReset={() => { setRepeat(false); setBattle(null); setScene(null); setAcc(A.newAccount(false)); flash('황혼 연대기를 처음부터 시작합니다'); }}
         onSelect={(cid) => { setRepeat(false); setAcc(a => A.selectCharacter(a, cid)); setView('depart'); }}
         onCreate={(cid) => { setRepeat(false); setAcc(a => A.createCharacter(a, cid)); setView('depart'); }} />
@@ -528,7 +544,7 @@ export default function ChronicleGame({ onExit }) {
   } else if (view === 'daily') {
     content = <DailyView acc={acc} onBack={() => setView('town')} onSwitch={(cid) => { setRepeat(false); setAcc(a => A.selectCharacter(a, cid)); }} onAct={(fn) => { const r = fn(acc); if (!r.n) return; setAcc(r.acc); flash(`임무 보상 ${r.n}건 수령 — ${D.dailyRewardText(r.reward)}`); }} />;
   } else if (view === 'ascend') {
-    content = <AscendView acc={acc} onBack={() => setView('town')} />;
+    content = <AscendView acc={acc} onBack={() => setView('town')} onAct={(fn, msg) => { setAcc(a => fn(a)); if (msg) flash(msg); }} />;
   } else if (view === 'rival') {
     content = <RivalView acc={acc} top={rivalTab} onTop={setRivalTab} onFight={fightArena} onArena={(fn) => { const r = fn(acc); if (!r.n) return; setAcc(r.acc); if (r.item) flash(`${r.item.name} 구매`); }} onBack={() => setView('town')} onAct={(fn) => { const r = fn(acc); if (!r.n) return; setAcc(r.acc); flash(r.month ? `월간 1위 — 자령 「${F.famName(r.fam.key)}」${r.fam.soul ? ' (보유 중 → 사역혼 100)' : ''}` : r.fam ? `${r.rank}위 보상 — ${F.famGrade(r.fam.grade).label} 「${F.famName(r.fam.key)}」${r.fam.soul ? ` (보유 중 → 사역혼 ${r.fam.soul})` : ''}` : `${r.rank}위 · 주간 순위 보상을 받았습니다`); }} />;
   } else if (view === 'forge') {
@@ -546,6 +562,7 @@ export default function ChronicleGame({ onExit }) {
       )}
       {report && <HuntReport report={report} save={save} title={report.kind === 'tower' ? '🗼 첨탑 도전 집계' : report.kind === 'dungeon' ? '🏰 던전 전체 집계' : '📋 사냥 보고서'} onClose={() => setReport(null)} />}
       {boostSheet && save && <BoostSheet save={save} onClose={() => setBoostSheet(false)} onBuy={() => { const n = E.buyBoost(save); if (n === save) { flash(save.gold < E.boostCost(save) ? '골드가 부족합니다' : `최대 ${BOOST.maxStackMin / 60}시간까지 쌓을 수 있습니다`); return; } setSave(n); flash(`⏩ ×4 배속 +${BOOST.minutes}분`); }} />}
+      {acc.season?.report && (!save || view === 'title' || view === 'town') && <SeasonReportModal acc={acc} onClose={() => setAcc(a => SE.clearSeasonReport(a))} />}
       {acc.giftNotice && view === 'title' && <GiftNotice acc={acc} onClose={() => setAcc(a => ({ ...a, giftNotice: false }))} />}
       {view === 'town' && !scene && acc.offline?.pending && acc.chars?.[acc.offline.pending.hero] && <OfflineSheet pd={acc.offline.pending} onClaim={claimOffline} />}
       {cloud.conflict && (

@@ -7,8 +7,9 @@ import { chronicleClass, REBIRTH_BRANCHES, SLOTS } from '../data.js';
 import * as E from '../engine.js';
 import * as F from '../familiar.js';
 import * as ASC from '../ascend.js';
+import * as SE from '../season.js';
 import { MainGearCard } from './gear.jsx';
-import { Header, Portrait, MainTabs, MainModal, MainCell, MainSecHead, MS } from './common.jsx';
+import { Header, Portrait, MainTabs, MainModal, MainCell, MainSecHead, MainKvRows, MS } from './common.jsx';
 
 const box = { padding: '9px 11px', background: MS.box, border: `1px solid ${MS.line}`, borderRadius: MS.r, fontSize: 12.5, lineHeight: 1.6 };
 const pw = (n) => (n || 0).toLocaleString();
@@ -42,7 +43,88 @@ function SnapDetail({ snap, onClose, note }) {
   );
 }
 
-export function AscendView({ acc, onBack }) {
+// 결산 내용 — 시작 전 미리 보기와 시즌 종료 결산 창이 같이 쓴다
+const RESULT_KO = { new: ['새 칸', MS.green], replace: ['교체', MS.gold], keep: ['기존 유지', PALETTE.textDim] };
+function SettlementBody({ st }) {
+  return (
+    <>
+      <MainSecHead title="승 천" />
+      {st.ascended.map(a => { const r = RESULT_KO[a.result]; return (
+        <div key={a.cid} className="flex items-center gap-2 mt-1.5" style={box}>
+          <Portrait cid={a.cid} size={36} />
+          <div className="flex-1 min-w-0"><b style={{ color: chronicleClass(a.cid).color }}>{REBIRTH_BRANCHES[a.branch]?.name}</b> <span style={{ color: PALETTE.textDim }}>전승 {a.rebirth}회 · Lv.{a.lv}</span><br /><span style={{ fontSize: 11.5, color: r[1] }}>{r[0]}{a.result === 'replace' ? ` (이전 ${pw(a.prev)})` : a.result === 'keep' ? ` (보관 중 ${pw(a.prev)})` : ''}</span></div>
+          <b style={{ color: MS.gold }}>{pw(a.power)}</b>
+        </div>
+      ); })}
+      {!st.ascended.length && <div className="mt-1.5" style={{ ...box, color: PALETTE.textDim }}>승천한 캐릭터가 없다 (전승한 캐릭터만 승천한다).</div>}
+      {st.skipped.length > 0 && <div className="mt-1.5" style={{ ...box, borderColor: MS.red, color: '#ff9a90' }}>승천하지 못하고 사라짐: {st.skipped.map(x => `${chronicleClass(x.cid).name} Lv.${x.lv}`).join(' · ')}</div>}
+      <MainSecHead title="승 천 인 장" />
+      <MainKvRows rows={[
+        st.growth ? { l: `시즌 순위 ${st.growth.rank}위 / ${st.growth.total}명`, v: `+${st.growth.seal}` } : null,
+        st.arena ? { l: `투기장 ${st.arena.rank}위 / ${st.arena.total}명`, v: `+${st.arena.seal}` } : null,
+        st.ascSeal ? { l: '승천 (새 칸 · 교체)', v: `+${st.ascSeal}` } : null,
+        { l: `남은 재화 환산${st.conv.raw > st.conv.seal ? ` (상한 ${SE.SEASON.convertCap})` : ''}`, v: `+${st.conv.seal}` },
+        { l: '합계', v: `✶ +${st.seal}`, c: MS.gold },
+      ].filter(Boolean)} />
+      {st.conv.parts.length > 0 && <div className="mt-1" style={{ fontSize: 11.5, color: PALETTE.textDim, lineHeight: 1.55 }}>환산 내역: {st.conv.parts.map(p => `${p.label} ${p.n}`).join(' · ')}</div>}
+    </>
+  );
+}
+export function SeasonReportModal({ acc, onClose }) {
+  const r = acc.season.report;
+  return (
+    <MainModal kicker="SEASON END" title={r.n === 0 ? '시즌제 시작' : `시즌 ${r.n} 종료`} badge={`시즌 ${acc.season.n} 시작`} color={MS.gold} sub={`남은 시간 ${SE.fmtLeft(SE.seasonLeftMs(acc))}`} onClose={onClose}>
+      <div className="mt-2" style={{ ...box, color: PALETTE.textDim }}>시즌계가 새로 열렸다. 캐릭터·재화·사역마는 0에서 다시 시작하고, 승천한 캐릭터는 「승천계」에 보관됐다. 이번 시즌은 경험치 ×{1.5}, 레벨 상한 제한이 없다.</div>
+      <SettlementBody st={r} />
+    </MainModal>
+  );
+}
+// 시즌제 상태 · 시작 버튼
+function SeasonPanel({ acc, onAct }) {
+  const s = SE.seasonState(acc);
+  const [step, setStep] = useState(0);
+  const st = useMemo(() => (step ? SE.seasonSettlement(acc) : null), [step, acc]);
+  const left = SE.fmtLeft(SE.seasonLeftMs(acc));
+  const seal = ASC.ascState(acc).seal;
+  if (s.on) return (
+    <div className="flex-none" style={{ ...box, borderColor: MS.strong }}>
+      <div className="flex justify-between"><b style={{ color: MS.gold }}>시즌 {s.n} 진행 중</b><span style={{ color: PALETTE.text }}>남은 시간 <b>{left}</b></span></div>
+      월요일 0시에 순위가 확정되고, <b style={{ color: PALETTE.text }}>전승한 캐릭터</b>가 승천한 뒤 시즌계가 초기화된다.<br />
+      <span style={{ color: PALETTE.textDim }}>승천 인장 ✶ {seal.toLocaleString()} — 쓰임새(시작 특전 · 승천 특성)는 다음 업데이트에 열린다.</span>
+    </div>
+  );
+  return (
+    <>
+      <div className="flex-none" style={{ ...box, borderColor: MS.strong }}>
+        <b style={{ color: MS.gold }}>{s.armed ? `시즌 1 시작 예약됨 — ${left} 뒤` : '시즌제 시작 전'}</b><br />
+        {s.armed
+          ? <>다음 월요일 0시에 지금 캐릭터가 「시즌 0」으로 승천하고, 시즌계는 0에서 다시 시작한다. 그때까지 계속 키울 수 있다.</>
+          : <>시즌은 1주 단위다. 시즌이 끝나면 <b style={{ color: PALETTE.text }}>전승한 캐릭터</b>가 승천해 갈래별로 보관되고, 시즌계(캐릭터·재화·사역마)는 초기화된다. 시작하면 지금 캐릭터가 「시즌 0」으로 승천한다.</>}
+        <div className="flex gap-2 mt-2">
+          {s.armed
+            ? <button onClick={() => onAct(SE.disarmSeason, '시즌 시작 예약을 취소했습니다')} className="ui-press flex-1" style={{ height: 40, fontSize: 13, border: `1px solid ${MS.line}`, background: 'transparent', color: PALETTE.textDim }}>예약 취소</button>
+            : <button onClick={() => setStep(1)} className="ui-press flex-1 chr-btn-pri" style={{ height: 42, fontSize: 13.5, fontWeight: 800 }}>시즌제 시작…</button>}
+        </div>
+      </div>
+      {step > 0 && st && (
+        <MainModal kicker="SEASON" title="시즌제를 시작할까요?" color={MS.red} sub={`시작까지 ${SE.fmtLeft(SE.seasonLeftMs(SE.armSeason(acc)))} — 다음 월요일 0시에 아래처럼 처리된다 (지금 상태 기준)`} onClose={() => setStep(0)}
+          footer={step === 1
+            ? <button onClick={() => setStep(2)} className="ui-press w-full chr-btn-pri" style={{ height: 44, fontSize: 14, fontWeight: 800 }}>내용을 확인했다</button>
+            : <button onClick={() => { onAct((a) => SE.armSeason(a), '시즌 1 시작을 예약했습니다'); setStep(0); }} className="ui-press w-full" style={{ height: 44, fontSize: 14, fontWeight: 800, border: `1px solid ${MS.red}`, background: 'rgba(224,87,76,0.22)', color: '#ff8a7e' }}>정말 시작한다 — 다음 월요일에 초기화</button>}>
+          <div className="mt-2" style={{ ...box, borderColor: MS.red, color: PALETTE.text }}>
+            · 시즌계의 <b>캐릭터·장비·재화·사역마·창고가 전부 초기화</b>된다<br />
+            · <b>전승한 캐릭터만</b> 승천해 보관된다 — 전승 전 캐릭터는 사라진다<br />
+            · 월요일 전까지는 예약을 취소할 수 있고, 그동안 더 키우면 결과가 바뀐다<br />
+            · 교체 직전 상태는 이 기기에 한 벌 따로 남는다
+          </div>
+          <SettlementBody st={st} />
+        </MainModal>
+      )}
+    </>
+  );
+}
+
+export function AscendView({ acc, onBack, onAct }) {
   const [tab, setTab] = useState('plan');
   const [sel, setSel] = useState(null);
   const s = ASC.ascState(acc);
@@ -52,11 +134,7 @@ export function AscendView({ acc, onBack }) {
     <div className="absolute inset-0 flex flex-col">
       <Header title="승천계" onBack={onBack} right={<span style={{ fontSize: 11.5, color: PALETTE.textDim }}>보관 {filled} / {ASC.ASC_SLOTS.length}</span>} />
       <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2">
-        <div className="flex-none" style={{ ...box, borderColor: MS.strong }}>
-          <b style={{ color: MS.gold }}>시즌제 준비 중</b><br />
-          시즌이 끝나면 <b style={{ color: PALETTE.text }}>전승한 캐릭터</b>가 승천해 이곳에 갈래별로 보관된다. 승천한 캐릭터는 더 자라지 않고, 그 모습 그대로 「신 토벌」에 나선다.<br />
-          <span style={{ color: PALETTE.textDim }}>첫 시즌은 직접 시작 버튼을 누를 때 열린다 (다음 업데이트). 그때까지 지금 캐릭터를 계속 키울 수 있다.</span>
-        </div>
+        <SeasonPanel acc={acc} onAct={onAct} />
         <div className="flex-none"><MainTabs value={tab} onChange={setTab} items={[['plan', '승천 예정'], ['vault', '보관함']]} /></div>
         {tab === 'plan' && plan.map(p => {
           const c = chronicleClass(p.cid);
