@@ -2,10 +2,12 @@
 // 시즌 성장 시뮬 — 빈 계정(재화·사역마 0)에서 캐릭터 1명을 계속 키우며 전투 수별 도달 지점을 잰다.
 // 봇: 사역마는 얻은 조각으로 소환 · 강화는 +7까지 · 전승 조건이 되면 바로 전승(특전 = 경험의 축복)
 //     사냥은 레벨 +2 이하 최고 스테이지, 관문·보스는 레벨이 닿으면 도전(지면 1레벨 올린 뒤 재도전). 원정대 레벨 상한 없음.
-// ACC = 시즌 가속(경험치 배율) 시험
+// ACC = 시즌 가속(경험치 배율) 시험 · ASCT = 승천 특성 단계(4종 모두 그 단계 — 0~10)
 import * as E from '../src/chronicle/engine.js';
 import { CHRONICLE_FIELDS, CHRONICLE_CLASSES, CHRONICLE_SKILLS, CHRONICLE_TUNING as T, REBIRTH_BRANCHES, fieldStages } from '../src/chronicle/data.js';
 import { famStats } from '../src/chronicle/familiar.js';
+import { ascTalentFx } from '../src/chronicle/ascPerk.js';
+const ASCT = +(process.env.ASCT || 0); const ASC_FX = ASCT ? ascTalentFx({ might: ASCT, vigor: ASCT, lore: ASCT, guide: ASCT }) : null;
 function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const MAX = +process.argv[2] || 20000; const ACC = +(process.env.ACC || 1);
 if (ACC !== 1) { const o = T.expNeed; T.expNeed = (lv) => Math.max(1, Math.round(o(lv) / ACC)); }
@@ -42,6 +44,7 @@ function run(c) {
   const branch = Object.keys(REBIRTH_BRANCHES).find(k => REBIRTH_BRANCHES[k].cls === cid);
   const fail = {}; const marks = {}; const rbAt = {}; let wins = 0, hunts = 0;
   for (let k = 1; k <= MAX; k++) {
+    if (ASC_FX) save.ascFx = ASC_FX;
     save = upkeep(save, rng);
     if (E.canRebirth(save)) { save = E.rebirth(save, branch, cid, 'exp'); rbAt[save.units[cid].rebirth.count] = k; for (const x of Object.keys(fail)) delete fail[x]; save = upkeep(save, rng); }
     const lv = save.units[cid].lv;
@@ -60,7 +63,7 @@ function run(c) {
   }
   return { name: c.name, marks, rbAt, wr: Math.round(wins / Math.max(1, hunts) * 100) };
 }
-console.log(`시즌 성장 · 경험치 ×${ACC} · 최대 ${MAX}전`);
+console.log(`시즌 성장 · 경험치 ×${ACC} · 승천 특성 ${ASCT}단계 · 최대 ${MAX}전`);
 for (const c of CHRONICLE_CLASSES.filter(x => !process.env.CLS || process.env.CLS.split(',').includes(x.id))) {
   const r = run(c);
   console.log(`${r.name} | ` + MARKS.map(m => `${m}전 ${r.marks[m]}`).join(' | ') + ` | 전승 시점 ${Object.entries(r.rbAt).map(([n, k]) => `${n}회 ${k}전`).join(' · ')} | 사냥 승률 ${r.wr}%`);

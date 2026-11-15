@@ -18,6 +18,7 @@ import * as RV from '../rival.js';
 import * as AR from '../arena.js';
 import * as ASC from '../ascend.js';
 import * as SE from '../season.js';
+import * as AP from '../ascPerk.js';
 import { CENEMIES as ENEMIES } from '../enemies.js';
 import { Header, Wallet, Bar, XP_HERO, expSnap, xpPct, MainKvRows, MS, CLASS_PATH, MainSecHead, MainModal } from './common.jsx';
 
@@ -270,7 +271,7 @@ export function TownView({ save, acc, go, onExit, onSwitchChar, onClaimAll }) {
               <div style={{ fontSize: 11, letterSpacing: 4, color: cls.color }}>{CLASS_PATH[save.hero] || 'PATH'}</div>
               <button onClick={onSwitchChar} className="ui-press flex-none" style={{ fontSize: 11.5, padding: '3px 8px', border: `1px solid ${MS.line}`, color: PALETTE.text, background: MS.box, borderRadius: MS.r }}>⇄ 변경</button>
             </div>
-            <div className="font-bold" style={{ fontSize: 20, color: PALETTE.text, lineHeight: 1.2 }}><span className="chr-gtxt" style={{ '--tone': MS.gold, '--tone2': cls.color }}>{unitTitle(hero, save.hero)}</span> <span style={{ fontSize: 14, color: MS.gold }}>Lv.{hero.lv}</span> <span style={{ fontSize: 11, fontWeight: 400, color: PALETTE.textDim }}>/ {E.levelCapOf(save)} · {cls.role}</span></div>
+            <div className="font-bold" style={{ fontSize: 20, color: PALETTE.text, lineHeight: 1.2 }}><span className="chr-gtxt" style={{ '--tone': MS.gold, '--tone2': cls.color }}>{unitTitle(hero, save.hero)}</span> <span style={{ fontSize: 14, color: MS.gold }}>Lv.{hero.lv}</span>{AP.ascTitle(acc) ? <span className="chr-pill" style={{ fontSize: 11, marginLeft: 4, color: MS.gold, fontWeight: 600 }}>✶ {AP.ascTitle(acc).name}</span> : null} <span style={{ fontSize: 11, fontWeight: 400, color: PALETTE.textDim }}>/ {E.levelCapOf(save)} · {cls.role}</span></div>
             <div style={{ fontSize: 12.5, color: PALETTE.text }}>♡ {E.deriveUnit(save, save.hero).maxHp.toLocaleString()} · ⚔ 전투력 {E.unitPower(save, save.hero).toLocaleString()}</div>
             <div className="mt-1"><Bar v={hero.exp} max={expNeedFor(hero)} color={XP_HERO} h={5} /></div>
             <div className="truncate" style={{ fontSize: 11, color: PALETTE.textDim }}>경험치 {Math.floor(hero.exp / Math.max(1, expNeedFor(hero)) * 100)}% · ▶ {goal}</div>

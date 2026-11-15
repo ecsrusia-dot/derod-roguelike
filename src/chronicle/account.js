@@ -6,6 +6,7 @@
 //   캐릭터별(직업당 1명): 레벨·스킬·장비·개인 가방·진행도·의뢰·이야기·던전
 // engine/quest/화면은 예전처럼 「save 뷰」 하나를 다룬다 — toView/fromView가 계정 ↔ 뷰를 변환.
 // ============================================
+import { ascTalentFx } from './ascPerk.js';
 import { DUNGEON_KEYS, CLASS_SLOTS, CHRONICLE_TUNING as T } from './data.js';
 import * as E from './engine.js';
 import { ensureQuestFields } from './quest.js';
@@ -70,6 +71,7 @@ export function toView(acc) {
     roster: buildRoster(acc.chars), // 원정대 (1.229.0) — 레벨 상한·전역 버프 계산용, 읽기 전용
     rosterQuests: acc.rosterQuests || { claimed: {} }, // 원정대 의뢰 (1.230.0) — 계정 공유
     autoSalvage: acc.autoSalvage || { grade: -1, other: false }, // 획득 즉시 자동 분해 (1.231.2) — 계정 공유
+    ascFx: acc.season?.on ? ascTalentFx(acc.asc?.talents) : null, // 승천 특성 (1.298.0) — 시즌계에서만 적용 (읽기 전용)
     seasonOn: !!acc.season?.on, // 시즌계 (1.296.0) — 경험치 ×1.5 · 원정대 레벨 상한 해제 (읽기 전용)
     raid: acc.raid || null, // 원정대 레이드 기록 (1.231.0) — 읽기 전용 (갱신은 raid.applyRaidResult가 계정에 직접)
   });
