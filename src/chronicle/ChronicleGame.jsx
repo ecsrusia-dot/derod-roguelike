@@ -193,6 +193,9 @@ export default function ChronicleGame({ onExit }) {
   const [cloudUser, setCloudUser] = useState(null);
   const [cloud, setCloud] = useState({ checkedUid: null, lastUp: null, busy: false, error: null, conflict: null });
   const accRef = useRef(acc); accRef.current = acc;
+  const rollRef = useRef(null);
+  // 「지금 바로 시작」(1.300.2) — 예약 주가 이번 주로 바뀌면 30초를 기다리지 않고 바로 교체
+  useEffect(() => { if (acc.season?.armed && SE.seasonDue(acc)) rollRef.current?.(); }, [acc.season?.armed]);
   // 시즌 교체 (1.296.0) — 주가 바뀌면 결산 · 승천 · 초기화. 교체 직전 계정은 따로 한 벌 남긴다
   useEffect(() => {
     const roll = () => {
@@ -202,6 +205,7 @@ export default function ChronicleGame({ onExit }) {
       setRepeat(false); setAutoProg(false); setBattle(null); setScene(null);
       setAcc(SE.rollSeason(a)); setView('title');
     };
+    rollRef.current = roll;
     roll();
     const t = setInterval(roll, 30000);
     const vis = () => { if (document.visibilityState === 'visible') roll(); };

@@ -11,6 +11,7 @@
 // 데이터 + 순수 함수만. ⚠ 밸런스(보상·환산)는 SEASON 한 곳.
 // ============================================
 import { kstWeekKey, kstWeekStartMs } from './tower.js';
+export { kstWeekKey, kstWeekStartMs };
 import { rebirthLevelCap } from './data.js';
 import { newAccount } from './account.js';
 import { rivalDefs, rivalState, rivalTicks, rivalBoard, RIVAL_TUNING } from './rival.js';
@@ -42,6 +43,13 @@ export function armSeason(acc, now = Date.now()) {
   const s = seasonState(acc);
   if (s.on) return acc;
   return { ...acc, season: { ...(acc.season || {}), on: false, n: 0, armed: kstWeekKey(now + WEEK) } };
+}
+// 1.300.2 PM 「오늘부터 바로」 — 첫 시즌을 기다리지 않고 지금 시작 (이번 주를 예약 주로 → 바로 교체 대상).
+//   시즌 1은 이번 주 일요일 밤까지 — 시즌이 한 번 시작되면 다시 쓸 수 없다
+export function armSeasonNow(acc, now = Date.now()) {
+  const s = seasonState(acc);
+  if (s.on) return acc;
+  return { ...acc, season: { ...(acc.season || {}), on: false, n: 0, armed: kstWeekKey(now) } };
 }
 export function disarmSeason(acc) {
   const s = seasonState(acc);
