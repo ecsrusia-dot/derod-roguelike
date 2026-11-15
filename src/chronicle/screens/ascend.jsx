@@ -1,13 +1,14 @@
 // ============================================
 // chronicle/screens/ascend.jsx — 황혼 연대기 · 승천계 (시즌 시리즈 PR ① — 보관함 · 승천 예정)
 // ============================================
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { PALETTE } from '../../utils/helpers.js';
 import { chronicleClass, REBIRTH_BRANCHES, SLOTS } from '../data.js';
 import * as E from '../engine.js';
 import * as F from '../familiar.js';
 import * as ASC from '../ascend.js';
 import * as SE from '../season.js';
+import * as GD from '../god.js';
 import { MainGearCard } from './gear.jsx';
 import { Header, Portrait, MainTabs, MainModal, MainCell, MainSecHead, MainKvRows, MS } from './common.jsx';
 
@@ -62,6 +63,7 @@ function SettlementBody({ st }) {
       <MainKvRows rows={[
         st.growth ? { l: `시즌 순위 ${st.growth.rank}위 / ${st.growth.total}명`, v: `+${st.growth.seal}` } : null,
         st.arena ? { l: `투기장 ${st.arena.rank}위 / ${st.arena.total}명`, v: `+${st.arena.seal}` } : null,
+        st.god ? { l: `승천 순위 ${st.god.rank}위 / ${st.god.total}명 (점수 ${st.god.score})`, v: `+${st.god.seal}` } : null,
         st.ascSeal ? { l: '승천 (새 칸 · 교체)', v: `+${st.ascSeal}` } : null,
         { l: `남은 재화 환산${st.conv.raw > st.conv.seal ? ` (상한 ${SE.SEASON.convertCap})` : ''}`, v: `+${st.conv.seal}` },
         { l: '합계', v: `✶ +${st.seal}`, c: MS.gold },
@@ -124,8 +126,73 @@ function SeasonPanel({ acc, onAct }) {
   );
 }
 
-export function AscendView({ acc, onBack, onAct }) {
-  const [tab, setTab] = useState('plan');
+// 신 토벌 — 편성 · 도전 · 승천 순위 (경쟁자 점수는 조금씩 나눠 계산한다)
+const GOD_SCORES = {}; // 경쟁자 id → 점수 (이번 접속 동안 기억 · god.js가 구성별로 캐시)
+function GodPanel({ acc, onGod, onAct }) {
+  const slots = ASC.ascState(acc).slots;
+  const have = ASC.ASC_SLOTS.filter(b => slots[b]);
+  const g = GD.godState(acc); const weak = GD.godWeak(); const left = GD.godLeft(acc);
+  const ids = GD.godPartyIds(acc);
+  const [tick, setTick] = useState(0);
+  const entries = useMemo(() => GD.rivalGodEntries(acc), [acc.asc?.rivals]);
+  useEffect(() => {
+    let stop = false;
+    const step = () => {
+      if (stop) return;
+      const todo = entries.filter(e => GOD_SCORES[e.r.id + ':' + JSON.stringify(e.slots)] == null).slice(0, 3);
+      if (!todo.length) return;
+      for (const e of todo) GOD_SCORES[e.r.id + ':' + JSON.stringify(e.slots)] = GD.rivalGodScore(e.r, e.slots);
+      setTick(t => t + 1); setTimeout(step, 30);
+    };
+    const t = setTimeout(step, 200);
+    return () => { stop = true; clearTimeout(t); };
+  }, [entries]);
+  const scores = useMemo(() => Object.fromEntries(entries.map(e => [e.r.id, GOD_SCORES[e.r.id + ':' + JSON.stringify(e.slots)]]).filter(x => x[1] != null)), [entries, tick]);
+  const board = GD.godBoard(acc, scores);
+  const me = board.rows.find(x => x.me);
+  const toggle = (b) => { const on = ids.includes(b); const next = on ? ids.filter(x => x !== b) : ids.length >= GD.GOD.partyMax ? ids : [...ids, b]; if (next.length) onAct((a) => GD.setGodParty(a, next)); };
+  if (!have.length) return <div className="flex-none" style={{ ...box, color: PALETTE.textDim }}>승천한 캐릭터가 없다. 시즌이 끝나 전승한 캐릭터가 승천하면 신 토벌에 나설 수 있다.</div>;
+  return (
+    <>
+      <div className="flex-none" style={{ ...box, borderColor: MS.strong }}>
+        <div className="flex justify-between items-baseline"><b style={{ color: MS.gold }}>신 토벌</b><span style={{ color: PALETTE.text }}>오늘 <b>{left}</b> / {GD.GOD.daily}회</span></div>
+        승천 캐릭터 최대 {GD.GOD.partyMax}명이 「{GD.GOD.bossName}」에 도전한다. 넘은 단계가 곧 점수다 (동행 사역마는 참전하지 않는다).<br />
+        <span style={{ color: MS.violet }}>이번 주 약점 「{weak.name}」</span> <span style={{ color: PALETTE.text }}>— 파티 전원 {weak.desc}</span>
+        <div className="grid gap-1.5 mt-2" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
+          <MainCell label="최고 점수" value={g.best || '-'} color={MS.gold} />
+          <MainCell label="이번 주" value={g.weekBest || '-'} />
+          <MainCell label="승천 순위" value={me ? `${me.rank}위` : '-'} />
+        </div>
+        <button disabled={!left || !ids.length} onClick={() => onGod(ids)} className="ui-press w-full mt-2 chr-btn-pri" style={{ height: 44, fontSize: 14, fontWeight: 800, opacity: left && ids.length ? 1 : 0.45 }}>{left ? `토벌 출정 (${ids.length}명)` : '오늘 도전을 다 썼다 (0시 초기화)'}</button>
+      </div>
+      <MainSecHead title={`편 성  ${ids.length} / ${GD.GOD.partyMax}`} />
+      <div className="grid gap-1.5 flex-none" style={{ gridTemplateColumns: '1fr 1fr' }}>
+        {have.map(b => { const sn = slots[b]; const on = ids.includes(b); const c = chronicleClass(sn.cls); return (
+          <div key={b} role="button" onClick={() => toggle(b)} className="ui-press flex items-center gap-2" style={{ ...box, borderColor: on ? MS.gold : MS.line, opacity: on ? 1 : 0.6 }}>
+            <Portrait cid={sn.cls} size={34} dim={!on} />
+            <div className="min-w-0 flex-1"><b className="block truncate" style={{ color: c.color }}>{REBIRTH_BRANCHES[b].name}</b><span style={{ fontSize: 11, color: PALETTE.textDim }}>전승 {sn.rebirth} · Lv.{sn.lv} · {pw(sn.power)}</span></div>
+            <span style={{ color: on ? MS.gold : PALETTE.textDim, fontWeight: 800 }}>{on ? '✓' : '+'}</span>
+          </div>
+        ); })}
+      </div>
+      <MainSecHead title="승 천 순 위" />
+      <div className="flex-none" style={{ fontSize: 11.5, color: PALETTE.textDim, lineHeight: 1.55 }}>경쟁자도 자기 승천 캐릭터로 같은 신에게 도전한다. 시즌이 끝날 때 순위에 따라 승천 인장을 받는다 (1위 {GD.godRankSeal(1)} · 10위 {GD.godRankSeal(10)}).{board.pending ? ` 계산 중… (${board.pending}명 남음)` : ''}</div>
+      <div className="chr-list flex-none">
+        {board.rows.filter(x => x.rank <= 10 || x.me || (me && Math.abs(x.rank - me.rank) <= 2)).map(x => (
+          <div key={x.id} className="flex items-center gap-2" style={{ padding: '7px 10px', fontSize: 12.5, background: x.me ? 'rgba(232,176,74,0.1)' : 'transparent' }}>
+            <b style={{ width: 34, color: x.rank <= 3 ? MS.gold : PALETTE.textDim }}>{x.rank}위</b>
+            <span className="flex-1 truncate" style={{ color: x.me ? MS.gold : PALETTE.text, fontWeight: x.me ? 800 : 500 }}>{x.name} <span style={{ fontSize: 11, color: PALETTE.textDim }}>승천 {x.n}명</span></span>
+            <b style={{ color: PALETTE.text }}>{x.score}</b>
+          </div>
+        ))}
+        {!board.rows.length && <div style={{ padding: 10, fontSize: 12, color: PALETTE.textDim }}>아직 기록이 없다.</div>}
+      </div>
+    </>
+  );
+}
+
+export function AscendView({ acc, onBack, onAct, onGod }) {
+  const [tab, setTab] = useState(() => (Object.keys(ASC.ascState(acc).slots).length ? 'god' : 'plan'));
   const [sel, setSel] = useState(null);
   const s = ASC.ascState(acc);
   const plan = useMemo(() => ASC.ascPreview(acc), [acc]);
@@ -135,7 +202,8 @@ export function AscendView({ acc, onBack, onAct }) {
       <Header title="승천계" onBack={onBack} right={<span style={{ fontSize: 11.5, color: PALETTE.textDim }}>보관 {filled} / {ASC.ASC_SLOTS.length}</span>} />
       <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2">
         <SeasonPanel acc={acc} onAct={onAct} />
-        <div className="flex-none"><MainTabs value={tab} onChange={setTab} items={[['plan', '승천 예정'], ['vault', '보관함']]} /></div>
+        <div className="flex-none"><MainTabs value={tab} onChange={setTab} items={[['god', '신 토벌'], ['plan', '승천 예정'], ['vault', '보관함']]} /></div>
+        {tab === 'god' && <GodPanel acc={acc} onGod={onGod} onAct={onAct} />}
         {tab === 'plan' && plan.map(p => {
           const c = chronicleClass(p.cid);
           if (!p.eligible) return (

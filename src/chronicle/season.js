@@ -16,6 +16,7 @@ import { newAccount } from './account.js';
 import { rivalDefs, rivalState, rivalTicks, rivalBoard, RIVAL_TUNING } from './rival.js';
 import { arenaBoard } from './arena.js';
 import { ascState, ascPreview } from './ascend.js';
+import { godState, godRankSeal, rivalGodScore, rivalGodEntries } from './god.js';
 
 const WEEK = 7 * 86400000;
 export const SEASON = {
@@ -134,9 +135,16 @@ export function seasonSettlement(acc, endNow = Date.now()) {
     const ab = arenaBoard(acc, endNow); const am = ab.find(x => x.me);
     if (am) arena = { rank: am.rank, total: ab.length, seal: sealFor(SEASON.arenaSeals, am.rank) };
   }
+  // 승천 순위 (신 토벌 최고 점수) — 기록이 있을 때만. 경쟁자 점수는 이때 계산한다 (구성별 캐시)
+  let god = null;
+  const gs = godState(acc, endNow);
+  if (s.on && gs.best > 0) {
+    const above = rivalGodEntries(acc).filter(e => rivalGodScore(e.r, e.slots) > gs.best).length;
+    god = { rank: above + 1, total: rivalGodEntries(acc).length + 1, score: gs.best, seal: godRankSeal(above + 1) };
+  }
   const ascSeal = ascended.filter(a => a.result !== 'keep').length * SEASON.ascendSeal;
-  const seal = (growth?.seal || 0) + (arena?.seal || 0) + ascSeal + conv.seal;
-  return { n: s.n, ascended, skipped, slots, conv, growth, arena, ascSeal, seal };
+  const seal = (growth?.seal || 0) + (arena?.seal || 0) + (god?.seal || 0) + ascSeal + conv.seal;
+  return { n: s.n, ascended, skipped, slots, conv, growth, arena, god, ascSeal, seal };
 }
 // 교체 실행 → 새 계정 (시즌계는 비고, 승천계·설정·결산 보고만 남는다)
 export function rollSeason(acc, now = Date.now()) {
@@ -148,7 +156,7 @@ export function rollSeason(acc, now = Date.now()) {
   const rivals = ascendRivals(acc.asc?.rivals, acc, rivalTicks(acc, endNow), s.n);
   const storySeen = { ...(acc.asc?.storySeen || {}) };
   for (const c of Object.values(acc.chars || {})) for (const [id, v] of Object.entries(c.story?.seen || {})) if (v) storySeen[id] = true;
-  const report = { n: s.n, at: now, ascended: st.ascended, skipped: st.skipped, growth: st.growth, arena: st.arena, ascSeal: st.ascSeal, conv: st.conv, seal: st.seal };
+  const report = { n: s.n, at: now, ascended: st.ascended, skipped: st.skipped, growth: st.growth, arena: st.arena, god: st.god, ascSeal: st.ascSeal, conv: st.conv, seal: st.seal };
   const log = [...asc0.log, { n: s.n, at: now, ascended: st.ascended.map(a => ({ branch: a.branch, power: a.power, rebirth: a.rebirth, lv: a.lv, result: a.result })), growth: st.growth?.rank || null, arena: st.arena?.rank || null, seal: st.seal }].slice(-SEASON.logMax);
   const fresh = newAccount(false);
   return {
