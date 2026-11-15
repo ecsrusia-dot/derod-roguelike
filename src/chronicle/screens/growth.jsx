@@ -348,7 +348,7 @@ export function PartyView({ save, setSave, onBack, onForge, onRebirth }) {
               {rulesOpen && (
                 <div style={{ fontSize: 11.5, color: PALETTE.textDim, lineHeight: 1.6 }}>
                   ⏱ = 재사용 대기 (쓴 뒤 내 차례 N번은 못 씀){d.cdr || d.skillCdr ? <> · <b style={{ color: '#7fd1c8' }}>재사용 단축 반영됨</b> (모든 스킬 = 유니크·특성 / 스킬 하나 = 일반 장비 옵션)</> : null}<br />
-                  쓸 수 있는 스킬이 여럿이면 쿨타임이 아니라 <b style={{ color: PALETTE.text }}>상황 순서</b>로 고른다: 회복(위급) → 보호막 → 강화 → 도발(위급) → 지속 피해(안 걸린 적이 있을 때) → 광역(적 2명+) → 단일 중 가장 센 스킬 → 없으면 기본 공격<br />
+                  쓸 수 있는 스킬이 여럿이면 쿨타임이 아니라 <b style={{ color: PALETTE.text }}>상황 순서</b>로 고른다: 회복(위급) → 보호막 → 강화 → 도발(위급) → 지속 피해(안 걸린 적이 있을 때) → 준비된 공격 스킬 중 실제 위력(위력 × 강화 × 타수 × 맞는 적 수)이 가장 큰 것 → 없으면 기본 공격<br />
                   스킬을 다 올리고 남은 포인트는 <b style={{ color: PALETTE.legendary }}>특성</b> 탭에서 찍는다.
                 </div>
               )}
@@ -424,7 +424,7 @@ const SKILL_KIND_LABEL = {
 const SKILL_WHEN_TEXT = {
   heal: 'HP가 낮은 아군이 위급할 때 (회복 우선)', healAll: '부상당한 아군이 2명 이상일 때', healShield: 'HP가 낮은 아군이 있을 때', healBuff: 'HP가 낮은 아군이 있을 때', hot: 'HP가 낮은 아군이 있을 때',
   shield: '보호막이 없을 때', buffAtk: '강화 효과가 꺼져 있을 때', rage: '강화 효과가 꺼져 있을 때', taunt: '위급할 때 적의 공격을 끌어온다',
-  aoe: '살아 있는 적이 2명 이상일 때 (광역 우선)', passive: '항상 적용',
+  aoe: '준비된 공격 스킬 중 실제 위력(위력 × 맞는 적 수)이 가장 클 때 — 적이 1명이어도 쓴다', passive: '항상 적용',
   dot: '이 스킬의 지속 피해가 아직 안 걸린 적이 있을 때 (단일·광역 공격보다 먼저)',
 };
 
@@ -606,7 +606,7 @@ function MainSkillModal({ s, lv, u, d, sp, can, onLearn, onClose }) {
         <MainCell label="종류" value={SKILL_KIND_LABEL[s.kind] || '스킬'} />
       </div>
       <div className="mt-2" style={{ padding: '8px 10px', border: `1px solid ${MS.line}`, background: MS.box, borderRadius: MS.r, fontSize: 12.5, color: PALETTE.text }}>
-        <b style={{ color }}>◇ 발동</b> {SKILL_WHEN_TEXT[s.kind] || '다른 조건이 맞지 않을 때 — 준비된 단일 공격 중 위력이 가장 높은 것'}
+        <b style={{ color }}>◇ 발동</b> {SKILL_WHEN_TEXT[s.kind] || '준비된 공격 스킬 중 실제 위력(위력 × 강화 × 타수)이 가장 클 때'}
       </div>
       {pw != null && (
         <div className="mt-2" style={{ fontSize: 12.5, color: PALETTE.textDim, lineHeight: 1.7 }}>
