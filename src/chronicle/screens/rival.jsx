@@ -26,7 +26,7 @@ const RIVAL_STAT_ROWS = [
 ];
 function RivalDetail({ def, st }) {
   const [tab, setTab] = useState('stat');
-  const save = useMemo(() => AR.rivalSave(def, st), [def, st.lv, st.rebirth]);
+  const save = useMemo(() => AR.rivalSave(def, st), [def, st.lv, st.rebirth, st.battles]);
   const u = save.units[def.cls];
   const d = useMemo(() => E.deriveUnit(save, def.cls), [save]);
   const m = AR.ARENA.rivalMult;
@@ -37,6 +37,8 @@ function RivalDetail({ def, st }) {
   const famSt = ff ? F.famStats(fk, ff, u.lv, d.famPct || 0) : null;
   const famReso = ff ? F.famReso(fk, ff, u.rebirth?.branch || null, def.cls) : null;
   const famPv = ff ? F.famPassive(fk, ff) : null;
+  const subs = ['sub1', 'sub2'].map(sl => ({ sl, k: save.famTeam?.[sl] })).filter(x => x.k && save.fams?.[x.k]).map(x => ({ k: x.k, f: save.fams[x.k], on: E.famSlotOpen(save, x.sl) }));
+  const log = save.famLog;
   const box = { padding: '8px 10px', background: MS.box, border: `1px solid ${MS.line}`, borderRadius: MS.r, fontSize: 12.5, lineHeight: 1.55 };
   return (
     <>
@@ -94,8 +96,28 @@ function RivalDetail({ def, st }) {
             <div>{sk.effect}</div>
           </div>
         ))}
-        <div className="mt-2" style={{ fontSize: 11, color: PALETTE.textDim }}>보조 칸 사역마는 없다 (경쟁자는 동행 1마리만 데리고 다닌다).</div>
-      </> : <div className="mt-2" style={{ fontSize: 12, color: PALETTE.textDim }}>사역마 없음 (Lv.20부터 동행)</div>)}
+        <MainSecHead title="보 조 칸" />
+        {subs.length ? subs.map(({ k, f, on }, i) => (
+          <div key={k} className="flex gap-2.5 mt-1.5" style={{ ...box, opacity: on ? 1 : 0.55 }}>
+            <img src={chronicleEnemyArt(k)} alt="" className="flex-none object-cover" style={{ width: 44, height: 44, borderRadius: 8, border: `1px solid ${F.famGrade(f.grade).color}` }} />
+            <div className="flex-1 min-w-0">
+              <b style={{ color: F.famGrade(f.grade).color }}>{F.famName(k)}{F.famPlusText(f)}</b> <span style={{ fontSize: 11, color: PALETTE.textDim }}>보조 {i + 1} · {F.famGrade(f.grade).label} · {F.FAM_ROLES[F.famRole(k)].label}{on ? '' : ' · 칸 미개방'}</span>
+              <div style={{ fontSize: 11.5, color: PALETTE.textDim }}>{F.famSubItems(k, f, u.lv).map(x => `${x.label} ${x.text}`).join(' · ')}</div>
+            </div>
+          </div>
+        )) : <div className="mt-1.5" style={{ fontSize: 12, color: PALETTE.textDim }}>보조로 넣을 사역마가 아직 없다.</div>}
+        {log && <>
+          <MainSecHead title="소 환 · 강 화 내 역" />
+          <MainKvRows rows={[
+            { l: '소환', v: `${log.summons.toLocaleString()}회`, c: MS.gold },
+            { l: '보유 사역마', v: `${Object.keys(save.fams || {}).length}종` },
+            { l: '강화 성공', v: `${log.enhance.toLocaleString()}회` },
+            { l: '진화', v: `${log.evoTry}회 시도 · ${log.evoOk}회 성공`, c: log.evoOk ? '#d07ae8' : undefined },
+            { l: '번 사역혼 / 남은 사역혼', v: `🔮 ${log.soulsEarned.toLocaleString()} / ${log.soulsLeft.toLocaleString()}` },
+          ]} />
+          <div className="mt-1.5" style={{ fontSize: 11, color: PALETTE.textDim }}>내 캐릭터와 같은 확률로 소환·강화·진화한 결과다 (약 25전에 소환 1회). 보유한 사역마 전부가 보유 효과·인연에 들어간다.</div>
+        </>}
+      </> : <div className="mt-2" style={{ fontSize: 12, color: PALETTE.textDim }}>사역마 없음 (아직 소환을 한 번도 못 했다)</div>)}
     </>
   );
 }
