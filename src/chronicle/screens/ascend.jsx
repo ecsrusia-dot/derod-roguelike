@@ -9,6 +9,8 @@ import * as F from '../familiar.js';
 import * as ASC from '../ascend.js';
 import * as SE from '../season.js';
 import * as GD from '../god.js';
+import * as AP from '../ascPerk.js';
+import { DUNGEON_KEYS } from '../data.js';
 import { MainGearCard } from './gear.jsx';
 import { Header, Portrait, MainTabs, MainModal, MainCell, MainSecHead, MainKvRows, MS } from './common.jsx';
 
@@ -92,7 +94,7 @@ function SeasonPanel({ acc, onAct }) {
     <div className="flex-none" style={{ ...box, borderColor: MS.strong }}>
       <div className="flex justify-between"><b style={{ color: MS.gold }}>시즌 {s.n} 진행 중</b><span style={{ color: PALETTE.text }}>남은 시간 <b>{left}</b></span></div>
       월요일 0시에 순위가 확정되고, <b style={{ color: PALETTE.text }}>전승한 캐릭터</b>가 승천한 뒤 시즌계가 초기화된다.<br />
-      <span style={{ color: PALETTE.textDim }}>승천 인장 ✶ {seal.toLocaleString()} — 쓰임새(시작 특전 · 승천 특성)는 다음 업데이트에 열린다.</span>
+      <span style={{ color: PALETTE.textDim }}>승천 인장 ✶ {seal.toLocaleString()} — 「인장」 탭에서 승천 특성과 시즌 보급에 쓴다.</span>
     </div>
   );
   return (
@@ -191,6 +193,51 @@ function GodPanel({ acc, onGod, onAct }) {
   );
 }
 
+// 승천 인장 — 승천 특성(영구) · 시즌 보급 · 칭호
+function SealPanel({ acc, onAct }) {
+  const seal = ASC.ascState(acc).seal;
+  const owned = AP.ascTitlesOwned(acc); const cur = AP.ascTitle(acc);
+  const fx = AP.ascTalentFx(acc.asc?.talents);
+  const btn = (ok) => ({ height: 34, padding: '0 12px', fontSize: 12.5, fontWeight: 800, borderRadius: 10, border: `1px solid ${ok ? MS.gold : MS.line}`, color: ok ? MS.gold : PALETTE.textDim, background: ok ? 'rgba(232,176,74,0.12)' : 'transparent', opacity: ok ? 1 : 0.55 });
+  return (
+    <>
+      <div className="flex-none" style={{ ...box, borderColor: MS.strong }}>
+        <div className="flex justify-between items-baseline"><b style={{ color: MS.gold }}>승천 인장</b><b style={{ fontSize: 17, color: MS.gold }}>✶ {seal.toLocaleString()}</b></div>
+        시즌 순위 · 투기장 · 승천 · 신 토벌로 얻는다. <b style={{ color: PALETTE.text }}>승천 특성</b>은 시즌이 바뀌어도 남고, 시즌계 캐릭터에게만 적용된다 (승천한 캐릭터는 그대로).
+        {Object.keys(fx).length > 0 && <div className="mt-1" style={{ color: MS.green }}>지금 적용 중: {AP.ASC_TALENTS.filter(t => AP.ascTalentLv(acc, t.id)).map(t => `${t.name} ${AP.ascTalentLv(acc, t.id)}단계`).join(' · ')}{acc.season?.on ? '' : ' (시즌이 시작되면 적용)'}</div>}
+      </div>
+      <MainSecHead title="승 천 특 성" />
+      {AP.ASC_TALENTS.map(t => { const lv = AP.ascTalentLv(acc, t.id); const cost = AP.ascTalentCost(lv); const ok = cost != null && seal >= cost; return (
+        <div key={t.id} className="flex-none flex items-center gap-2" style={box}>
+          <div className="flex-1 min-w-0">
+            <div><b style={{ color: PALETTE.text }}>{t.icon} {t.name}</b> <span style={{ color: MS.gold, fontWeight: 800 }}>{lv} / {AP.ASC_TALENT_MAX}</span></div>
+            <div style={{ fontSize: 11.5, color: PALETTE.textDim }}>단계마다 {t.unit}{lv ? <> · 지금 <span style={{ color: MS.green }}>{Object.values(t.fx).map(v => `+${Math.round(v * lv * 100)}%`).join(' · ')}</span></> : ''}</div>
+            <div className="mt-1" style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.08)' }}><div style={{ width: `${lv / AP.ASC_TALENT_MAX * 100}%`, height: '100%', borderRadius: 2, background: MS.gold }} /></div>
+          </div>
+          <button disabled={!ok} onClick={() => onAct((a) => AP.buyAscTalent(a, t.id), `${t.name} ${lv + 1}단계`)} className="ui-press flex-none" style={btn(ok)}>{cost == null ? '최대' : `✶ ${cost}`}</button>
+        </div>
+      ); })}
+      <MainSecHead title="시 즌 보 급" />
+      <div className="flex-none" style={{ fontSize: 11.5, color: PALETTE.textDim }}>이번 시즌 계정에 바로 들어온다. 한도는 시즌마다 다시 찬다.</div>
+      {AP.ASC_SUPPLY.map(it => { const can = AP.ascSupplyCan(acc, it.id); const left = AP.ascSupplyLeft(acc, it); return (
+        <div key={it.id} className="flex-none flex items-center gap-2" style={box}>
+          <div className="flex-1 min-w-0"><b style={{ color: PALETTE.text }}>{it.name}</b><div style={{ fontSize: 11.5, color: PALETTE.textDim }}>{it.desc} · 남은 한도 {left}/{it.limit}{!can.ok && can.why !== '이번 시즌 한도' ? ` · ${can.why}` : ''}</div></div>
+          <button disabled={!can.ok} onClick={() => onAct((a) => AP.buyAscSupply(a, it.id, DUNGEON_KEYS.max), `${it.name} 받음`)} className="ui-press flex-none" style={btn(can.ok)}>✶ {it.cost}</button>
+        </div>
+      ); })}
+      <MainSecHead title={`칭 호  ${owned.length} / ${AP.ASC_TITLES.length}`} />
+      <div className="grid gap-1.5 flex-none" style={{ gridTemplateColumns: '1fr 1fr' }}>
+        {AP.ASC_TITLES.map(t => { const has = owned.includes(t); const on = cur?.id === t.id; return (
+          <div key={t.id} role={has ? 'button' : undefined} onClick={has ? () => onAct((a) => AP.setAscTitle(a, on ? null : t.id), on ? '칭호를 내렸습니다' : `칭호 「${t.name}」`) : undefined} className={has ? 'ui-press' : ''} style={{ ...box, borderColor: on ? MS.gold : MS.line, opacity: has ? 1 : 0.5 }}>
+            <b className="block truncate" style={{ color: on ? MS.gold : has ? PALETTE.text : PALETTE.textDim }}>{on ? '✓ ' : ''}{t.name}</b>
+            <span style={{ fontSize: 11, color: PALETTE.textDim }}>{t.desc}</span>
+          </div>
+        ); })}
+      </div>
+    </>
+  );
+}
+
 export function AscendView({ acc, onBack, onAct, onGod }) {
   const [tab, setTab] = useState(() => (Object.keys(ASC.ascState(acc).slots).length ? 'god' : 'plan'));
   const [sel, setSel] = useState(null);
@@ -202,8 +249,9 @@ export function AscendView({ acc, onBack, onAct, onGod }) {
       <Header title="승천계" onBack={onBack} right={<span style={{ fontSize: 11.5, color: PALETTE.textDim }}>보관 {filled} / {ASC.ASC_SLOTS.length}</span>} />
       <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2">
         <SeasonPanel acc={acc} onAct={onAct} />
-        <div className="flex-none"><MainTabs value={tab} onChange={setTab} items={[['god', '신 토벌'], ['plan', '승천 예정'], ['vault', '보관함']]} /></div>
+        <div className="flex-none"><MainTabs value={tab} onChange={setTab} items={[['god', '신 토벌'], ['plan', '승천 예정'], ['vault', '보관함'], ['seal', '인장', ASC.ascState(acc).seal >= AP.ASC_TALENT_COST]]} /></div>
         {tab === 'god' && <GodPanel acc={acc} onGod={onGod} onAct={onAct} />}
+        {tab === 'seal' && <SealPanel acc={acc} onAct={onAct} />}
         {tab === 'plan' && plan.map(p => {
           const c = chronicleClass(p.cid);
           if (!p.eligible) return (

@@ -460,6 +460,8 @@ export function deriveUnit(save, classId) {
   for (const [k, v] of Object.entries(famResoHeroFx(save.fams, activeMain(save), u.rebirth?.branch, classId))) g[k] = (g[k] || 0) + v;
   // 원정대 전역 버프 (1.229.0) — 다른 캐릭터들의 Lv.20/40/60/80/100 달성 보상
   for (const [k, v] of Object.entries(globalBuffFx(save.roster, classId))) g[k] = (g[k] || 0) + v;
+  // 승천 특성 (1.298.0) — 승천 인장으로 찍은 계정 영구 특성. 시즌계에서만 (account.toView가 ascFx를 넣는다)
+  if (save.ascFx) for (const [k, v] of Object.entries(save.ascFx)) g[k] = (g[k] || 0) + v;
   // 전승 갈래 기본 효과 (1.220.0)
   const br = u.rebirth?.branch && REBIRTH_BRANCHES[u.rebirth.branch];
   if (br) for (const [k, v] of Object.entries(br.fx)) g[k] = (g[k] || 0) + v;
