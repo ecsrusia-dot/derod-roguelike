@@ -157,7 +157,7 @@ export function IdleScreen({ save, kind, label, startedAt, wakeOn, delay, onDela
       <div className="absolute left-0 right-0 text-center" style={{ bottom: 126 }}>
         <div style={{ fontSize: 12, letterSpacing: 6, color: PALETTE.legendary, fontWeight: 700 }}>🌙 대기화면</div>
         <div style={{ fontSize: 24, fontWeight: 900, marginTop: 4, color: PALETTE.text }}>{IDLE_KIND_LABEL[kind] || '자동 진행 중'}</div>
-        <div style={{ fontSize: 12.5, color: '#d8c8b0', marginTop: 4 }}><span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#8fd08a', boxShadow: '0 0 8px #8fd08a', marginRight: 5 }} />{label ? `${label} · ` : ''}Lv.{u.lv} {cls.name} · 경과 {el}</div>
+        <div style={{ fontSize: 12.5, color: '#d8c8b0', marginTop: 4 }}><span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#8fd08a', boxShadow: '0 0 8px #8fd08a', marginRight: 5 }} />{label ? `${label} · ` : ''}Lv.{u.lv} {unitTitle(u, hero)} · 경과 {el}</div>
         <div style={{ margin: '9px 28px 0', textAlign: 'left' }}>
           <IdleXpRow name={unitTitle(u, hero)} x={xs.hero} st={heroXp} now={now} />
           {xs.fam ? <IdleXpRow name={F.famName(xs.fam.key)} x={xs.fam} st={famXp} now={now} fam /> : null}

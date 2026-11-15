@@ -6,6 +6,7 @@ import * as E from '../src/chronicle/engine.js';
 import * as A from '../src/chronicle/account.js';
 import { RIVALS } from '../src/chronicle/rival.js';
 import { chronicleClass, unitTitle } from '../src/chronicle/data.js';
+if (process.env.MULT) AR.ARENA.rivalMult = +process.env.MULT; // 경쟁자 전력 배율 시험
 function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const N = +process.argv[2] || 30;
 const acc0 = JSON.parse(fs.readFileSync(process.env.SAVE, 'utf8')).acc;

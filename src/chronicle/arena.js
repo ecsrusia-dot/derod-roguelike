@@ -9,8 +9,8 @@
 // ⚠ 밸런스 조정은 ARENA 한 곳.
 import * as E from './engine.js';
 import * as F from './familiar.js';
-import { chronicleClass, chronicleEnemyArt, CHRONICLE_FIELDS, CHRONICLE_DUNGEONS, DUNGEON_KEYS, FORGE } from './data.js';
-import { RIVAL_FAMS, rivalState, rivalTicks, rivalDefs } from './rival.js';
+import { chronicleClass, chronicleEnemyArt, CHRONICLE_FIELDS, CHRONICLE_DUNGEONS, DUNGEON_KEYS, FORGE, rebirthLevelCap } from './data.js';
+import { RIVAL_FAMS, RIVAL_TUNING, rivalState, rivalTicks, rivalDefs } from './rival.js';
 import { toView } from './account.js';
 
 export const ARENA = {
@@ -18,8 +18,9 @@ export const ARENA = {
   refreshDaily: 1,     // 상대 목록 새로 고침 (캐릭터당 하루)
   base: 1000,          // 투기장 점수 = base + 전력 점수 × perPower + 결투로 얻은 변동
   perPower: 4, rebirthPower: 25, // 전력 점수 = 레벨 + 전승 횟수 × 25 (성장 순위의 전승 × 120과 다르다 — 갓 전승한 Lv.30은 결투에서 약하다)
-  // 경쟁자 전력 배율 — 경쟁자는 동행 1마리만 조립한다. 보조 사역마·보유 효과·인연·원정대 버프 몫을 체력·공격 배율로 준다
-  rivalMult: 2.5,
+  // 경쟁자 전력 배율 — 경쟁자가 조립하지 않는 몫(원정대 버프·전승 특전·유니크 풀세트 등)을 체력·공격 배율로 준다.
+  // 1.299.0: 사역마를 실제 소환·강화로 얻고 보조 2칸·보유 효과·인연이 붙어 2.5 → 2.0 (PM 저장 구간 승률 평균 58% → 59%)
+  rivalMult: 2.0,
   k: 24,               // 한 판에 움직이는 최대 점수
   spread: 200,         // 이 점수 차이면 기대 승률 약 76%
   rivalShare: 0.5,     // 상대 점수는 내 변동의 절반만 반대로 움직인다
@@ -49,16 +50,86 @@ const hash = (s) => { let h = 2166136261; for (const c of String(s)) { h ^= c.ch
 
 // ===== 경쟁자 → 실제 캐릭터 =====
 // 장비: 레벨에 맞는 등급 · 강화 / 전승자는 유니크 무기 + 높은 레벨 장비(레벨 맞춤 착용) / 사역마: 진행도에 맞는 등급
-const ALL_PROGRESS = {
-  bossCleared: Object.fromEntries(CHRONICLE_FIELDS.map(f => [f.id, true])),
-  dungeonTier: Object.fromEntries(CHRONICLE_DUNGEONS.map(d => [d.id, 0])),
+
+// ===== 경쟁자 사역마 (1.299.0 PM: 「직접 소환·강화로 얻게」) =====
+// 경쟁자가 치른 전투 수만큼 조각·사역혼을 벌어, 플레이어와 같은 함수(소환·강화·진화)로 굴린다.
+// 10회 소환 묶음마다 그 시점의 진행도(레벨·전승)로 소환 → 번 사역혼을 동행·보조 2칸에 쓴다. 난수는 경쟁자별 고정.
+export const RIVAL_FAM = {
+  battlesPerSummon: 25,   // 약 25전에 소환 1회 (플레이어 실측과 같은 속도)
+  soulPerBattle: 0.2,     // 전투로 버는 사역혼 (일반 0.09 + 강적·보스·던전 몫)
+  batch: 10,              // 10회 소환 묶음 (청령 이상 1마리 확정)
+  mainWeight: 0.5,        // 사역혼은 동행에 먼저 쓴다 (동행 비용을 절반으로 쳐서 비교)
 };
-let FAM_BY_GRADE = null;
-function famCandidates(gid, role) {
-  if (!FAM_BY_GRADE) FAM_BY_GRADE = F.famPool(ALL_PROGRESS);
-  const list = FAM_BY_GRADE[gid] || [];
-  const same = list.filter(k => F.famRole(k) === role);
-  return same.length ? same : list;
+const GI = (g) => F.famGradeIdx(g);
+function progressAt(st) {
+  const peak = st.peak || st.lv;
+  const bossCleared = {};
+  for (const f of CHRONICLE_FIELDS) if (f.bossLv <= peak && (st.rebirth || 0) >= (f.reqRebirth || 0)) bossCleared[f.id] = true;
+  const dungeonTier = {};
+  for (const d of CHRONICLE_DUNGEONS) if (bossCleared[d.unlockField]) dungeonTier[d.id] = 0;
+  return { bossCleared, dungeonTier };
+}
+// 전투 수를 모르는 상태(승천한 경쟁자 등)의 전투 수 추정
+function battlesFor(st) {
+  if (st.battles != null) return st.battles;
+  const T = RIVAL_TUNING; const first = T.firstCurve[T.firstCurve.length - 1][0];
+  const over = (g) => (g <= 100 ? 0 : g <= 120 ? T.overBattles * Math.pow((g - 100) / 20, 1 / T.overPow) : T.overBattles + (g - 120) / 10 * T.deepBattles);
+  let n = 0;
+  for (let i = 0; i < (st.rebirth || 0); i++) n += first * (i === 0 ? 1 : T.regrowMult) + over(i === 0 ? 100 : rebirthLevelCap(i));
+  const sc = st.rebirth ? T.regrowMult : 1; const lv = st.lv || 1;
+  if (lv >= 100) n += first * sc + over(lv);
+  else { const c = T.firstCurve; let k = 1; while (k < c.length - 1 && c[k][1] < lv) k++; n += (c[k - 1][0] + (c[k][0] - c[k - 1][0]) * (lv - c[k - 1][1]) / Math.max(1, c[k][1] - c[k - 1][1])) * sc; }
+  return Math.round(n);
+}
+function pickTeam(fams, role) {
+  const keys = Object.keys(fams).sort((a, b) => GI(fams[b].grade) - GI(fams[a].grade) || (fams[b].plus || 0) - (fams[a].plus || 0) || (a < b ? -1 : 1));
+  const main = keys.find(k => F.famRole(k) === role) || keys[0] || null;
+  const rest = keys.filter(k => k !== main);
+  return { main, sub1: rest[0] || null, sub2: rest[1] || null };
+}
+const FAM_CACHE = new Map();
+// → { fams, team, log { summons, enhance, evoTry, evoOk, soulsEarned, soulsLeft, byGrade } }
+export function rivalFams(r, st) {
+  const R = RIVAL_FAM;
+  const battles = battlesFor(st);
+  const batches = Math.floor(battles / (R.battlesPerSummon * R.batch));
+  const role = RIVAL_FAMS[r.fam][0];
+  const ck = `${r.id}|${r.fam}|${batches}`;
+  if (FAM_CACHE.has(ck)) return FAM_CACHE.get(ck);
+  const rng = seeded(hash(r.id + ':fam'));
+  let fams = {}; let pity = {}; let souls = 0;
+  const log = { summons: 0, enhance: 0, evoTry: 0, evoOk: 0, soulsEarned: 0, soulsLeft: 0, byGrade: {} };
+  const perBatch = R.battlesPerSummon * R.batch;
+  const pr = { ...r, pace: 1 };
+  for (let i = 1; i <= batches; i++) {
+    const at = st.battles != null ? rivalState(pr, i * perBatch) : st; // 그 시점의 진행도 (전투 수를 모르면 지금 상태)
+    const res = F.summonFamiliars(fams, pity, progressAt(at), R.batch, rng);
+    fams = res.fams; pity = res.pity;
+    const earn = res.souls + perBatch * R.soulPerBattle;
+    souls += earn; log.soulsEarned += earn; log.summons += R.batch;
+    for (const x of res.results || []) { const g = x.grade || x.gid; if (g) log.byGrade[g] = (log.byGrade[g] || 0) + 1; }
+    for (let guard = 0; guard < 300; guard++) {
+      const t = pickTeam(fams, role);
+      const acts = [];
+      for (const [slot, k] of Object.entries(t)) {
+        const f = k && fams[k]; if (!f) continue;
+        const w = slot === 'main' ? R.mainWeight : 1;
+        if ((f.plus || 0) < F.FAM_TUNING.maxPlus) acts.push({ k, kind: 'enh', cost: F.FAM_TUNING.enhanceCost(f.plus || 0, f.grade), w });
+        else if (slot === 'main' && GI(f.grade) < F.FAM_GRADES.length - 1) acts.push({ k, kind: 'evo', cost: F.FAM_TUNING.evolveCost(f.grade), w });
+      }
+      if (!acts.length) break;
+      acts.sort((a, b) => a.cost * a.w - b.cost * b.w);
+      const a = acts[0];
+      if (souls < a.cost) break; // 모은다
+      if (a.kind === 'enh') { const x = F.enhanceFamiliar(fams, souls, a.k); if (!x.ok) break; fams = x.fams; souls = x.souls; log.enhance += 1; }
+      else { const x = F.evolveFamiliar(fams, souls, a.k, rng); if (!x.result) break; fams = x.fams; souls = x.souls; log.evoTry += 1; if (x.result === 'success') log.evoOk += 1; }
+    }
+  }
+  log.soulsLeft = Math.floor(souls); log.soulsEarned = Math.floor(log.soulsEarned);
+  const out = { fams, team: pickTeam(fams, role), log };
+  if (FAM_CACHE.size > 400) FAM_CACHE.clear();
+  FAM_CACHE.set(ck, out);
+  return out;
 }
 // 1.294.1 PM 결정 「실제 확률로 강화」 — 경쟁자도 내 대장간과 같은 성공·하락·파괴 확률로 강화한다.
 //   부위마다 따로 굴린다 (경쟁자·부위별 고정 난수 — 시도 횟수가 늘면 그 뒤를 이어서 굴리므로 결과가 뒤바뀌지 않는다)
@@ -93,13 +164,11 @@ export function rivalGearPlan(st) {
   const peak = st.peak || st.lv;
   const grade = st.rebirth >= 3 ? 'mythic' : peak >= 50 ? 'epic' : peak >= 25 ? 'rare' : 'uncommon';
   const ilv = st.rebirth > 0 ? Math.max(100, peak) : st.lv;
-  const famGrade = peak < 20 ? null : st.rebirth >= 3 ? 'violet' : (peak >= 80 || st.rebirth >= 1) ? 'indigo' : peak >= 60 ? 'blue' : peak >= 40 ? 'green' : 'red';
-  const famPlus = Math.min(10, Math.floor(peak / 10) + st.rebirth);
-  return { grade, ilv, famGrade, famPlus, unique: st.rebirth >= 1 };
+  return { grade, ilv, unique: st.rebirth >= 1 };
 }
 const SAVE_CACHE = new Map();
 export function rivalSave(r, st) {
-  const ck = `${r.id}|${r.branch}|${st.rebirth}|${st.lv}|${st.peak || st.lv}`;
+  const ck = `${r.id}|${r.branch}|${st.rebirth}|${st.lv}|${st.peak || st.lv}|${st.battles ?? 'x'}`;
   if (SAVE_CACHE.has(ck)) return SAVE_CACHE.get(ck);
   const rng = seeded(hash(r.id) + st.rebirth * 7919 + st.lv * 31);
   const plan = rivalGearPlan(st);
@@ -115,14 +184,12 @@ export function rivalSave(r, st) {
   }
   u = E.autoGrowUnit(u);
   save.units = { [r.cls]: u };
-  if (plan.famGrade) {
-    const role = RIVAL_FAMS[r.fam][0];
-    const cands = famCandidates(plan.famGrade, role);
-    if (cands.length) {
-      const key = cands[hash(r.id) % cands.length];
-      save.fams = { [key]: { grade: plan.famGrade, plus: plan.famPlus, lv: st.lv, exp: 0, base: plan.famGrade } };
-      save.famTeam = { main: key, sub1: null, sub2: null };
-    }
+  // 사역마 — 실제 소환·강화·진화 결과 (rivalFams). 동행 1 + 보조 2 · 보유한 것 전부가 보유 효과·인연에 들어간다
+  const fm = rivalFams(r, st);
+  if (fm.team.main) {
+    save.fams = Object.fromEntries(Object.entries(fm.fams).map(([k, f]) => [k, { ...f, lv: st.lv, exp: 0 }]));
+    save.famTeam = { ...fm.team };
+    save.famLog = fm.log;
   }
   if (SAVE_CACHE.size > 60) SAVE_CACHE.clear();
   SAVE_CACHE.set(ck, save);

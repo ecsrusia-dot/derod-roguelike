@@ -432,7 +432,7 @@ export function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAga
                 </div> : null}
                 <div className="flex flex-wrap justify-center gap-1 mt-1.5">
                 {Object.entries(summary.levelUps).map(([cid, lv]) => (
-                  <div key={cid} className="chr-chip font-semibold chr-levelup" style={{ color: PALETTE.legendary }}>▲ 레벨 업! {chronicleClass(cid).name} Lv.{lv}</div>
+                  <div key={cid} className="chr-chip font-semibold chr-levelup" style={{ color: PALETTE.legendary }}>▲ 레벨 업! {unitTitle(save.units[cid], cid)} Lv.{lv}</div>
                 ))}
                 {summary.autoSalvaged ? <div className="chr-chip" style={{ color: PALETTE.textDim }}>♻ 자동 분해 {summary.autoSalvaged}개 → {E.salvageText(summary.autoSalvage || {})}</div> : null}
                 {summary.autoDismantled ? <div className="chr-chip" style={{ color: PALETTE.textDim }}>가방이 가득 차 {summary.autoDismantled}개 자동 분해</div> : null}
