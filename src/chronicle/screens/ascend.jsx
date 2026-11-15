@@ -87,7 +87,9 @@ export function SeasonReportModal({ acc, onClose }) {
 function SeasonPanel({ acc, onAct }) {
   const s = SE.seasonState(acc);
   const [step, setStep] = useState(0);
+  const [nowMode, setNowMode] = useState(false); // 1.300.2 지금 바로 시작
   const st = useMemo(() => (step ? SE.seasonSettlement(acc) : null), [step, acc]);
+  const weekLeft = SE.fmtLeft(Math.max(0, SE.kstWeekStartMs(SE.kstWeekKey(Date.now())) + 7 * 86400000 - Date.now()));
   const left = SE.fmtLeft(SE.seasonLeftMs(acc));
   const seal = ASC.ascState(acc).seal;
   if (s.on) return (
@@ -106,19 +108,23 @@ function SeasonPanel({ acc, onAct }) {
           : <>시즌은 1주 단위다. 시즌이 끝나면 <b style={{ color: PALETTE.text }}>전승한 캐릭터</b>가 승천해 갈래별로 보관되고, 시즌계(캐릭터·재화·사역마)는 초기화된다. 시작하면 지금 캐릭터가 「시즌 0」으로 승천한다.</>}
         <div className="flex gap-2 mt-2">
           {s.armed
-            ? <button onClick={() => onAct(SE.disarmSeason, '시즌 시작 예약을 취소했습니다')} className="ui-press flex-1" style={{ height: 40, fontSize: 13, border: `1px solid ${MS.line}`, background: 'transparent', color: PALETTE.textDim }}>예약 취소</button>
-            : <button onClick={() => setStep(1)} className="ui-press flex-1 chr-btn-pri" style={{ height: 42, fontSize: 13.5, fontWeight: 800 }}>시즌제 시작…</button>}
+            ? <button onClick={() => onAct(SE.disarmSeason, '시즌 시작 예약을 취소했습니다')} className="ui-press flex-1" style={{ height: 42, fontSize: 13, border: `1px solid ${MS.line}`, background: 'transparent', color: PALETTE.textDim }}>예약 취소</button>
+            : <button onClick={() => { setNowMode(false); setStep(1); }} className="ui-press flex-1" style={{ height: 42, fontSize: 13, border: `1px solid ${MS.line}`, background: 'transparent', color: PALETTE.text }}>다음 월요일 시작…</button>}
+          <button onClick={() => { setNowMode(true); setStep(1); }} className="ui-press flex-1 chr-btn-pri" style={{ height: 42, fontSize: 13.5, fontWeight: 800 }}>⚡ 지금 바로 시작…</button>
         </div>
+        <div className="mt-1" style={{ fontSize: 11.5, color: PALETTE.textDim }}>「지금 바로 시작」은 첫 시즌에만 쓸 수 있다 — 시즌 1은 이번 주 일요일 밤까지({weekLeft}).</div>
       </div>
       {step > 0 && st && (
-        <MainModal kicker="SEASON" title="시즌제를 시작할까요?" color={MS.red} sub={`시작까지 ${SE.fmtLeft(SE.seasonLeftMs(SE.armSeason(acc)))} — 다음 월요일 0시에 아래처럼 처리된다 (지금 상태 기준)`} onClose={() => setStep(0)}
+        <MainModal kicker="SEASON" title="시즌제를 시작할까요?" color={MS.red} sub={nowMode ? `지금 바로 아래처럼 처리된다 — 시즌 1은 ${weekLeft} 동안` : `시작까지 ${SE.fmtLeft(SE.seasonLeftMs(SE.armSeason(acc)))} — 다음 월요일 0시에 아래처럼 처리된다 (지금 상태 기준)`} onClose={() => setStep(0)}
           footer={step === 1
             ? <button onClick={() => setStep(2)} className="ui-press w-full chr-btn-pri" style={{ height: 44, fontSize: 14, fontWeight: 800 }}>내용을 확인했다</button>
-            : <button onClick={() => { onAct((a) => SE.armSeason(a), '시즌 1 시작을 예약했습니다'); setStep(0); }} className="ui-press w-full" style={{ height: 44, fontSize: 14, fontWeight: 800, border: `1px solid ${MS.red}`, background: 'rgba(224,87,76,0.22)', color: '#ff8a7e' }}>정말 시작한다 — 다음 월요일에 초기화</button>}>
+            : nowMode
+              ? <button onClick={() => { onAct((a) => SE.armSeasonNow(a), '시즌 1을 시작합니다'); setStep(0); }} className="ui-press w-full" style={{ height: 44, fontSize: 14, fontWeight: 800, border: `1px solid ${MS.red}`, background: 'rgba(224,87,76,0.22)', color: '#ff8a7e' }}>정말 시작한다 — 지금 바로 초기화</button>
+              : <button onClick={() => { onAct((a) => SE.armSeason(a), '시즌 1 시작을 예약했습니다'); setStep(0); }} className="ui-press w-full" style={{ height: 44, fontSize: 14, fontWeight: 800, border: `1px solid ${MS.red}`, background: 'rgba(224,87,76,0.22)', color: '#ff8a7e' }}>정말 시작한다 — 다음 월요일에 초기화</button>}>
           <div className="mt-2" style={{ ...box, borderColor: MS.red, color: PALETTE.text }}>
             · 시즌계의 <b>캐릭터·장비·재화·사역마·창고가 전부 초기화</b>된다<br />
             · <b>전승한 캐릭터만</b> 승천해 보관된다 — 전승 전 캐릭터는 사라진다<br />
-            · 월요일 전까지는 예약을 취소할 수 있고, 그동안 더 키우면 결과가 바뀐다<br />
+            {nowMode ? <>· <b>누르는 즉시 처리되고 취소할 수 없다</b> (백업 창의 「시즌 교체 직전으로 되돌리기」만 가능)<br /></> : <>· 월요일 전까지는 예약을 취소할 수 있고, 그동안 더 키우면 결과가 바뀐다<br /></>}
             · 교체 직전 상태는 이 기기에 한 벌 따로 남는다
           </div>
           <SettlementBody st={st} />
