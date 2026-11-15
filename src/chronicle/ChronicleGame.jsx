@@ -27,6 +27,7 @@ import { RaidView, RosterView, TownView } from './screens/town.jsx';
 import { RivalView } from './screens/rival.jsx';
 import { AscendView, SeasonReportModal } from './screens/ascend.jsx';
 import * as SE from './season.js';
+import * as GD from './god.js';
 import * as ASC from './ascend.js';
 import * as F from './familiar.js';
 import { FieldView, DungeonView, TowerView } from './screens/field.jsx';
@@ -476,6 +477,14 @@ export default function ChronicleGame({ onExit }) {
     setBattle({ sim: r.sim, enemies: r.enemies, party: r.party, summary: r.summary, ctx: { kind: 'arena', type: 'arena', enemies: r.enemies, label: `투기장 · ${r.opp.name}` }, key: Date.now() });
     setView('battle');
   };
+  // 신 토벌 (시즌 시리즈 PR ③) — 승천 캐릭터 파티. 결과는 계산 즉시 계정에 반영한다
+  const fightGod = (ids) => {
+    const r = GD.godChallenge(acc, ids);
+    if (!r) { flash(GD.godLeft(acc) <= 0 ? '오늘 도전 횟수를 다 썼습니다' : '승천한 캐릭터가 없습니다'); return; }
+    setAcc(r.acc);
+    setBattle({ sim: r.sim, enemies: r.enemies, party: r.party, summary: r.summary, ctx: { kind: 'god', type: 'god', enemies: r.enemies, label: `신 토벌 · ${r.enemies[0].god}단계` }, key: Date.now() });
+    setView('battle');
+  };
   const afterBattle = () => {
     const ctx = battle?.ctx;
     if (autoProg) stopAuto(); // 「계속」을 누르면 자동 진행도 멈춘다
@@ -483,6 +492,7 @@ export default function ChronicleGame({ onExit }) {
     // 1.247.0 — 끝난 콘텐츠의 화면으로 돌아간다 (던전 클리어·패배도 마을이 아니라 던전 목록, 사냥 패배도 사냥터)
     if (ctx?.kind === 'raid') setView('raid');
     else if (ctx?.kind === 'arena') { setRivalTab('arena'); setView('rival'); }
+    else if (ctx?.kind === 'god') setView('ascend');
     else if (ctx?.kind === 'dungeon') setView('dungeon');
     else if (ctx?.kind === 'tower') setView('tower');
     else setView('field');
@@ -544,7 +554,7 @@ export default function ChronicleGame({ onExit }) {
   } else if (view === 'daily') {
     content = <DailyView acc={acc} onBack={() => setView('town')} onSwitch={(cid) => { setRepeat(false); setAcc(a => A.selectCharacter(a, cid)); }} onAct={(fn) => { const r = fn(acc); if (!r.n) return; setAcc(r.acc); flash(`임무 보상 ${r.n}건 수령 — ${D.dailyRewardText(r.reward)}`); }} />;
   } else if (view === 'ascend') {
-    content = <AscendView acc={acc} onBack={() => setView('town')} onAct={(fn, msg) => { setAcc(a => fn(a)); if (msg) flash(msg); }} />;
+    content = <AscendView acc={acc} onBack={() => setView('town')} onGod={fightGod} onAct={(fn, msg) => { setAcc(a => fn(a)); if (msg) flash(msg); }} />;
   } else if (view === 'rival') {
     content = <RivalView acc={acc} top={rivalTab} onTop={setRivalTab} onFight={fightArena} onArena={(fn) => { const r = fn(acc); if (!r.n) return; setAcc(r.acc); if (r.item) flash(`${r.item.name} 구매`); }} onBack={() => setView('town')} onAct={(fn) => { const r = fn(acc); if (!r.n) return; setAcc(r.acc); flash(r.month ? `월간 1위 — 자령 「${F.famName(r.fam.key)}」${r.fam.soul ? ' (보유 중 → 사역혼 100)' : ''}` : r.fam ? `${r.rank}위 보상 — ${F.famGrade(r.fam.grade).label} 「${F.famName(r.fam.key)}」${r.fam.soul ? ` (보유 중 → 사역혼 ${r.fam.soul})` : ''}` : `${r.rank}위 · 주간 순위 보상을 받았습니다`); }} />;
   } else if (view === 'forge') {
