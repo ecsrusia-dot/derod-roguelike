@@ -182,8 +182,10 @@ export function itemOpts(item) {
   if (!item?.named || item.uid == null) return base;
   const u = UNIQUE_ITEMS[item.named]; const want = GRADES[gradeIdx('unique')]?.opts || 0;
   if (!u || base.length >= want) return base;
-  const o = rollOption(uidRng(item.uid * 9973 + 17), u.cls, 'unique', base);
-  return o ? [...base, o] : base;
+  // 1.300.0 — 자유 옵션 2줄 (같은 난수 줄에서 차례로 → 기존 3번째 줄의 종류는 그대로, 4번째가 새로 붙는다)
+  const rng = uidRng(item.uid * 9973 + 17); const out = [...base];
+  while (out.length < want) { const o = rollOption(rng, u.cls, 'unique', out); if (!o) break; out.push(o); }
+  return out;
 }
 // ===== 옵션 재설정 (1.276.0) =====
 // 유니크의 고정 옵션은 잠김 — 무작위로 붙는 줄만 다시 굴릴 수 있다
