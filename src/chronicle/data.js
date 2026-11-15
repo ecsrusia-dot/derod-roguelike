@@ -16,6 +16,7 @@ export const CHRONICLE_SAVE_KEY_V1 = 'dnt_chronicle_v1'; // 1.x 저장 (읽기 �
 export const CHRONICLE_SAVE_KEY = 'dnt_chronicle_v2';    // 2.0 계정 저장
 
 export const CHRONICLE_TUNING = {
+  skillPick: 'power',         // 1.301.0 자동 스킬 선택 — 'power' = 실제 위력순 / 'order' = 이전 규칙 (시뮬 비교용: node --import ./scripts/pick-order.mjs …)
   pointsPerLevel: 4,          // 레벨업당 능력치 포인트
   statResetGold: 300,         // 능력치 재분배 비용 (첫 1회 무료 · 이후 레벨 × 이 값) — 1.270.0
   // 1.270.0 PM 결정 「4능력치 모두 쓸모 있게」 — 주 능력치 = 공격력(그대로), 비주 능력치 = 보조 효과

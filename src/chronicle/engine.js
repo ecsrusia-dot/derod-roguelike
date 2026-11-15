@@ -1521,6 +1521,23 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
     //   (이전엔 적이 1마리면 「위력 높은 단일기」 순이라 화염구가 겁화를 밀어냈고, 화염구 쿨감 옵션이 오히려 손해였다)
     const dotSk = ready.find(x => x.s.kind === 'dot' && foes.some(f => !(f.dots || []).some(d => d.src === u.id && d.sn === x.s.name && d.t > 1)));
     if (dotSk) return dotSk;
+    // 1.301.0 PM 결정 「실제 위력이 가장 큰 스킬 우선」 — 위력 × 강화 × 타수 × 맞는 적 수.
+    //   이전: 광역기는 적 2마리 이상일 때만 · 배운 순서대로 / 단일기는 타수를 무시한 기본 위력순
+    //   → 보스(1마리)전 턴의 절반이 기본 공격이었고, 가장 센 광역기가 한 번도 안 쓰이는 빌드가 있었다
+    if (T.skillPick === 'power') {
+      const rageX = u.rageDouble && u.buffs.rage?.t > 0 ? 2 : 1;
+      const eff = (x) => {
+        const v = (x.s.base + x.s.perLv * (x.lv - 1)) * (1 + (u.skillBoost?.[x.s.id] || 0));
+        const k = x.s.kind;
+        if (k === 'aoe') return v * foes.length;
+        if (k === 'multi') return v * (x.s.hits + (x.s.id === 'e_volley' ? u.multiHitsAdd || 0 : 0));
+        if (k === 'dot') return v * (1 + (u.dotDmg || 0)) * (x.s.all ? foes.length : 1); // 이미 걸린 지속 피해 갱신 = 한 틱 값으로만 친다
+        return v * rageX;
+      };
+      const cand = ready.filter(x => ['aoe', 'strike', 'multi', 'lifesteal', 'dot'].includes(x.s.kind));
+      if (!cand.length) return null;
+      return cand.map(x => [eff(x), x]).sort((a, b) => b[0] - a[0])[0][1];
+    }
     if (foes.length >= 2) {
       const aoe = has('aoe') || ready.find(x => x.s.kind === 'dot' && x.s.all);
       if (aoe) return aoe;
