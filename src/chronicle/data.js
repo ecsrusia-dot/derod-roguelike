@@ -21,7 +21,7 @@ export const CHRONICLE_TUNING = {
   // 1.270.0 PM 결정 「4능력치 모두 쓸모 있게」 — 주 능력치 = 공격력(그대로), 비주 능력치 = 보조 효과
   //   힘 = 방어 관통 · 지능 = 스킬 피해(+회복력) · 민첩 = 치명·회피(효율 절반)·속도 · 체력 = HP·방어
   //   치명 상한(60%)을 넘는 몫은 치명 피해로 전환 (1%당 +critOverflow)
-  stat: { strPen: 0.004, strReduce: 0.001, intSkill: 0.004, agiCrit: 0.002, agiDodge: 0.001, agiChain: 0.0015, critOverflow: 1, softPerLv: 1.5, softMin: 30, softMult: 0.3 },
+  stat: { strPen: 0.002, strReduce: 0.001, intSkill: 0.004, agiCrit: 0.002, agiDodge: 0.001, agiChain: 0.0015, critOverflow: 1, softPerLv: 1.5, softMin: 30, softMult: 0.3 },
   spPerLevel: 1,              // 레벨업당 스킬 포인트
   maxLevel: 100,              // 1.211.0 2부 — 지역 9곳, 마지막 보스 Lv.100
   expNeed: (lv) => Math.round(60 * Math.pow(lv, 1.6)), // 1.219.0 ×2 (PM 결정)
@@ -92,7 +92,7 @@ export const CHRONICLE_TUNING = {
 
 // ===== 능력치 =====
 export const STAT_META = {
-  str: { label: '힘', desc: '공격력 (검사·마족 주 능력치) · 모든 직업: 방어 관통 +0.4%/점 · 받는 피해 -0.1%/점' },
+  str: { label: '힘', desc: '공격력 (검사·마족 주 능력치) · 모든 직업: 방어 관통 +0.2%/점 · 받는 피해 -0.1%/점' },
   int: { label: '지능', desc: '공격력 (술법사·사제 주 능력치) · 모든 직업: 스킬 피해 +0.4%/점 · 회복력' },
   agi: { label: '민첩', desc: '공격력 (정령사 주 능력치) · 모든 직업: 치명 +0.2%/점 · 회피 +0.1%/점 · 추가 타격 +0.15%/점 · 속도 (치명 60%를 넘는 몫은 치명 피해로)' },
   vit: { label: '체력', desc: '모든 직업: 최대 HP +10/점 · 방어 +0.8/점' },
@@ -606,7 +606,8 @@ export const GRADES = [
   { id: 'uncommon', label: '고급', color: '#7fbf6a', mult: 1.2, opts: 1, optMult: 1, dismantle: 3 },
   { id: 'rare', label: '희귀', color: '#6aa6e0', mult: 1.45, opts: 2, optMult: 1.15, dismantle: 8 },
   { id: 'epic', label: '에픽', color: '#c08ae8', mult: 1.8, opts: 3, optMult: 1.3, dismantle: 20, shard: 2 },
-  { id: 'unique', label: '유니크', color: '#f0883e', mult: 2.2, opts: 3, optMult: 1.45, dismantle: 40, shard: 5 },
+  // 1.300.0 PM 결정 — 유니크를 전승보다 확실히 낫게: 옵션 4줄(고정 2 + 자유 2) · 기본 ×2.4 · 옵션 수치 ×1.7
+  { id: 'unique', label: '유니크', color: '#f0883e', mult: 2.4, opts: 4, optMult: 1.7, dismantle: 40, shard: 5 },
   // 1.221.0 — 전승한 캐릭터만 얻는 최상위 등급 (승급 불가 · 옵션 4개)
   { id: 'mythic', label: '전승', color: '#ff6ad5', mult: 2.3, opts: 4, optMult: 1.6, dismantle: 60, shard: 10 },
 ];
@@ -763,6 +764,17 @@ Object.assign(UNIQUE_ITEMS, {
   ub_arch6: U('ub_arch6', 'priest', 'accessory', '대주교의 인장', { hpPct: 0.10, healPct: 0.10 }, { overhealShield: 1, atkPct: 0.1 }, '공격력 +10% · 최대 HP를 넘는 회복은 보호막으로', { branch: 'p_arch' }),
   ub_inq2: U('ub_inq2', 'priest', 'offhand', '단죄의 서', { atkPct: 0.10, critDmg: 0.2 }, { sb_pi_verdict: 0.3, sb_pi_brand: 0.3 }, '「판결」·「단죄의 인장」 위력 +30%', { branch: 'p_inq' }),
   ub_inq3: U('ub_inq3', 'priest', 'armor', '심판관의 법복', { hpPct: 0.10, dmgReduce: 0.04 }, { armorPen: 0.15, dmgReduce: 0.05 }, '방어 관통 +15% · 받는 피해 -5%', { branch: 'p_inq' }),
+  // 1.300.0 갈래 유니크 4부위 완성 — 갈래마다 비어 있던 부위 1종씩 (보조 1 · 갑옷 3 · 장신구 6)
+  ub_warlord4: U('ub_warlord4', 'wanderer', 'accessory', '검귀의 귀걸이', { atkPct: 0.08, counterPct: 0.06 }, { atkPct: 0.12, counterDmg: 0.3 }, '공격력 +12% · 반격 피해 +30%', { branch: 'w_warlord' }),
+  ub_paladin4: U('ub_paladin4', 'wanderer', 'accessory', '서약의 반지', { hpPct: 0.10, healPct: 0.12 }, { healPct: 0.25, dmgReduce: 0.05 }, '회복량 +25% · 받는 피해 -5%', { branch: 'w_paladin' }),
+  ub_arch7: U('ub_arch7', 'sage', 'offhand', '별의 마도서', { skillDmg: 0.12, critDmg: 0.2 }, { skillDmg: 0.12, crit: 0.08 }, '스킬 피해 +12% · 치명 +8%', { branch: 's_arch' }),
+  ub_hex4: U('ub_hex4', 'sage', 'accessory', '저주의 눈', { dotDmg: 0.2, atkPct: 0.08 }, { dotDmg: 0.3, cdr: 1 }, '지속 피해 +30% · 모든 스킬 재사용 -1턴', { branch: 's_hex' }),
+  ub_reaper4: U('ub_reaper4', 'demonblood', 'armor', '혈귀의 외투', { hpPct: 0.12, lifesteal: 0.03 }, { lowHpDmg: 0.2, dmgReduce: 0.06 }, 'HP 50% 이하일 때 피해 +20% · 받는 피해 -6%', { branch: 'd_reaper' }),
+  ub_plague4: U('ub_plague4', 'demonblood', 'accessory', '역병의 향로', { dotDmg: 0.2, hpPct: 0.08 }, { dotDmg: 0.3, regenPct: 0.01 }, '지속 피해 +30% · 매 턴 HP 1% 회복', { branch: 'd_plague' }),
+  ub_sniper4: U('ub_sniper4', 'elf', 'armor', '은신 망토', { dodge: 0.05, hpPct: 0.10 }, { dodge: 0.06, critAfterCounter: 1 }, '회피 +6% · 회피 직후 다음 공격 치명 확정', { branch: 'e_sniper' }),
+  ub_storm4: U('ub_storm4', 'elf', 'accessory', '폭풍의 눈', { chain: 0.08, crit: 0.05 }, { chain: 0.15, critDmg: 0.3 }, '추가 타격 확률 +15% · 치명 피해 +30%', { branch: 'e_storm' }),
+  ub_arch8: U('ub_arch8', 'priest', 'armor', '대주교의 제의', { hpPct: 0.12, dmgReduce: 0.05 }, { hpPct: 0.1, regenPct: 0.015 }, '최대 HP +10% · 매 턴 HP 1.5% 회복', { branch: 'p_arch' }),
+  ub_inq4: U('ub_inq4', 'priest', 'accessory', '심판의 저울', { atkPct: 0.10, critDmg: 0.2 }, { atkPct: 0.15, armorPen: 0.15 }, '공격력 +15% · 방어 관통 +15%', { branch: 'p_inq' }),
 });
 export const UNIQUE_CHANCE = { boss: 0.005, dungeonBoss: [0.02, 0.05, 0.10] };
 
@@ -780,9 +792,10 @@ export const FORGE = {
   },
   // 1.219.0 PM 결정 — 강한 패널티 + 파괴
   // 강화 성공률: 인덱스 = 현재 강화 단계 (+0→+1 … +9→+10)
-  enhanceRate: [1, 1, 1, 0.85, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2],
+  // 1.300.0 PM 결정 「+8부터 성공률↓ 파괴율↑」 — +8→+9 30% → 20% · +9→+10 20% → 12% · 파괴 30% → 45%
+  enhanceRate: [1, 1, 1, 0.85, 0.7, 0.6, 0.5, 0.4, 0.2, 0.12],
   // 실패 시: 현재 +3~+5 = 재료만 잃음 / +6~+7 = 1단계 하락 / +8~+9 = 1단계 하락 + 이 확률로 장비 파괴
-  enhanceDropFrom: 6, enhanceBreakFrom: 8, enhanceBreakChance: 0.3,
+  enhanceDropFrom: 6, enhanceBreakFrom: 8, enhanceBreakChance: 0.45,
   // 승급 성공률 · 실패 시 에픽 승급은 장비 파괴 (그 외는 재료만 잃음)
   promoteRate: { uncommon: 0.8, rare: 0.5, epic: 0.2 },
   promoteBreak: { epic: true },
