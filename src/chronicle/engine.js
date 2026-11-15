@@ -2254,6 +2254,16 @@ export function towerShopCanBuy(save, id) {
   if (id === 'unique' && save.inventory.length >= bagMax(save)) return false;
   return true;
 }
+// 살 수 없는 이유 (화면 안내용) — 살 수 있으면 null
+export function towerShopBlock(save, id) {
+  const it = TOWER_SHOP.find(x => x.id === id);
+  if (!it) return '판매 안 함';
+  const lack = it.cost - (save.mats.towerCoin || 0);
+  if (lack > 0) return `✪ ${lack} 부족`;
+  if (id === 'key' && keyCount(save) >= DUNGEON_KEYS.max) return `열쇠 가득 (${DUNGEON_KEYS.max}개)`;
+  if (id === 'unique' && save.inventory.length >= bagMax(save)) return `가방 가득 (${save.inventory.length}/${bagMax(save)}) — 비우면 구매 가능`;
+  return null;
+}
 export function buyTowerItem(save0, id, uniqueId = null) {
   if (!towerShopCanBuy(save0, id)) return save0;
   const it = TOWER_SHOP.find(x => x.id === id);

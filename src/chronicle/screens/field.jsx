@@ -332,7 +332,7 @@ export function TowerView({ save, setSave, onBack, onFight, flash, towerAuto = f
                   <div className="flex-1" style={{ fontSize: 11, color: PALETTE.textDim, lineHeight: 1.4, minHeight: 28 }}>{it.desc}</div>
                   <div className="flex items-center justify-between mt-1.5" style={{ fontSize: 12 }}>
                     <span style={{ padding: '0 7px', border: `1px solid ${MS.gold}`, color: MS.gold, fontWeight: 700 }}>✪ {it.cost}</span>
-                    <b style={{ color: ok ? '#8fd08a' : '#e07a6a' }}>{ok ? '구매' : lack ? `${lack} 부족` : '구매 불가'}</b>
+                    <b style={{ color: ok ? '#8fd08a' : '#e07a6a' }}>{ok ? '구매' : (E.towerShopBlock(save, it.id) || '구매 불가')}</b>
                   </div>
                 </button>
               );
