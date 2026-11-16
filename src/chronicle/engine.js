@@ -6,7 +6,7 @@
 // ============================================
 import { levelCap, globalBuffFx } from './roster.js';
 import { talentFx, canLearnTalent, talentNode, talentResetCost, talentTrees, tierUnlocked } from './talents.js';
-import { BOSS_MECHS, BOSS_MECH_OF, fieldStages, FIELD_STAGES, STAGE_TUNING, AUTO_CLIMB, BOOST, BAG_EXPAND, SALVAGE, SALVAGE_ICON, REBIRTH, REBIRTH_BRANCHES, DUEL, REBIRTH_PERKS, rebirthPerkCount, rebirthPerkLeft, rebirthPerkOk, expNeedFor, OPTION_LV_CURVE, REFORGE , unitTitle, SEASON_RULES } from './data.js';
+import { BOSS_MECHS, BOSS_MECH_OF, fieldStages, FIELD_STAGES, STAGE_TUNING, AUTO_CLIMB, BOOST, BAG_EXPAND, SALVAGE, SALVAGE_ICON, REBIRTH, REBIRTH_BRANCHES, DUEL, REBIRTH_PERKS, rebirthPerkCount, rebirthPerkLeft, rebirthPerkOk, expNeedFor, OPTION_LV_CURVE, REFORGE, APPRAISE, SPECIAL_FX_LABEL , unitTitle, SEASON_RULES } from './data.js';
 import { TOWER, TOWER_SHOP, towerUnlocked, isTowerBoss, towerEnemyLv, towerArea, towerFloorPicks, towerTheme, kstWeekKey } from './tower.js';
 import { famCombatant, famRole, famSubFx, famOwnFx, famBondFx, famResoHeroFx, rollFamShards, rollFamSouls, gainFamExp, FAM_AI, FAM_TUNING, summonFamiliars, enhanceFamiliar, evolveFamiliar, transcendFamiliar } from './familiar.js';
 import {
@@ -103,7 +103,35 @@ const tierOf = (ilv) => Math.min(6, Math.floor((Math.max(1, ilv) - 1) / 15));
 // 2부(아이템 레벨 61+) 이름 — 4단계 이름의 「균열의/심연의」를 2부 지역 접두어로 바꾼다
 const LATE_PREFIX = ['성역의', '핏빛', '황혼의'];
 export const itemUsable = (item, classId) => !!item && (item.cls === 'common' || item.cls === classId);
-export const uniqueDef = (item) => (item?.named ? UNIQUE_ITEMS[item.named] : null);
+// 전승 장비 특수 효과 (1.301.0) — item.mfx = { src: 유니크 id | 'e:에픽 효과 키', m: 수치 배율 }
+//   효과 종류는 원본 그대로, 소수 수치만 배율을 곱한다 (턴 수·확정 효과 같은 정수 값은 그대로)
+const MFX_CACHE = new Map();
+export function mythicFxPool() {
+  return [...Object.values(UNIQUE_ITEMS).filter(u => !u.disabled).map(u => u.id), ...Object.keys(EPIC_OPTIONS).map(k => `e:${k}`)];
+}
+export function specialFxText(fx) {
+  return Object.entries(fx).map(([k, v]) => {
+    if (k.startsWith('sb_')) return `「${CHRONICLE_SKILLS[k.slice(3)]?.name || '스킬'}」 위력 +${Math.round(v * 1000) / 10}%`;
+    if (SPECIAL_FX_LABEL[k]) return SPECIAL_FX_LABEL[k](v);
+    return statLabel(k, v);
+  }).join(' · ');
+}
+export function mythicFxDef(item) {
+  const mf = item?.mfx; if (!mf?.src) return null;
+  const key = `${mf.src}|${mf.m}`;
+  if (MFX_CACHE.has(key)) return MFX_CACHE.get(key);
+  const src = mf.src.startsWith('e:') ? EPIC_OPTIONS[mf.src.slice(2)] : UNIQUE_ITEMS[mf.src];
+  let def = null;
+  if (src) {
+    const fx = {};
+    for (const [k, v] of Object.entries(src.fx)) fx[k] = Number.isInteger(v) ? v : +(v * (mf.m || 1)).toFixed(3);
+    const br = src.branch ? REBIRTH_BRANCHES[src.branch]?.name : null;
+    def = { name: `${src.name}의 잔향`, desc: specialFxText(fx) + (br && Object.keys(fx).some(k => k.startsWith('sb_')) ? ` — ${br}만 쓰는 스킬` : ''), fx, mythic: true, src: mf.src, m: mf.m };
+  }
+  MFX_CACHE.set(key, def);
+  return def;
+}
+export const uniqueDef = (item) => (item?.named ? UNIQUE_ITEMS[item.named] : item?.mfx ? mythicFxDef(item) : null);
 export const epicOptOf = (item) => (item?.eopt ? EPIC_OPTIONS[item.eopt] : null);
 export function itemName(item) {
   if (item.named) return UNIQUE_ITEMS[item.named]?.name || '유니크';
@@ -195,41 +223,45 @@ export function reforgeLines(item) {
   const fixed = fixedOptCount(item);
   return itemOpts(item).map((o, i) => ({ i, o, locked: i < fixed }));
 }
-export function reforgeCost(item) {
-  const base = REFORGE.base[item?.grade];
-  if (!base || !itemOpts(item).length) return null;
-  const k = 1 + REFORGE.growth * Math.min(REFORGE.growthMax, item.rr || 0);
-  return {
-    gold: Math.round((20 + item.ilv * 4) * REFORGE.goldMult * k),
-    essence: Math.round(base * (1 + item.ilv / REFORGE.lvDiv) * k),
-  };
+// 1.301.0 PM 결정 — 옵션 재부여(종류 다시 굴리기)는 폐지. 드랍된 옵션 종류가 그 장비의 정체이고, 수치만 다시 굴릴 수 있다
+// ===== 장비 감정 (1.301.0) =====
+export const needsAppraise = (item) => !!item?.unid;
+export function appraiseCost(item) {
+  if (!item?.unid) return null;
+  return { gold: Math.round((20 + item.ilv * 4) * APPRAISE.goldMult), essence: Math.round(APPRAISE.essence * (1 + item.ilv / APPRAISE.lvDiv)) };
 }
-export function canReforge(save, item, idx) {
-  const c = item && reforgeCost(item);
-  const line = c && reforgeLines(item)[idx];
-  return !!line && !line.locked && save.gold >= c.gold && (save.mats.essence || 0) >= c.essence;
+export function canAppraise(save, item) {
+  const c = appraiseCost(item);
+  return !!c && save.gold >= c.gold && (save.mats.essence || 0) >= c.essence;
 }
-// 그 줄에 나올 수 있는 옵션과 확률 (다른 줄에 이미 있는 종류는 제외)
-export function reforgePool(item, idx) {
-  const pool = { ...(OPTION_POOLS[optPoolCls(item)] || OPTION_POOLS.common) };
-  itemOpts(item).forEach((o, i) => { if (i !== idx) delete pool[o.k]; });
-  if (!scdrSkillList(optPoolCls(item)).length) delete pool.scdr;
-  const tot = Object.values(pool).reduce((a, b) => a + b, 0) || 1;
-  return Object.entries(pool).map(([k, w]) => ({ k, label: OPTION_DEFS[k]?.label || k, p: w / tot })).sort((a, b) => b.p - a.p);
+export function rollMythicFx(rng = Math.random) {
+  if (rng() >= APPRAISE.mythicFxChance) return null;
+  const [lo, hi] = APPRAISE.fxRange;
+  return { src: pick(rng, mythicFxPool()), m: +(lo + rng() * (hi - lo)).toFixed(2) };
 }
-// 굴리기 → { save(비용 차감·횟수 +1), cand(새 옵션), cost } — 아직 장비는 안 바뀐다
-export function reforgeRoll(save0, uid, idx, rng = Math.random) {
+// 감정 → { save, item(감정된 장비), fx(전승 특수 효과 정의 | null), cost }
+export function appraiseItem(save0, uid, rng = Math.random) {
   const it0 = save0.inventory.find(i => i.uid === uid);
-  if (!canReforge(save0, it0, idx)) return { save: save0, cand: null, cost: null };
-  const cost = reforgeCost(it0);
-  const others = itemOpts(it0).filter((_, i) => i !== idx);
-  const cand = rollOption(rng, optPoolCls(it0), it0.grade, others);
-  if (!cand) return { save: save0, cand: null, cost: null };
+  if (!canAppraise(save0, it0)) return { save: save0, item: null, fx: null, cost: null };
+  const cost = appraiseCost(it0);
   const save = clone(save0);
   const it = save.inventory.find(i => i.uid === uid);
   save.gold -= cost.gold; save.mats.essence -= cost.essence;
-  it.rr = (it.rr || 0) + 1;
-  return { save, cand, cost };
+  delete it.unid;
+  if (it.grade === 'mythic' && !it.mfx) { const mf = rollMythicFx(rng); if (mf) it.mfx = mf; }
+  save.stats.appraised = (save.stats.appraised || 0) + 1;
+  return { save, item: it, fx: it.mfx ? mythicFxDef(it) : null, cost };
+}
+// 감정할 수 있는 장비를 전부 감정 (시뮬 봇·일괄 감정용) — 재화가 모자라면 거기서 멈춘다
+export function appraiseAll(save0, rng = Math.random, onlyUsable = true) {
+  let save = save0; let n = 0;
+  for (const it of save0.inventory) {
+    if (!it.unid || (onlyUsable && !itemUsable(it, save0.hero))) continue;
+    const r = appraiseItem(save, it.uid, rng);
+    if (!r.item) continue;
+    save = r.save; n++;
+  }
+  return save;
 }
 // ===== 수치 재설정 (1.280.0) — 옵션 종류는 그대로, 수치만 그 등급 범위 [최저, 최고] 안에서 다시 굴린다 =====
 // 유니크의 고정 옵션(1·2번)도 가능 — PM 결정: 범위는 유니크 등급 범위 전체 (설계값보다 낮게 나올 수도 있다 → 유지/바꾸기 선택)
@@ -242,7 +274,7 @@ export function tuneRange(item, o0) {
 }
 export function tuneCost(item) {
   const base = REFORGE.tuneShard?.[item?.grade];
-  if (!base || !itemOpts(item).length) return null;
+  if (!base || item.unid || !itemOpts(item).length) return null;
   const k = 1 + REFORGE.growth * Math.min(REFORGE.growthMax, item.rr || 0);
   return { gold: Math.round((20 + item.ilv * 4) * REFORGE.goldMult * k), shard: Math.max(1, Math.round(base * (1 + item.ilv / REFORGE.lvDiv) * k)) };
 }
@@ -274,11 +306,11 @@ export function tuneRoll(save0, uid, idx, rng = Math.random) {
 }
 // 바꾸기 — 굴려서 나온 옵션을 그 줄에 넣는다 (유니크의 계산형 3번째 줄은 이때부터 저장된다)
 // mode 'value' (수치 재설정) = 잠긴 줄도 가능하지만 옵션 종류가 같아야 한다
-export function reforgeApply(save0, uid, idx, cand, mode = 'kind') {
+export function reforgeApply(save0, uid, idx, cand, mode = 'value') {
   const it0 = save0.inventory.find(i => i.uid === uid);
   const line = it0 && cand && reforgeLines(it0)[idx];
   if (!line) return save0;
-  if (mode === 'value' ? normOpt(it0, line.o).k !== cand.k : line.locked) return save0;
+  if (mode !== 'value' || normOpt(it0, line.o).k !== cand.k) return save0; // 1.301.0 — 수치 재설정만 남았다
   const save = clone(save0);
   const it = save.inventory.find(i => i.uid === uid);
   const opts = itemOpts(it).map(o => ({ ...o }));
@@ -358,6 +390,7 @@ export function statLabel(k, v) {
 
 // 전승 캐릭터 착용 제한 (1.220.0) — 장비 레벨 ≤ 내 레벨 + 5 (전승 전에는 제한 없음)
 export function canWear(it, u) {
+  if (it.unid) return false; // 1.301.0 미감정 장비는 착용 불가
   const ub = it.named && UNIQUE_ITEMS[it.named]?.branch;
   if (ub && u?.rebirth?.branch !== ub) return false; // 갈래 유니크는 그 갈래만
   // 1.282.0 PM 결정 「레벨 맞춤 착용」 — 전승자는 레벨이 모자라도 착용하고, 기본 능력치만 내 레벨 수준으로 낮춰 받는다 (wearSyncLv)
@@ -859,7 +892,7 @@ export function dismantleStash(save0, uids) {
 // ===== 대장간 =====
 export function enhanceCost(item) { return FORGE.enhanceCost(item.plus || 0, item.ilv); }
 export function canEnhance(save, item) {
-  if (!item || (item.plus || 0) >= FORGE.maxEnhance) return false;
+  if (!item || item.unid || (item.plus || 0) >= FORGE.maxEnhance) return false;
   const c = enhanceCost(item);
   return save.gold >= c.gold && save.mats.essence >= c.essence;
 }
@@ -2000,6 +2033,7 @@ export function applyBattle(save0, ctx, battle, rng = Math.random) {
     }
     if (save.inventory.length >= bagMax(save)) { const sv = salvageOf(it); addSalvage(save, sv); summary.autoDismantled = (summary.autoDismantled || 0) + 1; summary.dismantleLoot = summary.dismantleLoot || {}; for (const [k, v] of Object.entries(sv)) summary.dismantleLoot[k] = (summary.dismantleLoot[k] || 0) + v; continue; }
     const item = { ...it, uid: save.nextUid++ };
+    if (APPRAISE.grades.includes(item.grade)) item.unid = true; // 1.301.0 전승·유니크는 미감정으로 들어온다
     save.inventory.push(item);
     summary.items.push(item);
     if (item.grade === 'epic') save.stats.epics += 1;
@@ -2291,7 +2325,7 @@ export function buyTowerItem(save0, id, uniqueId = null) {
     const u = UNIQUE_ITEMS[uniqueId];
     if (!u || u.disabled || !(u.cls === save.hero || u.cls === 'common')) return save0;
     if (u.branch && u.branch !== save.units[save.hero]?.rebirth?.branch) return save0; // 갈래 전용은 내 갈래만 (1.286.2)
-    save.inventory.push({ ...makeItem(Math.random, { named: uniqueId, ilv: save.units[save.hero].lv }), uid: save.nextUid++ });
+    save.inventory.push({ ...makeItem(Math.random, { named: uniqueId, ilv: save.units[save.hero].lv }), uid: save.nextUid++, unid: true });
     save.stats.uniques = (save.stats.uniques || 0) + 1;
   } else if (id === 'shards') save.mats.famShard = (save.mats.famShard || 0) + 10;
   else if (id === 'key') addKeys(save, 1);

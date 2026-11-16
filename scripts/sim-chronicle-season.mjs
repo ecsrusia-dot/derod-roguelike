@@ -25,7 +25,7 @@ function famUpkeep(save, rng) {
 function upkeep(save, rng) {
   save = famUpkeep(save, rng); const cid = save.hero; save = E.autoAllocate(save, cid);
   let g = 0; while (save.units[cid].sp > 0 && g++ < 60) { const u = save.units[cid]; const s = Object.values(CHRONICLE_SKILLS).find(x => x.cls === cid && E.canLearn(u, x)); const n = s ? E.learnSkill(save, cid, s.id) : E.autoAllocateTalents(save, cid); if (n === save) break; save = n; }
-  save = E.autoEquip(save);
+  save = E.autoEquip(E.appraiseAll(save)); // 1.301.0 — 봇도 전승·유니크를 감정해서 쓴다
   save = E.dismantleItems(save, save.inventory.filter(i => !E.equippedBy(save, i.uid)).map(i => i.uid)).save;
   for (const uid of Object.values(save.units[cid].equip)) { if (uid == null) continue; let k = 0; while (k++ < 3) { const it = save.inventory.find(i => i.uid === uid); if (!it) break; if (E.canPromote(save, it) && it.grade !== 'epic') save = E.forgePromote(save, uid, rng).save; else if (E.canEnhance(save, it) && (it.plus || 0) < 7) save = E.forgeEnhance(save, uid, rng).save; else break; } }
   return save;
