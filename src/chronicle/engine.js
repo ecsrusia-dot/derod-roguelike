@@ -180,11 +180,11 @@ export function makeItem(rng, { cls, slot, grade, ilv, set = 'field', named = nu
   if (grade === 'mythic' && slot === 'accessory') it.eopt = pick(rng, Object.keys(EPIC_OPTIONS));
   return it;
 }
-// 드랍 직업 분배 (현재 직업 70 / 다른 직업 25 / 공용 장신구 5)
+// 드랍 직업 분배 (1.301.1: 현재 직업 95 / 다른 직업 0 / 공용 장신구 5)
 function rollDropClass(rng, heroCls, D = CLASS_DROP) {
   const r = rng();
   if (r < D.common) return 'common';
-  if (r < D.common + D.own) return heroCls;
+  if (r < D.common + D.own || !(D.other > 0)) return heroCls;
   return pick(rng, CHRONICLE_CLASSES.map(c => c.id).filter(id => id !== heroCls));
 }
 export function rollGear(rng, grade, ilv, heroCls, set = 'field') {

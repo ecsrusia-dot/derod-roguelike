@@ -677,10 +677,10 @@ export const OFFHAND_BASE = {
   elf: { flat: { spd: [0.5, 0.05] }, pct: { crit: 0.04 } },
   priest: { flat: {}, pct: { healPct: 0.08, shieldPct: 0.05 } },
 };
-// 드랍 직업 분배 (PM 확정 70 / 25 / 5)
-export const CLASS_DROP = { own: 0.70, other: 0.25, common: 0.05 };
+// 드랍 직업 분배 — 1.301.1 다른 직업 장비 드랍 폐지 (PM 지시: 70/25/5 → 95/0/5)
+export const CLASS_DROP = { own: 0.95, other: 0, common: 0.05 };
 // 1.269.0 유니크 드랍 직업 분배 — 공용 유니크 비중 5% → 15%
-export const UNIQUE_DROP = { own: 0.65, other: 0.20, common: 0.15 };
+export const UNIQUE_DROP = { own: 0.85, other: 0, common: 0.15 };   // 1.301.1 다른 직업 0
 
 // 에픽 장신구 전용 옵션 (1.208.0 고유 옵션 12종 → 2.0에서 에픽 장신구 전용)
 export const EPIC_OPTIONS = {
