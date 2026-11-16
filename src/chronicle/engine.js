@@ -567,6 +567,105 @@ export function deriveUnit(save, classId) {
   if (out.holyDmg) out.holyDmg = Math.min(T.holyCap || 9, out.holyDmg); // 치유→신성 피해 상한 (1.216.0)
   return out;
 }
+// ===== 능력치 출처 (1.304.0) — 성장 정보 탭에서 수치를 누르면 「어디서 얼마가 왔는지」 보여 준다 =====
+// deriveUnit과 같은 순서·같은 공식으로 묶음별 값을 따로 모은다 (전투 계산에는 쓰지 않는다 — 표시 전용).
+// ⚠️ deriveUnit에 새 출처·새 공식을 넣으면 여기도 같이 고칠 것
+const PASSIVE_KEY = { critAdd: 'crit', dodgeAdd: 'dodge' };
+export function statSourceBags(save, classId) {
+  const u = save.units[classId];
+  const bags = [];
+  const push = (label, fx, note) => { if (fx && Object.keys(fx).length) bags.push({ label, fx, note }); };
+  for (const sl of SLOTS) {
+    const uid = u.equip?.[sl.id];
+    const it = uid != null ? save.inventory.find(i => i.uid === uid) : null;
+    if (!it || !itemUsable(it, u.classId) || !canWear(it, u)) continue;
+    const fx = {};
+    const add = (k, v) => { fx[k] = (fx[k] || 0) + v; };
+    for (const [k, v] of Object.entries(itemStats(it, wearSyncLv(it, u)))) add(k, v);
+    const ud = uniqueDef(it);
+    if (ud) for (const [k, v] of Object.entries(ud.fx)) add(k, v);
+    const eo = epicOptOf(it);
+    if (eo) for (const [k, v] of Object.entries(eo.fx)) add(k, v);
+    push(`${sl.label} · ${itemName(it)}${it.plus ? ` +${it.plus}` : ''}`, fx);
+  }
+  push('보조 사역마', famSubFx(save.fams, activeSubs(save), u.lv));
+  push('사역마 보유 효과', famOwnFx(save.fams));
+  push('사역마 인연', famBondFx(save.fams));
+  push('동행 사역마 공명', famResoHeroFx(save.fams, activeMain(save), u.rebirth?.branch, classId));
+  push('원정대 버프', globalBuffFx(save.roster, classId));
+  if (save.ascFx) push('승천 특성', save.ascFx);
+  const br = u.rebirth?.branch && REBIRTH_BRANCHES[u.rebirth.branch];
+  if (br) push(`전승 갈래 「${br.name}」`, br.fx);
+  push('특성', talentFx(u));
+  for (const [id, lv] of Object.entries(u.skills || {})) {
+    const s = CHRONICLE_SKILLS[id];
+    if (!s || s.kind !== 'passive' || lv <= 0) continue;
+    const fx = {};
+    for (const [k, v] of Object.entries(s.fx(lv))) fx[PASSIVE_KEY[k] || k] = v;
+    push(`패시브 「${s.name}」 Lv.${lv}`, fx);
+  }
+  return bags;
+}
+// key = 화면의 수치 키 (hp·atk·def·spd·crit·dodge·heal + deriveUnit 결과 키)
+// → { unit: 'num'|'pct', base[], flat[], pct[], mult[], notes[] } — 각 줄 { label, v }
+export function statBreakdown(save, classId, key) {
+  const u = save.units[classId];
+  const cls = chronicleClass(classId);
+  const S = T.stat || {};
+  const softCap = Math.max(S.softMin || 0, u.lv * (S.softPerLv || 1e9));
+  const eff = (v) => (v <= softCap ? v : softCap + (v - softCap) * (S.softMult ?? 1));
+  const st = { str: eff(u.stats.str), int: eff(u.stats.int), agi: eff(u.stats.agi), vit: eff(u.stats.vit) };
+  const STAT_KO = { str: '힘', int: '지능', agi: '민첩', vit: '체력' };
+  const r1 = (v) => Math.round(v * 10) / 10;
+  const statLine = (k, per, perText) => ({ label: `${STAT_KO[k]} ${r1(st[k])}${st[k] !== u.stats[k] ? `(찍은 값 ${u.stats[k]})` : ''} × ${perText}`, v: st[k] * per });
+  const bags = statSourceBags(save, classId);
+  const from = (k) => bags.filter(b => b.fx[k]).map(b => ({ label: b.label, v: b.fx[k] }));
+  const mainK = cls.main === 'int' ? 'int' : cls.main === 'agi' ? 'agi' : 'str';
+  const rbN = u.rebirth?.count || 0;
+  const rb = rbN ? [{ label: `전승 ${rbN}회 보너스`, v: 1 + REBIRTH.bonusPct * rbN }] : [];
+  const out = { unit: 'num', base: [], flat: [], pct: [], mult: [], notes: [] };
+  const pctUnit = () => { out.unit = 'pct'; };
+  switch (key) {
+    case 'hp': out.base = [{ label: '기본', v: 50 }, statLine('vit', 10, '10'), { label: `레벨 ${u.lv} × 6`, v: u.lv * 6 }]; out.flat = from('hp'); out.pct = from('hpPct'); out.mult = rb; break;
+    case 'atk': out.base = [statLine(mainK, 2.2, '2.2 (주 능력치)'), { label: `레벨 ${u.lv} × 1.5`, v: u.lv * 1.5 }]; out.flat = from('atk'); out.pct = from('atkPct'); out.mult = rb; break;
+    case 'def': out.base = [statLine('vit', 0.8, '0.8')]; out.flat = from('def'); out.pct = from('defPct'); break;
+    case 'spd': out.base = [{ label: '기본', v: 8 }, statLine('agi', 0.6, '0.6')]; out.flat = from('spd'); out.pct = from('spdPct'); break;
+    case 'heal': {
+      out.base = [statLine('int', 2.2, '2.2'), { label: `레벨 ${u.lv} × 1.5`, v: u.lv * 1.5 }];
+      out.flat = from('atk').map(x => ({ label: `${x.label} (공격력의 절반)`, v: x.v * 0.5 }));
+      out.pct = from('healPct');
+      if (from('healFromAtk').length) out.notes.push('「공격력 비례 치유」 효과가 있으면 위 값과 공격력 × 비율 중 큰 쪽을 쓴다.');
+      break;
+    }
+    case 'crit': pctUnit(); out.base = [{ label: '기본', v: 0.05 }, statLine('agi', S.agiCrit || 0, `${r1((S.agiCrit || 0) * 100)}%`)]; out.flat = from('crit'); out.notes.push('상한 60% — 넘친 몫은 「치명 피해」로 바뀐다.'); break;
+    case 'dodge': pctUnit(); out.base = [statLine('agi', S.agiDodge || 0, `${r1((S.agiDodge || 0) * 100)}%`)]; out.flat = from('dodge'); out.notes.push('상한 35%.'); break;
+    case 'critMult': {
+      pctUnit(); out.base = [{ label: '기본', v: T.critMult }]; out.flat = from('critDmg');
+      const raw = 0.05 + st.agi * (S.agiCrit || 0) + from('crit').reduce((t, x) => t + x.v, 0);
+      const over = Math.max(0, raw - 0.6) * (S.critOverflow || 0);
+      if (over > 0) out.flat.push({ label: `치명 확률 초과분 ${r1((raw - 0.6) * 100)}%`, v: over });
+      break;
+    }
+    case 'armorPen': pctUnit(); out.base = [statLine('str', S.strPen || 0, `${r1((S.strPen || 0) * 100)}%`)]; out.flat = from('armorPen'); out.notes.push('상한 80%.'); break;
+    case 'skillDmg': pctUnit(); out.base = [statLine('int', S.intSkill || 0, `${r1((S.intSkill || 0) * 100)}%`)]; out.flat = from('skillDmg'); break;
+    case 'chain': pctUnit(); out.base = [statLine('agi', S.agiChain || 0, `${r1((S.agiChain || 0) * 100)}%`)]; out.flat = from('chain'); out.notes.push(`상한 ${Math.round((T.chainCap || 1) * 100)}%.`); break;
+    case 'dmgReduce': {
+      pctUnit(); out.base = [statLine('str', S.strReduce || 0, `${r1((S.strReduce || 0) * 100)}%`)]; out.flat = from('dmgReduce');
+      for (const x of from('dmgTakenUp')) out.flat.push({ label: `${x.label} (받는 피해 증가)`, v: -x.v });
+      out.notes.push('감소 합계 상한 50%.');
+      break;
+    }
+    case 'lifesteal': pctUnit(); out.flat = from('lifesteal'); out.notes.push(`상한 ${Math.round((T.lifestealCap || 1) * 100)}%.`); break;
+    case 'startShieldPct': pctUnit(); out.flat = from('shieldPct'); out.notes.push(`상한 ${Math.round((T.shieldCap || 1) * 100)}%.`); break;
+    case 'holyDmg': pctUnit(); out.flat = from('holyDmg'); out.notes.push(`상한 ${Math.round((T.holyCap || 9) * 100)}%.`); break;
+    case 'cdr': out.flat = from('cdr'); out.notes.push('상한 2턴 (특정 스킬 전용 단축과 합쳐서).'); break;
+    default:
+      out.unit = 'raw'; out.flat = from(key);
+      if (MULT_KEYS.includes(key)) out.notes.push('배율 효과는 더하지 않고 가장 큰 값 하나만 적용된다.');
+      if (key === 'rageDouble') out.notes.push('두 곳에서 겹치면 겹친 몫은 「광폭화 지속 +1턴 · 광폭화 중 흡혈 2배」로 바뀐다.');
+  }
+  return out;
+}
 export function unitPower(save, classId) {
   const d = deriveUnit(save, classId);
   return Math.round(d.atk * 2 + d.maxHp * 0.3 + d.def * 2 + d.spd * 2 + d.healPower * (d.classId === 'priest' ? 1.5 : 0.2));
