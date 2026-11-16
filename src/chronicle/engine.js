@@ -576,6 +576,30 @@ export function deriveUnit(save, classId) {
 // deriveUnit과 같은 순서·같은 공식으로 묶음별 값을 따로 모은다 (전투 계산에는 쓰지 않는다 — 표시 전용).
 // ⚠️ deriveUnit에 새 출처·새 공식을 넣으면 여기도 같이 고칠 것
 const PASSIVE_KEY = { critAdd: 'crit', dodgeAdd: 'dodge' };
+// 스킬 예상 피해 (1.306.0, 표시 전용) — 같은 레벨 적(방어 = 레벨 × 1.2) 기준 · 굴림 평균(±10%) · 버프·약화·처형 조건 제외
+export function skillDamagePreview(save, classId, skillId, lv = null) {
+  const s = CHRONICLE_SKILLS[skillId]; const u = save.units[classId];
+  if (!s || !u || s.kind === 'passive') return null;
+  const d = deriveUnit(save, classId);
+  const L = Math.max(1, lv ?? u.skills?.[skillId] ?? 1);
+  const v = (s.base + s.perLv * (L - 1)) * (1 + (d.skillBoost?.[skillId] || 0));
+  const tdef = Math.round(u.lv * 1.2);
+  const through = T.defK / (T.defK + tdef * (1 - (d.armorPen || 0)));
+  const target = { lv: u.lv, def: tdef };
+  const cm = d.critMult || T.critMult;
+  if (s.kind === 'dot') {
+    const tick = Math.max(1, Math.round(d.atk * v * (1 + (d.dotDmg || 0)))); const turns = s.turns * (d.dotTurnsMult || 1);
+    return { kind: 'dot', tick, turns, total: tick * turns, all: !!s.all, target };
+  }
+  const DIRECT = ['strike', 'lifesteal', 'multi', 'aoe', 'breakStrike', 'weakStrike', 'markStrike', 'executeStrike'];
+  if (!DIRECT.includes(s.kind)) return null;
+  const n = Math.max(1, Math.round(d.atk * v * (1 + (d.skillDmg || 0)) * through));
+  const c = Math.max(1, Math.round(d.atk * v * (1 + (d.skillDmg || 0)) * cm * through));
+  const hits = s.kind === 'multi' ? s.hits + (s.id === 'e_volley' ? d.multiHitsAdd || 0 : s.id === 'et_barrage' ? d.barrageHitsAdd || 0 : 0) : 1;
+  const crit = Math.min(1, d.crit || 0);
+  const avg = Math.round((n * (1 - crit) + c * crit) * hits);
+  return { kind: s.kind, n, c, hits, totalN: n * hits, totalC: c * hits, avg, crit, aoe: s.kind === 'aoe', execute: s.kind === 'executeStrike', target };
+}
 // 스킬 위력 강화(sb_)의 출처 — 장비·특성 등 묶음 + 전승 특전 「갈래의 극의」 (1.305.1, 표시 전용)
 export function skillBoostSources(save, classId, skillId) {
   const u = save.units[classId];
@@ -1496,7 +1520,8 @@ export function pickRebirthPerk(save0, perkId, classId = save0.hero) {
 }
 
 // ===== 전투 시뮬 (풀오토) =====
-export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
+// opts (1.306.0 훈련장): maxRounds = 라운드 제한 · training = 제한까지 버티면 'win'(측정 완료)
+export function simulateChronicleBattle(party0, enemies0, rng = Math.random, opts = {}) {
   const units = [
     ...party0.map(p => ({ ...p, buffs: {}, shield: Math.round((p.startShieldPct || 0) * p.maxHp), taunt: p.startTaunt || 0, tauntDef: 0, dots: [], cds: {}, fx: {}, hots: [], forced: null, cover: null, turn: 0, critNext: false, firstDone: false, reviveUsed: false, emergencyUsed: false })),
     // 결투 (pvp) — 적 편이지만 주인공·사역마처럼 스킬·특성을 쓰는 유닛. 일반 전투에는 없다 (pvp 플래그가 있을 때만 다르게 동작)
@@ -2002,7 +2027,8 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
 
   let round = 0;
   let result = null;
-  while (round < T.maxRounds) {
+  const maxRounds = opts.maxRounds || T.maxRounds;
+  while (round < maxRounds) {
     round += 1;
     push({ round });
     const order = units.filter(u => u.hp > 0).sort((a, b) => (b.spd + rng() * 3) - (a.spd + rng() * 3));
@@ -2050,7 +2076,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
     }
     if (result) break;
   }
-  if (!result) result = duel ? 'draw' : 'lose';
+  if (!result) result = opts.training ? 'win' : duel ? 'draw' : 'lose';
   const finalHp = Object.fromEntries(units.filter(u => u.side === 'party').map(u => [u.id, u.hp]));
   return { result, events, rounds: round, finalHp };
 }

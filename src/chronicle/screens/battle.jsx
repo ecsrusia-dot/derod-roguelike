@@ -9,7 +9,7 @@ import { BOSS_MECHS, gradeIdx, AUTO_CLIMB, chronicleClass, chronicleEnemyArt , u
 import * as E from '../engine.js';
 import * as R from '../roster.js';
 import * as F from '../familiar.js';
-import { FONT_TITLE, gradeOf, clsTag, CountUp, Bar, XP_HERO, XP_FAM, xpPct, XpResultRow, MainKvRows, MainTabs, MS, MainSecHead, MainModal } from './common.jsx';
+import { FONT_TITLE, gradeOf, clsTag, CountUp, Bar, XP_HERO, XP_FAM, xpPct, XpResultRow, MainKvRows, MainTabs, MS, MainSecHead, MainModal, MainCell } from './common.jsx';
 import { huntRecord, newHuntStats, addHuntRecord, HuntReport } from './report.jsx';
 
 // ===== 전투 카드 · 로그 (1.227.0) =====
@@ -28,7 +28,7 @@ function BossCard({ u, art, hp, sh, acting, fx, w, h, ward = false, children }) 
           <div className="absolute left-0 right-0 bottom-0" style={{ padding: '22px 8px 6px', background: 'linear-gradient(transparent, #000e 55%)', zIndex: 2 }}>
             <div className="text-center truncate font-bold" style={{ fontSize: 13.5, color: '#ffe3a0', textShadow: '0 1px 2px #000' }}>Lv.{u.lv} {u.name}</div>
             <div className="mt-1"><Bar v={hp} max={u.maxHp} shield={sh} color="linear-gradient(90deg,#b8261c,#ff8a6a)" h={7} /></div>
-            <div className="text-center" style={{ fontSize: 11, color: '#ddd', textShadow: '0 1px 2px #000' }}>{Math.max(0, hp).toLocaleString()} / {u.maxHp.toLocaleString()}{sh > 0 ? <span style={{ color: '#9cc4e4' }}> ◈{sh.toLocaleString()}</span> : null}</div>
+            <div className="text-center" style={{ fontSize: 11, color: '#ddd', textShadow: '0 1px 2px #000' }}>{u.dummy ? hpText(u, hp) : <>{Math.max(0, hp).toLocaleString()} / {u.maxHp.toLocaleString()}</>}{sh > 0 ? <span style={{ color: '#9cc4e4' }}> ◈{sh.toLocaleString()}</span> : null}</div>
           </div>
         </div>
       </div>
@@ -38,7 +38,40 @@ function BossCard({ u, art, hp, sh, acting, fx, w, h, ward = false, children }) 
 }
 
 // 1.265.0 — 전투 결과 전체 화면 일러 (시안 ㊼, 본편 VictoryScreen 방식): 직업 승리/패배 일러 → 정산 창은 뒤에 올라온다
-function ResultStage({ hero, title, lv, win, foe, rounds, revealed, onReveal }) {
+// 훈련장 피해 미터 (1.306.0) — 총 피해·라운드당 피해·유닛별·스킬별 막대
+function TrainingMeter({ m }) {
+  const top = Math.max(1, ...m.skills.map(x => x.dmg));
+  const pct = (v) => (m.total ? Math.round(v / m.total * 100) : 0);
+  return (
+    <div className="mt-1.5 flex flex-col gap-1" style={{ fontSize: 12.5, color: PALETTE.text }}>
+      {m.died ? <div className="chr-chip font-semibold" style={{ color: '#ff8a7e' }}>⚠ {m.rounds}라운드에 쓰러져 측정이 중단됐다 — 공격을 끄거나 허수아비 레벨을 낮추자</div> : null}
+      <div className="grid gap-1.5" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
+        <MainCell label="총 피해" value={m.total.toLocaleString()} hot />
+        <MainCell label="라운드당" value={m.perRound.toLocaleString()} hot />
+        <MainCell label="라운드" value={`${m.rounds}R`} />
+      </div>
+      {m.units.length > 1 && <>
+        <MainSecHead title="누 가" />
+        <MainKvRows rows={m.units.map(u => ({ l: `${u.fam ? '🐾 ' : ''}${u.name}`, v: `${u.dmg.toLocaleString()} (${pct(u.dmg)}%)`, c: u.fam ? '#e8b8ff' : MS.gold }))} />
+      </>}
+      <MainSecHead title="스 킬 별 피 해" />
+      {m.skills.length ? m.skills.map((x, i) => (
+        <div key={i} className="relative overflow-hidden" style={{ padding: '5px 9px', borderRadius: 9, border: `1px solid ${MS.line}`, background: MS.box }}>
+          <div className="absolute left-0 top-0 bottom-0" style={{ width: `${x.dmg / top * 100}%`, background: x.fam ? 'rgba(176,108,255,0.22)' : 'rgba(232,176,74,0.2)' }} />
+          <div className="relative flex justify-between gap-2">
+            <span className="truncate">{x.fam ? '🐾 ' : ''}{x.name}</span>
+            <b className="flex-none" style={{ color: x.fam ? '#e8b8ff' : MS.gold }}>{x.dmg.toLocaleString()} <span style={{ fontWeight: 400, color: PALETTE.textDim }}>{pct(x.dmg)}%</span></b>
+          </div>
+        </div>
+      )) : <div style={{ color: PALETTE.textDim }}>피해를 주지 못했다</div>}
+      {m.taken > 0 ? <div className="chr-chip" style={{ color: PALETTE.textDim }}>🛡 받은 피해 {m.taken.toLocaleString()}</div> : null}
+      <div style={{ fontSize: 11.5, color: PALETTE.textDim, lineHeight: 1.5 }}>보상·기록 없음 · 사용 횟수·치명 등 자세한 수치는 「📊 전투 집계」</div>
+    </div>
+  );
+}
+// 훈련장 허수아비 (1.306.0) — 체력 대신 지금까지 받은 피해를 보여 준다
+const hpText = (u, hp) => (u.dummy ? `∞ · -${Math.max(0, u.maxHp - hp).toLocaleString()}` : Math.max(0, hp).toLocaleString());
+function ResultStage({ hero, title, lv, win, foe, rounds, revealed, onReveal, words }) {
   const cls = chronicleClass(hero);
   const art = (win ? cls.winImage : cls.lossImage) || cls.image;
   const tone = win ? MS.gold : '#e0574c';
@@ -49,15 +82,15 @@ function ResultStage({ hero, title, lv, win, foe, rounds, revealed, onReveal }) 
       {!revealed && <>
         <div className="absolute left-0 right-0 bottom-0" style={{ height: '45%', background: `linear-gradient(transparent, ${PALETTE.bgDeep}e6 70%, ${PALETTE.bgDeep})` }} />
         <div className="absolute left-0 right-0 text-center px-4" style={{ bottom: 64 }}>
-          <div className="chr-result-sub" style={{ fontSize: 11, letterSpacing: '0.5em', color: tone }}>━━ {win ? 'V I C T O R Y' : 'D E F E A T'} ━━</div>
-          <div className="chr-result-title font-bold" style={{ fontSize: 48, color: PALETTE.text, fontFamily: FONT_TITLE, textShadow: `0 0 24px ${tone}99, 0 2px 8px #000` }}>{win ? '승리' : '패배'}</div>
-          <div className="chr-result-sub truncate" style={{ fontSize: 12.5, color: PALETTE.textDim, textShadow: '0 1px 4px #000', animationDelay: '.5s' }}>Lv.{lv} {title || cls.name} · {foe ? (win ? `「${foe}」 처치` : `「${foe}」에게 쓰러짐`) : (win ? '적을 처치' : '쓰러졌다')} · {rounds}라운드</div>
+          <div className="chr-result-sub" style={{ fontSize: 11, letterSpacing: '0.5em', color: tone }}>━━ {words?.en || (win ? 'V I C T O R Y' : 'D E F E A T')} ━━</div>
+          <div className="chr-result-title font-bold" style={{ fontSize: 48, color: PALETTE.text, fontFamily: FONT_TITLE, textShadow: `0 0 24px ${tone}99, 0 2px 8px #000` }}>{words?.big || (win ? '승리' : '패배')}</div>
+          <div className="chr-result-sub truncate" style={{ fontSize: 12.5, color: PALETTE.textDim, textShadow: '0 1px 4px #000', animationDelay: '.5s' }}>Lv.{lv} {title || cls.name} · {words?.sub ? words.sub : foe ? (win ? `「${foe}」 처치` : `「${foe}」에게 쓰러짐`) : (win ? '적을 처치' : '쓰러졌다')} · {rounds}라운드</div>
         </div>
         <div className="absolute left-0 right-0 text-center" style={{ bottom: 22, fontSize: 11.5, color: PALETTE.textDim, opacity: 0.8 }}>화면을 누르면 바로 정산</div>
       </>}
       {revealed && <div className="absolute left-0 right-0 text-center" style={{ top: 50 }}>
-        <div style={{ fontSize: 11, letterSpacing: '0.5em', color: tone, textShadow: '0 1px 3px #000' }}>{win ? 'V I C T O R Y' : 'D E F E A T'}</div>
-        <div className="font-bold" style={{ fontSize: 30, color: PALETTE.text, fontFamily: FONT_TITLE, textShadow: `0 0 18px ${tone}99, 0 2px 6px #000` }}>{win ? '승리' : '패배'}</div>
+        <div style={{ fontSize: 11, letterSpacing: '0.5em', color: tone, textShadow: '0 1px 3px #000' }}>{words?.en || (win ? 'V I C T O R Y' : 'D E F E A T')}</div>
+        <div className="font-bold" style={{ fontSize: 30, color: PALETTE.text, fontFamily: FONT_TITLE, textShadow: `0 0 18px ${tone}99, 0 2px 6px #000` }}>{words?.big || (win ? '승리' : '패배')}</div>
       </div>}
     </div>
   );
@@ -79,13 +112,13 @@ function BattleCard({ u, art, hp, sh, acting, fx, h, enemy = false, border, chil
             <>
               <div className="truncate" style={{ fontSize: 11, color: '#fff', textShadow: '0 1px 2px #000' }}>{u.short || u.name}</div>
               <Bar v={hp} max={u.maxHp} shield={sh} color={enemy ? 'linear-gradient(90deg,#8b1f1f,#e0574c)' : 'linear-gradient(90deg,#3d7a3a,#7fcf6a)'} h={6} />
-              <div className="truncate" style={{ fontSize: 11, color: '#ddd', textShadow: '0 1px 2px #000' }}>{Math.max(0, hp).toLocaleString()}{sh > 0 ? <span style={{ color: '#9cc4e4' }}> ◈{sh.toLocaleString()}</span> : null}</div>
+              <div className="truncate" style={{ fontSize: 11, color: '#ddd', textShadow: '0 1px 2px #000' }}>{hpText(u, hp)}{sh > 0 ? <span style={{ color: '#9cc4e4' }}> ◈{sh.toLocaleString()}</span> : null}</div>
             </>
           ) : (
             <>
               <div className="flex items-baseline justify-between gap-1">
                 <span className="truncate" style={{ fontSize: 11.5, color: '#fff', textShadow: '0 1px 2px #000' }}>{u.fam ? '🐾 ' : ''}Lv.{u.lv} {u.name}</span>
-                <span className="flex-none" style={{ fontSize: 11, color: '#ddd', textShadow: '0 1px 2px #000' }}>{Math.max(0, hp).toLocaleString()}{sh > 0 ? <span style={{ color: '#9cc4e4' }}> ◈{sh.toLocaleString()}</span> : null}</span>
+                <span className="flex-none" style={{ fontSize: 11, color: '#ddd', textShadow: '0 1px 2px #000' }}>{hpText(u, hp)}{sh > 0 ? <span style={{ color: '#9cc4e4' }}> ◈{sh.toLocaleString()}</span> : null}</span>
               </div>
               <Bar v={hp} max={u.maxHp} shield={sh} color={enemy ? 'linear-gradient(90deg,#8b1f1f,#e0574c)' : 'linear-gradient(90deg,#3d7a3a,#7fcf6a)'} h={7} />
               {xp && <>
@@ -307,7 +340,8 @@ export function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAga
       {done ? (
         <ResultStage title={unitTitle(save.units[save.hero], save.hero)} hero={party.find(p => !p.fam)?.classId || save.hero} lv={(xp?.after?.hero || xp?.before?.hero)?.lv || party.find(p => !p.fam)?.lv}
           win={sim.result === 'win'} foe={(enemies.find(e => e.tier === 'boss') || enemies.find(e => e.tier === 'elite') || enemies[0])?.name}
-          rounds={sim.rounds || round} revealed={revealed} onReveal={() => setRevealed(true)} />
+          rounds={sim.rounds || round} revealed={revealed} onReveal={() => setRevealed(true)}
+          words={ctx.kind === 'training' ? (sim.result === 'win' ? { en: 'M E A S U R E D', big: '측정 완료', sub: `${sim.rounds}라운드 · 총 피해 ${summary.training.total.toLocaleString()}` } : { en: 'D O W N', big: '쓰러짐', sub: `${sim.rounds}라운드에 쓰러짐 · 총 피해 ${summary.training.total.toLocaleString()}` }) : null} />
       ) : (() => {
         // 1.257.0 — 보스가 있고 3마리 이하면 보스를 가운데 크게 (레이드처럼 많을 땐 기존 배열)
         const boss = enemies.length <= 3 ? enemies.find(e => e.tier === 'boss') : null;
@@ -405,10 +439,10 @@ export function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAga
           <div className="chr-glass flex flex-col min-h-0 flex-1" style={{ '--edge': sim.result === 'win' ? MS.gold : MS.red, '--glow': sim.result === 'win' ? 'rgba(232,176,74,.22)' : 'rgba(224,87,76,.22)' }}>
           <div className="overflow-y-auto min-h-0 flex-1" style={{ padding: '10px 12px 4px' }}>
             <div className="flex items-baseline justify-between gap-2">
-              <span className="font-bold" style={{ fontSize: 18, color: sim.result === 'win' ? PALETTE.text : '#e06a5f', fontFamily: FONT_TITLE }}>{sim.result === 'win' ? (ctx.kind === 'arena' ? '결투 승리' : ctx.kind === 'god' ? '토벌 결과' : '전투 결과') : ctx.kind === 'arena' ? '결투 패배' : ctx.kind === 'god' ? '토벌 실패' : '전멸'}</span>
+              <span className="font-bold flex-none" style={{ fontSize: 18, color: sim.result === 'win' ? PALETTE.text : '#e06a5f', fontFamily: FONT_TITLE, whiteSpace: 'nowrap' }}>{ctx.kind === 'training' ? (sim.result === 'win' ? '측정 결과' : '측정 중단') : sim.result === 'win' ? (ctx.kind === 'arena' ? '결투 승리' : ctx.kind === 'god' ? '토벌 결과' : '전투 결과') : ctx.kind === 'arena' ? '결투 패배' : ctx.kind === 'god' ? '토벌 실패' : '전멸'}</span>
               <span className="truncate" style={{ fontSize: 11, letterSpacing: 2, color: MS.gold }}>{ctx.label} · {sim.rounds || round}라운드</span>
             </div>
-            {sim.result === 'win' ? (
+            {ctx.kind === 'training' ? <TrainingMeter m={summary.training} /> : sim.result === 'win' ? (
               <div className="mt-1.5 flex flex-col gap-1" style={{ fontSize: 12.5, color: PALETTE.text }}>
                 {ctx.kind !== 'raid' && ctx.kind !== 'arena' && ctx.kind !== 'god' && <>
                   <MainSecHead title="획 득" />
@@ -479,7 +513,7 @@ export function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAga
                   : autoProg && ctx.kind === 'field' ? ['▶ 자동 진행 중 (끄기)', true, onStopAuto]
                     : ctx.kind === 'field' && ((ctx.type !== 'boss' && sim.result === 'win') || summary.fallback) ? [repeat ? '🔁 반복 중 (끄기)' : '🔁 반복 사냥', repeat, onToggleRepeat] : null;
               const next = dungeonNext || towerNext;
-              const back = ctx.kind === 'dungeon' ? '던전 목록으로' : ctx.kind === 'tower' ? '첨탑으로' : ctx.kind === 'raid' ? '레이드로' : ctx.kind === 'arena' ? '투기장으로' : ctx.kind === 'god' ? '승천계로' : '사냥터로';
+              const back = ctx.kind === 'dungeon' ? '던전 목록으로' : ctx.kind === 'tower' ? '첨탑으로' : ctx.kind === 'raid' ? '레이드로' : ctx.kind === 'arena' ? '투기장으로' : ctx.kind === 'god' ? '승천계로' : ctx.kind === 'training' ? '훈련장 설정으로' : '사냥터로';
               const sub = [
                 ['📜 전투 기록', () => setLogFull(true), {}],
                 ['📊 전투 집계', openStats, {}],
@@ -499,7 +533,8 @@ export function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAga
                 !next && ctx.kind === 'field' && sim.result === 'win' && ctx.type !== 'boss' && ['⚔ 한 번 더', onAgain, {}],
               ].filter(Boolean);
               return <>
-                <div className="grid gap-1.5 mt-3" style={{ gridTemplateColumns: toggle ? '1fr 1fr' : '1fr' }}>
+                <div className="grid gap-1.5 mt-3" style={{ gridTemplateColumns: toggle || ctx.kind === 'training' ? '1fr 1fr' : '1fr' }}>
+                  {ctx.kind === 'training' && <button onClick={onAgain} className="ui-press" style={sq(on)}>🔁 다시 측정</button>}
                   {toggle && <button onClick={toggle[2]} className="ui-press" style={sq(toggle[1] ? on : {})}>{toggle[0]}</button>}
                   {next ? <button onClick={onAgain} className="ui-press" style={sq(hot)}>다음 층으로 ▸</button>
                     : <button onClick={onDone} className="ui-press" style={sq(hot)}>{back}</button>}

@@ -240,12 +240,13 @@ export function TownView({ save, acc, go, onExit, onSwitchChar, onClaimAll }) {
     { id: 'daily', icon: '📅', label: '일일 · 주간 임무', sub: (() => { const n = D.DAILY_MISSIONS.filter(m => D.missionState(acc, m).status !== 'progress').length; const w = D.WEEKLY_MISSIONS.filter(m => D.weeklyMissionState(acc, m).status !== 'progress').length; return `오늘 ${n}/${D.DAILY_MISSIONS.length} · 주간 ${w}/${D.WEEKLY_MISSIONS.length}`; })(), badge: D.dailyBadge(acc) + D.weeklyBadge(acc) > 0 },
     (() => { const b = RV.myBestRank(acc); const got = !!acc.season?.on || RV.rivalWeekClaimed(acc); /* 시즌 중엔 주간 보상 대신 시즌 종료 보상 */ const left = AR.arenaLeft(acc); return { id: 'rival', icon: '🏆', label: '경쟁자 · 투기장', sub: b ? `${b.rank}위 / ${b.total}명 · 결투 ${left}회${got ? '' : ' · 주간 보상'}` : '가상 경쟁자 100명', badge: !!b && (!got || left > 0) }; })(),
     { id: 'ascend', icon: '✶', label: '승천계', sub: acc.season?.on ? `시즌 ${acc.season.n} · ${SE.fmtLeft(SE.seasonLeftMs(acc))} 남음 · 보관 ${ASC.ascFilled(acc)}/${ASC.ASC_SLOTS.length}` : `보관 ${ASC.ascFilled(acc)}/${ASC.ASC_SLOTS.length} · 승천 예정 ${ASC.ascEligibleCount(acc)}명${acc.season?.armed ? ' · 시작 예약됨' : ''}` },
+    { id: 'training', icon: '🎯', label: '훈련장', sub: '체력 무한 허수아비 · 피해 측정' },
     { id: 'exit', icon: '⇄', label: '게임 선택', sub: '진행은 자동 저장' },
   ];
   const byId = Object.fromEntries(tiles.map(t => [t.id, t]));
   const GROUPS = [
     { label: '전 투', ids: ['field', 'dungeon', 'tower'] },
-    { label: '성 장', ids: ['party', 'fam', 'forge'] },
+    { label: '성 장', ids: ['party', 'fam', 'forge', 'training'] },
     { label: '의 뢰 · 경 쟁', ids: ['quests', 'daily', 'rival'] },
     { label: '원 정 대', ids: acc.season?.on ? ['roster', 'ascend'] : ['roster', 'raid', 'ascend'] }, // 시즌계에서는 「다섯 봉인」 레이드가 없다 (승천계 신 토벌이 대신함)
     { label: '보 관', ids: ['bag', 'stash'] },

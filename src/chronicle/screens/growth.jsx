@@ -608,6 +608,7 @@ function MainSkillCard({ s, lv, u, d, can, onClick }) {
         {locked ? `Lv.${s.reqLv}부터` : <>{SKILL_KIND_SHORT[s.kind] || '스킬'} · <span style={{ color: cdr ? '#7fd1c8' : PALETTE.textDim }}>⏱{s.cd ? (w ? `${w}턴` : '매 턴') : '매 턴'}</span></>}
       </div>
       <div style={{ fontSize: 12, fontWeight: 800, color: lv ? MS.gold : PALETTE.textDim }}>{lv ? <>Lv.{lv}{lv >= SKILL_MAX_LV ? <span style={{ fontSize: 11, marginLeft: 4, color: MS.red }}>MAX</span> : <span style={{ fontSize: 11, fontWeight: 400, color: PALETTE.textDim }}> / {SKILL_MAX_LV}</span>}</> : '미습득'}</div>
+      {lv > 0 && s.kind !== 'passive' && d?.skillBoost?.[s.id] ? <div className="truncate" style={{ fontSize: 11, fontWeight: 700, color: '#ffb46a' }}>▲ 위력 +{Math.round(d.skillBoost[s.id] * 100)}%</div> : null}
     </button>
   );
 }
@@ -636,6 +637,7 @@ function MainSkillModal({ save, cid, s, lv, u, d, sp, can, onLearn, onClose }) {
   const passive = s.kind === 'passive';
   const boost = d?.skillBoost?.[s.id] || 0;
   const bsrc = !passive && boost && save ? E.skillBoostSources(save, cid, s.id) : [];
+  const dmgPv = !passive && save ? E.skillDamagePreview(save, cid, s.id, cur) : null;
   const locked = s.reqLv > u.lv;
   const color = s.branch ? REBIRTH_BRANCHES[s.branch].color : MS.red;
   return (
@@ -655,6 +657,28 @@ function MainSkillModal({ save, cid, s, lv, u, d, sp, can, onLearn, onClose }) {
       <div className="mt-2" style={{ padding: '8px 10px', border: `1px solid ${MS.line}`, background: MS.box, borderRadius: MS.r, fontSize: 12.5, color: PALETTE.text }}>
         <b style={{ color }}>◇ 발동</b> {SKILL_WHEN_TEXT[s.kind] || '준비된 공격 스킬 중 실제 위력(위력 × 강화 × 타수)이 가장 클 때'}
       </div>
+      {dmgPv && (
+        <div className="mt-2" style={{ padding: '8px 10px', border: `1px solid ${MS.line}`, background: MS.box, borderRadius: MS.r, fontSize: 12.5, color: PALETTE.text, lineHeight: 1.6 }}>
+          <b style={{ color }}>◇ 예상 피해</b> <span style={{ color: PALETTE.textDim }}>(Lv.{dmgPv.target.lv} 적 · 방어 {dmgPv.target.def} 기준)</span>
+          {dmgPv.kind === 'dot' ? (
+            <div className="grid gap-1.5 mt-1.5" style={{ gridTemplateColumns: '1fr 1fr' }}>
+              <MainCell label="매 턴" value={dmgPv.tick.toLocaleString()} />
+              <MainCell label={`${dmgPv.turns}턴 합계`} value={dmgPv.total.toLocaleString()} hot />
+            </div>
+          ) : (
+            <div className="grid gap-1.5 mt-1.5" style={{ gridTemplateColumns: '1fr 1fr' }}>
+              <MainCell label={dmgPv.hits > 1 ? `일반 (${dmgPv.hits}타 합계)` : '일반'} value={dmgPv.totalN.toLocaleString()} />
+              <MainCell label={dmgPv.hits > 1 ? `치명 (${dmgPv.hits}타 전부)` : '치명'} value={dmgPv.totalC.toLocaleString()} hot />
+            </div>
+          )}
+          <div className="mt-1" style={{ fontSize: 11.5, color: PALETTE.textDim }}>
+            {dmgPv.kind === 'dot'
+              ? `지속 피해는 방어를 무시하고 치명이 없다${dmgPv.all ? ' · 적 전체에 각각' : ''}.`
+              : <>{dmgPv.hits > 1 ? `1타 ${dmgPv.n.toLocaleString()} / 치명 ${dmgPv.c.toLocaleString()} · ` : ''}치명 확률 {Math.round(dmgPv.crit * 100)}% 반영 평균 <b style={{ color: PALETTE.text }}>{dmgPv.avg.toLocaleString()}</b>{dmgPv.aoe ? ' · 적 1명당' : ''}{dmgPv.execute ? ' · 적 HP 35% 미만이면 2배' : ''}</>}
+            <br />실제 피해는 ±10% 흔들린다 · 광폭화·축복 같은 전투 중 강화와 적 약화는 뺀 값{lv ? '' : ' · Lv.1 기준'}
+          </div>
+        </div>
+      )}
       {pw != null && boost > 0 && (
         <div className="mt-2" style={{ padding: '8px 10px', border: `1px solid ${MS.line}`, background: MS.box, borderRadius: MS.r, fontSize: 12.5, color: PALETTE.text, lineHeight: 1.7 }}>
           <b style={{ color: MS.gold }}>◇ 위력 강화 +{Math.round(boost * 100)}%</b> <span style={{ color: PALETTE.textDim }}>({pw}% × {(1 + boost).toFixed(2)} = {Math.round(pw * (1 + boost))}%)</span>
