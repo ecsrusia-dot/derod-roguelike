@@ -1,4 +1,4 @@
-// 사용: CLS=sage node scripts/sim-chronicle-unique.mjs [전투 수=150]
+// 사용: CLS=sage [COMMON=1] node scripts/sim-chronicle-unique.mjs [전투 수=150] (COMMON=1이면 공용 반지도 포함)
 // 전승 캐릭터 Lv.100 (에픽 +7 4부위 · 특성 자동) — 한 부위를 유니크(+7)로 바꿨을 때 승률·라운드 (에픽 기준 대비)
 import * as E from '../src/chronicle/engine.js';
 import { CHRONICLE_FIELDS, CHRONICLE_SKILLS, UNIQUE_ITEMS, REBIRTH_BRANCHES } from '../src/chronicle/data.js';
@@ -31,5 +31,5 @@ for (const [branch, br] of Object.entries(REBIRTH_BRANCHES).filter(([, b]) => b.
   console.log('==', br.name);
   const row = (label, named) => { const s = build(branch, named); console.log(label.padEnd(26), '무리 +5', run(s, 5, false), ' +7', run(s, 7, false), ' 보스 +3', run(s, 3, true), ' 보스 +5', run(s, 5, true)); };
   row('에픽 4부위 (기준)', null);
-  for (const u of Object.values(UNIQUE_ITEMS)) if (u.cls === CLS && !u.disabled && (!u.branch || u.branch === branch)) row(`${u.branch ? '✦' : ' '}${u.name} (${u.slot})`, u.id);
+  for (const u of Object.values(UNIQUE_ITEMS)) if ((u.cls === CLS || (process.env.COMMON && u.cls === 'common')) && !u.disabled && (!u.branch || u.branch === branch)) row(`${u.branch ? '✦' : ' '}${u.name} (${u.slot})`, u.id);
 }

@@ -710,7 +710,7 @@ const U = (id, cls, slot, name, opts, fx, desc, extra = {}) => ({ id, cls, slot,
 export const UNIQUE_ITEMS = {
   u_w_blade: U('u_w_blade', 'wanderer', 'weapon', '눈먼 자의 칼', { counterDmg: 0.3, atkPct: 0.08 }, { atkPct: 0.12, counterPct: 0.08 }, '공격력 +12% · 반격 확률 +8%'),
   u_w_oath: U('u_w_oath', 'wanderer', 'offhand', '부동의 맹세', { defPct: 0.15, counterPct: 0.08 }, { tauntReduce: 0.3, dmgReduce: 0.08, counterPct: 0.06 }, '받는 피해 -8% · 반격 확률 +6% · 도발 중 받는 피해 추가 -30%'),
-  u_w_cloak: U('u_w_cloak', 'wanderer', 'armor', '먼지 낀 망토', { dmgReduce: 0.06, hpPct: 0.10 }, { critAfterCounter: 1 }, '반격·회피 직후 다음 공격 치명 확정'),
+  u_w_cloak: U('u_w_cloak', 'wanderer', 'armor', '먼지 낀 망토', { dmgReduce: 0.06, hpPct: 0.10 }, { dodge: 0.10, critAfterCounter: 1 }, '회피 +10% · 반격·회피 직후 다음 공격 치명 확정'),
   u_w_beads: U('u_w_beads', 'wanderer', 'accessory', '스승의 염주', { hpPct: 0.10, defPct: 0.10 }, { emergencyHeal: 0.5, cdr: 1 }, '전투당 1회, HP 30% 이하가 되면 HP 50% 회복 · 모든 스킬 재사용 -1턴'),
   u_s_staff: U('u_s_staff', 'sage', 'weapon', '영겁의 지팡이', { skillDmg: 0.12, atkPct: 0.08 }, { skillDmg: 0.15, critDmg: 0.3 }, '스킬 피해 +15% · 치명 피해 +30%'),
   u_s_pact: U('u_s_pact', 'sage', 'offhand', '이프리트의 계약서', { skillDmg: 0.10, atkPct: 0.08 }, { openInferno: 0.6 }, '전투 시작 시 적 전체에 이프리트의 낙인 — 매 턴 공격력 60% · 3턴 (스킬 「겁화」와 별개 · 턴 소모 없음)'),
@@ -722,8 +722,8 @@ export const UNIQUE_ITEMS = {
   u_d_brand: U('u_d_brand', 'demonblood', 'accessory', '광기의 혈인', { atkPct: 0.10, lifesteal: 0.04 }, { atkPct: 0.15, critDmg: 0.3, cdr: 1 }, '공격력 +15% · 치명 피해 +30% · 모든 스킬 재사용 -1턴'),
   u_e_string: U('u_e_string', 'elf', 'weapon', '바람의 현', { atkPct: 0.08, chain: 0.08 }, { atkPct: 0.1, chain: 0.15 }, '공격력 +10% · 공격 뒤 추가 타격 확률 +15%'),
   u_e_quiver: U('u_e_quiver', 'elf', 'offhand', '정령 화살통', { critDmg: 0.2, chain: 0.06 }, { spiritArrow: 0.4, atkPct: 0.06 }, '공격 시 40% 확률로 정령 화살(공격력 80%) · 공격력 +6%'),
-  u_e_leaf: U('u_e_leaf', 'elf', 'armor', '잎새 갑옷', { dodge: 0.05, hpPct: 0.08 }, { dodgeHeal: 0.05 }, '회피할 때마다 HP 5% 회복'),
-  u_e_hawk: U('u_e_hawk', 'elf', 'accessory', '매의 눈', { crit: 0.06, chain: 0.07 }, { critDmg: 0.6, atkPct: 0.1, chain: 0.1, firstCrit: 1, cdr: 1 }, '공격력 +10% · 치명 피해 +60% · 추가 타격 확률 +10% · 전투 첫 공격 치명 확정 · 모든 스킬 재사용 -1턴'),
+  u_e_leaf: U('u_e_leaf', 'elf', 'armor', '잎새 갑옷', { dodge: 0.05, hpPct: 0.08 }, { dodge: 0.05, dodgeHeal: 0.05 }, '회피 +5% · 회피할 때마다 HP 5% 회복'),
+  u_e_hawk: U('u_e_hawk', 'elf', 'accessory', '매의 눈', { crit: 0.06, chain: 0.07 }, { critDmg: 0.6, atkPct: 0.1, chain: 0.1, acc: 0.1, firstCrit: 1, cdr: 1 }, '공격력 +10% · 적중 +10% · 치명 피해 +60% · 추가 타격 확률 +10% · 전투 첫 공격 치명 확정 · 모든 스킬 재사용 -1턴'),
   u_p_scepter: U('u_p_scepter', 'priest', 'weapon', '여명의 홀', { healPct: 0.12, atkPct: 0.06 }, { holyDmg: 0.3 }, '회복량의 30%만큼 적에게 신성 피해'),
   u_p_grail: U('u_p_grail', 'priest', 'offhand', '순례자의 성배', { healPct: 0.10, hpPct: 0.08 }, { revive: 0.6, atkPct: 0.12, dmgReduce: 0.06 }, '공격력 +12% · 받는 피해 -6% · 전투당 1회, 쓰러지면 HP 60%로 부활'),
   u_p_vest: U('u_p_vest', 'priest', 'armor', '빛의 법의', { shieldPct: 0.08, dmgReduce: 0.05 }, { shieldReduce: 0.3, shieldPct: 0.1, skillDmg: 0.12, dmgReduce: 0.05 }, '스킬 피해 +12% · 받는 피해 -5% · 전투 시작 보호막 +10% · 보호막이 남아 있는 동안 받는 피해 -30%'),
@@ -737,6 +737,9 @@ export const UNIQUE_ITEMS = {
   u_c_ward: U('u_c_ward', 'common', 'accessory', '수호자의 반지', { hpPct: 0.08, defPct: 0.08 }, { hpPct: 0.12, dmgReduce: 0.06 }, '최대 HP +12% · 받는 피해 -6%'),
   u_c_gale: U('u_c_gale', 'common', 'accessory', '질풍의 반지', { atkPct: 0.06, chain: 0.1 }, { chain: 0.25, atkPct: 0.06 }, '공격력 +6% · 공격 뒤 추가 타격 확률 +25%'),
   u_c_edge: U('u_c_edge', 'common', 'accessory', '예리한 눈의 반지', { crit: 0.05, atkPct: 0.06 }, { crit: 0.1, critDmg: 0.4 }, '치명 +10% · 치명 피해 +40%'),
+  // 1.308.0 회피·적중 공용 반지 — 모든 직업이 반지 한 칸으로 회피나 적중을 고를 수 있다
+  u_c_pierce: U('u_c_pierce', 'common', 'accessory', '꿰뚫는 눈의 반지', { atkPct: 0.06, critDmg: 0.15 }, { acc: 0.15, critDmg: 0.2 }, '적중 +15% · 치명 피해 +20%'),
+  u_c_shade: U('u_c_shade', 'common', 'accessory', '그림자 걸음 반지', { hpPct: 0.06, dodge: 0.04 }, { dodge: 0.10, dodgeHeal: 0.03 }, '회피 +10% · 회피할 때마다 HP 3% 회복'),
 };
 // 유니크 확률 — 장비 1개당 (설계서 5절)
 // 갈래 전용 유니크 (1.221.0) — 그 갈래로 전승한 캐릭터만 착용 · 전승 캐릭터 보스 드랍
@@ -761,13 +764,13 @@ Object.assign(UNIQUE_ITEMS, {
   ub_hex2: U('ub_hex2', 'sage', 'weapon', '역병의 홀', { dotDmg: 0.2, atkPct: 0.08 }, { sb_sh_plague: 0.4, sb_sh_mark: 0.25 }, '「역병의 저주」 위력 +40% · 「파멸의 표식」 위력 +25%', { branch: 's_hex' }),
   ub_hex3: U('ub_hex3', 'sage', 'armor', '부패의 수의', { hpPct: 0.12, dmgReduce: 0.04 }, { hpPct: 0.08, regenPct: 0.01 }, '최대 HP +8% · 매 턴 HP 1% 회복', { branch: 's_hex' }),
   ub_reaper2: U('ub_reaper2', 'demonblood', 'offhand', '피에 젖은 손톱', { critDmg: 0.25, atkPct: 0.08 }, { sb_dr_rend: 0.3, sb_dr_break: 0.3 }, '「심장 찢기」·「뼈 부수기」 위력 +30%', { branch: 'd_reaper' }),
-  ub_reaper3: U('ub_reaper3', 'demonblood', 'accessory', '혈귀의 송곳니', { atkPct: 0.10, lifesteal: 0.04 }, { critDmg: 0.4, firstCrit: 1 }, '치명 피해 +40% · 전투 첫 공격 치명 확정', { branch: 'd_reaper' }),
+  ub_reaper3: U('ub_reaper3', 'demonblood', 'accessory', '혈귀의 송곳니', { atkPct: 0.10, lifesteal: 0.04 }, { critDmg: 0.4, acc: 0.1, firstCrit: 1 }, '치명 피해 +40% · 적중 +10% · 전투 첫 공격 치명 확정', { branch: 'd_reaper' }),
   ub_plague2: U('ub_plague2', 'demonblood', 'weapon', '독기 서린 도끼', { dotDmg: 0.2, atkPct: 0.08 }, { sb_dp_miasma: 0.4, sb_dp_weaken: 0.25 }, '「독기」 위력 +40% · 「쇠약의 일격」 위력 +25%', { branch: 'd_plague' }),
   ub_plague3: U('ub_plague3', 'demonblood', 'offhand', '썩은 심장', { hpPct: 0.12, defPct: 0.10 }, { hpPct: 0.1, dmgReduce: 0.06 }, '최대 HP +10% · 받는 피해 -6%', { branch: 'd_plague' }),
   ub_sniper2: U('ub_sniper2', 'elf', 'offhand', '저격수의 조준경', { critDmg: 0.25, atkPct: 0.08 }, { sb_es_snipe: 0.3, sb_es_pierce: 0.3 }, '「저격」·「관통 사격」 위력 +30%', { branch: 'e_sniper' }),
-  ub_sniper3: U('ub_sniper3', 'elf', 'accessory', '매사냥꾼의 깃', { crit: 0.06, atkPct: 0.08 }, { armorPen: 0.2, execute: 0.2 }, '방어 관통 +20% · HP 30% 미만의 적에게 피해 +20%', { branch: 'e_sniper' }),
+  ub_sniper3: U('ub_sniper3', 'elf', 'accessory', '매사냥꾼의 깃', { crit: 0.06, atkPct: 0.08 }, { armorPen: 0.2, execute: 0.2, acc: 0.1 }, '방어 관통 +20% · 적중 +10% · HP 30% 미만의 적에게 피해 +20%', { branch: 'e_sniper' }),
   ub_storm2: U('ub_storm2', 'elf', 'weapon', '폭풍의 활', { atkPct: 0.10, chain: 0.08 }, { sb_et_gale: 0.3, sb_et_barrage: 0.3 }, '「돌풍 화살」·「폭풍 연사」 위력 +30%', { branch: 'e_storm' }),
-  ub_storm3: U('ub_storm3', 'elf', 'armor', '바람결 갑옷', { dodge: 0.05, hpPct: 0.10 }, { dodge: 0.05, dodgeHeal: 0.04 }, '회피 +5% · 회피할 때마다 HP 4% 회복', { branch: 'e_storm' }),
+  ub_storm3: U('ub_storm3', 'elf', 'armor', '바람결 갑옷', { dodge: 0.05, hpPct: 0.10 }, { dodge: 0.10, dodgeHeal: 0.04 }, '회피 +10% · 회피할 때마다 HP 4% 회복', { branch: 'e_storm' }),
   ub_arch5: U('ub_arch5', 'priest', 'weapon', '찬가의 홀', { healPct: 0.15, atkPct: 0.08 }, { sb_pa_hymn: 0.35, sb_pa_regen: 0.35 }, '「고양의 찬가」·「재생의 기도」 효과 +35%', { branch: 'p_arch' }),
   ub_arch6: U('ub_arch6', 'priest', 'accessory', '대주교의 인장', { hpPct: 0.10, healPct: 0.10 }, { overhealShield: 1, atkPct: 0.1 }, '공격력 +10% · 최대 HP를 넘는 회복은 보호막으로', { branch: 'p_arch' }),
   ub_inq2: U('ub_inq2', 'priest', 'offhand', '단죄의 서', { atkPct: 0.10, critDmg: 0.2 }, { sb_pi_verdict: 0.3, sb_pi_brand: 0.3 }, '「판결」·「단죄의 인장」 위력 +30%', { branch: 'p_inq' }),
@@ -779,10 +782,10 @@ Object.assign(UNIQUE_ITEMS, {
   ub_hex4: U('ub_hex4', 'sage', 'accessory', '저주의 눈', { dotDmg: 0.2, atkPct: 0.08 }, { dotDmg: 0.3, cdr: 1 }, '지속 피해 +30% · 모든 스킬 재사용 -1턴', { branch: 's_hex' }),
   ub_reaper4: U('ub_reaper4', 'demonblood', 'armor', '혈귀의 외투', { hpPct: 0.12, lifesteal: 0.03 }, { lowHpDmg: 0.2, dmgReduce: 0.06 }, 'HP 50% 이하일 때 피해 +20% · 받는 피해 -6%', { branch: 'd_reaper' }),
   ub_plague4: U('ub_plague4', 'demonblood', 'accessory', '역병의 향로', { dotDmg: 0.2, hpPct: 0.08 }, { dotDmg: 0.3, regenPct: 0.01 }, '지속 피해 +30% · 매 턴 HP 1% 회복', { branch: 'd_plague' }),
-  ub_sniper4: U('ub_sniper4', 'elf', 'armor', '은신 망토', { dodge: 0.05, hpPct: 0.10 }, { dodge: 0.06, critAfterCounter: 1 }, '회피 +6% · 회피 직후 다음 공격 치명 확정', { branch: 'e_sniper' }),
+  ub_sniper4: U('ub_sniper4', 'elf', 'armor', '은신 망토', { dodge: 0.05, hpPct: 0.10 }, { dodge: 0.10, critAfterCounter: 1 }, '회피 +10% · 회피 직후 다음 공격 치명 확정', { branch: 'e_sniper' }),
   ub_storm4: U('ub_storm4', 'elf', 'accessory', '폭풍의 눈', { chain: 0.08, crit: 0.05 }, { chain: 0.15, critDmg: 0.3 }, '추가 타격 확률 +15% · 치명 피해 +30%', { branch: 'e_storm' }),
   ub_arch8: U('ub_arch8', 'priest', 'armor', '대주교의 제의', { hpPct: 0.12, dmgReduce: 0.05 }, { hpPct: 0.1, regenPct: 0.015 }, '최대 HP +10% · 매 턴 HP 1.5% 회복', { branch: 'p_arch' }),
-  ub_inq4: U('ub_inq4', 'priest', 'accessory', '심판의 저울', { atkPct: 0.10, critDmg: 0.2 }, { atkPct: 0.15, armorPen: 0.15 }, '공격력 +15% · 방어 관통 +15%', { branch: 'p_inq' }),
+  ub_inq4: U('ub_inq4', 'priest', 'accessory', '심판의 저울', { atkPct: 0.10, critDmg: 0.2 }, { atkPct: 0.15, armorPen: 0.15, acc: 0.1 }, '공격력 +15% · 방어 관통 +15% · 적중 +10%', { branch: 'p_inq' }),
 });
 export const UNIQUE_CHANCE = { boss: 0.005, dungeonBoss: [0.02, 0.05, 0.10] };
 
