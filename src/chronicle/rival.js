@@ -26,6 +26,9 @@ export const RIVAL_TUNING = {
   scorePerRebirth: 120, towerDiv: 5,
   // 시즌제 (1.296.0) — 시즌 중 경쟁자 주간 최소 활동량(내 전투 수 환산) · 시즌 경험치 가속을 경쟁자 속도에도 반영
   seasonMinTicks: 7000, seasonPaceMult: 1.5,
+  // 1.302.1 — 시즌 중 경쟁자의 레벨 성장 배율 (PM 결정 「2배」: 시즌 경험치 1.5배 + 한 캐릭터 집중 육성을 따라잡게).
+  // 전투 수(소환·강화 시도 수의 기준)는 그대로 두고 레벨 곡선에만 곱한다.
+  seasonGrowMult: 2,
 };
 
 // 순위 점수 = 전승 × 120 + 레벨 + 첨탑 최고층 ÷ 5 (내 캐릭터·경쟁자 공통)
@@ -102,6 +105,7 @@ export function rivalState(r, ticks) {
   const T = RIVAL_TUNING;
   let left = Math.max(0, ticks) * r.pace;
   const battles = Math.round(left);
+  left *= r.grow || 1; // 1.302.1 시즌 성장 배율 (레벨 곡선만)
   const to100First = T.firstCurve[T.firstCurve.length - 1][0];
   const overNeed = (g) => (g <= 100 ? 0 : g <= 120 ? T.overBattles * Math.pow((g - 100) / 20, 1 / T.overPow) : T.overBattles + (g - 120) / 10 * T.deepBattles);
   let rebirth = 0, lv = 1, peak = 1;
@@ -148,7 +152,7 @@ export function seasonRival(r, n = 0) {
 export function rivalDefs(acc) {
   if (!acc?.season?.on) return RIVALS;
   const n = acc.season.n || 1;
-  return RIVALS.map(r => { const d = seasonRival(r, n); return { ...d, pace: d.pace * RIVAL_TUNING.seasonPaceMult }; });
+  return RIVALS.map(r => { const d = seasonRival(r, n); return { ...d, pace: d.pace * RIVAL_TUNING.seasonPaceMult, grow: RIVAL_TUNING.seasonGrowMult }; });
 }
 
 // 내 캐릭터 줄
