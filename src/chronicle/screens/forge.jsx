@@ -9,7 +9,7 @@ import { SLOTS, FORGE } from '../data.js';
 import * as E from '../engine.js';
 import * as GE from '../gearEval.js';
 import { gradeOf, clsTag, Header, ForgePop, Wallet, BASE_STATS, BASE_LABEL, MainKvRows, MainTabs, MS, MainSecHead, MainModal, MainCell, ConfirmSheet } from './common.jsx';
-import { AppraisePanel, appraiseText, useGearEval, SORT_LABEL, effSort, EvalBasis, MainGearCard, CMP_DN, ForgeFooter, useItemSort, sortItems, filterItems, EquipBoxes, forgeNextRate } from './gear.jsx';
+import { GearCompareStack, AppraisePanel, appraiseText, useGearEval, SORT_LABEL, effSort, EvalBasis, MainGearCard, CMP_DN, ForgeFooter, useItemSort, sortItems, filterItems, EquipBoxes, forgeNextRate } from './gear.jsx';
 
 function RiskLine({ rate, fail, danger }) {
   return (
@@ -90,6 +90,8 @@ export function ForgeView({ save, setSave, onBack, flash, onTrack = () => {} }) 
   const [skipAsk, setSkipAsk] = useState(forgeConfirmSkip);
   const [ftab, setFtab] = useState('enhance'); // 강화/승급 탭 (1.246.0)
   const [rulesOpen, setRulesOpen] = useState(false);
+  const [cmpOpen, setCmpOpen] = useState(() => { try { return localStorage.getItem('chronicleForgeCmp') !== '0'; } catch { return true; } });
+  useEffect(() => { try { localStorage.setItem('chronicleForgeCmp', cmpOpen ? '1' : '0'); } catch { /* */ } }, [cmpOpen]);
   // 옵션 재설정 (1.276.0) — 줄 선택 → 굴리기(비용 소모) → 새 옵션을 보고 바꾸기/유지
   const [rfIdx, setRfIdx] = useState(null);
   const [rfCand, setRfCand] = useState(null); // { uid, idx, opt, mode }
@@ -243,6 +245,11 @@ export function ForgeView({ save, setSave, onBack, flash, onTrack = () => {} }) 
               : !by && E.itemUsable(item, hero) && (E.canWear(item, save.units[hero])
                 ? <button onClick={() => equipNow(item)} className="ui-press w-full mb-2" style={{ height: 36, fontSize: 12.5, fontWeight: 800, border: `1px solid ${MS.gold}`, background: 'rgba(232,176,74,0.10)', color: MS.gold }}>착용하기</button>
                 : <div className="mb-2 text-center" style={{ fontSize: 12, color: CMP_DN }}>Lv.{item.ilv}부터 착용 가능</div>)}
+            {(() => { const fc = !by && !item.unid && E.itemUsable(item, hero) ? save.inventory.find(x => x.uid === save.units[hero].equip[item.slot]) : null;
+              return fc ? (<div className="mb-2">
+                <button onClick={() => setCmpOpen(o => !o)} className="ui-press w-full" style={{ height: 34, fontSize: 12.5, border: `1px solid ${MS.line}`, background: MS.box, borderRadius: MS.r, color: PALETTE.text }}>⇄ 착용 장비와 비교 {cmpOpen ? '▴ 접기' : '▾ 펼치기'}</button>
+                {cmpOpen && <div className="mt-2"><GearCompareStack item={item} cur={fc} /></div>}
+              </div>) : null; })()}
             <MainTabs items={[['enhance', maxed ? '⚒ 최대 강화' : `⚒ 강화 +${item.plus || 0} → +${(item.plus || 0) + 1}`], ['promote', ng ? `⬆ 승급 → ${gradeOf(ng).label}` : '⬆ 승급'], ['reforge', '🎯 수치']]} value={ftab} onChange={(t) => { if (!rfPending) setFtab(t); }} size={12.5} />
             {ftab === 'enhance' && (maxed
               ? <div className="mt-3" style={{ fontSize: 12.5, color: PALETTE.textDim }}>최대 강화 +{FORGE.maxEnhance}에 도달했습니다</div>
