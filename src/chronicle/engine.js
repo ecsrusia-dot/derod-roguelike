@@ -1468,6 +1468,18 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
     }
     return { d, crit, absorbed, cover };
   };
+  // 예상 피해 (난수 없음·상태 불변) — 최저 굴림(×0.9)·치명 없음. 스킬 선택의 「마무리」 판단용
+  const estDamage = (att, def, mult) => {
+    if (immuneTo(att, def)) return 0;
+    const raw = att.atk * mult * atkMod(att) * (1 + (att.skillDmg || 0)) * 0.9 * (1 - fxv(att, 'weak'));
+    const defV = (def.def || 0) * (1 + (def.taunt > 0 ? def.tauntDef : 0) + fxv(def, 'guardDef')) * (1 - (att.armorPen || 0)) * (1 - fxv(def, 'armorBreak'));
+    let d = raw * T.defK / (T.defK + defV);
+    d *= 1 - (def.dmgReduce || 0);
+    d *= (1 + fxv(def, 'vuln')) * (1 - fxv(def, 'guardRed'));
+    if (def.taunt > 0 && def.tauntReduce) d *= 1 - def.tauntReduce;
+    if (def.shield > 0 && def.shieldReduce) d *= 1 - def.shieldReduce;
+    return Math.floor(d);
+  };
   // 정령 화살 — 공격 뒤 확률 추가 타격 (유니크)
   const spiritHit = (u, hits) => {
     if (!u.spiritArrow || rng() >= u.spiritArrow) return;
@@ -1547,6 +1559,15 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
     if (hurt >= 2 && has('healAll')) return has('healAll');
     if (lowAlly && has('heal')) return has('heal');
     if (lowAlly && has('healAll')) return has('healAll');
+    // 1.303.1 PM 결정 「마무리 우선」 — 광역기 한 번으로 남은 적을 전부 쓰러뜨릴 수 있으면 다른 판단보다 먼저 쓴다
+    //   (예상 피해는 최저 굴림·치명 없음으로 보수적으로 잡는다 — 확실할 때만 끼어든다)
+    if (T.finisher && foes.length >= 2) {
+      const fin = ready.filter(x => x.s.kind === 'aoe').find(x => {
+        const v = (x.s.base + x.s.perLv * (x.lv - 1)) * (1 + (u.skillBoost?.[x.s.id] || 0));
+        return foes.every(f => estDamage(u, f, v) >= f.hp + (f.shield || 0));
+      });
+      if (fin) return fin;
+    }
     const shieldNeed = u.fam ? (() => { const ld = allies.find(a => a.leader) || allies[0]; return ld && ld.shield < ld.maxHp * FAM_AI.shieldBelow; })() : !allies.some(a => a.shield > 0);
     if (has('shield') && shieldNeed) return has('shield');
     if (has('buffAtk') && !allies.some(a => a.buffs.bless?.t > 0)) return has('buffAtk');

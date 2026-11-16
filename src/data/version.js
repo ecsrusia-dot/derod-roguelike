@@ -3,6 +3,6 @@
 // MAJOR: 큰 시스템 변경 (1 → 2)
 // MINOR: 새 기능/원정 추가 (1.0 → 1.1)
 // PATCH: 버그 수정/밸런스 조정 (1.0.0 → 1.0.1)
-export const GAME_VERSION = '1.303.0';
+export const GAME_VERSION = '1.303.1';
 export const VERSION_DATE = '2026-11-16';
-export const VERSION_LABEL = '추가 타격 — 연속기·광역기에도 적용';
+export const VERSION_LABEL = '자동 스킬 — 광역기 마무리 우선';
