@@ -405,9 +405,9 @@ export function PartyView({ save, setSave, onBack, onForge, onRebirth }) {
       )}
       {statPick && <StatAllocModal save={save} cid={cid} focus={statPick} onClose={() => setStatPick(null)} onApply={(plan) => { setSave(E.addStats(save, cid, plan)); setStatPick(null); }} />}
       {rowInfo && (
-        <MainModal kicker="능 력 치 설 명" title={rowInfo.label} color={rowInfo.color || MS.red} badge={String(rowInfo.value)} onClose={() => setRowInfo(null)}>
-          <div style={{ fontSize: 13, color: PALETTE.text, lineHeight: 1.6 }}>{rowInfo.desc || `${rowInfo.label} — 장비·특성·사역마·원정대 버프·전승을 모두 합산한 값.`}</div>
-          <div className="mt-2" style={{ fontSize: 11.5, color: PALETTE.textDim }}>◇ 출처: 장비 옵션 · 유니크 · 특성 · 사역마(보조·보유·인연) · 원정대 버프 · 전승 갈래 합산</div>
+        <MainModal kicker="능 력 치 출 처" title={rowInfo.label} color={rowInfo.color || MS.red} badge={String(rowInfo.value)} onClose={() => setRowInfo(null)}>
+          <div style={{ fontSize: 13, color: PALETTE.text, lineHeight: 1.6 }}>{rowInfo.desc || `${rowInfo.label} — 아래 출처를 모두 합산한 값.`}</div>
+          <StatBreakdown save={save} cid={cid} row={rowInfo} />
         </MainModal>
       )}
     </div>
@@ -464,6 +464,50 @@ function CdDetail({ s, cdr: d }) {
       {cdr ? <> − 재사용 단축 <b style={{ color: '#7fd1c8' }}>{cdr}턴</b> = <b style={{ color: '#7fd1c8' }}>{w ? `${w}턴` : '매 턴 사용 가능'}</b>
         <br />단축 출처: {[all ? `모든 스킬 -${all} (유니크·특성)` : null, own ? `이 스킬 전용 -${own} (장비 옵션·시간의 모래)` : null].filter(Boolean).join(' · ')} — 합계 최대 {E.CDR_CAP}턴</> : null}
       <br />쓴 뒤 내 차례 {w}번은 이 스킬을 쓸 수 없고, 그 다음 차례부터 다시 쓸 수 있다
+    </div>
+  );
+}
+
+// ===== 능력치 출처 (1.304.0) — 수치를 누르면 어디서 얼마가 왔는지 =====
+const BD_KEY = { hp: 'hp', atk: 'atk', def: 'def', spd: 'spd', crit: 'crit', dodge: 'dodge', heal: 'heal' };
+function StatBreakdown({ save, cid, row }) {
+  const bd = E.statBreakdown(save, cid, BD_KEY[row.key] || row.key);
+  const f = DETAIL_STATS.find(r => r[0] === row.key)?.[2];
+  const r1 = (v) => Math.round(v * 10) / 10;
+  const sign = (v) => (v < 0 ? '−' : '+');
+  const fmt = (v) => {
+    if (bd.unit === 'pct') return `${sign(v)}${r1(Math.abs(v) * 100)}%`;
+    if (bd.unit === 'raw') return f === 'pct' ? `${sign(v)}${r1(Math.abs(v) * 100)}%` : f === 'flag' ? '보유' : f === 'x' ? `×${v}` : f === 'turn' ? `${sign(v)}${Math.abs(v)}턴` : `${sign(v)}${r1(Math.abs(v))}`;
+    return `${sign(v)}${r1(Math.abs(v)).toLocaleString()}`;
+  };
+  const sum = (a) => a.reduce((t, x) => t + x.v, 0);
+  const addRows = [...bd.base, ...bd.flat];
+  const pctSum = sum(bd.pct);
+  const multAll = bd.mult.reduce((t, x) => t * x.v, 1);
+  const empty = !addRows.length && !bd.pct.length && !bd.mult.length;
+  const Sec = ({ title, sub, rows }) => (
+    <div className="mt-2.5">
+      <div className="flex items-baseline justify-between" style={{ marginBottom: 4 }}>
+        <span className="chr-head" style={{ fontSize: 12, fontWeight: 800, color: MS.gold }}>{title}</span>
+        {sub && <span style={{ fontSize: 12, fontWeight: 800, color: PALETTE.text }}>{sub}</span>}
+      </div>
+      <MainKvRows rows={rows} />
+    </div>
+  );
+  return (
+    <div>
+      {empty && <div className="mt-2" style={{ fontSize: 12, color: PALETTE.textDim }}>이 수치를 올려 주는 출처가 지금은 없다.</div>}
+      {addRows.length > 0 && <Sec title={bd.pct.length || bd.mult.length ? '① 더하는 값' : '출처별 값'} sub={bd.unit === 'raw' && f === 'flag' ? null : `합계 ${fmt(sum(addRows)).replace(/^\+/, '')}`}
+        rows={addRows.map(x => ({ l: x.label, v: fmt(x.v), c: x.v < 0 ? MS.red : undefined }))} />}
+      {bd.pct.length > 0 && <Sec title="② % 증가" sub={`×${r1((1 + pctSum) * 100) / 100} (+${r1(pctSum * 100)}%)`}
+        rows={bd.pct.map(x => ({ l: x.label, v: `+${r1(x.v * 100)}%` }))} />}
+      {bd.mult.length > 0 && <Sec title="③ 배율" sub={`×${r1(multAll * 100) / 100}`} rows={bd.mult.map(x => ({ l: x.label, v: `×${r1(x.v * 100) / 100}` }))} />}
+      {(bd.pct.length > 0 || bd.mult.length > 0) && addRows.length > 0 && (
+        <div className="mt-2.5 text-center" style={{ fontSize: 12.5, color: PALETTE.text, padding: '8px 10px', borderRadius: MS.r, border: `1px solid ${MS.line}`, background: MS.box }}>
+          {r1(sum(addRows)).toLocaleString()}{bd.pct.length ? ` × ${r1((1 + pctSum) * 100) / 100}` : ''}{bd.mult.length ? ` × ${r1(multAll * 100) / 100}` : ''} = <b style={{ color: MS.gold }}>{row.value}</b>
+        </div>
+      )}
+      {bd.notes.map((n, i) => <div key={i} className="mt-2" style={{ fontSize: 11.5, color: PALETTE.textDim }}>◇ {n}</div>)}
     </div>
   );
 }
