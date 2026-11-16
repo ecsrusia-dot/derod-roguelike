@@ -25,6 +25,8 @@ import { BattleView } from './screens/battle.jsx';
 import { DepartView, fmtWhen, SummaryLine, TitleView, GiftNotice, SceneView, OfflineSheet } from './screens/title.jsx';
 import { RaidView, RosterView, TownView } from './screens/town.jsx';
 import { RivalView } from './screens/rival.jsx';
+import { TrainingView, readTrainingCfg } from './screens/training.jsx';
+import * as TR from './training.js';
 import { AscendView, SeasonReportModal } from './screens/ascend.jsx';
 import * as SE from './season.js';
 import * as GD from './god.js';
@@ -489,6 +491,13 @@ export default function ChronicleGame({ onExit }) {
     setBattle({ sim: r.sim, enemies: r.enemies, party: r.party, summary: r.summary, ctx: { kind: 'god', type: 'god', enemies: r.enemies, label: `신 토벌 · ${r.enemies[0].god}단계` }, key: Date.now() });
     setView('battle');
   };
+  // 훈련장 (1.306.0) — 체력 무한 허수아비. 저장·보상·임무에 아무것도 남기지 않는다
+  const fightTraining = (cfg) => {
+    const sv = save;
+    const r = TR.runTraining(sv, cfg || readTrainingCfg(sv.units[sv.hero].lv), rng);
+    setBattle({ sim: r.sim, enemies: r.enemies, party: r.party, summary: r.summary, ctx: { kind: 'training', type: 'training', enemies: r.enemies, label: TR.trainingLabel(r.cfg), cfg: r.cfg }, key: Date.now() });
+    setView('battle');
+  };
   const afterBattle = () => {
     const ctx = battle?.ctx;
     if (autoProg) stopAuto(); // 「계속」을 누르면 자동 진행도 멈춘다
@@ -497,6 +506,7 @@ export default function ChronicleGame({ onExit }) {
     if (ctx?.kind === 'raid') setView('raid');
     else if (ctx?.kind === 'arena') { setRivalTab('arena'); setView('rival'); }
     else if (ctx?.kind === 'god') setView('ascend');
+    else if (ctx?.kind === 'training') setView('training');
     else if (ctx?.kind === 'dungeon') setView('dungeon');
     else if (ctx?.kind === 'tower') setView('tower');
     else setView('field');
@@ -521,7 +531,7 @@ export default function ChronicleGame({ onExit }) {
         holdAuto={!!pendingReport || !!report}
         repeat={repeat} onToggleRepeat={toggleRepeat}
         autoProg={autoProg} onStopAuto={() => stopAuto('자동 진행을 멈췄습니다')}
-        onAgain={() => (battle.ctx.kind === 'dungeon' ? fightDungeon() : battle.ctx.kind === 'tower' ? fightTower() : autoProg ? autoStep() : lastFieldRef.current && fightField(lastFieldRef.current.field, 'hunt', lastFieldRef.current.stage))}
+        onAgain={() => (battle.ctx.kind === 'training' ? fightTraining(battle.ctx.cfg) : battle.ctx.kind === 'dungeon' ? fightDungeon() : battle.ctx.kind === 'tower' ? fightTower() : autoProg ? autoStep() : lastFieldRef.current && fightField(lastFieldRef.current.field, 'hunt', lastFieldRef.current.stage))}
         dungeonAuto={dungeonAuto} onToggleDungeonAuto={toggleDungeonAuto}
         towerAuto={towerAuto} onToggleTowerAuto={toggleTowerAuto}
         onIdle={autoRunning ? () => setIdle(true) : null} idleDelay={idleDelay}
@@ -559,6 +569,8 @@ export default function ChronicleGame({ onExit }) {
     content = <DailyView acc={acc} onBack={() => setView('town')} onSwitch={(cid) => { setRepeat(false); setAcc(a => A.selectCharacter(a, cid)); }} onAct={(fn) => { const r = fn(acc); if (!r.n) return; setAcc(r.acc); flash(`임무 보상 ${r.n}건 수령 — ${D.dailyRewardText(r.reward)}`); }} />;
   } else if (view === 'ascend') {
     content = <AscendView acc={acc} onBack={() => setView('town')} onGod={fightGod} onAct={(fn, msg) => { setAcc(a => fn(a)); if (msg) flash(msg); }} />;
+  } else if (view === 'training') {
+    content = <TrainingView save={save} onBack={() => setView('town')} onStart={fightTraining} />;
   } else if (view === 'rival') {
     content = <RivalView acc={acc} top={rivalTab} onTop={setRivalTab} onFight={fightArena} onArena={(fn) => { const r = fn(acc); if (!r.n) return; setAcc(r.acc); if (r.item) flash(`${r.item.name} 구매`); }} onBack={() => setView('town')} onAct={(fn) => { const r = fn(acc); if (!r.n) return; setAcc(r.acc); flash(r.month ? `월간 1위 — 자령 「${F.famName(r.fam.key)}」${r.fam.soul ? ' (보유 중 → 사역혼 100)' : ''}` : r.fam ? `${r.rank}위 보상 — ${F.famGrade(r.fam.grade).label} 「${F.famName(r.fam.key)}」${r.fam.soul ? ` (보유 중 → 사역혼 ${r.fam.soul})` : ''}` : `${r.rank}위 · 주간 순위 보상을 받았습니다`); }} />;
   } else if (view === 'forge') {
