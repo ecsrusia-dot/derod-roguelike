@@ -400,7 +400,7 @@ export function PartyView({ save, setSave, onBack, onForge, onRebirth }) {
         );
       })()}
       {skillInfo && (
-        <MainSkillModal s={skillInfo} lv={u.skills[skillInfo.id] || 0} u={u} d={d} sp={u.sp} can={E.canLearn(u, skillInfo)}
+        <MainSkillModal save={save} cid={cid} s={skillInfo} lv={u.skills[skillInfo.id] || 0} u={u} d={d} sp={u.sp} can={E.canLearn(u, skillInfo)}
           onLearn={() => setSave(E.learnSkill(save, cid, skillInfo.id))} onClose={() => setSkillInfo(null)} />
       )}
       {statPick && <StatAllocModal save={save} cid={cid} focus={statPick} onClose={() => setStatPick(null)} onApply={(plan) => { setSave(E.addStats(save, cid, plan)); setStatPick(null); }} />}
@@ -628,12 +628,14 @@ function MainPassiveCard({ s, lv, u, can, onClick }) {
   );
 }
 
-function MainSkillModal({ s, lv, u, d, sp, can, onLearn, onClose }) {
+function MainSkillModal({ save, cid, s, lv, u, d, sp, can, onLearn, onClose }) {
   const cur = Math.max(1, lv);
   const pw = skillPower(s, cur);
   const w = cdWait(s, d); const cdr = cdOf(s, d);
   const all = d?.cdr || 0; const own = d?.skillCdr?.[s.id] || 0;
   const passive = s.kind === 'passive';
+  const boost = d?.skillBoost?.[s.id] || 0;
+  const bsrc = !passive && boost && save ? E.skillBoostSources(save, cid, s.id) : [];
   const locked = s.reqLv > u.lv;
   const color = s.branch ? REBIRTH_BRANCHES[s.branch].color : MS.red;
   return (
@@ -645,7 +647,7 @@ function MainSkillModal({ s, lv, u, d, sp, can, onLearn, onClose }) {
       )}>
       <div style={{ fontSize: 13, color: PALETTE.text, lineHeight: 1.55 }}><HiNum text={describeSkill(s, cur)} /></div>
       <div className="grid gap-1.5 mt-3" style={{ gridTemplateColumns: '1fr 1fr' }}>
-        <MainCell label="위력" value={pw != null ? `${pw}%` : '상시'} />
+        <MainCell label="위력" value={pw != null ? (boost ? `${pw} → ${Math.round(pw * (1 + boost))}%` : `${pw}%`) : '상시'} color={pw != null && boost ? MS.gold : null} />
         <MainCell label="대상" value={skillTarget(s)} />
         <MainCell label="재사용" value={passive ? '—' : !s.cd ? '매 턴' : cdr ? `${s.cd} → ${w ? `${w}턴` : '매 턴'}` : `${s.cd}턴`} color={cdr ? '#7fd1c8' : null} />
         <MainCell label="종류" value={SKILL_KIND_LABEL[s.kind] || '스킬'} />
@@ -653,6 +655,12 @@ function MainSkillModal({ s, lv, u, d, sp, can, onLearn, onClose }) {
       <div className="mt-2" style={{ padding: '8px 10px', border: `1px solid ${MS.line}`, background: MS.box, borderRadius: MS.r, fontSize: 12.5, color: PALETTE.text }}>
         <b style={{ color }}>◇ 발동</b> {SKILL_WHEN_TEXT[s.kind] || '준비된 공격 스킬 중 실제 위력(위력 × 강화 × 타수)이 가장 클 때'}
       </div>
+      {pw != null && boost > 0 && (
+        <div className="mt-2" style={{ padding: '8px 10px', border: `1px solid ${MS.line}`, background: MS.box, borderRadius: MS.r, fontSize: 12.5, color: PALETTE.text, lineHeight: 1.7 }}>
+          <b style={{ color: MS.gold }}>◇ 위력 강화 +{Math.round(boost * 100)}%</b> <span style={{ color: PALETTE.textDim }}>({pw}% × {(1 + boost).toFixed(2)} = {Math.round(pw * (1 + boost))}%)</span>
+          {bsrc.map((b, i) => <div key={i} className="flex justify-between gap-2" style={{ color: PALETTE.textDim }}><span className="truncate">· {b.label}</span><b style={{ color: PALETTE.text, flex: 'none' }}>+{Math.round(b.v * 100)}%</b></div>)}
+        </div>
+      )}
       {pw != null && (
         <div className="mt-2" style={{ fontSize: 12.5, color: PALETTE.textDim, lineHeight: 1.7 }}>
           {[1, 2, 3, 4, 5].map(l => (

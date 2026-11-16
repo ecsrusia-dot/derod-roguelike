@@ -576,6 +576,14 @@ export function deriveUnit(save, classId) {
 // deriveUnit과 같은 순서·같은 공식으로 묶음별 값을 따로 모은다 (전투 계산에는 쓰지 않는다 — 표시 전용).
 // ⚠️ deriveUnit에 새 출처·새 공식을 넣으면 여기도 같이 고칠 것
 const PASSIVE_KEY = { critAdd: 'crit', dodgeAdd: 'dodge' };
+// 스킬 위력 강화(sb_)의 출처 — 장비·특성 등 묶음 + 전승 특전 「갈래의 극의」 (1.305.1, 표시 전용)
+export function skillBoostSources(save, classId, skillId) {
+  const u = save.units[classId];
+  const out = statSourceBags(save, classId).filter(b => b.fx['sb_' + skillId]).map(b => ({ label: b.label, v: b.fx['sb_' + skillId] }));
+  const n = rebirthPerkCount(u, 'skill');
+  if (n && u.rebirth?.branch && CHRONICLE_SKILLS[skillId]?.branch === u.rebirth.branch) out.push({ label: `전승 특전 「갈래의 극의」${n > 1 ? ` ×${n}` : ''}`, v: 0.15 * n });
+  return out;
+}
 export function statSourceBags(save, classId) {
   const u = save.units[classId];
   const bags = [];
