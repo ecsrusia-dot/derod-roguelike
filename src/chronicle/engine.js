@@ -1585,7 +1585,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
     const t = pickEnemyTarget(u);
     if (!t) return;
     const r = damage(u, t, 0.8, { noDodge: true });
-    hits.push({ t: t.id, d: r.d, c: r.crit, chain: true, ab: r.absorbed });
+    hits.push({ t: t.id, d: r.d, c: r.crit, chain: true, spirit: true, ab: r.absorbed }); // spirit = 로그 표시용 (통계는 추가타로 합산)
   };
   // 연속기 타수 — 「연속 화살」은 multiHitsAdd, 「폭풍 연사」는 barrageHitsAdd (1.303.0)
   const multiHitsOf = (u, s) => s.hits + (s.id === 'e_volley' ? u.multiHitsAdd || 0 : s.id === 'et_barrage' ? u.barrageHitsAdd || 0 : 0);
@@ -1838,11 +1838,13 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
           hits.push({ t: t.id, d: r.d, c: r.crit, m: r.miss, ab: r.absorbed });
         }
         chainHit(u, pickEnemyTarget(u), hits); // 1.303.0 연속기 뒤에도 추가 타격 1회 판정
+        spiritHit(u, hits); // 1.304.1 정령 화살도 스킬당 1회
         break;
       }
       case 'aoe':
         for (const t of foes) { const r = damage(u, t, v, { skill: true }); hits.push({ t: t.id, d: r.d, c: r.crit, m: r.miss, ab: r.absorbed }); }
         chainHit(u, pickEnemyTarget(u), hits); // 1.303.0 광역기 뒤에도 추가 타격 1회 판정
+        spiritHit(u, hits);
         break;
       case 'dot': {
         const targets = s.all ? foes : [pickEnemyTarget(u)];
