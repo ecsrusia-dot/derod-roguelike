@@ -229,6 +229,62 @@ export function ForgeFooter({ it, onEquip = null, canWear = true }) {
 }
 
 // 장비 정보창 — 본편 카드 모달 (1.249.0, PM 승인 시안 ⑭)
+// ===== 착용 장비와 위아래 비교 (1.302.0) =====
+// 위 = 착용 중 · 아래 = 고른 장비. 두 칸이 같은 줄 순서를 써서 같은 높이의 줄끼리 바로 비교된다.
+export function GearCompareStack({ item, cur }) {
+  const a = E.itemStats(item); const b = E.itemStats(cur);
+  const baseKeys = BASE_STATS.filter(k => a[k] || b[k]);
+  const optKeys = [...new Set([...Object.keys(b), ...Object.keys(a)])].filter(k => !BASE_STATS.includes(k) && (a[k] || b[k]))
+    .sort((x, y) => ((b[x] ? 0 : 1) - (b[y] ? 0 : 1)) || ((a[x] ? 0 : 1) - (a[y] ? 0 : 1)));
+  const keys = [...baseKeys, ...optKeys];
+  const split = (k, v) => { if (BASE_STATS.includes(k)) return [BASE_LABEL[k] === '공격' ? '공격력' : BASE_LABEL[k], Math.round(v).toLocaleString()]; const t = E.statLabel(k, v); const m = t.match(/^(.*?)\s*([+-]?[\d.]+.*)$/); return m ? [m[1], m[2]] : [t, '']; };
+  const lab = (k) => split(k, a[k] || b[k])[0];
+  const diff = (k) => +(((a[k] || 0) - (b[k] || 0))).toFixed(3);
+  const dTxt = (k, d) => (BASE_STATS.includes(k) ? Math.abs(Math.round(d)).toLocaleString() : split(k, Math.abs(d))[1].replace(/^\+/, ''));
+  const up = keys.filter(k => diff(k) > 0).length; const dn = keys.filter(k => diff(k) < 0).length;
+  const pd = E.itemPower(item) - E.itemPower(cur);
+  const fxOf = (it) => { const u = E.uniqueDef(it); const e = E.epicOptOf(it); return [u, e].filter(Boolean); };
+  const fa = fxOf(item); const fb2 = fxOf(cur);
+  const sameFx = fa.map(x => x.name).join('|') === fb2.map(x => x.name).join('|');
+  const Panel = ({ it, st, mine }) => {
+    const g = gradeOf(it.grade); const fx = mine ? fa : fb2;
+    return (
+      <div style={{ border: `1.5px solid ${mine ? `${g.color}` : MS.line}`, background: mine ? 'rgba(232,176,74,0.06)' : MS.box, borderRadius: MS.r, overflow: 'hidden' }}>
+        <div className="flex items-center gap-1.5" style={{ padding: '7px 10px', background: mine ? 'rgba(232,176,74,0.10)' : 'rgba(255,255,255,0.04)', borderBottom: `1px solid ${MS.line}`, minWidth: 0 }}>
+          <span className="flex-none" style={{ fontSize: 11, fontWeight: 800, padding: '1px 7px', borderRadius: 999, color: mine ? '#1b1206' : PALETTE.text, background: mine ? MS.gold : 'rgba(255,255,255,0.14)' }}>{mine ? '고른 장비' : '착용 중'}</span>
+          <span className="truncate font-bold" style={{ fontSize: 13, color: g.color, flex: 1, minWidth: 0 }}>{E.itemName(it)}{it.plus ? ` +${it.plus}` : ''}</span>
+          <span className="flex-none" style={{ fontSize: 11.5, color: PALETTE.textDim }}>Lv.{it.ilv} · ⚔{E.itemPower(it)}{mine && pd ? <b style={{ color: pd > 0 ? CMP_UP : CMP_DN }}> {pd > 0 ? '▲' : '▼'}{Math.abs(pd)}</b> : null}</span>
+        </div>
+        {[baseKeys, optKeys].map((grp, gi) => grp.length ? <div key={gi} className="grid" style={{ gridTemplateColumns: '1fr 1fr', borderTop: gi ? `1px dashed ${MS.line}` : 'none' }}>{grp.map((k) => {
+          const v = st[k] || 0; const d = diff(k); const firstOpt = false;
+          const col = !v ? PALETTE.textDim : !d ? PALETTE.textDim : mine ? (d > 0 ? CMP_UP : CMP_DN) : PALETTE.text;
+          return (
+            <div key={k} className="flex items-baseline justify-between gap-2" style={{ padding: '3px 10px', minWidth: 0, borderTop: firstOpt ? `1px dashed ${MS.line}` : 'none', background: mine && d ? (d > 0 ? 'rgba(143,208,138,0.09)' : 'rgba(224,122,106,0.09)') : 'transparent' }}>
+              <span className="truncate" style={{ fontSize: 12, color: v ? PALETTE.textDim : 'rgba(255,255,255,0.28)', textDecoration: !v && !mine ? 'none' : 'none' }}>{lab(k)}</span>
+              <span className="flex-none" style={{ fontSize: 12.5, fontWeight: 800, color: col }}>
+                {v ? split(k, v)[1] : '—'}
+                {mine && d !== 0 && <span style={{ fontSize: 11, marginLeft: 4 }}>{!b[k] ? '신규' : !a[k] ? '사라짐' : `${d > 0 ? '▲' : '▼'}${dTxt(k, d)}`}</span>}
+              </span>
+            </div>);
+        })}</div> : null)}
+        <div style={{ padding: '4px 10px 6px', borderTop: `1px dashed ${MS.line}`, fontSize: 11.5, lineHeight: 1.4, color: PALETTE.text, background: mine && !sameFx ? (fx.length ? 'rgba(143,208,138,0.09)' : 'rgba(224,122,106,0.09)') : 'transparent' }}>
+          <b style={{ color: fx.length ? '#c79bff' : PALETTE.textDim }}>◇ 특수 효과</b>{' '}
+          {fx.length ? fx.map((x, i) => <span key={i}>{i ? ' · ' : ''}<b style={{ color: '#f0a86a' }}>{x.name}</b> — {x.desc}</span>) : <span style={{ color: PALETTE.textDim }}>없음{mine && fb2.length ? <b style={{ color: CMP_DN }}> (착용 장비의 효과를 잃는다)</b> : null}</span>}
+        </div>
+      </div>);
+  };
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-2" style={{ marginBottom: 6, fontSize: 12 }}>
+        <span style={{ color: PALETTE.textDim }}>⇄ 착용 장비와 비교 <span style={{ fontSize: 11 }}>(지금 강화 그대로)</span></span>
+        <span style={{ fontWeight: 800 }}><span style={{ color: CMP_UP }}>▲ 오름 {up}</span> · <span style={{ color: CMP_DN }}>▼ 내림 {dn}</span></span>
+      </div>
+      <Panel it={cur} st={b} mine={false} />
+      <div className="text-center" style={{ fontSize: 13, color: MS.gold, lineHeight: '18px' }}>▼</div>
+      <Panel it={item} st={a} mine />
+    </div>);
+}
+
 export function MainItemModal({ save, item, cur, by, usable, onClose, footer, evalInfo = null, onAppraise = null }) {
   if (item.unid) {
     const g0 = gradeOf(item.grade); const sl0 = SLOTS.find(sl => sl.id === item.slot);
@@ -265,13 +321,7 @@ export function MainItemModal({ save, item, cur, by, usable, onClose, footer, ev
   return (
     <MainModal kicker={`${g.label} · ${slot?.label || ''}`.split('').join(' ').replace(/ {3}/g, '  ')} title={`${E.itemName(item)}${item.plus ? ` +${item.plus}` : ''}`} color={g.color} badge={`⚔ ${E.itemPower(item)}`} onClose={onClose} footer={footer}>
       <div className="flex flex-wrap gap-1" style={{ fontSize: 11.5, marginBottom: 10 }}><span className="chr-pill">Lv.{item.ilv}</span><span className="chr-pill">{clsTag(item)}</span><span className="chr-pill" style={by ? { color: '#8fd08a', borderColor: 'rgba(143,208,138,.45)' } : { color: PALETTE.textDim }}>{by ? '착용 중' : '가방'}</span></div>
-      {evalInfo && evalInfo.state !== 'na' && evalInfo.state !== 'none' && (
-        <div className="chr-cell" style={{ padding: '9px 11px', marginBottom: 10, borderColor: 'rgba(232,176,74,.4)' }}>
-          <div className="flex items-baseline justify-between gap-2"><span style={{ fontSize: 11.5, color: PALETTE.textDim }}>⚔ 실전 효율 (착용 대비)</span><span style={{ fontSize: 15 }}><EvalChip info={evalInfo} /></span></div>
-          <div style={{ fontSize: 11, color: PALETTE.textDim, marginTop: 2 }}>비교 = <EvalBasis it={item} cur={cur} /></div>
-          {evalInfo.full && <div style={{ fontSize: 11.5, color: PALETTE.text, marginTop: 2 }}>실전 {evalInfo.full.n}전 · 승률 <b>{Math.round(evalInfo.full.win * 100)}%</b> · 남은 HP <b>{Math.round(evalInfo.full.hp * 100)}%</b></div>}
-        </div>
-      )}
+      {showCmp && cur ? <GearCompareStack item={item} cur={cur} /> : <>
       <div className="grid gap-2" style={{ gridTemplateColumns: '1fr 1fr' }}>
         {BASE_STATS.filter(k => st[k] || b[k]).map((k, i) => <MainCell key={k} hot={i === 0} label={BASE_LABEL[k] === '공격' ? '공격력' : BASE_LABEL[k]} value={st[k] ? <>{Math.round(st[k]).toLocaleString()}{dTag(k)}</> : (b[k] ? <span style={{ color: '#e07a6a', fontSize: 12 }}>▼{Math.round(b[k]).toLocaleString()}</span> : '—')} />)}
       </div>
@@ -289,10 +339,18 @@ export function MainItemModal({ save, item, cur, by, usable, onClose, footer, ev
       <div className="mt-2" style={{ padding: '8px 10px', border: `1px solid ${MS.line}`, background: MS.box, borderRadius: MS.r, fontSize: 12.5, color: PALETTE.text, lineHeight: 1.55 }}>
         <b style={{ color: ud || eo ? '#c79bff' : MS.red }}>◇ 특수 효과</b> {ud ? <><b style={{ color: '#f0a86a' }}>{ud.name}</b> — {ud.desc}{eo ? <> · <b style={{ color: '#d7a8ff' }}>{eo.name}</b> — {eo.desc}</> : null}</> : eo ? <><b style={{ color: '#d7a8ff' }}>{eo.name}</b> — {eo.desc}</> : <span style={{ color: PALETTE.textDim }}>없음 (에픽 장신구 · 유니크 · 감정한 전승 장비 일부에 붙는다)</span>}
       </div>
-      {showCmp && (
+      </>}
+      {evalInfo && evalInfo.state !== 'na' && evalInfo.state !== 'none' && (
+        <div className="chr-cell" style={{ padding: '9px 11px', marginTop: 8, borderColor: 'rgba(232,176,74,.4)' }}>
+          <div className="flex items-baseline justify-between gap-2"><span style={{ fontSize: 11.5, color: PALETTE.textDim }}>⚔ 실전 효율 (착용 대비)</span><span style={{ fontSize: 15 }}><EvalChip info={evalInfo} /></span></div>
+          <div style={{ fontSize: 11, color: PALETTE.textDim, marginTop: 2 }}>비교 = <EvalBasis it={item} cur={cur} /></div>
+          {evalInfo.full && <div style={{ fontSize: 11.5, color: PALETTE.text, marginTop: 2 }}>실전 {evalInfo.full.n}전 · 승률 <b>{Math.round(evalInfo.full.win * 100)}%</b> · 남은 HP <b>{Math.round(evalInfo.full.hp * 100)}%</b></div>}
+        </div>
+      )}
+      {showCmp && !cur && (
         <div className="mt-2" style={{ padding: '8px 10px', border: `1px solid ${MS.line}`, background: MS.box, borderRadius: MS.r, fontSize: 12.5, color: PALETTE.text, lineHeight: 1.55 }}>
           <b style={{ color: MS.red }}>◇ 비교 기준</b> {cur ? <>지금 착용 「{E.itemName(cur)}{cur.plus ? ` +${cur.plus}` : ''}」 · 전투력 <b style={{ color: pd > 0 ? '#8fd08a' : pd < 0 ? '#e07a6a' : PALETTE.textDim }}>{pd > 0 ? `▲ ${pd}` : pd < 0 ? `▼ ${-pd}` : '같음'}</b></> : '이 부위 비어 있음 — 끼면 전부 추가'}
-          {(E.uniqueDef(cur) || E.epicOptOf(cur)) && <div style={{ fontSize: 11.5, color: '#e07a6a' }}>※ 교체하면 착용 중 장비의 특수 효과를 잃는다</div>}
+          {cur && (E.uniqueDef(cur) || E.epicOptOf(cur)) && <div style={{ fontSize: 11.5, color: '#e07a6a' }}>※ 교체하면 착용 중 장비의 특수 효과를 잃는다</div>}
         </div>
       )}
       <div className="mt-2" style={{ padding: '8px 10px', border: `1px solid ${MS.line}`, background: MS.box, borderRadius: MS.r, fontSize: 12.5, color: PALETTE.text, lineHeight: 1.55 }}>
