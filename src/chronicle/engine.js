@@ -552,7 +552,12 @@ export function deriveUnit(save, classId) {
       .filter(x => x.s && x.lv > 0 && x.s.kind !== 'passive'),
   };
   for (const k of PASS_KEYS) if (G(k)) out[k] = G(k);
-  if (out.chain) out.chain = Math.min(T.chainCap || 1, out.chain); // 추가 타격 확률 상한 (1.270.0)
+  if (out.chain) {
+    // 추가 타격 확률 상한 (1.270.0) — 넘친 몫은 추가 타격 피해로 (1.305.0, 피해 상한 없음)
+    const cap = T.chainCap || 1, over = Math.max(0, out.chain - cap);
+    out.chain = Math.min(cap, out.chain);
+    out.chainPow = (T.chainBase || 0.5) + over * (T.chainOverflow || 0);
+  }
   if (out.guts || out.revive || out.firstCrit || out.emergencyHeal) out.standbySrc = standbySources(save, u, br);
   if (out.rageDouble) out.rageDouble = 1; // 중첩 수가 아닌 보유 여부
   if (Object.keys(skillBoost).length) out.skillBoost = skillBoost;
@@ -648,7 +653,16 @@ export function statBreakdown(save, classId, key) {
     }
     case 'armorPen': pctUnit(); out.base = [statLine('str', S.strPen || 0, `${r1((S.strPen || 0) * 100)}%`)]; out.flat = from('armorPen'); out.notes.push('상한 80%.'); break;
     case 'skillDmg': pctUnit(); out.base = [statLine('int', S.intSkill || 0, `${r1((S.intSkill || 0) * 100)}%`)]; out.flat = from('skillDmg'); break;
-    case 'chain': pctUnit(); out.base = [statLine('agi', S.agiChain || 0, `${r1((S.agiChain || 0) * 100)}%`)]; out.flat = from('chain'); out.notes.push(`상한 ${Math.round((T.chainCap || 1) * 100)}%.`); break;
+    case 'chain': pctUnit(); out.base = [statLine('agi', S.agiChain || 0, `${r1((S.agiChain || 0) * 100)}%`)]; out.flat = from('chain'); out.notes.push(`상한 ${Math.round((T.chainCap || 1) * 100)}% — 넘친 몫은 「추가 타격 피해」로 바뀐다.`); break;
+    case 'chainPow': {
+      pctUnit();
+      const S2 = T.stat || {}, tot = (st.agi || 0) * (S2.agiChain || 0) + bags.reduce((a, b) => a + (b.fx.chain || 0), 0);
+      const over = Math.max(0, tot - (T.chainCap || 1));
+      out.base = [{ label: '기본', v: T.chainBase || 0.5 }];
+      out.flat = over > 0 ? [{ label: `추가 타격 확률 초과분 (합계 ${Math.round(tot * 100)}% − 상한 ${Math.round((T.chainCap || 1) * 100)}%)`, v: over * (T.chainOverflow || 0) }] : [];
+      out.notes.push('추가 타격 1회의 피해 = 공격력 × 이 값. 확률이 상한을 넘으면 넘친 1%p당 +1%p (상한 없음).');
+      break;
+    }
     case 'dmgReduce': {
       pctUnit(); out.base = [statLine('str', S.strReduce || 0, `${r1((S.strReduce || 0) * 100)}%`)]; out.flat = from('dmgReduce');
       for (const x of from('dmgTakenUp')) out.flat.push({ label: `${x.label} (받는 피해 증가)`, v: -x.v });
@@ -1592,7 +1606,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
   // 연격 — 기본 공격·단일기는 명중마다, 연속기·광역기는 스킬당 1회 추가 타격 판정
   const chainHit = (u, t, hits) => {
     if (!u.chain || !t || t.hp <= 0 || rng() >= u.chain) return;
-    const r = damage(u, t, 0.5, { noDodge: true });
+    const r = damage(u, t, u.chainPow || 0.5, { noDodge: true });
     hits.push({ t: t.id, d: r.d, c: r.crit, chain: true, ab: r.absorbed });
   };
   const pickEnemyTarget = (u) => {
@@ -1921,6 +1935,8 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
         hits.push({ t: t.id, d: r.d, c: r.crit, m: r.miss, ab: r.absorbed });
         const key = { breakStrike: 'armorBreak', weakStrike: 'weak', markStrike: 'vuln' }[s.kind];
         if (key && !r.miss && t.hp > 0) { t.fx[key] = { v: s.dv, t: s.turns }; hits.push({ t: t.id, debuff: true }); }
+        if (!r.miss) chainHit(u, t, hits); // 1.305.0 전승 단일기(처형·방어 파괴·약화·표식)도 단일기와 같이 판정
+        spiritHit(u, hits);
         break;
       }
       default: break;
