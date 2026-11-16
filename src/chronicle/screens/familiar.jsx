@@ -151,19 +151,21 @@ function MainFamTeam({ save, onOpen, onPick }) {
 // 지금 주인공의 갈래 (FamiliarView가 그릴 때마다 맞춘다)
 let heroBranch = null;
 let heroCls = null;
+let heroMain = null; // 동행 칸의 사역마 — 공명은 동행 칸에서만 켜진다 (1.301.3 표시 수정)
 function ResoLine({ k, f, box = false }) {
-  const r = F.famReso(k, f, heroBranch, heroCls);
-  if (!r) return null;
+  const r0 = F.famReso(k, f, heroBranch, heroCls);
+  if (!r0) return null;
+  const match = !!r0.on; const r = { ...r0, on: match && heroMain === k };
   const bn = r.cls ? r.clsName : (REBIRTH_BRANCHES[r.branch]?.name || r.branch);
   const col = r.on ? '#7fe0c0' : PALETTE.textDim;
   if (box) return (
     <div className="mt-2" style={{ padding: '8px 10px', border: `1px solid ${r.on ? '#7fe0c0aa' : MS.line}`, background: MS.box, borderRadius: MS.r, fontSize: 12.5, lineHeight: 1.55 }}>
-      <div className="flex justify-between gap-2"><b style={{ color: col }}>✦ 공명 「{r.name}」</b><span style={{ fontSize: 11, color: col }}>{r.on ? '켜짐' : `${bn} 전용`}</span></div>
+      <div className="flex justify-between gap-2"><b style={{ color: col }}>✦ 공명 「{r.name}」</b><span style={{ fontSize: 11, color: col }}>{r.on ? '켜짐' : match ? '꺼짐 · 동행 칸에 두면 켜짐' : `${bn} 전용`}</span></div>
       <div style={{ color: r.on ? PALETTE.text : PALETTE.textDim }}><HiNum text={r.desc} /></div>
       <div style={{ fontSize: 11, color: PALETTE.textDim }}>{r.cls ? `${bn}(전승 갈래 포함)이 동행 칸에 둘 때만 적용 · 청령 ×1 → 남령 ×2.5 → 진화 자령 ×3.5` : `${bn} 갈래가 이 자령을 동행 칸에 둘 때만 적용`}</div>
     </div>
   );
-  return <div className="mt-0.5" style={{ fontSize: 11.5, lineHeight: 1.4, color: col }}>✦ 공명 [{bn}]{r.on ? ' 켜짐' : ''} — <span style={{ color: r.on ? PALETTE.text : PALETTE.textDim }}>{r.desc}</span></div>;
+  return <div className="mt-0.5" style={{ fontSize: 11.5, lineHeight: 1.4, color: col }}>✦ 공명 [{bn}]{r.on ? ' 켜짐' : match ? ' 꺼짐(동행 칸에서만)' : ''} — <span style={{ color: r.on ? PALETTE.text : PALETTE.textDim }}>{r.desc}</span></div>;
 }
 
 const FAM_STAT_ROWS = [['HP', 'maxHp'], ['공격력', 'atk'], ['방어', 'def'], ['회복력', 'healPower']];
@@ -290,6 +292,7 @@ export function FamiliarView({ save, setSave, onBack, flash, onTrack = () => {} 
   const fams = save.fams || {};
   heroBranch = save.units[save.hero]?.rebirth?.branch || null;
   heroCls = save.hero;
+  heroMain = E.activeMain(save);
   const shards = save.mats.famShard || 0;
   const souls = save.mats.famSoul || 0;
   const heroLv = save.units[save.hero]?.lv || 1;
@@ -382,7 +385,7 @@ export function FamiliarView({ save, setSave, onBack, flash, onTrack = () => {} 
           );
         })}
         {tab === 'team' && <FamRoleGuide heroCls={save.hero} />}
-        {tab === 'team' && <div style={{ fontSize: 11.5, color: PALETTE.textDim, lineHeight: 1.6 }}>동행 사역마의 능력치는 사역마 자신의 레벨·등급·강화·역할로 정해진다 (주인공 직업과 무관). 새 사역마는 Lv.1 — 동행 칸에서 이길 때만 경험치를 받고, 주인공 레벨이 상한. 보조 칸은 사역마마다 경험치·골드·아이템 획득 중 하나를 더 준다. 주인공이 쓰러지면 패배. 사역마는 모든 캐릭터가 함께 쓴다.</div>}
+        {tab === 'team' && <div style={{ fontSize: 11.5, color: PALETTE.textDim, lineHeight: 1.6 }}>동행 사역마의 능력치는 사역마 자신의 레벨·등급·강화·역할로 정해진다 (주인공 직업과 무관). 새 사역마는 Lv.1 — 동행·보조 칸에 편성돼 있으면 이길 때마다 같은 경험치를 받고(보관만 하면 안 오름), 주인공 레벨이 상한. 공명은 동행 칸에서만 켜진다. 보조 칸은 사역마마다 경험치·골드·아이템 획득 중 하나를 더 준다. 주인공이 쓰러지면 패배. 사역마는 모든 캐릭터가 함께 쓴다.</div>}
       </div>
 
       {results && (() => {
@@ -448,7 +451,7 @@ export function FamiliarView({ save, setSave, onBack, flash, onTrack = () => {} 
               <MainSecHead title="경 험 치" />
               {F.famLv(selF) < heroLv ? <>
                 <Bar v={selF.exp || 0} max={F.FAM_LEVEL.expNeed(F.famLv(selF))} color={MS.violet} h={6} />
-                <div className="mt-1" style={{ fontSize: 11.5, color: PALETTE.textDim }}>{(selF.exp || 0).toLocaleString()} / {F.FAM_LEVEL.expNeed(F.famLv(selF)).toLocaleString()} · <b style={{ color: MS.gold }}>동행 칸</b>에서 이길 때만 오른다 · 보조 효과 {F.famSubPctOf(selF, heroLv)}%</div>
+                <div className="mt-1" style={{ fontSize: 11.5, color: PALETTE.textDim }}>{(selF.exp || 0).toLocaleString()} / {F.FAM_LEVEL.expNeed(F.famLv(selF)).toLocaleString()} · <b style={{ color: MS.gold }}>동행·보조 칸</b>에 편성돼 있으면 이길 때마다 오른다 · 보조 효과 {F.famSubPctOf(selF, heroLv)}%</div>
               </> : <div style={{ fontSize: 11.5, color: PALETTE.textDim }}>주인공 레벨 도달 — 주인공이 레벨업하면 다시 경험치를 받는다</div>}
               <div className="flex gap-1 mt-3 justify-center">{Array.from({ length: F.FAM_TUNING.maxPlus }, (_, i) => <span key={i} style={{ width: 18, height: 6, background: i < selF.plus ? g.color : '#ffffff1a' }} />)}</div>
               <div className="grid gap-1.5 mt-3" style={{ gridTemplateColumns: '1fr 1fr' }}>

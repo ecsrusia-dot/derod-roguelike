@@ -2006,6 +2006,15 @@ export function applyBattle(save0, ctx, battle, rng = Math.random) {
     save.fams = { ...save.fams, [mk]: g.f };
     summary.famExp = { key: mk, gained: g.gained, ups: g.ups, lv: g.f.lv };
   }
+  // 1.301.3 — 보조 칸 사역마도 같은 경험치를 받는다 (PM 지시: 사역마 육성 부담 완화 · 각자 100%, 주인공 레벨이 상한)
+  const subUps = [];
+  for (const sk of activeSubs(save)) {
+    if (sk === mk) continue;
+    const g = gainFamExp(save.fams[sk], r.exp, save.units[save.hero].lv);
+    save.fams = { ...save.fams, [sk]: g.f };
+    if (g.ups) subUps.push({ key: sk, lv: g.f.lv });
+  }
+  if (subUps.length) summary.famSubUps = subUps;
   // 전승 장비 · 갈래 유니크 (1.221.0 — 전승 캐릭터만)
   const hu = save.units[save.hero];
   if (hu?.rebirth?.count > 0 && battle.result === 'win') {
