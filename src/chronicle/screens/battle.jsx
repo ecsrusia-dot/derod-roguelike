@@ -444,6 +444,7 @@ export function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAga
                 {summary.gateOpen ? <div className="chr-chip font-semibold" style={{ color: PALETTE.legendary }}>⚔ 처치 목표 달성 — 관문 도전 가능!</div> : null}
                 {summary.stageClear ? <div className="chr-chip font-semibold" style={{ color: '#9cc4e4' }}>🔓 스테이지 {summary.stageClear} 관문 통과!</div> : null}
                 {summary.famShards || summary.famSouls ? <div className="chr-chip" style={{ color: '#d07ae8' }}>{summary.famShards ? `📜 계약서 조각 +${summary.famShards}` : ''}{summary.famShards && summary.famSouls ? ' · ' : ''}{summary.famSouls ? `🔮 사역혼 +${summary.famSouls}` : ''}</div> : null}
+                {(summary.famSubUps || []).map(x => <div key={x.key} className="chr-chip font-semibold" style={{ color: '#e8b04a' }}>🐾 보조 {F.famName(x.key)} Lv.{x.lv} 달성!</div>)}
                 {summary.famExp?.ups ? <div className="chr-chip font-semibold" style={{ color: '#e8b04a' }}>🐾 {F.famName(summary.famExp.key)} Lv.{summary.famExp.lv} 달성!</div> : null}
                 {summary.keys ? <div className="chr-chip font-semibold" style={{ color: PALETTE.legendary }}>🗝 던전 열쇠 +{summary.keys}</div> : null}
                 {summary.talentScroll ? <div className="chr-chip font-semibold" style={{ color: '#7fd1c8' }}>📖 특성 초기화 주문서 +{summary.talentScroll}</div> : null}
