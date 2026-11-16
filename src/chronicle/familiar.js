@@ -852,3 +852,47 @@ const FX_LABEL = {
 export function famFxText(fx) {
   return Object.entries(fx).filter(([, v]) => v).map(([k, v]) => `${(FX_LABEL[k] || [k])[0]} +${Math.round(v * 1000) / 10}%`).join(' · ');
 }
+
+// ===== 사역마 도감 (1.302.0) — 소환으로 얻을 수 있는 모든 사역마 =====
+// 항목: { key, grade(소환으로 나올 수 있는 최고 등급), src(나오는 곳), open(지금 소환 풀에 있는가) }
+let _codex = null;
+export function famCodex() {
+  if (_codex) return _codex;
+  const map = {};
+  const put = (k, src, order) => { if (!k || !ENEMIES[k]) return; if (!map[k]) map[k] = { key: k, src, order }; };
+  for (const f of CHRONICLE_FIELDS) {
+    if (f.depth) continue; // 심층은 같은 적
+    const part = f.part ? `${f.part}부` : '1부';
+    put(f.boss, `${part} 「${f.name}」 보스`, f.id * 10);
+    for (const k of f.elites || []) put(k, `${part} 「${f.name}」 강적`, f.id * 10 + 1);
+    for (const k of f.normals || []) put(k, `${part} 「${f.name}」`, f.id * 10 + 2);
+  }
+  for (const d of CHRONICLE_DUNGEONS) put(d.floors[d.floors.length - 1].enemies[0], `던전 「${d.name}」 보스`, 900 + (d.unlockField || 0));
+  _codex = Object.values(map).map(e => ({ ...e, grade: famNaturalGrade(e.key), role: famRole(e.key) }))
+    .sort((a, b) => famGradeIdx(b.grade) - famGradeIdx(a.grade) || a.order - b.order || (a.key < b.key ? -1 : 1));
+  return _codex;
+}
+// 지금 소환 풀에 들어 있는 키 (등급 무관)
+export function famPoolKeys(progress) {
+  const p = famPool(progress);
+  return new Set(Object.values(p).flat());
+}
+// 도감 요약 — 전체·등급별 보유 수
+export function famCodexSummary(fams) {
+  const all = famCodex();
+  const by = {};
+  for (const g of FAM_GRADES) by[g.id] = { own: 0, total: 0 };
+  for (const e of all) { by[e.grade].total++; if (fams?.[e.key]) by[e.grade].own++; }
+  return { total: all.length, own: all.filter(e => fams?.[e.key]).length, by };
+}
+// 필터 — { grade: 'all'|등급 id, role: 'all'|역할, reso: 내 직업·갈래와 공명이 맞는 것만 }
+export function famFilterMatch(key, f, flt, branch, cls) {
+  if (!flt) return true;
+  if (flt.grade && flt.grade !== 'all' && (f ? f.grade : famNaturalGrade(key)) !== flt.grade) return false;
+  if (flt.role && flt.role !== 'all' && famRole(key) !== flt.role) return false;
+  if (flt.reso) {
+    const r = famReso(key, f || { grade: famNaturalGrade(key), base: famNaturalGrade(key), plus: 0 }, branch, cls);
+    if (!r?.on) return false;
+  }
+  return true;
+}

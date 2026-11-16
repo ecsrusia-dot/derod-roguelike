@@ -282,12 +282,109 @@ function MainFamSkill({ k, f, save }) {
   );
 }
 
+// ===== 사역마 필터 (1.302.0) — 보관함·도감 공용 =====
+const FAM_FLT0 = { grade: 'all', role: 'all', reso: false };
+function readFamFlt() { try { return { ...FAM_FLT0, ...(JSON.parse(localStorage.getItem('chronicleFamFilter') || '{}')) }; } catch { return FAM_FLT0; } }
+function FamFilterBar({ flt, setFlt, count }) {
+  const chip = (on, label, onClick, color) => (
+    <button key={label} onClick={onClick} className="ui-press flex-none" style={{ minHeight: 30, padding: '4px 10px', borderRadius: 999, fontSize: 11.5, fontWeight: on ? 800 : 500, border: `1px solid ${on ? (color || MS.gold) : MS.line}`, background: on ? 'rgba(232,176,74,0.12)' : MS.box, color: on ? (color || MS.gold) : PALETTE.textDim }}>{label}</button>
+  );
+  const active = flt.grade !== 'all' || flt.role !== 'all' || flt.reso;
+  return (
+    <div className="flex-none" style={{ padding: '8px 10px', border: `1px solid ${MS.line}`, background: MS.box, borderRadius: MS.r }}>
+      <div className="flex items-center justify-between" style={{ fontSize: 11.5, color: PALETTE.textDim, marginBottom: 6 }}>
+        <span>🔎 필터 {count != null && <b style={{ color: PALETTE.text }}>· {count}마리</b>}</span>
+        {active && <button onClick={() => setFlt(FAM_FLT0)} className="ui-press" style={{ fontSize: 11.5, color: '#e07a6a' }}>초기화</button>}
+      </div>
+      <div className="flex gap-1.5 overflow-x-auto" style={{ paddingBottom: 4 }}>
+        {chip(flt.grade === 'all', '전체 등급', () => setFlt({ ...flt, grade: 'all' }))}
+        {[...F.FAM_GRADES].reverse().map(g => chip(flt.grade === g.id, g.label, () => setFlt({ ...flt, grade: flt.grade === g.id ? 'all' : g.id }), g.color))}
+      </div>
+      <div className="flex gap-1.5 overflow-x-auto" style={{ paddingTop: 2 }}>
+        {chip(flt.role === 'all', '전체 역할', () => setFlt({ ...flt, role: 'all' }))}
+        {Object.entries(F.FAM_ROLES).map(([id, r]) => chip(flt.role === id, `${r.icon} ${r.label}`, () => setFlt({ ...flt, role: flt.role === id ? 'all' : id }), r.color))}
+        {chip(flt.reso, '✦ 내 공명만', () => setFlt({ ...flt, reso: !flt.reso }), '#7fe0c0')}
+      </div>
+    </div>
+  );
+}
+
+// ===== 사역마 도감 (1.302.0) =====
+function FamCodexView({ save, flt, setFlt, onOpen }) {
+  const fams = save.fams || {};
+  const sum = F.famCodexSummary(fams);
+  const poolKeys = F.famPoolKeys(save.progress);
+  const [only, setOnly] = useState('all'); // all · own · miss
+  const [info, setInfo] = useState(null);
+  const rows = F.famCodex().filter(e => F.famFilterMatch(e.key, null, { ...flt, grade: 'all' }, heroBranch, heroCls) && (flt.grade === 'all' || e.grade === flt.grade)
+    && (only === 'all' || (only === 'own') === !!fams[e.key]));
+  const groups = [...F.FAM_GRADES].reverse().map(g => ({ g, list: rows.filter(e => e.grade === g.id) })).filter(x => x.list.length);
+  const pct = Math.round(sum.own / Math.max(1, sum.total) * 100);
+  const ie = info ? F.famCodex().find(e => e.key === info) : null;
+  return (
+    <>
+      <div className="flex-none" style={{ padding: '10px 12px', border: `1px solid ${MS.line}`, background: MS.box, borderRadius: MS.r }}>
+        <div className="flex items-baseline justify-between"><span style={{ fontSize: 12.5, color: PALETTE.textDim }}>📖 수집</span><span style={{ fontSize: 15, fontWeight: 800, color: MS.gold }}>{sum.own} <span style={{ fontSize: 12, color: PALETTE.textDim }}>/ {sum.total} ({pct}%)</span></span></div>
+        <div className="mt-1"><Bar v={sum.own} max={sum.total} color={MS.gold} h={6} /></div>
+        <div className="grid gap-1 mt-2" style={{ gridTemplateColumns: `repeat(${F.FAM_GRADES.filter(g => sum.by[g.id].total).length}, 1fr)` }}>
+          {[...F.FAM_GRADES].reverse().filter(g => sum.by[g.id].total).map(g => (
+            <div key={g.id} className="text-center" style={{ fontSize: 11 }}><div style={{ color: g.color, fontWeight: 700 }}>{g.label}</div><div style={{ color: PALETTE.text }}>{sum.by[g.id].own}/{sum.by[g.id].total}</div></div>
+          ))}
+        </div>
+      </div>
+      <FamFilterBar flt={flt} setFlt={setFlt} count={rows.length} />
+      <MainTabs items={[['all', '전체'], ['own', '보유'], ['miss', '미보유']]} value={only} onChange={setOnly} size={12.5} />
+      {groups.map(({ g, list }) => (
+        <div key={g.id} className="flex-none">
+          <div className="flex items-center justify-between" style={{ marginBottom: 6 }}><span className="chr-head" style={{ color: g.color }}>{g.label}</span><span style={{ fontSize: 11.5, color: PALETTE.textDim }}>{list.filter(e => fams[e.key]).length} / {list.length}</span></div>
+          <div className="grid gap-1.5" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+            {list.map(e => { const own = fams[e.key]; const role = F.FAM_ROLES[e.role]; const open = poolKeys.has(e.key);
+              return (
+                <button key={e.key} onClick={() => (own ? onOpen(e.key) : setInfo(e.key))} className="ui-press text-center" style={{ padding: '5px 3px 6px', borderRadius: 12, border: `1px solid ${own ? `${g.color}aa` : MS.line}`, background: MS.box, minWidth: 0 }}>
+                  <div className="relative mx-auto" style={{ width: '100%', aspectRatio: '1 / 1', borderRadius: 9, overflow: 'hidden' }}>
+                    <img src={chronicleEnemyArt(e.key)} alt="" className="w-full h-full object-cover" style={{ filter: own ? 'none' : 'grayscale(1) brightness(0.45)' }} />
+                    {!own && <span className="absolute inset-0 flex items-center justify-center" style={{ fontSize: 16 }}>{open ? '❔' : '🔒'}</span>}
+                    <span className="absolute" style={{ left: 3, top: 2, fontSize: 11 }}>{role.icon}</span>
+                  </div>
+                  <div className="truncate" style={{ fontSize: 11, marginTop: 3, fontWeight: own ? 700 : 400, color: own ? g.color : PALETTE.textDim }}>{F.famName(e.key)}</div>
+                  <div className="truncate" style={{ fontSize: 11, color: PALETTE.textDim }}>{own ? `${F.famGrade(own.grade).label}${F.famPlusText ? F.famPlusText(own) : ''}` : open ? '소환 가능' : '잠김'}</div>
+                </button>);
+            })}
+          </div>
+        </div>
+      ))}
+      {!rows.length && <div className="text-center py-10" style={{ fontSize: 12.5, color: PALETTE.textDim }}>조건에 맞는 사역마가 없습니다</div>}
+      {ie && (() => { const g = F.famGrade(ie.grade); const role = F.FAM_ROLES[ie.role]; const open = poolKeys.has(ie.key);
+        const f0 = { grade: ie.grade, base: ie.grade, plus: 0, lv: 1 };
+        const sig = F.famHasSignature(ie.key, f0) ? F.famSignature(ie.key, ie.grade) : null; const pv = F.famPassive(ie.key, f0);
+        return (
+          <MainModal kicker="사 역 마 도 감" title={F.famName(ie.key)} color={g.color} badge="미보유" img={chronicleEnemyArt(ie.key)} sub={`${role.icon} ${role.label} · 최고 소환 등급 ${g.label}`} onClose={() => setInfo(null)}>
+            <MainKvRows rows={[
+              { l: '나오는 곳', v: ie.src },
+              { l: '소환 상태', v: open ? '소환 가능' : '잠김', c: open ? '#8fd08a' : '#e07a6a' },
+              { l: '역할', v: `${role.icon} ${role.label}`, c: role.color },
+              { l: '소환 등급', v: ie.grade === 'green' ? '적령 · 녹령' : g.label, c: g.color },
+            ]} />
+            {!open && <div className="mt-1" style={{ fontSize: 11.5, color: PALETTE.textDim }}>그 지역을 열거나(보스·던전 보스는 처치·클리어) 하면 소환 풀에 들어온다</div>}
+            <div className="mt-2" style={{ fontSize: 12, color: PALETTE.textDim, lineHeight: 1.55 }}>{role.desc}</div>
+            {sig && <div className="mt-2" style={{ padding: '8px 10px', border: `1px solid ${MS.line}`, background: MS.box, borderRadius: MS.r, fontSize: 12.5, lineHeight: 1.55 }}><b style={{ color: '#c79bff' }}>★ 고유 스킬</b> {sig.name} <span style={{ color: PALETTE.textDim }}>· {sig.type || ''}</span></div>}
+            {pv && <div className="mt-2" style={{ padding: '8px 10px', border: `1px solid ${MS.line}`, background: MS.box, borderRadius: MS.r, fontSize: 12.5, lineHeight: 1.55 }}><b style={{ color: '#f0a86a' }}>◆ 자령 패시브</b> {pv.name} — <span style={{ color: PALETTE.textDim }}>{pv.desc}</span></div>}
+            <ResoLine k={ie.key} f={f0} box />
+          </MainModal>);
+      })()}
+    </>
+  );
+}
+
+
 export function FamiliarView({ save, setSave, onBack, flash, onTrack = () => {} }) {
   const [tab, setTab] = useState('summon');
   const [results, setResults] = useState(null);
   const [sel, setSel] = useState(null);
   const [pickSlot, setPickSlot] = useState(null);
   const [selTab, setSelTab] = useState('fx'); // 설명창 탭 (1.244.0)
+  const [flt, setFltRaw] = useState(readFamFlt); // 1.302.0 필터 (보관함·도감 공용)
+  const setFlt = (v) => { setFltRaw(v); try { localStorage.setItem('chronicleFamFilter', JSON.stringify(v)); } catch { /* */ } };
   const [preview, setPreview] = useState(null); // 효율 미리보기 (1.232.0)
   const fams = save.fams || {};
   heroBranch = save.units[save.hero]?.rebirth?.branch || null;
@@ -318,6 +415,7 @@ export function FamiliarView({ save, setSave, onBack, flash, onTrack = () => {} 
   const slotOf = (k) => ['main', 'sub1', 'sub2', 'sub3'].find(sl => team[sl] === k) || null;
   const inTeam = list.filter(([k]) => slotOf(k));
   const waiting = list.filter(([k]) => !slotOf(k));
+  const shown = [...inTeam, ...waiting].filter(([k, f]) => F.famFilterMatch(k, f, flt, heroBranch, heroCls));
   const grpHead = (left, right) => <div className="flex justify-between" style={{ fontSize: 11.5, fontWeight: 700, color: PALETTE.textDim, marginTop: 2 }}><span>{left}</span>{right && <span style={{ fontWeight: 400 }}>{right}</span>}</div>;
   return (
     <div className="absolute inset-0 flex flex-col">
@@ -328,7 +426,7 @@ export function FamiliarView({ save, setSave, onBack, flash, onTrack = () => {} 
           <span style={{ fontSize: 11.5, color: PALETTE.textDim }}>누르면 정보 · 빈 칸은 편성</span>
         </div>
         <MainFamTeam save={save} onOpen={(k) => setSel(k)} onPick={(sl) => setPickSlot(sl)} />
-        <div className="mt-2"><MainTabs items={[['summon', '소환'], ['list', `보관함 ${list.length}`], ['team', '편성'], ['bond', `인연 ${F.FAM_BONDS.filter(b => F.bondTier(fams, b) > 0).length}`]]} value={tab} onChange={setTab} /></div>
+        <div className="mt-2"><MainTabs items={[['summon', '소환'], ['list', `보관함 ${list.length}`], ['team', '편성'], ['bond', `인연 ${F.FAM_BONDS.filter(b => F.bondTier(fams, b) > 0).length}`], ['codex', '도감']]} value={tab} onChange={setTab} size={12} /></div>
       </div>
       <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
         {tab === 'summon' && (
@@ -364,12 +462,15 @@ export function FamiliarView({ save, setSave, onBack, flash, onTrack = () => {} 
         {tab === 'list' && (
           <>
             <div className="flex justify-between" style={{ fontSize: 12, color: PALETTE.textDim }}><span>보관 <b style={{ color: PALETTE.text }}>{list.length}</b> · 정렬 <b style={{ color: MS.gold }}>등급</b></span><span>📜 {shards} · 🔮 {souls}</span></div>
+            <FamFilterBar flt={flt} setFlt={setFlt} count={shown.length} />
             <div className="flex flex-col gap-1.5">
-              {[...inTeam, ...waiting].map(([k, f]) => <MainFamCard key={k} k={k} f={f} slot={slotOf(k)} heroLv={heroLv} famPct={famPct} onClick={() => setSel(k)} />)}
+              {shown.map(([k, f]) => <MainFamCard key={k} k={k} f={f} slot={slotOf(k)} heroLv={heroLv} famPct={famPct} onClick={() => setSel(k)} />)}
+              {!!list.length && !shown.length && <div className="text-center py-8" style={{ fontSize: 12.5, color: PALETTE.textDim }}>조건에 맞는 사역마가 없습니다</div>}
             </div>
             {!list.length && <div className="text-center py-10" style={{ fontSize: 12.5, color: PALETTE.textDim }}>아직 사역마가 없습니다 — 계약서 조각을 모아 소환하세요</div>}
           </>
         )}
+        {tab === 'codex' && <FamCodexView save={save} flt={flt} setFlt={setFlt} onOpen={(k) => setSel(k)} />}
         {tab === 'bond' && <FamBondView fams={fams} onPick={(k) => fams[k] && setSel(k)} />}
         {tab === 'team' && slots.map(sl => {
           const open = E.famSlotOpen(save, sl.id);
