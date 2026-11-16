@@ -610,12 +610,14 @@ export function FamiliarView({ save, setSave, onBack, flash, onTrack = () => {} 
             <button onClick={() => setPreview({ after: E.setFamTeam(save, pickSlot, k), title: `🐾 ${slotLabel}: ${F.famName(k)}(으)로 바꾸면` })} className="ui-press flex-none" aria-label="효율 미리보기" style={{ width: 44, borderRadius: 12, border: `1px dashed ${PALETTE.legendary}88`, color: PALETTE.legendary, background: 'transparent', fontSize: 16 }}>📊</button>
           </div>
         );
-        const others = list.filter(([k]) => k !== curK && slotOf(k));
-        const rest = list.filter(([k]) => !slotOf(k));
+        const fm = ([k, f]) => F.famFilterMatch(k, f, flt, heroBranch, heroCls); // 1.302.2 편성 선택에도 필터
+        const others = list.filter(([k]) => k !== curK && slotOf(k)).filter(fm);
+        const rest = list.filter(([k]) => !slotOf(k)).filter(fm);
         return (
           <BottomSheet title={`${slotLabel} 편성`} onClose={() => setPickSlot(null)} maxHeight="80%">
             <div className="flex flex-col gap-1.5">
               <div style={{ fontSize: 11.5, color: PALETTE.textDim }}>{isMain ? '동행 칸 = 함께 싸운다 · ▲▼ = 지금 동행과 비교한 능력치' : '보조 칸 = 효과만 준다 · ▲▼ = 지금 이 칸의 사역마와 비교'} · 📊 = 사냥 효율 미리보기</div>
+              <FamFilterBar flt={flt} setFlt={setFlt} count={others.length + rest.length} />
               {grpHead(`지금 ${slotLabel} 칸`)}
               {curF ? <MainFamCard k={curK} f={curF} heroLv={heroLv} famPct={famPct} slot={pickSlot} mark hideSub={isMain} onClick={() => setPickSlot(null)} />
                 : <div style={{ padding: 10, borderRadius: 12, border: '1px dashed var(--ui-line-strong)', fontSize: 12, color: PALETTE.textDim }}>비어 있음</div>}
