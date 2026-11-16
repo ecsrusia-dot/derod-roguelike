@@ -480,7 +480,7 @@ function standbySources(save, u, br) {
 }
 // 전투 능력치 (2.0 — 장비 옵션·유니크 효과 합산)
 const PASS_KEYS = ['counterDouble', 'tauntReduce', 'critAfterCounter', 'emergencyHeal', 'dotTurnsMult', 'openInferno', 'skillShield', 'resetEvery',
-  'overhealShield', 'missingHpAtk', 'rageDouble', 'rageTurnsAdd', 'rageLifesteal', 'multiHitsAdd', 'spiritArrow', 'dodgeHeal', 'firstCrit', 'revive', 'shieldReduce', 'blessMult', 'blessTurns',
+  'overhealShield', 'missingHpAtk', 'rageDouble', 'rageTurnsAdd', 'rageLifesteal', 'multiHitsAdd', 'barrageHitsAdd', 'spiritArrow', 'dodgeHeal', 'firstCrit', 'revive', 'shieldReduce', 'blessMult', 'blessTurns',
   'execute', 'chain', 'holyDmg', 'regenPct', 'counterDmg', 'skillDmg', 'dotDmg', 'expPct', 'goldPct', 'dropPct', 'famPct', 'fam_tank', 'fam_healer', 'fam_dps'];
 const MULT_KEYS = ['dotTurnsMult', 'blessMult'];
 export function deriveUnit(save, classId) {
@@ -1476,7 +1476,9 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
     const r = damage(u, t, 0.8, { noDodge: true });
     hits.push({ t: t.id, d: r.d, c: r.crit, chain: true, ab: r.absorbed });
   };
-  // 연격 — 단일 공격 뒤 추가 타격
+  // 연속기 타수 — 「연속 화살」은 multiHitsAdd, 「폭풍 연사」는 barrageHitsAdd (1.303.0)
+  const multiHitsOf = (u, s) => s.hits + (s.id === 'e_volley' ? u.multiHitsAdd || 0 : s.id === 'et_barrage' ? u.barrageHitsAdd || 0 : 0);
+  // 연격 — 기본 공격·단일기는 명중마다, 연속기·광역기는 스킬당 1회 추가 타격 판정
   const chainHit = (u, t, hits) => {
     if (!u.chain || !t || t.hp <= 0 || rng() >= u.chain) return;
     const r = damage(u, t, 0.5, { noDodge: true });
@@ -1563,7 +1565,7 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
         const v = (x.s.base + x.s.perLv * (x.lv - 1)) * (1 + (u.skillBoost?.[x.s.id] || 0));
         const k = x.s.kind;
         if (k === 'aoe') return v * foes.length;
-        if (k === 'multi') return v * (x.s.hits + (x.s.id === 'e_volley' ? u.multiHitsAdd || 0 : 0));
+        if (k === 'multi') return v * multiHitsOf(u, x.s);
         if (k === 'dot') return v * (1 + (u.dotDmg || 0)) * (x.s.all ? foes.length : 1); // 이미 걸린 지속 피해 갱신 = 한 틱 값으로만 친다
         return v * rageX;
       };
@@ -1708,17 +1710,19 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random) {
         break;
       }
       case 'multi': {
-        const n = s.hits + (s.id === 'e_volley' ? u.multiHitsAdd || 0 : 0);
+        const n = multiHitsOf(u, s);
         for (let i = 0; i < n; i++) {
           const t = pickEnemyTarget(u);
           if (!t) break;
           const r = damage(u, t, v, { skill: true });
           hits.push({ t: t.id, d: r.d, c: r.crit, m: r.miss, ab: r.absorbed });
         }
+        chainHit(u, pickEnemyTarget(u), hits); // 1.303.0 연속기 뒤에도 추가 타격 1회 판정
         break;
       }
       case 'aoe':
         for (const t of foes) { const r = damage(u, t, v, { skill: true }); hits.push({ t: t.id, d: r.d, c: r.crit, m: r.miss, ab: r.absorbed }); }
+        chainHit(u, pickEnemyTarget(u), hits); // 1.303.0 광역기 뒤에도 추가 타격 1회 판정
         break;
       case 'dot': {
         const targets = s.all ? foes : [pickEnemyTarget(u)];

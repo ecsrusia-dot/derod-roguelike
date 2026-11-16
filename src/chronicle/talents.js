@@ -196,7 +196,7 @@ export const BRANCH_TREES = {
     [N('bt_e1', '돌풍 숙련', 5, { sb_et_gale: 0.08 }), N('bt_e2', '바람 타기', 5, { dodge: 0.006 })],
     [N('bt_e3', '속사', 5, { chain: 0.02 }), N('bt_e4', '연사 숙련', 5, { sb_et_barrage: 0.08 })],
     [N('bt_e5', '바람의 화살', 5, { spiritArrow: 0.02 }), N('bt_e6', '날랜 손', 5, { atkPct: 0.02 })],
-    [N('bt_e7', '빠른 시위', 1, { cdr: 1 }), N('bt_e8', '화살 더미', 2, { multiHitsAdd: 1 })],
+    [N('bt_e7', '빠른 시위', 1, { cdr: 1 }), N('bt_e8', '화살 더미', 2, { barrageHitsAdd: 1 })],
     [N('bt_e9', '폭풍의 눈', 1, { sb_et_gale: 0.5, sb_et_barrage: 0.5 })],
   ]),
   p_arch: BT('p_arch', 'priest', '대주교', '#ffe9a8', '고치고 북돋운다 — 고양의 찬가·재생의 기도', [
@@ -280,12 +280,12 @@ const LBL = {
   dodge: ['회피', '%'], dodgeHeal: ['회피 시 HP 회복', '%'], counterPct: ['반격 확률', '%'], counterDmg: ['반격 피해', '%'], counterDouble: ['반격 2회 확률', '%'],
   critAfterCounter: ['반격·회피 직후 다음 공격 치명 확정', 'flag'], dmgReduce: ['받는 피해 감소', '%'], tauntReduce: ['도발 중 받는 피해 감소', '%'],
   regenPct: ['매 턴 HP 재생', '%'], shieldPct: ['전투 시작 보호막(최대 HP)', '%'], guts: ['전투당 1회 HP 1로 버팀', 'flag'], emergencyHeal: ['HP 30% 미만 시 1회 회복', '%'],
-  thornsPct: ['받은 피해 반사', '%'], armorPen: ['방어 관통', '%'], chain: ['단일 공격 뒤 추가 타격 확률', '%'], execute: ['HP 30% 미만 적에게 피해', '%'],
+  thornsPct: ['받은 피해 반사', '%'], armorPen: ['방어 관통', '%'], chain: ['공격 뒤 추가 타격 확률', '%'], execute: ['HP 30% 미만 적에게 피해', '%'],
   cdr: ['모든 스킬 재사용 대기', 'turn'], dotDmg: ['지속 피해', '%'], skillDmg: ['스킬 피해', '%'], openInferno: ['이프리트의 낙인(공격력)', '%'],
   dotTurnsMult: ['지속 피해 지속 시간 ×', 'x'], firstCrit: ['전투 첫 공격 치명 확정', 'flag'], skillShield: ['스킬 사용 시 보호막(공격력)', '%'],
   shieldReduce: ['보호막이 있는 동안 받는 피해 감소', '%'], overhealShield: ['최대 HP를 넘는 회복은 보호막으로', 'flag'], lowHpDmg: ['HP 50% 이하일 때 피해', '%'],
   missingHpAtk: ['잃은 HP 10%마다 공격력', '%'], revive: ['전투당 1회 쓰러지면 부활(최대 HP)', '%'], rageDouble: ['광폭화 중 모든 공격 2회', 'flag'],
-  spdPct: ['속도', '%'], multiHitsAdd: ['연속 화살 타수', 'n'], spiritArrow: ['공격 뒤 정령 화살 확률', '%'], famPct: ['사역마 능력치', '%'],
+  spdPct: ['속도', '%'], multiHitsAdd: ['「연속 화살」 타수', 'n'], barrageHitsAdd: ['「폭풍 연사」 타수', 'n'], spiritArrow: ['공격 뒤 정령 화살 확률', '%'], famPct: ['사역마 능력치', '%'],
   healPct: ['회복량', '%'], holyDmg: ['회복의 일부를 신성 피해로', '%'], blessTurns: ['축복 지속', 'turnAdd'],
 };
 export function talentFxText(fx, skillName = (id) => id) {

@@ -686,13 +686,13 @@ export const UNIQUE_DROP = { own: 0.85, other: 0, common: 0.15 };   // 1.301.1 �
 export const EPIC_OPTIONS = {
   w_exec: { name: '처형자', desc: 'HP 30% 이하인 적에게 피해 +50%', fx: { execute: 0.5 } },
   w_vamp: { name: '흡혈', desc: '준 피해의 8%만큼 회복', fx: { lifesteal: 0.08 } },
-  w_chain: { name: '연격', desc: '단일 공격 후 25% 확률로 50% 추가 타격', fx: { chain: 0.25 } },
+  w_chain: { name: '연격', desc: '공격 후 25% 확률로 50% 추가 타격', fx: { chain: 0.25 } },
   w_pierce: { name: '관통', desc: '적 방어 40% 무시', fx: { armorPen: 0.4 } },
   a_thorn: { name: '가시', desc: '받은 피해의 25%를 되돌려 줌', fx: { thornsPct: 0.25 } },
   a_regen: { name: '재생', desc: '내 차례마다 최대 HP 4% 회복', fx: { regenPct: 0.04 } },
   a_bulwark: { name: '성채', desc: '전투 시작 시 최대 HP 15% 보호막', fx: { shieldPct: 0.15 } },
   a_guts: { name: '불굴', desc: '전투당 1회, 쓰러질 피해를 HP 1로 버팀', fx: { guts: 1 } },
-  c_haste: { name: '신속', desc: '단일 공격 뒤 추가 타격 확률 +20%', fx: { chain: 0.2 } }, // 1.270.0 속도 → 추가 타격
+  c_haste: { name: '신속', desc: '공격 뒤 추가 타격 확률 +20%', fx: { chain: 0.2 } }, // 1.270.0 속도 → 추가 타격
   c_focus: { name: '집중', desc: '치명 +10% · 치명 피해 +30%', fx: { crit: 0.1, critDmg: 0.3 } },
   c_time: { name: '시간의 모래', desc: '재사용 대기가 가장 긴 스킬 -1턴', fx: { longCdr: 1 } }, // 1.241.0: 모든 스킬 → 가장 긴 스킬 1개
   c_fury: { name: '분노', desc: '공격력 +12%', fx: { atkPct: 0.12 } },
@@ -713,7 +713,7 @@ export const UNIQUE_ITEMS = {
   u_d_heart: U('u_d_heart', 'demonblood', 'offhand', '마왕의 심장 조각', { hpPct: 0.12, lowHpDmg: 0.1 }, { missingHpAtk: 0.06 }, '잃은 HP 10%마다 공격력 +6%'),
   u_d_scar: U('u_d_scar', 'demonblood', 'armor', '흉터 갑주', { hpPct: 0.12, dmgReduce: 0.04 }, { thornsPct: 0.15 }, '받은 피해 15% 반사'),
   u_d_brand: U('u_d_brand', 'demonblood', 'accessory', '광기의 혈인', { atkPct: 0.10, lifesteal: 0.04 }, { atkPct: 0.15, critDmg: 0.3, cdr: 1 }, '공격력 +15% · 치명 피해 +30% · 모든 스킬 재사용 -1턴'),
-  u_e_string: U('u_e_string', 'elf', 'weapon', '바람의 현', { atkPct: 0.08, chain: 0.08 }, { atkPct: 0.1, chain: 0.15 }, '공격력 +10% · 단일 공격 뒤 추가 타격 확률 +15%'),
+  u_e_string: U('u_e_string', 'elf', 'weapon', '바람의 현', { atkPct: 0.08, chain: 0.08 }, { atkPct: 0.1, chain: 0.15 }, '공격력 +10% · 공격 뒤 추가 타격 확률 +15%'),
   u_e_quiver: U('u_e_quiver', 'elf', 'offhand', '정령 화살통', { critDmg: 0.2, chain: 0.06 }, { spiritArrow: 0.4, atkPct: 0.06 }, '공격 시 40% 확률로 정령 화살(공격력 80%) · 공격력 +6%'),
   u_e_leaf: U('u_e_leaf', 'elf', 'armor', '잎새 갑옷', { dodge: 0.05, hpPct: 0.08 }, { dodgeHeal: 0.05 }, '회피할 때마다 HP 5% 회복'),
   u_e_hawk: U('u_e_hawk', 'elf', 'accessory', '매의 눈', { crit: 0.06, chain: 0.07 }, { critDmg: 0.6, atkPct: 0.1, chain: 0.1, firstCrit: 1, cdr: 1 }, '공격력 +10% · 치명 피해 +60% · 추가 타격 확률 +10% · 전투 첫 공격 치명 확정 · 모든 스킬 재사용 -1턴'),
@@ -728,7 +728,7 @@ export const UNIQUE_ITEMS = {
   // 1.269.0 PM 결정 「전투용 공용 반지 4종」 — 공격·생존·속도·치명 계열
   u_c_wrath: U('u_c_wrath', 'common', 'accessory', '분노의 인장', { atkPct: 0.08, hpPct: 0.05 }, { atkPct: 0.12, execute: 0.2 }, '공격력 +12% · HP 30% 미만의 적에게 피해 +20%'),
   u_c_ward: U('u_c_ward', 'common', 'accessory', '수호자의 반지', { hpPct: 0.08, defPct: 0.08 }, { hpPct: 0.12, dmgReduce: 0.06 }, '최대 HP +12% · 받는 피해 -6%'),
-  u_c_gale: U('u_c_gale', 'common', 'accessory', '질풍의 반지', { atkPct: 0.06, chain: 0.1 }, { chain: 0.25, atkPct: 0.06 }, '공격력 +6% · 단일 공격 뒤 추가 타격 확률 +25%'),
+  u_c_gale: U('u_c_gale', 'common', 'accessory', '질풍의 반지', { atkPct: 0.06, chain: 0.1 }, { chain: 0.25, atkPct: 0.06 }, '공격력 +6% · 공격 뒤 추가 타격 확률 +25%'),
   u_c_edge: U('u_c_edge', 'common', 'accessory', '예리한 눈의 반지', { crit: 0.05, atkPct: 0.06 }, { crit: 0.1, critDmg: 0.4 }, '치명 +10% · 치명 피해 +40%'),
 };
 // 유니크 확률 — 장비 1개당 (설계서 5절)
@@ -741,7 +741,7 @@ Object.assign(UNIQUE_ITEMS, {
   ub_reaper: U('ub_reaper', 'demonblood', 'weapon', '혈귀의 낫', { critDmg: 0.3, atkPct: 0.1 }, { execute: 0.4 }, 'HP 30% 미만의 적에게 피해 +40%', { branch: 'd_reaper' }),
   ub_plague: U('ub_plague', 'demonblood', 'armor', '역병의 갑주', { hpPct: 0.15, dmgReduce: 0.06 }, { thornsPct: 0.2 }, '받은 피해 20% 반사', { branch: 'd_plague' }),
   ub_sniper: U('ub_sniper', 'elf', 'weapon', '저격수의 장궁', { crit: 0.08, critDmg: 0.3 }, { firstCrit: 1 }, '전투 첫 공격 치명타 확정', { branch: 'e_sniper' }),
-  ub_storm: U('ub_storm', 'elf', 'offhand', '폭풍의 화살통', { chain: 0.1, atkPct: 0.08 }, { chain: 0.2 }, '단일 공격 뒤 추가 타격 확률 +20%', { branch: 'e_storm' }),
+  ub_storm: U('ub_storm', 'elf', 'offhand', '폭풍의 화살통', { chain: 0.1, atkPct: 0.08 }, { chain: 0.2 }, '공격 뒤 추가 타격 확률 +20%', { branch: 'e_storm' }),
   ub_arch2: U('ub_arch2', 'priest', 'offhand', '대주교의 성배', { healPct: 0.2, hpPct: 0.08 }, { revive: 0.3 }, '전투당 1회, 쓰러지면 HP 30%로 부활', { branch: 'p_arch' }),
   ub_inq: U('ub_inq', 'priest', 'weapon', '심판관의 망치', { atkPct: 0.15, holyDmg: 0.1 }, { execute: 0.3 }, 'HP 30% 미만의 적에게 피해 +30%', { branch: 'p_inq' }),
   // 1.286.0 갈래 전용 유니크 확대 (갈래당 1 → 3종) — PM 결정: 전승 전용 유니크는 그 갈래의 전승 스킬을 강화한다 (기본 스킬 강화 X)
