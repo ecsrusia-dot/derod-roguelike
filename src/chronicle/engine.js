@@ -427,7 +427,10 @@ export function scaleEnemiesForRebirth(save, enemies) {
     const n = intimidateLevel(heroLv, e.lv);
     const st = intimidateStep(n);
     const h = hm * (st ? st.hp : 1); const a = am * (st ? st.atk : 1);
-    if (h === 1 && a === 1) return e;
+    // 회피·적중 (1.307.0) — 강적·보스·위압 단계에 따라 적 추가 적중·회피
+    { const A = T.accRule || {}; const ac = (A.tierAcc?.[e.tier] || 0) + (st?.acc || 0); const dg = (A.tierDodge?.[e.tier] || 0) + (st?.dodge || 0);
+      if (ac || dg) e = { ...e, acc: (e.acc || 0) + ac, dodge: Math.min(T.dodgeCap, (e.dodge || 0) + dg) }; }
+    if (h === 1 && a === 1) return n ? { ...e, intim: n } : e;
     return { ...e, hp: Math.round(e.hp * h), maxHp: Math.round(e.maxHp * h), atk: Math.round(e.atk * a), ...(c ? { rebirthTier: c } : {}), ...(n ? { intim: n } : {}) };
   });
 }
@@ -541,7 +544,9 @@ export function deriveUnit(save, classId) {
     spd: +((8 + st.agi * 0.6 + G('spd')) * (1 + G('spdPct'))).toFixed(1),
     crit: Math.min(0.6, critRaw),
     critMult: T.critMult + G('critDmg') + Math.max(0, critRaw - 0.6) * (SK.critOverflow || 0), // 상한 초과분 → 치명 피해 (1.270.0)
-    dodge: Math.min(0.35, st.agi * SK.agiDodge + (fx.dodgeAdd || 0) + G('dodge')),
+    dodge: Math.min(T.dodgeCap, st.agi * SK.agiDodge + (fx.dodgeAdd || 0) + G('dodge')),
+    dodgeOver: Math.max(0, st.agi * SK.agiDodge + (fx.dodgeAdd || 0) + G('dodge') - T.dodgeCap), // 상한을 넘은 회피 = 상대 추가 적중을 상쇄
+    acc: (st.str + st.int) * (SK.acc || 0) + G('acc'),
     counterPct: (fx.counterPct || 0) + G('counterPct'),
     lowHpDmg: (fx.lowHpDmg || 0) + G('lowHpDmg'),
     lifesteal: Math.min(T.lifestealCap || 1, G('lifesteal')), thornsPct: G('thornsPct'), armorPen: Math.min(0.8, G('armorPen')),
@@ -675,7 +680,8 @@ export function statBreakdown(save, classId, key) {
       break;
     }
     case 'crit': pctUnit(); out.base = [{ label: '기본', v: 0.05 }, statLine('agi', S.agiCrit || 0, `${r1((S.agiCrit || 0) * 100)}%`)]; out.flat = from('crit'); out.notes.push('상한 60% — 넘친 몫은 「치명 피해」로 바뀐다.'); break;
-    case 'dodge': pctUnit(); out.base = [statLine('agi', S.agiDodge || 0, `${r1((S.agiDodge || 0) * 100)}%`)]; out.flat = from('dodge'); out.notes.push('상한 35%.'); break;
+    case 'dodge': pctUnit(); out.base = [statLine('agi', S.agiDodge || 0, `${r1((S.agiDodge || 0) * 100)}%`)]; out.flat = from('dodge'); out.notes.push(`상한 ${Math.round(T.dodgeCap * 100)}% — 넘친 몫은 상대의 추가 적중을 그만큼 지운다. 실제 회피 = 회피 − (상대 적중 − 넘친 회피).`); break;
+    case 'acc': pctUnit(); out.base = [statLine('str', S.acc || 0, `${r1((S.acc || 0) * 100)}%`), statLine('int', S.acc || 0, `${r1((S.acc || 0) * 100)}%`)]; out.flat = from('acc'); out.notes.push('상대 회피를 이만큼 깎는다. 레벨이 높은 적·보스는 회피가 있다 (위압 1~4단계 +5/10/15/30% · 보스 +5%).'); break;
     case 'critMult': {
       pctUnit(); out.base = [{ label: '기본', v: T.critMult }]; out.flat = from('critDmg');
       const raw = 0.05 + st.agi * (S.agiCrit || 0) + from('crit').reduce((t, x) => t + x.v, 0);
@@ -1574,9 +1580,11 @@ export function simulateChronicleBattle(party0, enemies0, rng = Math.random, opt
   // 원정대 레이드 「다섯 봉인」 (1.231.0) — 봉인은 그 직업만, 봉인이 남아 있으면 보스 무적. 일반 전투엔 봉인이 없어 영향 0
   const immuneTo = (att, def) => !!def && ((def.sealOf && att?.classId !== def.sealOf) || (def.sealedBoss && units.some(x => x.sealOf && x.hp > 0))
     || (def.mech === 'ward' && units.some(x => x.warden && x.hp > 0))); // 호위 결계 (1.237.0)
+  // 회피 판정 (1.307.0) — 회피(상한 적용) − max(0, 공격자 적중 − 방어자 초과 회피)
+  const missChance = (att, def) => Math.max(0, (def.dodge || 0) - Math.max(0, (att.acc || 0) - (def.dodgeOver || 0)));
   const damage = (att, def, mult, { noDodge = false, skill = false } = {}) => {
     if (immuneTo(att, def)) return { d: 0, immune: true };
-    if (!noDodge && rng() < (def.dodge || 0)) {
+    if (!noDodge && rng() < missChance(att, def)) {
       if (def.dodgeHeal) healUnit(def, Math.round(def.maxHp * def.dodgeHeal));
       if (def.critAfterCounter) def.critNext = true;
       return { miss: true, d: 0 };
