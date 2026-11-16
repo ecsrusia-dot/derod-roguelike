@@ -9,7 +9,7 @@ import { SLOTS, FORGE } from '../data.js';
 import * as E from '../engine.js';
 import * as GE from '../gearEval.js';
 import { gradeOf, clsTag, Header, ForgePop, Wallet, BASE_STATS, BASE_LABEL, MainKvRows, MainTabs, MS, MainSecHead, MainModal, MainCell, ConfirmSheet } from './common.jsx';
-import { useGearEval, SORT_LABEL, effSort, EvalBasis, MainGearCard, CMP_DN, ForgeFooter, useItemSort, sortItems, filterItems, EquipBoxes, forgeNextRate } from './gear.jsx';
+import { AppraisePanel, appraiseText, useGearEval, SORT_LABEL, effSort, EvalBasis, MainGearCard, CMP_DN, ForgeFooter, useItemSort, sortItems, filterItems, EquipBoxes, forgeNextRate } from './gear.jsx';
 
 function RiskLine({ rate, fail, danger }) {
   return (
@@ -93,7 +93,7 @@ export function ForgeView({ save, setSave, onBack, flash, onTrack = () => {} }) 
   // 옵션 재설정 (1.276.0) — 줄 선택 → 굴리기(비용 소모) → 새 옵션을 보고 바꾸기/유지
   const [rfIdx, setRfIdx] = useState(null);
   const [rfCand, setRfCand] = useState(null); // { uid, idx, opt, mode }
-  const [rfMode, setRfMode] = useState('kind'); // 'kind' 옵션 재설정(✦) · 'value' 수치 재설정(◆) — 1.280.0
+  const [rfMode] = useState('value'); // 1.301.0 옵션 재부여 폐지 — 수치 재설정만 // 'kind' 옵션 재설정(✦) · 'value' 수치 재설정(◆) — 1.280.0
   useEffect(() => { setRfIdx(null); setRfCand(null); }, [sel]);
   const guard = (risky, info, run) => {
     if (!risky || forgeConfirmSkip) { run(); return; }
@@ -162,15 +162,16 @@ export function ForgeView({ save, setSave, onBack, flash, onTrack = () => {} }) 
     if (r.result === 'fail') { showPop('fail', '승급 실패', '재료만 잃었습니다'); return; }
     const it2 = r.save.inventory.find(i => i.uid === item.uid); showPop('success', `${gradeOf(ng).label} 등급으로 승급!`, E.epicOptOf(it2) ? `에픽 효과 「${E.epicOptOf(it2).name}」` : E.itemName(it2));
   });
-  const rfLines = item ? E.reforgeLines(item) : [];
+  const doAppraise = (it) => { const r = E.appraiseItem(save, it.uid, Math.random); if (!r.item) return; setSave(r.save); flash(appraiseText(r)); };
+  const rfLines = item && !item.unid ? E.reforgeLines(item) : [];
   const rfValue = rfMode === 'value';
-  const rfCost = item ? (rfValue ? E.tuneCost(item) : E.reforgeCost(item)) : null;
+  const rfCost = item ? E.tuneCost(item) : null;
   const rfTune = (i) => E.tuneLineState(item, i);
   const rfOpen = rfLines.filter(l => (rfValue ? rfTune(l.i).ok : !l.locked));
   const rfSel = rfOpen.some(l => l.i === rfIdx) ? rfIdx : (rfOpen[0]?.i ?? null);
   const rfPending = rfCand && item && rfCand.uid === item.uid ? rfCand : null;
   const doReforge = () => {
-    const r = rfValue ? E.tuneRoll(save, item.uid, rfSel, Math.random) : E.reforgeRoll(save, item.uid, rfSel, Math.random);
+    const r = E.tuneRoll(save, item.uid, rfSel, Math.random);
     if (!r.cand) return;
     setSave(r.save); setRfCand({ uid: item.uid, idx: rfSel, opt: r.cand, mode: rfMode });
   };
@@ -232,16 +233,17 @@ export function ForgeView({ save, setSave, onBack, flash, onTrack = () => {} }) 
             footer={ftab === 'reforge'
               ? (!rfCost || rfSel == null ? null : rfPending
                 ? <div className="grid gap-1.5" style={{ gridTemplateColumns: '1fr 1fr' }}>{bigBtn(true, '유지', () => rfDecide(false), true)}{bigBtn(true, rfPending.mode === 'value' ? '새 수치로 바꾸기' : '새 옵션으로 바꾸기', () => rfDecide(true))}</div>
-                : (rfValue ? E.canTune(save, item, rfSel) : E.canReforge(save, item, rfSel)) ? bigBtn(true, rfValue ? '🎯 선택한 옵션의 수치 다시 굴리기' : '🎲 선택한 옵션 다시 굴리기', doReforge) : bigBtn(false, forgeShort(save, rfCost)))
+                : E.canTune(save, item, rfSel) ? bigBtn(true, rfValue ? '🎯 선택한 옵션의 수치 다시 굴리기' : '🎲 선택한 옵션 다시 굴리기', doReforge) : bigBtn(false, forgeShort(save, rfCost)))
               : ftab === 'enhance'
               ? (maxed ? null : enhOk ? bigBtn(true, `⚒ 강화 +${item.plus || 0} → +${(item.plus || 0) + 1}`, doEnhance) : bigBtn(false, forgeShort(save, ec)))
               : (!ng ? null : proOk ? bigBtn(true, `⬆ ${gradeOf(ng).label} 승급`, doPromote, true) : bigBtn(false, forgeShort(save, pc)))}>
+            {item.unid && <AppraisePanel save={save} item={item} onAppraise={() => doAppraise(item)} />}
             {by === hero
               ? <button onClick={() => { setSave(E.unequipItem(save, hero, item.slot)); flash(`${E.itemName(item)} 착용 해제`); }} className="ui-press w-full mb-2" style={{ height: 36, fontSize: 12.5, border: `1px solid ${MS.line}`, background: MS.box, borderRadius: MS.r, color: PALETTE.text }}>착용 해제</button>
               : !by && E.itemUsable(item, hero) && (E.canWear(item, save.units[hero])
                 ? <button onClick={() => equipNow(item)} className="ui-press w-full mb-2" style={{ height: 36, fontSize: 12.5, fontWeight: 800, border: `1px solid ${MS.gold}`, background: 'rgba(232,176,74,0.10)', color: MS.gold }}>착용하기</button>
                 : <div className="mb-2 text-center" style={{ fontSize: 12, color: CMP_DN }}>Lv.{item.ilv}부터 착용 가능</div>)}
-            <MainTabs items={[['enhance', maxed ? '⚒ 최대 강화' : `⚒ 강화 +${item.plus || 0} → +${(item.plus || 0) + 1}`], ['promote', ng ? `⬆ 승급 → ${gradeOf(ng).label}` : '⬆ 승급'], ['reforge', '🎲 옵션']]} value={ftab} onChange={(t) => { if (!rfPending) setFtab(t); }} size={12.5} />
+            <MainTabs items={[['enhance', maxed ? '⚒ 최대 강화' : `⚒ 강화 +${item.plus || 0} → +${(item.plus || 0) + 1}`], ['promote', ng ? `⬆ 승급 → ${gradeOf(ng).label}` : '⬆ 승급'], ['reforge', '🎯 수치']]} value={ftab} onChange={(t) => { if (!rfPending) setFtab(t); }} size={12.5} />
             {ftab === 'enhance' && (maxed
               ? <div className="mt-3" style={{ fontSize: 12.5, color: PALETTE.textDim }}>최대 강화 +{FORGE.maxEnhance}에 도달했습니다</div>
               : <>
@@ -270,9 +272,9 @@ export function ForgeView({ save, setSave, onBack, flash, onTrack = () => {} }) 
                 </div>
               </>)}
             {ftab === 'reforge' && (!rfCost
-              ? <div className="mt-3" style={{ fontSize: 12.5, color: PALETTE.textDim }}>옵션이 없는 장비입니다 — 고급 등급부터 옵션이 붙는다</div>
+              ? <div className="mt-3" style={{ fontSize: 12.5, color: PALETTE.textDim }}>{item.unid ? '미감정 장비입니다 — 감정한 뒤에 수치를 다시 굴릴 수 있다' : '옵션이 없는 장비입니다 — 고급 등급부터 옵션이 붙는다'}</div>
               : <>
-                <div className="mt-2"><MainTabs size={12.5} value={rfMode} onChange={(m) => { if (!rfPending) { setRfMode(m); setRfIdx(null); } }} items={[['kind', '🎲 옵션 재설정 · ✦'], ['value', '🎯 수치 재설정 · ◆']]} /></div>
+                <div className="mt-2" style={{ fontSize: 11.5, color: MS.gold }}>🎯 수치 재설정 · ◆ 파편 — 옵션 종류는 바꿀 수 없다 (드랍된 옵션이 그 장비의 정체)</div>
                 <div className="mt-1" style={{ fontSize: 11.5, color: PALETTE.textDim, lineHeight: 1.5 }}>{rfValue ? '옵션 종류는 그대로 두고 수치만 다시 굴린다 — 유니크의 고정 옵션도 가능' : '옵션 종류와 수치를 함께 다시 굴린다'}</div>
                 <MainSecHead title="옵 션" />
                 <div className="flex flex-col gap-1.5">
@@ -303,12 +305,7 @@ export function ForgeView({ save, setSave, onBack, flash, onTrack = () => {} }) 
                         <div className="mt-1" style={{ fontSize: 11.5, color: PALETTE.textDim }}>최저~최고 사이에서 고르게 나온다 — 지금보다 낮게 나오면 「유지」를 고르면 된다</div>
                       </>
                     ); })()
-                    : <>
-                      <MainSecHead title="나 올 수 있 는 옵 션" />
-                      <div className="flex flex-wrap gap-1">
-                        {E.reforgePool(item, rfSel).map(x => <span key={x.k} style={{ fontSize: 11.5, padding: '2px 7px', border: `1px solid ${MS.line}`, background: MS.box, borderRadius: MS.r, color: PALETTE.text }}>{x.label} <b style={{ color: MS.gold }}>{Math.round(x.p * 100)}%</b></span>)}
-                      </div>
-                    </>}
+                    : null}
                 </>}
                 <div className="mt-2" style={{ padding: '8px 10px', border: `1px solid ${MS.line}`, background: MS.box, borderRadius: MS.r, fontSize: 12, color: PALETTE.text, lineHeight: 1.55 }}>
                   <b style={{ color: MS.red }}>◇ 규칙</b> 옵션 1줄을 골라 다시 굴린다 · 나온 결과를 보고 바꾸거나 유지 · 같은 장비는 굴릴수록 비싸진다 (두 방식 합쳐 이 장비 {item.rr || 0}회){item.named ? ' · 유니크의 고정 옵션은 종류를 못 바꾸고 수치만 다시 굴릴 수 있다' : ''}

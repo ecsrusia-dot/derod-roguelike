@@ -5,7 +5,7 @@
 // ============================================
 import React, { useEffect, useMemo, useState } from 'react';
 import { PALETTE } from '../../utils/helpers.js';
-import { gradeIdx, SLOTS, FORGE, chronicleClass } from '../data.js';
+import { gradeIdx, SLOTS, FORGE, APPRAISE, chronicleClass } from '../data.js';
 import * as E from '../engine.js';
 import * as GE from '../gearEval.js';
 import { gradeOf, clsTag, BASE_STATS, BASE_LABEL, MS, MainSecHead, MainModal, MainCell } from './common.jsx';
@@ -104,8 +104,46 @@ export function EvalFooter({ it, cur, info, canWear, needLv, onEquip }) {
   </>;
 }
 
+// ===== 장비 감정 (1.301.0) — 전승·유니크는 감정해야 옵션이 드러나고 착용할 수 있다 =====
+export function appraiseText(r) {
+  const n = E.itemOpts(r.item).length;
+  if (r.item.grade !== 'mythic') return `감정 완료 — 옵션 ${n}줄이 드러났습니다`;
+  return r.fx ? `감정 완료 — ★ 특수 효과 「${r.fx.name}」` : `감정 완료 — 옵션 ${n}줄 · 특수 효과는 붙지 않았습니다`;
+}
+export function AppraisePanel({ save, item, onAppraise }) {
+  const c = E.appraiseCost(item); const ok = E.canAppraise(save, item);
+  if (!c) return null;
+  const lack = save.gold < c.gold ? `🪙 ${(c.gold - save.gold).toLocaleString()} 부족` : (save.mats.essence || 0) < c.essence ? `✦ ${c.essence - (save.mats.essence || 0)} 부족` : '';
+  return (
+    <div className="mb-2" style={{ padding: '10px 11px', border: `1px solid ${MS.gold}`, background: 'rgba(232,176,74,0.08)', borderRadius: MS.r }}>
+      <div style={{ fontSize: 13, fontWeight: 800, color: MS.gold }}>🔍 미감정 장비</div>
+      <div className="mt-1" style={{ fontSize: 12, color: PALETTE.textDim, lineHeight: 1.55 }}>
+        감정해야 옵션이 드러나고 <b style={{ color: PALETTE.text }}>착용·강화</b>할 수 있다. 옵션은 얻을 때 이미 정해져 있고, 종류는 바꿀 수 없다.
+        {item.grade === 'mythic' && <><br /><b style={{ color: '#c79bff' }}>전승 장비</b>는 감정할 때 <b style={{ color: PALETTE.text }}>{Math.round(APPRAISE.mythicFxChance * 100)}%</b> 확률로 특수 효과가 1개 붙는다 — 종류(일반·갈래·공용)와 수치 모두 무작위.</>}
+      </div>
+      {onAppraise
+        ? <button disabled={!ok} onClick={onAppraise} className={`ui-press w-full mt-2 ${ok ? 'chr-btn-pri' : ''}`} style={{ height: 42, fontSize: 13.5, fontWeight: 800, opacity: ok ? 1 : 0.5, ...(ok ? {} : { border: `1px solid ${MS.line}`, background: 'transparent', color: PALETTE.textDim }) }}>{ok ? `🔍 감정하기 · ✦ ${c.essence} · 🪙 ${c.gold.toLocaleString()}` : `감정 ✦ ${c.essence} · 🪙 ${c.gold.toLocaleString()} — ${lack}`}</button>
+        : <div className="mt-2" style={{ fontSize: 12, color: PALETTE.textDim }}>감정 비용 ✦ {c.essence} · 🪙 {c.gold.toLocaleString()} — 가방으로 꺼낸 뒤 감정할 수 있다</div>}
+    </div>
+  );
+}
+
 export function MainGearCard({ it, onClick, note, dim = false, footer = null, tag = null, picked = null, cmp, evalInfo = null, syncLv = 0 }) {
   const sl = SLOTS.find(x => x.id === it.slot);
+  if (it.unid) {
+    const g0 = gradeOf(it.grade); const c0 = E.appraiseCost(it);
+    return (
+      <button onClick={onClick} className="ui-press w-full text-left" style={{ opacity: dim ? 0.6 : 1, padding: '8px 10px 8px 12px', background: picked ? 'rgba(224,106,95,0.16)' : MS.box, border: `1px solid ${picked ? '#e06a5f' : MS.line}`, borderLeft: `3px solid ${g0.color}`, borderRadius: MS.r }}>
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="truncate font-bold" style={{ fontSize: 13.5, color: g0.color }}>{sl.icon} {E.itemName(it)}{tag}</span>
+          {picked != null ? <span className="flex-none flex items-center justify-center" style={{ width: 20, height: 20, border: `1.5px solid ${picked ? '#e06a5f' : MS.line}`, color: '#e06a5f', fontSize: 13 }}>{picked ? '✓' : ''}</span>
+            : <b className="flex-none" style={{ fontSize: 12, color: MS.gold }}>🔍 미감정</b>}
+        </div>
+        <div style={{ fontSize: 11, color: PALETTE.textDim }}>{g0.label} · Lv.{it.ilv} · {sl.label}</div>
+        <div className="mt-1" style={{ fontSize: 11.5, color: PALETTE.textDim }}>옵션 <b style={{ color: PALETTE.text }}>? ? ?</b> — 감정하면 드러난다 (✦ {c0?.essence} · 🪙 {c0?.gold.toLocaleString()})</div>
+      </button>
+    );
+  }
   // 1.267.0 비교 모드(cmp !== undefined) — 양쪽 모두 +7 기준 능력치로 줄마다 ▲▼
   const cmpMode = cmp !== undefined;
   const itE = cmpMode ? GE.asEvalItem(it) : it;
@@ -137,7 +175,7 @@ export function MainGearCard({ it, onClick, note, dim = false, footer = null, ta
           </div>
         ))}
       </div>
-      {(ud || eo) && <div className="mt-1" style={{ fontSize: 11.5, color: '#c79bff', lineHeight: 1.45 }}>★ {(ud || eo).name} — <span style={{ color: PALETTE.text }}>{(ud || eo).desc}</span></div>}
+      {[ud, eo].filter(Boolean).map((x, i) => <div key={i} className="mt-1" style={{ fontSize: 11.5, color: '#c79bff', lineHeight: 1.45 }}>★ {x.name} — <span style={{ color: PALETTE.text }}>{x.desc}</span></div>)}
       {footer && <div className="flex items-center justify-between gap-2 mt-1.5 pt-1.5" style={{ borderTop: `1px dashed ${MS.line}`, fontSize: 11.5 }}>{footer}</div>}
     </button>
   );
@@ -191,7 +229,18 @@ export function ForgeFooter({ it, onEquip = null, canWear = true }) {
 }
 
 // 장비 정보창 — 본편 카드 모달 (1.249.0, PM 승인 시안 ⑭)
-export function MainItemModal({ save, item, cur, by, usable, onClose, footer, evalInfo = null }) {
+export function MainItemModal({ save, item, cur, by, usable, onClose, footer, evalInfo = null, onAppraise = null }) {
+  if (item.unid) {
+    const g0 = gradeOf(item.grade); const sl0 = SLOTS.find(sl => sl.id === item.slot);
+    return (
+      <MainModal kicker={`${g0.label} · ${sl0?.label || ''}`.split('').join(' ').replace(/ {3}/g, '  ')} title={E.itemName(item)} color={g0.color} badge="🔍 미감정" onClose={onClose} footer={footer}>
+        <div className="flex flex-wrap gap-1" style={{ fontSize: 11.5, marginBottom: 10 }}><span className="chr-pill">Lv.{item.ilv}</span><span className="chr-pill">{clsTag(item)}</span></div>
+        <AppraisePanel save={save} item={item} onAppraise={onAppraise} />
+        <div className="chr-list">{[['기본 능력치', '? ? ?'], ['추가 옵션', `? ? ? (${g0.opts}줄)`], ['특수 효과', item.named ? '? ? ?' : '? ? ? (붙지 않을 수도 있다)']].map(([l, v]) => (
+          <div key={l} className="flex items-baseline justify-between gap-2" style={{ padding: '8px 11px' }}><span style={{ fontSize: 12, color: PALETTE.textDim }}>{l}</span><span style={{ fontSize: 12.5, fontWeight: 800, color: PALETTE.textDim }}>{v}</span></div>))}</div>
+      </MainModal>
+    );
+  }
   const g = gradeOf(item.grade);
   const slot = SLOTS.find(sl => sl.id === item.slot);
   const st = E.itemStats(item);
@@ -238,7 +287,7 @@ export function MainItemModal({ save, item, cur, by, usable, onClose, footer, ev
         </div>
       ) : <div style={{ fontSize: 12, color: PALETTE.textDim }}>{g.opts ? '옵션 없음' : '추가 옵션은 고급 등급부터 붙는다'}</div>}
       <div className="mt-2" style={{ padding: '8px 10px', border: `1px solid ${MS.line}`, background: MS.box, borderRadius: MS.r, fontSize: 12.5, color: PALETTE.text, lineHeight: 1.55 }}>
-        <b style={{ color: ud || eo ? '#c79bff' : MS.red }}>◇ 특수 효과</b> {ud ? <><b style={{ color: '#f0a86a' }}>{ud.name}</b> — {ud.desc}</> : eo ? <><b style={{ color: '#d7a8ff' }}>{eo.name}</b> — {eo.desc}</> : <span style={{ color: PALETTE.textDim }}>없음 (에픽 장신구 · 유니크 장비에만 붙는다)</span>}
+        <b style={{ color: ud || eo ? '#c79bff' : MS.red }}>◇ 특수 효과</b> {ud ? <><b style={{ color: '#f0a86a' }}>{ud.name}</b> — {ud.desc}{eo ? <> · <b style={{ color: '#d7a8ff' }}>{eo.name}</b> — {eo.desc}</> : null}</> : eo ? <><b style={{ color: '#d7a8ff' }}>{eo.name}</b> — {eo.desc}</> : <span style={{ color: PALETTE.textDim }}>없음 (에픽 장신구 · 유니크 · 감정한 전승 장비 일부에 붙는다)</span>}
       </div>
       {showCmp && (
         <div className="mt-2" style={{ padding: '8px 10px', border: `1px solid ${MS.line}`, background: MS.box, borderRadius: MS.r, fontSize: 12.5, color: PALETTE.text, lineHeight: 1.55 }}>

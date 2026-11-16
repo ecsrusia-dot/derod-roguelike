@@ -39,7 +39,7 @@ function upkeep(save, rng) {
     const s = Object.values(CHRONICLE_SKILLS).find(x => x.cls === cid && E.canLearn(u, x));
     save = s ? E.learnSkill(save, cid, s.id) : E.autoAllocateTalents(save, cid);
   }
-  save = E.autoEquip(save);
+  save = E.autoEquip(E.appraiseAll(save)); // 1.301.0 — 봇도 전승·유니크를 감정해서 쓴다
   const junk = save.inventory.filter(i => !E.equippedBy(save, i.uid)).map(i => i.uid);
   save = E.dismantleItems(save, junk).save;
   for (const uid of Object.values(save.units[cid].equip)) {

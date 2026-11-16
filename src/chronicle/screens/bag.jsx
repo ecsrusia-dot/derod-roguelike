@@ -11,7 +11,7 @@ import * as E from '../engine.js';
 import * as A from '../account.js';
 import * as GE from '../gearEval.js';
 import { gradeOf, clsTag, Header, Wallet, Bar, MainTabs, MS, MainSecHead, MainModal, ConfirmSheet } from './common.jsx';
-import { useGearEval, SORT_LABEL, effSort, EvalFooter, MainGearCard, MainItemModal, useItemSort, sortItems, filterItems } from './gear.jsx';
+import { appraiseText, useGearEval, SORT_LABEL, effSort, EvalFooter, MainGearCard, MainItemModal, useItemSort, sortItems, filterItems } from './gear.jsx';
 import { PreviewSheet } from './report.jsx';
 
 // ===== 가방 (캐릭터 전용) =====
@@ -178,7 +178,11 @@ export function BagView({ save, setSave, onBack, flash, onForge }) {
         const fb = (extra = {}) => ({ height: 42, fontSize: 13, background: 'transparent', border: `1px solid ${MS.line}`, color: PALETTE.text, ...extra });
         return (
           <MainItemModal save={save} item={item} cur={cur} by={by} usable={usable} evalInfo={usable && !by ? ev.info(item) : null} onClose={() => setSel(null)}
-            footer={<>
+            onAppraise={() => { const r = E.appraiseItem(save, item.uid, Math.random); if (r.item) { setSave(r.save); flash(appraiseText(r)); } }}
+            footer={item.unid ? <div className="grid gap-1.5" style={{ gridTemplateColumns: '1fr 1fr' }}>
+              <button onClick={() => { toStash([item.uid]); setSel(null); }} className="ui-press" style={fb({ color: '#9cc4e4' })}>창고로</button>
+              <button onClick={() => { const r = E.dismantleItems(save, [item.uid]); setSave(r.save); setSel(null); flash(`분해 → ${E.salvageText(r.salvage)}`); }} className="ui-press" style={fb({ color: '#e07a6a' })}>분해 {E.salvageText(E.salvageOf(item))}</button>
+            </div> : <>
               <div className="grid gap-1.5" style={{ gridTemplateColumns: '1fr 1fr' }}>
                 {by ? <button onClick={() => { setSave(E.unequipItem(save, by, item.slot)); setSel(null); flash('착용 해제'); }} className="ui-press" style={fb({ color: MS.gold, borderColor: MS.gold })}>착용 해제</button>
                   : usable && E.canWear(item, save.units[hero]) ? <button onClick={() => { setSave(E.equipItem(save, hero, item.uid)); setSel(null); flash('장착'); }} className="ui-press" style={fb({ color: MS.gold, borderColor: MS.gold, fontWeight: 800 })}>착용</button>

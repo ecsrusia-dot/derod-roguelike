@@ -815,6 +815,25 @@ export const REFORGE = {
   tuneShard: { uncommon: 1, rare: 2, epic: 3, unique: 5, mythic: 5 },
 };
 
+// ===== 장비 감정 (1.301.0 PM 결정) — 옵션 재부여는 폐지, 전승·유니크는 감정해야 옵션이 드러나고 착용할 수 있다 =====
+//   비용 = 폐지된 옵션 재부여 1회와 같은 공식 (정수 = essence × (1 + 장비 레벨 ÷ lvDiv))
+//   전승 장비는 감정할 때 mythicFxChance 확률로 특수 효과 1개 — 유니크(일반·갈래·공용)·에픽 효과 전체에서 구분 없이, 수치는 fxRange 배율로 변동
+export const APPRAISE = { grades: ['unique', 'mythic'], essence: 24, lvDiv: 50, goldMult: 3, mythicFxChance: 0.3, fxRange: [0.5, 1.1] };
+const pc = (v) => `${Math.round(v * 1000) / 10}%`;
+export const SPECIAL_FX_LABEL = {
+  tauntReduce: (v) => `도발 중 받는 피해 추가 -${pc(v)}`, critAfterCounter: () => '반격·회피 직후 다음 공격 치명 확정',
+  emergencyHeal: (v) => `전투당 1회, HP 30% 이하가 되면 HP ${pc(v)} 회복`, openInferno: (v) => `전투 시작 시 적 전체에 이프리트의 낙인 (매 턴 공격력 ${pc(v)} · 3턴)`,
+  skillShield: (v) => `스킬 사용 시 공격력 ${pc(v)}만큼 보호막`, resetEvery: (v) => `${v}턴마다 무작위 스킬 재사용 대기 초기화`,
+  overhealShield: () => '최대 HP를 넘는 회복은 보호막으로', missingHpAtk: (v) => `잃은 HP 10%마다 공격력 +${pc(v)}`,
+  spiritArrow: (v) => `공격 시 ${pc(v)} 확률로 정령 화살(공격력 80%)`, dodgeHeal: (v) => `회피할 때마다 HP ${pc(v)} 회복`,
+  firstCrit: () => '전투 첫 공격 치명 확정', revive: (v) => `전투당 1회, 쓰러지면 HP ${pc(v)}로 부활`,
+  shieldReduce: (v) => `보호막이 남아 있는 동안 받는 피해 -${pc(v)}`, famPct: (v) => `동행 사역마의 공격력·HP +${pc(v)}`,
+  dmgTakenUp: (v) => `받는 피해 +${pc(v)}`, execute: (v) => `HP 30% 미만의 적에게 피해 +${pc(v)}`, dotTurnsMult: (v) => `지속 피해가 ${v}배 길게 지속`,
+  counterDouble: (v) => `반격이 ${pc(v)} 확률로 2회 연속`, regenPct: (v) => `매 턴 HP ${pc(v)} 회복`, armorPen: (v) => `방어 관통 +${pc(v)}`,
+  guts: () => '전투당 1회, 쓰러질 피해를 HP 1로 버팀', longCdr: (v) => `재사용 대기가 가장 긴 스킬 -${v}턴`, cdr: (v) => `모든 스킬 재사용 -${v}턴`,
+  lifesteal: (v) => `준 피해의 ${pc(v)}만큼 회복`, thornsPct: (v) => `받은 피해의 ${pc(v)}를 되돌려 줌`, shieldPct: (v) => `전투 시작 시 최대 HP ${pc(v)} 보호막`,
+};
+
 export const DROP_TABLE = {
   normal: { itemChance: 0.18, grades: { common: 70, uncommon: 25, rare: 5 }, essence: [1, 2] },
   elite: { itemChance: 1, grades: { common: 25, uncommon: 50, rare: 25 }, essence: [3, 5] },
