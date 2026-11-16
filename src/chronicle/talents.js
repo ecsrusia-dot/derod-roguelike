@@ -146,7 +146,7 @@ const BT = (branch, cls, name, color, desc, tiers) => ({ id: `bt_${branch}`, bra
 export const BRANCH_TREES = {
   s_arch: BT('s_arch', 'sage', '대마도사', '#9cc4e4', '하늘을 가르는 광역 주문 — 천벌의 폭풍·유성우', [
     [N('ba_s1', '천벌 숙련', 5, { sb_sa_storm: 0.08 }), N('ba_s2', '비전 집중', 5, { skillDmg: 0.015 })],
-    [N('ba_s3', '폭풍의 눈', 5, { crit: 0.01 }), N('ba_s4', '유성 숙련', 5, { sb_sa_rain: 0.08 })],
+    [N('ba_s3', '폭풍의 눈', 5, { acc: 0.015 }), N('ba_s4', '유성 숙련', 5, { sb_sa_rain: 0.08 })],
     [N('ba_s5', '마력 과부하', 5, { critDmg: 0.05 }), N('ba_s6', '비전 방벽', 5, { skillShield: 0.02 })],
     [N('ba_s7', '연쇄 영창', 1, { cdr: 1 }), N('ba_s8', '꿰뚫는 별빛', 3, { armorPen: 0.05 })],
     [N('ba_s9', '대마도사의 권능', 1, { sb_sa_storm: 0.5, sb_sa_rain: 0.5 })],
@@ -155,11 +155,11 @@ export const BRANCH_TREES = {
     [N('bh_s1', '역병 숙련', 5, { sb_sh_plague: 0.08 }), N('bh_s2', '썩은 피', 5, { dotDmg: 0.05 })],
     [N('bh_s3', '부패의 갑주', 5, { hpPct: 0.02 }), N('bh_s4', '표식 숙련', 5, { sb_sh_mark: 0.08 })],
     [N('bh_s5', '저주의 무게', 5, { dmgReduce: 0.006 }), N('bh_s6', '생기 흡수', 5, { regenPct: 0.002 })],
-    [N('bh_s7', '빠른 저주', 1, { cdr: 1 }), N('bh_s8', '약점 간파', 3, { armorPen: 0.05 })],
+    [N('bh_s7', '빠른 저주', 1, { cdr: 1 }), N('bh_s8', '약점 간파', 3, { acc: 0.025 })],
     [N('bh_s9', '파멸의 군주', 1, { sb_sh_plague: 0.5, sb_sh_mark: 0.5 })],
   ]),  w_warlord: BT('w_warlord', 'wanderer', '검귀', '#e8826a', '베고 되받아친다 — 참마검·일도양단', [
     [N('bw_w1', '참마 숙련', 5, { sb_wb_cleave: 0.08 }), N('bw_w2', '검귀의 눈', 5, { counterPct: 0.02 })],
-    [N('bw_w3', '살기', 5, { atkPct: 0.02 }), N('bw_w4', '일도 숙련', 5, { sb_wb_execute: 0.08 })],
+    [N('bw_w3', '간파', 5, { acc: 0.015 }), N('bw_w4', '일도 숙련', 5, { sb_wb_execute: 0.08 })],
     [N('bw_w5', '응수의 칼날', 5, { counterDmg: 0.06 }), N('bw_w6', '피의 굶주림', 5, { lowHpDmg: 0.03 })],
     [N('bw_w7', '빠른 발도', 1, { cdr: 1 }), N('bw_w8', '목 베기', 3, { execute: 0.08 })],
     [N('bw_w9', '검귀 강림', 1, { sb_wb_cleave: 0.5, sb_wb_execute: 0.5 })],
@@ -172,7 +172,7 @@ export const BRANCH_TREES = {
     [N('bp_w9', '성역의 수호자', 1, { sb_wp_lay: 0.5, sb_wp_aegis: 0.5 })],
   ]),
   d_reaper: BT('d_reaper', 'demonblood', '혈귀', '#e0574c', '급소를 찢는다 — 심장 찢기·뼈 부수기', [
-    [N('br_d1', '찢기 숙련', 5, { sb_dr_rend: 0.08 }), N('br_d2', '피 냄새 맡기', 5, { crit: 0.01 })],
+    [N('br_d1', '찢기 숙련', 5, { sb_dr_rend: 0.08 }), N('br_d2', '피 냄새 맡기', 5, { acc: 0.015 })],
     [N('br_d3', '잔혹', 5, { critDmg: 0.05 }), N('br_d4', '부수기 숙련', 5, { sb_dr_break: 0.08 })],
     [N('br_d5', '꿰뚫는 송곳니', 5, { armorPen: 0.03 }), N('br_d6', '굶주린 광기', 5, { lowHpDmg: 0.03 })],
     [N('br_d7', '선혈의 일격', 1, { firstCrit: 1 }), N('br_d8', '처형자', 3, { execute: 0.08 })],
@@ -186,7 +186,7 @@ export const BRANCH_TREES = {
     [N('bq_d9', '역병의 왕', 1, { sb_dp_miasma: 0.5, sb_dp_weaken: 0.5 })],
   ]),
   e_sniper: BT('e_sniper', 'elf', '저격수', '#d8e89a', '한 발로 끝낸다 — 저격·관통 사격', [
-    [N('bs_e1', '저격 숙련', 5, { sb_es_snipe: 0.08 }), N('bs_e2', '매의 시선', 5, { crit: 0.01 })],
+    [N('bs_e1', '저격 숙련', 5, { sb_es_snipe: 0.08 }), N('bs_e2', '매의 시선', 5, { acc: 0.015 })],
     [N('bs_e3', '급소 조준', 5, { critDmg: 0.05 }), N('bs_e4', '관통 숙련', 5, { sb_es_pierce: 0.08 })],
     [N('bs_e5', '철갑 화살', 5, { armorPen: 0.03 }), N('bs_e6', '고른 호흡', 5, { atkPct: 0.02 })],
     [N('bs_e7', '일발필중', 1, { firstCrit: 1 }), N('bs_e8', '숨통 끊기', 3, { execute: 0.08 })],
@@ -195,20 +195,20 @@ export const BRANCH_TREES = {
   e_storm: BT('e_storm', 'elf', '폭풍궁수', '#7fd1c8', '쉬지 않는 화살비 — 돌풍 화살·폭풍 연사', [
     [N('bt_e1', '돌풍 숙련', 5, { sb_et_gale: 0.08 }), N('bt_e2', '바람 타기', 5, { dodge: 0.006 })],
     [N('bt_e3', '속사', 5, { chain: 0.02 }), N('bt_e4', '연사 숙련', 5, { sb_et_barrage: 0.08 })],
-    [N('bt_e5', '바람의 화살', 5, { spiritArrow: 0.02 }), N('bt_e6', '날랜 손', 5, { atkPct: 0.02 })],
+    [N('bt_e5', '바람의 화살', 5, { spiritArrow: 0.02 }), N('bt_e6', '바람 읽기', 5, { acc: 0.015 })],
     [N('bt_e7', '빠른 시위', 1, { cdr: 1 }), N('bt_e8', '화살 더미', 2, { barrageHitsAdd: 1 })],
     [N('bt_e9', '폭풍의 눈', 1, { sb_et_gale: 0.5, sb_et_barrage: 0.5 })],
   ]),
   p_arch: BT('p_arch', 'priest', '대주교', '#ffe9a8', '고치고 북돋운다 — 고양의 찬가·재생의 기도', [
     [N('ba_p1', '찬가 숙련', 5, { sb_pa_hymn: 0.08 }), N('ba_p2', '자애', 5, { healPct: 0.03 })],
-    [N('ba_p3', '고양된 신념', 5, { atkPct: 0.02 }), N('ba_p4', '기도 숙련', 5, { sb_pa_regen: 0.08 })],
+    [N('ba_p3', '인도의 빛', 5, { acc: 0.015 }), N('ba_p4', '기도 숙련', 5, { sb_pa_regen: 0.08 })],
     [N('ba_p5', '수호의 빛', 5, { dmgReduce: 0.006 }), N('ba_p6', '빛의 응징', 5, { holyDmg: 0.01 })],
     [N('ba_p7', '넘쳐흐르는 빛', 1, { overhealShield: 1 }), N('ba_p8', '긴 축복', 2, { blessTurns: 1 })],
     [N('ba_p9', '대주교의 축복', 1, { sb_pa_hymn: 0.5, sb_pa_regen: 0.5 })],
   ]),
   p_inq: BT('p_inq', 'priest', '심판관', '#c9a0ff', '죄를 묻는다 — 판결·단죄의 인장', [
     [N('bi_p1', '판결 숙련', 5, { sb_pi_verdict: 0.08 }), N('bi_p2', '불타는 신념', 5, { atkPct: 0.02 })],
-    [N('bi_p3', '심판의 눈', 5, { crit: 0.01 }), N('bi_p4', '인장 숙련', 5, { sb_pi_brand: 0.08 })],
+    [N('bi_p3', '심판의 눈', 5, { acc: 0.015 }), N('bi_p4', '인장 숙련', 5, { sb_pi_brand: 0.08 })],
     [N('bi_p5', '신성한 분노', 5, { critDmg: 0.05 }), N('bi_p6', '꿰뚫는 빛', 5, { armorPen: 0.03 })],
     [N('bi_p7', '빠른 심판', 1, { cdr: 1 }), N('bi_p8', '이단 처단', 3, { execute: 0.08 })],
     [N('bi_p9', '최후의 심판', 1, { sb_pi_verdict: 0.5, sb_pi_brand: 0.5 })],
@@ -277,7 +277,7 @@ export function talentResetCost(u) {
 // ===== 효과 문구 (fx에서 자동 생성) =====
 const LBL = {
   atkPct: ['공격력', '%'], hpPct: ['최대 HP', '%'], defPct: ['방어', '%'], crit: ['치명타 확률', '%'], critDmg: ['치명타 피해', '%'],
-  dodge: ['회피', '%'], dodgeHeal: ['회피 시 HP 회복', '%'], counterPct: ['반격 확률', '%'], counterDmg: ['반격 피해', '%'], counterDouble: ['반격 2회 확률', '%'],
+  acc: ['적중', '%'], dodge: ['회피', '%'], dodgeHeal: ['회피 시 HP 회복', '%'], counterPct: ['반격 확률', '%'], counterDmg: ['반격 피해', '%'], counterDouble: ['반격 2회 확률', '%'],
   critAfterCounter: ['반격·회피 직후 다음 공격 치명 확정', 'flag'], dmgReduce: ['받는 피해 감소', '%'], tauntReduce: ['도발 중 받는 피해 감소', '%'],
   regenPct: ['매 턴 HP 재생', '%'], shieldPct: ['전투 시작 보호막(최대 HP)', '%'], guts: ['전투당 1회 HP 1로 버팀', 'flag'], emergencyHeal: ['HP 30% 미만 시 1회 회복', '%'],
   thornsPct: ['받은 피해 반사', '%'], armorPen: ['방어 관통', '%'], chain: ['공격 뒤 추가 타격 확률', '%'], execute: ['HP 30% 미만 적에게 피해', '%'],

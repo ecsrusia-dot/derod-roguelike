@@ -23,7 +23,7 @@ export const CHRONICLE_TUNING = {
   // 1.270.0 PM 결정 「4능력치 모두 쓸모 있게」 — 주 능력치 = 공격력(그대로), 비주 능력치 = 보조 효과
   //   힘 = 방어 관통 · 지능 = 스킬 피해(+회복력) · 민첩 = 치명·회피(효율 절반)·속도 · 체력 = HP·방어
   //   치명 상한(60%)을 넘는 몫은 치명 피해로 전환 (1%당 +critOverflow)
-  stat: { strPen: 0.002, strReduce: 0.001, intSkill: 0.004, agiCrit: 0.002, agiDodge: 0.001, agiChain: 0.0015, critOverflow: 1, softPerLv: 1.5, softMin: 30, softMult: 0.3 },
+  stat: { strPen: 0.002, strReduce: 0.001, intSkill: 0.004, agiCrit: 0.002, agiDodge: 0.001, agiChain: 0.0015, acc: 0.0005, critOverflow: 1, softPerLv: 1.5, softMin: 30, softMult: 0.3 },
   spPerLevel: 1,              // 레벨업당 스킬 포인트
   maxLevel: 100,              // 1.211.0 2부 — 지역 9곳, 마지막 보스 Lv.100
   expNeed: (lv) => Math.round(60 * Math.pow(lv, 1.6)), // 1.219.0 ×2 (PM 결정)
@@ -36,13 +36,17 @@ export const CHRONICLE_TUNING = {
   expGap: { free: 5, perLv: 0.15, min: 0.1 },
   // 위압 (1.235.0) — 적 레벨 − 주인공 레벨 차이가 클수록 적 HP·공격 강화. 10 이상은 극복 불가 수준
   intimidate: [
-    { gap: 3, hp: 1.3, atk: 1.25, label: '위압 1단계' },
-    { gap: 5, hp: 1.8, atk: 1.8, label: '위압 2단계' },
-    { gap: 7, hp: 2.6, atk: 2.8, label: '위압 3단계' },
-    { gap: 10, hp: 8, atk: 7, label: '절대 위압' },
+    { gap: 3, hp: 1.3, atk: 1.25, acc: 0.05, dodge: 0.05, label: '위압 1단계' },
+    { gap: 5, hp: 1.8, atk: 1.8, acc: 0.1, dodge: 0.1, label: '위압 2단계' },
+    { gap: 7, hp: 2.6, atk: 2.8, acc: 0.2, dodge: 0.15, label: '위압 3단계' },
+    { gap: 10, hp: 8, atk: 7, acc: 0.7, dodge: 0.3, label: '절대 위압' },
   ],
   // 던전 솔로 보정 (1.214.0) — 층 사이 회복이 없으므로 던전 적만 따로 낮춘다 · 층당 적 수
   holyCap: 0.2, // 치유→신성 피해 합계 상한 (1.216.0 — 사제 + 사역마 조합 독주 보정)
+  // 회피·적중 (1.307.0) — 최종 회피 = min(회피, dodgeCap) − max(0, 상대 적중 − 내 초과 회피)
+  // 적 추가 적중·회피: 등급(tierAcc/tierDodge) + 위압 단계(intimidate[].acc/.dodge) · 주인공 적중: (힘+지능) × stat.acc + 옵션·특성
+  dodgeCap: 0.7,
+  accRule: { tierAcc: { elite: 0.05, boss: 0.15 }, tierDodge: { boss: 0.05 } },
   chainBase: 0.5, chainOverflow: 1, // 추가 타격 피해 = 공격력 × 50% + 확률 초과분 × 1 (1.305.0)
   chainCap: 0.6, // 추가 타격 확률 합계 상한 (1.270.0 — 속도 옵션이 추가 타격으로 바뀌어 쌓이는 출처가 늘었다)
   shieldCap: 0.15, // 시작 보호막 합계 상한 (1.216.0)
@@ -95,8 +99,8 @@ export const CHRONICLE_TUNING = {
 
 // ===== 능력치 =====
 export const STAT_META = {
-  str: { label: '힘', desc: '공격력 (검사·마족 주 능력치) · 모든 직업: 방어 관통 +0.2%/점 · 받는 피해 -0.1%/점' },
-  int: { label: '지능', desc: '공격력 (술법사·사제 주 능력치) · 모든 직업: 스킬 피해 +0.4%/점 · 회복력' },
+  str: { label: '힘', desc: '공격력 (검사·마족 주 능력치) · 모든 직업: 방어 관통 +0.2%/점 · 받는 피해 -0.1%/점 · 적중 +0.05%/점' },
+  int: { label: '지능', desc: '공격력 (술법사·사제 주 능력치) · 모든 직업: 스킬 피해 +0.4%/점 · 회복력 · 적중 +0.05%/점' },
   agi: { label: '민첩', desc: '공격력 (정령사 주 능력치) · 모든 직업: 치명 +0.2%/점 · 회피 +0.1%/점 · 추가 타격 +0.15%/점 · 속도 (치명 60%를 넘는 몫은 치명 피해로)' },
   vit: { label: '체력', desc: '모든 직업: 최대 HP +10/점 · 방어 +0.8/점' },
 };
@@ -642,6 +646,7 @@ export const OPTION_DEFS = {
   crit: { label: '치명', pct: true, v: [0.02, 0.05] },
   critDmg: { label: '치명 피해', pct: true, v: [0.10, 0.20] },
   dodge: { label: '회피', pct: true, v: [0.02, 0.04] },
+  acc: { label: '적중', pct: true, v: [0.015, 0.03] },
   counterPct: { label: '반격 확률', pct: true, v: [0.03, 0.06] },
   counterDmg: { label: '반격 피해', pct: true, v: [0.10, 0.20] },
   dmgReduce: { label: '받는 피해 감소', pct: true, v: [0.02, 0.05] },
@@ -664,12 +669,12 @@ export const OPTION_DEFS = {
 export const OPTION_LV_CURVE = [[10, 0.6], [60, 1.0], [100, 1.3]];
 // 직업별 옵션 풀 (가중치) — 그 직업 장비에서만 뽑힌다
 export const OPTION_POOLS = {
-  wanderer: { defPct: 4, counterPct: 4, counterDmg: 3, dmgReduce: 3, hpPct: 2, atkPct: 2, scdr: 2 },
-  sage: { skillDmg: 4, scdr: 2, dotDmg: 3, shieldPct: 3, critDmg: 2, atkPct: 2 },
-  demonblood: { lifesteal: 4, hpPct: 3, lowHpDmg: 3, atkPct: 3, thornsPct: 2, scdr: 2 },
-  elf: { crit: 4, dodge: 3, chain: 5, critDmg: 2, scdr: 2 }, // 1.270.0 속도 옵션 → 추가 타격
-  priest: { healPct: 4, shieldPct: 3, dmgReduce: 3, hpPct: 2, holyDmg: 3, scdr: 2 },
-  common: { hpPct: 3, atkPct: 3, chain: 2, critDmg: 2, expPct: 1, goldPct: 1 },
+  wanderer: { defPct: 4, counterPct: 4, counterDmg: 3, dmgReduce: 3, hpPct: 2, atkPct: 2, scdr: 2, acc: 1 },
+  sage: { skillDmg: 4, scdr: 2, dotDmg: 3, shieldPct: 3, critDmg: 2, atkPct: 2, acc: 1 },
+  demonblood: { lifesteal: 4, hpPct: 3, lowHpDmg: 3, atkPct: 3, thornsPct: 2, scdr: 2, acc: 1 },
+  elf: { crit: 4, dodge: 3, chain: 5, critDmg: 2, scdr: 2, acc: 1 }, // 1.270.0 속도 옵션 → 추가 타격
+  priest: { healPct: 4, shieldPct: 3, dmgReduce: 3, hpPct: 2, holyDmg: 3, scdr: 2, acc: 1 },
+  common: { hpPct: 3, atkPct: 3, chain: 2, critDmg: 2, expPct: 1, goldPct: 1, acc: 1 },
 };
 // 직업 보조 칸 기본 능력치 (등급 배율만 적용, 레벨 무관 % + 레벨 비례 수치)
 export const OFFHAND_BASE = {

@@ -518,7 +518,7 @@ const DETAIL_STATS = [
   ['critMult', '치명 피해', 'pctMult'], ['counterPct', '반격 확률', 'pct'], ['counterDmg', '반격 피해', 'pct'], ['counterDouble', '반격 2회 확률', 'pct'],
   ['critAfterCounter', '반격·회피 후 확정 치명', 'flag'], ['firstCrit', '첫 공격 확정 치명', 'flag'],
   ['dmgReduce', '받는 피해 감소', 'pct'], ['tauntReduce', '도발 중 피해 감소', 'pct'], ['shieldReduce', '보호막 중 피해 감소', 'pct'],
-  ['lifesteal', '흡혈', 'pct'], ['thornsPct', '피해 반사', 'pct'], ['armorPen', '방어 관통', 'pct'], ['lowHpDmg', 'HP 50% 이하일 때 피해', 'pct'],
+  ['lifesteal', '흡혈', 'pct'], ['thornsPct', '피해 반사', 'pct'], ['armorPen', '방어 관통', 'pct'], ['acc', '적중', 'pct'], ['dodgeOver', '초과 회피 (적 적중 상쇄)', 'pct'], ['lowHpDmg', 'HP 50% 이하일 때 피해', 'pct'],
   ['missingHpAtk', '잃은 HP 10%당 피해', 'pct'], ['execute', '빈사(HP 30%↓) 적 피해', 'pct'], ['chain', '추가 타격 확률', 'pct'], ['chainPow', '추가 타격 피해', 'pct'],
   ['skillDmg', '스킬 피해', 'pct'], ['dotDmg', '지속 피해', 'pct'], ['dotTurnsMult', '지속 피해 시간', 'x'], ['holyDmg', '치유→신성 피해', 'pct'],
   ['startShieldPct', '시작 보호막', 'pct'], ['skillShield', '스킬 사용 시 보호막(공격력 대비)', 'pct'], ['overhealShield', '넘친 회복 → 보호막', 'flag'],
@@ -533,8 +533,8 @@ const fmtDetail = (v, f) => (f === 'pct' ? `${Math.round(v * 1000) / 10}%` : f =
 
 // 1.245.0 — 성격별 4구획 (PM 승인 시안)
 const DETAIL_GROUPS = [
-  { id: 'atk', icon: '⚔', title: '공격', color: '#e07a6a', keys: ['critMult', 'counterPct', 'counterDmg', 'counterDouble', 'critAfterCounter', 'firstCrit', 'armorPen', 'lowHpDmg', 'missingHpAtk', 'execute', 'chain', 'chainPow', 'skillDmg', 'dotDmg', 'dotTurnsMult', 'holyDmg', 'openInferno', 'rageDouble', 'rageTurnsAdd', 'multiHitsAdd', 'barrageHitsAdd', 'spiritArrow'] },
-  { id: 'surv', icon: '🛡', title: '생존', color: '#6aa6e0', keys: ['dmgReduce', 'tauntReduce', 'shieldReduce', 'lifesteal', 'rageLifesteal', 'thornsPct', 'startShieldPct', 'skillShield', 'overhealShield', 'regenPct', 'dodgeHeal', 'emergencyHeal', 'revive', 'guts', 'blessMult', 'blessTurns'] },
+  { id: 'atk', icon: '⚔', title: '공격', color: '#e07a6a', keys: ['critMult', 'counterPct', 'counterDmg', 'counterDouble', 'critAfterCounter', 'firstCrit', 'armorPen', 'acc', 'lowHpDmg', 'missingHpAtk', 'execute', 'chain', 'chainPow', 'skillDmg', 'dotDmg', 'dotTurnsMult', 'holyDmg', 'openInferno', 'rageDouble', 'rageTurnsAdd', 'multiHitsAdd', 'barrageHitsAdd', 'spiritArrow'] },
+  { id: 'surv', icon: '🛡', title: '생존', color: '#6aa6e0', keys: ['dodgeOver', 'dmgReduce', 'tauntReduce', 'shieldReduce', 'lifesteal', 'rageLifesteal', 'thornsPct', 'startShieldPct', 'skillShield', 'overhealShield', 'regenPct', 'dodgeHeal', 'emergencyHeal', 'revive', 'guts', 'blessMult', 'blessTurns'] },
   { id: 'skill', icon: '⏱', title: '스킬', color: '#9cc4e4', keys: ['cdr', 'resetEvery'] },
   { id: 'gain', icon: '💰', title: '획득', color: '#8fe08a', keys: ['famPct', 'expPct', 'goldPct', 'dropPct'] },
 ];
@@ -568,7 +568,9 @@ const COMBAT_DESC = {
   def: '받는 피해를 줄인다. 체력 능력치와 방어구가 올린다.',
   spd: '행동 순서. 높을수록 라운드에서 먼저 행동한다.',
   crit: '치명타 확률. 치명타는 「치명 피해」 배율만큼 세게 들어간다.',
-  dodge: '적 공격을 완전히 피할 확률.',
+  dodge: '적 공격을 완전히 피할 확률 (상한 70%). 강적·보스·나보다 레벨이 높은 적은 「추가 적중」으로 이 값을 깎는다.',
+  acc: '상대의 회피를 이만큼 깎는다. 나보다 레벨이 높은 적과 보스는 회피가 있어, 적중이 낮으면 공격이 빗나간다.',
+  dodgeOver: '회피 상한 70%를 넘긴 몫. 적의 추가 적중을 이만큼 지워 준다.',
   heal: '회복·보호막 스킬의 기준 수치 (사제).',
 };
 
@@ -707,7 +709,7 @@ function MainSkillModal({ save, cid, s, lv, u, d, sp, can, onLearn, onClose }) {
 // ===== 능력치 한 번에 배분 (1.277.0) — 네 능력치를 모두 보여 주고 슬라이더·±버튼으로 계획한 뒤 한 번에 적용 =====
 const ALLOC_PREVIEW = [
   ['maxHp', 'HP', 'n'], ['atk', '공격력', 'n'], ['def', '방어', 'n'], ['healPower', '치유력', 'n'], ['spd', '속도', 'n'],
-  ['crit', '치명', 'p'], ['critMult', '치명 피해', 'p'], ['dodge', '회피', 'p'], ['skillDmg', '스킬 피해', 'p'], ['armorPen', '방어 관통', 'p'], ['dmgReduce', '받는 피해 감소', 'p'], ['chain', '추가 타격', 'p'],
+  ['crit', '치명', 'p'], ['critMult', '치명 피해', 'p'], ['dodge', '회피', 'p'], ['skillDmg', '스킬 피해', 'p'], ['armorPen', '방어 관통', 'p'], ['acc', '적중', 'p'], ['dmgReduce', '받는 피해 감소', 'p'], ['chain', '추가 타격', 'p'],
 ];
 
 function StatAllocModal({ save, cid, focus, onClose, onApply }) {

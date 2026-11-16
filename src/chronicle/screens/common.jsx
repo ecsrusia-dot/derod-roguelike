@@ -208,7 +208,7 @@ export function IntimNote({ heroLv, lv, what }) {
   const n = E.intimidateLevel(heroLv, lv);
   if (!n) return null;
   const st = E.intimidateStep(n);
-  return <div style={{ fontSize: 11.5, color: n >= 4 ? '#ff6a5a' : '#ff9a7a' }}>{n >= 4 ? '☠' : '☗'} {what} Lv.{lv} — {st.label} (적 HP ×{st.hp} · 공격 ×{st.atk}){n >= 4 ? ' · 극복 불가 수준' : ''}</div>;
+  return <div style={{ fontSize: 11.5, color: n >= 4 ? '#ff6a5a' : '#ff9a7a' }}>{n >= 4 ? '☠' : '☗'} {what} Lv.{lv} — {st.label} (적 HP ×{st.hp} · 공격 ×{st.atk}{st.acc ? ` · 적중 +${Math.round(st.acc * 100)}%` : ''}{st.dodge ? ` · 회피 +${Math.round(st.dodge * 100)}%` : ''}){n >= 4 ? ' · 극복 불가 수준' : ''}</div>;
 }
 
 export function MainKvRows({ rows }) {
