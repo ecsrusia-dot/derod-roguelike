@@ -21,6 +21,40 @@ const IDLE_MOTION = {
 
 export const LOSS_STOP = 3; // 반복·자동 사냥이 연속으로 이만큼 지면 멈춤 (1.273.1)
 
+// 대기화면 움직이는 일러 (1.308.2) — 직업 id → 반복 영상 파일 버전.
+// 영상을 넣는 법: public/classes/idle/<직업 id>.mp4 (세로 9:16 · 무음 · 1MB 안팎) 를 넣고 여기에 { <직업 id>: 1 } 추가.
+// 같은 이름으로 덮어쓰면 번호를 올린다(기기 캐시 갱신). 없는 직업은 지금처럼 정지 일러 + 효과.
+export const IDLE_VIDEOS = {};
+export function idleVideoSrc(classId) {
+  const v = IDLE_VIDEOS[classId];
+  return v ? `./classes/idle/${classId}.mp4?v=${v}` : null;
+}
+function idleVideoAllowed() {
+  if (typeof window === 'undefined') return false;
+  try { if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return false; } catch { /* 무시 */ }
+  try { if (navigator.connection?.saveData) return false; } catch { /* 무시 */ }
+  return true;
+}
+
+// 영상이 실제로 재생되기 시작하면 정지 일러 위로 서서히 나타난다. 실패(파일 없음·자동 재생 막힘)면 정지 일러 그대로.
+function IdleVideo({ src, poster }) {
+  const ref = useRef(null);
+  const [on, setOn] = useState(false);
+  const [fail, setFail] = useState(false);
+  useEffect(() => {
+    const v = ref.current; if (!v) return;
+    v.muted = true;
+    const p = v.play(); if (p && p.catch) p.catch(() => setFail(true));
+  }, [src]);
+  if (fail) return null;
+  return (
+    <video ref={ref} src={src} poster={poster} muted loop playsInline autoPlay preload="auto" aria-hidden="true"
+      onPlaying={() => setOn(true)} onError={() => setFail(true)}
+      className="absolute inset-0 w-full h-full object-cover"
+      style={{ objectPosition: '50% 18%', filter: 'brightness(.62) saturate(.9)', opacity: on ? 1 : 0, transition: 'opacity .8s ease' }} />
+  );
+}
+
 const IDLE_KIND_LABEL = { repeat: '반복 사냥 중', prog: '자동 진행 중', tower: '자동 등반 중', dungeon: '연속 도전 중' };
 
 const IDLE_DELAYS = [[30, '30초'], [60, '1분'], [180, '3분'], [0, '끄기']];
@@ -144,10 +178,12 @@ export function IdleScreen({ save, kind, label, startedAt, wakeOn, delay, onDela
   const xs = expSnap(save);
   const heroXp = useIdleXp(xs.hero, (L) => expNeedFor({ ...u, lv: L }));
   const famXp = useIdleXp(xs.fam, (L) => F.FAM_LEVEL.expNeed(L));
+  const vSrc = useMemo(() => (idleVideoAllowed() ? idleVideoSrc(hero) : null), [hero]);
   const wakeTxt = typeof navigator !== 'undefined' && !('wakeLock' in navigator) ? '⚠ 이 브라우저는 화면 유지 미지원 — 화면이 꺼지면 멈춥니다' : wakeOn ? '🔆 화면 꺼짐 방지 켜짐' : '🔅 화면 꺼짐 방지 대기 중';
   return (
     <div className="absolute inset-0 overflow-hidden chr-idle" style={{ zIndex: 60, background: '#070404' }}>
       <img src={cls.image} alt="" className="absolute inset-0 w-full h-full object-cover chr-idle-breathe" style={{ objectPosition: '50% 18%', filter: 'brightness(.62) saturate(.9)' }} />
+      {vSrc && <IdleVideo src={vSrc} poster={cls.image} />}
       <div className="absolute chr-idle-glow" style={{ left: '50%', top: '45%', width: 320, height: 320, margin: -160, borderRadius: '50%', background: `radial-gradient(circle, ${mo.glow}, transparent 65%)` }} />
       <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(7,4,4,.25) 0%, rgba(7,4,4,0) 20%, rgba(7,4,4,0) 55%, rgba(7,4,4,.82) 76%, rgba(7,4,4,.96) 100%)' }} />
       {mo.kind === 'mist' && <div className="absolute inset-0 chr-idle-mist" style={{ background: `radial-gradient(60% 30% at 30% 70%, ${mo.glow}, transparent), radial-gradient(50% 25% at 75% 55%, ${mo.glow}, transparent)` }} />}
