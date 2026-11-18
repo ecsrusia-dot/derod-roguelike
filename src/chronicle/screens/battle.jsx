@@ -71,14 +71,14 @@ function TrainingMeter({ m }) {
 }
 // 훈련장 허수아비 (1.306.0) — 체력 대신 지금까지 받은 피해를 보여 준다
 const hpText = (u, hp) => (u.dummy ? `∞ · -${Math.max(0, u.maxHp - hp).toLocaleString()}` : Math.max(0, hp).toLocaleString());
-function ResultStage({ hero, title, lv, win, foe, rounds, revealed, onReveal, words }) {
+function ResultStage({ hero, title, lv, win, foe, rounds, revealed, onReveal, words, clean = false }) {
   const cls = chronicleClass(hero);
   const art = (win ? cls.winImage : cls.lossImage) || cls.image;
   const tone = win ? MS.gold : '#e0574c';
   return (
     <div className="absolute inset-0 overflow-hidden" style={{ zIndex: 1, cursor: revealed ? 'default' : 'pointer' }} onClick={revealed ? undefined : onReveal}>
       <img src={art} onError={(e) => { if (cls.image && !e.currentTarget.src.endsWith(cls.image.slice(1))) e.currentTarget.src = cls.image; }} alt="" className="chr-result-in absolute inset-0 w-full h-full object-cover" style={{ objectPosition: '50% 20%', filter: win ? 'none' : 'saturate(.75)' }} draggable={false} />
-      <div className="absolute left-0 right-0 top-0" style={{ height: 70, background: 'linear-gradient(#000a, transparent)' }} />
+      {!clean && <div className="absolute left-0 right-0 top-0" style={{ height: 70, background: 'linear-gradient(#000a, transparent)' }} />}
       {!revealed && <>
         <div className="absolute left-0 right-0 bottom-0" style={{ height: '45%', background: `linear-gradient(transparent, ${PALETTE.bgDeep}e6 70%, ${PALETTE.bgDeep})` }} />
         <div className="absolute left-0 right-0 text-center px-4" style={{ bottom: 64 }}>
@@ -88,7 +88,7 @@ function ResultStage({ hero, title, lv, win, foe, rounds, revealed, onReveal, wo
         </div>
         <div className="absolute left-0 right-0 text-center" style={{ bottom: 22, fontSize: 11.5, color: PALETTE.textDim, opacity: 0.8 }}>화면을 누르면 바로 정산</div>
       </>}
-      {revealed && <div className="absolute left-0 right-0 text-center" style={{ top: 50 }}>
+      {revealed && !clean && <div className="absolute left-0 right-0 text-center" style={{ top: 50 }}>
         <div style={{ fontSize: 11, letterSpacing: '0.5em', color: tone, textShadow: '0 1px 3px #000' }}>{words?.en || (win ? 'V I C T O R Y' : 'D E F E A T')}</div>
         <div className="font-bold" style={{ fontSize: 30, color: PALETTE.text, fontFamily: FONT_TITLE, textShadow: `0 0 18px ${tone}99, 0 2px 6px #000` }}>{words?.big || (win ? '승리' : '패배')}</div>
       </div>}
@@ -240,6 +240,9 @@ export function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAga
   useEffect(() => { if (done) onReplayDone?.(); }, [done]); // eslint-disable-line react-hooks/exhaustive-deps
   // 1.265.0 — 결과: 전체 화면 일러 먼저, 정산 창은 1.2초 뒤(반복·자동 중엔 0.3초) 또는 탭
   const [revealed, setRevealed] = useState(false);
+  // 1.308.2 — 결과창 숨기기 (일러만 보기). 한 번 숨기면 다시 켤 때까지 모든 전투 결과에 유지
+  const [hideRes, setHideRes] = useState(() => { try { return localStorage.getItem('chronicleHideResult') === '1'; } catch { return false; } });
+  const setHide = (v) => { setHideRes(v); try { localStorage.setItem('chronicleHideResult', v ? '1' : '0'); } catch { /* */ } };
   useEffect(() => {
     if (!done || revealed) return undefined;
     const t = setTimeout(() => setRevealed(true), brief ? 300 : 1200);
@@ -340,7 +343,7 @@ export function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAga
       {done ? (
         <ResultStage title={unitTitle(save.units[save.hero], save.hero)} hero={party.find(p => !p.fam)?.classId || save.hero} lv={(xp?.after?.hero || xp?.before?.hero)?.lv || party.find(p => !p.fam)?.lv}
           win={sim.result === 'win'} foe={(enemies.find(e => e.tier === 'boss') || enemies.find(e => e.tier === 'elite') || enemies[0])?.name}
-          rounds={sim.rounds || round} revealed={revealed} onReveal={() => setRevealed(true)}
+          rounds={sim.rounds || round} revealed={revealed} onReveal={() => setRevealed(true)} clean={revealed && hideRes}
           words={ctx.kind === 'training' ? (sim.result === 'win' ? { en: 'M E A S U R E D', big: '측정 완료', sub: `${sim.rounds}라운드 · 총 피해 ${summary.training.total.toLocaleString()}` } : { en: 'D O W N', big: '쓰러짐', sub: `${sim.rounds}라운드에 쓰러짐 · 총 피해 ${summary.training.total.toLocaleString()}` }) : null} />
       ) : (() => {
         // 1.257.0 — 보스가 있고 3마리 이하면 보스를 가운데 크게 (레이드처럼 많을 땐 기존 배열)
@@ -433,14 +436,26 @@ export function BattleView({ battle, save, onDone, repeat, onToggleRepeat, onAga
       </div>
 
       {/* 결과 */}
-      {done && revealed && (
+      {done && revealed && hideRes && (
+        <div className="absolute left-0 right-0 bottom-0 flex gap-2 px-3" style={{ zIndex: 4, paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 0px))' }}>
+          <button onClick={() => setHide(false)} className="ui-press flex-1" aria-label="결과창 보이기"
+            style={{ height: 40, fontSize: 12.5, fontWeight: 700, border: `1px solid ${MS.line}`, background: 'rgba(10,6,6,0.55)', color: PALETTE.text, backdropFilter: 'blur(6px)' }}>👁 결과창 보이기</button>
+          <button onClick={(dungeonNext || towerNext) ? onAgain : onDone} className="ui-press flex-1"
+            style={{ height: 40, fontSize: 12.5, fontWeight: 800, border: `1px solid ${MS.red}`, background: 'rgba(60,14,12,0.6)', color: '#ff8a7e', backdropFilter: 'blur(6px)' }}>{(dungeonNext || towerNext) ? '다음 층으로 ▸' : '돌아가기'}</button>
+        </div>
+      )}
+      {done && revealed && !hideRes && (
         <div className="chr-result-panel absolute left-0 right-0 bottom-0 flex flex-col min-h-0 px-3 pb-3" style={{ zIndex: 4, height: brief ? 'auto' : '62%', maxHeight: '62%' }}>
           {/* 1.253.0 — 본편 스타일 (시안 ㉘) · 1.260.1 버튼은 스크롤 밖 하단 고정 (보상이 길면 버튼이 화면 밖으로 밀리던 문제) */}
           <div className="chr-glass flex flex-col min-h-0 flex-1" style={{ '--edge': sim.result === 'win' ? MS.gold : MS.red, '--glow': sim.result === 'win' ? 'rgba(232,176,74,.22)' : 'rgba(224,87,76,.22)' }}>
           <div className="overflow-y-auto min-h-0 flex-1" style={{ padding: '10px 12px 4px' }}>
             <div className="flex items-baseline justify-between gap-2">
               <span className="font-bold flex-none" style={{ fontSize: 18, color: sim.result === 'win' ? PALETTE.text : '#e06a5f', fontFamily: FONT_TITLE, whiteSpace: 'nowrap' }}>{ctx.kind === 'training' ? (sim.result === 'win' ? '측정 결과' : '측정 중단') : sim.result === 'win' ? (ctx.kind === 'arena' ? '결투 승리' : ctx.kind === 'god' ? '토벌 결과' : '전투 결과') : ctx.kind === 'arena' ? '결투 패배' : ctx.kind === 'god' ? '토벌 실패' : '전멸'}</span>
-              <span className="truncate" style={{ fontSize: 11, letterSpacing: 2, color: MS.gold }}>{ctx.label} · {sim.rounds || round}라운드</span>
+              <span className="flex items-center gap-2 min-w-0">
+                <span className="truncate" style={{ fontSize: 11, letterSpacing: 2, color: MS.gold }}>{ctx.label} · {sim.rounds || round}라운드</span>
+                <button onClick={() => setHide(true)} className="ui-press flex-none" aria-label="결과창 숨기기" title="결과창 숨기기 — 다시 켤 때까지 유지"
+                  style={{ fontSize: 11, padding: '3px 8px', borderRadius: 8, border: `1px solid ${MS.line}`, background: 'transparent', color: PALETTE.textDim, whiteSpace: 'nowrap' }}>숨기기 ▾</button>
+              </span>
             </div>
             {ctx.kind === 'training' ? <TrainingMeter m={summary.training} /> : sim.result === 'win' ? (
               <div className="mt-1.5 flex flex-col gap-1" style={{ fontSize: 12.5, color: PALETTE.text }}>
